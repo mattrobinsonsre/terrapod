@@ -137,6 +137,7 @@ interface WorkspaceAttrs {
   'ansible-host-key-checking'?: boolean
   'default-playbook'?: string
   'default-limit'?: string
+  'hard-limit'?: string
   locked: boolean
   // Why the workspace is locked and who locked it (#1705). Null when unlocked,
   // and absent from an older API.
@@ -540,6 +541,7 @@ function WorkspaceDetailContent() {
   const [editAnsibleHostKeyChecking, setEditAnsibleHostKeyChecking] = useState(true)
   const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
   const [editDefaultLimit, setEditDefaultLimit] = useState('')
+  const [editHardLimit, setEditHardLimit] = useState('')
   const [editBindPlan, setEditBindPlan] = useState(false)
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -1413,6 +1415,7 @@ function WorkspaceDetailContent() {
     setEditAnsibleHostKeyChecking(workspace.attributes['ansible-host-key-checking'] ?? true)
     setEditDefaultPlaybook(workspace.attributes['default-playbook'] || '')
     setEditDefaultLimit(workspace.attributes['default-limit'] || '')
+    setEditHardLimit(workspace.attributes['hard-limit'] || '')
     setEditBindPlan(workspace.attributes['pulumi-bind-plan'] ?? false)
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -1505,6 +1508,7 @@ function WorkspaceDetailContent() {
               'ansible-host-key-checking': editAnsibleHostKeyChecking,
               'default-playbook': editDefaultPlaybook,
               'default-limit': editDefaultLimit,
+              'hard-limit': editHardLimit,
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
               'drift-ignore-rules': editDriftIgnoreRules,
@@ -2730,6 +2734,7 @@ function WorkspaceDetailContent() {
         'config-directory': editConfigDir,
         'default-playbook': editDefaultPlaybook,
         'default-limit': editDefaultLimit,
+        'hard-limit': editHardLimit,
         'inventory-paths': editInventoryPaths,
         'dynamic-inventory-enabled': editDynamicInventoryEnabled,
         'inventory-scripts-enabled': editInventoryScriptsEnabled,
@@ -2757,6 +2762,10 @@ function WorkspaceDetailContent() {
     'configure-after-apply': 'fields.configureAfterApplyHint',
     'configure-all-hosts': 'fields.configureAllHostsHint',
     'config-directory': 'fields.configDirectoryTitle',
+    // The ceiling (#2451). Here rather than as a `title=` on the input: at
+    // 389 characters it is an explanation, and a hover is unreachable on
+    // touch and invisible to a keyboard.
+    'hard-limit': 'fields.hardLimitTitle',
     'inventory-paths': 'fields.inventoryPathsHint',
     'dynamic-inventory-enabled': 'fields.dynamicInventoryModeHint',
     'ansible-host-key-checking': 'fields.ansibleHostKeyCheckingHint',
@@ -3706,6 +3715,31 @@ function WorkspaceDetailContent() {
                         onChange={(e) => setEditDefaultLimit(e.target.value)}
                         placeholder={t('fields.defaultLimitPlaceholder')}
                         title={t('fields.defaultLimitTitle')}
+                        className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    }
+                  />
+                  <Field
+                    attr="hard-limit"
+                    ctx={ansibleCtx}
+                    kind="text"
+                    display={
+                      attrs['hard-limit'] ? (
+                        <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                          {attrs['hard-limit']}
+                        </code>
+                      ) : (
+                        <span className="text-slate-500">{t('common.none')}</span>
+                      )
+                    }
+                    control={
+                      <input
+                        id="ws-hard-limit"
+                        data-testid="ws-hard-limit"
+                        type="text"
+                        value={editHardLimit}
+                        onChange={(e) => setEditHardLimit(e.target.value)}
+                        placeholder={t('fields.hardLimitPlaceholder')}
                         className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     }

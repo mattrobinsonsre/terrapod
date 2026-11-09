@@ -1299,7 +1299,8 @@
       "previewDryRun": "Förhandsgranska (torrkörning)",
       "applyChanges": "Tillämpa ändringar",
       "setOidcAudiences": "Ange OIDC-audiences för körningsidentitet (ersätter kartan på varje matchad arbetsyta)",
-      "operationsNone": "Detta skulle lämna varje matchande arbetsyta helt utan operation. En arbetsyta måste behålla planera och tillämpa, eller konfigurera, eller båda."
+      "operationsNone": "Detta skulle lämna varje matchande arbetsyta helt utan operation. En arbetsyta måste behålla planera och tillämpa, eller konfigurera, eller båda.",
+      "setHardLimit": "Sätt hård gräns (ett tomt värde tar bort taket)"
     },
     "diff": {
       "colWorkspace": "Arbetsyta",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Samlingar som installeras innan en configure körs, en per rad som namespace.name eller namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "En av den här installationens egna exekveringsmiljöer, via etikett. Att ange en åsidosätter arbetsytans Ansible-version.",
       "labelsLead": "Etiketter fyller dubbla syften: de är vad den etikettbaserade RBAC-matchningen utgår från, och de är de tags som ett cloud-block kan välja en arbetsyta med.",
-      "nameTitlePulumiLead": "Två delar åtskilda av '::' — project::stack."
+      "nameTitlePulumiLead": "Två delar åtskilda av '::' — project::stack.",
+      "hardLimit": "Hård gräns",
+      "hardLimitPlaceholder": "t.ex. canary",
+      "hardLimitTitle": "Den kombineras med den gräns körningen själv anger, så en körning kan smalna av inom den och ingen kan vidga sig utanför den. Den anger högst en grupp eller ett värdmönster — till exempel canary, eller !prod för allt utom produktion — eftersom ansible inte har något sätt att säga ”någon av dessa” i en gräns. Ska taket täcka två grupper skapar du en överordnad grupp av dem i ditt inventarium och anger den.",
+      "hardLimitLead": "En --limit som ingen körning kan komma runt. Lämna tomt om inget tak ska gälla."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

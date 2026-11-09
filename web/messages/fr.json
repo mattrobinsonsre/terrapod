@@ -1299,7 +1299,8 @@
       "previewDryRun": "Aperçu (simulation)",
       "applyChanges": "Appliquer les modifications",
       "setOidcAudiences": "Définir les audiences OIDC de l''identité d''exécution (remplace la carte sur chaque espace de travail correspondant)",
-      "operationsNone": "Cela laisserait chaque espace de travail correspondant sans aucune opération. Un espace de travail doit conserver planifier et appliquer, ou configurer, ou les deux."
+      "operationsNone": "Cela laisserait chaque espace de travail correspondant sans aucune opération. Un espace de travail doit conserver planifier et appliquer, ou configurer, ou les deux.",
+      "setHardLimit": "Définir la limite stricte (une valeur vide supprime le plafond)"
     },
     "diff": {
       "colWorkspace": "Espace de travail",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Collections installées avant l''exécution d''un configure, une par ligne sous la forme namespace.name ou namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Un des environnements d'exécution propres à ce déploiement, par étiquette. En indiquer un remplace la version d'Ansible de l'espace de travail.",
       "labelsLead": "Les labels ont un double rôle : ils sont ce sur quoi s'appuie la correspondance RBAC par label, et ils sont les « tags » par lesquels un bloc cloud peut sélectionner un espace de travail.",
-      "nameTitlePulumiLead": "Deux parties séparées par '::' — project::stack."
+      "nameTitlePulumiLead": "Deux parties séparées par '::' — project::stack.",
+      "hardLimit": "Limite stricte",
+      "hardLimitPlaceholder": "p. ex. canary",
+      "hardLimitTitle": "Il est combiné avec la limite que fournit l'exécution : celle-ci peut le restreindre, mais aucune ne peut l'élargir. Il ne nomme qu'un seul groupe ou motif d'hôte — par exemple canary, ou !prod pour tout sauf la production — car ansible n'a aucun moyen de dire « l'un ou l'autre » dans une limite. Pour un plafond couvrant deux groupes, créez dans votre inventaire un groupe parent qui les rassemble et nommez celui-là.",
+      "hardLimitLead": "Un motif --limit qu'aucune exécution ne peut franchir. Laissez-le vide pour ne fixer aucun plafond."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

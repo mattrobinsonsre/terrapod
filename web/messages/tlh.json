@@ -1299,7 +1299,8 @@
       "previewDryRun": "tI'ang (QaD Sar)",
       "applyChanges": "choHmey lo'",
       "setOidcAudiences": "OIDC vum pong HevwI''mey choq (Hoch rurbogh Qumwo''Daq chart chartlh)",
-      "operationsNone": "Qumwo''mey rurbogh Hoch pagh Qu'' ghajmoH. nab ''ej lo'', ghap Qum, ghap cha'' Hoch polnIS Qumwo''."
+      "operationsNone": "Qumwo''mey rurbogh Hoch pagh Qu'' ghajmoH. nab ''ej lo'', ghap Qum, ghap cha'' Hoch polnIS Qumwo''.",
+      "setHardLimit": "veH let choq (valur chIm veH teq)"
     },
     "diff": {
       "colWorkspace": "Qumwo'",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "configure qaSpa'' lan ta''lu''bogh ghomHommey, wa'' per Dagh namespace.name ghap namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "naDev vumwI' Daqmey wa', per lo'taHvIS. wa' yIwIv 'ej Qumwo' Ansible mI' lulIj.",
       "labelsLead": "permey cha' Qu' ta': label-RBAC rurmoHmeH, 'ej cloud 'ay' Qumwo' wIvmeH \"tags\" moj.",
-      "nameTitlePulumiLead": "cha' 'ay' '::' Sepbogh — project::stack."
+      "nameTitlePulumiLead": "cha' 'ay' '::' Sepbogh — project::stack.",
+      "hardLimit": "veH let",
+      "hardLimitPlaceholder": "Da canary",
+      "hardLimitTitle": "Qu'' veH je boSlu''. vaj veH qoDDaq machchoHlaH Qu'', ''ach veH Dung tInchoHlaHbe''. wa'' ghom pagh wa'' host tem neH pong: Da canary, pagh prod Hutlhbogh Hoch''e''vaD Da !prod. veHDaq “wa'' ghap latlh” jatlhmeH mIw Hutlh ansible. cha'' ghommeyvaD veH DaneHchugh, ghom tetlhlIjDaq ghom''a'' chenmoH ''ej ''oH pong.",
+      "hardLimitLead": "--limit ''oH veH''e''; Qu'' Haw''laHbe''. veH DaHutlh DaneHchugh, chImmoH."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

@@ -87,6 +87,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ConfigDirectory      string   `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
 		InventoryPaths       []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
 		DefaultPlaybook      string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
+		HardLimit            string   `json:"hard_limit,omitempty" jsonschema:"a --limit NO RUN MAY ESCAPE; empty means no ceiling. Distinct from default_limit, which a run replaces outright when it supplies its own -- this one is INTERSECTED with whatever limit the run ends up with, so a run may narrow within it and none may widen past it. It also bounds what the resolved inventory shows for this workspace"`
 		DefaultLimit         string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
 		// Whether a configure verifies the SSH host key of the hosts it
 		// targets (#2318). A pointer like the declarations above, so omitting
@@ -180,6 +181,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
 			DefaultLimit:    in.DefaultLimit,
+			HardLimit:       in.HardLimit,
 			// #2318's one. A pointer straight through, so a create that leaves
 			// it out sends nothing and takes the server's TRUE, which verifies.
 			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,
@@ -236,6 +238,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ConfigDirectory *string  `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
 		InventoryPaths  []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone"`
 		DefaultPlaybook *string  `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook"`
+		HardLimit       *string  `json:"hard_limit,omitempty" jsonschema:"a --limit NO RUN MAY ESCAPE; empty means no ceiling. Unlike default_limit, which a run replaces when it supplies its own, this is INTERSECTED with the run's limit -- narrowing is allowed, widening is not. Pass an empty string to REMOVE the ceiling, which widens every run on this workspace"`
 		DefaultLimit    *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
 		// Host-key verification, settable here for the reason the block below
 		// gives at length: this server is not an authorization boundary, so an
@@ -390,6 +393,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
 			DefaultLimit:    in.DefaultLimit,
+			HardLimit:       in.HardLimit,
 			// #2318's one. A pointer straight through, so a PATCH that does not
 			// mention it cannot disturb the stored setting.
 			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,

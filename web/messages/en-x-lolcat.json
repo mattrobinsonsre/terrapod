@@ -1299,7 +1299,8 @@
       "previewDryRun": "Preview (dry run)",
       "applyChanges": "Apply chaenges",
       "setOidcAudiences": "Set OIDC run identitee audiencez (replacez teh map on every matchd workspace)",
-      "operationsNone": "Dis wud leev evry matchd werkspace wif no opurashun at all. A werkspace must keep plan an apply, or konfigur, or bof."
+      "operationsNone": "Dis wud leev evry matchd werkspace wif no opurashun at all. A werkspace must keep plan an apply, or konfigur, or bof.",
+      "setHardLimit": "Set hard limit (a empteh valoo remooves teh ceilin)"
     },
     "diff": {
       "colWorkspace": "Werkspace",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Collekshunz wot gets instolled b4 a configyur runz, wun per line liek namespace.name or namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Wan of dis deploymentz own execushun enviromentz, by labul. Settin wan overridez teh werkspacez Ansibul vershun. srsly",
       "labelsLead": "Labulz do dubble dooty: dey iz wot labul-based RBAC matchez on, an dey iz teh tagz a cloud blok can pik a werkspace by. srsly",
-      "nameTitlePulumiLead": "Two partz separatd by '::' — projekt::stak. KTHX"
+      "nameTitlePulumiLead": "Two partz separatd by '::' — projekt::stak. KTHX",
+      "hardLimit": "Hard Limit",
+      "hardLimitPlaceholder": "e.g. canary",
+      "hardLimitTitle": "It getz mixd wif whatevr limit a run bringz, so a run can go smallr insied it but noen can go biggr dan it. It namez at most wun groop or host pattrn — say canary, or !prod fer evrythin cept producshun — coz ansible haz noe way ta say “eithr ov deez” in a limit. Fer a ceilin ovr too groopz, make a parent groop ov dem in ur inventoree an name dat wun. srsly",
+      "hardLimitLead": "A --limit wot noe run can evr escape. Leev it empteh fer noe ceilin."
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

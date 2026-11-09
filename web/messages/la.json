@@ -1299,7 +1299,8 @@
       "previewDryRun": "Praevidere (cursus siccus)",
       "applyChanges": "Mutationes applicare",
       "setOidcAudiences": "Auditores OIDC identitatis exsecutionis statuere (chartam in omni loco operis conveniente substituit)",
-      "operationsNone": "Hoc omne spatium operis congruens sine ulla operatione relinqueret. Spatium operis destinare et adhibere, aut configurare, aut utrumque servare debet."
+      "operationsNone": "Hoc omne spatium operis congruens sine ulla operatione relinqueret. Spatium operis destinare et adhibere, aut configurare, aut utrumque servare debet.",
+      "setHardLimit": "Limitem firmum statuere (valor vacuus limitem supremum tollit)"
     },
     "diff": {
       "colWorkspace": "Locus Operis",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Collectiones ante configure exsecutum institutae, una per lineam ut namespace.name vel namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Unus ex ambitibus exsecutionis huius institutionis, per titulum. Unum statuere versionem Ansible loci operis supervertit.",
       "labelsLead": "Tituli duplex officium praestant: ad eos convenientia RBAC titulo-basata respicit, et ipsi sunt \"tags\" quibus blocus cloud locum operis eligere potest.",
-      "nameTitlePulumiLead": "Duae partes signo '::' divisae — project::stack."
+      "nameTitlePulumiLead": "Duae partes signo '::' divisae — project::stack.",
+      "hardLimit": "Limes firmus",
+      "hardLimitPlaceholder": "ex. gr. canary",
+      "hardLimitTitle": "Cum limite quem executio ipsa praebet coniungitur, ita ut executio eum artiorem reddere possit, latiorem autem nulla. Unum tantum gregem aut exemplar hospitis nominat — veluti canary, aut !prod pro omnibus praeter productionem — quia ansible nullo modo in limite “unum ex his” dicere potest. Si limes supremus duos greges complecti debet, in inventario tuo gregem superiorem eorum constitue eumque nomina.",
+      "hardLimitLead": "Exemplar --limit quod nulla executio transgredi potest. Vacuum relinque ne ullus limes supremus imponatur."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

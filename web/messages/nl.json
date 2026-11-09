@@ -1299,7 +1299,8 @@
       "previewDryRun": "Voorbeeld (proefdraaien)",
       "applyChanges": "Wijzigingen toepassen",
       "setOidcAudiences": "OIDC-audiences van de uitvoeringsidentiteit instellen (vervangt de map op elke overeengekomen workspace)",
-      "operationsNone": "Hiermee zou elke overeenkomende workspace helemaal geen operatie meer hebben. Een workspace moet plannen en toepassen, of configureren, of beide houden."
+      "operationsNone": "Hiermee zou elke overeenkomende workspace helemaal geen operatie meer hebben. Een workspace moet plannen en toepassen, of configureren, of beide houden.",
+      "setHardLimit": "Harde limiet instellen (een lege waarde verwijdert het plafond)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Collections die worden geïnstalleerd voordat een configure draait, één per regel als namespace.name of namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Een van de eigen uitvoeringsomgevingen van deze installatie, op label. Er een instellen overschrijft de Ansible-versie van de workspace.",
       "labelsLead": "Labels doen dubbel werk: de label-gebaseerde RBAC matcht erop, en ze zijn de tags waarmee een cloud-blok een workspace kan selecteren.",
-      "nameTitlePulumiLead": "Twee delen gescheiden door '::' — project::stack."
+      "nameTitlePulumiLead": "Twee delen gescheiden door '::' — project::stack.",
+      "hardLimit": "Harde limiet",
+      "hardLimitPlaceholder": "bijv. canary",
+      "hardLimitTitle": "Hij wordt gecombineerd met de limiet die een run zelf meegeeft, dus een run kan daarbinnen verder versmallen en geen enkele run kan erbuiten uitbreiden. Hij benoemt ten hoogste één groep of hostpatroon — bijvoorbeeld canary, of !prod voor alles behalve productie — omdat ansible in een limiet geen manier heeft om “een van deze” te zeggen. Maak voor een plafond over twee groepen in je inventaris een bovenliggende groep van die twee en benoem die.",
+      "hardLimitLead": "Een --limit waaraan geen enkele run kan ontsnappen. Laat het veld leeg als er geen plafond moet gelden."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

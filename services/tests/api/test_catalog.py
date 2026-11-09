@@ -553,6 +553,36 @@ class TestSelfContainedCatalogItems:
         assert resp.status_code == 422
         db.add.assert_not_called()
 
+    async def test_create_rejects_a_two_term_hard_limit(self):
+        """A catalog item's ceiling takes the SHARED rule (#2451).
+
+        It matters more here than on a hand-made workspace: the provisioner
+        picks an item and never sees the settings it carries, so this is where
+        the platform's own bound on a self-service workspace is written down.
+        """
+        app, db = _make_app(_user(roles=["admin"]))
+        db.get = AsyncMock(return_value=MagicMock())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/catalog-items",
+                json={
+                    "data": {
+                        "attributes": {
+                            "name": "root",
+                            "module-id": str(uuid.uuid4()),
+                            "configure-enabled": True,
+                            "ansible-directory": "ansible",
+                            "default-playbook": "site.yml",
+                            "hard-limit": "canary:prod",
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        assert "at most one" in resp.json()["detail"]
+        db.add.assert_not_called()
+
     async def test_create_rejects_provider_templates_for_self_contained_item(self):
         app, db = _make_app(_user(roles=["admin"]))
         db.get = AsyncMock(return_value=MagicMock())

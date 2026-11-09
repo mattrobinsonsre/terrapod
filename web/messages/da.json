@@ -1299,7 +1299,8 @@
       "previewDryRun": "Forhåndsvis (prøvekørsel)",
       "applyChanges": "Anvend ændringer",
       "setOidcAudiences": "Angiv OIDC-audiences for kørselsidentitet (erstatter mappet på hvert matchet arbejdsområde)",
-      "operationsNone": "Dette ville efterlade hvert matchende arbejdsområde helt uden handling. Et arbejdsområde skal beholde planlæg og anvend, eller konfigurer, eller begge."
+      "operationsNone": "Dette ville efterlade hvert matchende arbejdsområde helt uden handling. Et arbejdsområde skal beholde planlæg og anvend, eller konfigurer, eller begge.",
+      "setHardLimit": "Sæt hård grænse (en tom værdi fjerner loftet)"
     },
     "diff": {
       "colWorkspace": "Arbejdsområde",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Samlinger der installeres, før en configure kører, én pr. linje som namespace.name eller namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Et af denne installations egne eksekveringsmiljøer, via etiket. At angive et tilsidesætter arbejdsområdets Ansible-version.",
       "labelsLead": "Labels har en dobbeltfunktion: de er det, den label-baserede RBAC-matchning går efter, og de er de tags, som en cloud-blok kan vælge et arbejdsområde ud fra.",
-      "nameTitlePulumiLead": "To dele adskilt af '::' — project::stack."
+      "nameTitlePulumiLead": "To dele adskilt af '::' — project::stack.",
+      "hardLimit": "Hård grænse",
+      "hardLimitPlaceholder": "f.eks. canary",
+      "hardLimitTitle": "Den kombineres med den grænse, kørslen selv angiver, så en kørsel kan indsnævre inden for den, og ingen kan udvide ud over den. Den angiver højst én gruppe eller ét værtsmønster — for eksempel canary eller !prod for alt undtagen produktion — fordi ansible ikke har nogen måde at sige »en af disse« i en grænse. Skal loftet dække to grupper, opretter du en overordnet gruppe af dem i dit inventar og angiver den.",
+      "hardLimitLead": "En --limit, ingen kørsel kan slippe uden om. Lad feltet være tomt, hvis der ikke skal være noget loft."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

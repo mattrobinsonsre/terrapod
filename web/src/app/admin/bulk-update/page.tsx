@@ -175,6 +175,8 @@ export default function BulkUpdatePage() {
   const [uDefaultPlaybook, setUDefaultPlaybook] = useState('')
   const [uSetDefaultLimit, setUSetDefaultLimit] = useState(false)
   const [uDefaultLimit, setUDefaultLimit] = useState('')
+  const [uSetHardLimit, setUSetHardLimit] = useState(false)
+  const [uHardLimit, setUHardLimit] = useState('')
   const [uExecBackend, setUExecBackend] = useState('')
   const [uExecMode, setUExecMode] = useState('')
   // '' means "leave unchanged"; anything else is an auto-apply mode (#1276).
@@ -313,6 +315,7 @@ export default function BulkUpdatePage() {
     if (uSetConfigDirectory) u['config-directory'] = uConfigDirectory.trim()
     if (uSetDefaultPlaybook) u['default-playbook'] = uDefaultPlaybook.trim()
     if (uSetDefaultLimit) u['default-limit'] = uDefaultLimit.trim()
+    if (uSetHardLimit) u['hard-limit'] = uHardLimit.trim()
     if (uExecBackend) u['execution-backend'] = uExecBackend
     if (uExecMode) u['execution-mode'] = uExecMode
     // Send the mode, never the boolean — the endpoint 422s if both are set.
@@ -890,6 +893,31 @@ export default function BulkUpdatePage() {
               disabled={gateOff('default-limit')}
               className={inputCls}
             />
+          )}
+        </div>
+          <div className="min-w-0">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetHardLimit}
+              onChange={(e) => setUSetHardLimit(e.target.checked)}
+              disabled={gateOff('hard-limit')}
+            />
+            {t('update.setHardLimit')}
+          </label>
+          {uSetHardLimit && (
+            <>
+              <input
+                type="text"
+                value={uHardLimit}
+                onChange={(e) => setUHardLimit(e.target.value)}
+                placeholder={tWs('fields.hardLimitPlaceholder')}
+                aria-label={tWs('fields.hardLimit')}
+                disabled={gateOff('hard-limit')}
+                className={inputCls}
+              />
+              {tieredHint(tWs, 'fields.hardLimitTitle')}
+            </>
           )}
         </div>
         <div className="min-w-0 sm:col-span-2">

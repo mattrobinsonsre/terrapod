@@ -1383,6 +1383,12 @@ function WorkspacesPageInner() {
           placeholder={tDetail('fields.defaultLimitPlaceholder')}
         />
         <Field
+          attr="hard-limit"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.hardLimitPlaceholder')}
+        />
+        <Field
           attr="inventory-paths"
           ctx={createCtx}
           kind="list"

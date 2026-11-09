@@ -33,6 +33,98 @@ if TYPE_CHECKING:  # the listener image ships no DB layer — see tests/meta
     from terrapod.config import RunnerConfig
 
 
+#: How ansible spells "and also in this", verified against ansible-core 2.18.3.
+#: A `--limit` pattern resolves as
+#:
+#:     (union of the bare terms) INTERSECT (every `&` term)
+#:                               MINUS (union of the `!` terms)
+#:
+#: -- a PARTITION by operator, not a left-to-right accumulator, so the order of
+#: the terms does not matter (`prod:web:&canary` == `web:prod:&canary`, and
+#: `all:&web:&canary` == `all:&canary:&web`). An intersection matching nothing
+#: resolves to no hosts rather than erroring.
+#:
+#: `services/inventory_narrowing.py` carries the same account, having had it
+#: wrong once: it read as a left-to-right accumulator, on which appending an
+#: `&` term to a multi-term pattern would be WIDER than either input. It is not,
+#: and that is what #2451 rests on -- appending one `&` term to an arbitrary
+#: pattern is exact. Its own conclusion is unaffected: `changed ∩ (A ∪ B)` is
+#: still inexpressible, because `&` ANDs rather than ORs.
+LIMIT_INTERSECTION = ":&"
+
+#: What separates one term of a `--limit` pattern from the next. Both work
+#: (measured: `all,&canary` resolves the same as `all:&canary`).
+LIMIT_SEPARATORS = ":,"
+
+
+def ceiling_terms(hard: str) -> list[str]:
+    """The ceiling's own terms, each keeping its operator prefix.
+
+    Shared with `workspace_settings.validate_hard_limit` so the rule that
+    decides whether a ceiling is admissible and the code that composes it
+    cannot disagree about where its terms are -- a second splitter is how the
+    validator comes to accept a shape the composer gets wrong.
+    """
+    out: list[str] = []
+    term = ""
+    for ch in hard:
+        if ch in LIMIT_SEPARATORS:
+            if term:
+                out.append(term)
+            term = ""
+        else:
+            term += ch
+    if term:
+        out.append(term)
+    return out
+
+
+def combine_limits(hard: str, run: str) -> str:
+    """The `--limit` a run actually gets: its own, bounded by the workspace's.
+
+    `hard_limit` is a ceiling a run may narrow within and none may widen past,
+    so the two compose by INTERSECTION rather than by precedence (#2451). That
+    is the whole difference from `default_limit`, which this function also
+    resolves one line above its caller: a default is replaced by a run's own
+    limit, a ceiling is not.
+
+    The run's pattern is kept VERBATIM and the ceiling is appended, each of its
+    terms carrying the operator it needs: a bare ceiling term becomes an `&`
+    term, and a ceiling term that is already `&` or `!` is appended as it
+    stands. Because ansible partitions by operator rather than accumulating
+    left to right (see `LIMIT_INTERSECTION`), that is EXACT rather than
+    approximate -- for a run pattern of any shape, including one that already
+    unions, excludes, intersects or wildcards.
+
+    It relies on the ceiling carrying **at most one bare term**, which
+    `workspace_settings.validate_hard_limit` enforces and explains. Two bare
+    terms would mean a union, `&` ANDs rather than ORs, so a union ceiling is
+    inexpressible at all -- and writing it anyway makes the second term an
+    INCLUDE, which configures hosts the run never named.
+
+    Empty on either side means that side adds nothing, so a deployment that
+    sets no `hard_limit` gets exactly what it got before -- which is what makes
+    this additive rather than a behaviour change for everyone.
+
+    No validation here: an intersection that matches nothing is a legitimate
+    answer meaning "no hosts", and the decision (#2451) was to let the run
+    discover that rather than refuse it at creation. Refusing would need the
+    resolved inventory, which is the design this deliberately did not take.
+    """
+    hard, run = (hard or "").strip(), (run or "").strip()
+    if not hard:
+        return run
+    if not run:
+        # The ceiling alone IS a valid limit, verbatim: a ceiling with no bare
+        # term (`!prod`) leaves the includes empty, which ansible reads as
+        # `all` -- measured, `!prod` alone resolves to every host but prod.
+        return hard
+    appended = "".join(
+        f":{t}" if t[0] in "&!" else f"{LIMIT_INTERSECTION}{t}" for t in ceiling_terms(hard)
+    )
+    return f"{run}{appended}"
+
+
 @dataclass(frozen=True)
 class TerraformRunOptions:
     """How one Terraform run differs from the default.
@@ -354,7 +446,10 @@ class TerraformStrategy:
             # keys are read here so the precedence is stated once; until #1974
             # adds the per-run attribute only the second ever has a value.
             playbook=attrs.get("playbook") or attrs.get("default-playbook", ""),
-            ansible_limit=attrs.get("ansible-limit") or attrs.get("default-limit", ""),
+            ansible_limit=combine_limits(
+                attrs.get("hard-limit", ""),
+                attrs.get("ansible-limit") or attrs.get("default-limit", ""),
+            ),
             cost_estimation=attrs.get("cost-estimation", True),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),
             working_directory=attrs.get("working-directory", ""),

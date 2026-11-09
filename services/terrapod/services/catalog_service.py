@@ -535,6 +535,7 @@ def _apply_ansible_settings(ws: Workspace, item: CatalogItem) -> None:
     ws.config_directory = item.ansible_directory if item.configure_enabled else ""
     ws.default_playbook = item.default_playbook if item.configure_enabled else ""
     ws.default_limit = item.default_limit if item.configure_enabled else ""
+    ws.hard_limit = item.hard_limit if item.configure_enabled else ""
 
 
 def _unlink_quietly(path: str) -> None:

@@ -164,8 +164,10 @@ in the inventory**.
 
 That is deliberate rather than an oversight: at scale the hazard is hosts left
 *unconfigured* because somebody has to remember to run a playbook, not hosts
-getting configured. So the controls are **visibility** and **reversibility**
-rather than prevention:
+getting configured. So the default posture is **visibility** and
+**reversibility**, with prevention available where you want it
+([`hard-limit`](#hard-limit-is-a-ceiling-no-run-can-widen-past), below) rather
+than imposed on every workspace:
 
 - **See what it would target before it runs.** `GET
   /workspaces/{id}/inventory/resolved?limit=<pattern>` is ansible's own
@@ -179,6 +181,90 @@ rather than prevention:
 A workspace whose `default-limit` names a canary group **cannot be made to fire
 wider by a git push**, because a push carries no run options. If you want an
 estate-wide auto-configure, leave the limit empty on purpose.
+
+But a `default-limit` is only a *default*: a run that supplies its own `--limit`
+**replaces** it outright and can target any host in the resolved inventory. That
+is right for a default and useless as a control, which is what `hard-limit` is
+for.
+
+## `hard-limit` is a ceiling no run can widen past
+
+`hard-limit` is the second limit on a workspace, and the difference from
+`default-limit` is the only thing worth remembering about it:
+
+| | a run supplies no limit | a run supplies its own |
+|---|---|---|
+| `default-limit` | the default applies | the default is **replaced** |
+| `hard-limit` | the ceiling applies | the ceiling is **intersected** with it |
+
+So a run may narrow within the ceiling and no run may widen past it. Empty means
+no ceiling, which is why adding the column changed nothing for an existing
+workspace.
+
+```hcl
+resource "terrapod_workspace" "fleet" {
+  name              = "fleet"
+  configure_enabled = true
+  config_directory  = "ansible"
+  default_playbook  = "site.yml"
+
+  default_limit = "canary"   # where a configure goes when nobody says
+  hard_limit    = "!prod"    # where a configure can NEVER go
+}
+```
+
+It bounds **every** path uniformly — a manual run, a push-triggered configure, a
+derived one, a composite after an apply — and it bounds what the API *shows* as
+well as what a run *does*: the resolved read, the `?limit=` preview, the stored
+run artifact and the Inventory tab all come back already intersected with it. A
+ceiling that held for runs and not for reads would be worse than none, because
+the view would show hosts the workspace can never touch.
+
+### It names at most one group or host pattern
+
+This is the ceiling's one constraint, and it is ansible's rather than ours.
+
+A `--limit` pattern resolves as *(union of the bare terms) ∩ (every `&` term) −
+(union of the `!` terms)* — a partition by operator, so term order does not
+matter. That is what makes the ceiling exact: appending it as an `&` term bounds
+a run limit of **any** shape, including one that already unions, excludes,
+intersects or wildcards.
+
+What it cannot express is "either of these". `&` means AND: a ceiling of
+`canary:prod` written as `:&canary:&prod` resolves to *no hosts*, and written as
+`:&canary:prod` turns `prod` into an include — so a run asking for a host in
+`prod` would configure a host in `canary` that it never named. Rather than ship
+either, Terrapod refuses the ceiling at the write with a 422 naming both terms.
+
+These are all accepted, and the list is wider than the obvious case:
+
+| ceiling | means |
+|---|---|
+| `canary` | one group. The common case |
+| `web*`, `~web\..*` | a wildcard or a regex — still one term |
+| `!prod` | **no run may touch production.** No bare term at all, which ansible reads as "every host, minus prod" |
+| `all:!prod` | the same thing written out |
+| `canary:!h1` | a group with a hole in it |
+
+For a ceiling over two groups, make a parent group of them in your own inventory
+and name that — which is ansible's own answer to the same question.
+
+### It is a ceiling, not a validator
+
+Nothing checks the ceiling against the inventory, for the same reason nothing
+checks `default-limit` against it. An intersection that matches nothing is a
+legitimate answer meaning "no hosts", so a run whose own limit falls entirely
+outside the ceiling behaves exactly as [a limit that matches
+nothing](#a-default-limit-that-matches-nothing) does: the preview returns
+`host-count: 0`, and the run errors from ansible itself naming the pattern.
+
+### Where to set it
+
+The same four places as every other workspace setting, so a fleet does not have
+to be edited one workspace at a time: the workspace itself, a bulk update, an
+autodiscovery rule (which stamps it on every workspace the rule materialises),
+and a service-catalog item (where it matters most — the provisioner picks an item
+and never sees the settings it carries).
 
 ### A `default-limit` that matches nothing
 

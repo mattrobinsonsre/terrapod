@@ -88,6 +88,7 @@ interface AutodiscoveryRule {
     'inventory-paths'?: string[]
     'default-playbook'?: string
     'default-limit'?: string
+  'hard-limit'?: string
     'resource-cpu': string
     parallelism: number
     'resource-memory': string
@@ -275,6 +276,7 @@ export default function AutodiscoveryPage() {
   const [inventoryPaths, setInventoryPaths] = useState<string[]>([])
   const [defaultPlaybook, setDefaultPlaybook] = useState('')
   const [defaultLimit, setDefaultLimit] = useState('')
+  const [hardLimit, setHardLimit] = useState('')
   const [resourceCpu, setResourceCpu] = useState('1')
   const [engine, setEngine] = useState('terraform')
   const [bindPlan, setBindPlan] = useState(false)
@@ -445,6 +447,7 @@ export default function AutodiscoveryPage() {
     setInventoryPaths([])
     setDefaultPlaybook('')
     setDefaultLimit('')
+    setHardLimit('')
     // The two grants that decide what the RUNNER may resolve (#2033), and the
     // one whose default is TRUE because that is ansible's own behaviour
     // (#2318). All three were among the fifteen.
@@ -526,6 +529,7 @@ export default function AutodiscoveryPage() {
     setInventoryPaths(a['inventory-paths'] || [])
     setDefaultPlaybook(a['default-playbook'] || '')
     setDefaultLimit(a['default-limit'] || '')
+    setHardLimit(a['hard-limit'] || '')
     setResourceCpu(a['resource-cpu'])
     setParallelism(String(a.parallelism ?? 10))
     setEngine(a.engine || 'terraform')
@@ -609,6 +613,7 @@ export default function AutodiscoveryPage() {
       'inventory-paths': inventoryPaths.map(s => s.trim()).filter(Boolean),
       'default-playbook': defaultPlaybook.trim(),
       'default-limit': defaultLimit.trim(),
+      'hard-limit': hardLimit.trim(),
       'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
       engine,
@@ -898,6 +903,7 @@ export default function AutodiscoveryPage() {
     'config-directory': configDirectory,
     'default-playbook': defaultPlaybook,
     'default-limit': defaultLimit,
+    'hard-limit': hardLimit,
     'inventory-paths': inventoryPaths,
     'dynamic-inventory-enabled': dynamicInventoryEnabled,
     'inventory-scripts-enabled': inventoryScriptsEnabled,
@@ -968,6 +974,7 @@ export default function AutodiscoveryPage() {
       case 'config-directory': setConfigDirectory(s); break
       case 'default-playbook': setDefaultPlaybook(s); break
       case 'default-limit': setDefaultLimit(s); break
+      case 'hard-limit': setHardLimit(s); break
       case 'inventory-paths': setInventoryPaths(v as string[]); break
       case 'dynamic-inventory-enabled': setDynamicInventoryEnabled(b); break
       case 'inventory-scripts-enabled': setInventoryScriptsEnabled(b); break
@@ -1092,6 +1099,8 @@ export default function AutodiscoveryPage() {
         return hintText(tWs('fields.defaultPlaybookTitle'))
       case 'default-limit':
         return hintText(tWs('fields.defaultLimitTitle'))
+      case 'hard-limit':
+        return tieredHint(tWs, 'fields.hardLimitTitle')
       case 'inventory-paths':
         return hintText(tWs('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':

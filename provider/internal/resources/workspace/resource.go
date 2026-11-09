@@ -851,6 +851,18 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"hard_limit": schema.StringAttribute{
+				Description: "A `--limit` no run may escape; empty means no ceiling. " +
+					"Distinct from `default_limit`, which a run REPLACES when it supplies " +
+					"its own: this one is intersected with whatever limit the run ends up " +
+					"with, so a run may narrow within it and none may widen past it. It " +
+					"also bounds what a resolved-inventory read returns for the workspace.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"default_limit": schema.StringAttribute{
 				Description: "The default `--limit` for a configure run, overridable per " +
 					"run. Empty means the whole inventory, which is ansible's own default. " +
@@ -1574,6 +1586,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.DefaultPlaybook.IsNull() && !m.DefaultPlaybook.IsUnknown() {
 		req.DefaultPlaybook = m.DefaultPlaybook.ValueString()
 	}
+	if !m.HardLimit.IsNull() && !m.HardLimit.IsUnknown() {
+		req.HardLimit = m.HardLimit.ValueString()
+	}
 	if !m.DefaultLimit.IsNull() && !m.DefaultLimit.IsUnknown() {
 		req.DefaultLimit = m.DefaultLimit.ValueString()
 	}
@@ -1842,6 +1857,10 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DefaultPlaybook.ValueString()
 		req.DefaultPlaybook = &v
 	}
+	if !m.HardLimit.IsNull() && !m.HardLimit.IsUnknown() {
+		v := m.HardLimit.ValueString()
+		req.HardLimit = &v
+	}
 	if !m.DefaultLimit.IsNull() && !m.DefaultLimit.IsUnknown() {
 		v := m.DefaultLimit.ValueString()
 		req.DefaultLimit = &v
@@ -2081,6 +2100,11 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.DefaultLimit = types.StringValue(ws.DefaultLimit)
 	} else {
 		m.DefaultLimit = types.StringNull()
+	}
+	if ws.HardLimit != "" {
+		m.HardLimit = types.StringValue(ws.HardLimit)
+	} else {
+		m.HardLimit = types.StringNull()
 	}
 	m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)
 	m.VCSBranch = types.StringValue(ws.VCSBranch)

@@ -1299,7 +1299,8 @@
       "previewDryRun": "プレビュー（ドライラン）",
       "applyChanges": "変更を適用",
       "setOidcAudiences": "実行アイデンティティの OIDC オーディエンスを設定（一致したすべてのワークスペースのマップを置き換えます）",
-      "operationsNone": "これでは一致するすべてのワークスペースに操作が一切なくなります。ワークスペースはプランと適用、構成、またはその両方のいずれかを保持する必要があります。"
+      "operationsNone": "これでは一致するすべてのワークスペースに操作が一切なくなります。ワークスペースはプランと適用、構成、またはその両方のいずれかを保持する必要があります。",
+      "setHardLimit": "強制 limit を設定（空の値で上限を解除）"
     },
     "diff": {
       "colWorkspace": "ワークスペース",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "構成の実行前にインストールされるコレクションです。1 行に 1 つ、namespace.name または namespace.name:version の形式で指定します。",
       "ansibleExecutionEnvironmentLead": "このデプロイメント独自の実行環境をラベルで指定します。指定すると、ワークスペースの Ansible バージョンより優先されます。",
       "labelsLead": "ラベルは二重の役割を果たします: ラベルベースのRBACが一致を判定する対象であり、cloud ブロックがワークスペースを選択する際の「tags」でもあります。",
-      "nameTitlePulumiLead": "'::' で区切られた 2 つの部分 — project::stack。"
+      "nameTitlePulumiLead": "'::' で区切られた 2 つの部分 — project::stack。",
+      "hardLimit": "強制 limit",
+      "hardLimitPlaceholder": "例: canary",
+      "hardLimitTitle": "実行が指定する limit と組み合わされるため、実行はこの範囲内でさらに絞り込めますが、これを越えて広げることはできません。指定できるのはグループまたはホストパターン 1 つまでです — 例えば canary、あるいは本番以外のすべてを表す !prod — ansible には limit で「このいずれか」と表す方法がないためです。2 つのグループにまたがる上限が必要な場合は、インベントリでそれらの親グループを作成し、それを指定してください。",
+      "hardLimitLead": "どの実行も超えられない --limit。上限を設けない場合は空のままにしてください。"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

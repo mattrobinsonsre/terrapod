@@ -1299,7 +1299,8 @@
       "previewDryRun": "Rhagolwg (rhediad sych)",
       "applyChanges": "Gweithredu newidiadau",
       "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad OIDC (yn amnewid y map ar bob gweithfan gyfatebol)",
-      "operationsNone": "Byddai hyn yn gadael pob gweithle cyfatebol heb unrhyw weithrediad o gwbl. Rhaid i weithle gadw cynllunio a gweithredu, neu gyflunio, neu'r ddau."
+      "operationsNone": "Byddai hyn yn gadael pob gweithle cyfatebol heb unrhyw weithrediad o gwbl. Rhaid i weithle gadw cynllunio a gweithredu, neu gyflunio, neu'r ddau.",
+      "setHardLimit": "Gosod y terfyn caled (mae gwerth gwag yn tynnu''r terfyn uchaf)"
     },
     "diff": {
       "colWorkspace": "Gweithfan",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Casgliadau a osodir cyn i ffurfweddiad redeg, un fesul llinell fel namespace.name neu namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Un o amgylcheddau gweithredu'r gosodiad hwn, drwy label. Mae gosod un yn disodli fersiwn Ansible y gweithle.",
       "labelsLead": "Mae labeli yn gwneud gwaith deublyg: cyfateb RBAC yn seiliedig ar labeli, a'r \"tagiau\" y gall bloc cloud ddewis gweithfan drwyddynt.",
-      "nameTitlePulumiLead": "Dwy ran wedi'u gwahanu gan '::' — project::stack."
+      "nameTitlePulumiLead": "Dwy ran wedi'u gwahanu gan '::' — project::stack.",
+      "hardLimit": "Terfyn caled",
+      "hardLimitPlaceholder": "e.e. canary",
+      "hardLimitTitle": "Fe''i cyfunir ag unrhyw derfyn a ddarperir gan rediad, felly gall rhediad gulhau o''i fewn ond ni all unrhyw un ymestyn y tu hwnt iddo. Un grŵp neu un patrwm gwesteiwr ar y mwyaf y caiff ei enwi — canary, dyweder, neu !prod ar gyfer popeth heblaw cynhyrchu — oherwydd nid oes modd i ansible ddweud \"unrhyw un o''r rhain\" mewn terfyn. Ar gyfer terfyn uchaf sy''n cwmpasu dau grŵp, gwnewch riant-grŵp ohonynt yn eich rhestr eiddo ac enwch hwnnw.",
+      "hardLimitLead": "Patrwm --limit na all unrhyw rediad ddianc ohono. Gadewch yn wag i beidio â gosod unrhyw derfyn uchaf."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

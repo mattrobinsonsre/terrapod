@@ -517,6 +517,7 @@ four are templated onto every workspace provisioned from the item:
 | `ansible_directory` | `""` | the subdirectory **of the module** whose contents are copied into the generated configuration version, and the workspace's `config_directory` |
 | `default_playbook` | `""` | its `default_playbook`, relative to `ansible_directory` |
 | `default_limit` | `""` | its `default_limit` |
+| `hard_limit` | `""` | its `hard_limit` — the ceiling no run on the provisioned workspace can widen past |
 
 **The pair rule here is a different rule, not the workspace's inverted.**
 `configure_enabled = true` with an empty `ansible_directory` is refused — by the
@@ -534,7 +535,8 @@ resource "terrapod_catalog_item" "fleet" {
   configure_enabled = true
   ansible_directory = "ansible"    # a subdirectory of the MODULE
   default_playbook  = "site.yml"   # relative to ansible_directory
-  default_limit     = "web"
+  default_limit     = "web"       # where a configure goes by default
+  hard_limit        = "!prod"     # where it can NEVER go
 }
 ```
 

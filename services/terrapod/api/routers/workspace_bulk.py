@@ -96,6 +96,7 @@ _FIELD_MAP: dict[str, str] = {
     "inventory-paths": "inventory_paths",
     "default-playbook": "default_playbook",
     "default-limit": "default_limit",
+    "hard-limit": "hard_limit",
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
     # The Ansible execution environment's own pair (#2154). Separate from the
@@ -439,6 +440,7 @@ _SETTING_RULES: dict[str, Any] = {
         v, "default-playbook"
     ),
     "default-limit": lambda v: workspace_settings.validate_ansible_run_default(v, "default-limit"),
+    "hard-limit": workspace_settings.validate_hard_limit,
     "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
     "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
     "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,

@@ -1299,7 +1299,8 @@
       "previewDryRun": "Vista previa (simulación)",
       "applyChanges": "Aplicar cambios",
       "setOidcAudiences": "Establecer audiencias OIDC de la identidad de ejecución (reemplaza el mapa en cada espacio de trabajo coincidente)",
-      "operationsNone": "Esto dejaría cada espacio de trabajo coincidente sin ninguna operación. Un espacio de trabajo debe conservar planificar y aplicar, o configurar, o ambas."
+      "operationsNone": "Esto dejaría cada espacio de trabajo coincidente sin ninguna operación. Un espacio de trabajo debe conservar planificar y aplicar, o configurar, o ambas.",
+      "setHardLimit": "Establecer el límite estricto (un valor vacío elimina el techo)"
     },
     "diff": {
       "colWorkspace": "Espacio de trabajo",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Colecciones instaladas antes de ejecutar un configure, una por línea como namespace.name o namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Uno de los entornos de ejecución propios de esta instalación, por etiqueta. Indicar uno sustituye a la versión de Ansible del espacio de trabajo.",
       "labelsLead": "Las etiquetas cumplen doble función: son aquello con lo que coincide el RBAC basado en etiquetas, y son los \"tags\" con los que un bloque cloud puede seleccionar un espacio de trabajo.",
-      "nameTitlePulumiLead": "Dos partes separadas por '::' — project::stack."
+      "nameTitlePulumiLead": "Dos partes separadas por '::' — project::stack.",
+      "hardLimit": "Límite estricto",
+      "hardLimitPlaceholder": "p. ej. canary",
+      "hardLimitTitle": "Se combina con el límite que indique cada ejecución, de modo que una ejecución puede restringirlo pero ninguna puede ampliarlo. Nombra como máximo un grupo o patrón de host — por ejemplo canary, o !prod para todo excepto producción — porque ansible no tiene forma de decir «cualquiera de estos» en un límite. Para un techo sobre dos grupos, crea en tu inventario un grupo padre que los contenga y nombra ese grupo.",
+      "hardLimitLead": "Un --limit del que ninguna ejecución puede escapar. Déjalo vacío para no imponer ningún techo."
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",

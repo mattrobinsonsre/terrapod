@@ -1299,7 +1299,8 @@
       "previewDryRun": "Önizleme (deneme çalıştırması)",
       "applyChanges": "Değişiklikleri uygula",
       "setOidcAudiences": "OIDC çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki eşlemeyi değiştirir)",
-      "operationsNone": "Bu, eşleşen her çalışma alanını hiç işlemi olmadan bırakırdı. Bir çalışma alanı planlama ve uygulamayı, yapılandırmayı ya da ikisini birlikte korumalıdır."
+      "operationsNone": "Bu, eşleşen her çalışma alanını hiç işlemi olmadan bırakırdı. Bir çalışma alanı planlama ve uygulamayı, yapılandırmayı ya da ikisini birlikte korumalıdır.",
+      "setHardLimit": "Katı limiti ayarla (boş değer üst sınırı kaldırır)"
     },
     "diff": {
       "colWorkspace": "Çalışma Alanı",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Bir configure çalışmadan önce kurulan koleksiyonlar; her satırda bir tane, namespace.name veya namespace.name:version biçiminde.",
       "ansibleExecutionEnvironmentLead": "Bu kurulumun kendi yürütme ortamlarından biri, etiketle. Ayarlanması, çalışma alanının Ansible sürümünü geçersiz kılar.",
       "labelsLead": "Etiketler çifte görev yapar: etikete dayalı RBAC bunlar üzerinden eşleşir ve bir cloud bloğunun bir çalışma alanını seçebildiği \"tag\"ler de bunlardır.",
-      "nameTitlePulumiLead": "'::' ile ayrılmış iki bölüm — project::stack."
+      "nameTitlePulumiLead": "'::' ile ayrılmış iki bölüm — project::stack.",
+      "hardLimit": "Katı limit",
+      "hardLimitPlaceholder": "örn. canary",
+      "hardLimitTitle": "Çalıştırmanın kendi verdiği limitle birleştirilir; böylece bir çalıştırma kapsamı bunun içinde daraltabilir, ancak hiçbiri bunun ötesine genişletemez. En fazla bir grup veya bir ana makine deseni belirtir — örneğin canary ya da üretim dışındaki her şey için !prod — çünkü ansible bir limitte “bunlardan herhangi biri” diyemez. İki grubu birlikte kapsayan bir üst sınır için envanterinizde bunlardan bir üst grup oluşturun ve onu belirtin.",
+      "hardLimitLead": "Hiçbir çalıştırmanın aşamayacağı bir --limit. Üst sınır olmaması için boş bırakın."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

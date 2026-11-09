@@ -1299,7 +1299,8 @@
       "previewDryRun": "Preview (dry run)",
       "applyChanges": "Apply changes",
       "setOidcAudiences": "Set OIDC run identity audiences (replaces the map on every matched workspace)",
-      "operationsNone": "This would leave every matched workspace with no operation at all. A workspace must keep plan and apply, or configure, or both."
+      "operationsNone": "This would leave every matched workspace with no operation at all. A workspace must keep plan and apply, or configure, or both.",
+      "setHardLimit": "Set hard limit (an empty value removes the ceiling)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2724,7 +2725,11 @@
       "ansibleHostKeyCheckingLead": "On by default, as Ansible does on its own. Relaxes a protection when off: any key a host presents is accepted, so the connection can be intercepted.",
       "bindPlanLead": "On, the update applies exactly the plan the preview saved, so anything that changed since the preview fails the update instead of being applied.",
       "configDirectoryLead": "Where ansible.cfg, the playbooks, roles/, group_vars/ and host_vars/ live, relative to the repository root. Empty means the root itself.",
-      "ansibleCollectionsLead": "Collections installed before a configure runs, one per line as namespace.name or namespace.name:version."
+      "ansibleCollectionsLead": "Collections installed before a configure runs, one per line as namespace.name or namespace.name:version.",
+      "hardLimit": "Hard limit",
+      "hardLimitPlaceholder": "e.g. canary",
+      "hardLimitLead": "A --limit no run may escape. Leave it empty for no ceiling.",
+      "hardLimitTitle": "It is combined with whatever limit a run supplies, so a run may narrow within it and none may widen past it. It names at most one group or host pattern — say canary, or !prod for everything except production — because ansible has no way to say “either of these” in a limit. For a ceiling over two groups, make a parent group of them in your inventory and name that."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

@@ -80,6 +80,65 @@ class TestTheConfigureInstructions:
         assert env["TP_PLAYBOOK"] == "patch-only.yml"
         assert env["TP_ANSIBLE_LIMIT"] == "canary"
 
+    def test_the_ceiling_bounds_the_limit_that_reaches_the_job(self):
+        """`hard-limit` is intersected into `TP_ANSIBLE_LIMIT` (#2451).
+
+        Asserted on the variable the Job actually gets, rather than on
+        `combine_limits`, because this is the one place the ceiling crosses to
+        the runner -- and the engine reads FOUR limit-shaped attributes here
+        (`hard-limit`, `ansible-limit`, `default-limit`, and nothing for a
+        plan), so which two it combines is the thing worth pinning.
+        """
+        # A run with its own limit: narrowed within the ceiling.
+        env = _env(
+            **{
+                "config-directory": "ansible",
+                "default-playbook": "site.yml",
+                "ansible-limit": "web",
+                "hard-limit": "canary",
+            }
+        )
+        assert env["TP_ANSIBLE_LIMIT"] == "web:&canary"
+
+        # A run with none: the ceiling is the limit, not the default beside it.
+        env = _env(
+            **{
+                "config-directory": "ansible",
+                "default-playbook": "site.yml",
+                "hard-limit": "canary",
+            }
+        )
+        assert env["TP_ANSIBLE_LIMIT"] == "canary"
+
+        # The workspace default is bounded too, not just a run's own limit --
+        # a push-triggered configure carries no run options, so the default is
+        # what the ceiling has to bound for the trigger that fires unattended.
+        env = _env(
+            **{
+                "config-directory": "ansible",
+                "default-playbook": "site.yml",
+                "default-limit": "web",
+                "hard-limit": "canary",
+            }
+        )
+        assert env["TP_ANSIBLE_LIMIT"] == "web:&canary"
+
+    def test_no_ceiling_leaves_the_limit_exactly_as_before(self):
+        """What makes the column additive.
+
+        Paired with the test above: a composition applied unconditionally would
+        pass that one and change `TP_ANSIBLE_LIMIT` for every existing
+        deployment, which is the one thing this must not do.
+        """
+        env = _env(
+            **{
+                "config-directory": "ansible",
+                "default-playbook": "site.yml",
+                "ansible-limit": "web",
+            }
+        )
+        assert env["TP_ANSIBLE_LIMIT"] == "web"
+
     def test_an_empty_config_directory_still_reaches_the_job(self):
         """`""` is the repository root, which is a real answer.
 

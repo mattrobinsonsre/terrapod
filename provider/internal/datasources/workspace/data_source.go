@@ -53,6 +53,7 @@ type workspaceDataSourceModel struct {
 	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
 	DefaultLimit                  types.String `tfsdk:"default_limit"`
+	HardLimit                     types.String `tfsdk:"hard_limit"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
@@ -159,6 +160,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			},
 			"default_playbook":    computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
 			"default_limit":       computedString("The default `--limit` for a configure run. Null means the whole inventory."),
+			"hard_limit":          computedString("A `--limit` no run may escape. Null means no ceiling. Unlike `default_limit`, which a run REPLACES when it supplies its own, this is intersected with whatever limit the run ends up with -- so a run may narrow within it and none may widen past it."),
 			"working_directory":   computedString("Working directory."),
 			"parallelism":         computedInt64("How many operations the engine performs at once."),
 			"debug_mode":          computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
@@ -374,6 +376,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.ConfigDirectory = types.StringValue(terrapod.GetStringAttr(res, "config-directory"))
 	setOptionalString(&m.DefaultPlaybook, terrapod.GetStringAttr(res, "default-playbook"))
 	setOptionalString(&m.DefaultLimit, terrapod.GetStringAttr(res, "default-limit"))
+	setOptionalString(&m.HardLimit, terrapod.GetStringAttr(res, "hard-limit"))
 	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
 	m.AllowForkPRPlans = types.BoolValue(terrapod.GetBoolAttr(res, "allow-fork-pr-plans"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))

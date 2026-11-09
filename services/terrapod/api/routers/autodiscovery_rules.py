@@ -114,6 +114,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "inventory-paths": list(rule.inventory_paths or []),
             "default-playbook": rule.default_playbook,
             "default-limit": rule.default_limit,
+            "hard-limit": rule.hard_limit,
             "resource-memory": rule.resource_memory,
             # The EE sidecar's pair, templated like the orchestrator's (#2154).
             "ee-resource-cpu": rule.ee_resource_cpu,
@@ -405,6 +406,14 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     ):
         if _key in attrs:
             out[_col] = str(attrs[_key] or "")
+    # The ceiling takes the SHARED rule, not the loose coercion above (#2451):
+    # it is a single pattern term, and `str(... or "")` would accept a
+    # multi-term one and stamp it on every workspace the rule materialises.
+    if "hard-limit" in attrs:
+        try:
+            out["hard_limit"] = workspace_settings.validate_hard_limit(attrs["hard-limit"])
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     if "parallelism" in attrs:
         try:
             out["parallelism"] = validate_parallelism(attrs["parallelism"])
@@ -876,6 +885,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         inventory_paths=fields.get("inventory_paths", []),
         default_playbook=fields.get("default_playbook", ""),
         default_limit=fields.get("default_limit", ""),
+        hard_limit=fields.get("hard_limit", ""),
         resource_memory=fields.get("resource_memory", "2Gi"),
         oidc_audiences=fields.get("oidc_audiences", {}),
         auto_apply=fields.get("auto_apply", False),

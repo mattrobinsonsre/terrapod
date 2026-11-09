@@ -633,6 +633,27 @@ class Workspace(Base):
     #: per run rather than in the playbook.
     default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
+    #: A `--limit` no run may escape; empty is no ceiling (#2451).
+    #:
+    #: Deliberately NOT `default_limit` with a second meaning. A default is an
+    #: operator convenience a run is entitled to override -- and overrides it
+    #: does: `engines/terraform.py` reads `ansible-limit OR default-limit`, so a
+    #: run that carries its own limit replaces the default outright and can
+    #: target any host in the resolved inventory. That is correct for a default
+    #: and useless as a control, which is why this is a second column rather
+    #: than a flag on the first: one column carrying both meanings makes "may a
+    #: run override this?" unanswerable.
+    #:
+    #: Combined with whatever limit the run ends up with by INTERSECTION, so a
+    #: run may narrow within it and none may widen past it. Empty on either side
+    #: means that side adds nothing.
+    #:
+    #: It bounds every path uniformly, including the three `default_limit`
+    #: already bounds -- a push-triggered configure, a derived one, a composite.
+    #: Intersecting an already-narrower limit is a no-op, so uniform is cheaper
+    #: than special-casing and leaves nothing to reason about.
+    hard_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
     #: The Pulumi stack this workspace is, when it is one (#1570). NULL for
     #: Terraform, and for any Pulumi workspace created before this column.
     #:
@@ -1338,6 +1359,13 @@ class CatalogItem(Base):
     default_limit: Mapped[str] = mapped_column(
         String(255), nullable=False, server_default="", default=""
     )
+
+    #: The `hard_limit` to stamp on workspaces provisioned from this item
+    #: (#2451). A ceiling matters MORE here than on a hand-made workspace: the
+    #: provisioner picks an item from a catalog and never sees the settings it
+    #: carries, so this is where the platform's own bound on a self-service
+    #: workspace is written down.
+    hard_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
@@ -2084,6 +2112,11 @@ class AutodiscoveryRule(Base):
     inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+    #: The `hard_limit` to stamp on workspaces this rule creates (#2451).
+    #: A ceiling matters MORE here than on a hand-made workspace: these are
+    #: created in bulk, by a rule, with nobody looking at each one.
+    hard_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     #: The EE sidecar's request, templated like the pair above (#2154). `""`

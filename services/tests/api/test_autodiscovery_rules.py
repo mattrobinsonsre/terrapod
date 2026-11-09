@@ -75,6 +75,8 @@ def _mock_rule(
     r.inventory_paths = []
     r.default_playbook = ""
     r.default_limit = ""
+    # And the ceiling (#2451), same reason as the pair above.
+    r.hard_limit = ""
     r.resource_cpu = "1"
     r.parallelism = 10
     r.resource_memory = "2Gi"
@@ -243,6 +245,31 @@ class TestCreateRule:
         assert resp.status_code == 422
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_when_the_hard_limit_names_two_groups(self, *_mocks):
+        """A rule's ceiling takes the SHARED rule, not the loose coercion (#2451).
+
+        Its siblings go through `str(attrs[key] or "")`, which would accept a
+        two-term ceiling and stamp it on every workspace the rule materialises.
+        """
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "*",
+                    "hard-limit": "canary:prod",
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422, resp.text
+        assert "at most one" in resp.json()["detail"]
+
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_422_when_pattern_missing(self, *_mocks):
