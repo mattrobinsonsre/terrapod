@@ -166,7 +166,9 @@ other.
 own scripts, `curl` calls and dashboards onto `/api/v1` and `/api/tfe/v2` at
 whatever pace suits you; until you do, the old paths answer as before. `terraform`
 and `tofu` need nothing either way — they take the path from service discovery,
-which has advertised the canonical one since v1.7.0.
+and 2.0.0 is the release that starts advertising the canonical one: 1.x advertised
+`/api/v2/`, so the CLI follows the move by itself the first time it talks to an
+upgraded deployment.
 
 **The sunset waits on Terrapod, not on the major version.** Terrapod's own
 consumers still call the alias, by design: the runner and listener images, the HA
@@ -219,14 +221,21 @@ before:  {callback_base_url}/api/terrapod/v1/auth/saml/acs    (SAML only)
 after:   {callback_base_url}/api/v1/auth/saml/acs
 ```
 
-**Why serving both prefixes does not save you.** Terrapod has served
-`/api/terrapod/v1` and `/api/v1` side by side since v1.7.0, and for every other
-path that is the whole story. These two are different: they are **registered**
+**Why serving both prefixes does not save you.** 2.0.0 serves `/api/v1` and
+`/api/terrapod/v1` side by side, and for every other path that is the whole
+story — a consumer still calling the alias is unaffected. These two are
+different: they are **registered**
 with your identity provider, which validates the `redirect_uri` Terrapod sends
 against its own allow-list. An unrecognised value is refused **at the IdP**,
 before any request reaches Terrapod — so there is nothing Terrapod can serve,
 alias or not, that makes the switch safe on its own. Every SSO login fails with
 an IdP-side error, and local admin login is your only way back in.
+
+Note that `/api/v1` is **new in 2.0.0** — no 1.x release served it — so you cannot
+verify the new callback URL against your current deployment before upgrading, and a
+deployment with `auth.local_enabled: false` has no local account to fall back on.
+Register the new URL anyway: an unused entry in an IdP allow-list is harmless, and
+with both listed the upgrade is a no-op at the IdP.
 
 **What to do — in this order:**
 
