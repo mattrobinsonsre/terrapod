@@ -330,6 +330,10 @@ def _run_plan_phase(
             cfg,
             plan_json=_PLAN_JSON if plan_show_ok else _PLAN_JSON,
             work_dir=_OPA_WORK,
+            # The API holds the run between this Job and the apply Job, and
+            # `evaluate_post_plan` is the decision. Failing here would lose the
+            # plan artifact and the override path with it.
+            enforce=False,
         )
     except opa.PolicyEvaluationError as exc:
         log.error("policy evaluation failed", err=str(exc))
@@ -1051,8 +1055,26 @@ def _run_configure_phase(cfg: RunnerConfig, *, binary: str, work_dir: Path) -> i
     # is Terraform-flavoured and the mechanism is not.
     gate_log = structlog.get_logger("runner.job_entrypoint")
     try:
-        opa.evaluate_policies(cfg, plan_json=_CONFIGURE_POLICY_INPUT, work_dir=_OPA_WORK)
+        opa.evaluate_policies(
+            cfg,
+            plan_json=_CONFIGURE_POLICY_INPUT,
+            work_dir=_OPA_WORK,
+            # A configure is ONE Job. Nothing downstream can hold it, so this
+            # gate is the only thing that can refuse.
+            enforce=True,
+        )
+    except opa.PolicyGateBlocked as exc:
+        # The gate doing its job. A configure is a single Job, so there is no
+        # between-Jobs moment for the API to hold the run -- refusing here is
+        # the whole mechanism, and the results are already POSTed, so the UI
+        # shows WHICH set denied beside the failed run.
+        gate_log.error("configure blocked by policy", err=str(exc))
+        return 1
     except opa.PolicyEvaluationError as exc:
+        # Could not evaluate, which is a different thing and also fatal: a
+        # policy set that applies and was not evaluated is a gate that did not
+        # run, and passing the run would be the fail-open this gate exists to
+        # prevent.
         gate_log.error("configure policy evaluation failed", err=str(exc))
         return 1
 
@@ -1432,7 +1454,14 @@ def _finish_pulumi_preview(cfg, event_log: Path) -> int:  # type: ignore[no-unty
         )
 
     try:
-        opa.evaluate_policies(cfg, plan_json=_policy_input_path, work_dir=_OPA_WORK)
+        opa.evaluate_policies(
+            cfg,
+            plan_json=_policy_input_path,
+            work_dir=_OPA_WORK,
+            # Pulumi's preview half, the same shape as Terraform's plan: the
+            # API holds the run before the update.
+            enforce=False,
+        )
     except opa.PolicyEvaluationError as exc:
         log.error("policy evaluation failed", err=str(exc))
         return 1

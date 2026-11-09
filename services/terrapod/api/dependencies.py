@@ -696,7 +696,7 @@ async def require_admin_or_audit(
 
 
 def require_runner_for_run(
-    user: AuthenticatedUser, run_id: str, *, phase: str | None = None
+    user: AuthenticatedUser, run_id: str, *, phase: str | tuple[str, ...] | None = None
 ) -> None:
     """Reject the request unless the caller is a runner-token authenticated
     for this exact run — and, where ``phase`` is given, for that phase.
@@ -706,11 +706,21 @@ def require_runner_for_run(
     actions on another. Not a FastAPI dependency — call it inside the
     handler with the path's ``run_id`` after resolving the user.
 
-    ``phase`` is the Job phase this endpoint belongs to — ``plan`` or ``apply``
-    — and is passed only where the endpoint genuinely belongs to one. A run has
-    two Jobs and each gets its own token, so without it a plan-phase token drove
-    the apply-phase routes and vice versa (GHSA-xmrf-hxq9-m59m): a speculative
-    pull-request plan's own token could post an apply result or an apply log.
+    ``phase`` is the Job phase this endpoint belongs to — ``plan``, ``apply`` or
+    ``configure`` — and is passed only where the endpoint genuinely belongs to
+    one. A run has a Job per phase and each gets its own token, so without it a
+    plan-phase token drove the apply-phase routes and vice versa
+    (GHSA-xmrf-hxq9-m59m): a speculative pull-request plan's own token could
+    post an apply result or an apply log.
+
+    **A TUPLE means "any of these", for an endpoint that genuinely serves more
+    than one phase.** The OPA policy bundle and results are the case: the same
+    two endpoints are driven by the plan-phase Job and, since #2435, by the
+    configure-phase Job as well. Before the tuple they asked for ``"plan"``
+    alone, so every configure 403'd — and the fix must not be `phase=None`,
+    which would hand the apply phase a route it has no business on and give
+    back the GHSA this parameter exists for. Name the phases that genuinely
+    drive the endpoint and no others.
 
     **A token carrying no phase claim passes any phase.** That is a listener
     older than the claim, and refusing it would break every run on a lagging
@@ -735,11 +745,14 @@ def require_runner_for_run(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Token not scoped to this run",
         )
-    if phase is not None and user.run_phase is not None and user.run_phase != phase:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Token not scoped to the {phase} phase of this run",
-        )
+    if phase is not None and user.run_phase is not None:
+        allowed = (phase,) if isinstance(phase, str) else tuple(phase)
+        if user.run_phase not in allowed:
+            named = " or ".join(allowed)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Token not scoped to the {named} phase of this run",
+            )
 
 
 # ── Listener Certificate Auth ────────────────────────────────────────────

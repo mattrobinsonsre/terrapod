@@ -253,17 +253,26 @@ class TestTheOverrideCoversWhatTheCheckCovers:
 
 
 class TestWhyARunHasNoPolicyEvaluations:
-    """The run-evaluations meta says why there are none (#2435).
+    """The run-evaluations meta says why there are none, and for a configure
+    there is no longer a why.
 
-    `meta.not-evaluated-reason` is the operator's only signal that a mandatory
-    set in scope was never applied. It was keyed on the workspace's ENGINE, so
-    a standalone configure -- which has no plan and therefore never reaches the
-    post-plan gate at all -- came back with no reason, which reads as "every
-    set in scope passed". That is the defect this names.
+    `meta.not-evaluated-reason` is the operator's signal that a mandatory set
+    in scope was never applied. This class used to assert that a configure
+    carries one, and that was right while a configure was ungated. #2435 gated
+    it -- on the runner, before the playbook -- so the reason became a false
+    claim that the configure was unenforced.
 
-    Handlers called directly with a mocked session, as the rest of this file
-    does. All three call sites of the reason function were unverified before
-    this: reverting any of them to drop the run killed zero tests.
+    It was also acted on rather than merely reported, in two places that both
+    failed OPEN: the runner's policy bundle was emptied whenever it was truthy,
+    and `evaluate_post_plan` short-circuits to `GATE_PASSED` on it, which
+    skipped the safety net on the apply half of every COMPOSITE run (a
+    composite carries `is_configure=True` and does have a plan). So the signal
+    this class was built to provide was being paid for with the enforcement it
+    was reporting on.
+
+    What survives from the original reasoning is the PAIR: a reason must never
+    fire for a run whose apply is gated. That is now asserted across all three
+    legal run shapes rather than two.
     """
 
     @staticmethod
@@ -287,12 +296,18 @@ class TestWhyARunHasNoPolicyEvaluations:
             auth_method="session",
         )
 
-    async def _meta(self, *, is_configure: bool) -> dict:
+    async def _meta(self, *, is_configure: bool, composite: bool = False) -> dict:
         from terrapod.api.routers import policy_sets as ps_router
 
         ws_id, run_id = uuid.uuid4(), uuid.uuid4()
         ws = MagicMock(id=ws_id, engine="terraform", labels={}, owner_email=None)
-        run = MagicMock(id=run_id, workspace_id=ws_id, plan_only=False, is_configure=is_configure)
+        run = MagicMock(
+            id=run_id,
+            workspace_id=ws_id,
+            plan_only=False,
+            is_configure=is_configure,
+            configure_after_apply=composite,
+        )
         with (
             patch.object(
                 ps_router.policy_set_service, "get_run_evaluations", AsyncMock(return_value=[])
@@ -309,19 +324,18 @@ class TestWhyARunHasNoPolicyEvaluations:
 
         return _json.loads(resp.body)["meta"]
 
-    async def test_a_configure_run_is_told_why(self) -> None:
-        meta = await self._meta(is_configure=True)
-        reason = meta.get("not-evaluated-reason")
-        assert reason is not None, "a configure must say why nothing was evaluated"
-        assert "configure" in reason.lower()
+    async def test_no_run_shape_is_told_a_configure_is_unevaluated(self) -> None:
+        """All three legal shapes, because each one reached a different bug.
 
-    async def test_a_plan_apply_run_on_the_same_engine_gets_no_reason(self) -> None:
-        """The pair, not the single case.
-
-        Without this, a reason that fired for EVERY run would pass the test
-        above -- and a blanket reason is exactly the shape that makes
-        `evaluate_post_plan` short-circuit to GATE_PASSED and let every apply
-        through.
+        A blanket reason would pass a single-case test, and a blanket reason is
+        exactly the shape that makes `evaluate_post_plan` short-circuit to
+        `GATE_PASSED` and let every apply through -- which is what actually
+        happened to composites.
         """
-        meta = await self._meta(is_configure=False)
-        assert "not-evaluated-reason" not in meta
+        for label, kw in (
+            ("standalone configure", {"is_configure": True}),
+            ("composite", {"is_configure": True, "composite": True}),
+            ("ordinary plan/apply", {"is_configure": False}),
+        ):
+            meta = await self._meta(**kw)
+            assert "not-evaluated-reason" not in meta, label

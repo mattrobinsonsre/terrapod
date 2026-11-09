@@ -170,7 +170,42 @@ engine's own account of the change**, so it differs between them.
 | `input` (Terraform) | The raw `terraform show -json` plan document — `input.resource_changes`, `input.planned_values`, etc. Existing community Terraform Rego works unchanged. |
 | `input` (Pulumi) | A document built from the preview's engine event log — see below. |
 | `input` (Ansible configure) | The run's **resolved inventory document** — `input.hosts`, `input.groups`, `input.children`. See below. |
-| `data.terrapod_context` | Terrapod metadata: `workspace` (`id`, `name`, `labels`) and `run` (`id`, `message`, `source`, `is_destroy`, `plan_only`). |
+| `data.terrapod_context` | Terrapod metadata: `workspace` (`id`, `name`, `labels`) and `run` (`id`, `message`, `source`, `is_destroy`, `plan_only`, `phase`). |
+
+#### `run.phase` — guard a rule on the phase it is written for
+
+`run.phase` is `"plan"` or `"configure"`, and it is the only thing that tells a
+policy which operation it is judging. That matters because a workspace with both
+halves enabled produces a **composite** run — one apply, then one configure — and
+both of its phases evaluate the same policy sets against the same
+`terrapod_context`. Every other field in that document is identical between them.
+
+So a rule meant for the playbook must say so, or it also fires on the Terraform
+plan:
+
+```rego
+package terrapod
+
+# WRONG on a composite workspace: `input` is the inventory during the configure
+# and the plan document during the plan, so `input.hosts` is simply undefined in
+# the plan phase and the rule quietly never fires there. A rule that denies on
+# something present in both would fire in both.
+deny contains msg if {
+	count(input.hosts) > 50
+	msg := "too many hosts"
+}
+
+# RIGHT: state the phase.
+deny contains msg if {
+	data.terrapod_context.run.phase == "configure"
+	count(input.hosts) > 50
+	msg := sprintf("configure reaches %d hosts, limit is 50", [count(input.hosts)])
+}
+```
+
+A policy set applies to a workspace, not to a phase, so this guard is how a
+single set carries rules for both — there is no per-phase assignment to do it
+for you.
 
 #### The configure input
 
@@ -189,11 +224,22 @@ deny contains msg if {
     msg := sprintf("configure targets production host %s", [name])
 }
 
-# Refuse one that reaches outside a named group.
+# Refuse a workspace whose inventory declares a host outside a named group.
+#
+# NOTE WHAT THIS IS AND IS NOT. `--limit` is not applied to the document (see
+# below), so this reasons about the INVENTORY, not about the subset a
+# particular run targets -- it denies whenever any declared host is outside
+# `canary`, including on a configure correctly limited to `canary`. That is a
+# fine rule for "this workspace should only ever hold canary hosts" and the
+# wrong one for "this run should only touch canary hosts".
+#
+# For the latter, do not write a policy: `hard_limit` is the control, it is a
+# ceiling no run can widen past, and it is enforced before OPA is consulted.
+# See docs/ansible-configure.md#hard-limit-is-a-ceiling-no-run-can-widen-past.
 deny contains msg if {
     some name, _ in input.hosts
     not name in input.groups.canary
-    msg := sprintf("%s is not in the canary group", [name])
+    msg := sprintf("%s is declared outside the canary group", [name])
 }
 ```
 

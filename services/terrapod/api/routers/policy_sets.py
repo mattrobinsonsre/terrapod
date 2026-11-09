@@ -734,7 +734,12 @@ async def get_policy_bundle(
     runner does no evaluation and posts no results, which the API gate
     treats as PASSED.
     """
-    require_runner_for_run(user, run_id, phase="plan")
+    # BOTH phases drive these two endpoints: the plan-phase Job has always,
+    # and the configure-phase Job does since #2435. Asking for "plan" alone
+    # 403'd every configure, so the gate never fetched a bundle at all.
+    # NOT `phase=None`, which would also admit the apply phase and give
+    # back GHSA-xmrf-hxq9-m59m.
+    require_runner_for_run(user, run_id, phase=("plan", "configure"))
     try:
         run_uuid = uuid.UUID(run_id.removeprefix("run-"))
     except ValueError as exc:
@@ -753,7 +758,10 @@ async def get_policy_bundle(
         if policy_set_service.policy_sets_not_evaluated_reason(ws, run)
         else await policy_set_service.applicable_policy_sets(db, ws)
     )
-    context = policy_set_service.build_run_context(ws, run)
+    # The phase comes off the TOKEN, not the run: a composite's plan Job and
+    # its configure Job fetch this same bundle for the same run, and this is
+    # the only field that tells a policy which of the two it is judging.
+    context = policy_set_service.build_run_context(ws, run, user.run_phase)
 
     return JSONResponse(
         content={
@@ -804,7 +812,12 @@ async def post_policy_results(
     via ON CONFLICT DO NOTHING on ``(run_id, policy_set_id)``, so a
     retried POST after a transient failure is safely idempotent.
     """
-    require_runner_for_run(user, run_id, phase="plan")
+    # BOTH phases drive these two endpoints: the plan-phase Job has always,
+    # and the configure-phase Job does since #2435. Asking for "plan" alone
+    # 403'd every configure, so the gate never fetched a bundle at all.
+    # NOT `phase=None`, which would also admit the apply phase and give
+    # back GHSA-xmrf-hxq9-m59m.
+    require_runner_for_run(user, run_id, phase=("plan", "configure"))
     try:
         run_uuid = uuid.UUID(run_id.removeprefix("run-"))
     except ValueError as exc:
@@ -898,9 +911,22 @@ async def post_policy_results(
 
     await policy_set_service._insert_evaluations(db, rows)
     await db.commit()
+
+    # The verdict, from the ONE place that owns the rule (#2435). A
+    # configure is a single Job, so there is no between-Jobs moment for the
+    # API to hold it -- the in-Job gate has to decide, and it must decide the
+    # SAME WAY `run_is_policy_blocked` does or the two disagree about what
+    # "mandatory" means. Rather than restate that rule in the runner, which
+    # cannot import this layer at all, the runner asks: it POSTs its results
+    # and is told whether they block.
+    #
+    # Additive for the plan phase, which ignores it -- there the API still
+    # holds the run between Jobs and `evaluate_post_plan` is the decision.
+    blocked = await policy_set_service.run_is_policy_blocked(db, run_uuid)
     logger.info(
         "Policy results recorded by runner",
         run_id=str(run_uuid),
         sets=len(rows),
+        blocked=blocked,
     )
-    return JSONResponse(content={"recorded": len(rows)}, status_code=201)
+    return JSONResponse(content={"recorded": len(rows), "blocked": blocked}, status_code=201)
