@@ -16,8 +16,10 @@ export function useDarkTheme(): [boolean, (dark: boolean) => void] {
   const dark = useSyncExternalStore(subscribe, isDark, () => false)
   const set = (next: boolean) => {
     document.documentElement.classList.toggle('dark', next)
-    // Revert if the cookie could not be saved, so the UI never shows a theme that will not survive a reload.
-    setTheme(next ? 'dark' : 'light').catch(() => document.documentElement.classList.toggle('dark', !next))
+    // Revert if the cookie could not be saved, unless a later click has already changed the class.
+    setTheme(next ? 'dark' : 'light').catch(() => {
+      if (isDark() === next) document.documentElement.classList.toggle('dark', !next)
+    })
   }
   return [dark, set]
 }

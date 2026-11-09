@@ -8,6 +8,7 @@ export async function setTheme(next: string) {
   const store = await cookies()
   store.set(THEME_COOKIE, parseTheme(next), {
     path: '/',
+    httpOnly: true,
     maxAge: 60 * 60 * 24 * 365,
     sameSite: 'lax',
   })

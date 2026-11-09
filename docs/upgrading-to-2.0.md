@@ -1564,14 +1564,14 @@ report the stored status verbatim.
 
 The web UI defaulted to dark through 1.x and **defaults to light from 2.0**
 (#2337). The dark theme is kept, not removed: each user can switch to it with
-**Account ▾ → Dark theme** (the account drawer on a phone). The choice is
+**Account → Dark theme** (the account drawer on a phone). The choice is
 stored in a `terrapod-theme` cookie in that browser and rendered on the server,
 so it loads without a flash of the light theme.
 
 There is still **no Helm value or config key that sets the default** for
 everyone, and the UI does not follow the browser's `prefers-color-scheme`. A
-deployment that wants dark for every user by default needs a source edit to
-`web/src/app/layout.tsx` so `<html>` always carries `className="dark"`.
+deployment that wants dark for every user by default changes `DEFAULT_THEME` to
+`'dark'` in `web/src/lib/theme.ts`; a user's own choice still wins over it.
 
 Dark is restored exactly rather than approximately, which is a property of how
 the themes are built rather than a promise: the dark values are Tailwind's own

@@ -671,6 +671,10 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(back).toBeVisible();
     await back.click();
     await expect(account.getByRole('button', { name: startDark ? 'Light theme' : 'Dark theme' })).toBeVisible();
+    // Let the cookie write settle so it cannot leak into the next test.
+    await expect.poll(async () =>
+      (await page.context().cookies()).find((c) => c.name === 'terrapod-theme')?.value,
+    ).toBe(startDark ? 'dark' : 'light');
   });
 
   test('workspace list surfaces status in-row at phone width', async ({ page }) => {

@@ -306,7 +306,7 @@ server; Digger runs inside your existing CI. See [Alternatives](alternatives.md)
 
 ## Can I make the UI dark? Where is the theme setting?
 
-Each user can switch it themselves: **Account ▾ → Dark theme** (the account
+Each user can switch it themselves: **Account → Dark theme** (the account
 drawer on a phone). The choice is stored in a `terrapod-theme` cookie in that
 browser and rendered on the server, so the page loads in the chosen theme
 without a flash of the other one.
@@ -315,8 +315,8 @@ The web UI defaults to **light** from 2.0 (it defaulted to dark through 1.x).
 There is no Helm value or config key that sets the default for everyone, and the
 UI does not follow the viewer's `prefers-color-scheme`: a browser set to dark
 still opens light until its user flips the toggle. A deployment that wants dark
-for every user needs a source edit, adding `className="dark"` to the `<html>`
-element in `web/src/app/layout.tsx` so it always carries the class.
+for every user changes `DEFAULT_THEME` to `'dark'` in `web/src/lib/theme.ts`; a
+user's own choice still wins over it.
 
 Dark is restored exactly rather than approximately: the dark values are
 Tailwind's own plus the `brand` ramp, and light is a single `:root:not(.dark)`
