@@ -999,17 +999,34 @@ function WorkspacesPageInner() {
   /** The explanatory line under a field, where one exists already translated. */
   function createHint(attr: string): ReactNode {
     switch (attr) {
-      // The composed `project::stack` name is the one an operator must get
-      // right before the browser will let the form submit at all, so its hint
-      // is shown rather than left to the input's `title`.
+      // Two things belong under this field and they are not alternatives: the
+      // naming RULE, which mirrors the input's own `pattern` and which #2432
+      // moved on screen rather than leaving it in the `title` tooltip; and,
+      // for Pulumi, how to point the CLI at the stack once it exists.
+      //
+      // They were two separate `case 'name':` arms, and a switch takes the
+      // FIRST match -- so the rule arm below was dead code and the rule
+      // reached nobody on this page, for either engine. CodeQL's
+      // js/duplicate-switch-case found it; `no-duplicate-case` is an ESLint
+      // error as of this change, so the class fails lint rather than waiting
+      // on a security scan. The CLI hint rides as `trailing`, which
+      // `tieredHint` keeps on the always-visible lead, and keeps its test id
+      // because `e2e/tests/pulumi-workspace.spec.ts` asserts it.
       case 'name':
-        return engine === 'pulumi' ? (
-          <p className="mt-1 text-xs text-slate-400" data-testid="ws-pulumi-name-hint">
-            {t.rich('form.pulumiNameHint', {
-              code: (c) => <code className="bg-slate-700 px-1 rounded">{c}</code>,
-            })}
-          </p>
-        ) : undefined
+        return engine === 'pulumi'
+          ? // The key stays on the `tieredHint(` line: the render gate in
+            // tests/hint-tiers.test.ts matches per line, deliberately and with
+            // the measurement in its own comment, having removed a lookahead
+            // window that "was buying nothing and hiding something". Splitting
+            // the arguments across lines hides the call from it.
+            tieredHint(t, 'form.namePatternPulumi', (
+              <span className="block mt-1 text-slate-400" data-testid="ws-pulumi-name-hint">
+                {t.rich('form.pulumiNameHint', {
+                  code: (c) => <code className="bg-slate-700 px-1 rounded">{c}</code>,
+                })}
+              </span>
+            ))
+          : hintText(t('form.namePattern'))
       case 'engine':
         return <p className="mt-1 text-xs text-slate-400">{t('form.engineHelp')}</p>
       case 'auto-apply-mode':
@@ -1053,14 +1070,6 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.configureAfterApplyHint'))
       case 'configure-all-hosts':
         return hintText(tDetail('fields.configureAllHostsHint'))
-      case 'name':
-        // The engine decides the rule, so it cannot be a static entry. The
-        // input keeps the CRISP form in its `title` because a `title` beside a
-        // `pattern` is the browser's constraint-validation message; the full
-        // rule is here, on screen, rather than only on hover (#2432).
-        return engine === 'pulumi'
-          ? tieredHint(t, 'form.namePatternPulumi')
-          : hintText(t('form.namePattern'))
       case 'config-directory':
         return tieredHint(tDetail, 'fields.configDirectoryTitle')
       case 'inventory-paths':

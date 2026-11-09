@@ -8,8 +8,10 @@ at that rate is a known scaling constraint for any event-per-row design.
 
 from __future__ import annotations
 
+import ast
 import json
 import os
+import pathlib
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -310,45 +312,38 @@ class TestThePerHostPartition:
         assert '"web1"' in web1 and '"web2"' not in web1
         assert '"web2"' in web2 and '"web1"' not in web2
 
-    async def test_more_hosts_than_open_handles_keep_every_event_in_order(self):
-        active = []
-        real = host_results_service._Partitioner
+    async def test_interleaved_hosts_each_get_a_complete_in_order_partition(self):
+        """Each write is its own append, so interleaving must not lose or reorder.
 
-        class _Spy(real):
-            def add(self, host, raw):
-                super().add(host, raw)
-                active.append(len(self._open_handles))
-
+        This used to patch `MAX_OPEN_PARTITION_FILES` down to 2 and assert the
+        LRU never held more than that, because a reopen after eviction was
+        where a lost or reordered append would have come from. There is no
+        cache to bound now -- `add` appends inside its own `with` -- so the
+        bound has nothing left to assert, while the property it was protecting
+        is unchanged and is what this checks.
+        """
         records = [
             {"kind": "ok", "host": host, "seq": seq}
             for seq, host in enumerate(("web1", "web2", "web3", "web1", "web2", "web3"))
         ]
-        with (
-            patch.object(host_results_service, "MAX_OPEN_PARTITION_FILES", 2),
-            patch.object(host_results_service, "_Partitioner", _Spy),
-        ):
-            _, run, puts = await _ingest_capturing(records)
+        _, run, puts = await _ingest_capturing(records)
 
-        assert max(active) == 2
         assert len(puts) == 3
         for host in ("web1", "web2", "web3"):
             expected = "".join(json.dumps(r) + "\n" for r in records if r["host"] == host)
             assert _partition(puts, run, host) == expected.encode()
 
-    async def test_the_release_stack_grows_with_hosts_not_with_writes(self):
-        """One registration per HOST, however many times its handle reopens.
+    async def test_the_bookkeeping_grows_with_hosts_not_with_writes(self):
+        """One entry per HOST, however many times that host is written.
 
-        Past `MAX_OPEN_PARTITION_FILES` hosts the LRU miss rate approaches
-        100%, so registering each `open` made the release stack grow with the
-        number of WRITES -- ~10,000 callbacks for a 500-host play with 20
-        tasks, held for the whole ingest (#2425). The sibling test above is
-        what proves the reopen still appends correctly; this one is only about
-        the growth.
-
-        It reads the stack's private callback deque deliberately. The property
-        IS that structure's size, and the alternatives -- asserting a memory
-        figure, or counting `open` calls -- either cannot be measured in a test
-        or restate the implementation more loosely than this does.
+        Its predecessor measured an `ExitStack`'s private callback deque,
+        because the release mechanism was a per-host callback and registering
+        one per `open` made it grow with the number of WRITES -- ~10,000 for a
+        500-host play with 20 tasks (#2425). That mechanism went with the handle
+        cache, and the memory property it was protecting now belongs to the path
+        map: this class exists so the API pod's memory does not scale with the
+        operator's estate, and it must not scale with the stream's length
+        either.
         """
         depths = []
         real = host_results_service._Partitioner
@@ -356,19 +351,16 @@ class TestThePerHostPartition:
         class _Spy(real):
             def add(self, host, raw):
                 super().add(host, raw)
-                depths.append(len(self._stack._exit_callbacks))
+                depths.append(len(self._paths))
 
         hosts = ("web1", "web2", "web3")
         records = [{"kind": "ok", "host": host, "seq": seq} for seq, host in enumerate(hosts * 4)]
-        with (
-            patch.object(host_results_service, "MAX_OPEN_PARTITION_FILES", 2),
-            patch.object(host_results_service, "_Partitioner", _Spy),
-        ):
+        with patch.object(host_results_service, "_Partitioner", _Spy):
             _, run, puts = await _ingest_capturing(records)
 
         assert len(records) == 12, "the point is that writes outnumber hosts"
         assert max(depths) == len(hosts), (
-            f"the stack reached {max(depths)} entries for {len(hosts)} hosts "
+            f"the map reached {max(depths)} entries for {len(hosts)} hosts "
             f"over {len(records)} writes -- it is growing per write"
         )
         # And every partition is still complete, so the bound was not bought
@@ -476,18 +468,22 @@ class TestThePerHostPartition:
 
 
 @pytest.mark.asyncio
-class TestEveryHandleAndTheTempDirectoryAreReleased:
+class TestTheSpoolDirectoryIsAlwaysRemoved:
     """The partitioner's lifetime is a `with`, not a `try` around `flush` alone.
 
-    It opens handles inside the streaming loop, so a cleanup that
-    guarded only `flush` left those handles open and the temp directory behind
-    whenever anything between the two raised -- a storage error mid-stream, or a
-    failing `db.flush`. That is one descriptor per host plus a full copy of the
-    stream split by host: exactly the PVC-filling failure the cleanup exists to
-    prevent, and what CodeQL's py/file-not-closed pointed at.
+    It writes a full copy of the stream split by host into a temp directory, so
+    a cleanup that guarded only `flush` left that directory behind whenever
+    anything between the two raised -- a storage error mid-stream, or a failing
+    `db.flush`. That is exactly the PVC-filling failure the cleanup exists to
+    prevent, and what CodeQL's py/file-not-closed first pointed at.
+
+    There are no open handles left to assert about, because each append is its
+    own `with`. That is the stronger property, and a behavioural test cannot
+    see a cached handle reintroduced later -- so it is pinned over the source
+    by `test_every_open_in_this_module_is_a_with` below.
     """
 
-    async def test_a_failure_after_the_stream_still_releases_everything(self):
+    async def test_a_failure_after_the_stream_still_removes_the_directory(self):
         created: list = []
         real = host_results_service._Partitioner
 
@@ -511,8 +507,49 @@ class TestEveryHandleAndTheTempDirectoryAreReleased:
 
         assert created, "the partitioner was never constructed"
         partitioner = created[0]
-        # Without this the assertions below pass vacuously: nothing needs
-        # releasing if nothing was ever opened.
-        assert len(partitioner._handles) == 2, partitioner._handles
-        assert all(handle.closed for handle in partitioner._handles.values())
+        # Without this the assertion below passes vacuously: nothing needs
+        # removing if nothing was ever spooled.
+        assert len(partitioner._paths) == 2, partitioner._paths
         assert not os.path.exists(partitioner._dir)
+
+
+def test_every_open_in_this_module_is_a_with() -> None:
+    """No `open` in `host_results_service` may outlive its own statement.
+
+    This is the durable half of the fix for CodeQL's py/file-not-closed, which
+    was raised against this module three times and dismissed twice -- alert 550,
+    then 558 twelve lines further down, then 566 once the file moved again. A
+    dismissal is per-alert, so it does not survive the file being edited, which
+    makes it a deferral rather than a disposition. The construct the query
+    objects to is therefore gone instead of argued with, and this is what keeps
+    it gone: a cached handle cannot come back without failing here, where the
+    behavioural test above would not notice it.
+
+    Derived from the module's own source rather than from a list of call sites,
+    so a new `open` anywhere in it is in scope automatically, and floored so a
+    matcher that stops matching fails instead of passing on nothing.
+    """
+    tree = ast.parse(pathlib.Path(host_results_service.__file__).read_text())
+
+    guarded = {
+        item.context_expr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.With | ast.AsyncWith)
+        for item in node.items
+    }
+    opens = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "open"
+    ]
+
+    assert len(opens) >= 2, (
+        f"the matcher found {len(opens)} open() calls in host_results_service; it is "
+        "meant to see every one, so a floor this low failing means the matcher broke"
+    )
+    loose = sorted(node.lineno for node in opens if node not in guarded)
+    assert loose == [], (
+        "every open() in host_results_service must be the context expression of a "
+        "`with`, so that its close is checkable by reading one line rather than by "
+        f"tracing a handle through a dict. Loose open() at line(s): {loose}"
+    )

@@ -28,12 +28,10 @@ somebody needs when a configure was killed.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import shutil
 import tempfile
-from collections import OrderedDict
 from typing import Any
 
 from sqlalchemy import select
@@ -55,9 +53,6 @@ ROW_KINDS = ("failed", "unreachable")
 #: caps only what Postgres holds, and the cap being hit is logged rather than
 #: silent.
 MAX_EVENT_ROWS = 2000
-
-# Keep a bounded number of spool files open even for a large inventory.
-MAX_OPEN_PARTITION_FILES = 64
 
 #: `msg` is for a reader to recognise the failure, not to hold the payload --
 #: that stays in the stream, or in the sidecar when it is large.
@@ -155,100 +150,53 @@ class _Partitioner:
         self._workspace_id = workspace_id
         self._run_id = run_id
         self._dir = tempfile.mkdtemp(prefix="tp-hostevents-", dir=_resolve_tmpdir())
-        self._handles: dict[str, Any] = {}
-        self._open_handles: OrderedDict[str, Any] = OrderedDict()
-        # Every host this object opens a file for is registered here once, so
-        # releasing them is one call rather than three hand-written loops that
-        # each had to remember the others. `cleanup` closes the stack; the LRU
-        # below and `flush` still close individual handles early, and closing
-        # an already-closed file is a no-op.
+        # host -> that host's spool file path. The PATH, not an open handle:
+        # `add` appends inside a `with`, so no descriptor outlives the call and
+        # the only thing `cleanup` has left to release is the directory.
         #
-        # ONE entry per HOST, not one per `open`. `add` reopens a handle after
-        # an LRU eviction, so registering each open made the stack grow with
-        # the number of WRITES: past MAX_OPEN_PARTITION_FILES hosts the miss
-        # rate approaches 100%, and a 500-host play with 20 tasks accumulated
-        # ~10,000 callbacks held for the whole ingest (#2425 section 4 noted
-        # this as a performance note rather than a defect, and it is -- the
-        # callbacks are released at cleanup). It is still the thing this class
-        # exists to avoid: the docstring above says the partition is buffered
-        # to disk so the API pod's memory does not scale with the operator's
-        # estate, and a per-write callback list scales with it by a smaller
-        # constant. A per-host callback closes whatever handle that host
-        # currently holds, so the release guarantee is unchanged and remains
-        # pinned by `TestEveryHandleAndTheTempDirectoryAreReleased`.
+        # This used to cache handles behind a 64-entry LRU to amortise the
+        # `open`, and that shape cost three CodeQL py/file-not-closed alerts
+        # and two dismissals -- 550, then 558 twelve lines further down, then
+        # 566 once the file moved again. The property was real and tested:
+        # every handle was closed by LRU eviction, by `flush`, or by an
+        # ExitStack callback. But it lived across four members plus a `with` on
+        # the caller, which no analyser can verify and a reader has to
+        # reconstruct -- and a suppression that must be re-applied every time
+        # the file is edited is not a disposition. So the lifetime is now one
+        # line long and both can check it by looking at it.
         #
-        # This replaced a SIM115 suppression on the `open` below. The handle
-        # genuinely outlives that frame, so the noqa was honest -- but CodeQL
-        # reported it anyway (py/file-not-closed) and the dismissal did not
-        # survive the code moving: alert 550 was dismissed at line 162 and
-        # alert 558 appeared for the same construct twelve lines later. A
-        # suppression that has to be re-applied every time the file is edited
-        # is not a disposition, so the resource is handed to the stdlib's own
-        # mechanism for releasing a dynamic set of resources instead.
-        self._stack = contextlib.ExitStack()
+        # The trade is an open/close pair per written line instead of one per
+        # host per eviction cycle. These are appends to a local spool file that
+        # is read back and uploaded moments later, so the syscall pair is noise
+        # beside the HTTP stream being parsed and the object being PUT. It also
+        # removes the per-host ExitStack callback whose growth #2425 section 4
+        # recorded as a cost in its own right.
+        self._paths: dict[str, str] = {}
 
     def add(self, host: str, raw: bytes) -> None:
-        handle = self._handles.get(host)
-        if handle is None or handle.closed:
-            if len(self._open_handles) >= MAX_OPEN_PARTITION_FILES:
-                _, oldest = self._open_handles.popitem(last=False)
-                oldest.close()
+        path = self._paths.get(host)
+        if path is None:
             # One file per host, named by ordinal rather than by hostname: a
             # host name is not a safe filename, and the mapping is held in the
             # dict rather than recovered from the directory.
-            path = (
-                handle.name
-                if handle is not None
-                else os.path.join(self._dir, f"{len(self._handles)}.jsonl")
-            )
-            # noqa because the handle outlives this frame by design: it is
-            # closed on LRU eviction above, in `flush`, or in `cleanup` -- and
-            # `cleanup` runs on every path because the only call site holds this
-            # object in a `with`. CodeQL's py/file-not-closed cannot see through
-            # the dict plus the context manager and reports it anyway (alert
-            # 558, dismissed); the property is pinned by
-            # `TestEveryHandleAndTheTempDirectoryAreReleased` in
-            # `tests/services/test_host_results_ingest.py`, which drives the
-            # real `ingest` with a failure AFTER the stream and asserts handles
-            # were opened and then all closed. Name the test rather than just
-            # asserting the property, so the next triage reads the proof
-            # instead of re-deriving it.
-            # Registered BEFORE the open, so a raising `open` cannot leave an
-            # unreleased handle: the callback reads whatever the dict holds at
-            # cleanup time, and `None` is a no-op.
-            if host not in self._handles:
-                self._stack.callback(self._close_current, host)
-            handle = open(path, "ab" if handle is not None else "wb")
-            self._handles[host] = handle
-            self._open_handles[host] = handle
-        else:
-            self._open_handles.move_to_end(host)
-        handle.write(raw)
-        if not raw.endswith(b"\n"):
-            handle.write(b"\n")
-
-    def _close_current(self, host: str) -> None:
-        """Close whichever handle this host holds now, if any.
-
-        Registered on the stack once per host. An earlier handle for the same
-        host was already closed by the LRU eviction that replaced it, so every
-        handle is closed exactly once by one of eviction, `flush`, or this.
-        """
-        handle = self._handles.get(host)
-        if handle is not None:
-            handle.close()
+            path = os.path.join(self._dir, f"{len(self._paths)}.jsonl")
+            self._paths[host] = path
+        # "ab" unconditionally: the directory is made fresh per run, so the
+        # first append to a new path creates the file and there is never prior
+        # content to truncate.
+        with open(path, "ab") as handle:
+            handle.write(raw)
+            if not raw.endswith(b"\n"):
+                handle.write(b"\n")
 
     async def flush(self) -> int:
         """Upload one object per host. Returns how many were written."""
         storage = get_storage()
         written = 0
-        for handle in self._open_handles.values():
-            handle.close()
-        self._open_handles.clear()
-        for host, handle in self._handles.items():
+        for host, path in self._paths.items():
             key = host_events_host_key(self._workspace_id, self._run_id, host)
             try:
-                with open(handle.name, "rb") as fh:
+                with open(path, "rb") as fh:
                     await storage.put(key, fh.read(), content_type="application/x-ndjson")
                 written += 1
             except Exception:
@@ -270,16 +218,17 @@ class _Partitioner:
         self.cleanup()
 
     def cleanup(self) -> None:
-        """Release every handle and the temp directory, on every path.
+        """Remove the spool directory, on every path.
 
         The only call site holds this object in a `with`, so this runs whether
-        `ingest` returns or raises -- which is the property
-        `TestEveryHandleAndTheTempDirectoryAreReleased` pins by driving the real
-        `ingest` with a failure AFTER the stream and asserting that handles were
-        opened and then all closed.
+        `ingest` returns or raises -- the property
+        `TestTheSpoolDirectoryIsAlwaysRemoved` pins by driving the real `ingest`
+        with a failure AFTER the stream. There are no descriptors left to
+        release: every `open` in this module is a `with`, which
+        `test_every_open_in_this_module_is_a_with` asserts over the source so
+        the CodeQL class cannot return by someone reintroducing a cached
+        handle.
         """
-        self._stack.close()
-        self._open_handles.clear()
         shutil.rmtree(self._dir, ignore_errors=True)
 
 
@@ -364,14 +313,13 @@ async def ingest(db: AsyncSession, run: Run) -> tuple[int, int]:
     events: list[RunHostEvent] = []
     malformed = 0
     truncated = False
-    # The partitioner owns a temp directory and a bounded set of open handles, so
-    # its lifetime is a `with` rather than a `try` around `flush` alone. That
-    # arrangement was the defect CodeQL's py/file-not-closed pointed at: the
-    # handles are opened in the streaming loop below, and the `finally` began
-    # after it -- so a storage error mid-stream, or a failing `db.flush`, left
-    # every handle open and the directory behind. One descriptor per host and
-    # a full copy of the stream split by host, which is exactly the
-    # PVC-filling failure the cleanup existed to prevent.
+    # The partitioner owns a temp directory holding a full copy of the stream
+    # split by host, so its lifetime is a `with` rather than a `try` around
+    # `flush` alone: a storage error mid-stream, or a failing `db.flush`, used
+    # to leave the directory behind, which is exactly the PVC-filling failure
+    # the cleanup exists to prevent. It no longer holds open descriptors --
+    # each append is its own `with` -- so the directory is all there is to
+    # release.
     #
     # "At completion", per #1928: the upload happens after the pass, so a
     # partition exists only for a stream that was read all the way through.
