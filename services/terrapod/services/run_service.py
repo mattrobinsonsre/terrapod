@@ -1752,9 +1752,21 @@ async def create_run(
     # In the Terraform Enterprise vocabulary the run's post-plan task stage
     # exists from the start, as it does there: the CLI reads a run's stages
     # once, right after creating it, and never sees one added later (#1704).
+    #
+    # Not for a STANDALONE configure, which has no plan to follow. The only
+    # caller of `create_task_stage(..., "post_plan")` is `complete_plan`, which
+    # such a run never reaches -- so the stage would be reserved `pending`,
+    # never start, and be cancelled when the run ended. That is visible: the
+    # run document carries a task-stages relationship, so an operator with a
+    # mandatory post-plan task sees a gate on a configure and is entitled to
+    # read it as one having run. It never did (#2435).
+    #
+    # A COMPOSITE configure keeps its reservation, because its apply half does
+    # plan and does reach `complete_plan`. That asymmetry is exactly why this
+    # cannot be `run.is_configure` -- see `is_standalone_configure`.
     from terrapod.config import settings
 
-    if settings.runs.tfe_post_plan_decisions:
+    if settings.runs.tfe_post_plan_decisions and not is_standalone_configure(run):
         from terrapod.services import run_task_service
 
         await run_task_service.reserve_task_stage(db, run.id, workspace.id, "post_plan")
