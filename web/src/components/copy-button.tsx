@@ -17,6 +17,29 @@ interface CopyButtonProps {
   testId?: string
   /** Hide the text label below `sm`, as the run-log control does. */
   responsiveLabel?: boolean
+  /** Overrides the accessible name. Use where "Copy" alone is ambiguous
+   *  because the page holds several copy controls. */
+  ariaLabel?: string
+  /** Padding, and so height. See `SIZING` -- a dense toolbar needs `compact`. */
+  size?: Size
+  /** An idle tooltip. The failure title always wins over it, because that one
+   *  carries the recovery advice. */
+  title?: string
+}
+
+type Size = 'compact' | 'default'
+
+const SIZING: Record<Size, string> = {
+  /** The dense-toolbar idiom (`px-2 py-1`), matching the siblings a copy
+   *  control sits beside there. It imposes NO height, deliberately: a pane with
+   *  a reserved height is measured from the toolbar above it, so a copy button
+   *  taller than its row silently shrinks the pane. That shipped once, 12px
+   *  over an end-to-end tolerance of 2, because this control appears only once
+   *  the log has content and so the row grows when output arrives. */
+  compact: 'px-2 py-1',
+  /** A standalone primary action, where the tap target matters more than the
+   *  row -- the write-once secrets this component exists for. */
+  default: 'px-3 py-2 min-h-[2.25rem]',
 }
 
 type Outcome = 'idle' | 'copied' | 'failed'
@@ -51,6 +74,9 @@ export function CopyButton({
   className,
   testId,
   responsiveLabel = false,
+  ariaLabel,
+  size = 'default',
+  title,
 }: CopyButtonProps) {
   const t = useTranslations('common')
   const [outcome, setOutcome] = useState<Outcome>('idle')
@@ -88,10 +114,13 @@ export function CopyButton({
         type="button"
         onClick={copy}
         data-testid={testId}
-        aria-label={outcome === 'failed' ? t('copy.failedAria') : (label ?? t('copy.button'))}
-        title={outcome === 'failed' ? t('copy.failedTitle') : undefined}
+        aria-label={
+          outcome === 'failed' ? t('copy.failedAria') : (ariaLabel ?? label ?? t('copy.button'))
+        }
+        title={outcome === 'failed' ? t('copy.failedTitle') : title}
         className={
-          'px-3 py-2 min-h-[2.25rem] rounded text-xs font-medium transition-colors inline-flex items-center gap-1.5 ' +
+          SIZING[size] +
+          ' rounded text-xs font-medium transition-colors inline-flex items-center gap-1.5 ' +
           (outcome === 'failed'
             ? 'bg-red-900/40 text-red-200 hover:bg-red-900/60'
             : 'bg-slate-700 text-slate-200 hover:bg-slate-600') +

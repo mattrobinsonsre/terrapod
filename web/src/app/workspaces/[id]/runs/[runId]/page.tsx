@@ -932,7 +932,10 @@ function LogPanel({
               <CopyButton
                 value={plainContent}
                 label={t('log.copy')}
+                ariaLabel={t('log.copyAria')}
+                title={t('log.copyTitle')}
                 responsiveLabel
+                size="compact"
                 testId="run-log-copy"
               />
             )}
