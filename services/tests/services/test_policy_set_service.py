@@ -149,3 +149,68 @@ async def test_evaluate_post_plan_speculative_runs_never_block() -> None:
             await policy_set_service.evaluate_post_plan(db, run) == policy_set_service.GATE_PASSED
         )
     gate_query.assert_not_called()
+
+
+class TestWhyNoPolicySetWasEvaluated:
+    """`policy_sets_not_evaluated_reason` answers for a RUN, not an engine (#2435).
+
+    All three post-plan gates are called from one place,
+    `run_service._complete_plan`, and a standalone configure has no plan so
+    never reaches it. Keyed on the workspace alone, the function returned
+    `None` for such a run -- which reads as "every set in scope was applied".
+    An operator who scoped a mandatory set saw nothing anywhere saying
+    otherwise, which is worse than the missing enforcement, because the
+    absence is invisible.
+    """
+
+    @staticmethod
+    def _ws(engine: str = "terraform") -> SimpleNamespace:
+        return SimpleNamespace(id=uuid.uuid4(), engine=engine)
+
+    @staticmethod
+    def _run(*, is_configure: bool) -> SimpleNamespace:
+        return SimpleNamespace(id=uuid.uuid4(), plan_only=False, is_configure=is_configure)
+
+    def test_a_configure_says_why_it_was_not_evaluated(self) -> None:
+        reason = policy_set_service.policy_sets_not_evaluated_reason(
+            self._ws(), self._run(is_configure=True)
+        )
+        assert reason is not None
+        # Names the cause, not just the fact: an operator needs to know it is
+        # the absence of a plan rather than a misscoped set.
+        assert "configure" in reason.lower()
+        assert "plan" in reason.lower()
+
+    def test_a_plan_apply_run_on_THAT_SAME_WORKSPACE_is_still_evaluated(self) -> None:
+        """The relationship, which is the whole safety property.
+
+        A workspace may have `configure_enabled` AND `plan_apply_enabled`. If
+        the reason were a property of the WORKSPACE, it would be truthy here
+        too -- and `evaluate_post_plan` short-circuits to `GATE_PASSED` on a
+        reason, so that would pass every apply on every configure-enabled
+        workspace. Testing the configure case alone cannot see that; the pair
+        can.
+        """
+        ws = self._ws()
+        assert (
+            policy_set_service.policy_sets_not_evaluated_reason(ws, self._run(is_configure=True))
+            is not None
+        )
+        assert (
+            policy_set_service.policy_sets_not_evaluated_reason(ws, self._run(is_configure=False))
+            is None
+        )
+
+    def test_the_engine_answer_is_unchanged_when_no_run_is_given(self) -> None:
+        # The pre-existing contract: a caller with no run in hand still gets
+        # the engine-only answer rather than an exception.
+        assert policy_set_service.policy_sets_not_evaluated_reason(self._ws()) is None
+
+    def test_an_engine_that_does_not_evaluate_still_wins_over_run_shape(self) -> None:
+        # Order matters: the engine reason is the more fundamental one, and it
+        # names the engine rather than the run shape.
+        with patch("terrapod.engines.evaluates_policy_sets", return_value=False):
+            reason = policy_set_service.policy_sets_not_evaluated_reason(
+                self._ws("pulumi"), self._run(is_configure=True)
+            )
+        assert reason is not None and "pulumi" in reason

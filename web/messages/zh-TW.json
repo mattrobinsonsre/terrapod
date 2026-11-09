@@ -1993,7 +1993,14 @@
       "removeProviderAria": "移除 provider 設定 {provider}"
     },
     "showDetail": "顯示完整說明",
-    "hideDetail": "隱藏完整說明"
+    "hideDetail": "隱藏完整說明",
+    "copy": {
+      "button": "複製",
+      "copied": "已複製",
+      "failed": "複製失敗",
+      "failedAria": "複製失敗 — 請選取該值並手動複製",
+      "failedTitle": "瀏覽器拒絕了剪貼簿存取權限。請選取該值並手動複製。"
+    }
   },
   "planSummary": {
     "aiGenerated": "AI 生成",
@@ -2251,7 +2258,6 @@
       "refresh": "重新整理",
       "refreshTitle": "重新整理日誌",
       "copy": "複製",
-      "copied": "已複製！",
       "copyTitle": "將純文字複製到剪貼簿",
       "copyAria": "將日誌複製到剪貼簿",
       "download": "下載",

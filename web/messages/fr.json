@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Retirer la configuration de provider {provider}"
     },
     "showDetail": "Afficher l''explication complète",
-    "hideDetail": "Masquer l''explication complète"
+    "hideDetail": "Masquer l''explication complète",
+    "copy": {
+      "button": "Copier",
+      "copied": "Copié",
+      "failed": "Échec de la copie",
+      "failedAria": "Échec de la copie — sélectionnez la valeur et copiez-la à la main",
+      "failedTitle": "Accès au presse-papiers refusé par le navigateur. Sélectionnez la valeur et copiez-la manuellement."
+    }
   },
   "planSummary": {
     "aiGenerated": "Généré par IA",
@@ -2251,7 +2258,6 @@
       "refresh": "Actualiser",
       "refreshTitle": "Actualiser le journal",
       "copy": "Copier",
-      "copied": "Copié !",
       "copyTitle": "Copier le texte brut dans le presse-papiers",
       "copyAria": "Copier le journal dans le presse-papiers",
       "download": "Télécharger",

@@ -49,7 +49,11 @@ def _ws(engine="pulumi", **kw):
 
 
 def _run(ws):
-    return SimpleNamespace(id=uuid.uuid4(), plan_only=False, workspace_id=ws.id)
+    # `is_configure` because the reason function now keys on the run's SHAPE,
+    # not the engine alone (#2435). SimpleNamespace raises on a missing
+    # attribute rather than being silently truthy, which is why this showed up
+    # as six named failures instead of a wrong answer.
+    return SimpleNamespace(id=uuid.uuid4(), plan_only=False, workspace_id=ws.id, is_configure=False)
 
 
 class TestWhichEnginesAreEvaluated:

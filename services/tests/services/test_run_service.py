@@ -527,6 +527,52 @@ def _mock_workspace(**kwargs):
 
 @pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestCreateRun:
+    @pytest.mark.parametrize(
+        ("is_configure", "configure_after_apply", "reserves"),
+        [
+            # A STANDALONE configure has no plan to follow, and the only caller
+            # of `create_task_stage(..., "post_plan")` is `complete_plan`, which
+            # it never reaches. A stage reserved for one would sit `pending`,
+            # never start, and be cancelled when the run ended -- while showing
+            # on the run document as a task-stages relationship, so an operator
+            # with a MANDATORY post-plan task sees a gate on a configure and is
+            # entitled to read it as one that ran. It never did (#2435).
+            (True, False, False),
+            # A COMPOSITE does plan, in its apply half, and does reach
+            # `complete_plan` -- so it keeps its reservation. Instantiated
+            # beside the case above on purpose: with only one of the two, the
+            # guard reads the same whether it is written on `is_configure`
+            # alone (which would wrongly strip the composite) or on the
+            # standalone predicate.
+            (True, True, True),
+            # And the ordinary run, which is what the vocabulary is for.
+            (False, False, True),
+        ],
+        ids=["standalone-configure", "composite-configure", "ordinary-run"],
+    )
+    @patch("terrapod.services.run_service.Run")
+    async def test_only_a_run_that_can_reach_the_boundary_reserves_its_stage(
+        self, MockRun, _stub_post_plan_stages, is_configure, configure_after_apply, reserves
+    ):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        ws = _mock_workspace()
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+        # Set EXPLICITLY: left as MagicMock attributes both are truthy, so every
+        # run here would read as a composite and the standalone case -- the one
+        # this guard exists for -- would never be exercised.
+        instance.is_configure = is_configure
+        instance.configure_after_apply = configure_after_apply
+
+        await create_run(db, ws)
+
+        assert _stub_post_plan_stages.reserve.await_count == (1 if reserves else 0)
+
     @patch("terrapod.services.run_service.Run")
     async def test_creates_run_with_defaults(self, MockRun):
         db = AsyncMock(spec=AsyncSession)

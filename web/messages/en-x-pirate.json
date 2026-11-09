@@ -1993,7 +1993,14 @@
       "removeProviderAria": "Remove th'' {provider} provider riggin''"
     },
     "showDetail": "Show th'' full yarn",
-    "hideDetail": "Stow th'' full yarn"
+    "hideDetail": "Stow th'' full yarn",
+    "copy": {
+      "button": "Copy",
+      "copied": "Copied, matey",
+      "failed": "Copy foundered",
+      "failedAria": "Copy foundered — select th'' value an'' copy it by yer own hand",
+      "failedTitle": "Th'' browser refused th'' clipboard access. Select th'' value an'' copy it by yer own hand."
+    }
   },
   "planSummary": {
     "aiGenerated": "AI conjured",
@@ -2251,7 +2258,6 @@
       "refresh": "Refresh",
       "refreshTitle": "Refresh th'' ship''s log",
       "copy": "Copy",
-      "copied": "Copied, matey!",
       "copyTitle": "Copy plain text t'' th'' clipboard",
       "copyAria": "Copy th'' ship''s log t'' th'' clipboard",
       "download": "Download",

@@ -14,6 +14,7 @@ import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
 import { useConfirm } from '@/lib/use-confirm'
+import { CopyButton } from '@/components/copy-button'
 
 interface Token {
   id: string
@@ -360,12 +361,12 @@ export default function TokensPage() {
               >
                 {showToken ? t('tokens.hide') : t('tokens.show')}
               </button>
-              <button
-                onClick={() => navigator.clipboard.writeText(createdToken)}
-                className="px-3 py-1 rounded text-xs font-medium bg-green-800/50 hover:bg-green-700/50 text-green-200 transition-colors flex-shrink-0"
-              >
-                {t('tokens.copy')}
-              </button>
+              <CopyButton
+                value={createdToken}
+                label={t('tokens.copy')}
+                testId="api-token-copy"
+                className="flex-shrink-0"
+              />
             </div>
           </div>
         )}

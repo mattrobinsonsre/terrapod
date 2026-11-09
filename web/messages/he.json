@@ -1993,7 +1993,14 @@
       "removeProviderAria": "הסרת תצורת provider {provider}"
     },
     "showDetail": "הצגת ההסבר המלא",
-    "hideDetail": "הסתרת ההסבר המלא"
+    "hideDetail": "הסתרת ההסבר המלא",
+    "copy": {
+      "button": "העתקה",
+      "copied": "הועתק",
+      "failed": "ההעתקה נכשלה",
+      "failedAria": "ההעתקה נכשלה — בחרו את הערך והעתיקו אותו ידנית",
+      "failedTitle": "הדפדפן דחה את הגישה ללוח. בחרו את הערך והעתיקו אותו ידנית."
+    }
   },
   "planSummary": {
     "aiGenerated": "נוצר על ידי AI",
@@ -2251,7 +2258,6 @@
       "refresh": "רענן",
       "refreshTitle": "רענן יומן",
       "copy": "העתק",
-      "copied": "הועתק!",
       "copyTitle": "העתק טקסט רגיל ללוח",
       "copyAria": "העתק יומן ללוח",
       "download": "הורד",
