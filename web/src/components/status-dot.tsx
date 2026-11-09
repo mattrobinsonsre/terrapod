@@ -17,8 +17,12 @@ export type EntityStatus = 'online' | 'degraded' | 'cert-expired' | 'offline'
 interface StatusDotProps {
   status: string | undefined
   /** The already-translated status text. Becomes the accessible name, so the
-   *  dot is not a colour-only signal — the mobile layout renders the dot alone
-   *  and had only a hover `title`, which a touch user never sees. */
+   *  dot is never a colour-only signal for a screen reader.
+   *
+   *  It does NOT discharge WCAG 1.4.11 for a sighted user: an accessible name
+   *  is not a visual presentation. Every call site must also render this text
+   *  VISIBLY beside the dot, which `tests/status-dot-pairing.test.ts` asserts
+   *  — see the note on `FILL` for why the dot cannot carry state on its own. */
   label: string
   className?: string
 }
@@ -36,6 +40,20 @@ interface StatusDotProps {
  * and are bright enough on dark, so one class works in both themes. Do not
  * "brighten" these by moving to a lower number: on light that makes them
  * darker.
+ *
+ * And do not chase WCAG 1.4.11's 3:1 by moving to a HIGHER number either. It
+ * cannot be reached: measured against both themes' own surfaces, the 500 row
+ * clears 3:1 on dark and fails on light (online 2.64, degraded 2.62,
+ * cert-expired 2.37) while the 600 row does the exact reverse (online 2.96,
+ * degraded 2.91, offline 2.28 on dark). The light ladder sits at luminance
+ * .75-.95 and the dark at .01-.05, so a single mid-chroma fill is squeezed from
+ * both ends — there is no stop that passes both, and a per-theme remap of
+ * `*-500` would move every other consumer of those stops with it.
+ *
+ * So the dot is deliberately NOT the carrier of state: each call site renders
+ * the status word beside it, and 1.4.11 does not bind on a graphic that is not
+ * required to understand the content. The 500 row is then chosen purely for hue
+ * legibility, which is what a status LED is for.
  */
 const FILL: Record<EntityStatus, string> = {
   online: 'bg-green-500',
