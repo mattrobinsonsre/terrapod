@@ -862,6 +862,19 @@ multi-language implementation ships in the same PR**:
   is high; "unrelated" without evidence is a workaround. The same goes for a
   flaky test: prove it's flaky, then **fix the flake** — re-running until green
   just hides it for the next person.
+- **A code-scanning alert is addressed in a way that sticks — never just
+  dismissed (hard requirement).** A dismissal is bound to one alert number, so
+  the next edit to that file raises a fresh one: `py/file-not-closed` on one
+  module was dismissed twice and reported three times (alerts 550, 558 twelve
+  lines later, then 566 once the file moved again), and each dismissal read as
+  a disposition while being a deferral. So: if the finding is real, fix it. If
+  the analyser is simply less capable than a reader — it does not model
+  `NoReturn`, it cannot trace a file handle through a dict — **restructure so
+  the property is checkable rather than argued**, which is usually clearer code
+  anyway. Then **gate the class**: a duplicate `switch` case and a dead local
+  are both ESLint errors for free, so a scan finding one means the linter was
+  not asked. Reach for a dismissal only where nothing can be restructured, and
+  say in it why not.
 
 ## CI capacity is finite — keep the merge chain short
 

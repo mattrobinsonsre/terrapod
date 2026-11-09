@@ -29,6 +29,14 @@ const eslintConfig = defineConfig([
     // being needed fails the build rather than lingering.
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
+      // A duplicate case is dead code that reads as live: a switch takes the
+      // first match, so the second arm never runs and whatever it was added
+      // for silently does not happen. One shipped on the workspaces page --
+      // two `case 'name':` arms, the later one carrying the name-pattern rule
+      // -- and CodeQL found it rather than the linter, because this rule is
+      // not in Next's presets. A security scan is a slow and expensive way to
+      // learn something ESLint checks for free.
+      'no-duplicate-case': 'error',
       'jsx-a11y/role-has-required-aria-props': 'error',
     },
   },

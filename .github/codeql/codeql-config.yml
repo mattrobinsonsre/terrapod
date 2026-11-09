@@ -14,6 +14,20 @@
 # now dismissed per alert — which costs a click and leaves a dated, auditable
 # record naming the alert, instead of a comment that silently stops being true.
 #
+# BUT a dismissal is the last resort, not the default, because it is NOT
+# durable: it is bound to one alert number, and the next edit to the file raises
+# a fresh one. py/file-not-closed on host_results_service.py proved it three
+# times over — alert 550 dismissed, 558 for the same construct twelve lines
+# later, then 566 once the file moved again. Two dismissals bought nothing, and
+# each one read as a disposition.
+#
+# So: a finding is addressed in a way that sticks. If it is real, fix it. If the
+# analyser is simply less capable than a reader — it does not model `NoReturn`,
+# it cannot trace a handle through a dict — restructure so the property is
+# checkable rather than argued, and gate the class with a linter rule where one
+# exists, so the next instance fails lint instead of waiting on a security scan.
+# Dismiss only what cannot be restructured, and say in the dismissal why not.
+#
 # What is left is deliberately not security analysis. These flag an idiom the
 # codebase uses on purpose, in hundreds of places, and per-alert dismissal would be
 # churn with no judgement in it:

@@ -51,8 +51,10 @@ const offered = (() => {
 
 const load = (loc: string) => JSON.parse(readFileSync(`messages/${loc}.json`, 'utf8'))
 
-const slot = (doc: Record<string, any>, group: string, leaf: string) =>
-  (doc?.[group]?.[leaf] ?? {}) as Record<string, string>
+type Catalogue = Record<string, Record<string, unknown>>
+
+const slot = (doc: Catalogue, group: string, leaf: string) =>
+  (doc?.[group]?.[leaf] as Record<string, string> | undefined) ?? {}
 
 const EN = Object.fromEntries(
   NAMESPACES.map(([g, l]) => [`${g}.${l}`, slot(load('en'), g, l)]),

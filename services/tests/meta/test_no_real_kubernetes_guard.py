@@ -50,14 +50,24 @@ def _accessors() -> set[str]:
 
 
 def _guard() -> ast.FunctionDef:
-    for node in ast.parse(CONFTEST.read_text()).body:
-        if isinstance(node, ast.FunctionDef) and node.name == "_no_real_kubernetes":
-            return node
-    pytest.fail(
-        "tests/conftest.py no longer defines the `_no_real_kubernetes` autouse fixture. "
-        "Without it a test that forgets to patch a Kubernetes call passes on a machine "
-        "with a kubeconfig and fails in CI, silently and by environment (#2406)."
-    )
+    # Matched first and returned once, rather than returning from inside the
+    # loop and falling through to `pytest.fail`. `pytest.fail` is `NoReturn`,
+    # so ruff is right that the old shape could not fall out of the function --
+    # but CodeQL does not model `NoReturn` and read the fall-through as a
+    # mixed return (py/mixed-returns). One explicit return says the same thing
+    # in a form both analysers can check.
+    found = [
+        node
+        for node in ast.parse(CONFTEST.read_text()).body
+        if isinstance(node, ast.FunctionDef) and node.name == "_no_real_kubernetes"
+    ]
+    if not found:
+        pytest.fail(
+            "tests/conftest.py no longer defines the `_no_real_kubernetes` autouse fixture. "
+            "Without it a test that forgets to patch a Kubernetes call passes on a machine "
+            "with a kubeconfig and fails in CI, silently and by environment (#2406)."
+        )
+    return found[0]
 
 
 def _cleared_globals() -> set[str]:
