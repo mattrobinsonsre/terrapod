@@ -45,7 +45,7 @@ interface StatusDotProps {
  * cannot be reached: measured against both themes' own surfaces, the 500 row
  * clears 3:1 on dark and fails on light (online 2.64, degraded 2.62,
  * cert-expired 2.37) while the 600 row does the exact reverse (online 2.96,
- * degraded 2.91, offline 2.28 on dark). The light ladder sits at luminance
+ * degraded 2.91, offline 2.28 on dark). The light surfaces sit at luminance
  * .75-.95 and the dark at .01-.05, so a single mid-chroma fill is squeezed from
  * both ends — there is no stop that passes both, and a per-theme remap of
  * `*-500` would move every other consumer of those stops with it.

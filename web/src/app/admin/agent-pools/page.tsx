@@ -192,7 +192,7 @@ export default function AgentPoolsPage() {
                         {/* Below md the STATUS column is hidden, so reflow the health signal
                             inline — otherwise a phone loses healthy/degraded entirely (#719).
                             The TEXT comes with it: no stop clears WCAG 1.4.11's 3:1 against
-                            both themes' surfaces (the light ladder sits at luminance .75-.95
+                            both themes' surfaces (the light ones sit at luminance .75-.95
                             and the dark at .01-.05, so a mid-chroma fill is squeezed from both
                             ends), and this is the one place the dot would otherwise be the sole
                             visual carrier of state for a sighted user. The dot reinforces; the

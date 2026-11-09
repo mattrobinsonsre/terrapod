@@ -197,15 +197,15 @@ body {
      * luminance alone.
      *
      * The luminance steps themselves are unchanged, and that is deliberate
-     * rather than an oversight -- measured, this ladder is 1.04 page->panel,
+     * rather than an oversight -- measured, the steps are 1.04 page->panel,
      * 1.12 panel->row and 1.31 panel->border, almost exactly what the greys
-     * gave (1.05 / 1.13 / 1.36). Deepening it is NOT available: these surfaces
+     * gave (1.05 / 1.13 / 1.36). Deepening them is NOT available: these surfaces
      * are the ground for translucent badge fills and for hover text, so one
      * step deeper (blue-100/200/300) takes `check_theme_contrast` from 0
      * problems to 7 -- `bg-brand-900/50` falls to 1.08:1 against its own card
-     * and `hover:bg-slate-600 + text-brand-300` to 3.77:1. A deeper ladder
-     * therefore needs those fills reworked first, at every site, which is its
-     * own change.
+     * and `hover:bg-slate-600 + text-brand-300` to 3.77:1. Deeper surfaces would
+     * therefore need those fills reworked first, at every site, which is its own
+     * change.
      *
      * Hue sits just cooler than the brand (`#1447e6`) rather than on it, so a
      * tinted surface does not compete with the blue it is carrying. Text on

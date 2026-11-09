@@ -12,7 +12,7 @@
 //   500 row  online 2.64  degraded 2.62  FAIL      4.54 .. 5.06  PASS
 //   600 row  online 4.05  degraded 4.12  PASS      2.96 .. 2.28  FAIL
 //
-// The light ladder sits at luminance .75-.95 and the dark at .01-.05, so a
+// The light surfaces sit at luminance .75-.95 and the dark at .01-.05, so a
 // single mid-chroma fill is squeezed from both ends. Per-theme remapping of
 // `*-500` would drag every other consumer of those stops along with it.
 //
