@@ -288,8 +288,8 @@ is the same correction the workspace's own `config-directory` needed. At
 provision that subtree is **copied** into the generated configuration version at
 the same relative path (not referenced from it: a composite run's configure Job
 re-fetches the configuration version and never runs `init`), and becomes the
-workspace's `config-directory` alongside the item's `default_playbook` and
-`default_limit`.
+workspace's `config-directory` alongside the item's `default_playbook`,
+`default_limit` and `hard_limit`.
 
 | Tool | Safety | What it does |
 |---|---|---|

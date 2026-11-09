@@ -118,6 +118,7 @@ data terrapod_workspace.engine required=false optional=false computed=true sensi
 data terrapod_workspace.engine_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.execution_backend required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.execution_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.hard_limit required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.inventory_paths required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_workspace.inventory_scripts_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
@@ -600,6 +601,7 @@ resource terrapod_workspace.engine required=false optional=true computed=true se
 resource terrapod_workspace.engine_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.hard_limit required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.inventory_paths required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_workspace.inventory_scripts_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType

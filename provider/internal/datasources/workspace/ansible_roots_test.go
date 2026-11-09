@@ -125,6 +125,7 @@ func TestDataSourceReadsTheRemainingRoots(t *testing.T) {
 		"inventory-paths":  []string{"inventory/production", "inventory/extra.yml"},
 		"default-playbook": "site.yml",
 		"default-limit":    "web",
+		"hard-limit":       "!prod",
 	})
 	if diags := readDataSourceModel(ctx, res, &m); diags.HasError() {
 		t.Fatalf("read: %v", diags)
@@ -140,6 +141,13 @@ func TestDataSourceReadsTheRemainingRoots(t *testing.T) {
 	if m.DefaultLimit.ValueString() != "web" {
 		t.Errorf("default_limit = %q", m.DefaultLimit.ValueString())
 	}
+	// The ceiling, read back verbatim (#2451). The API stores it byte for byte
+	// -- it REFUSES an unusable pattern rather than normalising one -- so a data
+	// source that altered it would make a consumer's comparison disagree with
+	// the workspace.
+	if m.HardLimit.ValueString() != "!prod" {
+		t.Errorf("hard_limit = %q", m.HardLimit.ValueString())
+	}
 	// Empty reads as null for the two strings, so a workspace declaring no
 	// default stays out of a consumer's comparisons. `config_directory` is
 	// deliberately NOT in this set any more -- see its own test above.
@@ -147,9 +155,9 @@ func TestDataSourceReadsTheRemainingRoots(t *testing.T) {
 	if diags := readDataSourceModel(ctx, wsResource(t, map[string]any{"name": "api"}), &m2); diags.HasError() {
 		t.Fatalf("read: %v", diags)
 	}
-	if !m2.DefaultPlaybook.IsNull() || !m2.DefaultLimit.IsNull() {
-		t.Errorf("absent defaults read back as playbook=%v limit=%v, want null",
-			m2.DefaultPlaybook, m2.DefaultLimit)
+	if !m2.DefaultPlaybook.IsNull() || !m2.DefaultLimit.IsNull() || !m2.HardLimit.IsNull() {
+		t.Errorf("absent defaults read back as playbook=%v limit=%v hard=%v, want null",
+			m2.DefaultPlaybook, m2.DefaultLimit, m2.HardLimit)
 	}
 	if !m2.InventoryPaths.IsNull() {
 		t.Errorf("absent inventory_paths read back as %v, want null", m2.InventoryPaths)

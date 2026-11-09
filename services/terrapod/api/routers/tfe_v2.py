@@ -989,6 +989,7 @@ def _workspace_json(
                 "inventory-paths": list(ws.inventory_paths or []),
                 "default-playbook": ws.default_playbook,
                 "default-limit": ws.default_limit,
+                "hard-limit": ws.hard_limit,
                 # One version, two spellings (#1559). `engine-version` is the
                 # canonical one now that the column pins whichever engine the
                 # workspace runs. `terraform-version` is not deprecated and is
@@ -1214,6 +1215,7 @@ def _workspace_json(
             "inventory-paths",
             "default-playbook",
             "default-limit",
+            "hard-limit",
         ):
             payload["data"]["attributes"].pop(_native_only, None)
     return payload
@@ -1913,6 +1915,7 @@ async def _create_workspace_impl(
             attrs.get("default-playbook"),
             "default-playbook",
         ),
+        hard_limit=_422(workspace_settings.validate_hard_limit, attrs.get("hard-limit")),
         default_limit=_422(
             workspace_settings.validate_ansible_run_default,
             attrs.get("default-limit"),
@@ -2731,6 +2734,8 @@ async def update_workspace(
             attrs["default-playbook"],
             "default-playbook",
         )
+    if "hard-limit" in attrs:
+        ws.hard_limit = _422(workspace_settings.validate_hard_limit, attrs["hard-limit"])
     if "default-limit" in attrs:
         ws.default_limit = _422(
             workspace_settings.validate_ansible_run_default,

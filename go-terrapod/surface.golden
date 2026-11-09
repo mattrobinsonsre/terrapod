@@ -402,6 +402,7 @@ field CreateWorkspaceRequest.Engine string `json:"engine,omitempty"`
 field CreateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
+field CreateWorkspaceRequest.HardLimit string `json:"hard-limit,omitempty"`
 field CreateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field CreateWorkspaceRequest.InventoryScriptsEnabled *bool `json:"inventory-scripts-enabled,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
@@ -1289,6 +1290,7 @@ field UpdateWorkspaceRequest.EEResourceMemory string `json:"ee-resource-memory,o
 field UpdateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
+field UpdateWorkspaceRequest.HardLimit *string `json:"hard-limit,omitempty"`
 field UpdateWorkspaceRequest.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field UpdateWorkspaceRequest.InventoryScriptsEnabled *bool `json:"inventory-scripts-enabled,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
@@ -1515,6 +1517,7 @@ field Workspace.Engine string `json:"engine,omitempty"`
 field Workspace.EngineVersion string `json:"engine-version,omitempty"`
 field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Workspace.ExecutionMode string `json:"execution-mode"`
+field Workspace.HardLimit string `json:"hard-limit,omitempty"`
 field Workspace.ID string `json:"id"`
 field Workspace.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field Workspace.InventoryScriptsEnabled bool `json:"inventory-scripts-enabled"`

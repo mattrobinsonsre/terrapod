@@ -1299,7 +1299,8 @@
       "previewDryRun": "Preview (dry run)",
       "applyChanges": "Apply changes",
       "setOidcAudiences": "Set OIDC voyage colours audiences (replaces th'' map on every matched work-deck)",
-      "operationsNone": "This would leave every matched work-deck with no order at all. A work-deck must keep chart an'' make good, or riggin'', or both."
+      "operationsNone": "This would leave every matched work-deck with no order at all. A work-deck must keep chart an'' make good, or riggin'', or both.",
+      "setHardLimit": "Set th'' iron-bound limit (an empty value lifts th'' ceilin'')"
     },
     "diff": {
       "colWorkspace": "Work-deck",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Hoards hauled aboard afore a configure sets sail, one per line as namespace.name or namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "One o' this here deployment's own execution quarters, by label. Settin' one overrides th' workspace's Ansible version, arr.",
       "labelsLead": "Labels do double duty, matey: they be what label-based RBAC matches on, an' they be the tags a cloud block can pick a work-deck by.",
-      "nameTitlePulumiLead": "Two parts split by '::' — project::stack, matey."
+      "nameTitlePulumiLead": "Two parts split by '::' — project::stack, matey.",
+      "hardLimit": "Iron-bound limit",
+      "hardLimitPlaceholder": "e.g. canary",
+      "hardLimitTitle": "It be lashed t'' whatever limit a voyage supplies, so a voyage may haul in within it an'' none may run wider than it. It names at most one muster or hand pattern — say canary, or !prod fer everythin'' save production — because ansible has no way t'' say “either o'' these” in a limit. Fer a ceilin'' over two musters, make a parent muster o'' them in yer manifest an'' name that one, arr.",
+      "hardLimitLead": "A --limit no voyage may slip past. Leave it empty an'' there be no ceilin'' at all, arr."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

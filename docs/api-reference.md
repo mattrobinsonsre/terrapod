@@ -698,6 +698,7 @@ invocation consumes them.
 | `inventory-paths` | list of strings | The inventory sources, in order, each a file or a directory, relative to `config-directory`. Empty falls through to the `inventory` pathlist in the operator's own `ansible.cfg` |
 | `default-playbook` | string | The playbook a configure runs when the run names none |
 | `default-limit` | string | The default `--limit`. Empty is the whole inventory |
+| `hard-limit` | string | A `--limit` **no run may escape**. Empty is no ceiling. Unlike `default-limit`, which a run REPLACES when it supplies its own, this is intersected with whatever limit the run ends up with — so a run may narrow within it and none may widen past it. It bounds what the resolved reads return as well as what a run does. At most one group or host pattern: `canary`, or `!prod` for everything except production. Refused with a 422 naming both terms if it names two, because ansible's `&` is AND and has no form for “either of these”. See [a ceiling no run can widen past](ansible-configure.md#hard-limit-is-a-ceiling-no-run-can-widen-past) |
 
 **The declared inventory rows always take part in resolution.** There is no
 attribute to switch them off, because declaring none already says it: with no

@@ -1299,7 +1299,8 @@
       "previewDryRun": "Vorschau (Probelauf)",
       "applyChanges": "Änderungen anwenden",
       "setOidcAudiences": "OIDC-Audiences der Lauf-Identität setzen (ersetzt die Zuordnung auf jedem getroffenen Arbeitsbereich)",
-      "operationsNone": "Dies würde jeden passenden Workspace ohne jede Operation zurücklassen. Ein Workspace muss Planen und Anwenden oder Konfigurieren oder beides behalten."
+      "operationsNone": "Dies würde jeden passenden Workspace ohne jede Operation zurücklassen. Ein Workspace muss Planen und Anwenden oder Konfigurieren oder beides behalten.",
+      "setHardLimit": "Hartes Limit setzen (ein leerer Wert entfernt die Obergrenze)"
     },
     "diff": {
       "colWorkspace": "Arbeitsbereich",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Collections, die vor einem Configure installiert werden, eine pro Zeile als namespace.name oder namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Eine der eigenen Ausführungsumgebungen dieser Installation, per Label. Das Setzen einer Umgebung überschreibt die Ansible-Version des Workspace.",
       "labelsLead": "Beschriftungen erfüllen einen doppelten Zweck: Nach ihnen richtet sich die beschriftungsbasierte RBAC-Zuordnung, und sie sind die Tags, über die ein cloud-Block einen Workspace auswählen kann.",
-      "nameTitlePulumiLead": "Zwei durch '::' getrennte Teile — project::stack."
+      "nameTitlePulumiLead": "Zwei durch '::' getrennte Teile — project::stack.",
+      "hardLimit": "Hartes Limit",
+      "hardLimitPlaceholder": "z. B. canary",
+      "hardLimitTitle": "Es wird mit dem Limit kombiniert, das ein Lauf selbst mitgibt, sodass ein Lauf darin enger werden kann, aber keiner darüber hinaus. Es benennt höchstens eine Gruppe oder ein Hostmuster — etwa canary oder !prod für alles außer der Produktion — weil ansible in einem Limit nicht „eines von diesen“ ausdrücken kann. Soll die Obergrenze zwei Gruppen umfassen, fassen Sie diese im Inventar zu einer übergeordneten Gruppe zusammen und benennen diese.",
+      "hardLimitLead": "Ein --limit, das kein Lauf überschreiten darf. Leer lassen für keine Obergrenze."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

@@ -1299,7 +1299,8 @@
       "previewDryRun": "预览（试运行）",
       "applyChanges": "应用更改",
       "setOidcAudiences": "设置运行身份的 OIDC 受众（替换每个匹配工作区上的映射）",
-      "operationsNone": "这会让所有匹配的工作区完全没有任何操作。工作区必须保留计划与应用、配置，或两者之一。"
+      "operationsNone": "这会让所有匹配的工作区完全没有任何操作。工作区必须保留计划与应用、配置，或两者之一。",
+      "setHardLimit": "设置强制 limit（空值将移除上限）"
     },
     "diff": {
       "colWorkspace": "工作区",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "在配置运行前安装的集合，每行一个，格式为 namespace.name 或 namespace.name:version。",
       "ansibleExecutionEnvironmentLead": "通过标签指定本部署自有的执行环境。设置后会覆盖该工作区的 Ansible 版本。",
       "labelsLead": "标签具有双重作用：既是基于标签的 RBAC 的匹配依据，也是 cloud 块据以选择工作区的 \"tags\"。",
-      "nameTitlePulumiLead": "由 '::' 分隔的两部分 — project::stack。"
+      "nameTitlePulumiLead": "由 '::' 分隔的两部分 — project::stack。",
+      "hardLimit": "强制 limit",
+      "hardLimitPlaceholder": "例如 canary",
+      "hardLimitTitle": "它会与运行所提供的 limit 结合，因此运行只能在其范围内进一步收窄，而无法越过它扩大范围。它最多只能指定一个主机组或一个主机模式 — 例如 canary，或表示除生产环境之外一切的 !prod — 因为 ansible 无法在 limit 中表达“其中任意一个”。若要让上限覆盖两个主机组，请在清单中为它们创建一个父组并指定该父组。",
+      "hardLimitLead": "任何运行都无法突破的 --limit。不设上限则留空。"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

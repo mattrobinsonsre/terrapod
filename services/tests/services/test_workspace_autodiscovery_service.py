@@ -553,6 +553,12 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "inventory_paths",
         "default_playbook",
         "default_limit",
+        # And the ceiling those defaults sit under (#2451). A rule materialises
+        # workspaces in bulk with nobody looking at each one, so the ceiling is
+        # the setting a fleet most needs stamped at creation rather than added
+        # afterwards -- adding it afterwards leaves a window in which every
+        # discovered workspace has none.
+        "hard_limit",
         # Whether the repository's own dynamic inventory sources are resolved on
         # the runner (#2033). A fleet decides this once -- it is a security
         # posture rather than a per-workspace detail -- so a rule carries both.

@@ -1299,7 +1299,8 @@
       "previewDryRun": "Náhled (zkušební běh)",
       "applyChanges": "Aplikovat změny",
       "setOidcAudiences": "Nastavit OIDC audience identity běhu (nahradí mapu na každém odpovídajícím pracovním prostoru)",
-      "operationsNone": "Tím by každý odpovídající pracovní prostor zůstal vůbec bez operací. Pracovní prostor si musí ponechat plánování a použití, konfiguraci nebo obojí."
+      "operationsNone": "Tím by každý odpovídající pracovní prostor zůstal vůbec bez operací. Pracovní prostor si musí ponechat plánování a použití, konfiguraci nebo obojí.",
+      "setHardLimit": "Nastavit pevný limit (prázdná hodnota strop odstraní)"
     },
     "diff": {
       "colWorkspace": "Pracovní prostor",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Kolekce instalované před spuštěním configure, jedna na řádek ve tvaru namespace.name nebo namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Jedno z vlastních běhových prostředí této instalace, podle označení. Jeho nastavení přepisuje verzi Ansible pracovního prostoru.",
       "labelsLead": "Štítky plní dvojí úlohu: label-based RBAC se shoduje podle nich a jsou to zároveň „tagy“, podle kterých může blok cloud vybrat pracovní prostor.",
-      "nameTitlePulumiLead": "Dvě části oddělené '::' — project::stack."
+      "nameTitlePulumiLead": "Dvě části oddělené '::' — project::stack.",
+      "hardLimit": "Pevný limit",
+      "hardLimitPlaceholder": "např. canary",
+      "hardLimitTitle": "Kombinuje se s limitem, který běh uvede, takže běh může zasažený rozsah zúžit, ale žádný jej nemůže rozšířit nad tuto hranici. Uvádí nejvýše jednu skupinu nebo jeden vzor hostitele — například canary, nebo !prod pro všechno kromě produkce — protože ansible neumí v limitu vyjádřit „kteroukoli z těchto“. Chcete-li strop nad dvěma skupinami, vytvořte z nich ve svém inventáři nadřazenou skupinu a uveďte ji.",
+      "hardLimitLead": "Hodnota --limit, které žádný běh neunikne. Nechte prázdné, pokud nemá platit žádný strop."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

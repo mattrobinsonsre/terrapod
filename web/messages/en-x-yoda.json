@@ -1299,7 +1299,8 @@
       "previewDryRun": "Preview (run, dry)",
       "applyChanges": "changes, Apply",
       "setOidcAudiences": "audiences, Set OIDC run identity (on every matched workspace, the map replaces)",
-      "operationsNone": "With no operation at all, every matched workspace this would leave. Plan and apply, or configure, or both, a workspace must keep."
+      "operationsNone": "With no operation at all, every matched workspace this would leave. Plan and apply, or configure, or both, a workspace must keep.",
+      "setHardLimit": "hard limit, Set (the ceiling, an empty value removes)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Before a configure runs, installed the collections are, one per line as namespace.name or namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Of this deployment's own execution environments, one it is, by label. Set one, and the workspace's Ansible version it overrides.",
       "labelsLead": "Double duty, labels do: what label-based RBAC matches on, they are — and the tags a cloud block can select a workspace by, they are.",
-      "nameTitlePulumiLead": "Separated by '::', two parts there are — project::stack."
+      "nameTitlePulumiLead": "Separated by '::', two parts there are — project::stack.",
+      "hardLimit": "limit, Hard",
+      "hardLimitPlaceholder": "e.g. canary",
+      "hardLimitTitle": "With whatever limit a run supplies, combined it is, so narrow within it a run may, and widen past it none may. At most one group or host pattern it names — say canary, or !prod for everything except production — because to say “either of these” in a limit, no way ansible has. For a ceiling over two groups, a parent group of them in your inventory make, and that one name.",
+      "hardLimitLead": "Escape it, no run may — a --limit this is. For no ceiling, empty leave it."
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

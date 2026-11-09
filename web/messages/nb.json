@@ -1299,7 +1299,8 @@
       "previewDryRun": "Forhåndsvis (prøvekjøring)",
       "applyChanges": "Anvend endringer",
       "setOidcAudiences": "Sett OIDC-audiences for kjøringsidentitet (erstatter kartet på hvert samsvarende arbeidsområde)",
-      "operationsNone": "Dette ville etterlate hvert samsvarende arbeidsområde helt uten operasjon. Et arbeidsområde må beholde planlegg og anvend, eller konfigurer, eller begge."
+      "operationsNone": "Dette ville etterlate hvert samsvarende arbeidsområde helt uten operasjon. Et arbeidsområde må beholde planlegg og anvend, eller konfigurer, eller begge.",
+      "setHardLimit": "Sett hard grense (en tom verdi fjerner taket)"
     },
     "diff": {
       "colWorkspace": "Arbeidsområde",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Samlinger som installeres før en configure kjører, én per linje som namespace.name eller namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Et av denne installasjonens egne kjøremiljøer, via etikett. Å angi et overstyrer arbeidsområdets Ansible-versjon.",
       "labelsLead": "Etiketter har en dobbeltrolle: de er det etikettbasert RBAC samsvarer mot, og de er de «tags» en cloud-blokk kan velge et arbeidsområde med.",
-      "nameTitlePulumiLead": "To deler atskilt av '::' — project::stack."
+      "nameTitlePulumiLead": "To deler atskilt av '::' — project::stack.",
+      "hardLimit": "Hard grense",
+      "hardLimitPlaceholder": "f.eks. canary",
+      "hardLimitTitle": "Den kombineres med grensen kjøringen selv angir, så en kjøring kan snevre inn innenfor den, og ingen kan utvide forbi den. Den navngir høyst én gruppe eller ett vertsmønster — for eksempel canary, eller !prod for alt bortsett fra produksjon — fordi ansible ikke har noen måte å si «én av disse» i en grense. Skal taket dekke to grupper, lager du en overordnet gruppe av dem i inventaret og navngir den.",
+      "hardLimitLead": "En --limit ingen kjøring kan unnslippe. La feltet stå tomt hvis det ikke skal gjelde noe tak."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

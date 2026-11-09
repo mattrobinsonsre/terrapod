@@ -379,6 +379,32 @@ class TestBulkUpdateValidation:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_two_term_hard_limit_422_no_commit(self, *_mocks):
+        """The ceiling takes the SHARED rule here, not a restated one (#2451).
+
+        Driven through the route and asserting no commit, because a bulk update
+        is the surface where getting this wrong stamps the bad ceiling on a
+        whole fleet rather than on one workspace.
+        """
+        body = {"filter": {"all": True}, "update": {"hard-limit": "canary:prod"}}
+        resp, db = await self._post(body)
+        assert resp.status_code == 422
+        assert "at most one" in resp.json()["detail"]
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_admissible_hard_limit_is_not_refused(self, *_mocks):
+        """Paired with the refusal above: a rule that refused every pattern
+        carrying a separator would pass that and break this."""
+        body = {"filter": {"all": True}, "update": {"hard-limit": "all:!prod"}}
+        resp, _db = await self._post(body)
+        assert resp.status_code != 422, resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_empty_update_422(self, *_mocks):
         body = {"filter": {"all": True}, "update": {}}
         resp, db = await self._post(body)

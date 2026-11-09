@@ -1299,7 +1299,8 @@
       "previewDryRun": "Prévia (simulação)",
       "applyChanges": "Aplicar alterações",
       "setOidcAudiences": "Definir audiences OIDC da identidade de execução (substitui o mapa em cada workspace correspondente)",
-      "operationsNone": "Isso deixaria cada espaço de trabalho correspondente sem nenhuma operação. Um espaço de trabalho precisa manter planejar e aplicar, ou configurar, ou ambas."
+      "operationsNone": "Isso deixaria cada espaço de trabalho correspondente sem nenhuma operação. Um espaço de trabalho precisa manter planejar e aplicar, ou configurar, ou ambas.",
+      "setHardLimit": "Definir o limite rígido (um valor vazio remove o teto)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Coleções instaladas antes de um configure ser executado, uma por linha como namespace.name ou namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Um dos ambientes de execução próprios desta instalação, por rótulo. Definir um substitui a versão do Ansible do workspace.",
       "labelsLead": "Os rótulos têm dupla função: são aquilo com que o RBAC baseado em rótulos faz correspondência, e são as \"tags\" pelas quais um bloco cloud pode selecionar um workspace.",
-      "nameTitlePulumiLead": "Duas partes separadas por '::' — project::stack."
+      "nameTitlePulumiLead": "Duas partes separadas por '::' — project::stack.",
+      "hardLimit": "Limite rígido",
+      "hardLimitPlaceholder": "ex.: canary",
+      "hardLimitTitle": "Ele é combinado com o limite que a execução fornecer, então uma execução pode restringi-lo, mas nenhuma pode ampliá-lo. Ele nomeia no máximo um grupo ou padrão de host — por exemplo canary, ou !prod para tudo exceto produção — porque o ansible não tem como dizer «qualquer um destes» em um limite. Para um teto sobre dois grupos, crie no seu inventário um grupo pai que os contenha e nomeie esse grupo.",
+      "hardLimitLead": "Um padrão --limit que nenhuma execução pode ultrapassar. Deixe vazio para não impor nenhum teto."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

@@ -1299,7 +1299,8 @@
       "previewDryRun": "預覽（試執行）",
       "applyChanges": "應用更改",
       "setOidcAudiences": "設定執行身分的 OIDC 受眾（替換每個相符工作區上的對映）",
-      "operationsNone": "這會讓所有相符的工作區完全沒有任何作業。工作區必須保留計畫與套用、設定，或兩者之一。"
+      "operationsNone": "這會讓所有相符的工作區完全沒有任何作業。工作區必須保留計畫與套用、設定，或兩者之一。",
+      "setHardLimit": "設定強制 limit（空值會移除上限）"
     },
     "diff": {
       "colWorkspace": "工作區",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "在設定執行前安裝的集合，每行一個，格式為 namespace.name 或 namespace.name:version。",
       "ansibleExecutionEnvironmentLead": "透過標籤指定本部署自有的執行環境。設定後會覆蓋該工作區的 Ansible 版本。",
       "labelsLead": "標籤具有雙重作用：既是基於標籤的 RBAC 的匹配依據，也是 cloud 塊據以選擇工作區的 \"tags\"。",
-      "nameTitlePulumiLead": "由 '::' 分隔的兩部分 — project::stack。"
+      "nameTitlePulumiLead": "由 '::' 分隔的兩部分 — project::stack。",
+      "hardLimit": "強制 limit",
+      "hardLimitPlaceholder": "例如 canary",
+      "hardLimitTitle": "它會與執行所提供的 limit 結合，因此執行只能在其範圍內進一步收窄，而無法越過它擴大範圍。它最多只能指定一個主機組或一個主機模式 — 例如 canary，或代表除生產環境之外一切的 !prod — 因為 ansible 無法在 limit 中表達「其中任一個」。若要讓上限涵蓋兩個主機組，請在清冊中為它們建立一個父組並指定該父組。",
+      "hardLimitLead": "任何執行都無法逾越的 --limit。不設上限則留空。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

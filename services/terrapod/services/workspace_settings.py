@@ -726,6 +726,75 @@ def validate_ansible_run_default(raw: object, field: str) -> str:
     return raw
 
 
+def validate_hard_limit(raw: object) -> str:
+    """`hard_limit`: a plain string like the pair above, and AT MOST ONE bare term.
+
+    That is the only part of #2451 that constrains what an operator may write,
+    so it is worth the measurement that produced it. Against ansible-core
+    2.18.3 a `--limit` pattern resolves as
+
+        (union of the bare terms) INTERSECT (every `&` term)
+                                  MINUS (union of the `!` terms)
+
+    -- a partition by operator, order-independent. So appending the ceiling's
+    terms to a run's pattern, each keeping its operator and a bare one becoming
+    `&`, is EXACT for a run limit of any shape: bare, unioning, excluding,
+    already intersecting, or wildcarded. Verified across all of those; none
+    admitted a host outside the ceiling.
+
+    **Two bare terms cannot be expressed, which is the whole of the rule.** A
+    ceiling of `canary:prod` means "in canary OR in prod", and `&` ANDs:
+    `:&canary:&prod` resolves to no hosts at all (measured). Writing it as
+    `:&canary:prod` instead makes `prod` a bare term, i.e. an INCLUDE -- and
+    measured, a run asking for `h4` under that ceiling configures `h2`, a host
+    the run never named. It never escapes the ceiling, which is why this is a
+    422 rather than an advisory, but a run touching a host nobody asked for is
+    not a behaviour to ship. An operator wanting a ceiling over two groups
+    makes a parent group of them in their own inventory, which is ansible's own
+    answer to the same question.
+
+    Everything else is admitted, and deliberately so -- the shapes that compose
+    exactly are more than the obvious one:
+
+    * `canary` -- one group or host pattern. The common case.
+    * `web*`, `~web\\..*` -- wildcards and regex are single terms.
+    * `!prod` -- "no run may touch production", which is the most valuable
+      ceiling there is and has no bare term at all. Measured: a pattern whose
+      includes are empty reads as `all`, so the ceiling alone still means
+      every host but prod.
+    * `all:!prod` -- the same thing written out, one bare term plus an
+      exclusion.
+    * `canary:!h1` -- a group with a hole in it.
+    """
+    value = validate_ansible_run_default(raw, "hard-limit")
+    if not value:
+        return value
+    if value != value.strip():
+        raise ValueError("hard-limit: leading or trailing whitespace is not allowed")
+    if any(c.isspace() for c in value):
+        raise ValueError("hard-limit: whitespace is not allowed inside a pattern")
+
+    from terrapod.engines.terraform import ceiling_terms
+
+    terms = ceiling_terms(value)
+    if not terms:
+        # Separators only (`:`, `,,`). Not empty -- it got past the guard above
+        # -- so refusing beats storing a pattern that resolves to nothing.
+        raise ValueError("hard-limit: a pattern of separators alone is not a limit")
+    bare = [t for t in terms if t[0] not in "&!"]
+    if len(bare) > 1:
+        raise ValueError(
+            "hard-limit may name at most one group or host pattern, so "
+            + " and ".join(repr(t) for t in bare)
+            + " cannot both appear -- ansible has no way to say "
+            '"either of these" in a limit, so make a parent group of them in '
+            "your inventory and name that instead"
+        )
+    if any(len(t) == 1 for t in terms):
+        raise ValueError("hard-limit: '&' and '!' need a pattern after them")
+    return value
+
+
 def validate_trigger_prefixes(raw: object) -> list[str]:
     """Each entry is normalised like a working directory; at most 20."""
     if not isinstance(raw, list):

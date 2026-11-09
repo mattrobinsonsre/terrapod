@@ -1299,7 +1299,8 @@
       "previewDryRun": "Podgląd (przebieg próbny)",
       "applyChanges": "Zastosuj zmiany",
       "setOidcAudiences": "Ustaw audience OIDC tożsamości uruchomienia (zastępuje mapę na każdym dopasowanym obszarze roboczym)",
-      "operationsNone": "To pozostawiłoby każdą dopasowaną przestrzeń robocza w ogóle bez operacji. Przestrzeń robocza musi zachować planowanie i stosowanie, konfigurację albo oba."
+      "operationsNone": "To pozostawiłoby każdą dopasowaną przestrzeń robocza w ogóle bez operacji. Przestrzeń robocza musi zachować planowanie i stosowanie, konfigurację albo oba.",
+      "setHardLimit": "Ustaw sztywny limit (pusta wartość usuwa pułap)"
     },
     "diff": {
       "colWorkspace": "Obszar roboczy",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Kolekcje instalowane przed uruchomieniem configure, po jednej w wierszu jako namespace.name lub namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Jedno z własnych środowisk wykonawczych tej instalacji, według etykiety. Jego ustawienie nadpisuje wersję Ansible obszaru roboczego.",
       "labelsLead": "Etykiety pełnią podwójną rolę: to po nich dopasowuje RBAC oparty na etykietach i to one są \"tagami\", po których blok cloud może wybrać obszar roboczy.",
-      "nameTitlePulumiLead": "Dwie części oddzielone '::' — project::stack."
+      "nameTitlePulumiLead": "Dwie części oddzielone '::' — project::stack.",
+      "hardLimit": "Sztywny limit",
+      "hardLimitPlaceholder": "np. canary",
+      "hardLimitTitle": "Jest łączona z limitem podanym przez przebieg, więc przebieg może zawęzić zakres w jej obrębie, ale żaden nie może go rozszerzyć ponad nią. Wskazuje najwyżej jedną grupę lub jeden wzorzec hosta — na przykład canary albo !prod dla wszystkiego poza produkcją — ponieważ ansible nie potrafi wyrazić w limicie „którejkolwiek z nich”. Aby uzyskać pułap obejmujący dwie grupy, utwórz z nich grupę nadrzędną w inwentarzu i wskaż ją.",
+      "hardLimitLead": "Wartość --limit, której żaden przebieg nie może obejść. Pozostaw puste, aby nie obowiązywał żaden pułap."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

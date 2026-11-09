@@ -95,6 +95,11 @@ def _mock_workspace(
     ws.inventory_paths = []
     ws.default_playbook = ""
     ws.default_limit = ""
+    # The ceiling (#2451). Set explicitly for the same reason as the roots
+    # above: an unset attribute here is a distinct auto-mock that reaches
+    # `json.dumps` and fails with "Object of type MagicMock is not JSON
+    # serializable", naming neither this helper nor the test that broke.
+    ws.hard_limit = ""
     # #2318's, set explicitly for the same reason as #2033's pair above -- and
     # to its REAL default, TRUE, so a test that reads it off this fixture reads
     # what a workspace actually has rather than whatever a mock would coerce to.
@@ -2821,8 +2826,69 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
             "inventory-paths",
             "default-playbook",
             "default-limit",
+            "hard-limit",
         ):
             assert key not in a, f"{key} reached the TFE-compatible wire"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_a_two_term_hard_limit_is_refused(self, mock_resolve, _pub, *mocks):
+        """The ceiling's one constraint, through the ROUTE (#2451).
+
+        Driven as a request rather than by calling the validator, because the
+        defect this guards is the route not consulting it -- a test that calls
+        `validate_hard_limit` directly passes with the PATCH branch deleted.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(name="cfg-ws")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = ws_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"hard-limit": "canary:prod"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "at most one" in detail
+        assert "'canary'" in detail and "'prod'" in detail
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_an_exclusion_shaped_hard_limit_is_accepted(self, mock_resolve, _pub, *mocks):
+        """ "No run may touch production" is the most valuable ceiling there is.
+
+        Paired with the refusal above deliberately: a route that refused every
+        pattern carrying a separator would pass that test and break this one,
+        and `!prod` is exactly the shape a too-strict rule would lose.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(name="cfg-ws")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = ws_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"hard-limit": "all:!prod"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert ws.hard_limit == "all:!prod"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

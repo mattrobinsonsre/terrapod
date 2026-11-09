@@ -27,6 +27,7 @@
 //	"ansible-collections"               → ansible_collections (list of {name, version})
 //	"default-playbook"                  → default_playbook    (string, optional+computed)
 //	"default-limit"                     → default_limit       (string, optional+computed)
+//	"hard-limit"                        → hard_limit          (string, optional+computed)
 //	"working-directory"                 → working_directory   (string, optional)
 //	"parallelism"                       → parallelism
 //	"resource-cpu"                      → resource_cpu        (string, optional, default "1")
@@ -151,6 +152,7 @@ type workspaceModel struct {
 	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
 	DefaultLimit                  types.String `tfsdk:"default_limit"`
+	HardLimit                     types.String `tfsdk:"hard_limit"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	EEResourceCPU                 types.String `tfsdk:"ee_resource_cpu"`

@@ -65,6 +65,12 @@ export const HINT_LEADS: Record<string, string> = {
   // unreachable on touch and invisible to a keyboard. 257 characters of it.
   'fields.configDirectoryTitle': 'fields.configDirectoryLead',
   'fields.ansibleCollectionsHint': 'fields.ansibleCollectionsLead',
+  // The ceiling (#2451). A hover `title=` until now, at 168 characters --
+  // over `TITLE_EXPLANATION`, so unreachable on touch and invisible to a
+  // keyboard. The split also let the detail carry the single-term rule,
+  // which until then an operator learned only from a 422 after being
+  // refused.
+  'fields.hardLimitTitle': 'fields.hardLimitLead',
   'variables.vaultFileHint': 'variables.vaultFileLead',
   'variables.vaultFileTemplateHint': 'variables.vaultFileTemplateLead',
   'variables.gitSshHint': 'variables.gitSshLead',

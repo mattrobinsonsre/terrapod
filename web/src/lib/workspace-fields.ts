@@ -248,6 +248,7 @@ export const FIELDS: readonly FieldSpec[] = [
     dependsOn: 'configure-enabled',
   },
   { attr: 'default-limit', id: 'ws-default-limit', group: 'ansible', dependsOn: 'configure-enabled' },
+  { attr: 'hard-limit', id: 'ws-hard-limit', group: 'ansible', dependsOn: 'configure-enabled' },
   {
     attr: 'inventory-paths',
     id: 'ws-inventory-paths',
@@ -579,6 +580,7 @@ export const LABEL_KEY: Record<string, string> = {
   'config-directory': 'fields.configDirectory',
   'default-playbook': 'fields.defaultPlaybook',
   'default-limit': 'fields.defaultLimit',
+  'hard-limit': 'fields.hardLimit',
   'inventory-paths': 'fields.inventoryPaths',
   // The COMPOSED label (#2413 F19): the three surfaces that set a concrete
   // value render one ordered select over this attribute and

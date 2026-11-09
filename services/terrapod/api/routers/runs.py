@@ -3980,6 +3980,10 @@ async def next_run(
         attributes["timeout-minutes"] = _lrc().configure_timeout_minutes
         attributes["default-playbook"] = ws.default_playbook or ""
         attributes["default-limit"] = ws.default_limit or ""
+        # The ceiling, sent alongside rather than folded in: the engine
+        # intersects them, and sending the product would lose which part a
+        # reader of the Job spec is looking at (#2451).
+        attributes["hard-limit"] = ws.hard_limit or ""
         if run.playbook:
             attributes["playbook"] = run.playbook
         if run.ansible_limit:

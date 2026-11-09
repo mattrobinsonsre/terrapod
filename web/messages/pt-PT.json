@@ -1299,7 +1299,8 @@
       "previewDryRun": "Pré-visualização (simulação)",
       "applyChanges": "Aplicar alterações",
       "setOidcAudiences": "Definir audiences OIDC da identidade de execução (substitui o mapa em cada workspace correspondente)",
-      "operationsNone": "Isto deixaria cada área de trabalho correspondente sem qualquer operação. Uma área de trabalho tem de manter planear e aplicar, ou configurar, ou ambas."
+      "operationsNone": "Isto deixaria cada área de trabalho correspondente sem qualquer operação. Uma área de trabalho tem de manter planear e aplicar, ou configurar, ou ambas.",
+      "setHardLimit": "Definir o limite rígido (um valor vazio remove o limite superior)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2716,7 +2717,11 @@
       "ansibleCollectionsLead": "Coleções instaladas antes de um configure ser executado, uma por linha como namespace.name ou namespace.name:version.",
       "ansibleExecutionEnvironmentLead": "Um dos ambientes de execução próprios desta instalação, por etiqueta. Definir um substitui a versão do Ansible do workspace.",
       "labelsLead": "As etiquetas têm dupla função: são aquilo com que a correspondência de RBAC por etiqueta é feita, e são as \"tags\" pelas quais um bloco cloud pode selecionar um workspace.",
-      "nameTitlePulumiLead": "Duas partes separadas por '::' — project::stack."
+      "nameTitlePulumiLead": "Duas partes separadas por '::' — project::stack.",
+      "hardLimit": "Limite rígido",
+      "hardLimitPlaceholder": "p. ex. canary",
+      "hardLimitTitle": "É combinado com o limite que a execução fornecer, pelo que uma execução o pode restringir, mas nenhuma o pode ampliar. Nomeia no máximo um grupo ou padrão de host — por exemplo canary, ou !prod para tudo exceto produção — porque o ansible não tem forma de dizer «qualquer um destes» num limite. Para um limite superior sobre dois grupos, crie no seu inventário um grupo pai que os contenha e indique esse grupo.",
+      "hardLimitLead": "Um padrão --limit que nenhuma execução pode ultrapassar. Deixe vazio para não impor qualquer limite superior."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

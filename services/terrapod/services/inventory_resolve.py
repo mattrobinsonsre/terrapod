@@ -1155,6 +1155,26 @@ async def write_run_artifact(db, run, *, limit: str | None = None) -> tuple[str,
     return key, document
 
 
+def bounded_limit(ws: Any, limit: str | None) -> str | None:
+    """`limit`, intersected with the workspace's `hard_limit` (#2451).
+
+    Applied HERE, at the one boundary every reader passes through, rather than
+    at each call site. The ceiling has to hold for the run's `-i` document, the
+    `?limit=` preview, the stored artifact, the OPA policy input and whatever
+    the UI renders -- and a per-caller rule is how one of those comes to show
+    hosts the workspace can never touch.
+
+    `ws` may be None (a workspace that is not an inventory workspace), in which
+    case there is no ceiling to apply.
+    """
+    from terrapod.engines.terraform import combine_limits
+
+    hard = getattr(ws, "hard_limit", "") or ""
+    if not hard:
+        return limit
+    return combine_limits(hard, limit or "")
+
+
 async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any]:
     """The inventory a RUN targets, pinned to the commit the run is running (#2021).
 
@@ -1180,6 +1200,7 @@ async def resolve_for_run(db, run, *, limit: str | None = None) -> dict[str, Any
     from terrapod.services import inventory_service as inv
 
     ws = await inv.get_inventory_workspace(db, run.workspace_id)
+    limit = bounded_limit(ws, limit)
 
     # Same gate as `resolve`, minus the branch-head lookup: a CV is only a git
     # source for a workspace that has declared a configure operation (#1966),
@@ -1231,6 +1252,10 @@ async def resolve(
     # that would skip the fetch for exactly the workspaces that want it most.
     if ws is not None and ws.vcs_connection_id and ws.vcs_repo_url and ws.configure_enabled:
         git_sha = await _resolve_git_sha(db, ws)
+
+    # Before the cache key, deliberately: the key carries the limit, so
+    # bounding afterwards would let two different ceilings share an entry.
+    limit = bounded_limit(ws, limit)
 
     rev = await platform_rev(db, workspace_id)
     # `provenance` is PART OF THE KEY, not a post-filter: the two answers differ

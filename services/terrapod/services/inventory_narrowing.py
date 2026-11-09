@@ -52,11 +52,28 @@ lifecycle, so it is not settled here.
 ## The intersection is computed, not expressed as a pattern
 
 `changed:&<default-limit>` works for a single-term limit (measured:
-`h1:h3:&canary` -> `h1`), but ansible applies pattern terms left to right with no
-grouping, so it cannot express `changed ∩ (A ∪ B)` for a multi-term limit --
-`h1:h2:&canary:prod` parses as `({h1,h2} ∩ canary) ∪ prod`, which is WIDER than
-either input. So ansible expands the workspace's limit, and the intersection is
-taken here over host names.
+`h1:h3:&canary` -> `h1`), and it cannot express `changed ∩ (A ∪ B)` for a
+multi-term one -- so ansible expands the workspace's limit and the intersection
+is taken here over host names.
+
+The reason is that `&` **ANDs**: `all:&canary:&prod` resolves to no hosts
+(measured against ansible-core 2.18.3), where a multi-term limit means "canary
+OR prod". There is no pattern form for "either of these" as an intersect, so
+there is nothing to write.
+
+Measured semantics, because an earlier version of this paragraph had them wrong
+and #2451 was built on the correction. A `--limit` pattern resolves as
+
+    (union of the bare terms) INTERSECT (every `&` term)
+                              MINUS (union of the `!` terms)
+
+-- a PARTITION by operator, so term order is irrelevant (`prod:web:&canary` ==
+`web:prod:&canary`). It is NOT a left-to-right accumulator, which is what this
+file used to say, and on that account `h1:h2:&canary:prod` would parse as
+`({h1,h2} ∩ canary) ∪ prod` and be wider than either input. It does not: it
+resolves to `h1`, because the trailing `prod` joins the include union and is
+then intersected with `canary` like everything else. The conclusion above
+survives the correction; the mechanism given for it did not.
 
 The emitted limit is therefore a plain `:`-joined host list, which is safe
 because `validate_host_name` refuses `, : ! & ~` and whitespace -- those being

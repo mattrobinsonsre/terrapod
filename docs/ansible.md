@@ -99,9 +99,15 @@ on this workspace.
 The blast radius is whatever **`default-limit`** declares, and an empty
 `default-limit` means **the whole inventory**. That is a deliberate choice rather
 than an oversight, and the reasoning is worth reading before you turn anything on
-— it rests on visibility and reversibility, not on prevention. Before enabling a
-trigger, `?limit=` answers **what a configure would target**, from the live
-resolved inventory, without running anything.
+— the default posture is visibility and reversibility rather than prevention.
+Before enabling a trigger, `?limit=` answers **what a configure would target**,
+from the live resolved inventory, without running anything.
+
+Where you do want prevention, **`hard-limit`** is a ceiling no run can widen
+past: a run may narrow within it and none may escape it, including a run that
+supplies its own `--limit` (which *replaces* `default-limit` outright). `!prod`
+is the shape most people want. See
+[a ceiling no run can widen past](ansible-configure.md#hard-limit-is-a-ceiling-no-run-can-widen-past).
 
 Two properties worth knowing up front: a **destroy never configures**, and only
 **one mutating run at a time** executes per workspace — a configure holds the

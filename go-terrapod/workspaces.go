@@ -201,6 +201,13 @@ type Workspace struct {
 	// DefaultLimit is the default `--limit` for a configure run. Empty means
 	// the whole inventory, which is ansible's own default.
 	DefaultLimit string `json:"default-limit,omitempty"`
+
+	// HardLimit is a `--limit` NO run may escape; empty means no ceiling.
+	// Distinct from DefaultLimit, which a run REPLACES when it supplies its
+	// own: this one is intersected with whatever limit the run ends up with,
+	// so a run may narrow within it and none may widen past it. It also
+	// bounds what a resolved-inventory read returns for the workspace.
+	HardLimit string `json:"hard-limit,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901), keyed
 	// on the provider configuration a token is for: `aws`, or `aws.west` for
 	// one aliased configuration. Empty means this workspace mints nothing and
@@ -449,6 +456,8 @@ type CreateWorkspaceRequest struct {
 	// empty value here is omitted rather than sent.
 	DefaultPlaybook string `json:"default-playbook,omitempty"`
 	DefaultLimit    string `json:"default-limit,omitempty"`
+	// HardLimit is the ceiling; see Workspace.HardLimit.
+	HardLimit string `json:"hard-limit,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
 	// configuration. It is MERGED over the deployment's catalogue per key, so
@@ -625,6 +634,10 @@ type UpdateWorkspaceRequest struct {
 	// `debug-mode` and `ai-policy-mode` shipped with.
 	DefaultPlaybook *string `json:"default-playbook,omitempty"`
 	DefaultLimit    *string `json:"default-limit,omitempty"`
+	// HardLimit is a POINTER for the same reason as the fields above: an
+	// empty string REMOVES the ceiling, which widens every run, so it has to
+	// be distinguishable from "leave it alone".
+	HardLimit *string `json:"hard-limit,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
 	// configuration. It is MERGED over the deployment's catalogue per key, so
@@ -996,6 +1009,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.DefaultPlaybook != "" {
 		attrs["default-playbook"] = req.DefaultPlaybook
 	}
+	if req.HardLimit != "" {
+		attrs["hard-limit"] = req.HardLimit
+	}
 	if req.DefaultLimit != "" {
 		attrs["default-limit"] = req.DefaultLimit
 	}
@@ -1196,6 +1212,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 		// inventory.
 		attrs["default-limit"] = *req.DefaultLimit
 	}
+	if req.HardLimit != nil {
+		// &"" REMOVES the ceiling, which widens every run on the workspace --
+		// the one direction a ceiling must not move by accident, which is why
+		// it is a pointer rather than an empty-means-unset string.
+		attrs["hard-limit"] = *req.HardLimit
+	}
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
@@ -1389,6 +1411,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AnsibleCollections:            GetAnsibleCollectionsAttr(res, "ansible-collections"),
 		DefaultPlaybook:               GetStringAttr(res, "default-playbook"),
 		DefaultLimit:                  GetStringAttr(res, "default-limit"),
+		HardLimit:                     GetStringAttr(res, "hard-limit"),
 		VCSRepoURL:                    GetStringAttr(res, "vcs-repo-url"),
 		VCSBranch:                     GetStringAttr(res, "vcs-branch"),
 		VCSWorkflow:                   GetStringAttr(res, "vcs-workflow"),

@@ -2197,6 +2197,10 @@
           "description": "local or agent (default: server default)",
           "type": "string"
         },
+        "hard_limit": {
+          "description": "a --limit NO RUN MAY ESCAPE; empty means no ceiling. Distinct from default_limit, which a run replaces outright when it supplies its own -- this one is INTERSECTED with whatever limit the run ends up with, so a run may narrow within it and none may widen past it. It also bounds what the resolved inventory shows for this workspace",
+          "type": "string"
+        },
         "inventory_paths": {
           "description": "the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source",
           "items": {
@@ -2553,6 +2557,13 @@
         "execution_mode": {
           "description": "local or agent",
           "type": "string"
+        },
+        "hard_limit": {
+          "description": "a --limit NO RUN MAY ESCAPE; empty means no ceiling. Unlike default_limit, which a run replaces when it supplies its own, this is INTERSECTED with the run's limit -- narrowing is allowed, widening is not. Pass an empty string to REMOVE the ceiling, which widens every run on this workspace",
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "inventory_paths": {
           "description": "the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone",

@@ -64,7 +64,7 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
-from terrapod.services import catalog_service, pool_set, run_service
+from terrapod.services import catalog_service, pool_set, run_service, workspace_settings
 from terrapod.services.catalog_rbac_service import (
     resolve_catalog_capabilities_for,
 )
@@ -189,6 +189,7 @@ def _item_json(
             "ansible-directory": item.ansible_directory or "",
             "default-playbook": item.default_playbook or "",
             "default-limit": item.default_limit or "",
+            "hard-limit": item.hard_limit or "",
             "labels": dict(item.labels or {}),
             "owner-email": item.owner_email or "",
             "created-at": _rfc3339(item.created_at),
@@ -584,6 +585,14 @@ async def _coerce_item(
                 detail="default-limit: leading or trailing whitespace is not allowed",
             )
         out["default_limit"] = raw
+    # The ceiling, through the SHARED rule rather than restated here (#2451).
+    # It is a single pattern term, and a second copy of that rule is how the
+    # two surfaces come to disagree about what a ceiling may say.
+    if "hard-limit" in attrs:
+        try:
+            out["hard_limit"] = workspace_settings.validate_hard_limit(attrs["hard-limit"])
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # A cross-field invariant, so it takes the RESULTING values rather than the
     # submitted ones -- the #1966 shape, and the exception that proves the
@@ -688,6 +697,7 @@ async def create_catalog_item(
         ansible_directory=fields.get("ansible_directory", ""),
         default_playbook=fields.get("default_playbook", ""),
         default_limit=fields.get("default_limit", ""),
+        hard_limit=fields.get("hard_limit", ""),
         labels=fields.get("labels", {}),
         owner_email=user.email,
         created_at=_now(),
