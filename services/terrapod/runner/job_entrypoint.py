@@ -92,6 +92,10 @@ _INIT_LOG = Path("/tmp/init.log")
 _PLAN_LOG = Path("/tmp/plan.log")
 _APPLY_LOG = Path("/tmp/apply.log")
 _CONFIGURE_LOG = Path("/tmp/configure.log")
+#: The resolved inventory as OPA sees it (#2435). The ORCHESTRATOR's own space,
+#: not the shared volume: `opa eval` runs here and the EE has no business
+#: reading the policy input.
+_CONFIGURE_POLICY_INPUT = Path("/tmp/configure-policy-input.json")
 _PLAN_JSON = Path("/tmp/plan.json")
 _TF_RC = Path("/tmp/terraform.rc")
 _OPA_WORK = Path("/tmp/opa")
@@ -1033,7 +1037,25 @@ def _run_configure_phase(cfg: RunnerConfig, *, binary: str, work_dir: Path) -> i
         discover_providers=False,
         token_dir=cloud_identity.ee_token_dir(),
     )
-    inventory = configure_inventory.materialise(cfg, work_dir=work_dir, resolved=credential_refs)
+    inventory = configure_inventory.materialise(
+        cfg, work_dir=work_dir, resolved=credential_refs, policy_input=_CONFIGURE_POLICY_INPUT
+    )
+
+    # The policy gate, BEFORE anything runs (#2435). A configure is a single
+    # Job -- it IS the action -- so there is no between-Jobs moment for the API
+    # to hold it at, the way it holds a plan before an apply. The gate is
+    # therefore here, and it is placed before the collection install so a denied
+    # configure does no work at all beyond resolving its own inventory.
+    #
+    # `plan_json` is just the file piped to `opa eval --stdin-input`; the name
+    # is Terraform-flavoured and the mechanism is not.
+    gate_log = structlog.get_logger("runner.job_entrypoint")
+    try:
+        opa.evaluate_policies(cfg, plan_json=_CONFIGURE_POLICY_INPUT, work_dir=_OPA_WORK)
+    except opa.PolicyEvaluationError as exc:
+        gate_log.error("configure policy evaluation failed", err=str(exc))
+        return 1
+
     ansible_collections.install(cfg, cwd, log_file=str(_CONFIGURE_LOG))
     # Capture is best-effort and says so: `deliver` returns None when the plugin
     # asset is missing from this image, which is our packaging defect rather

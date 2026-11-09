@@ -446,6 +446,61 @@ class TestTheConfigureFlowIsWired:
         assert cred < self._call(fn, module="configure_inventory", func_attr="materialise").lineno
         assert cred < self._call(fn, module="ansible_collections", func_attr="install").lineno
 
+    def test_the_policy_gate_runs_before_anything_executes(self):
+        """#2435. A configure is a SINGLE Job -- it is the action -- so there is
+        no between-Jobs moment for the API to hold it at, the way it holds a
+        plan before an apply. The gate is therefore in the Job, and the only
+        thing that makes it a gate rather than a report is that it runs first.
+
+        Ordering by line number over the function's own AST, because there is no
+        seam in the middle of `_run_configure_phase` to observe it at -- the same
+        shape as the `db.flush()`-inside-`try` gate.
+        """
+        fn = self._function()
+        gate = self._call(fn=fn, module="opa", func_attr="evaluate_policies")
+        play = self._call(fn=fn, module="configure", func_attr="run")
+        install = self._call(fn=fn, module="ansible_collections", func_attr="install")
+
+        assert gate.lineno < play.lineno, (
+            "the playbook runs before the policy gate, so a denied configure "
+            "has already changed hosts by the time anything refuses it"
+        )
+        assert gate.lineno < install.lineno, (
+            "a denied configure installs collections first -- it should do no "
+            "work beyond resolving its own inventory"
+        )
+
+    def test_the_gate_reads_the_policy_input_and_not_the_rendered_inventory(self):
+        """The two must name the SAME file, and it must not be the `-i` source.
+
+        `materialise` substitutes `${terrapod:...}` placeholders in the RENDERED
+        inventory and nowhere else, so handing OPA that file would put a
+        delivered password into the policy input -- and from there into any
+        `deny` message a policy chose to emit. Asserting only that `plan_json=`
+        is passed would be satisfied by passing the rendered path.
+        """
+        fn = self._function()
+        gate = self._call(fn=fn, module="opa", func_attr="evaluate_policies")
+        materialise = self._call(fn=fn, module="configure_inventory", func_attr="materialise")
+
+        gate_input = {k.arg: k.value for k in gate.keywords}.get("plan_json")
+        assert isinstance(gate_input, ast.Name), (
+            "the gate's input should be the module constant, not an expression"
+        )
+        kept = {k.arg: k.value for k in materialise.keywords}.get("policy_input")
+        assert isinstance(kept, ast.Name), "materialise is not asked to keep the policy input"
+        assert kept.id == gate_input.id, (
+            f"materialise writes {kept.id} and the gate reads {gate_input.id} -- "
+            "they must be the same file"
+        )
+        # And that file is NOT what the playbook is pointed at.
+        play = self._call(fn=fn, module="configure", func_attr="run")
+        inv = {k.arg: k.value for k in play.keywords}.get("inventory")
+        assert not (isinstance(inv, ast.Name) and inv.id == gate_input.id), (
+            "the policy input and the playbook's inventory are the same object; "
+            "the rendered inventory carries resolved secrets"
+        )
+
 
 class TestWhereItRuns:
     def test_the_working_directory_is_the_config_root(self, cfg, tree, ee):

@@ -285,6 +285,7 @@ def materialise(
     work_dir: Path,
     client: Any = None,
     resolved: dict[str, str] | None = None,
+    policy_input: Path | None = None,
 ) -> list[Path]:
     """Fetch the run's resolved inventory and write the `-i` list for this run.
 
@@ -348,6 +349,20 @@ def materialise(
             f"the resolved inventory for run {cfg.run_id} is not an inventory document "
             f"(got keys {sorted(document)[:5] if isinstance(document, dict) else type(document).__name__})"
         )
+
+    if policy_input is not None:
+        # The RAW document, for OPA (#2435) -- deliberately not the rendered
+        # inventory. `${terrapod:...}` placeholders are substituted in the
+        # rendered file and NOWHERE else, so this carries what the inventory
+        # SAYS rather than the secrets it delivers. Handing a policy the
+        # rendered form would put a delivered password into the policy input,
+        # and from there into any `deny` message a policy chose to emit.
+        #
+        # Written here rather than at either return: the handoff branch below
+        # returns early, so a configure with a dynamic source would otherwise
+        # be evaluated against nothing.
+        policy_input.parent.mkdir(parents=True, exist_ok=True)
+        policy_input.write_text(json.dumps(document, indent=2, sort_keys=True))
 
     target = inventory_dir()
     # `parents=True` because a runner-tier test has no Job to have created it,
