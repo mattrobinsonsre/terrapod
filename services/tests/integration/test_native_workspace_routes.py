@@ -105,6 +105,13 @@ class TestTheNativeSurfaceServesEveryEngine:
             "alone and already uses `operations` for TFE's own execution-mode "
             "boolean (#1966)"
         ),
+        # Which of the two operations gets the prominent button (#2479).
+        "default-run-kind": (
+            "which run kind is primary is a Terrapod UI concept: `terraform` and "
+            "`tofu` have no run button, so it could only ever be noise on that "
+            "wire -- and a provider reading a workspace back from there would see "
+            "a value it had just written come back absent (#2479)"
+        ),
         "configure-enabled": (
             "the workspace's operation declaration; `/api/tfe/v2` serves Terraform "
             "alone and already uses `operations` for TFE's own execution-mode "

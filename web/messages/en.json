@@ -2732,7 +2732,11 @@
       "hardLimit": "Hard limit",
       "hardLimitPlaceholder": "e.g. canary",
       "hardLimitLead": "A --limit no run may escape. Leave it empty for no ceiling.",
-      "hardLimitTitle": "It is combined with whatever limit a run supplies, so a run may narrow within it and none may widen past it. It names at most one group or host pattern — say canary, or !prod for everything except production — because ansible has no way to say “either of these” in a limit. For a ceiling over two groups, make a parent group of them in your inventory and name that."
+      "hardLimitTitle": "It is combined with whatever limit a run supplies, so a run may narrow within it and none may widen past it. It names at most one group or host pattern — say canary, or !prod for everything except production — because ansible has no way to say “either of these” in a limit. For a ceiling over two groups, make a parent group of them in your inventory and name that.",
+      "defaultRunKind": "Primary run button",
+      "defaultRunKindAuto": "Automatic (most complete)",
+      "defaultRunKindLead": "Which action gets the loud button on this workspace. Automatic offers the most complete run it can.",
+      "defaultRunKindTitle": "Which action gets the loud button on this workspace. Automatic offers the most complete run it can — usually right, and wrong where the everyday action is not the biggest one: a workspace whose Terraform half only maintains the Ansible inventory, applying unattended and never configuring after an apply, wants Configure here. A choice this workspace cannot offer is refused when you save it, and one your role cannot run falls back to Automatic for you."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

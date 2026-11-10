@@ -80,6 +80,11 @@ _FIELD_MAP: dict[str, str] = {
     # is what bulk update exists to avoid.
     "plan-apply-enabled": "plan_apply_enabled",
     "configure-enabled": "configure_enabled",
+    # Which run kind is the primary button (#2479). Bulk-settable because the
+    # case it exists for IS a fleet: workspaces whose Terraform half only
+    # maintains an Ansible inventory want Configure as their everyday action,
+    # and there is rarely one of them.
+    "default-run-kind": "default_run_kind",
     # How a configure STARTS (#1974). Bulk-settable for the same reason the
     # pair above is: adopting Ansible across a fleet means turning the trigger
     # on for the workspaces that should have it, and doing that one at a time
@@ -420,6 +425,11 @@ _SETTING_RULES: dict[str, Any] = {
     # the two surfaces come to disagree about what is valid (#1763).
     "plan-apply-enabled": lambda v: workspace_settings.validate_bool(v, "plan-apply-enabled"),
     "configure-enabled": lambda v: workspace_settings.validate_bool(v, "configure-enabled"),
+    # The FORMAT half only. The rest of this rule is cross-field -- the kind has
+    # to name an operation each matched workspace still has after the merge --
+    # so it lives in `_reject_a_run_kind_a_workspace_cannot_offer`, next to the
+    # other invariants over the matched set rather than over the payload.
+    "default-run-kind": workspace_settings.validate_run_kind_format,
     "configure-all-hosts": lambda v: workspace_settings.validate_bool(v, "configure-all-hosts"),
     "ansible-host-key-checking": lambda v: workspace_settings.validate_bool(
         v, "ansible-host-key-checking"
@@ -658,6 +668,48 @@ def _reject_leaving_a_workspace_with_no_operations(
             f"operation at all: {shown}{more}. A workspace must keep plan-apply-enabled "
             "or configure-enabled. Set the other one in the same update, or narrow the "
             "filter to the workspaces that already have it."
+        ),
+    )
+
+
+def _reject_a_run_kind_a_workspace_cannot_offer(fields: dict[str, Any], workspaces: list) -> None:
+    """Refuse a `default-run-kind` a matched workspace could not offer (#2479).
+
+    Over the MERGE, like the operations guard above, and for the same reason: a
+    preference naming `configure` is right for the workspaces that have it and
+    unhonourable for the ones that do not, and an update reaching a hundred
+    workspaces is exactly where that difference disappears.
+
+    It also fires when the OPERATIONS move and the preference does not — turning
+    `configure-enabled` off across a fleet would otherwise leave the workspaces
+    that preferred Configure holding a preference nothing can honour. Stored and
+    ignored is the state this refuses; the operator clears the preference in the
+    same update, or narrows the filter.
+    """
+    kinds = workspace_settings.RUN_KIND_REQUIREMENTS
+    if not ({"default_run_kind", "plan_apply_enabled", "configure_enabled"} & set(fields)):
+        return
+    offenders: list[str] = []
+    for w in workspaces:
+        kind = fields.get("default_run_kind", w.default_run_kind or "")
+        if not kind:
+            continue
+        have = {
+            "plan_apply": fields.get("plan_apply_enabled", w.plan_apply_enabled),
+            "configure": fields.get("configure_enabled", w.configure_enabled),
+        }
+        if any(not have[op] for op in kinds.get(kind, ())):
+            offenders.append(w.name)
+    if not offenders:
+        return
+    shown = ", ".join(sorted(offenders)[:10])
+    more = f" (and {len(offenders) - 10} more)" if len(offenders) > 10 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"this update would leave {len(offenders)} matched workspace(s) with a "
+            f"default-run-kind they cannot offer: {shown}{more}. Set the operation it "
+            "needs in the same update, clear default-run-kind, or narrow the filter."
         ),
     )
 
@@ -984,6 +1036,7 @@ async def bulk_update_workspaces(
     workspaces = list((await db.execute(query)).scalars().all())
     _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
     _reject_leaving_a_workspace_with_no_operations(plan["fields"], workspaces)
+    _reject_a_run_kind_a_workspace_cannot_offer(plan["fields"], workspaces)
     _reject_scan_enforcement_on_unscannable_engines(plan["fields"], workspaces)
     await _reject_unrunnable_ee_selection(plan["fields"], workspaces, db)
     _reject_apply_then_merge_where_it_cannot_hold(plan["fields"], workspaces)

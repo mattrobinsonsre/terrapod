@@ -2724,7 +2724,11 @@
       "hardLimit": "Limite rígido",
       "hardLimitPlaceholder": "p. ex. canary",
       "hardLimitTitle": "É combinado com o limite que a execução fornecer, pelo que uma execução o pode restringir, mas nenhuma o pode ampliar. Nomeia no máximo um grupo ou padrão de host — por exemplo canary, ou !prod para tudo exceto produção — porque o ansible não tem forma de dizer «qualquer um destes» num limite. Para um limite superior sobre dois grupos, crie no seu inventário um grupo pai que os contenha e indique esse grupo.",
-      "hardLimitLead": "Um padrão --limit que nenhuma execução pode ultrapassar. Deixe vazio para não impor qualquer limite superior."
+      "hardLimitLead": "Um padrão --limit que nenhuma execução pode ultrapassar. Deixe vazio para não impor qualquer limite superior.",
+      "defaultRunKind": "Botão de execução principal",
+      "defaultRunKindAuto": "Automático (a mais completa)",
+      "defaultRunKindLead": "Que ação recebe o botão destacado neste workspace. Automático oferece a execução mais completa que consegue.",
+      "defaultRunKindTitle": "Que ação recebe o botão destacado neste workspace. Automático oferece a execução mais completa que consegue — em geral o correto, e errado quando a ação do dia a dia não é a maior: um workspace cuja parte de Terraform apenas mantém o inventário do Ansible, que aplica sem supervisão e nunca configura após um apply, quer Configurar aqui. Uma escolha que este workspace não pode oferecer é recusada ao guardar, e uma que a sua função não pode executar recai em Automático para si."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

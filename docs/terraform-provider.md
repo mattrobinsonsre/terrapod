@@ -514,6 +514,43 @@ The refusal is evaluated against the row the write would produce, not against
 what the configuration sends, so turning `plan_apply_enabled` off is accepted on
 a workspace that has `configure_enabled` set and refused on one that does not.
 
+### `default_run_kind`
+
+A workspace with both operations can start four kinds of run, and the UI gives
+one of them the prominent button. `default_run_kind` chooses which: `full`
+(plan + apply + configure), `plan_apply`, `configure`, `plan`, or omitted for no
+preference — in which case the most complete kind the workspace has is offered.
+
+```hcl
+resource "terrapod_workspace" "inventory_only" {
+  name              = "fleet-inventory"
+  configure_enabled = true
+  config_directory  = "ansible"
+
+  # This workspace's Terraform half only maintains the Ansible inventory. It
+  # applies unattended and never configures after an apply, so the action
+  # somebody actually reaches for is the configure.
+  default_run_kind = "configure"
+}
+```
+
+It is `Optional + Computed`, so a configuration that does not manage it will not
+drift. Two things to know when you do manage it:
+
+- **A kind the workspace does not have is refused by the API with a 422**, so
+  declare the operation it needs in the same configuration. `configure` needs
+  `configure_enabled`; `full` needs both booleans.
+- **The reverse is refused too.** A plan that turns `configure_enabled` off
+  while `default_run_kind` is still `configure` fails at apply — change both in
+  the same plan, which Terraform does in one apply anyway.
+
+Setting `default_run_kind = ""` explicitly is the same as omitting it, and it is
+the way to **clear** a preference the workspace already holds: an unmanaged
+attribute is left alone, so going back to no preference has to be said.
+
+The server stores the string byte for byte — it validates and never normalises —
+which is what makes the read-back exact and the apply consistent.
+
 **`config_directory` is an ordinary path and does not declare anything.** `""`
 is its default and means the configuration version's root, exactly as it does
 for `working_directory`. It was briefly nullable, with `null` meaning "no

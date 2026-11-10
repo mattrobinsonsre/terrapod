@@ -371,6 +371,14 @@
                     "type": "string",
                     "description": "Instance name.\n"
                 },
+                "updateBlockReason": {
+                    "type": "string",
+                    "description": "Non-sensitive reason code for a blocked catalog publish.\n"
+                },
+                "updateBlockVersion": {
+                    "type": "string",
+                    "description": "Version whose publish requires attention; null when no update is blocked.\n"
+                },
                 "versionPin": {
                     "type": "string",
                     "description": "Module version pin.\n"
@@ -381,6 +389,8 @@
                 "agentPoolId",
                 "id",
                 "name",
+                "updateBlockReason",
+                "updateBlockVersion",
                 "versionPin"
             ],
             "language": {
@@ -452,6 +462,53 @@
                 "description",
                 "name",
                 "sensitive"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredInputs": []
+                }
+            }
+        },
+        "terrapod:index/getInventoryResolvedVarProvenance:getInventoryResolvedVarProvenance": {
+            "properties": {
+                "chains": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/getInventoryResolvedVarProvenanceChain:getInventoryResolvedVarProvenanceChain"
+                    }
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "chains",
+                "origin",
+                "value"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredInputs": []
+                }
+            }
+        },
+        "terrapod:index/getInventoryResolvedVarProvenanceChain:getInventoryResolvedVarProvenanceChain": {
+            "properties": {
+                "level": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "level",
+                "value"
             ],
             "language": {
                 "nodejs": {
@@ -1035,6 +1092,7 @@
             "required": [
                 "createdAt",
                 "createdBy",
+                "description",
                 "expiresAt",
                 "isRevoked",
                 "poolId",
@@ -2025,6 +2083,14 @@
                     "type": "string",
                     "description": "The catalog item ID to provision from. Changing this forces a new instance."
                 },
+                "engineVersion": {
+                    "type": "string",
+                    "description": "The engine version for this instance. The server RESOLVES this to an exact offered binary version, so a partial value like \"1.12\" is a request rather than the stored result; this attribute keeps what you configured and reports the resolved version only when you configure nothing. Refused when it falls outside the item's declared range."
+                },
+                "executionBackend": {
+                    "type": "string",
+                    "description": "The engine this instance runs on — \"tofu\" or \"terraform\". Omit to take the deployment's default; note that a catalog item with\u003cspan pulumi-lang-nodejs=\" executionBackendConstraints \" pulumi-lang-dotnet=\" ExecutionBackendConstraints \" pulumi-lang-go=\" executionBackendConstraints \" pulumi-lang-python=\" execution_backend_constraints \" pulumi-lang-yaml=\" executionBackendConstraints \" pulumi-lang-java=\" executionBackendConstraints \" pulumi-lang-hcl=\" execution_backend_constraints \"\u003e executionBackendConstraints \u003c/span\u003evalidates that default too, so an item whose constraints exclude it cannot be provisioned without naming a permitted backend here."
+                },
                 "inputValues": {
                     "type": "object",
                     "additionalProperties": {
@@ -2044,6 +2110,14 @@
                     "type": "string",
                     "description": "Name for the provisioned workspace. Changing this forces a new instance."
                 },
+                "updateBlockReason": {
+                    "type": "string",
+                    "description": "Non-sensitive reason code for a blocked catalog publish."
+                },
+                "updateBlockVersion": {
+                    "type": "string",
+                    "description": "Version whose publish requires attention; null when no update is blocked."
+                },
                 "versionPin": {
                     "type": "string",
                     "description": "Module version pin to provision/reconfigure to (e.g. \"\u003e 1.0\")."
@@ -2053,7 +2127,12 @@
                 "agentPoolId",
                 "autoApply",
                 "catalogItemId",
-                "name"
+                "engineVersion",
+                "executionBackend",
+                "name",
+                "updateBlockReason",
+                "updateBlockVersion",
+                "versionPin"
             ],
             "inputProperties": {
                 "agentPoolId": {
@@ -2067,6 +2146,14 @@
                 "catalogItemId": {
                     "type": "string",
                     "description": "The catalog item ID to provision from. Changing this forces a new instance."
+                },
+                "engineVersion": {
+                    "type": "string",
+                    "description": "The engine version for this instance. The server RESOLVES this to an exact offered binary version, so a partial value like \"1.12\" is a request rather than the stored result; this attribute keeps what you configured and reports the resolved version only when you configure nothing. Refused when it falls outside the item's declared range."
+                },
+                "executionBackend": {
+                    "type": "string",
+                    "description": "The engine this instance runs on — \"tofu\" or \"terraform\". Omit to take the deployment's default; note that a catalog item with\u003cspan pulumi-lang-nodejs=\" executionBackendConstraints \" pulumi-lang-dotnet=\" ExecutionBackendConstraints \" pulumi-lang-go=\" executionBackendConstraints \" pulumi-lang-python=\" execution_backend_constraints \" pulumi-lang-yaml=\" executionBackendConstraints \" pulumi-lang-java=\" executionBackendConstraints \" pulumi-lang-hcl=\" execution_backend_constraints \"\u003e executionBackendConstraints \u003c/span\u003evalidates that default too, so an item whose constraints exclude it cannot be provisioned without naming a permitted backend here."
                 },
                 "inputValues": {
                     "type": "object",
@@ -2111,6 +2198,14 @@
                         "type": "string",
                         "description": "The catalog item ID to provision from. Changing this forces a new instance."
                     },
+                    "engineVersion": {
+                        "type": "string",
+                        "description": "The engine version for this instance. The server RESOLVES this to an exact offered binary version, so a partial value like \"1.12\" is a request rather than the stored result; this attribute keeps what you configured and reports the resolved version only when you configure nothing. Refused when it falls outside the item's declared range."
+                    },
+                    "executionBackend": {
+                        "type": "string",
+                        "description": "The engine this instance runs on — \"tofu\" or \"terraform\". Omit to take the deployment's default; note that a catalog item with\u003cspan pulumi-lang-nodejs=\" executionBackendConstraints \" pulumi-lang-dotnet=\" ExecutionBackendConstraints \" pulumi-lang-go=\" executionBackendConstraints \" pulumi-lang-python=\" execution_backend_constraints \" pulumi-lang-yaml=\" executionBackendConstraints \" pulumi-lang-java=\" executionBackendConstraints \" pulumi-lang-hcl=\" execution_backend_constraints \"\u003e executionBackendConstraints \u003c/span\u003evalidates that default too, so an item whose constraints exclude it cannot be provisioned without naming a permitted backend here."
+                    },
                     "inputValues": {
                         "type": "object",
                         "additionalProperties": {
@@ -2130,6 +2225,14 @@
                         "type": "string",
                         "description": "Name for the provisioned workspace. Changing this forces a new instance."
                     },
+                    "updateBlockReason": {
+                        "type": "string",
+                        "description": "Non-sensitive reason code for a blocked catalog publish."
+                    },
+                    "updateBlockVersion": {
+                        "type": "string",
+                        "description": "Version whose publish requires attention; null when no update is blocked."
+                    },
                     "versionPin": {
                         "type": "string",
                         "description": "Module version pin to provision/reconfigure to (e.g. \"\u003e 1.0\")."
@@ -2147,9 +2250,25 @@
                     },
                     "description": "Agent pool IDs users may provision instances onto. Omit (null) for unrestricted."
                 },
+                "ansibleDirectory": {
+                    "type": "string",
+                    "description": "Subdirectory of the MODULE whose contents are copied into the generated configuration version, and the \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e the provisioned workspace is given. Module-relative, written without a leading or trailing slash. Copied rather than referenced because a configure Job never runs init, so the module's own checkout does not exist in it."
+                },
+                "configureEnabled": {
+                    "type": "boolean",
+                    "description": "Whether a workspace provisioned from this item has the Ansible configure operation. Defaults to false — configure is opt-in. **Turning it on needs a non-empty \u003cspan pulumi-lang-nodejs=\"`ansibleDirectory`\" pulumi-lang-dotnet=\"`AnsibleDirectory`\" pulumi-lang-go=\"`ansibleDirectory`\" pulumi-lang-python=\"`ansible_directory`\" pulumi-lang-yaml=\"`ansibleDirectory`\" pulumi-lang-java=\"`ansibleDirectory`\" pulumi-lang-hcl=\"`ansible_directory`\"\u003e`ansibleDirectory`\u003c/span\u003e; the pair is refused (422) otherwise**, because a configure rooted at the generated wrapper has no playbook to run."
+                },
                 "createdAt": {
                     "type": "string",
                     "description": "Creation timestamp."
+                },
+                "defaultLimit": {
+                    "type": "string",
+                    "description": "Ansible `--limit` templated onto the provisioned workspace. Stored byte for byte, so leading or trailing whitespace is refused rather than trimmed."
+                },
+                "defaultPlaybook": {
+                    "type": "string",
+                    "description": "Playbook templated onto the provisioned workspace, relative to \u003cspan pulumi-lang-nodejs=\"`ansibleDirectory`\" pulumi-lang-dotnet=\"`AnsibleDirectory`\" pulumi-lang-go=\"`ansibleDirectory`\" pulumi-lang-python=\"`ansible_directory`\" pulumi-lang-yaml=\"`ansibleDirectory`\" pulumi-lang-java=\"`ansibleDirectory`\" pulumi-lang-hcl=\"`ansible_directory`\"\u003e`ansibleDirectory`\u003c/span\u003e — which becomes that workspace's Ansible root. Written without a leading or trailing slash."
                 },
                 "defaultVersionPin": {
                     "type": "string",
@@ -2166,6 +2285,13 @@
                 "enabled": {
                     "type": "boolean",
                     "description": "Whether the catalog item is available for provisioning."
+                },
+                "executionBackendConstraints": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Version ranges for allowed execution backends (tofu and/or terraform). Required for self-contained items; omit for wrapper items. Set to null to clear on update."
                 },
                 "labels": {
                     "type": "object",
@@ -2188,6 +2314,10 @@
                         "type": "string"
                     },
                     "description": "Provider template IDs rendered into the generated wrapper for instances."
+                },
+                "selfContained": {
+                    "type": "boolean",
+                    "description": "Use the module archive as the root configuration rather than generating a wrapper. Requires\u003cspan pulumi-lang-nodejs=\" executionBackendConstraints \" pulumi-lang-dotnet=\" ExecutionBackendConstraints \" pulumi-lang-go=\" executionBackendConstraints \" pulumi-lang-python=\" execution_backend_constraints \" pulumi-lang-yaml=\" executionBackendConstraints \" pulumi-lang-java=\" executionBackendConstraints \" pulumi-lang-hcl=\" execution_backend_constraints \"\u003e executionBackendConstraints \u003c/span\u003eand cannot use provider templates."
                 },
                 "updatedAt": {
                     "type": "string",
@@ -2200,10 +2330,18 @@
                 }
             },
             "required": [
+                "ansibleDirectory",
+                "configureEnabled",
                 "createdAt",
+                "defaultLimit",
+                "defaultPlaybook",
+                "defaultVersionPin",
+                "description",
+                "displayName",
                 "enabled",
                 "moduleId",
                 "name",
+                "selfContained",
                 "updatedAt"
             ],
             "inputProperties": {
@@ -2213,6 +2351,22 @@
                         "type": "string"
                     },
                     "description": "Agent pool IDs users may provision instances onto. Omit (null) for unrestricted."
+                },
+                "ansibleDirectory": {
+                    "type": "string",
+                    "description": "Subdirectory of the MODULE whose contents are copied into the generated configuration version, and the \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e the provisioned workspace is given. Module-relative, written without a leading or trailing slash. Copied rather than referenced because a configure Job never runs init, so the module's own checkout does not exist in it."
+                },
+                "configureEnabled": {
+                    "type": "boolean",
+                    "description": "Whether a workspace provisioned from this item has the Ansible configure operation. Defaults to false — configure is opt-in. **Turning it on needs a non-empty \u003cspan pulumi-lang-nodejs=\"`ansibleDirectory`\" pulumi-lang-dotnet=\"`AnsibleDirectory`\" pulumi-lang-go=\"`ansibleDirectory`\" pulumi-lang-python=\"`ansible_directory`\" pulumi-lang-yaml=\"`ansibleDirectory`\" pulumi-lang-java=\"`ansibleDirectory`\" pulumi-lang-hcl=\"`ansible_directory`\"\u003e`ansibleDirectory`\u003c/span\u003e; the pair is refused (422) otherwise**, because a configure rooted at the generated wrapper has no playbook to run."
+                },
+                "defaultLimit": {
+                    "type": "string",
+                    "description": "Ansible `--limit` templated onto the provisioned workspace. Stored byte for byte, so leading or trailing whitespace is refused rather than trimmed."
+                },
+                "defaultPlaybook": {
+                    "type": "string",
+                    "description": "Playbook templated onto the provisioned workspace, relative to \u003cspan pulumi-lang-nodejs=\"`ansibleDirectory`\" pulumi-lang-dotnet=\"`AnsibleDirectory`\" pulumi-lang-go=\"`ansibleDirectory`\" pulumi-lang-python=\"`ansible_directory`\" pulumi-lang-yaml=\"`ansibleDirectory`\" pulumi-lang-java=\"`ansibleDirectory`\" pulumi-lang-hcl=\"`ansible_directory`\"\u003e`ansibleDirectory`\u003c/span\u003e — which becomes that workspace's Ansible root. Written without a leading or trailing slash."
                 },
                 "defaultVersionPin": {
                     "type": "string",
@@ -2229,6 +2383,13 @@
                 "enabled": {
                     "type": "boolean",
                     "description": "Whether the catalog item is available for provisioning."
+                },
+                "executionBackendConstraints": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Version ranges for allowed execution backends (tofu and/or terraform). Required for self-contained items; omit for wrapper items. Set to null to clear on update."
                 },
                 "labels": {
                     "type": "object",
@@ -2251,6 +2412,10 @@
                         "type": "string"
                     },
                     "description": "Provider template IDs rendered into the generated wrapper for instances."
+                },
+                "selfContained": {
+                    "type": "boolean",
+                    "description": "Use the module archive as the root configuration rather than generating a wrapper. Requires\u003cspan pulumi-lang-nodejs=\" executionBackendConstraints \" pulumi-lang-dotnet=\" ExecutionBackendConstraints \" pulumi-lang-go=\" executionBackendConstraints \" pulumi-lang-python=\" execution_backend_constraints \" pulumi-lang-yaml=\" executionBackendConstraints \" pulumi-lang-java=\" executionBackendConstraints \" pulumi-lang-hcl=\" execution_backend_constraints \"\u003e executionBackendConstraints \u003c/span\u003eand cannot use provider templates."
                 },
                 "variableOptionsJson": {
                     "type": "string",
@@ -2271,9 +2436,25 @@
                         },
                         "description": "Agent pool IDs users may provision instances onto. Omit (null) for unrestricted."
                     },
+                    "ansibleDirectory": {
+                        "type": "string",
+                        "description": "Subdirectory of the MODULE whose contents are copied into the generated configuration version, and the \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e the provisioned workspace is given. Module-relative, written without a leading or trailing slash. Copied rather than referenced because a configure Job never runs init, so the module's own checkout does not exist in it."
+                    },
+                    "configureEnabled": {
+                        "type": "boolean",
+                        "description": "Whether a workspace provisioned from this item has the Ansible configure operation. Defaults to false — configure is opt-in. **Turning it on needs a non-empty \u003cspan pulumi-lang-nodejs=\"`ansibleDirectory`\" pulumi-lang-dotnet=\"`AnsibleDirectory`\" pulumi-lang-go=\"`ansibleDirectory`\" pulumi-lang-python=\"`ansible_directory`\" pulumi-lang-yaml=\"`ansibleDirectory`\" pulumi-lang-java=\"`ansibleDirectory`\" pulumi-lang-hcl=\"`ansible_directory`\"\u003e`ansibleDirectory`\u003c/span\u003e; the pair is refused (422) otherwise**, because a configure rooted at the generated wrapper has no playbook to run."
+                    },
                     "createdAt": {
                         "type": "string",
                         "description": "Creation timestamp."
+                    },
+                    "defaultLimit": {
+                        "type": "string",
+                        "description": "Ansible `--limit` templated onto the provisioned workspace. Stored byte for byte, so leading or trailing whitespace is refused rather than trimmed."
+                    },
+                    "defaultPlaybook": {
+                        "type": "string",
+                        "description": "Playbook templated onto the provisioned workspace, relative to \u003cspan pulumi-lang-nodejs=\"`ansibleDirectory`\" pulumi-lang-dotnet=\"`AnsibleDirectory`\" pulumi-lang-go=\"`ansibleDirectory`\" pulumi-lang-python=\"`ansible_directory`\" pulumi-lang-yaml=\"`ansibleDirectory`\" pulumi-lang-java=\"`ansibleDirectory`\" pulumi-lang-hcl=\"`ansible_directory`\"\u003e`ansibleDirectory`\u003c/span\u003e — which becomes that workspace's Ansible root. Written without a leading or trailing slash."
                     },
                     "defaultVersionPin": {
                         "type": "string",
@@ -2290,6 +2471,13 @@
                     "enabled": {
                         "type": "boolean",
                         "description": "Whether the catalog item is available for provisioning."
+                    },
+                    "executionBackendConstraints": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Version ranges for allowed execution backends (tofu and/or terraform). Required for self-contained items; omit for wrapper items. Set to null to clear on update."
                     },
                     "labels": {
                         "type": "object",
@@ -2312,6 +2500,10 @@
                             "type": "string"
                         },
                         "description": "Provider template IDs rendered into the generated wrapper for instances."
+                    },
+                    "selfContained": {
+                        "type": "boolean",
+                        "description": "Use the module archive as the root configuration rather than generating a wrapper. Requires\u003cspan pulumi-lang-nodejs=\" executionBackendConstraints \" pulumi-lang-dotnet=\" ExecutionBackendConstraints \" pulumi-lang-go=\" executionBackendConstraints \" pulumi-lang-python=\" execution_backend_constraints \" pulumi-lang-yaml=\" executionBackendConstraints \" pulumi-lang-java=\" executionBackendConstraints \" pulumi-lang-hcl=\" execution_backend_constraints \"\u003e executionBackendConstraints \u003c/span\u003eand cannot use provider templates."
                     },
                     "updatedAt": {
                         "type": "string",
@@ -2368,6 +2560,7 @@
             },
             "required": [
                 "createdAt",
+                "description",
                 "enabled",
                 "hookPoint",
                 "name",
@@ -2531,6 +2724,7 @@
                 "keyId",
                 "namespace",
                 "source",
+                "sourceUrl",
                 "updatedAt"
             ],
             "inputProperties": {
@@ -3528,6 +3722,7 @@
                 "hasToken",
                 "name",
                 "updatedAt",
+                "url",
                 "workspaceId"
             ],
             "inputProperties": {
@@ -4590,6 +4785,7 @@
                 "capabilities",
                 "catalogPermission",
                 "createdAt",
+                "description",
                 "name",
                 "poolPermission",
                 "registryPermission",
@@ -5217,6 +5413,7 @@
                 "category",
                 "configureOnly",
                 "createdAt",
+                "description",
                 "hcl",
                 "key",
                 "sensitive",
@@ -5384,6 +5581,7 @@
             },
             "required": [
                 "createdAt",
+                "description",
                 "global",
                 "name",
                 "priority",
@@ -5522,6 +5720,7 @@
                 "category",
                 "configureOnly",
                 "createdAt",
+                "description",
                 "hcl",
                 "key",
                 "sensitive",
@@ -5988,6 +6187,10 @@
                     "type": "string",
                     "description": "One of the deployment's OWN execution environments, by label — `rhel8-hardened`, say. Overrides \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e outright, so a workspace carrying this ignores its line entirely. A label rather than an image reference, so a workspace cannot name an arbitrary image and so the whole estate can be re-pointed in one place. Available labels come from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-dotnet=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-go=\"`getAnsibleExecutionEnvironments`\" pulumi-lang-python=\"`get_ansible_execution_environments`\" pulumi-lang-yaml=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-java=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-hcl=\"`data.terrapod_ansible_execution_environments`\"\u003e`terrapod.getAnsibleExecutionEnvironments`\u003c/span\u003e data source; naming one the deployment has not configured is refused at apply with a 422. Leave unset to run the built-in image for \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e, which is the ordinary case."
                 },
+                "ansibleHostKeyChecking": {
+                    "type": "boolean",
+                    "description": "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit \u003cspan pulumi-lang-nodejs=\"`ansibleSshCommonArgs`\" pulumi-lang-dotnet=\"`AnsibleSshCommonArgs`\" pulumi-lang-go=\"`ansibleSshCommonArgs`\" pulumi-lang-python=\"`ansible_ssh_common_args`\" pulumi-lang-yaml=\"`ansibleSshCommonArgs`\" pulumi-lang-java=\"`ansibleSshCommonArgs`\" pulumi-lang-hcl=\"`ansible_ssh_common_args`\"\u003e`ansibleSshCommonArgs`\u003c/span\u003e as a variable on the \u003cspan pulumi-lang-nodejs=\"`all`\" pulumi-lang-dotnet=\"`All`\" pulumi-lang-go=\"`all`\" pulumi-lang-python=\"`all`\" pulumi-lang-yaml=\"`all`\" pulumi-lang-java=\"`all`\" pulumi-lang-hcl=\"`all`\"\u003e`all`\u003c/span\u003e group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures."
+                },
                 "ansibleVersion": {
                     "type": "string",
                     "description": "The ansible-core LINE whose execution environment this workspace's configure operations run in — `2.21`, say. Terrapod publishes one execution-environment image per line, and the line is what decides which Python versions a managed host may have, so it is the unit to pin. An exact patch (`2.21.5`) is accepted and names its own line. No HCL constraint operators and not \u003cspan pulumi-lang-nodejs=\"`latest`\" pulumi-lang-dotnet=\"`Latest`\" pulumi-lang-go=\"`latest`\" pulumi-lang-python=\"`latest`\" pulumi-lang-yaml=\"`latest`\" pulumi-lang-java=\"`latest`\" pulumi-lang-hcl=\"`latest`\"\u003e`latest`\u003c/span\u003e. Left unset the server supplies the platform's current line at creation, which is then the workspace's own value — changing the platform default moves only workspaces created afterwards, exactly as \u003cspan pulumi-lang-nodejs=\"`engineVersion`\" pulumi-lang-dotnet=\"`EngineVersion`\" pulumi-lang-go=\"`engineVersion`\" pulumi-lang-python=\"`engine_version`\" pulumi-lang-yaml=\"`engineVersion`\" pulumi-lang-java=\"`engineVersion`\" pulumi-lang-hcl=\"`engine_version`\"\u003e`engineVersion`\u003c/span\u003e behaves. This does not affect how Terrapod reads the workspace's inventory: that is done server-side with the ansible in the API image."
@@ -6044,6 +6247,10 @@
                     "type": "string",
                     "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook."
                 },
+                "defaultRunKind": {
+                    "type": "string",
+                    "description": "Which run kind gets the prominent button on this workspace, and which the API offers first. One of \u003cspan pulumi-lang-nodejs=\"`full`\" pulumi-lang-dotnet=\"`Full`\" pulumi-lang-go=\"`full`\" pulumi-lang-python=\"`full`\" pulumi-lang-yaml=\"`full`\" pulumi-lang-java=\"`full`\" pulumi-lang-hcl=\"`full`\"\u003e`full`\u003c/span\u003e (plan + apply + configure), \u003cspan pulumi-lang-nodejs=\"`planApply`\" pulumi-lang-dotnet=\"`PlanApply`\" pulumi-lang-go=\"`planApply`\" pulumi-lang-python=\"`plan_apply`\" pulumi-lang-yaml=\"`planApply`\" pulumi-lang-java=\"`planApply`\" pulumi-lang-hcl=\"`plan_apply`\"\u003e`planApply`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e or \u003cspan pulumi-lang-nodejs=\"`plan`\" pulumi-lang-dotnet=\"`Plan`\" pulumi-lang-go=\"`plan`\" pulumi-lang-python=\"`plan`\" pulumi-lang-yaml=\"`plan`\" pulumi-lang-java=\"`plan`\" pulumi-lang-hcl=\"`plan`\"\u003e`plan`\u003c/span\u003e. **Omitted or empty means no preference**, and the platform offers the most complete kind the workspace has — usually what you want. Set it where the everyday action is not the biggest one: a workspace whose Terraform half only maintains the Ansible inventory, applying unattended and never configuring after an apply, wants \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e here. **Refused (422) when it names an operation the workspace does not have** — \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`full`\" pulumi-lang-dotnet=\"`Full`\" pulumi-lang-go=\"`full`\" pulumi-lang-python=\"`full`\" pulumi-lang-yaml=\"`full`\" pulumi-lang-java=\"`full`\" pulumi-lang-hcl=\"`full`\"\u003e`full`\u003c/span\u003e needs both — rather than being stored and ignored, so declare the operation in the same configuration. It changes only the ORDERING: every kind the workspace offers stays available, and a caller whose role cannot run the preferred kind falls back to the usual order."
+                },
                 "driftDetectionEnabled": {
                     "type": "boolean",
                     "description": "Enable drift detection for this workspace. Defaults to true for VCS-connected workspaces, false otherwise."
@@ -6071,6 +6278,10 @@
                     "type": "string",
                     "description": "Current drift status: \"\" (never checked), \u003cspan pulumi-lang-nodejs=\"\"noDrift\"\" pulumi-lang-dotnet=\"\"NoDrift\"\" pulumi-lang-go=\"\"noDrift\"\" pulumi-lang-python=\"\"no_drift\"\" pulumi-lang-yaml=\"\"noDrift\"\" pulumi-lang-java=\"\"noDrift\"\" pulumi-lang-hcl=\"\"no_drift\"\"\u003e\"noDrift\"\u003c/span\u003e, \"drifted\", or \"errored\". Server-volatile — updates when a drift run completes."
                 },
+                "dynamicInventoryEnabled": {
+                    "type": "boolean",
+                    "description": "Whether ansible's \u003cspan pulumi-lang-nodejs=\"`auto`\" pulumi-lang-dotnet=\"`Auto`\" pulumi-lang-go=\"`auto`\" pulumi-lang-python=\"`auto`\" pulumi-lang-yaml=\"`auto`\" pulumi-lang-java=\"`auto`\" pulumi-lang-hcl=\"`auto`\"\u003e`auto`\u003c/span\u003e inventory plugin — a **declared plugin config**, a YAML file with a top-level `plugin:` key — may run, and it runs **on the runner**. **Defaults to false.** The API never executes a plugin in either state; what this decides is what becomes of such a source when an inventory is resolved.\n\nOff, a plugin source is **refused by name** rather than resolving partially — a short host set read as the truth is the failure the inventory surface exists to prevent. On, the API **skips** it and says so per source, and the **runner re-resolves the inventory and is authoritative** for the hosts a configure reaches.\n\nSeparate from \u003cspan pulumi-lang-nodejs=\"`inventoryScriptsEnabled`\" pulumi-lang-dotnet=\"`InventoryScriptsEnabled`\" pulumi-lang-go=\"`inventoryScriptsEnabled`\" pulumi-lang-python=\"`inventory_scripts_enabled`\" pulumi-lang-yaml=\"`inventoryScriptsEnabled`\" pulumi-lang-java=\"`inventoryScriptsEnabled`\" pulumi-lang-hcl=\"`inventory_scripts_enabled`\"\u003e`inventoryScriptsEnabled`\u003c/span\u003e so declared plugin configs can be permitted without also permitting arbitrary executables."
+                },
                 "eeResourceCpu": {
                     "type": "string",
                     "description": "CPU request for the Ansible execution-environment sidecar (K8s format, e.g. '500m'), the container a configure's playbooks run in. Separate from \u003cspan pulumi-lang-nodejs=\"`resourceCpu`\" pulumi-lang-dotnet=\"`ResourceCpu`\" pulumi-lang-go=\"`resourceCpu`\" pulumi-lang-python=\"`resource_cpu`\" pulumi-lang-yaml=\"`resourceCpu`\" pulumi-lang-java=\"`resourceCpu`\" pulumi-lang-hcl=\"`resource_cpu`\"\u003e`resourceCpu`\u003c/span\u003e, which sizes the orchestrator, because the two do different work: one runs tofu, the other runs ansible against however many hosts the inventory resolves to. The limit is 2x the request. Leave unset to take the deployment default."
@@ -6095,12 +6306,20 @@
                     "type": "string",
                     "description": "Execution mode: local or agent."
                 },
+                "hardLimit": {
+                    "type": "string",
+                    "description": "A `--limit` no run may escape; empty means no ceiling. Distinct from \u003cspan pulumi-lang-nodejs=\"`defaultLimit`\" pulumi-lang-dotnet=\"`DefaultLimit`\" pulumi-lang-go=\"`defaultLimit`\" pulumi-lang-python=\"`default_limit`\" pulumi-lang-yaml=\"`defaultLimit`\" pulumi-lang-java=\"`defaultLimit`\" pulumi-lang-hcl=\"`default_limit`\"\u003e`defaultLimit`\u003c/span\u003e, which a run REPLACES when it supplies its own: this one is intersected with whatever limit the run ends up with, so a run may narrow within it and none may widen past it. It also bounds what a resolved-inventory read returns for the workspace."
+                },
                 "inventoryPaths": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     },
                     "description": "Inventory sources, each a file or a directory relative to the repository root. **Ordered — the order is the precedence ansible applies**, so this is a list and not a set. Name the files or directories you mean rather than a parent: `-i` over a directory containing both \u003cspan pulumi-lang-nodejs=\"`production`\" pulumi-lang-dotnet=\"`Production`\" pulumi-lang-go=\"`production`\" pulumi-lang-python=\"`production`\" pulumi-lang-yaml=\"`production`\" pulumi-lang-java=\"`production`\" pulumi-lang-hcl=\"`production`\"\u003e`production`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`staging`\" pulumi-lang-dotnet=\"`Staging`\" pulumi-lang-go=\"`staging`\" pulumi-lang-python=\"`staging`\" pulumi-lang-yaml=\"`staging`\" pulumi-lang-java=\"`staging`\" pulumi-lang-hcl=\"`staging`\"\u003e`staging`\u003c/span\u003e merges them into one inventory. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set \u003cspan pulumi-lang-nodejs=\"`inventoryPaths \" pulumi-lang-dotnet=\"`InventoryPaths \" pulumi-lang-go=\"`inventoryPaths \" pulumi-lang-python=\"`inventory_paths \" pulumi-lang-yaml=\"`inventoryPaths \" pulumi-lang-java=\"`inventoryPaths \" pulumi-lang-hcl=\"`inventory_paths \"\u003e`inventoryPaths \u003c/span\u003e= []` to clear."
+                },
+                "inventoryScriptsEnabled": {
+                    "type": "boolean",
+                    "description": "Whether ansible's \u003cspan pulumi-lang-nodejs=\"`script`\" pulumi-lang-dotnet=\"`Script`\" pulumi-lang-go=\"`script`\" pulumi-lang-python=\"`script`\" pulumi-lang-yaml=\"`script`\" pulumi-lang-java=\"`script`\" pulumi-lang-hcl=\"`script`\"\u003e`script`\u003c/span\u003e inventory plugin — an **executable inventory script** — may run, and it runs **on the runner**. **Defaults to false**, and the API never executes one in either state.\n\nOff, a script source is **refused by name** rather than resolving partially. On, the API **skips** it and the **runner re-resolves and is authoritative**.\n\nThe stricter half of the pair, and separate from \u003cspan pulumi-lang-nodejs=\"`dynamicInventoryEnabled`\" pulumi-lang-dotnet=\"`DynamicInventoryEnabled`\" pulumi-lang-go=\"`dynamicInventoryEnabled`\" pulumi-lang-python=\"`dynamic_inventory_enabled`\" pulumi-lang-yaml=\"`dynamicInventoryEnabled`\" pulumi-lang-java=\"`dynamicInventoryEnabled`\" pulumi-lang-hcl=\"`dynamic_inventory_enabled`\"\u003e`dynamicInventoryEnabled`\u003c/span\u003e for that reason: a declared plugin config names a collection that can be pinned and installed, a script names nothing — so an operator can take declared configs without permitting arbitrary executables."
                 },
                 "labels": {
                     "type": "object",
@@ -6287,6 +6506,7 @@
                 "aiSummaryMode",
                 "allowForkPrPlans",
                 "ansibleCollections",
+                "ansibleHostKeyChecking",
                 "ansibleVersion",
                 "autoApply",
                 "autoApplyMode",
@@ -6301,19 +6521,23 @@
                 "debugMode",
                 "defaultLimit",
                 "defaultPlaybook",
+                "defaultRunKind",
                 "driftDetectionEnabled",
                 "driftDetectionIntervalSeconds",
                 "driftIgnoreRules",
                 "driftLastCheckedAt",
                 "driftLatestRunId",
                 "driftStatus",
+                "dynamicInventoryEnabled",
                 "eeResourceCpu",
                 "eeResourceMemory",
                 "engine",
                 "engineVersion",
                 "executionBackend",
                 "executionMode",
+                "hardLimit",
                 "inventoryPaths",
+                "inventoryScriptsEnabled",
                 "lifecycleReason",
                 "lifecycleState",
                 "lockReason",
@@ -6341,11 +6565,14 @@
                 "triggerPrefixes",
                 "updatedAt",
                 "varFiles",
+                "vcsBranch",
+                "vcsConnectionId",
                 "vcsConnectionName",
                 "vcsLastAttemptedAt",
                 "vcsLastError",
                 "vcsLastErrorAt",
                 "vcsLastPolledAt",
+                "vcsRepoUrl",
                 "vcsWorkflow",
                 "workingDirectory"
             ],
@@ -6387,6 +6614,10 @@
                 "ansibleExecutionEnvironment": {
                     "type": "string",
                     "description": "One of the deployment's OWN execution environments, by label — `rhel8-hardened`, say. Overrides \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e outright, so a workspace carrying this ignores its line entirely. A label rather than an image reference, so a workspace cannot name an arbitrary image and so the whole estate can be re-pointed in one place. Available labels come from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-dotnet=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-go=\"`getAnsibleExecutionEnvironments`\" pulumi-lang-python=\"`get_ansible_execution_environments`\" pulumi-lang-yaml=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-java=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-hcl=\"`data.terrapod_ansible_execution_environments`\"\u003e`terrapod.getAnsibleExecutionEnvironments`\u003c/span\u003e data source; naming one the deployment has not configured is refused at apply with a 422. Leave unset to run the built-in image for \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e, which is the ordinary case."
+                },
+                "ansibleHostKeyChecking": {
+                    "type": "boolean",
+                    "description": "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit \u003cspan pulumi-lang-nodejs=\"`ansibleSshCommonArgs`\" pulumi-lang-dotnet=\"`AnsibleSshCommonArgs`\" pulumi-lang-go=\"`ansibleSshCommonArgs`\" pulumi-lang-python=\"`ansible_ssh_common_args`\" pulumi-lang-yaml=\"`ansibleSshCommonArgs`\" pulumi-lang-java=\"`ansibleSshCommonArgs`\" pulumi-lang-hcl=\"`ansible_ssh_common_args`\"\u003e`ansibleSshCommonArgs`\u003c/span\u003e as a variable on the \u003cspan pulumi-lang-nodejs=\"`all`\" pulumi-lang-dotnet=\"`All`\" pulumi-lang-go=\"`all`\" pulumi-lang-python=\"`all`\" pulumi-lang-yaml=\"`all`\" pulumi-lang-java=\"`all`\" pulumi-lang-hcl=\"`all`\"\u003e`all`\u003c/span\u003e group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures."
                 },
                 "ansibleVersion": {
                     "type": "string",
@@ -6440,6 +6671,10 @@
                     "type": "string",
                     "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook."
                 },
+                "defaultRunKind": {
+                    "type": "string",
+                    "description": "Which run kind gets the prominent button on this workspace, and which the API offers first. One of \u003cspan pulumi-lang-nodejs=\"`full`\" pulumi-lang-dotnet=\"`Full`\" pulumi-lang-go=\"`full`\" pulumi-lang-python=\"`full`\" pulumi-lang-yaml=\"`full`\" pulumi-lang-java=\"`full`\" pulumi-lang-hcl=\"`full`\"\u003e`full`\u003c/span\u003e (plan + apply + configure), \u003cspan pulumi-lang-nodejs=\"`planApply`\" pulumi-lang-dotnet=\"`PlanApply`\" pulumi-lang-go=\"`planApply`\" pulumi-lang-python=\"`plan_apply`\" pulumi-lang-yaml=\"`planApply`\" pulumi-lang-java=\"`planApply`\" pulumi-lang-hcl=\"`plan_apply`\"\u003e`planApply`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e or \u003cspan pulumi-lang-nodejs=\"`plan`\" pulumi-lang-dotnet=\"`Plan`\" pulumi-lang-go=\"`plan`\" pulumi-lang-python=\"`plan`\" pulumi-lang-yaml=\"`plan`\" pulumi-lang-java=\"`plan`\" pulumi-lang-hcl=\"`plan`\"\u003e`plan`\u003c/span\u003e. **Omitted or empty means no preference**, and the platform offers the most complete kind the workspace has — usually what you want. Set it where the everyday action is not the biggest one: a workspace whose Terraform half only maintains the Ansible inventory, applying unattended and never configuring after an apply, wants \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e here. **Refused (422) when it names an operation the workspace does not have** — \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`full`\" pulumi-lang-dotnet=\"`Full`\" pulumi-lang-go=\"`full`\" pulumi-lang-python=\"`full`\" pulumi-lang-yaml=\"`full`\" pulumi-lang-java=\"`full`\" pulumi-lang-hcl=\"`full`\"\u003e`full`\u003c/span\u003e needs both — rather than being stored and ignored, so declare the operation in the same configuration. It changes only the ORDERING: every kind the workspace offers stays available, and a caller whose role cannot run the preferred kind falls back to the usual order."
+                },
                 "driftDetectionEnabled": {
                     "type": "boolean",
                     "description": "Enable drift detection for this workspace. Defaults to true for VCS-connected workspaces, false otherwise."
@@ -6454,6 +6689,10 @@
                         "type": "string"
                     },
                     "description": "Glob-aware patterns suppressed by the drift-result classifier (#482). Each entry is a Terraform resource address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` characters (so it can span `[N]` indices but not segment boundaries), and `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`, `aws_iam_role.foo`. Empty list (the default) means classic drift behaviour: every plan diff counts. Affects drift-detection runs only — regular plan/apply is untouched. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set \u003cspan pulumi-lang-nodejs=\"`driftIgnoreRules \" pulumi-lang-dotnet=\"`DriftIgnoreRules \" pulumi-lang-go=\"`driftIgnoreRules \" pulumi-lang-python=\"`drift_ignore_rules \" pulumi-lang-yaml=\"`driftIgnoreRules \" pulumi-lang-java=\"`driftIgnoreRules \" pulumi-lang-hcl=\"`drift_ignore_rules \"\u003e`driftIgnoreRules \u003c/span\u003e= []` to clear."
+                },
+                "dynamicInventoryEnabled": {
+                    "type": "boolean",
+                    "description": "Whether ansible's \u003cspan pulumi-lang-nodejs=\"`auto`\" pulumi-lang-dotnet=\"`Auto`\" pulumi-lang-go=\"`auto`\" pulumi-lang-python=\"`auto`\" pulumi-lang-yaml=\"`auto`\" pulumi-lang-java=\"`auto`\" pulumi-lang-hcl=\"`auto`\"\u003e`auto`\u003c/span\u003e inventory plugin — a **declared plugin config**, a YAML file with a top-level `plugin:` key — may run, and it runs **on the runner**. **Defaults to false.** The API never executes a plugin in either state; what this decides is what becomes of such a source when an inventory is resolved.\n\nOff, a plugin source is **refused by name** rather than resolving partially — a short host set read as the truth is the failure the inventory surface exists to prevent. On, the API **skips** it and says so per source, and the **runner re-resolves the inventory and is authoritative** for the hosts a configure reaches.\n\nSeparate from \u003cspan pulumi-lang-nodejs=\"`inventoryScriptsEnabled`\" pulumi-lang-dotnet=\"`InventoryScriptsEnabled`\" pulumi-lang-go=\"`inventoryScriptsEnabled`\" pulumi-lang-python=\"`inventory_scripts_enabled`\" pulumi-lang-yaml=\"`inventoryScriptsEnabled`\" pulumi-lang-java=\"`inventoryScriptsEnabled`\" pulumi-lang-hcl=\"`inventory_scripts_enabled`\"\u003e`inventoryScriptsEnabled`\u003c/span\u003e so declared plugin configs can be permitted without also permitting arbitrary executables."
                 },
                 "eeResourceCpu": {
                     "type": "string",
@@ -6479,12 +6718,20 @@
                     "type": "string",
                     "description": "Execution mode: local or agent."
                 },
+                "hardLimit": {
+                    "type": "string",
+                    "description": "A `--limit` no run may escape; empty means no ceiling. Distinct from \u003cspan pulumi-lang-nodejs=\"`defaultLimit`\" pulumi-lang-dotnet=\"`DefaultLimit`\" pulumi-lang-go=\"`defaultLimit`\" pulumi-lang-python=\"`default_limit`\" pulumi-lang-yaml=\"`defaultLimit`\" pulumi-lang-java=\"`defaultLimit`\" pulumi-lang-hcl=\"`default_limit`\"\u003e`defaultLimit`\u003c/span\u003e, which a run REPLACES when it supplies its own: this one is intersected with whatever limit the run ends up with, so a run may narrow within it and none may widen past it. It also bounds what a resolved-inventory read returns for the workspace."
+                },
                 "inventoryPaths": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     },
                     "description": "Inventory sources, each a file or a directory relative to the repository root. **Ordered — the order is the precedence ansible applies**, so this is a list and not a set. Name the files or directories you mean rather than a parent: `-i` over a directory containing both \u003cspan pulumi-lang-nodejs=\"`production`\" pulumi-lang-dotnet=\"`Production`\" pulumi-lang-go=\"`production`\" pulumi-lang-python=\"`production`\" pulumi-lang-yaml=\"`production`\" pulumi-lang-java=\"`production`\" pulumi-lang-hcl=\"`production`\"\u003e`production`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`staging`\" pulumi-lang-dotnet=\"`Staging`\" pulumi-lang-go=\"`staging`\" pulumi-lang-python=\"`staging`\" pulumi-lang-yaml=\"`staging`\" pulumi-lang-java=\"`staging`\" pulumi-lang-hcl=\"`staging`\"\u003e`staging`\u003c/span\u003e merges them into one inventory. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set \u003cspan pulumi-lang-nodejs=\"`inventoryPaths \" pulumi-lang-dotnet=\"`InventoryPaths \" pulumi-lang-go=\"`inventoryPaths \" pulumi-lang-python=\"`inventory_paths \" pulumi-lang-yaml=\"`inventoryPaths \" pulumi-lang-java=\"`inventoryPaths \" pulumi-lang-hcl=\"`inventory_paths \"\u003e`inventoryPaths \u003c/span\u003e= []` to clear."
+                },
+                "inventoryScriptsEnabled": {
+                    "type": "boolean",
+                    "description": "Whether ansible's \u003cspan pulumi-lang-nodejs=\"`script`\" pulumi-lang-dotnet=\"`Script`\" pulumi-lang-go=\"`script`\" pulumi-lang-python=\"`script`\" pulumi-lang-yaml=\"`script`\" pulumi-lang-java=\"`script`\" pulumi-lang-hcl=\"`script`\"\u003e`script`\u003c/span\u003e inventory plugin — an **executable inventory script** — may run, and it runs **on the runner**. **Defaults to false**, and the API never executes one in either state.\n\nOff, a script source is **refused by name** rather than resolving partially. On, the API **skips** it and the **runner re-resolves and is authoritative**.\n\nThe stricter half of the pair, and separate from \u003cspan pulumi-lang-nodejs=\"`dynamicInventoryEnabled`\" pulumi-lang-dotnet=\"`DynamicInventoryEnabled`\" pulumi-lang-go=\"`dynamicInventoryEnabled`\" pulumi-lang-python=\"`dynamic_inventory_enabled`\" pulumi-lang-yaml=\"`dynamicInventoryEnabled`\" pulumi-lang-java=\"`dynamicInventoryEnabled`\" pulumi-lang-hcl=\"`dynamic_inventory_enabled`\"\u003e`dynamicInventoryEnabled`\u003c/span\u003e for that reason: a declared plugin config names a collection that can be pinned and installed, a script names nothing — so an operator can take declared configs without permitting arbitrary executables."
                 },
                 "labels": {
                     "type": "object",
@@ -6661,6 +6908,10 @@
                         "type": "string",
                         "description": "One of the deployment's OWN execution environments, by label — `rhel8-hardened`, say. Overrides \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e outright, so a workspace carrying this ignores its line entirely. A label rather than an image reference, so a workspace cannot name an arbitrary image and so the whole estate can be re-pointed in one place. Available labels come from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-dotnet=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-go=\"`getAnsibleExecutionEnvironments`\" pulumi-lang-python=\"`get_ansible_execution_environments`\" pulumi-lang-yaml=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-java=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-hcl=\"`data.terrapod_ansible_execution_environments`\"\u003e`terrapod.getAnsibleExecutionEnvironments`\u003c/span\u003e data source; naming one the deployment has not configured is refused at apply with a 422. Leave unset to run the built-in image for \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e, which is the ordinary case."
                     },
+                    "ansibleHostKeyChecking": {
+                        "type": "boolean",
+                        "description": "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit \u003cspan pulumi-lang-nodejs=\"`ansibleSshCommonArgs`\" pulumi-lang-dotnet=\"`AnsibleSshCommonArgs`\" pulumi-lang-go=\"`ansibleSshCommonArgs`\" pulumi-lang-python=\"`ansible_ssh_common_args`\" pulumi-lang-yaml=\"`ansibleSshCommonArgs`\" pulumi-lang-java=\"`ansibleSshCommonArgs`\" pulumi-lang-hcl=\"`ansible_ssh_common_args`\"\u003e`ansibleSshCommonArgs`\u003c/span\u003e as a variable on the \u003cspan pulumi-lang-nodejs=\"`all`\" pulumi-lang-dotnet=\"`All`\" pulumi-lang-go=\"`all`\" pulumi-lang-python=\"`all`\" pulumi-lang-yaml=\"`all`\" pulumi-lang-java=\"`all`\" pulumi-lang-hcl=\"`all`\"\u003e`all`\u003c/span\u003e group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures."
+                    },
                     "ansibleVersion": {
                         "type": "string",
                         "description": "The ansible-core LINE whose execution environment this workspace's configure operations run in — `2.21`, say. Terrapod publishes one execution-environment image per line, and the line is what decides which Python versions a managed host may have, so it is the unit to pin. An exact patch (`2.21.5`) is accepted and names its own line. No HCL constraint operators and not \u003cspan pulumi-lang-nodejs=\"`latest`\" pulumi-lang-dotnet=\"`Latest`\" pulumi-lang-go=\"`latest`\" pulumi-lang-python=\"`latest`\" pulumi-lang-yaml=\"`latest`\" pulumi-lang-java=\"`latest`\" pulumi-lang-hcl=\"`latest`\"\u003e`latest`\u003c/span\u003e. Left unset the server supplies the platform's current line at creation, which is then the workspace's own value — changing the platform default moves only workspaces created afterwards, exactly as \u003cspan pulumi-lang-nodejs=\"`engineVersion`\" pulumi-lang-dotnet=\"`EngineVersion`\" pulumi-lang-go=\"`engineVersion`\" pulumi-lang-python=\"`engine_version`\" pulumi-lang-yaml=\"`engineVersion`\" pulumi-lang-java=\"`engineVersion`\" pulumi-lang-hcl=\"`engine_version`\"\u003e`engineVersion`\u003c/span\u003e behaves. This does not affect how Terrapod reads the workspace's inventory: that is done server-side with the ansible in the API image."
@@ -6717,6 +6968,10 @@
                         "type": "string",
                         "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook."
                     },
+                    "defaultRunKind": {
+                        "type": "string",
+                        "description": "Which run kind gets the prominent button on this workspace, and which the API offers first. One of \u003cspan pulumi-lang-nodejs=\"`full`\" pulumi-lang-dotnet=\"`Full`\" pulumi-lang-go=\"`full`\" pulumi-lang-python=\"`full`\" pulumi-lang-yaml=\"`full`\" pulumi-lang-java=\"`full`\" pulumi-lang-hcl=\"`full`\"\u003e`full`\u003c/span\u003e (plan + apply + configure), \u003cspan pulumi-lang-nodejs=\"`planApply`\" pulumi-lang-dotnet=\"`PlanApply`\" pulumi-lang-go=\"`planApply`\" pulumi-lang-python=\"`plan_apply`\" pulumi-lang-yaml=\"`planApply`\" pulumi-lang-java=\"`planApply`\" pulumi-lang-hcl=\"`plan_apply`\"\u003e`planApply`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e or \u003cspan pulumi-lang-nodejs=\"`plan`\" pulumi-lang-dotnet=\"`Plan`\" pulumi-lang-go=\"`plan`\" pulumi-lang-python=\"`plan`\" pulumi-lang-yaml=\"`plan`\" pulumi-lang-java=\"`plan`\" pulumi-lang-hcl=\"`plan`\"\u003e`plan`\u003c/span\u003e. **Omitted or empty means no preference**, and the platform offers the most complete kind the workspace has — usually what you want. Set it where the everyday action is not the biggest one: a workspace whose Terraform half only maintains the Ansible inventory, applying unattended and never configuring after an apply, wants \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e here. **Refused (422) when it names an operation the workspace does not have** — \u003cspan pulumi-lang-nodejs=\"`configure`\" pulumi-lang-dotnet=\"`Configure`\" pulumi-lang-go=\"`configure`\" pulumi-lang-python=\"`configure`\" pulumi-lang-yaml=\"`configure`\" pulumi-lang-java=\"`configure`\" pulumi-lang-hcl=\"`configure`\"\u003e`configure`\u003c/span\u003e needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`full`\" pulumi-lang-dotnet=\"`Full`\" pulumi-lang-go=\"`full`\" pulumi-lang-python=\"`full`\" pulumi-lang-yaml=\"`full`\" pulumi-lang-java=\"`full`\" pulumi-lang-hcl=\"`full`\"\u003e`full`\u003c/span\u003e needs both — rather than being stored and ignored, so declare the operation in the same configuration. It changes only the ORDERING: every kind the workspace offers stays available, and a caller whose role cannot run the preferred kind falls back to the usual order."
+                    },
                     "driftDetectionEnabled": {
                         "type": "boolean",
                         "description": "Enable drift detection for this workspace. Defaults to true for VCS-connected workspaces, false otherwise."
@@ -6744,6 +6999,10 @@
                         "type": "string",
                         "description": "Current drift status: \"\" (never checked), \u003cspan pulumi-lang-nodejs=\"\"noDrift\"\" pulumi-lang-dotnet=\"\"NoDrift\"\" pulumi-lang-go=\"\"noDrift\"\" pulumi-lang-python=\"\"no_drift\"\" pulumi-lang-yaml=\"\"noDrift\"\" pulumi-lang-java=\"\"noDrift\"\" pulumi-lang-hcl=\"\"no_drift\"\"\u003e\"noDrift\"\u003c/span\u003e, \"drifted\", or \"errored\". Server-volatile — updates when a drift run completes."
                     },
+                    "dynamicInventoryEnabled": {
+                        "type": "boolean",
+                        "description": "Whether ansible's \u003cspan pulumi-lang-nodejs=\"`auto`\" pulumi-lang-dotnet=\"`Auto`\" pulumi-lang-go=\"`auto`\" pulumi-lang-python=\"`auto`\" pulumi-lang-yaml=\"`auto`\" pulumi-lang-java=\"`auto`\" pulumi-lang-hcl=\"`auto`\"\u003e`auto`\u003c/span\u003e inventory plugin — a **declared plugin config**, a YAML file with a top-level `plugin:` key — may run, and it runs **on the runner**. **Defaults to false.** The API never executes a plugin in either state; what this decides is what becomes of such a source when an inventory is resolved.\n\nOff, a plugin source is **refused by name** rather than resolving partially — a short host set read as the truth is the failure the inventory surface exists to prevent. On, the API **skips** it and says so per source, and the **runner re-resolves the inventory and is authoritative** for the hosts a configure reaches.\n\nSeparate from \u003cspan pulumi-lang-nodejs=\"`inventoryScriptsEnabled`\" pulumi-lang-dotnet=\"`InventoryScriptsEnabled`\" pulumi-lang-go=\"`inventoryScriptsEnabled`\" pulumi-lang-python=\"`inventory_scripts_enabled`\" pulumi-lang-yaml=\"`inventoryScriptsEnabled`\" pulumi-lang-java=\"`inventoryScriptsEnabled`\" pulumi-lang-hcl=\"`inventory_scripts_enabled`\"\u003e`inventoryScriptsEnabled`\u003c/span\u003e so declared plugin configs can be permitted without also permitting arbitrary executables."
+                    },
                     "eeResourceCpu": {
                         "type": "string",
                         "description": "CPU request for the Ansible execution-environment sidecar (K8s format, e.g. '500m'), the container a configure's playbooks run in. Separate from \u003cspan pulumi-lang-nodejs=\"`resourceCpu`\" pulumi-lang-dotnet=\"`ResourceCpu`\" pulumi-lang-go=\"`resourceCpu`\" pulumi-lang-python=\"`resource_cpu`\" pulumi-lang-yaml=\"`resourceCpu`\" pulumi-lang-java=\"`resourceCpu`\" pulumi-lang-hcl=\"`resource_cpu`\"\u003e`resourceCpu`\u003c/span\u003e, which sizes the orchestrator, because the two do different work: one runs tofu, the other runs ansible against however many hosts the inventory resolves to. The limit is 2x the request. Leave unset to take the deployment default."
@@ -6768,12 +7027,20 @@
                         "type": "string",
                         "description": "Execution mode: local or agent."
                     },
+                    "hardLimit": {
+                        "type": "string",
+                        "description": "A `--limit` no run may escape; empty means no ceiling. Distinct from \u003cspan pulumi-lang-nodejs=\"`defaultLimit`\" pulumi-lang-dotnet=\"`DefaultLimit`\" pulumi-lang-go=\"`defaultLimit`\" pulumi-lang-python=\"`default_limit`\" pulumi-lang-yaml=\"`defaultLimit`\" pulumi-lang-java=\"`defaultLimit`\" pulumi-lang-hcl=\"`default_limit`\"\u003e`defaultLimit`\u003c/span\u003e, which a run REPLACES when it supplies its own: this one is intersected with whatever limit the run ends up with, so a run may narrow within it and none may widen past it. It also bounds what a resolved-inventory read returns for the workspace."
+                    },
                     "inventoryPaths": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
                         "description": "Inventory sources, each a file or a directory relative to the repository root. **Ordered — the order is the precedence ansible applies**, so this is a list and not a set. Name the files or directories you mean rather than a parent: `-i` over a directory containing both \u003cspan pulumi-lang-nodejs=\"`production`\" pulumi-lang-dotnet=\"`Production`\" pulumi-lang-go=\"`production`\" pulumi-lang-python=\"`production`\" pulumi-lang-yaml=\"`production`\" pulumi-lang-java=\"`production`\" pulumi-lang-hcl=\"`production`\"\u003e`production`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`staging`\" pulumi-lang-dotnet=\"`Staging`\" pulumi-lang-go=\"`staging`\" pulumi-lang-python=\"`staging`\" pulumi-lang-yaml=\"`staging`\" pulumi-lang-java=\"`staging`\" pulumi-lang-hcl=\"`staging`\"\u003e`staging`\u003c/span\u003e merges them into one inventory. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set \u003cspan pulumi-lang-nodejs=\"`inventoryPaths \" pulumi-lang-dotnet=\"`InventoryPaths \" pulumi-lang-go=\"`inventoryPaths \" pulumi-lang-python=\"`inventory_paths \" pulumi-lang-yaml=\"`inventoryPaths \" pulumi-lang-java=\"`inventoryPaths \" pulumi-lang-hcl=\"`inventory_paths \"\u003e`inventoryPaths \u003c/span\u003e= []` to clear."
+                    },
+                    "inventoryScriptsEnabled": {
+                        "type": "boolean",
+                        "description": "Whether ansible's \u003cspan pulumi-lang-nodejs=\"`script`\" pulumi-lang-dotnet=\"`Script`\" pulumi-lang-go=\"`script`\" pulumi-lang-python=\"`script`\" pulumi-lang-yaml=\"`script`\" pulumi-lang-java=\"`script`\" pulumi-lang-hcl=\"`script`\"\u003e`script`\u003c/span\u003e inventory plugin — an **executable inventory script** — may run, and it runs **on the runner**. **Defaults to false**, and the API never executes one in either state.\n\nOff, a script source is **refused by name** rather than resolving partially. On, the API **skips** it and the **runner re-resolves and is authoritative**.\n\nThe stricter half of the pair, and separate from \u003cspan pulumi-lang-nodejs=\"`dynamicInventoryEnabled`\" pulumi-lang-dotnet=\"`DynamicInventoryEnabled`\" pulumi-lang-go=\"`dynamicInventoryEnabled`\" pulumi-lang-python=\"`dynamic_inventory_enabled`\" pulumi-lang-yaml=\"`dynamicInventoryEnabled`\" pulumi-lang-java=\"`dynamicInventoryEnabled`\" pulumi-lang-hcl=\"`dynamic_inventory_enabled`\"\u003e`dynamicInventoryEnabled`\u003c/span\u003e for that reason: a declared plugin config names a collection that can be pinned and installed, a script names nothing — so an operator can take declared configs without permitting arbitrary executables."
                     },
                     "labels": {
                         "type": "object",
@@ -7243,6 +7510,9 @@
                     "limit": {
                         "type": "string"
                     },
+                    "provenance": {
+                        "type": "boolean"
+                    },
                     "workspaceId": {
                         "type": "string"
                     }
@@ -7288,6 +7558,18 @@
                     "limit": {
                         "type": "string"
                     },
+                    "provenance": {
+                        "type": "boolean"
+                    },
+                    "varProvenance": {
+                        "additionalProperties": {
+                            "additionalProperties": {
+                                "$ref": "#/types/terrapod:index/getInventoryResolvedVarProvenance:getInventoryResolvedVarProvenance"
+                            },
+                            "type": "object"
+                        },
+                        "type": "object"
+                    },
                     "workspaceId": {
                         "type": "string"
                     }
@@ -7298,6 +7580,7 @@
                     "groups",
                     "hostCount",
                     "hosts",
+                    "varProvenance",
                     "workspaceId"
                 ],
                 "type": "object"
@@ -7666,6 +7949,9 @@
                     "ansibleExecutionEnvironment": {
                         "type": "string"
                     },
+                    "ansibleHostKeyChecking": {
+                        "type": "boolean"
+                    },
                     "ansibleVersion": {
                         "type": "string"
                     },
@@ -7702,6 +7988,9 @@
                     "defaultPlaybook": {
                         "type": "string"
                     },
+                    "defaultRunKind": {
+                        "type": "string"
+                    },
                     "driftDetectionEnabled": {
                         "type": "boolean"
                     },
@@ -7723,6 +8012,9 @@
                     "driftStatus": {
                         "type": "string"
                     },
+                    "dynamicInventoryEnabled": {
+                        "type": "boolean"
+                    },
                     "eeResourceCpu": {
                         "type": "string"
                     },
@@ -7741,6 +8033,9 @@
                     "executionMode": {
                         "type": "string"
                     },
+                    "hardLimit": {
+                        "type": "string"
+                    },
                     "id": {
                         "type": "string"
                     },
@@ -7749,6 +8044,9 @@
                             "type": "string"
                         },
                         "type": "array"
+                    },
+                    "inventoryScriptsEnabled": {
+                        "type": "boolean"
                     },
                     "labels": {
                         "additionalProperties": {
@@ -7888,6 +8186,7 @@
                     "allowForkPrPlans",
                     "ansibleCollections",
                     "ansibleExecutionEnvironment",
+                    "ansibleHostKeyChecking",
                     "ansibleVersion",
                     "autoApply",
                     "autoApplyMode",
@@ -7900,20 +8199,24 @@
                     "debugMode",
                     "defaultLimit",
                     "defaultPlaybook",
+                    "defaultRunKind",
                     "driftDetectionEnabled",
                     "driftDetectionIntervalSeconds",
                     "driftIgnoreRules",
                     "driftLastCheckedAt",
                     "driftLatestRunId",
                     "driftStatus",
+                    "dynamicInventoryEnabled",
                     "eeResourceCpu",
                     "eeResourceMemory",
                     "engine",
                     "engineVersion",
                     "executionBackend",
                     "executionMode",
+                    "hardLimit",
                     "id",
                     "inventoryPaths",
+                    "inventoryScriptsEnabled",
                     "labels",
                     "lifecycleReason",
                     "lifecycleState",

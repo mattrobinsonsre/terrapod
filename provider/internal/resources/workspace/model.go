@@ -113,6 +113,12 @@ type workspaceModel struct {
 	// permit and nobody wants: both false, which can never produce a run.
 	PlanApplyEnabled types.Bool `tfsdk:"plan_apply_enabled"`
 	ConfigureEnabled types.Bool `tfsdk:"configure_enabled"`
+	// Which of the two gets the prominent button (#2479). The server stores
+	// what it is given byte for byte -- it validates and never normalises --
+	// so Optional+Computed with UseStateForUnknown is safe here: a configured
+	// value reads straight back, and an omitted one takes whatever the server
+	// holds.
+	DefaultRunKind types.String `tfsdk:"default_run_kind"`
 	// How a configure STARTS (#1974). Both default false on the server, both
 	// need ConfigureEnabled to mean anything, and neither has a cross-field
 	// invariant of its own -- a trigger declared on a workspace whose configure

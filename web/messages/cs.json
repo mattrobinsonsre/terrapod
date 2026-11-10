@@ -2724,7 +2724,11 @@
       "hardLimit": "Pevný limit",
       "hardLimitPlaceholder": "např. canary",
       "hardLimitTitle": "Kombinuje se s limitem, který běh uvede, takže běh může zasažený rozsah zúžit, ale žádný jej nemůže rozšířit nad tuto hranici. Uvádí nejvýše jednu skupinu nebo jeden vzor hostitele — například canary, nebo !prod pro všechno kromě produkce — protože ansible neumí v limitu vyjádřit „kteroukoli z těchto“. Chcete-li strop nad dvěma skupinami, vytvořte z nich ve svém inventáři nadřazenou skupinu a uveďte ji.",
-      "hardLimitLead": "Hodnota --limit, které žádný běh neunikne. Nechte prázdné, pokud nemá platit žádný strop."
+      "hardLimitLead": "Hodnota --limit, které žádný běh neunikne. Nechte prázdné, pokud nemá platit žádný strop.",
+      "defaultRunKind": "Hlavní tlačítko spuštění",
+      "defaultRunKindAuto": "Automaticky (nejúplnější)",
+      "defaultRunKindLead": "Která akce dostane v tomto pracovním prostoru výrazné tlačítko. Automaticky nabídne nejúplnější běh, jaký může.",
+      "defaultRunKindTitle": "Která akce dostane v tomto pracovním prostoru výrazné tlačítko. Automaticky nabídne nejúplnější běh, jaký může — obvykle správně, a nesprávně tam, kde každodenní akcí není ta největší: pracovní prostor, jehož část Terraform pouze udržuje inventář Ansible, kde použití probíhá bez dozoru a po němž se nikdy nekonfiguruje, chce zde Konfigurovat. Volba, kterou tento pracovní prostor nabídnout nemůže, je při uložení odmítnuta, a ta, kterou vaše role nemůže spustit, se pro vás vrátí na Automaticky."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

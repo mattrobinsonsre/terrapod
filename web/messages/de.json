@@ -2724,7 +2724,11 @@
       "hardLimit": "Hartes Limit",
       "hardLimitPlaceholder": "z. B. canary",
       "hardLimitTitle": "Es wird mit dem Limit kombiniert, das ein Lauf selbst mitgibt, sodass ein Lauf darin enger werden kann, aber keiner darüber hinaus. Es benennt höchstens eine Gruppe oder ein Hostmuster — etwa canary oder !prod für alles außer der Produktion — weil ansible in einem Limit nicht „eines von diesen“ ausdrücken kann. Soll die Obergrenze zwei Gruppen umfassen, fassen Sie diese im Inventar zu einer übergeordneten Gruppe zusammen und benennen diese.",
-      "hardLimitLead": "Ein --limit, das kein Lauf überschreiten darf. Leer lassen für keine Obergrenze."
+      "hardLimitLead": "Ein --limit, das kein Lauf überschreiten darf. Leer lassen für keine Obergrenze.",
+      "defaultRunKind": "Hauptschaltfläche für Läufe",
+      "defaultRunKindAuto": "Automatisch (vollständigster Lauf)",
+      "defaultRunKindLead": "Welche Aktion in diesem Arbeitsbereich die auffällige Schaltfläche erhält. Automatisch bietet den vollständigsten Lauf an, der möglich ist.",
+      "defaultRunKindTitle": "Welche Aktion in diesem Arbeitsbereich die auffällige Schaltfläche erhält. Automatisch bietet den vollständigsten Lauf an, der möglich ist — meist richtig, und falsch dort, wo die alltägliche Aktion nicht die umfassendste ist: Ein Arbeitsbereich, dessen Terraform-Hälfte nur das Ansible-Inventar pflegt, unbeaufsichtigt anwendet und nach einem Anwenden nie konfiguriert, möchte hier Konfigurieren. Eine Auswahl, die dieser Arbeitsbereich nicht anbieten kann, wird beim Speichern abgelehnt, und eine, die Ihre Rolle nicht ausführen darf, fällt für Sie auf Automatisch zurück."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

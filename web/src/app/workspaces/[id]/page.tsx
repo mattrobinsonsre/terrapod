@@ -113,6 +113,7 @@ interface WorkspaceAttrs {
   // mirror the column defaults, which ARE the compatibility story -- plan/apply
   // on, configure off.
   'plan-apply-enabled'?: boolean
+  'default-run-kind'?: string
   'configure-enabled'?: boolean
   // How a configure starts (#1974). Both opt-in, both default false, and
   // neither does anything without `configure-enabled`.
@@ -520,6 +521,8 @@ function WorkspaceDetailContent() {
   // workspace that predates these attributes reads back as.
   const [editPlanApplyEnabled, setEditPlanApplyEnabled] = useState(true)
   const [editConfigureEnabled, setEditConfigureEnabled] = useState(false)
+  // `''` is "use the ordering" (#2479), matching the column default.
+  const [editDefaultRunKind, setEditDefaultRunKind] = useState('')
   const [editAutoConfigureEnabled, setEditAutoConfigureEnabled] = useState(false)
   const [editConfigureAfterApply, setEditConfigureAfterApply] = useState(false)
   const [editConfigureAllHosts, setEditConfigureAllHosts] = useState(false)
@@ -1401,6 +1404,7 @@ function WorkspaceDetailContent() {
     // instead -- which for `plan-apply-enabled` means the editor would offer to
     // turn back on exactly the operation the operator turned off (#1966).
     setEditPlanApplyEnabled(workspace.attributes['plan-apply-enabled'] ?? true)
+    setEditDefaultRunKind(workspace.attributes['default-run-kind'] ?? '')
     setEditConfigureEnabled(workspace.attributes['configure-enabled'] ?? false)
     setEditAutoConfigureEnabled(workspace.attributes['auto-configure-enabled'] ?? false)
     setEditConfigureAfterApply(workspace.attributes['configure-after-apply'] ?? false)
@@ -1484,6 +1488,7 @@ function WorkspaceDetailContent() {
               // express, and the server checks the pair it ends up with.
               'plan-apply-enabled': editPlanApplyEnabled,
               'configure-enabled': editConfigureEnabled,
+              'default-run-kind': editDefaultRunKind,
               'auto-configure-enabled': editAutoConfigureEnabled,
               'configure-after-apply': editConfigureAfterApply,
               'configure-all-hosts': editConfigureAllHosts,
@@ -2563,6 +2568,10 @@ function WorkspaceDetailContent() {
     canQueueRun: !!perms['can-queue-run'],
     canQueueApply: !!perms['can-queue-apply'],
     vcsRefSelected: !!vcsRef,
+    // The workspace's preferred primary (#2479). An override of the ordering
+    // and nothing more: it cannot add or remove a kind, and a preference this
+    // caller cannot run — or that is blocked right now — falls back.
+    defaultRunKind: attrs['default-run-kind'] ?? '',
   }).map((k) => {
     const label: Record<RunKindId, string> = {
       full: t('runs.queueFullRun'),
@@ -2728,6 +2737,7 @@ function WorkspaceDetailContent() {
         'terragrunt-version': editTerragruntVersion,
         'plan-apply-enabled': editPlanApplyEnabled,
         'configure-enabled': editConfigureEnabled,
+        'default-run-kind': editDefaultRunKind,
         'auto-configure-enabled': editAutoConfigureEnabled,
         'configure-after-apply': editConfigureAfterApply,
         'configure-all-hosts': editConfigureAllHosts,
@@ -2819,6 +2829,7 @@ function WorkspaceDetailContent() {
     'engine-version': (v) => setEditVersion(String(v)),
     'working-directory': (v) => setEditWorkingDir(String(v)),
     'auto-apply-mode': (v) => setEditAutoApplyMode(String(v)),
+    'default-run-kind': (v) => setEditDefaultRunKind(String(v)),
     'pulumi-bind-plan': (v) => setEditBindPlan(Boolean(v)),
     // Kept a STRING, because the input is one: parsing here would turn a
     // half-typed value into `NaN` under the operator's cursor, and the save
@@ -2860,6 +2871,24 @@ function WorkspaceDetailContent() {
 
   /** The settings card's context. One `mode` for the whole card, because one
    *  Edit button governs all of it. */
+  // The SAME labels the run button uses (#2479), so the select reads as the
+  // thing it controls and a locale that renames the button renames this too.
+  // `plan_apply` and `plan` come from the engine's own vocabulary, because a
+  // plan is a "preview" on Pulumi.
+  const defaultRunKindOptions = [
+    { value: '', label: t('fields.defaultRunKindAuto') },
+    { value: 'full', label: t('runs.queueFullRun') },
+    { value: 'plan_apply', label: phaseWord('queueRun') },
+    { value: 'configure', label: t('runs.queueConfigure') },
+    { value: 'plan', label: phaseWord('queuePlan') },
+  ]
+  /** The stored value as the read view shows it, derived from the options so
+   *  the two cannot drift. An unrecognised value shows itself rather than
+   *  nothing: a newer server naming a kind this build does not know should be
+   *  visible, not silently rendered as "Automatic". */
+  const runKindDisplay = (stored: string) =>
+    defaultRunKindOptions.find((o) => o.value === stored)?.label ?? stored
+
   const settingsCtx: GroupCtx = {
     mode: settingsEditing ? 'edit' : 'view',
     values: settingsValues,
@@ -3592,6 +3621,13 @@ function WorkspaceDetailContent() {
                     kind="checkbox"
                     display={toggleDisplay('auto-configure-enabled', false)}
                     control={settingsToggle('auto-configure-enabled')}
+                  />
+                  <Field
+                    attr="default-run-kind"
+                    ctx={settingsCtx}
+                    kind="select"
+                    display={runKindDisplay(attrs['default-run-kind'] ?? '')}
+                    options={defaultRunKindOptions}
                   />
                   <Field
                     attr="configure-after-apply"

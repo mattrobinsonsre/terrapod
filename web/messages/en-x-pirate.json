@@ -2724,7 +2724,11 @@
       "hardLimit": "Iron-bound limit",
       "hardLimitPlaceholder": "e.g. canary",
       "hardLimitTitle": "It be lashed t'' whatever limit a voyage supplies, so a voyage may haul in within it an'' none may run wider than it. It names at most one muster or hand pattern — say canary, or !prod fer everythin'' save production — because ansible has no way t'' say “either o'' these” in a limit. Fer a ceilin'' over two musters, make a parent muster o'' them in yer manifest an'' name that one, arr.",
-      "hardLimitLead": "A --limit no voyage may slip past. Leave it empty an'' there be no ceilin'' at all, arr."
+      "hardLimitLead": "A --limit no voyage may slip past. Leave it empty an'' there be no ceilin'' at all, arr.",
+      "defaultRunKind": "Primary voyage button",
+      "defaultRunKindAuto": "Automatic (th'' fullest)",
+      "defaultRunKindLead": "Which order gets th'' loud button on this here workspace. Automatic offers th'' most complete voyage it can, arr.",
+      "defaultRunKindTitle": "Which order gets th'' loud button on this here workspace. Automatic offers th'' most complete voyage it can — usually right, an'' wrong where th'' everyday order be not th'' biggest one: a workspace whose Terraform half only keeps th'' Ansible manifest, committin'' unattended an'' never riggin'' after a commit, wants Rig here. A choice this workspace cannot offer be turned away when ye save it, an'' one yer role cannot run falls back t'' Automatic fer ye, arr."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

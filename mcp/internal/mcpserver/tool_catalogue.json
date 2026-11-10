@@ -2174,6 +2174,10 @@
           "description": "the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook",
           "type": "string"
         },
+        "default_run_kind": {
+          "description": "which run kind gets the PROMINENT button on this workspace, and which the API offers first. Empty or omitted means NO PREFERENCE, and the platform offers the most complete kind the workspace has -- which is usually right. Set it where the everyday action is not the biggest one: a workspace whose terraform half only maintains the ansible inventory, applying unattended and never configuring after an apply, wants 'configure' here. One of 'full' (plan+apply+configure), 'plan_apply', 'configure' or 'plan'. REFUSED (422) when it names an operation the workspace does not have -- 'configure' needs configure_enabled and 'full' needs both -- rather than being stored and ignored, so pass the operation flags it needs in the same call. It changes only the ORDERING: every kind the workspace offers stays available, and a caller whose role cannot run the preferred kind falls back to the ordinary order",
+          "type": "string"
+        },
         "dynamic_inventory_enabled": {
           "description": "permit ansible's auto inventory plugin -- a DECLARED plugin config, which is a YAML file carrying a top-level plugin: key -- for this workspace's configure operations. DEFAULTS TO FALSE, so a workspace that says nothing refuses plugin sources. The API NEVER executes a plugin in either state: with it off the API refuses a plugin source BY NAME rather than resolving the other sources and reporting the short host set that results as the truth, and with it on the API SKIPS that source and says so per source, leaving the RUNNER to re-resolve the inventory as the authoritative answer. Independent of inventory_scripts_enabled on purpose, so declared configs can be permitted without also permitting arbitrary executables: a declared config is inspectable and names a collection that can be pinned and installed, where a script names nothing. Only meaningful with configure_enabled",
           "type": [
@@ -2502,6 +2506,13 @@
         },
         "default_playbook": {
           "description": "the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_run_kind": {
+          "description": "which run kind gets the PROMINENT button on this workspace, and which the API offers first. Omitting the field leaves the stored value alone; passing an EMPTY STRING clears the preference, after which the platform offers the most complete kind the workspace has. One of 'full' (plan+apply+configure), 'plan_apply', 'configure' or 'plan'. Checked against the MERGED row, so a kind this workspace does not have is refused (422) unless the same call gives it the operation -- and conversely, turning an operation OFF is refused while this still names it, so clear it in the same call. It changes only the ORDERING: every kind the workspace offers stays available",
           "type": [
             "null",
             "string"

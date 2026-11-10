@@ -103,6 +103,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             # workspaces.
             "plan-apply-enabled": rule.plan_apply_enabled,
             "configure-enabled": rule.configure_enabled,
+            "default-run-kind": rule.default_run_kind or "",
             # And how a configure starts on them (#1974), both default false.
             "auto-configure-enabled": rule.auto_configure_enabled,
             "configure-all-hosts": rule.configure_all_hosts,
@@ -380,6 +381,26 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    # Which run kind the materialised workspaces make primary (#2479). Merged
+    # for exactly the reason above: the preference must name an operation the
+    # RULE ends up declaring, and a PATCH may send either side of that pair
+    # alone.
+    if "default-run-kind" in attrs or "plan-apply-enabled" in attrs or "configure-enabled" in attrs:
+        _stored = "" if on_create else getattr(existing, "default_run_kind", "")
+        try:
+            out["default_run_kind"] = workspace_settings.validate_default_run_kind(
+                attrs.get("default-run-kind", _stored),
+                plan_apply=out.get(
+                    "plan_apply_enabled",
+                    True if on_create else getattr(existing, "plan_apply_enabled", True),
+                ),
+                configure=out.get(
+                    "configure_enabled",
+                    False if on_create else getattr(existing, "configure_enabled", False),
+                ),
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
     # `in attrs` rather than truthiness, deliberately (#2010's rule): `""` is a
     # value meaning the configuration version's root, so a truthiness test would
     # read it as "not supplied" and leave no way to say "the root".

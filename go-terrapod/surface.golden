@@ -392,6 +392,7 @@ field CreateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omi
 field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field CreateWorkspaceRequest.DefaultLimit string `json:"default-limit,omitempty"`
 field CreateWorkspaceRequest.DefaultPlaybook string `json:"default-playbook,omitempty"`
+field CreateWorkspaceRequest.DefaultRunKind string `json:"default-run-kind,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -1286,6 +1287,7 @@ field UpdateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omi
 field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field UpdateWorkspaceRequest.DefaultLimit *string `json:"default-limit,omitempty"`
 field UpdateWorkspaceRequest.DefaultPlaybook *string `json:"default-playbook,omitempty"`
+field UpdateWorkspaceRequest.DefaultRunKind *string `json:"default-run-kind,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -1509,6 +1511,7 @@ field Workspace.CreatedAt string `json:"created-at,omitempty"`
 field Workspace.DebugMode bool `json:"debug-mode"`
 field Workspace.DefaultLimit string `json:"default-limit,omitempty"`
 field Workspace.DefaultPlaybook string `json:"default-playbook,omitempty"`
+field Workspace.DefaultRunKind string `json:"default-run-kind"`
 field Workspace.DriftDetectionEnabled bool `json:"drift-detection-enabled"`
 field Workspace.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`

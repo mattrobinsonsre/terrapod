@@ -2724,7 +2724,11 @@
       "hardLimit": "Sztywny limit",
       "hardLimitPlaceholder": "np. canary",
       "hardLimitTitle": "Jest łączona z limitem podanym przez przebieg, więc przebieg może zawęzić zakres w jej obrębie, ale żaden nie może go rozszerzyć ponad nią. Wskazuje najwyżej jedną grupę lub jeden wzorzec hosta — na przykład canary albo !prod dla wszystkiego poza produkcją — ponieważ ansible nie potrafi wyrazić w limicie „którejkolwiek z nich”. Aby uzyskać pułap obejmujący dwie grupy, utwórz z nich grupę nadrzędną w inwentarzu i wskaż ją.",
-      "hardLimitLead": "Wartość --limit, której żaden przebieg nie może obejść. Pozostaw puste, aby nie obowiązywał żaden pułap."
+      "hardLimitLead": "Wartość --limit, której żaden przebieg nie może obejść. Pozostaw puste, aby nie obowiązywał żaden pułap.",
+      "defaultRunKind": "Główny przycisk uruchamiania",
+      "defaultRunKindAuto": "Automatycznie (najpełniejszy)",
+      "defaultRunKindLead": "Która akcja otrzymuje w tym obszarze roboczym wyróżniony przycisk. Automatycznie proponuje najpełniejszy przebieg, jaki jest możliwy.",
+      "defaultRunKindTitle": "Która akcja otrzymuje w tym obszarze roboczym wyróżniony przycisk. Automatycznie proponuje najpełniejszy przebieg, jaki jest możliwy — zwykle słusznie, a niesłusznie tam, gdzie codzienną akcją nie jest ta największa: obszar roboczy, którego część Terraform tylko utrzymuje inwentarz Ansible, w którym stosowanie przebiega bez nadzoru i po którym nigdy nie następuje konfiguracja, chce tu mieć Konfiguruj. Wybór, którego ten obszar roboczy nie może zaoferować, zostaje odrzucony przy zapisie, a ten, którego nie może uruchomić Twoja rola, wraca dla Ciebie do Automatycznie."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

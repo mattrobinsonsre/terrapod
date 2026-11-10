@@ -298,6 +298,8 @@ function createDefaults(engine: string): Record<string, unknown> {
     'resource-memory': '2Gi',
     // operations
     'plan-apply-enabled': true,
+    // `''` is "use the ordering", which is the column default too.
+    'default-run-kind': '',
     // ansible — verification on is ansible's own behaviour, so the column
     // defaults TRUE and the box has to show that (#2318).
     'ansible-host-key-checking': true,
@@ -1068,6 +1070,8 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.autoConfigureEnabledHint'))
       case 'configure-after-apply':
         return hintText(tDetail('fields.configureAfterApplyHint'))
+      case 'default-run-kind':
+        return tieredHint(tDetail, 'fields.defaultRunKindTitle')
       case 'configure-all-hosts':
         return hintText(tDetail('fields.configureAllHostsHint'))
       case 'config-directory':
@@ -1133,6 +1137,22 @@ function WorkspacesPageInner() {
   // of an array, never a literal in the JSX below — a raw literal would be a
   // new entry in the hardcoded-string allowlist, which is the gate that keeps
   // untranslated copy out of the UI.
+  // Which run kind is the primary button (#2479). `''` first and labelled as
+  // the automatic choice, because it IS the default and is right almost always
+  // -- a list that opened on `full` would read as a decision the operator has
+  // to make. Values are the API's spelling, which `run-kinds.ts` maps.
+  const defaultRunKindOptions = [
+    { value: '', label: tDetail('fields.defaultRunKindAuto') },
+    // The SAME labels the run button itself uses, rather than four new strings.
+    // Not a saving on translation -- it is what makes the select read as the
+    // thing it controls, and it keeps the two in step for free: a locale that
+    // renames the button renames this. Two are engine-specific, so they come
+    // from the selected engine's vocabulary (a plan is a "preview" on Pulumi).
+    { value: 'full', label: tDetail('runs.queueFullRun') },
+    { value: 'plan_apply', label: phaseWord('queueRun') },
+    { value: 'configure', label: tDetail('runs.queueConfigure') },
+    { value: 'plan', label: phaseWord('queuePlan') },
+  ]
   const execModeOptions = [
     { value: 'local', label: tDetail('fields.execModeLocal') },
     { value: 'agent', label: tDetail('fields.execModeAgent') },
@@ -1359,6 +1379,12 @@ function WorkspacesPageInner() {
         <Field attr="auto-configure-enabled" ctx={createCtx} kind="checkbox" />
         <Field attr="configure-after-apply" ctx={createCtx} kind="checkbox" />
         <Field attr="configure-all-hosts" ctx={createCtx} kind="checkbox" />
+        <Field
+          attr="default-run-kind"
+          ctx={createCtx}
+          kind="select"
+          options={defaultRunKindOptions}
+        />
       </>
     ),
 

@@ -972,6 +972,9 @@ def _workspace_json(
                 # whether the workspace uses remote operations.
                 "plan-apply-enabled": ws.plan_apply_enabled,
                 "configure-enabled": ws.configure_enabled,
+                # `""` is "use the ordering", which is the default and almost
+                # always right (#2479).
+                "default-run-kind": ws.default_run_kind or "",
                 # How a configure starts (#1974). Both default false, so a
                 # workspace that predates them reads as having no trigger --
                 # which is exactly what it has.
@@ -1216,6 +1219,10 @@ def _workspace_json(
             "default-playbook",
             "default-limit",
             "hard-limit",
+            # Which run button is primary is a Terrapod UI concept (#2479):
+            # `terraform` and `tofu` have no run button, so it could only ever
+            # be noise on this wire.
+            "default-run-kind",
         ):
             payload["data"]["attributes"].pop(_native_only, None)
     return payload
@@ -2009,6 +2016,15 @@ async def _create_workspace_impl(
         plan_apply=ws.plan_apply_enabled,
         configure=ws.configure_enabled,
     )
+    # Which run kind is the primary button (#2479). Cross-field, so it is
+    # checked against the CONSTRUCTED row for the same reason as the line above:
+    # the kind has to name an operation the workspace ends up declaring.
+    ws.default_run_kind = _422(
+        workspace_settings.validate_default_run_kind,
+        attrs.get("default-run-kind", ""),
+        plan_apply=ws.plan_apply_enabled,
+        configure=ws.configure_enabled,
+    )
     pool_set.set_workspace_pools(ws, requested_pool_ids)
     if "ansible-version" in attrs or "ansible-execution-environment" in attrs:
         # Only when the caller actually chose, and `ws.ansible_version` is NOT
@@ -2721,6 +2737,18 @@ async def update_workspace(
         plan_apply=ws.plan_apply_enabled,
         configure=ws.configure_enabled,
     )
+    # And on the merged row too (#2479), which is the half a per-field check
+    # cannot do: turning an operation OFF can invalidate a preference set
+    # earlier, and the caller may be sending only the flag. So it is
+    # re-validated whenever either side of the pair moves, and the stored
+    # preference is the input when the caller sent none.
+    if "default-run-kind" in attrs or "plan-apply-enabled" in attrs or "configure-enabled" in attrs:
+        ws.default_run_kind = _422(
+            workspace_settings.validate_default_run_kind,
+            attrs.get("default-run-kind", ws.default_run_kind),
+            plan_apply=ws.plan_apply_enabled,
+            configure=ws.configure_enabled,
+        )
     # The Ansible roots and run defaults (#1929). `config-directory` is an
     # ordinary repo-relative path, `""` meaning the configuration version's
     # root; it no longer has a null state to clear (#1966).

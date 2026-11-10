@@ -57,6 +57,13 @@ def _mock_rule(
     # #1929's six, which `_rule_json` serialises.
     r.plan_apply_enabled = True
     r.configure_enabled = False
+    # Which of them the materialised workspaces put the prominent button on
+    # (#2479). Set explicitly because a MagicMock is truthy, so `_rule_json`'s
+    # `rule.default_run_kind or ""` would put the mock in the response document
+    # and fail to serialise -- and on the PATCH path the stored value is what an
+    # unmentioned attribute falls back to, so the mock reaches the validator and
+    # answers 422 on a request that never named the field.
+    r.default_run_kind = ""
     # #1974's pair, serialised beside them.
     r.auto_configure_enabled = False
     r.configure_after_apply = False
@@ -1595,3 +1602,193 @@ class TestARuleCannotDeclareNeitherOperation:
             "turning configure off on a rule whose plan/apply is already off must "
             "be refused -- this is the half that reads the stored plan/apply value"
         )
+
+
+class TestARuleCannotPreferARunKindItsWorkspacesWouldNotHave:
+    """`default-run-kind` on a rule, judged against the operations the same rule
+    declares (#2479).
+
+    The boundary is the rule rather than materialisation, for the reason the
+    operations guard above gives: one 422 while the operator is writing the rule,
+    against a poller error per matched directory with nothing actionable in it.
+    And the cost of getting it wrong is multiplied here -- a rule carrying an
+    unhonourable preference materialises a workspace holding it on every scan,
+    one per matched directory, for as long as the rule exists.
+
+    Driven through the ROUTE. The mutation this class exists for is deleting the
+    `workspace_settings.validate_default_run_kind` call from the rule builder:
+    the validator's own tests all pass without it, and it went UNCAUGHT by every
+    other test in this file and in the suite.
+    """
+
+    @staticmethod
+    def _body(attrs):
+        return {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "pattern": "accounts/*/**/*.tf",
+                    **attrs,
+                },
+            }
+        }
+
+    def _app(self, conn_id, added=None):
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        if added is not None:
+            db.add = added.append
+        return app
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_refuses_a_kind_the_rule_does_not_grant(self, *_mocks):
+        conn_id = uuid.uuid4()
+        added: list = []
+        app = self._app(conn_id, added)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules",
+                json=self._body(
+                    {
+                        "vcs-connection-id": f"vcs-{conn_id}",
+                        "repo-url": "https://github.com/example/repo",
+                        "default-run-kind": "configure",
+                    }
+                ),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "configure-enabled" in detail, (
+            f"the refusal must name the flag the rule has to grant: {detail}"
+        )
+        assert not added, "a refused rule was still added"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_accepts_it_when_the_same_rule_grants_the_operation(self, *_mocks):
+        conn_id = uuid.uuid4()
+        app = self._app(conn_id)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules",
+                json=self._body(
+                    {
+                        "vcs-connection-id": f"vcs-{conn_id}",
+                        "repo-url": "https://github.com/example/repo",
+                        "configure-enabled": True,
+                        "config-directory": "ansible",
+                        "default-run-kind": "configure",
+                    }
+                ),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["default-run-kind"] == "configure"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_refuses_a_word_outside_the_vocabulary(self, *_mocks):
+        conn_id = uuid.uuid4()
+        added: list = []
+        app = self._app(conn_id, added)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules",
+                json=self._body(
+                    {
+                        "vcs-connection-id": f"vcs-{conn_id}",
+                        "repo-url": "https://github.com/example/repo",
+                        "default-run-kind": "deploy",
+                    }
+                ),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, resp.text
+        assert "must be empty or one of" in resp.json()["detail"]
+        assert not added
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_defaults_to_no_preference(self, *_mocks):
+        """A rule written before this attribute existed goes on materialising
+        workspaces that offer the most complete kind they have."""
+        conn_id = uuid.uuid4()
+        app = self._app(conn_id)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules",
+                json=self._body(
+                    {
+                        "vcs-connection-id": f"vcs-{conn_id}",
+                        "repo-url": "https://github.com/example/repo",
+                    }
+                ),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["default-run-kind"] == ""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_patch_judges_the_merge_not_the_payload(self, *_mocks):
+        """Both directions, with the payload carrying only one side each time.
+
+        (a) the preference alone, against the operations the stored rule already
+        declares; (b) the operation alone, against the preference the stored rule
+        already holds -- which is the half a per-field check cannot do, and the
+        one that would otherwise leave a rule materialising workspaces with a
+        preference nothing can honour.
+        """
+        # (a) the rule already grants configure -> setting the preference is fine.
+        rule = _mock_rule()
+        rule.configure_enabled = True
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[rule])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                json={"data": {"attributes": {"default-run-kind": "configure"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert rule.default_run_kind == "configure"
+
+        # (b) the identical rule, now asked to drop the operation the stored
+        # preference names. The payload never mentions the preference.
+        rule2 = _mock_rule()
+        rule2.configure_enabled = True
+        rule2.default_run_kind = "configure"
+        app2, db2 = _make_app(_admin())
+        db2.get = AsyncMock(side_effect=[rule2])
+        db2.commit = AsyncMock()
+        db2.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app2), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule2.id}",
+                json={"data": {"attributes": {"configure-enabled": False}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        assert "configure-enabled" in resp.json()["detail"]

@@ -408,6 +408,10 @@ async def find_or_autocreate_workspace(
         # plan/apply workspaces.
         plan_apply_enabled=rule.plan_apply_enabled,
         configure_enabled=rule.configure_enabled,
+        # Templated like every other run setting (#2479). Validated on the RULE,
+        # so a materialised workspace cannot carry a preference its own
+        # operations do not support.
+        default_run_kind=rule.default_run_kind,
         auto_configure_enabled=rule.auto_configure_enabled,
         configure_all_hosts=rule.configure_all_hosts,
         dynamic_inventory_enabled=rule.dynamic_inventory_enabled,

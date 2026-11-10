@@ -48,6 +48,40 @@ export interface RunKindContext {
   canQueueApply: boolean
   /** A non-default ref is selected, which the server forces plan-only. */
   vcsRefSelected: boolean
+  /**
+   * The workspace's `default-run-kind`, in the API's spelling (#2479).
+   *
+   * `''` — the default — keeps the ordering below exactly as it was. Anything
+   * else PROMOTES that kind to primary, and only if the ordering already offers
+   * it unblocked for this caller.
+   */
+  defaultRunKind?: string
+}
+
+/**
+ * The API's spelling of a run kind to this module's.
+ *
+ * The API stores `plan_apply`, matching `auto_apply_mode`'s `create_update`;
+ * this module has always used `planApply`. One mapping, here, rather than the
+ * API bending to a frontend convention or the frontend to the wire's — and a
+ * value this does not recognise maps to `undefined`, which the preference logic
+ * treats as "no preference" rather than as an error. A newer server naming a
+ * kind this build has never heard of must not break the button; it falls back
+ * to the ordering, which is exactly what `''` does.
+ */
+export function runKindFromWire(wire: string | undefined): RunKindId | undefined {
+  switch (wire) {
+    case 'full':
+      return 'full'
+    case 'plan_apply':
+      return 'planApply'
+    case 'configure':
+      return 'configure'
+    case 'plan':
+      return 'plan'
+    default:
+      return undefined
+  }
 }
 
 export interface AvailableRunKind {
@@ -85,5 +119,27 @@ export function availableRunKinds(ctx: RunKindContext): AvailableRunKind[] {
   if (ctx.planApplyEnabled && ctx.canQueueRun) {
     out.push({ id: 'plan' })
   }
-  return out
+  return promote(out, runKindFromWire(ctx.defaultRunKind))
+}
+
+/**
+ * Move `preferred` to the front, if it is there to move and can run now.
+ *
+ * An OVERRIDE of the order and nothing else: it cannot add a kind or remove
+ * one, so a preference can never surface a button the API would refuse nor hide
+ * one it would accept. Three cases fall back to the ordering, deliberately:
+ *
+ *  - the workspace does not declare that operation — refused at the write, so
+ *    only reachable if the setting was made and the operation later turned off;
+ *  - this CALLER lacks the capability, which is per-caller and so cannot be
+ *    settled at the write at all;
+ *  - the kind is BLOCKED right now (a non-default `vcs-ref` forces plan-only).
+ *    Promoting a blocked kind would make the primary button the one that cannot
+ *    run, which is worse than the ordering it replaced.
+ */
+function promote(kinds: AvailableRunKind[], preferred: RunKindId | undefined): AvailableRunKind[] {
+  if (!preferred) return kinds
+  const i = kinds.findIndex((k) => k.id === preferred && !k.blocked)
+  if (i <= 0) return kinds
+  return [kinds[i], ...kinds.slice(0, i), ...kinds.slice(i + 1)]
 }

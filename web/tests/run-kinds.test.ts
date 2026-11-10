@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { availableRunKinds, type RunKindContext } from '../src/lib/run-kinds.ts'
+import { availableRunKinds, runKindFromWire, type RunKindContext } from '../src/lib/run-kinds.ts'
 
 /**
  * Which run kinds a workspace offers, and which is primary (#2413 F12 / F10).
@@ -131,5 +131,144 @@ describe('destroy is not a run kind here', () => {
         }
       }
     }
+  })
+})
+
+// ── default-run-kind: the workspace's preferred primary (#2479) ─────────────
+//
+// An OVERRIDE of the ordering, never a replacement. The cases that fall back
+// are the point: a preference must not be able to surface a button the API
+// would refuse, nor hide one it would accept.
+
+describe('default-run-kind', () => {
+  it('the preferred kind becomes primary when it is offered and runnable', () => {
+    const kinds = availableRunKinds({
+      planApplyEnabled: true,
+      configureEnabled: true,
+      canQueueRun: true,
+      canQueueApply: true,
+      vcsRefSelected: false,
+      defaultRunKind: 'configure',
+    })
+    assert.equal(kinds[0].id, 'configure')
+    // And the rest keep their order behind it, so nothing is lost or reshuffled.
+    assert.deepEqual(
+      kinds.map((k) => k.id),
+      ['configure', 'full', 'planApply', 'plan'],
+    )
+  })
+
+  it('no preference leaves the ordering exactly as it was', () => {
+    const base = {
+      planApplyEnabled: true,
+      configureEnabled: true,
+      canQueueRun: true,
+      canQueueApply: true,
+      vcsRefSelected: false,
+    }
+    const without = availableRunKinds(base).map((k) => k.id)
+    assert.deepEqual(availableRunKinds({ ...base, defaultRunKind: '' }).map((k) => k.id), without)
+    assert.deepEqual(
+      availableRunKinds({ ...base, defaultRunKind: undefined }).map((k) => k.id),
+      without,
+    )
+    assert.deepEqual(without, ['full', 'planApply', 'configure', 'plan'])
+  })
+
+  it('a preference this CALLER cannot run falls back to the ordering', () => {
+    // Per-caller, so it cannot be settled when the setting is written — which is
+    // why the fallback has to live here rather than only in the API's validation.
+    const kinds = availableRunKinds({
+      planApplyEnabled: true,
+      configureEnabled: true,
+      canQueueRun: true,
+      canQueueApply: false, // no apply, so no `configure` and no composite
+      vcsRefSelected: false,
+      defaultRunKind: 'configure',
+    })
+    assert.deepEqual(
+      kinds.map((k) => k.id),
+      ['plan'],
+    )
+  })
+
+  it('a preference that is BLOCKED right now is not promoted', () => {
+    // A non-default ref forces plan-only, so promoting a blocked kind would make
+    // the primary button the one that cannot run — worse than the order it
+    // replaced.
+    //
+    // `planApply` is the right fixture and `full` is not: the ordering already
+    // puts `full` first, so promoting it would be unobservable and the test
+    // would pass whether or not the blocked check exists. `planApply` sits at
+    // index 1 with `full` ahead of it, so a missing check moves it and this
+    // fails.
+    //
+    // Note it is NOT demoted either. "Fall back to today's ordering" means
+    // leave the order alone, and today's ordering puts a blocked composite
+    // first on a ref-selected workspace — which is pre-existing behaviour this
+    // setting has no business changing.
+    const ctx = {
+      planApplyEnabled: true,
+      configureEnabled: true,
+      canQueueRun: true,
+      canQueueApply: true,
+      vcsRefSelected: true,
+    }
+    const unchanged = availableRunKinds(ctx).map((k) => k.id)
+    assert.deepEqual(unchanged, ['full', 'planApply', 'configure', 'plan'])
+    assert.deepEqual(
+      availableRunKinds({ ...ctx, defaultRunKind: 'plan_apply' }).map((k) => k.id),
+      unchanged,
+      'a blocked preference was promoted anyway',
+    )
+    // And the unblocked one on the same workspace IS promoted, so the test
+    // above is about `blocked` and not about promotion being broken.
+    assert.equal(
+      availableRunKinds({ ...ctx, defaultRunKind: 'configure' })[0].id,
+      'configure',
+    )
+  })
+
+  it('a preference the workspace does not declare falls back', () => {
+    // Refused at the write, so only reachable if the setting was made and the
+    // operation later turned off. The button must not break meanwhile.
+    const kinds = availableRunKinds({
+      planApplyEnabled: true,
+      configureEnabled: false,
+      canQueueRun: true,
+      canQueueApply: true,
+      vcsRefSelected: false,
+      defaultRunKind: 'configure',
+    })
+    assert.deepEqual(
+      kinds.map((k) => k.id),
+      ['planApply', 'plan'],
+    )
+  })
+
+  it('a kind this build has never heard of is no preference at all', () => {
+    // A newer server could name one. Falling back is the only safe reading; an
+    // error here would break the run button over a value it can simply ignore.
+    const kinds = availableRunKinds({
+      planApplyEnabled: true,
+      configureEnabled: true,
+      canQueueRun: true,
+      canQueueApply: true,
+      vcsRefSelected: false,
+      defaultRunKind: 'teleport',
+    })
+    assert.equal(kinds[0].id, 'full')
+  })
+
+  it('the wire spelling maps to this modules ids, and only the known four', () => {
+    assert.equal(runKindFromWire('plan_apply'), 'planApply')
+    assert.equal(runKindFromWire('full'), 'full')
+    assert.equal(runKindFromWire('configure'), 'configure')
+    assert.equal(runKindFromWire('plan'), 'plan')
+    // The frontend's own spelling is NOT the wire's, and must not be accepted as
+    // if it were — that would hide a real mismatch between the two vocabularies.
+    assert.equal(runKindFromWire('planApply'), undefined)
+    assert.equal(runKindFromWire(''), undefined)
+    assert.equal(runKindFromWire(undefined), undefined)
   })
 })

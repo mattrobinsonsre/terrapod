@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { tieredHint } from '@/components/hint-with-detail'
+import { engineWord } from '@/lib/phase-vocabulary'
 import {
   EE_UNKNOWN,
   fetchAnsibleExecutionEnvironments,
@@ -86,6 +87,13 @@ const inputCls =
   'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed'
 const labelCls = 'block text-sm font-medium text-slate-300 mb-1'
 
+// The run-kind select's option value standing in for the API's AUTOMATIC,
+// which the API itself spells as an empty string -- a spelling this page has
+// already spent on "unchanged" (#2479). Not a word the API accepts, so a
+// sentinel that escapes the mapping is refused with a 422 naming the field
+// rather than stored as a run kind nothing can honour.
+const AUTO_RUN_KIND = '__auto__'
+
 function fmtVal(v: unknown, noneLabel: string): string {
   if (v === null || v === undefined) return noneLabel
   if (typeof v === 'object') return JSON.stringify(v)
@@ -101,6 +109,8 @@ export default function BulkUpdatePage() {
   const tScan = useTranslations('workspaceDetail.securityScan')
   const tAi = useTranslations('workspaceDetail.aiSummary')
   const tWs = useTranslations('workspaceDetail')
+  // Root-scoped, because a phase word's key is `phases.<engine>.words.<name>`.
+  const tPhase = useTranslations()
   const tAd = useTranslations('adminAutodiscovery.form')
   // A generic yes/no pair that already exists in every locale.
   const tCommon = useTranslations('runDetail.common')
@@ -136,6 +146,13 @@ export default function BulkUpdatePage() {
   // one workspace at a time is what this page exists to avoid.
   const [uPlanApplyEnabled, setUPlanApplyEnabled] = useState('')
   const [uConfigureEnabled, setUConfigureEnabled] = useState('')
+  // Which of those operations gets the prominent button (#2479). '' is
+  // "unchanged" here as everywhere on this page, so the AUTOMATIC value --
+  // which the API spells as an empty string -- needs an option value of its
+  // own. `AUTO_RUN_KIND` is that sentinel, and it is deliberately not a word
+  // the API would accept: if one ever leaks past the mapping below, the
+  // endpoint answers 422 naming the field rather than storing it.
+  const [uDefaultRunKind, setUDefaultRunKind] = useState('')
   // How a configure starts (#1974). Both opt-in, both meaningless without
   // `configure-enabled` above, and both bulk-settable because adopting Ansible
   // across a fleet means turning the trigger on for the workspaces that should
@@ -299,6 +316,14 @@ export default function BulkUpdatePage() {
     // being empty is refused.
     if (uPlanApplyEnabled) u['plan-apply-enabled'] = uPlanApplyEnabled === 'true'
     if (uConfigureEnabled) u['configure-enabled'] = uConfigureEnabled === 'true'
+    // Mapped, not sent raw: the sentinel becomes the API's empty string, which
+    // is how the preference is CLEARED across a matched set. The endpoint
+    // checks the kind against each matched workspace's own merged row, so
+    // naming one a workspace does not offer is refused per workspace rather
+    // than silently stored -- which is also why turning an operation off in
+    // the same submission wants this cleared alongside it.
+    if (uDefaultRunKind)
+      u['default-run-kind'] = uDefaultRunKind === AUTO_RUN_KIND ? '' : uDefaultRunKind
     if (uAutoConfigureEnabled) u['auto-configure-enabled'] = uAutoConfigureEnabled === 'true'
     if (uConfigureAfterApply) u['configure-after-apply'] = uConfigureAfterApply === 'true'
     if (uConfigureAllHosts) u['configure-all-hosts'] = uConfigureAllHosts === 'true'
@@ -745,6 +770,32 @@ export default function BulkUpdatePage() {
             <option value="false">{tCommon('no')}</option>
           </select>
           <p className="mt-1 text-xs text-slate-400">{tWs('fields.configureEnabledHint')}</p>
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-default-run-kind">
+            {tWs('fields.defaultRunKind')}
+          </label>
+          <select
+            id="bu-default-run-kind"
+            value={uDefaultRunKind}
+            onChange={(e) => setUDefaultRunKind(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value={AUTO_RUN_KIND}>{tWs('fields.defaultRunKindAuto')}</option>
+            {/* The same labels the run button itself uses, as on the workspace
+                forms. The two engine-specific ones take the DEFAULT engine's
+                word deliberately: a matched set can span engines, so there is
+                no one engine to ask, and the platform's default vocabulary is
+                what every other engine-agnostic surface shows. */}
+            <option value="full">{tWs('runs.queueFullRun')}</option>
+            <option value="plan_apply">{engineWord(tPhase, null, 'queueRun')}</option>
+            <option value="configure">{tWs('runs.queueConfigure')}</option>
+            <option value="plan">{engineWord(tPhase, null, 'queuePlan')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">
+            {tieredHint(tWs, 'fields.defaultRunKindTitle')}
+          </p>
         </div>
         <div className="min-w-0">
           <label className={labelCls} htmlFor="bu-auto-configure-enabled">

@@ -2724,7 +2724,11 @@
       "hardLimit": "Limite stricte",
       "hardLimitPlaceholder": "p. ex. canary",
       "hardLimitTitle": "Il est combiné avec la limite que fournit l'exécution : celle-ci peut le restreindre, mais aucune ne peut l'élargir. Il ne nomme qu'un seul groupe ou motif d'hôte — par exemple canary, ou !prod pour tout sauf la production — car ansible n'a aucun moyen de dire « l'un ou l'autre » dans une limite. Pour un plafond couvrant deux groupes, créez dans votre inventaire un groupe parent qui les rassemble et nommez celui-là.",
-      "hardLimitLead": "Un motif --limit qu'aucune exécution ne peut franchir. Laissez-le vide pour ne fixer aucun plafond."
+      "hardLimitLead": "Un motif --limit qu'aucune exécution ne peut franchir. Laissez-le vide pour ne fixer aucun plafond.",
+      "defaultRunKind": "Bouton d''exécution principal",
+      "defaultRunKindAuto": "Automatique (la plus complète)",
+      "defaultRunKindLead": "Quelle action obtient le bouton bien visible sur cet espace de travail. Automatique propose l''exécution la plus complète possible.",
+      "defaultRunKindTitle": "Quelle action obtient le bouton bien visible sur cet espace de travail. Automatique propose l''exécution la plus complète possible — généralement le bon choix, et le mauvais lorsque l''action quotidienne n''est pas la plus large : un espace de travail dont la partie Terraform ne fait qu''entretenir l''inventaire Ansible, qui applique sans surveillance et ne configure jamais après une application, veut Configurer ici. Un choix que cet espace de travail ne peut pas proposer est refusé à l''enregistrement, et un choix que votre rôle ne peut pas exécuter revient à Automatique pour vous."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

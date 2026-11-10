@@ -76,6 +76,11 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// plan/apply on the workspaces least expecting it.
 		PlanApplyEnabled *bool `json:"plan_apply_enabled,omitempty" jsonschema:"whether this workspace has a PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle. DEFAULTS TO TRUE, so omit it for an ordinary infrastructure workspace. Pass false only for a configure-only workspace, and pass configure_enabled=true in the same call when you do: both operations off is refused (422), because a workspace that can do nothing is not a state anyone wants -- lock the workspace instead, which parks it reversibly. Independent of configure_enabled, so a workspace may have both"`
 		ConfigureEnabled *bool `json:"configure_enabled,omitempty" jsonschema:"whether this workspace has an ansible CONFIGURE operation. DEFAULTS TO FALSE, so the operation is opt-in and this is what turns it on -- setting config_directory alone does NOT (#1966), and a workspace with configure_enabled false has no configure operation and no ansible inventory however its roots are set. With it true, config_directory says WHERE the operation runs and inventory_paths says what it targets. Independent of plan_apply_enabled, so a workspace may have both; both off is refused (422)"`
+		// Which of the operations above gets the prominent button (#2479).
+		// A plain string rather than a *bool-style tri-state: "" is a real
+		// value meaning "no preference", so on CREATE omitted and empty mean
+		// the same thing and there is no third state left to express.
+		DefaultRunKind string `json:"default_run_kind,omitempty" jsonschema:"which run kind gets the PROMINENT button on this workspace, and which the API offers first. Empty or omitted means NO PREFERENCE, and the platform offers the most complete kind the workspace has -- which is usually right. Set it where the everyday action is not the biggest one: a workspace whose terraform half only maintains the ansible inventory, applying unattended and never configuring after an apply, wants 'configure' here. One of 'full' (plan+apply+configure), 'plan_apply', 'configure' or 'plan'. REFUSED (422) when it names an operation the workspace does not have -- 'configure' needs configure_enabled and 'full' needs both -- rather than being stored and ignored, so pass the operation flags it needs in the same call. It changes only the ORDERING: every kind the workspace offers stays available, and a caller whose role cannot run the preferred kind falls back to the ordinary order"`
 		// The ansible configure operation's roots and run defaults (#1929).
 		// ConfigDirectory is a plain string: it is an ordinary path whose ""
 		// means the configuration version's root, so on CREATE "" and omitted
@@ -121,7 +126,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			"For a Pulumi workspace set engine=pulumi, and pulumi_bind_plan to bind its update to the approved preview. " +
 			"A workspace declares which OPERATIONS it has, as two independent booleans: plan_apply_enabled (the terraform/tofu/pulumi lifecycle, default TRUE) and configure_enabled (the ansible configure operation, default FALSE). " +
 			"So an ansible CONFIGURE operation needs configure_enabled=true — config_directory alone does not turn one on; it only says where it runs — plus inventory_paths and the run defaults; there is no separate inventory-settings object, these are workspace settings. " +
-			"Both operations off is refused (422). Returns the created workspace.",
+			"Both operations off is refused (422). default_run_kind picks which of them gets the prominent button; leave it out and the most complete kind the workspace has is offered first. " +
+			"Returns the created workspace.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceCreateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.Name == "" {
@@ -170,6 +176,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			// re-checked here, for the reason PulumiBindPlan gives above.
 			PlanApplyEnabled:     in.PlanApplyEnabled,
 			ConfigureEnabled:     in.ConfigureEnabled,
+			DefaultRunKind:       in.DefaultRunKind,
 			AutoConfigureEnabled: in.AutoConfigureEnabled,
 			ConfigureAfterApply:  in.ConfigureAfterApply,
 			ConfigureAllHosts:    in.ConfigureAllHosts,
@@ -223,11 +230,12 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		// off is `configure_enabled: false`, and it deliberately leaves
 		// config_directory where it is so re-enabling later resumes in the
 		// same directory.
-		PlanApplyEnabled     *bool `json:"plan_apply_enabled,omitempty" jsonschema:"turn this workspace's PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle -- on or off. Omitting the field leaves the stored value alone. Turning it off is refused (422) unless the workspace has, or this same call gives it, a configure operation: the refusal is checked against the MERGED row, so passing plan_apply_enabled=false alone on an ordinary workspace fails rather than leaving it able to do nothing. Lock the workspace instead to park it reversibly. Independent of configure_enabled"`
-		AutoConfigureEnabled *bool `json:"auto_configure_enabled,omitempty" jsonschema:"turn the GIT trigger for this workspace's configure on or off: a push that changes its ansible config root queues one, running default_playbook against default_limit. Omitting the field leaves the stored value alone"`
-		ConfigureAllHosts    *bool `json:"configure_all_hosts,omitempty" jsonschema:"turn the host narrowing off or back on: true makes every derived configure on this workspace sweep the whole inventory, false lets one an inventory change produced target only the hosts that changed. Omitting the field leaves the stored value alone"`
-		ConfigureAfterApply  *bool `json:"configure_after_apply,omitempty" jsonschema:"turn CONFIGURE-AFTER-APPLY on or off: an apply on this workspace is followed by a configure on the same run, which is what lets a terraform/tofu CLI apply stream the configure's logs. A destroy apply never chains one. Omitting the field leaves the stored value alone"`
-		ConfigureEnabled     *bool `json:"configure_enabled,omitempty" jsonschema:"turn this workspace's ansible CONFIGURE operation on or off. Omitting the field leaves the stored value alone. This is the ONLY way to turn the operation off (#1966), and it deliberately does NOT move config_directory, so a later configure_enabled=true resumes in the same directory. Turning it on does not need config_directory: empty means the configuration version's root. Turning it off is refused (422) if the workspace has no plan/apply operation either, checked against the merged row. Independent of plan_apply_enabled"`
+		PlanApplyEnabled     *bool   `json:"plan_apply_enabled,omitempty" jsonschema:"turn this workspace's PLAN/APPLY operation -- the terraform, tofu or pulumi lifecycle -- on or off. Omitting the field leaves the stored value alone. Turning it off is refused (422) unless the workspace has, or this same call gives it, a configure operation: the refusal is checked against the MERGED row, so passing plan_apply_enabled=false alone on an ordinary workspace fails rather than leaving it able to do nothing. Lock the workspace instead to park it reversibly. Independent of configure_enabled"`
+		AutoConfigureEnabled *bool   `json:"auto_configure_enabled,omitempty" jsonschema:"turn the GIT trigger for this workspace's configure on or off: a push that changes its ansible config root queues one, running default_playbook against default_limit. Omitting the field leaves the stored value alone"`
+		ConfigureAllHosts    *bool   `json:"configure_all_hosts,omitempty" jsonschema:"turn the host narrowing off or back on: true makes every derived configure on this workspace sweep the whole inventory, false lets one an inventory change produced target only the hosts that changed. Omitting the field leaves the stored value alone"`
+		ConfigureAfterApply  *bool   `json:"configure_after_apply,omitempty" jsonschema:"turn CONFIGURE-AFTER-APPLY on or off: an apply on this workspace is followed by a configure on the same run, which is what lets a terraform/tofu CLI apply stream the configure's logs. A destroy apply never chains one. Omitting the field leaves the stored value alone"`
+		ConfigureEnabled     *bool   `json:"configure_enabled,omitempty" jsonschema:"turn this workspace's ansible CONFIGURE operation on or off. Omitting the field leaves the stored value alone. This is the ONLY way to turn the operation off (#1966), and it deliberately does NOT move config_directory, so a later configure_enabled=true resumes in the same directory. Turning it on does not need config_directory: empty means the configuration version's root. Turning it off is refused (422) if the workspace has no plan/apply operation either, checked against the merged row. Independent of plan_apply_enabled"`
+		DefaultRunKind       *string `json:"default_run_kind,omitempty" jsonschema:"which run kind gets the PROMINENT button on this workspace, and which the API offers first. Omitting the field leaves the stored value alone; passing an EMPTY STRING clears the preference, after which the platform offers the most complete kind the workspace has. One of 'full' (plan+apply+configure), 'plan_apply', 'configure' or 'plan'. Checked against the MERGED row, so a kind this workspace does not have is refused (422) unless the same call gives it the operation -- and conversely, turning an operation OFF is refused while this still names it, so clear it in the same call. It changes only the ORDERING: every kind the workspace offers stays available"`
 		// The ansible configure operation's roots and run defaults (#1929).
 		// ConfigDirectory stays a POINTER here for a different reason from
 		// the booleans above and from the create tool's plain string: a PATCH
@@ -348,6 +356,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Description: "Update a workspace's settings. Only the fields you pass change; omitted fields are left alone. " +
 			"This is a config change (the new settings apply on the workspace's next run) — it does not itself queue a run. " +
 			"Which OPERATIONS the workspace has lives here as two independent booleans: plan_apply_enabled (the terraform/tofu/pulumi lifecycle) and configure_enabled (the ansible configure operation). configure_enabled=false is how you turn a configure operation off, and it leaves config_directory where it is so re-enabling resumes in the same directory; turning BOTH off is refused (422) against the resulting row. " +
+			"default_run_kind moves the prominent button between them, and is refused (422) against the resulting row — so turning an operation off while it still names that operation fails, and clearing it in the same call is what you want. " +
 			"The ansible configure operation's roots live here too (config_directory, inventory_paths, default_playbook, default_limit) — there is no separate inventory-settings object to configure.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceUpdateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
@@ -382,6 +391,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			// payload, which is the half that cannot answer the question.
 			PlanApplyEnabled:     in.PlanApplyEnabled,
 			ConfigureEnabled:     in.ConfigureEnabled,
+			DefaultRunKind:       in.DefaultRunKind,
 			AutoConfigureEnabled: in.AutoConfigureEnabled,
 			ConfigureAfterApply:  in.ConfigureAfterApply,
 			ConfigureAllHosts:    in.ConfigureAllHosts,

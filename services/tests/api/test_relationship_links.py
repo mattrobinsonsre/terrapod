@@ -82,6 +82,11 @@ class TestAutodiscoveryRule:
             ansible_collections=[],
             plan_apply_enabled=True,
             configure_enabled=False,
+            # Which of them the materialised workspaces put the prominent button
+            # on (#2479). Set explicitly because a MagicMock is TRUTHY, so
+            # `rule.default_run_kind or ""` would put the mock itself into the
+            # response document and the whole thing would fail to serialise.
+            default_run_kind="",
             # #1974's pair, serialised beside them.
             auto_configure_enabled=False,
             configure_after_apply=False,

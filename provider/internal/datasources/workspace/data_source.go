@@ -42,6 +42,7 @@ type workspaceDataSourceModel struct {
 	AnsibleExecutionEnvironment   types.String `tfsdk:"ansible_execution_environment"`
 	PlanApplyEnabled              types.Bool   `tfsdk:"plan_apply_enabled"`
 	ConfigureEnabled              types.Bool   `tfsdk:"configure_enabled"`
+	DefaultRunKind                types.String `tfsdk:"default_run_kind"`
 	AutoConfigureEnabled          types.Bool   `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply           types.Bool   `tfsdk:"configure_after_apply"`
 	ConfigureAllHosts             types.Bool   `tfsdk:"configure_all_hosts"`
@@ -137,6 +138,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"ansible_execution_environment": computedString("The operator-supplied execution environment this workspace runs its configure operations in, by label. Overrides ansible_version. Null when it names none and runs the built-in image for its line."),
 			"plan_apply_enabled":            computedBool("Whether this workspace has the plan/apply operation — the terraform, OpenTofu or Pulumi half. Defaults to true. A workspace with this and `configure_enabled` both false is refused, so at least one of the pair is always true."),
 			"configure_enabled":             computedBool("Whether this workspace has the ansible configure operation. Defaults to false — configure is opt-in. This is what declares the operation, not the presence of a `config_directory`."),
+			"default_run_kind":              computedString("Which run kind gets the prominent button on this workspace, and which the API offers first: `full`, `plan_apply`, `configure`, `plan`, or empty for no preference — in which case the most complete kind the workspace has is offered. Ordering only; every kind the workspace offers stays available."),
 			"auto_configure_enabled":        computedBool("Whether a push that changes the workspace's ansible config root queues a configure. Defaults to false. The run uses `default_playbook` and `default_limit`, because a push carries no run options."),
 			"configure_all_hosts":           computedBool("Whether a derived configure — one an inventory change or an apply produced — targets every host rather than only the hosts that changed. Defaults to false, which narrows: a derived configure narrows when the ansible code under `config_directory` is unchanged since the last successful configure, and goes wide when it moved."),
 			"configure_after_apply":         computedBool("Whether an apply on this workspace is followed by a configure on the same run — which is what lets a `terraform`/`tofu` CLI apply stream the configure's logs. Defaults to false. A destroy apply never chains one."),
@@ -339,6 +341,11 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	if v := terrapod.GetBoolPtrAttr(res, "configure-enabled"); v != nil {
 		m.ConfigureEnabled = types.BoolValue(*v)
 	}
+	// Which of the two is the prominent button (#2479). Native-only like the
+	// pair above, so it reads as the empty string through the compatibility
+	// route -- and "" is a real value here (no preference), so absent and
+	// empty mean the same thing and there is no wrong default to fall to.
+	m.DefaultRunKind = types.StringValue(terrapod.GetStringAttr(res, "default-run-kind"))
 	m.AutoConfigureEnabled = types.BoolValue(false)
 	if v := terrapod.GetBoolPtrAttr(res, "auto-configure-enabled"); v != nil {
 		m.AutoConfigureEnabled = types.BoolValue(*v)

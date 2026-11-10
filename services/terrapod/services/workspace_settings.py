@@ -529,6 +529,85 @@ def validate_operations(*, plan_apply: bool, configure: bool) -> None:
         )
 
 
+#: Which operations each run kind needs, in the API's own vocabulary.
+#:
+#: The source of truth for the vocabulary, and derived from by the parity gate:
+#: a new run kind added to the frontend without a matching entry here cannot be
+#: stored, which is the right way round -- the API refuses what it cannot honour
+#: rather than storing a word nothing reads.
+RUN_KIND_REQUIREMENTS: dict[str, tuple[str, ...]] = {
+    "full": ("plan_apply", "configure"),
+    "plan_apply": ("plan_apply",),
+    "configure": ("configure",),
+    "plan": ("plan_apply",),
+}
+
+
+def validate_run_kind_format(raw: object) -> str:
+    """The TYPE and VOCABULARY half of a `default-run-kind`, with no cross-field
+    check. Returns `""` for "no preference".
+
+    Split out because bulk update can judge this half from the payload alone,
+    while the cross-field half is over the MERGE of the payload with each
+    matched workspace's own row and so belongs with the matched set. One
+    producer for the vocabulary either way: a second list of the valid kinds is
+    how the two surfaces come to disagree about what is valid.
+    """
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError("default-run-kind must be a string")
+    # NOT stripped, deliberately. A Terraform provider writes the server's
+    # response back into state, so normalising a value here would make the plan
+    # disagree with the result and fail the apply as an inconsistent result --
+    # the v1.9.0 advisory class. `""` is the empty value; `"  "` is refused with
+    # a 422 naming the field, which tells the caller what to send instead of
+    # quietly storing something they did not write.
+    value = raw
+    if not value:
+        return ""
+    if value not in RUN_KIND_REQUIREMENTS:
+        known = ", ".join(f"'{k}'" for k in RUN_KIND_REQUIREMENTS)
+        raise ValueError(f"default-run-kind must be empty or one of {known}, got '{value}'")
+    return value
+
+
+def validate_default_run_kind(raw: object, *, plan_apply: bool, configure: bool) -> str:
+    """Which run kind is the primary button, or `""` for today's ordering (#2479).
+
+    **Takes the RESULTING operation flags**, like `validate_operations` above
+    and for the same reason: this is a cross-field invariant, so it is about the
+    state the write produces and cannot be answered from the submitted fields
+    alone. A caller setting only `default-run-kind` is checked against what the
+    workspace already declares.
+
+    Refused rather than stored-and-ignored when it names an operation the
+    workspace does not have. A stored setting nothing can honour is a promise
+    the platform does not keep, and the operator has no way to find that out --
+    which is the same argument `_ENGINE_SPECIFIC_RUN_ATTRS` makes for refusing a
+    run option on an engine that has no such thing.
+
+    An EMPTY STRING is a value, not an absence: it means "no preference, use the
+    ordering". There is no second spelling for that, so `None` folds to it too
+    -- a client clearing the field sends either and means the same thing. Note
+    this is deliberately NOT the `engine_version_attr` rule, where `""` means
+    "the deployment default" and only an absent key falls through: there is no
+    deployment-wide default run kind to inherit, so the two cases coincide.
+    """
+    value = validate_run_kind_format(raw)
+    if not value:
+        return ""
+    have = {"plan_apply": plan_apply, "configure": configure}
+    missing = [op for op in RUN_KIND_REQUIREMENTS[value] if not have[op]]
+    if missing:
+        names = " and ".join(f"{op.replace('_', '-')}-enabled" for op in missing)
+        raise ValueError(
+            f"default-run-kind '{value}' needs {names} on this workspace. Set it, or "
+            f"leave default-run-kind empty to take the usual ordering"
+        )
+    return value
+
+
 class PlanApplyNotEnabled(ValueError):
     """Raised when a plan or apply is asked for on a workspace that declares no
     such operation (#2116).
