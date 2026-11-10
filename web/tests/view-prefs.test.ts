@@ -11,10 +11,11 @@ import {
   readPref,
   resolveInitial,
   serializeSort,
+  sortStorageKey,
   usableEngine,
   writePref,
   type PrefStore,
-} from '../src/lib/workspace-view-prefs.ts'
+} from '../src/lib/view-prefs.ts'
 
 function memoryStore(initial: Record<string, string> = {}): PrefStore & { data: Record<string, string> } {
   const data = { ...initial }
@@ -78,17 +79,29 @@ describe('writePref / readPref', () => {
 
 describe('sort preference', () => {
   it('round-trips key and direction', () => {
-    assert.deepEqual(parseSort(serializeSort({ key: 'status', direction: 'desc' }), ['name', 'status']), {
+    assert.deepEqual(parseSort(serializeSort({ key: 'status', direction: 'desc' })), {
       key: 'status',
       direction: 'desc',
     })
   })
 
-  it('ignores an unknown key or a malformed value', () => {
-    assert.equal(parseSort('nope:asc', ['name', 'status']), null)
-    assert.equal(parseSort('status:sideways', ['name', 'status']), null)
-    assert.equal(parseSort('garbage', ['name', 'status']), null)
-    assert.equal(parseSort(null, ['name', 'status']), null)
+  it('keeps a column key that itself contains a colon or a dash', () => {
+    assert.deepEqual(parseSort(serializeSort({ key: 'created-at', direction: 'asc' })), {
+      key: 'created-at',
+      direction: 'asc',
+    })
+  })
+
+  it('ignores a malformed value', () => {
+    assert.equal(parseSort('status:sideways'), null)
+    assert.equal(parseSort('garbage'), null)
+    assert.equal(parseSort(':asc'), null)
+    assert.equal(parseSort(null), null)
+  })
+
+  it('keys each table separately, so several tables on one page do not collide', () => {
+    assert.notEqual(sortStorageKey('workspace-detail-runs'), sortStorageKey('workspace-detail-variables'))
+    assert.equal(sortStorageKey('workspaces'), 'terrapod:sort:workspaces')
   })
 })
 

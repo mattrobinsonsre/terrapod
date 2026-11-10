@@ -91,6 +91,7 @@ export default function TokensPage() {
         case 'expires-at': return item.attributes['expires-at']
       }
     }, []),
+    'tokens',
   )
 
   useEffect(() => {

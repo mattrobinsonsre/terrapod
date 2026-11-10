@@ -1,9 +1,12 @@
-// The Workspaces list keeps its filter, engine filter and sort until the user
-// clears them, the way the grouping mode already does: URL first, then storage.
+// A filter or a sort is a transient working set, so it lives in sessionStorage: it survives
+// reload and in-tab navigation, dies with the tab, and never reaches another tab. Durable
+// display preferences (grouping) stay in localStorage.
 
 export const FILTER_KEY = 'terrapod:workspace-filter'
 export const ENGINE_KEY = 'terrapod:workspace-engine'
-export const SORT_KEY = 'terrapod:workspace-sort'
+
+// One key per call site, not per page: several pages sort more than one table.
+export const sortStorageKey = (tableId: string) => `terrapod:sort:${tableId}`
 
 export interface PrefStore {
   getItem(key: string): string | null
@@ -53,10 +56,13 @@ export function serializeSort<K extends string>(sort: SortPref<K>): string {
   return `${sort.key}:${sort.direction}`
 }
 
-export function parseSort<K extends string>(value: string | null, keys: readonly K[]): SortPref<K> | null {
+// The key is not checked against the table's columns: the stored value dies with the tab, and a
+// key the table no longer sorts by just leaves it unsorted until a header is clicked.
+export function parseSort<K extends string>(value: string | null): SortPref<K> | null {
   if (!value) return null
-  const [key, direction] = value.split(':')
+  const i = value.lastIndexOf(':')
+  if (i <= 0) return null
+  const direction = value.slice(i + 1)
   if (direction !== 'asc' && direction !== 'desc') return null
-  const match = keys.find((k) => k === key)
-  return match ? { key: match, direction } : null
+  return { key: value.slice(0, i) as K, direction }
 }

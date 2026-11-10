@@ -384,6 +384,7 @@ export default function AutodiscoveryPage() {
 
   const { sortedItems, sortState, toggleSort } = useSortable<AutodiscoveryRule, SortKey>(
     rules, 'name', 'asc', accessor,
+    'autodiscovery-rules',
   )
 
   useEffect(() => {

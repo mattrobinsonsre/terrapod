@@ -71,12 +71,11 @@ import {
 import {
   ENGINE_KEY,
   FILTER_KEY,
-  SORT_KEY,
   readPref,
   resolveInitial,
   usableEngine,
   writePref,
-} from '@/lib/workspace-view-prefs'
+} from '@/lib/view-prefs'
 
 interface LatestRun {
   id: string
@@ -387,7 +386,7 @@ function WorkspacesPageInner() {
   const [filterInput, setFilterInput] = useState(() =>
     resolveInitial(
       searchParams.get('q'),
-      typeof window !== 'undefined' ? readPref(window.localStorage, FILTER_KEY) : null,
+      typeof window !== 'undefined' ? readPref(window.sessionStorage, FILTER_KEY) : null,
     ),
   )
   const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
@@ -396,7 +395,7 @@ function WorkspacesPageInner() {
   const [engineFilter, setEngineFilter] = useState(() =>
     resolveInitial(
       searchParams.get('engine'),
-      typeof window !== 'undefined' ? readPref(window.localStorage, ENGINE_KEY) : null,
+      typeof window !== 'undefined' ? readPref(window.sessionStorage, ENGINE_KEY) : null,
     ),
   )
 
@@ -566,12 +565,12 @@ function WorkspacesPageInner() {
   // Initialised to the URL's current `q` so that mounting on a page
   // already loaded with `?q=...` (refresh, shared link) doesn't fire a
   // redundant `router.replace` over the unchanged URL on first render.
-  // Kept until explicitly cleared: an empty value removes the stored key.
+  // Kept for the life of the tab, or until cleared: an empty value removes the stored key.
   useEffect(() => {
-    writePref(window.localStorage, FILTER_KEY, serializeFilter(parsedFilter))
+    writePref(window.sessionStorage, FILTER_KEY, serializeFilter(parsedFilter))
   }, [parsedFilter])
   useEffect(() => {
-    writePref(window.localStorage, ENGINE_KEY, engineFilter)
+    writePref(window.sessionStorage, ENGINE_KEY, engineFilter)
   }, [engineFilter])
 
   const lastSyncedQueryRef = useRef<string | null>(`${searchParams.get('q') || ''}|${searchParams.get('engine') || ''}`)
@@ -672,7 +671,6 @@ function WorkspacesPageInner() {
     e === 'pulumi' ? t('form.enginePulumi') : e === 'terraform' ? t('form.engineTerraform') : e
 
   type WsSortKey = 'name' | 'mode' | 'pool' | 'resources' | 'status' | 'created'
-  const WS_SORT_KEYS: readonly WsSortKey[] = ['name', 'mode', 'pool', 'resources', 'status', 'created']
 
   // resolveStatus + WORKSPACE_STATUSES are imported from workspace-status.ts
   // — single source of truth for both the row pill and the filter dropdown.
@@ -843,7 +841,7 @@ function WorkspacesPageInner() {
         case 'created': return item.attributes['created-at']
       }
     }, []),
-    { storageKey: SORT_KEY, keys: WS_SORT_KEYS },
+    'workspaces',
   )
 
   const workspaceTree = useMemo(

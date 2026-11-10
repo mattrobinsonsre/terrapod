@@ -80,6 +80,7 @@ export default function CachePage() {
   }, [])
   const { sortedItems: sortedEntries, sortState: binarySortState, toggleSort: toggleBinarySort } = useSortable<CachedBinary, BinarySortKey>(
     entries, 'cached-at', 'desc', binaryAccessor,
+    'binary-cache-binaries',
   )
 
   type ProviderSortKey = 'provider' | 'version' | 'hostname' | 'os' | 'arch' | 'cached-at'
@@ -95,6 +96,7 @@ export default function CachePage() {
   }, [])
   const { sortedItems: sortedProviders, sortState: providerSortState, toggleSort: toggleProviderSort } = useSortable<CachedProvider, ProviderSortKey>(
     providerEntries, 'cached-at', 'desc', providerAccessor,
+    'binary-cache-providers',
   )
 
   useEffect(() => {

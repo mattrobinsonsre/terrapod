@@ -129,6 +129,7 @@ export default function VCSConnectionsPage() {
 
   const { sortedItems, sortState, toggleSort } = useSortable<VCSConnection, VCSSortKey>(
     connections, 'name', 'asc', vcsAccessor,
+    'vcs-connections',
   )
 
   useEffect(() => {

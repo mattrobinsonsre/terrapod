@@ -63,6 +63,7 @@ export default function PolicySetsPage() {
 
   const { sortedItems, sortState, toggleSort } = useSortable<PolicySet, PsSortKey>(
     sets, 'name', 'asc', accessor,
+    'policy-sets',
   )
 
   useEffect(() => {

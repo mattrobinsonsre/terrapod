@@ -297,6 +297,7 @@ export default function RolesPage() {
   }, [])
   const { sortedItems: sortedAssignments, sortState: assignmentSortState, toggleSort: toggleAssignmentSort } = useSortable<RoleAssignment, AssignmentSortKey>(
     assignments, 'email', 'asc', assignmentAccessor,
+    'role-assignments',
   )
 
   useEffect(() => {

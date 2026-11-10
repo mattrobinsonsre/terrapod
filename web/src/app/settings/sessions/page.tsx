@@ -45,6 +45,7 @@ export default function SessionsPage() {
         case 'last_active_at': return item.last_active_at
       }
     }, []),
+    'sessions',
   )
 
   useEffect(() => {

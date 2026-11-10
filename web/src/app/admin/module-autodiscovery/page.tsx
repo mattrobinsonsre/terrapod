@@ -207,6 +207,7 @@ export default function ModuleAutodiscoveryPage() {
   }, [])
   const { sortedItems, sortState, toggleSort } = useSortable<ModuleRule, SortKey>(
     rules, 'name', 'asc', accessor,
+    'module-autodiscovery-rules',
   )
 
   useEffect(() => {

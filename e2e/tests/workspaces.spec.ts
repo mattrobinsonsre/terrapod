@@ -153,7 +153,7 @@ test.describe("Workspaces", () => {
   });
 
   test("the filter survives leaving the list and stays until cleared", async ({ page }) => {
-    // Storage is per browser context, so this test owns its own state.
+    // sessionStorage is per tab, so this test owns its own state.
     const filter = page.locator('input[aria-label="Filter workspaces"]');
     await page.goto("/workspaces");
     await expect(filter).toBeVisible();
@@ -177,6 +177,47 @@ test.describe("Workspaces", () => {
     await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
     await page.waitForURL(/\/workspaces/);
     await expect(filter).toHaveValue("");
+  });
+
+  test("a second tab does not inherit or overwrite the first tab's filter", async ({ page, context }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await filter.fill("status:errored ");
+    await expect(filter).toHaveValue("status:errored ");
+
+    const other = await context.newPage();
+    await other.goto("/workspaces");
+    const otherFilter = other.locator('input[aria-label="Filter workspaces"]');
+    await expect(otherFilter).toBeVisible();
+    await expect(otherFilter).toHaveValue("");
+
+    await otherFilter.fill("status:applied ");
+    await page.reload();
+    await expect(filter).toHaveValue("status:errored ");
+    await other.close();
+  });
+
+  test("the sort survives leaving the list and returning", async ({ page }) => {
+    // Two workspaces under one prefix, so their order is the only thing that decides the assertion.
+    const prefix = uniqueName("e2e-sort");
+    const token = getStoredToken();
+    await createWorkspace(token, `${prefix}-a`);
+    await createWorkspace(token, `${prefix}-b`);
+
+    const firstRow = () => page.locator("tbody tr", { hasText: prefix }).first();
+    await page.goto("/workspaces");
+    await page.locator('input[aria-label="Filter workspaces"]').fill(`${prefix} `);
+    // Name sorts ascending by default, so "-a" comes first.
+    await expect(firstRow()).toContainText(`${prefix}-a`);
+
+    await page.getByRole("columnheader", { name: /Name/ }).first().click();
+    await expect(firstRow()).toContainText(`${prefix}-b`);
+
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await page.locator('input[aria-label="Filter workspaces"]').fill(`${prefix} `);
+    await expect(firstRow()).toContainText(`${prefix}-b`);
   });
 
   test("workspace settings can be updated", async ({ page }) => {

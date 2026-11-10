@@ -74,6 +74,7 @@ export default function AuditLogPage() {
   }, [])
   const { sortedItems, sortState, toggleSort } = useSortable<AuditEntry, SortKey>(
     entries, 'timestamp', 'desc', accessor,
+    'audit-log',
   )
 
   useEffect(() => {

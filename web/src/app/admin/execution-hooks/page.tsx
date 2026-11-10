@@ -64,6 +64,7 @@ export default function ExecutionHooksPage() {
 
   const { sortedItems, sortState, toggleSort } = useSortable<ExecutionHook, HookSortKey>(
     hooks, 'name', 'asc', hookAccessor,
+    'execution-hooks',
   )
 
   useEffect(() => {

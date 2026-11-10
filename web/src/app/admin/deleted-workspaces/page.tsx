@@ -91,7 +91,8 @@ export default function DeletedWorkspacesPage() {
         default:
           return w.attributes['deleted-at'] ?? ''
       }
-    }
+    },
+    'deleted-workspaces',
   )
 
   async function restore(w: DeletedWorkspace) {

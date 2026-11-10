@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { parseSort, readPref, serializeSort, writePref } from './workspace-view-prefs'
+import { parseSort, readPref, serializeSort, sortStorageKey, writePref } from './view-prefs'
 
 export interface SortState<K extends string> {
   key: K
@@ -11,33 +11,25 @@ export function useSortable<T, K extends string>(
   defaultKey: K,
   defaultDirection: 'asc' | 'desc',
   accessor: (item: T, key: K) => string | number | null | undefined,
-  persist?: { storageKey: string; keys: readonly K[] },
+  // A table id opts this call site in to keeping its sort for the life of the tab.
+  tableId?: string,
 ) {
-  // Opt-in: only a caller that passes `persist` keeps its sort across navigation.
-  const [sortState, setSortState] = useState<SortState<K>>({
-    key: defaultKey,
-    direction: defaultDirection,
+  const storageKey = tableId ? sortStorageKey(tableId) : null
+  // Read in the initializer, as the Workspaces page does for its filter, so there is no
+  // effect that sets state and no first render with the default sort.
+  const [sortState, setSortState] = useState<SortState<K>>(() => {
+    const stored =
+      storageKey && typeof window !== 'undefined'
+        ? parseSort<K>(readPref(window.sessionStorage, storageKey))
+        : null
+    return stored ?? { key: defaultKey, direction: defaultDirection }
   })
 
-  // Writes wait until the stored sort has been applied, so the default never overwrites it.
-  const [restored, setRestored] = useState(false)
-  const storageKey = persist?.storageKey
-  const keys = persist?.keys
-
   useEffect(() => {
-    if (!storageKey || !keys) return
-    const stored = parseSort(readPref(window.localStorage, storageKey), keys)
-    if (stored) setSortState(stored)
-    setRestored(true)
-    // Read once on mount: the stored value is the starting point, not a live source.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey])
-
-  useEffect(() => {
-    if (!storageKey || !restored) return
+    if (!storageKey) return
     const isDefault = sortState.key === defaultKey && sortState.direction === defaultDirection
-    writePref(window.localStorage, storageKey, isDefault ? '' : serializeSort(sortState))
-  }, [sortState, restored, storageKey, defaultKey, defaultDirection])
+    writePref(window.sessionStorage, storageKey, isDefault ? '' : serializeSort(sortState))
+  }, [sortState, storageKey, defaultKey, defaultDirection])
 
   function toggleSort(key: K) {
     setSortState((prev) =>
