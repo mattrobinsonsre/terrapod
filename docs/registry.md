@@ -1109,6 +1109,8 @@ api:
 
 The web UI includes a cache admin page at `/admin/binary-cache` (admin-only) for viewing and purging cached CLI binaries and provider binaries, and a **Warm cache** panel for bulk pre-population.
 
+These are two of Terrapod's four caches; the [language package cache](caches.md#the-package-cache) and the [VCS archive cache](caches.md#the-vcs-archive-cache) have their own admin routes. [Caches](caches.md) covers all four together.
+
 ---
 
 ## Cache pre-population

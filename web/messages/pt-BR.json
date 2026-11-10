@@ -19,7 +19,7 @@
     "policySets": "Conjuntos de Políticas",
     "providerTemplates": "Modelos de Provider",
     "catalogAdmin": "Administração do Catálogo",
-    "cache": "Cache",
+    "cache": "Caches",
     "auditLog": "Log de Auditoria",
     "help": "Ajuda",
     "apiReference": "Referência da API",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "Gerenciamento de cache de binários da CLI e de providers",
+    "title": "Caches",
+    "description": "Binários da CLI, binários de providers, artefatos de pacotes e arquivos de VCS",
     "errors": {
       "loadBinary": "Falha ao carregar o cache de binários",
-      "loadCache": "Falha ao carregar o cache"
+      "loadCache": "Falha ao carregar o cache",
+      "loadPackages": "Falha ao carregar o cache de pacotes",
+      "loadArchives": "Falha ao carregar o cache de arquivos de VCS"
     },
     "sections": {
       "cliBinaries": "Binários da CLI",
-      "providerBinaries": "Binários de Provider"
+      "providerBinaries": "Binários de Provider",
+      "packages": "Cache de pacotes",
+      "vcsArchives": "Cache de arquivos de VCS"
     },
     "empty": {
       "binaries": "Nenhum binário da CLI em cache ainda.",
-      "providers": "Nenhum binário de provider em cache ainda."
+      "providers": "Nenhum binário de provider em cache ainda.",
+      "packages": "Nenhum artefato de pacote em cache ainda.",
+      "archives": "Nenhum arquivo de VCS em cache ainda."
     },
     "columns": {
       "tool": "Ferramenta",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Em Cache Desde",
       "provider": "Provider",
       "hostname": "Nome do Host",
-      "actions": "Ações"
+      "actions": "Ações",
+      "ecosystem": "Ecossistema",
+      "name": "Nome",
+      "filename": "Arquivo",
+      "size": "Tamanho",
+      "lastAccessed": "Último acesso",
+      "repository": "Repositório",
+      "commit": "Commit",
+      "paths": "Caminhos",
+      "written": "Gravado"
     },
     "warm": {
       "heading": "Aquecer cache",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Falha no expurgo de {provider} {version}",
       "successBinary": "Expurgadas {count} entradas de cache de binários",
       "successProvider": "Expurgadas {count} entradas de cache de providers"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# arquivo} other {# arquivos}} · {size}",
+      "archives": "{archives, plural, one {# arquivo} other {# arquivos}} · {size}"
+    },
+    "bulk": {
+      "button": "Expurgar correspondentes"
+    },
+    "packages": {
+      "ecosystemAll": "Todos os ecossistemas",
+      "namePlaceholder": "Prefixo do nome, p. ex. community.",
+      "totalsHeading": "Totais por ecossistema",
+      "bulkHeading": "Expurgar artefatos de pacotes",
+      "bulkDaysLabel": "Sem uso por esta quantidade de dias",
+      "bulkDaysHint": "Aqui a idade é medida a partir do último acesso, e não de quando o artefato entrou no cache, então algo que toda execução baixa nunca é expurgado só por ser antigo. Deixe em branco para expurgar independentemente da idade.",
+      "confirmRow": "Expurgar {name} {version} ({filename}) do cache de pacotes? Isso não pode ser desfeito. Será baixado novamente da origem na próxima requisição.",
+      "confirmAll": "Expurgar todo o cache de pacotes? Isso não pode ser desfeito, embora tudo nele possa ser baixado novamente do registro de onde veio.",
+      "confirmEcosystem": "Expurgar todos os artefatos de {ecosystem} do cache de pacotes? Isso não pode ser desfeito.",
+      "confirmAge": "Expurgar os artefatos de pacotes sem uso nos últimos {days} dias? Isso não pode ser desfeito.",
+      "confirmEcosystemAge": "Expurgar os artefatos de {ecosystem} sem uso nos últimos {days} dias? Isso não pode ser desfeito.",
+      "confirmFigures": "São {files} artefatos e {size} no momento.",
+      "successRow": "{filename} expurgado",
+      "successBulk": "{files} artefatos expurgados, liberando {size}",
+      "errorRow": "Falha ao expurgar o artefato",
+      "errorBulk": "Falha ao expurgar os artefatos de pacotes",
+      "capabilityOff": "O cache de pacotes está desativado, então não há nada para listar aqui. Tudo o que já está em cache é mantido e volta quando ele for ativado novamente."
+    },
+    "archives": {
+      "connectionLabel": "Conexão",
+      "connectionPlaceholder": "ID da conexão de VCS",
+      "totalsHeading": "Totais por repositório",
+      "totalsAll": "Todos os repositórios",
+      "truncated": "Um piso, não um total: a varredura parou depois de {limit} arquivos, então o que vem além disso não é contado aqui.",
+      "pathsFull": "repositório inteiro",
+      "loadMore": "Carregar mais",
+      "loadingMore": "Carregando…",
+      "listedAll": "{count, plural, one {# arquivo listado} other {# arquivos listados}} — esse é todo o cache.",
+      "bulkHeading": "Expurgar arquivos de VCS",
+      "bulkDaysLabel": "Gravado há mais de esta quantidade de dias",
+      "bulkDaysHint": "Um arquivo nunca muda depois de gravado e não guarda hora de acesso, então a idade dele é a hora da gravação. Deixe em branco para expurgar independentemente da idade.",
+      "confirmRow": "Expurgar o arquivo em cache de {repo} no commit {sha}? Isso não pode ser desfeito. Será baixado novamente do repositório na próxima verificação.",
+      "confirmAll": "Expurgar todos os arquivos de VCS em cache? Isso não pode ser desfeito, embora cada um seja baixado novamente do seu repositório na próxima verificação.",
+      "confirmConnection": "Expurgar todos os arquivos em cache da conexão {connection}? Isso não pode ser desfeito.",
+      "confirmAge": "Expurgar os arquivos gravados há mais de {days} dias? Isso não pode ser desfeito.",
+      "confirmConnectionAge": "Expurgar os arquivos da conexão {connection} gravados há mais de {days} dias? Isso não pode ser desfeito.",
+      "confirmFigures": "São {archives} arquivos e {size} no momento.",
+      "successRow": "Arquivo de {repo} no commit {sha} expurgado",
+      "successBulk": "{archives} arquivos expurgados, liberando {size}",
+      "errorRow": "Falha ao expurgar o arquivo",
+      "errorBulk": "Falha ao expurgar os arquivos de VCS"
+    },
+    "sealedWarning": "Este nó está selado, então nada expurgado aqui pode ser baixado novamente. Por isso a limpeza agendada ignora esses caches — esta é uma exclusão permanente."
   },
   "catalog": {
     "title": "Catálogo de Serviços",

@@ -19,7 +19,7 @@
     "policySets": "Copiae Regularum",
     "providerTemplates": "Exempla Providers",
     "catalogAdmin": "Administratio Catalogi",
-    "cache": "Promptuarium",
+    "cache": "Promptuaria",
     "auditLog": "Diarium Recognitionis",
     "help": "Auxilium",
     "apiReference": "Consultatio API",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Promptuarium",
-    "description": "Administratio promptuarii binariorum CLI et providers",
+    "title": "Promptuaria",
+    "description": "Binaria CLI, binaria providers, artificia fasciculorum et archiva VCS",
     "errors": {
       "loadBinary": "Promptuarium binariorum onerari non potuit",
-      "loadCache": "Promptuarium onerari non potuit"
+      "loadCache": "Promptuarium onerari non potuit",
+      "loadPackages": "Promptuarium fasciculorum legi non potuit",
+      "loadArchives": "Promptuarium archivorum VCS legi non potuit"
     },
     "sections": {
       "cliBinaries": "Binaria CLI",
-      "providerBinaries": "Binaria Providers"
+      "providerBinaries": "Binaria Providers",
+      "packages": "Promptuarium fasciculorum",
+      "vcsArchives": "Promptuarium archivorum VCS"
     },
     "empty": {
       "binaries": "Nulla adhuc binaria CLI in promptuario.",
-      "providers": "Nulla adhuc binaria providers in promptuario."
+      "providers": "Nulla adhuc binaria providers in promptuario.",
+      "packages": "Nulla adhuc artificia fasciculorum in promptuario.",
+      "archives": "Nulla adhuc archiva VCS in promptuario."
     },
     "columns": {
       "tool": "Instrumentum",
@@ -1750,7 +1756,16 @@
       "cachedAt": "In Promptuario Positum",
       "provider": "Praebitor",
       "hostname": "Nomen Hospitis",
-      "actions": "Actiones"
+      "actions": "Actiones",
+      "ecosystem": "Oecosystema",
+      "name": "Nomen",
+      "filename": "Plica",
+      "size": "Magnitudo",
+      "lastAccessed": "Ultimus accessus",
+      "repository": "Repositorium",
+      "commit": "Commissum",
+      "paths": "Semitae",
+      "written": "Scriptum"
     },
     "warm": {
       "heading": "Promptuarium calefacere",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Purgatio defecit pro {provider} {version}",
       "successBinary": "Purgatae {count} inscriptiones promptuarii binariorum",
       "successProvider": "Purgatae {count} inscriptiones promptuarii providers"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# plica} other {# plicae}} · {size}",
+      "archives": "{archives, plural, one {# archivum} other {# archiva}} · {size}"
+    },
+    "bulk": {
+      "button": "Congruentia purgare"
+    },
+    "packages": {
+      "ecosystemAll": "Omnia oecosystemata",
+      "namePlaceholder": "Praefixum nominis, exempli gratia community.",
+      "totalsHeading": "Summae per oecosystema",
+      "bulkHeading": "Artificia fasciculorum purgare",
+      "bulkDaysLabel": "Tot dies non adhibitum",
+      "bulkDaysHint": "Aetas hic ab ultimo accessu metitur, non ex tempore quo in promptuarium venit, itaque quod omnis cursus petit numquam propter solam vetustatem purgatur. Vacuum relinque ut quacumque aetate purgetur.",
+      "confirmRow": "{name} {version} ({filename}) e promptuario fasciculorum purgare? Hoc revocari non potest. A superiore in proxima petitione iterum petetur.",
+      "confirmAll": "Totum promptuarium fasciculorum purgare? Hoc revocari non potest, quamquam omnia in eo e registro unde venerunt iterum peti possunt.",
+      "confirmEcosystem": "Omne artificium {ecosystem} e promptuario fasciculorum purgare? Hoc revocari non potest.",
+      "confirmAge": "Artificia fasciculorum per ultimos {days} dies non adhibita purgare? Hoc revocari non potest.",
+      "confirmEcosystemAge": "Artificia {ecosystem} per ultimos {days} dies non adhibita purgare? Hoc revocari non potest.",
+      "confirmFigures": "Id nunc sunt {files} artificia et {size}.",
+      "successRow": "{filename} purgatum",
+      "successBulk": "Purgata sunt {files} artificia, liberatis {size}",
+      "errorRow": "Artificium purgari non potuit",
+      "errorBulk": "Artificia fasciculorum purgari non potuerunt",
+      "capabilityOff": "Promptuarium fasciculorum exstinctum est, itaque nihil hic est quod enumeretur. Quidquid iam conditum est servatur et redit cum rursus accenditur."
+    },
+    "archives": {
+      "connectionLabel": "Nexus",
+      "connectionPlaceholder": "Identitas nexus VCS",
+      "totalsHeading": "Summae per repositorium",
+      "totalsAll": "Omnia repositoria",
+      "truncated": "Minimum potius quam summa: perambulatio post {limit} archiva constitit, itaque quidquid ultra est hic non numeratur.",
+      "pathsFull": "totum repositorium",
+      "loadMore": "Plura legere",
+      "loadingMore": "Legitur…",
+      "listedAll": "{count, plural, one {# archivum enumeratum} other {# archiva enumerata}} — id est totum promptuarium.",
+      "bulkHeading": "Archiva VCS purgare",
+      "bulkDaysLabel": "Plus quam tot dies ante scriptum",
+      "bulkDaysHint": "Archivum semel scriptum numquam mutatur neque tempus accessus fert, itaque aetas eius est tempus scripturae. Vacuum relinque ut quacumque aetate purgetur.",
+      "confirmRow": "Archivum in promptuario pro {repo} ad {sha} purgare? Hoc revocari non potest. E repositorio in proxima interrogatione iterum petetur.",
+      "confirmAll": "Omne archivum VCS in promptuario purgare? Hoc revocari non potest, quamquam unumquodque e repositorio suo in proxima interrogatione iterum petetur.",
+      "confirmConnection": "Omne archivum in promptuario pro nexu {connection} purgare? Hoc revocari non potest.",
+      "confirmAge": "Archiva plus quam {days} dies ante scripta purgare? Hoc revocari non potest.",
+      "confirmConnectionAge": "Archiva nexus {connection} plus quam {days} dies ante scripta purgare? Hoc revocari non potest.",
+      "confirmFigures": "Id nunc sunt {archives} archiva et {size}.",
+      "successRow": "Archivum pro {repo} ad {sha} purgatum",
+      "successBulk": "Purgata sunt {archives} archiva, liberatis {size}",
+      "errorRow": "Archivum purgari non potuit",
+      "errorBulk": "Archiva VCS purgari non potuerunt"
+    },
+    "sealedWarning": "Hic nodus obsignatus est, itaque nihil hic purgatum iterum peti potest. Purgatio statuta haec promptuaria ea de causa praeterit — haec deletio perpetua est."
   },
   "catalog": {
     "title": "Catalogus Servitiorum",

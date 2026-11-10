@@ -19,7 +19,7 @@
     "policySets": "Regelsett",
     "providerTemplates": "Leverandørmaler",
     "catalogAdmin": "Katalogadmin",
-    "cache": "Buffer",
+    "cache": "Buffere",
     "auditLog": "Revisjonslogg",
     "help": "Hjelp",
     "apiReference": "API-referanse",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Buffer",
-    "description": "Administrasjon av CLI-binærfil- og leverandørbuffer",
+    "title": "Buffere",
+    "description": "CLI-binærfiler, leverandørbinærfiler, pakkeartefakter og VCS-arkiver",
     "errors": {
       "loadBinary": "Kunne ikke laste binærfilbuffer",
-      "loadCache": "Kunne ikke laste buffer"
+      "loadCache": "Kunne ikke laste buffer",
+      "loadPackages": "Kunne ikke laste pakkebufferen",
+      "loadArchives": "Kunne ikke laste VCS-arkivbufferen"
     },
     "sections": {
       "cliBinaries": "CLI-binærfiler",
-      "providerBinaries": "Leverandørbinærfiler"
+      "providerBinaries": "Leverandørbinærfiler",
+      "packages": "Pakkebuffer",
+      "vcsArchives": "VCS-arkivbuffer"
     },
     "empty": {
       "binaries": "Ingen bufrede CLI-binærfiler ennå.",
-      "providers": "Ingen bufrede leverandørbinærfiler ennå."
+      "providers": "Ingen bufrede leverandørbinærfiler ennå.",
+      "packages": "Ingen bufrede pakkeartefakter ennå.",
+      "archives": "Ingen bufrede VCS-arkiver ennå."
     },
     "columns": {
       "tool": "Verktøy",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Bufret",
       "provider": "Leverandør",
       "hostname": "Vertsnavn",
-      "actions": "Handlinger"
+      "actions": "Handlinger",
+      "ecosystem": "Økosystem",
+      "name": "Navn",
+      "filename": "Fil",
+      "size": "Størrelse",
+      "lastAccessed": "Sist brukt",
+      "repository": "Depot",
+      "commit": "Commit",
+      "paths": "Stier",
+      "written": "Skrevet"
     },
     "warm": {
       "heading": "Varm opp buffer",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Tømming mislyktes for {provider} {version}",
       "successBinary": "Tømte {count} binærfilbufferoppføringer",
       "successProvider": "Tømte {count} leverandørbufferoppføringer"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# fil} other {# filer}} · {size}",
+      "archives": "{archives, plural, one {# arkiv} other {# arkiver}} · {size}"
+    },
+    "bulk": {
+      "button": "Tøm treffene"
+    },
+    "packages": {
+      "ecosystemAll": "Alle økosystemer",
+      "namePlaceholder": "Navneprefiks, f.eks. community.",
+      "totalsHeading": "Totaler per økosystem",
+      "bulkHeading": "Tøm pakkeartefakter",
+      "bulkDaysLabel": "Ubrukt i så mange dager",
+      "bulkDaysHint": "Alderen måles her fra sist bruk, ikke fra da artefaktet ble bufret, så noe hver kjøring henter blir aldri tømt bare fordi det er gammelt. La feltet stå tomt for å tømme uansett alder.",
+      "confirmRow": "Tøm {name} {version} ({filename}) fra pakkebufferen? Dette kan ikke angres. Den hentes på nytt fra oppstrøms ved neste forespørsel.",
+      "confirmAll": "Tøm hele pakkebufferen? Dette kan ikke angres, men alt i den kan hentes på nytt fra registeret det kom fra.",
+      "confirmEcosystem": "Tøm alle {ecosystem}-artefakter fra pakkebufferen? Dette kan ikke angres.",
+      "confirmAge": "Tøm pakkeartefakter som ikke er brukt de siste {days} dagene? Dette kan ikke angres.",
+      "confirmEcosystemAge": "Tøm {ecosystem}-artefakter som ikke er brukt de siste {days} dagene? Dette kan ikke angres.",
+      "confirmFigures": "Det er {files} artefakter og {size} nå.",
+      "successRow": "{filename} tømt",
+      "successBulk": "Tømte {files} artefakter og frigjorde {size}",
+      "errorRow": "Kunne ikke tømme artefaktet",
+      "errorBulk": "Kunne ikke tømme pakkeartefaktene",
+      "capabilityOff": "Pakkebufferen er slått av, så det er ingenting å vise her. Alt som allerede er bufret, beholdes og kommer tilbake når den slås på igjen."
+    },
+    "archives": {
+      "connectionLabel": "Tilkobling",
+      "connectionPlaceholder": "VCS-tilkoblingens id",
+      "totalsHeading": "Totaler per depot",
+      "totalsAll": "Alle depoter",
+      "truncated": "En nedre grense og ikke en total: gjennomgangen stoppet etter {limit} arkiver, så alt utover det telles ikke med her.",
+      "pathsFull": "hele depotet",
+      "loadMore": "Last mer",
+      "loadingMore": "Laster …",
+      "listedAll": "{count, plural, one {# arkiv} other {# arkiver}} vist – det er hele bufferen.",
+      "bulkHeading": "Tøm VCS-arkiver",
+      "bulkDaysLabel": "Skrevet for mer enn så mange dager siden",
+      "bulkDaysHint": "Et arkiv endres aldri når det først er skrevet og har ingen brukstid, så alderen er skrivetidspunktet. La feltet stå tomt for å tømme uansett alder.",
+      "confirmRow": "Tøm det bufrede arkivet for {repo} ved {sha}? Dette kan ikke angres. Det hentes på nytt fra depotet ved neste spørring.",
+      "confirmAll": "Tøm hvert bufret VCS-arkiv? Dette kan ikke angres, men hvert arkiv hentes på nytt fra sitt depot ved neste spørring.",
+      "confirmConnection": "Tøm hvert bufret arkiv for tilkoblingen {connection}? Dette kan ikke angres.",
+      "confirmAge": "Tøm arkiver som ble skrevet for mer enn {days} dager siden? Dette kan ikke angres.",
+      "confirmConnectionAge": "Tøm arkiver for tilkoblingen {connection} som ble skrevet for mer enn {days} dager siden? Dette kan ikke angres.",
+      "confirmFigures": "Det er {archives} arkiver og {size} nå.",
+      "successRow": "Arkivet for {repo} ved {sha} ble tømt",
+      "successBulk": "Tømte {archives} arkiver og frigjorde {size}",
+      "errorRow": "Kunne ikke tømme arkivet",
+      "errorBulk": "Kunne ikke tømme VCS-arkivene"
+    },
+    "sealedWarning": "Denne noden er forseglet, så ingenting som tømmes her kan hentes på nytt. Den planlagte oppryddingen hopper over disse bufferne av samme grunn – dette er en permanent sletting."
   },
   "catalog": {
     "title": "Tjenestekatalog",

@@ -19,7 +19,7 @@
     "policySets": "Politiksæt",
     "providerTemplates": "Providerskabeloner",
     "catalogAdmin": "Katalogadministration",
-    "cache": "Cache",
+    "cache": "Caches",
     "auditLog": "Revisionslog",
     "help": "Hjælp",
     "apiReference": "API-reference",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "Administration af CLI-binærfiler og providercache",
+    "title": "Caches",
+    "description": "CLI-binærfiler, providerbinærfiler, pakkeartefakter og VCS-arkiver",
     "errors": {
       "loadBinary": "Kunne ikke indlæse binærfilcache",
-      "loadCache": "Kunne ikke indlæse cache"
+      "loadCache": "Kunne ikke indlæse cache",
+      "loadPackages": "Kunne ikke indlæse pakkecachen",
+      "loadArchives": "Kunne ikke indlæse VCS-arkivcachen"
     },
     "sections": {
       "cliBinaries": "CLI-binærfiler",
-      "providerBinaries": "Provider-binærfiler"
+      "providerBinaries": "Provider-binærfiler",
+      "packages": "Pakkecache",
+      "vcsArchives": "VCS-arkivcache"
     },
     "empty": {
       "binaries": "Ingen cachelagrede CLI-binærfiler endnu.",
-      "providers": "Ingen cachelagrede provider-binærfiler endnu."
+      "providers": "Ingen cachelagrede provider-binærfiler endnu.",
+      "packages": "Ingen cachelagrede pakkeartefakter endnu.",
+      "archives": "Ingen cachelagrede VCS-arkiver endnu."
     },
     "columns": {
       "tool": "Værktøj",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Cachelagret",
       "provider": "Provider",
       "hostname": "Værtsnavn",
-      "actions": "Handlinger"
+      "actions": "Handlinger",
+      "ecosystem": "Økosystem",
+      "name": "Navn",
+      "filename": "Fil",
+      "size": "Størrelse",
+      "lastAccessed": "Sidst brugt",
+      "repository": "Repository",
+      "commit": "Commit",
+      "paths": "Stier",
+      "written": "Skrevet"
     },
     "warm": {
       "heading": "Opvarm cache",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Rydning mislykkedes for {provider} {version}",
       "successBinary": "Ryddede {count} binærfilcacheposter",
       "successProvider": "Ryddede {count} providercacheposter"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# fil} other {# filer}} · {size}",
+      "archives": "{archives, plural, one {# arkiv} other {# arkiver}} · {size}"
+    },
+    "bulk": {
+      "button": "Ryd matchende"
+    },
+    "packages": {
+      "ecosystemAll": "Alle økosystemer",
+      "namePlaceholder": "Navnepræfiks, f.eks. community.",
+      "totalsHeading": "Totaler pr. økosystem",
+      "bulkHeading": "Ryd pakkeartefakter",
+      "bulkDaysLabel": "Ubrugt i så mange dage",
+      "bulkDaysHint": "Alderen måles her fra sidste brug og ikke fra, hvornår artefaktet blev cachelagret, så noget, hver kørsel henter, bliver aldrig ryddet blot fordi det er gammelt. Lad feltet stå tomt for at rydde uanset alder.",
+      "confirmRow": "Ryd {name} {version} ({filename}) fra pakkecachen? Det kan ikke fortrydes. Det hentes igen fra upstream ved næste anmodning.",
+      "confirmAll": "Ryd hele pakkecachen? Det kan ikke fortrydes, men alt i den kan hentes igen fra det register, det kom fra.",
+      "confirmEcosystem": "Ryd alle {ecosystem}-artefakter fra pakkecachen? Det kan ikke fortrydes.",
+      "confirmAge": "Ryd pakkeartefakter, der ikke er brugt i de seneste {days} dage? Det kan ikke fortrydes.",
+      "confirmEcosystemAge": "Ryd {ecosystem}-artefakter, der ikke er brugt i de seneste {days} dage? Det kan ikke fortrydes.",
+      "confirmFigures": "Det er {files} artefakter og {size} i øjeblikket.",
+      "successRow": "{filename} ryddet",
+      "successBulk": "Ryddede {files} artefakter og frigjorde {size}",
+      "errorRow": "Kunne ikke rydde artefaktet",
+      "errorBulk": "Kunne ikke rydde pakkeartefakterne",
+      "capabilityOff": "Pakkecachen er slået fra, så der er intet at vise her. Alt, der allerede er cachet, bevares og kommer tilbage, når den slås til igen."
+    },
+    "archives": {
+      "connectionLabel": "Forbindelse",
+      "connectionPlaceholder": "VCS-forbindelsens id",
+      "totalsHeading": "Totaler pr. repository",
+      "totalsAll": "Alle repositories",
+      "truncated": "En nedre grænse og ikke en total: gennemgangen stoppede efter {limit} arkiver, så alt derudover tælles ikke med her.",
+      "pathsFull": "hele repositoryet",
+      "loadMore": "Indlæs mere",
+      "loadingMore": "Indlæser…",
+      "listedAll": "{count, plural, one {# arkiv} other {# arkiver}} vist — det er hele cachen.",
+      "bulkHeading": "Ryd VCS-arkiver",
+      "bulkDaysLabel": "Skrevet for mere end så mange dage siden",
+      "bulkDaysHint": "Et arkiv ændres aldrig, når det først er skrevet, og har ingen brugstid, så dets alder er skrivetidspunktet. Lad feltet stå tomt for at rydde uanset alder.",
+      "confirmRow": "Ryd det cachelagrede arkiv for {repo} ved {sha}? Det kan ikke fortrydes. Det hentes igen fra repositoryet ved næste forespørgsel.",
+      "confirmAll": "Ryd alle cachelagrede VCS-arkiver? Det kan ikke fortrydes, men hvert arkiv hentes igen fra sit repository ved næste forespørgsel.",
+      "confirmConnection": "Ryd alle cachelagrede arkiver for forbindelsen {connection}? Det kan ikke fortrydes.",
+      "confirmAge": "Ryd arkiver, der blev skrevet for mere end {days} dage siden? Det kan ikke fortrydes.",
+      "confirmConnectionAge": "Ryd arkiver for forbindelsen {connection}, der blev skrevet for mere end {days} dage siden? Det kan ikke fortrydes.",
+      "confirmFigures": "Det er {archives} arkiver og {size} i øjeblikket.",
+      "successRow": "Arkivet for {repo} ved {sha} blev ryddet",
+      "successBulk": "Ryddede {archives} arkiver og frigjorde {size}",
+      "errorRow": "Kunne ikke rydde arkivet",
+      "errorBulk": "Kunne ikke rydde VCS-arkiverne"
+    },
+    "sealedWarning": "Denne node er forseglet, så intet, der ryddes her, kan hentes igen. Den planlagte oprydning springer disse caches over af samme grund — det er en permanent sletning."
   },
   "catalog": {
     "title": "Tjenestekatalog",

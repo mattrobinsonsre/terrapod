@@ -1729,18 +1729,24 @@
   },
   "adminBinaryCache": {
     "title": "キャッシュ",
-    "description": "CLIバイナリとプロバイダーのキャッシュ管理",
+    "description": "CLIバイナリ、プロバイダーバイナリ、パッケージ成果物、VCSアーカイブ",
     "errors": {
       "loadBinary": "バイナリキャッシュの読み込みに失敗しました",
-      "loadCache": "キャッシュの読み込みに失敗しました"
+      "loadCache": "キャッシュの読み込みに失敗しました",
+      "loadPackages": "パッケージキャッシュの読み込みに失敗しました",
+      "loadArchives": "VCSアーカイブキャッシュの読み込みに失敗しました"
     },
     "sections": {
       "cliBinaries": "CLIバイナリ",
-      "providerBinaries": "プロバイダーバイナリ"
+      "providerBinaries": "プロバイダーバイナリ",
+      "packages": "パッケージキャッシュ",
+      "vcsArchives": "VCSアーカイブキャッシュ"
     },
     "empty": {
       "binaries": "キャッシュされたCLIバイナリがまだありません。",
-      "providers": "キャッシュされたプロバイダーバイナリがまだありません。"
+      "providers": "キャッシュされたプロバイダーバイナリがまだありません。",
+      "packages": "キャッシュされたパッケージ成果物がまだありません。",
+      "archives": "キャッシュされたVCSアーカイブがまだありません。"
     },
     "columns": {
       "tool": "ツール",
@@ -1750,7 +1756,16 @@
       "cachedAt": "キャッシュ日時",
       "provider": "プロバイダー",
       "hostname": "ホスト名",
-      "actions": "操作"
+      "actions": "操作",
+      "ecosystem": "エコシステム",
+      "name": "名前",
+      "filename": "ファイル",
+      "size": "サイズ",
+      "lastAccessed": "最終アクセス",
+      "repository": "リポジトリ",
+      "commit": "コミット",
+      "paths": "パス",
+      "written": "書き込み日時"
     },
     "warm": {
       "heading": "キャッシュのウォームアップ",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "{provider} {version} のパージに失敗しました",
       "successBinary": "{count} 件のバイナリキャッシュエントリをパージしました",
       "successProvider": "{count} 件のプロバイダーキャッシュエントリをパージしました"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, other {#件のファイル}} · {size}",
+      "archives": "{archives, plural, other {#件のアーカイブ}} · {size}"
+    },
+    "bulk": {
+      "button": "該当分をパージ"
+    },
+    "packages": {
+      "ecosystemAll": "すべてのエコシステム",
+      "namePlaceholder": "名前の前方一致、例: community.",
+      "totalsHeading": "エコシステム別の合計",
+      "bulkHeading": "パッケージ成果物のパージ",
+      "bulkDaysLabel": "この日数のあいだ未使用",
+      "bulkDaysHint": "ここでの経過日数はキャッシュされた時点ではなく最終アクセスからの日数です。そのため毎回の実行で取得されるものが古いという理由だけでパージされることはありません。経過日数を問わずパージするには空のままにしてください。",
+      "confirmRow": "{name} {version}（{filename}）をパッケージキャッシュからパージしますか？この操作は取り消せません。次回のリクエスト時に上流から再取得されます。",
+      "confirmAll": "パッケージキャッシュ全体をパージしますか？この操作は取り消せませんが、中身はすべて取得元のレジストリから再取得できます。",
+      "confirmEcosystem": "{ecosystem} の成果物すべてをパッケージキャッシュからパージしますか？この操作は取り消せません。",
+      "confirmAge": "直近 {days} 日間使用されていないパッケージ成果物をパージしますか？この操作は取り消せません。",
+      "confirmEcosystemAge": "直近 {days} 日間使用されていない {ecosystem} の成果物をパージしますか？この操作は取り消せません。",
+      "confirmFigures": "現時点で {files} 件の成果物、{size} です。",
+      "successRow": "{filename} をパージしました",
+      "successBulk": "{files} 件の成果物をパージし、{size} を解放しました",
+      "errorRow": "成果物のパージに失敗しました",
+      "errorBulk": "パッケージ成果物のパージに失敗しました",
+      "capabilityOff": "パッケージキャッシュは無効になっているため、ここに表示するものはありません。すでにキャッシュされているものは保持され、再度有効にすると元に戻ります。"
+    },
+    "archives": {
+      "connectionLabel": "接続",
+      "connectionPlaceholder": "VCS接続ID",
+      "totalsHeading": "リポジトリ別の合計",
+      "totalsAll": "すべてのリポジトリ",
+      "truncated": "これは合計ではなく下限です。走査は {limit} 件のアーカイブで打ち切られたため、それ以降はここに含まれていません。",
+      "pathsFull": "リポジトリ全体",
+      "loadMore": "さらに読み込む",
+      "loadingMore": "読み込み中…",
+      "listedAll": "{count, plural, other {#件のアーカイブ}}を表示しました。これがキャッシュの全体です。",
+      "bulkHeading": "VCSアーカイブのパージ",
+      "bulkDaysLabel": "この日数より前に書き込まれた",
+      "bulkDaysHint": "アーカイブは一度書き込まれると変わらず、アクセス時刻を持たないため、その経過日数は書き込み時刻からの日数です。経過日数を問わずパージするには空のままにしてください。",
+      "confirmRow": "{repo} のコミット {sha} のキャッシュ済みアーカイブをパージしますか？この操作は取り消せません。次回のポーリング時にリポジトリから再取得されます。",
+      "confirmAll": "キャッシュ済みのVCSアーカイブをすべてパージしますか？この操作は取り消せませんが、各アーカイブは次回のポーリング時にそれぞれのリポジトリから再取得されます。",
+      "confirmConnection": "接続 {connection} のキャッシュ済みアーカイブをすべてパージしますか？この操作は取り消せません。",
+      "confirmAge": "{days} 日より前に書き込まれたアーカイブをパージしますか？この操作は取り消せません。",
+      "confirmConnectionAge": "接続 {connection} のうち {days} 日より前に書き込まれたアーカイブをパージしますか？この操作は取り消せません。",
+      "confirmFigures": "現時点で {archives} 件のアーカイブ、{size} です。",
+      "successRow": "{repo} のコミット {sha} のアーカイブをパージしました",
+      "successBulk": "{archives} 件のアーカイブをパージし、{size} を解放しました",
+      "errorRow": "アーカイブのパージに失敗しました",
+      "errorBulk": "VCSアーカイブのパージに失敗しました"
+    },
+    "sealedWarning": "このノードはシール済みのため、ここでパージしたものは再取得できません。定期クリーンアップがこれらのキャッシュを対象外にしているのもそのためです — これは完全な削除です。"
   },
   "catalog": {
     "title": "サービスカタログ",

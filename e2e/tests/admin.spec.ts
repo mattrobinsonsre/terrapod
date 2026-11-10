@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/auth.js';
+import type { Dialog } from '@playwright/test';
 import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api.js';
 
 test.describe('Admin access control', () => {
@@ -126,5 +127,93 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
     await expect(table).toContainText('auto_apply_mode');
     await expect(table).toContainText('create_update');
     await expect(table).toContainText('auto_apply');
+  });
+});
+
+test.describe('Caches — the package and VCS archive sections (#2474)', () => {
+  // Both caches had no admin surface at all: an operator could warm one and
+  // never see what was in it, how big it had grown, or drop one bad artifact
+  // without going to object storage by hand. These assertions drive the page
+  // against a real (and on a fresh stack, empty) cache, which is enough to
+  // prove the two listings, the two totals strips and both bulk purges reach
+  // the server — the thing a component test cannot show.
+  test('both sections render, and the package filter says the name is a prefix', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.locator('h1:has-text("Caches")')).toBeVisible({ timeout: 15_000 });
+
+    await expect(adminPage.getByTestId('package-cache-section')).toBeVisible();
+    await expect(adminPage.getByTestId('vcs-archive-cache-section')).toBeVisible();
+
+    // The server does a PREFIX match on the name, so the placeholder says so
+    // rather than leaving the operator to guess at a wildcard syntax.
+    await expect(adminPage.locator('#pkg-name')).toHaveAttribute('placeholder', /prefix/i);
+
+    // One option per ecosystem the proxy serves, plus the unfiltered choice.
+    const options = adminPage.locator('#pkg-ecosystem option');
+    await expect(options).toHaveCount(7);
+    for (const eco of ['galaxy', 'pypi', 'npm', 'go', 'nuget', 'pulumi']) {
+      await expect(adminPage.locator(`#pkg-ecosystem option[value="${eco}"]`)).toHaveCount(1);
+    }
+
+    // Both totals strips are present. They are computed over the whole cache
+    // server-side, so they are totals rather than a sum of a rendered page.
+    await expect(adminPage.getByText('Totals by ecosystem')).toBeVisible();
+    await expect(adminPage.getByText('Totals by repository')).toBeVisible();
+  });
+
+  test('the two age filters do not say the same thing', async ({ adminPage }) => {
+    // Package age is measured from the LAST ACCESS and an archive's from its
+    // WRITE time, so the labels have to differ: "older than" would be wrong
+    // about one of them, and an operator cannot tell which from the number.
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.getByTestId('package-cache-section')).toBeVisible({ timeout: 15_000 });
+
+    await expect(adminPage.getByText('Not used in this many days')).toBeVisible();
+    await expect(adminPage.getByText('Written more than this many days ago')).toBeVisible();
+  });
+
+  test('a bulk purge names its scope, and cancelling it does nothing', async ({ adminPage }) => {
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.getByTestId('vcs-archive-cache-section')).toBeVisible({ timeout: 15_000 });
+
+    // Irreversible, so it prompts on a precise pointer too — this project runs
+    // Desktop Chrome, which is what makes that the assertion here.
+    let seen = '';
+    const dismiss = async (d: Dialog) => { seen = d.message(); await d.dismiss(); };
+    adminPage.on('dialog', dismiss);
+    await adminPage.getByTestId('archive-bulk-purge').click();
+    await expect.poll(() => seen, { timeout: 10_000 }).not.toBe('');
+    adminPage.off('dialog', dismiss);
+    expect(seen).toMatch(/every cached VCS archive/i);
+    expect(seen).toMatch(/cannot be undone/i);
+    // Dismissed, so nothing ran: no success banner appears.
+    await expect(adminPage.getByText(/Purged \d+ archives/)).toHaveCount(0);
+
+    // Accepting it reaches the server and the result is reported back.
+    const accept = async (d: Dialog) => { await d.accept(); };
+    adminPage.on('dialog', accept);
+    await adminPage.getByTestId('archive-bulk-purge').click();
+    await expect(adminPage.getByText(/Purged \d+ archives/)).toBeVisible({ timeout: 15_000 });
+    adminPage.off('dialog', accept);
+  });
+
+  test('a package bulk purge narrowed to one ecosystem says which', async ({ adminPage }) => {
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.getByTestId('package-cache-section')).toBeVisible({ timeout: 15_000 });
+
+    // The purge panel has its OWN ecosystem select rather than reusing the
+    // list's: the evict endpoint takes an ecosystem and an age and has no name
+    // filter, so a button reading "purge what I am looking at" would purge
+    // beyond a name prefix the operator had typed.
+    await adminPage.locator('#pkg-purge-ecosystem').selectOption('npm');
+    let seen = '';
+    const accept = async (d: Dialog) => { seen = d.message(); await d.accept(); };
+    adminPage.on('dialog', accept);
+    await adminPage.getByTestId('package-bulk-purge').click();
+    await expect(adminPage.getByText(/Purged \d+ artifacts/)).toBeVisible({ timeout: 15_000 });
+    adminPage.off('dialog', accept);
+    expect(seen).toMatch(/every npm artifact/i);
   });
 });

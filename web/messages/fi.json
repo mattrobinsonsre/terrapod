@@ -19,7 +19,7 @@
     "policySets": "Käytäntöjoukot",
     "providerTemplates": "Palveluntarjoajamallit",
     "catalogAdmin": "Luettelon hallinta",
-    "cache": "Välimuisti",
+    "cache": "Välimuistit",
     "auditLog": "Tarkastusloki",
     "help": "Ohje",
     "apiReference": "API-referenssi",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Välimuisti",
-    "description": "CLI-binaarin ja palveluntarjoajan välimuistin hallinta",
+    "title": "Välimuistit",
+    "description": "CLI-binaarit, palveluntarjoajien binaarit, pakettiartefaktit ja VCS-arkistot",
     "errors": {
       "loadBinary": "Binaarivälimuistin lataaminen epäonnistui",
-      "loadCache": "Välimuistin lataaminen epäonnistui"
+      "loadCache": "Välimuistin lataaminen epäonnistui",
+      "loadPackages": "Pakettivälimuistin lataus ei onnistunut",
+      "loadArchives": "VCS-arkistovälimuistin lataus ei onnistunut"
     },
     "sections": {
       "cliBinaries": "CLI-binaarit",
-      "providerBinaries": "Palveluntarjoajabinaarit"
+      "providerBinaries": "Palveluntarjoajabinaarit",
+      "packages": "Pakettivälimuisti",
+      "vcsArchives": "VCS-arkistovälimuisti"
     },
     "empty": {
       "binaries": "Ei vielä välimuistissa olevia CLI-binaareja.",
-      "providers": "Ei vielä välimuistissa olevia palveluntarjoajabinaareja."
+      "providers": "Ei vielä välimuistissa olevia palveluntarjoajabinaareja.",
+      "packages": "Ei vielä välimuistissa olevia pakettiartefakteja.",
+      "archives": "Ei vielä välimuistissa olevia VCS-arkistoja."
     },
     "columns": {
       "tool": "Työkalu",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Tallennettu välimuistiin",
       "provider": "Palveluntarjoaja",
       "hostname": "Isäntänimi",
-      "actions": "Toiminnot"
+      "actions": "Toiminnot",
+      "ecosystem": "Ekosysteemi",
+      "name": "Nimi",
+      "filename": "Tiedosto",
+      "size": "Koko",
+      "lastAccessed": "Viimeksi käytetty",
+      "repository": "Repositorio",
+      "commit": "Commit",
+      "paths": "Polut",
+      "written": "Kirjoitettu"
     },
     "warm": {
       "heading": "Lämmitä välimuisti",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Poisto epäonnistui kohteelle {provider} {version}",
       "successBinary": "Poistettu {count} binaarivälimuistimerkintää",
       "successProvider": "Poistettu {count} palveluntarjoajavälimuistimerkintää"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# tiedosto} other {# tiedostoa}} · {size}",
+      "archives": "{archives, plural, one {# arkisto} other {# arkistoa}} · {size}"
+    },
+    "bulk": {
+      "button": "Poista osumat"
+    },
+    "packages": {
+      "ecosystemAll": "Kaikki ekosysteemit",
+      "namePlaceholder": "Nimen etuliite, esim. community.",
+      "totalsHeading": "Summat ekosysteemeittäin",
+      "bulkHeading": "Pakettiartefaktien poisto",
+      "bulkDaysLabel": "Käyttämättä näin monta päivää",
+      "bulkDaysHint": "Ikä mitataan tässä viimeisestä käytöstä eikä siitä, milloin artefakti tuli välimuistiin, joten jokaisella ajolla haettavaa ei poisteta koskaan pelkän ikänsä vuoksi. Jätä tyhjäksi, jos haluat poistaa iästä riippumatta.",
+      "confirmRow": "Poistetaanko {name} {version} ({filename}) pakettivälimuistista? Tätä ei voi peruuttaa. Se haetaan uudelleen ylävirrasta seuraavalla pyynnöllä.",
+      "confirmAll": "Poistetaanko koko pakettivälimuisti? Tätä ei voi peruuttaa, vaikka kaikki sen sisältö on haettavissa uudelleen siitä rekisteristä, josta se tuli.",
+      "confirmEcosystem": "Poistetaanko kaikki {ecosystem}-artefaktit pakettivälimuistista? Tätä ei voi peruuttaa.",
+      "confirmAge": "Poistetaanko pakettiartefaktit, joita ei ole käytetty viimeisten {days} päivän aikana? Tätä ei voi peruuttaa.",
+      "confirmEcosystemAge": "Poistetaanko {ecosystem}-artefaktit, joita ei ole käytetty viimeisten {days} päivän aikana? Tätä ei voi peruuttaa.",
+      "confirmFigures": "Se on tällä hetkellä {files} artefaktia ja {size}.",
+      "successRow": "{filename} poistettu",
+      "successBulk": "Poistettiin {files} artefaktia ja vapautettiin {size}",
+      "errorRow": "Artefaktin poisto ei onnistunut",
+      "errorBulk": "Pakettiartefaktien poisto ei onnistunut",
+      "capabilityOff": "Pakettivälimuisti on pois käytöstä, joten täällä ei ole mitään listattavaa. Kaikki jo välimuistissa oleva säilyy ja tulee takaisin, kun se otetaan uudelleen käyttöön."
+    },
+    "archives": {
+      "connectionLabel": "Yhteys",
+      "connectionPlaceholder": "VCS-yhteyden tunnus",
+      "totalsHeading": "Summat repositorioittain",
+      "totalsAll": "Kaikki repositoriot",
+      "truncated": "Alaraja eikä summa: läpikäynti pysähtyi {limit} arkiston jälkeen, joten sen jälkeistä ei lasketa tässä mukaan.",
+      "pathsFull": "koko repositorio",
+      "loadMore": "Lataa lisää",
+      "loadingMore": "Ladataan…",
+      "listedAll": "{count, plural, one {# arkisto} other {# arkistoa}} luettelossa — se on koko välimuisti.",
+      "bulkHeading": "VCS-arkistojen poisto",
+      "bulkDaysLabel": "Kirjoitettu yli näin monta päivää sitten",
+      "bulkDaysHint": "Arkisto ei muutu enää kirjoittamisen jälkeen eikä siinä ole käyttöaikaa, joten sen ikä on kirjoitusaika. Jätä tyhjäksi, jos haluat poistaa iästä riippumatta.",
+      "confirmRow": "Poistetaanko välimuistissa oleva arkisto {repo}, commit {sha}? Tätä ei voi peruuttaa. Se haetaan uudelleen repositoriosta seuraavalla kyselyllä.",
+      "confirmAll": "Poistetaanko kaikki välimuistissa olevat VCS-arkistot? Tätä ei voi peruuttaa, vaikka jokainen niistä haetaan uudelleen omasta repositoriostaan seuraavalla kyselyllä.",
+      "confirmConnection": "Poistetaanko kaikki yhteyden {connection} välimuistissa olevat arkistot? Tätä ei voi peruuttaa.",
+      "confirmAge": "Poistetaanko arkistot, jotka on kirjoitettu yli {days} päivää sitten? Tätä ei voi peruuttaa.",
+      "confirmConnectionAge": "Poistetaanko yhteyden {connection} arkistot, jotka on kirjoitettu yli {days} päivää sitten? Tätä ei voi peruuttaa.",
+      "confirmFigures": "Se on tällä hetkellä {archives} arkistoa ja {size}.",
+      "successRow": "Arkisto {repo}, commit {sha}, poistettu",
+      "successBulk": "Poistettiin {archives} arkistoa ja vapautettiin {size}",
+      "errorRow": "Arkiston poisto ei onnistunut",
+      "errorBulk": "VCS-arkistojen poisto ei onnistunut"
+    },
+    "sealedWarning": "Tämä solmu on sinetöity, joten mitään täältä poistettua ei voi hakea uudelleen. Ajastettu siivous jättää nämä välimuistit juuri siksi väliin — tämä on pysyvä poisto."
   },
   "catalog": {
     "title": "Palveluluettelo",

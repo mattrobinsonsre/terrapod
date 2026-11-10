@@ -19,7 +19,7 @@
     "policySets": "Policy Sets",
     "providerTemplates": "Provider Templates",
     "catalogAdmin": "Catalog Admin",
-    "cache": "Cache",
+    "cache": "Caches",
     "auditLog": "Audit Log",
     "help": "Help",
     "apiReference": "API Reference",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "CLI binary and provider cache management",
+    "title": "Caches",
+    "description": "CLI binaries, provider binaries, package artifacts and VCS archives",
     "errors": {
       "loadBinary": "Failed to load binary cache",
-      "loadCache": "Failed to load cache"
+      "loadCache": "Failed to load cache",
+      "loadPackages": "Failed to load the package cache",
+      "loadArchives": "Failed to load the VCS archive cache"
     },
     "sections": {
       "cliBinaries": "CLI Binaries",
-      "providerBinaries": "Provider Binaries"
+      "providerBinaries": "Provider Binaries",
+      "packages": "Package Cache",
+      "vcsArchives": "VCS Archive Cache"
     },
     "empty": {
       "binaries": "No cached CLI binaries yet.",
-      "providers": "No cached provider binaries yet."
+      "providers": "No cached provider binaries yet.",
+      "packages": "No cached package artifacts yet.",
+      "archives": "No cached VCS archives yet."
     },
     "columns": {
       "tool": "Tool",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Cached At",
       "provider": "Provider",
       "hostname": "Hostname",
-      "actions": "Actions"
+      "actions": "Actions",
+      "ecosystem": "Ecosystem",
+      "name": "Name",
+      "filename": "File",
+      "size": "Size",
+      "lastAccessed": "Last accessed",
+      "repository": "Repository",
+      "commit": "Commit",
+      "paths": "Paths",
+      "written": "Written"
     },
     "warm": {
       "heading": "Warm cache",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Purge failed for {provider} {version}",
       "successBinary": "Purged {count} binary cache entries",
       "successProvider": "Purged {count} provider cache entries"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# file} other {# files}} · {size}",
+      "archives": "{archives, plural, one {# archive} other {# archives}} · {size}"
+    },
+    "bulk": {
+      "button": "Purge matching"
+    },
+    "packages": {
+      "ecosystemAll": "All ecosystems",
+      "namePlaceholder": "Name prefix, e.g. community.",
+      "totalsHeading": "Totals by ecosystem",
+      "bulkHeading": "Purge package artifacts",
+      "bulkDaysLabel": "Not used in this many days",
+      "bulkDaysHint": "Age here is measured from the last access, not from when the artifact was cached, so something every run pulls is never purged merely for being old. Leave it empty to purge whatever the age.",
+      "confirmRow": "Purge {name} {version} ({filename}) from the package cache? This cannot be undone. It will be fetched again from upstream on the next request.",
+      "confirmAll": "Purge the whole package cache? This cannot be undone, although everything in it is fetchable again from the registry it came from.",
+      "confirmEcosystem": "Purge every {ecosystem} artifact from the package cache? This cannot be undone.",
+      "confirmAge": "Purge package artifacts not used in the last {days} days? This cannot be undone.",
+      "confirmEcosystemAge": "Purge {ecosystem} artifacts not used in the last {days} days? This cannot be undone.",
+      "confirmFigures": "That is {files} artifacts and {size} as things stand.",
+      "successRow": "Purged {filename}",
+      "successBulk": "Purged {files} artifacts, freeing {size}",
+      "errorRow": "Failed to purge the artifact",
+      "errorBulk": "Failed to purge package artifacts",
+      "capabilityOff": "The package cache is switched off, so there is nothing to list here. Anything already cached is kept and comes back when it is turned on again."
+    },
+    "archives": {
+      "connectionLabel": "Connection",
+      "connectionPlaceholder": "VCS connection id",
+      "totalsHeading": "Totals by repository",
+      "totalsAll": "All repositories",
+      "truncated": "A floor rather than a total: the walk stopped after {limit} archives, so anything past that is not counted here.",
+      "pathsFull": "whole repo",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "listedAll": "{count, plural, one {# archive} other {# archives}} listed — that is the whole cache.",
+      "bulkHeading": "Purge VCS archives",
+      "bulkDaysLabel": "Written more than this many days ago",
+      "bulkDaysHint": "An archive never changes once written and carries no access time, so its age is its write time. Leave it empty to purge whatever the age.",
+      "confirmRow": "Purge the cached archive for {repo} at {sha}? This cannot be undone. It will be fetched again from the repository on the next poll.",
+      "confirmAll": "Purge every cached VCS archive? This cannot be undone, although each one is fetched again from its repository on the next poll.",
+      "confirmConnection": "Purge every cached archive for connection {connection}? This cannot be undone.",
+      "confirmAge": "Purge archives written more than {days} days ago? This cannot be undone.",
+      "confirmConnectionAge": "Purge archives for connection {connection} written more than {days} days ago? This cannot be undone.",
+      "confirmFigures": "That is {archives} archives and {size} as things stand.",
+      "successRow": "Purged the archive for {repo} at {sha}",
+      "successBulk": "Purged {archives} archives, freeing {size}",
+      "errorRow": "Failed to purge the archive",
+      "errorBulk": "Failed to purge VCS archives"
+    },
+    "sealedWarning": "This node is sealed, so nothing purged here can be fetched again. The scheduled cleanup skips these caches for that reason — this is a permanent deletion."
   },
   "catalog": {
     "title": "Service Catalog",

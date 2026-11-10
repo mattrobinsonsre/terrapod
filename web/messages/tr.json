@@ -19,7 +19,7 @@
     "policySets": "Politika Setleri",
     "providerTemplates": "Sağlayıcı Şablonları",
     "catalogAdmin": "Katalog Yönetimi",
-    "cache": "Önbellek",
+    "cache": "Önbellekler",
     "auditLog": "Denetim Günlüğü",
     "help": "Yardım",
     "apiReference": "API Başvurusu",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Önbellek",
-    "description": "CLI ikili dosya ve sağlayıcı önbelleği yönetimi",
+    "title": "Önbellekler",
+    "description": "CLI ikili dosyaları, sağlayıcı ikili dosyaları, paket yapıtları ve VCS arşivleri",
     "errors": {
       "loadBinary": "İkili dosya önbelleği yüklenemedi",
-      "loadCache": "Önbellek yüklenemedi"
+      "loadCache": "Önbellek yüklenemedi",
+      "loadPackages": "Paket önbelleği yüklenemedi",
+      "loadArchives": "VCS arşiv önbelleği yüklenemedi"
     },
     "sections": {
       "cliBinaries": "CLI İkili Dosyaları",
-      "providerBinaries": "Sağlayıcı İkili Dosyaları"
+      "providerBinaries": "Sağlayıcı İkili Dosyaları",
+      "packages": "Paket Önbelleği",
+      "vcsArchives": "VCS Arşiv Önbelleği"
     },
     "empty": {
       "binaries": "Henüz önbelleğe alınmış CLI ikili dosyası yok.",
-      "providers": "Henüz önbelleğe alınmış sağlayıcı ikili dosyası yok."
+      "providers": "Henüz önbelleğe alınmış sağlayıcı ikili dosyası yok.",
+      "packages": "Henüz önbelleğe alınmış paket yapıtı yok.",
+      "archives": "Henüz önbelleğe alınmış VCS arşivi yok."
     },
     "columns": {
       "tool": "Araç",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Önbelleğe Alınma",
       "provider": "Sağlayıcı",
       "hostname": "Ana Bilgisayar Adı",
-      "actions": "Eylemler"
+      "actions": "Eylemler",
+      "ecosystem": "Ekosistem",
+      "name": "Ad",
+      "filename": "Dosya",
+      "size": "Boyut",
+      "lastAccessed": "Son erişim",
+      "repository": "Depo",
+      "commit": "Commit",
+      "paths": "Yollar",
+      "written": "Yazıldı"
     },
     "warm": {
       "heading": "Önbelleği ısıt",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "{provider} {version} için temizleme başarısız",
       "successBinary": "{count} ikili dosya önbellek girdisi temizlendi",
       "successProvider": "{count} sağlayıcı önbellek girdisi temizlendi"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# dosya} other {# dosya}} · {size}",
+      "archives": "{archives, plural, one {# arşiv} other {# arşiv}} · {size}"
+    },
+    "bulk": {
+      "button": "Eşleşenleri temizle"
+    },
+    "packages": {
+      "ecosystemAll": "Tüm ekosistemler",
+      "namePlaceholder": "Ad öneki, örn. community.",
+      "totalsHeading": "Ekosisteme göre toplamlar",
+      "bulkHeading": "Paket yapıtlarını temizle",
+      "bulkDaysLabel": "Bu kadar gündür kullanılmayan",
+      "bulkDaysHint": "Yaş burada önbelleğe alındığı andan değil, son erişimden itibaren ölçülür; böylece her çalıştırmanın çektiği bir şey sadece eski olduğu için asla temizlenmez. Yaşa bakılmaksızın temizlemek için boş bırakın.",
+      "confirmRow": "{name} {version} ({filename}) paket önbelleğinden temizlensin mi? Bu geri alınamaz. Bir sonraki istekte yukarı akıştan yeniden getirilecek.",
+      "confirmAll": "Tüm paket önbelleği temizlensin mi? Bu geri alınamaz, ancak içindeki her şey geldiği kayıt defterinden yeniden getirilebilir.",
+      "confirmEcosystem": "Paket önbelleğindeki her {ecosystem} yapıtı temizlensin mi? Bu geri alınamaz.",
+      "confirmAge": "Son {days} gündür kullanılmayan paket yapıtları temizlensin mi? Bu geri alınamaz.",
+      "confirmEcosystemAge": "Son {days} gündür kullanılmayan {ecosystem} yapıtları temizlensin mi? Bu geri alınamaz.",
+      "confirmFigures": "Bu şu anda {files} yapıt ve {size} demek.",
+      "successRow": "{filename} temizlendi",
+      "successBulk": "{files} yapıt temizlendi, {size} boşaltıldı",
+      "errorRow": "Yapıt temizlenemedi",
+      "errorBulk": "Paket yapıtları temizlenemedi",
+      "capabilityOff": "Paket önbelleği kapalı olduğundan burada listelenecek bir şey yok. Önbelleğe alınmış olanlar korunur ve önbellek yeniden açıldığında geri gelir."
+    },
+    "archives": {
+      "connectionLabel": "Bağlantı",
+      "connectionPlaceholder": "VCS bağlantı kimliği",
+      "totalsHeading": "Depoya göre toplamlar",
+      "totalsAll": "Tüm depolar",
+      "truncated": "Bu bir toplam değil, alt sınır: tarama {limit} arşivden sonra durdu, dolayısıyla ötesindekiler burada sayılmıyor.",
+      "pathsFull": "deponun tamamı",
+      "loadMore": "Daha fazla yükle",
+      "loadingMore": "Yükleniyor…",
+      "listedAll": "{count, plural, one {# arşiv} other {# arşiv}} listelendi — önbelleğin tamamı bu.",
+      "bulkHeading": "VCS arşivlerini temizle",
+      "bulkDaysLabel": "Bu kadar günden önce yazılmış",
+      "bulkDaysHint": "Bir arşiv yazıldıktan sonra hiç değişmez ve erişim zamanı tutmaz; dolayısıyla yaşı, yazıldığı zamandır. Yaşa bakılmaksızın temizlemek için boş bırakın.",
+      "confirmRow": "{repo} deposunun {sha} commit'indeki önbelleğe alınmış arşivi temizlensin mi? Bu geri alınamaz. Bir sonraki yoklamada depodan yeniden getirilecek.",
+      "confirmAll": "Önbelleğe alınmış her VCS arşivi temizlensin mi? Bu geri alınamaz, ancak her biri bir sonraki yoklamada kendi deposundan yeniden getirilecek.",
+      "confirmConnection": "{connection} bağlantısına ait önbelleğe alınmış her arşiv temizlensin mi? Bu geri alınamaz.",
+      "confirmAge": "{days} günden önce yazılmış arşivler temizlensin mi? Bu geri alınamaz.",
+      "confirmConnectionAge": "{connection} bağlantısına ait, {days} günden önce yazılmış arşivler temizlensin mi? Bu geri alınamaz.",
+      "confirmFigures": "Bu şu anda {archives} arşiv ve {size} demek.",
+      "successRow": "{repo} deposunun {sha} commit'indeki arşivi temizlendi",
+      "successBulk": "{archives} arşiv temizlendi, {size} boşaltıldı",
+      "errorRow": "Arşiv temizlenemedi",
+      "errorBulk": "VCS arşivleri temizlenemedi"
+    },
+    "sealedWarning": "Bu düğüm mühürlü olduğundan burada temizlenen hiçbir şey yeniden getirilemez. Zamanlanmış temizlik tam bu nedenle bu önbellekleri atlar — bu kalıcı bir silme işlemidir."
   },
   "catalog": {
     "title": "Hizmet Kataloğu",

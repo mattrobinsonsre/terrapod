@@ -19,7 +19,7 @@
     "policySets": "chut Segh",
     "providerTemplates": "nobwI' De'wI'",
     "catalogAdmin": "tetlh che'wI'",
-    "cache": "nge'wI'",
+    "cache": "nge'wI'mey",
     "auditLog": "nItebHa' teywI'",
     "help": "QaH",
     "apiReference": "API ngoDHom",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "nge'wI'",
-    "description": "CLI HaqwI' je nobwI' nge'wI' vu'",
+    "title": "nge'wI'mey",
+    "description": "CLI HaqwI'mey, nobwI' HaqwI'mey, De' janmey, VCS ngaSwI'mey je",
     "errors": {
       "loadBinary": "HaqwI' nge'wI' ghelmeH lujpu'",
-      "loadCache": "nge'wI' ghelmeH lujpu'"
+      "loadCache": "nge'wI' ghelmeH lujpu'",
+      "loadPackages": "De' nge'wI' ghelmeH lujpu'",
+      "loadArchives": "VCS ngaSwI' nge'wI' ghelmeH lujpu'"
     },
     "sections": {
       "cliBinaries": "CLI HaqwI'mey",
-      "providerBinaries": "nobwI' HaqwI'mey"
+      "providerBinaries": "nobwI' HaqwI'mey",
+      "packages": "De' nge'wI'",
+      "vcsArchives": "VCS ngaSwI' nge'wI'"
     },
     "empty": {
       "binaries": "nge'lu'pu'bogh CLI HaqwI' Hutlh.",
-      "providers": "nge'lu'pu'bogh nobwI' HaqwI' Hutlh."
+      "providers": "nge'lu'pu'bogh nobwI' HaqwI' Hutlh.",
+      "packages": "nge'lu'pu'bogh De' jan Hutlh.",
+      "archives": "nge'lu'pu'bogh VCS ngaSwI' Hutlh."
     },
     "columns": {
       "tool": "tool",
@@ -1750,7 +1756,16 @@
       "cachedAt": "nge'lu'pu'DI'",
       "provider": "nobwI'",
       "hostname": "host pong",
-      "actions": "vangmey"
+      "actions": "vangmey",
+      "ecosystem": "qo'",
+      "name": "pong",
+      "filename": "De'",
+      "size": "'ar",
+      "lastAccessed": "lo'lu'pu' poH",
+      "repository": "ghItlh",
+      "commit": "choH",
+      "paths": "Hemey",
+      "written": "ghItlhlu'pu' poH"
     },
     "warm": {
       "heading": "nge'wI' tujmoH",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "{provider} {version} tlhIl lujpu'",
       "successBinary": "{count} HaqwI' nge'wI' 'elmey tlhIllu'pu'",
       "successProvider": "{count} nobwI' nge'wI' 'elmey tlhIllu'pu'"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, other {# De''}} · {size}",
+      "archives": "{archives, plural, other {# ngaSwI''}} · {size}"
+    },
+    "bulk": {
+      "button": "rurbogh yItlhIl"
+    },
+    "packages": {
+      "ecosystemAll": "qo'mey Hoch",
+      "namePlaceholder": "pong taghwI', Da community.",
+      "totalsHeading": "qo' ngoqmey",
+      "bulkHeading": "De' janmey tlhIl",
+      "bulkDaysLabel": "jajmeyvam lo'lu'be'pu'",
+      "bulkDaysHint": "naDev ben mojaq lo'lu'pu' poHvo' ghel, nge'lu'pu' poHvo' ghelbe' — vaj Hoch qaStaHvIS Hevbogh Doch ben neH mojaq tlhIllu'be'. ben mojaq buSHa'meH yIchImmoH.",
+      "confirmRow": "De' nge'wI'vo' {name} {version} ({filename}) tlhIl'a'? choHlaHbe'lu'. tlhob veb, mungvo' Hevqa'lu'.",
+      "confirmAll": "De' nge'wI' naQ tlhIl'a'? choHlaHbe'lu'. 'ach Hoch ngaSbogh teywI'vo' Hevqa'laH.",
+      "confirmEcosystem": "De' nge'wI'vo' Hoch {ecosystem} jan tlhIl'a'? choHlaHbe'lu'.",
+      "confirmAge": "{days} jajmey lo'lu'be'pu'bogh De' janmey tlhIl'a'? choHlaHbe'lu'.",
+      "confirmEcosystemAge": "{days} jajmey lo'lu'be'pu'bogh {ecosystem} janmey tlhIl'a'? choHlaHbe'lu'.",
+      "confirmFigures": "DaH {files} janmey {size} je.",
+      "successRow": "{filename} tlhIllu'pu'",
+      "successBulk": "{files} janmey tlhIllu'pu', {size} tlhaplu'pu'",
+      "errorRow": "jan tlhIlmeH lujpu'",
+      "errorBulk": "De' janmey tlhIlmeH lujpu'",
+      "capabilityOff": "lo'laHbe'law' ngaSwI' pat. vaj pagh tetlh vIDel. ngaSta'bogh Hoch polta' 'ej chu'qa'DI' chegh."
+    },
+    "archives": {
+      "connectionLabel": "rar",
+      "connectionPlaceholder": "VCS rar mI'",
+      "totalsHeading": "ghItlh ngoqmey",
+      "totalsAll": "ghItlhmey Hoch",
+      "truncated": "ngoq qaSbe', 'a nIteb 'ar: {limit} ngaSwI'mey tlha'DI' nuD mev, vaj Hoch tlha'bogh naDev ngoqlu'be'.",
+      "pathsFull": "ghItlh naQ",
+      "loadMore": "latlh yIghel",
+      "loadingMore": "gheltaH…",
+      "listedAll": "{count, plural, other {# ngaSwI''}} tetlhlu'pu' — nge'wI' naQ 'oH.",
+      "bulkHeading": "VCS ngaSwI'mey tlhIl",
+      "bulkDaysLabel": "jajmeyvam ret ghItlhlu'pu'",
+      "bulkDaysHint": "ghItlhlu'pu'DI' ngaSwI' choHbe' 'ej lo' poH ghajbe', vaj ben mojaq 'oH ghItlhlu'pu' poH. ben mojaq buSHa'meH yIchImmoH.",
+      "confirmRow": "{repo} ngaSwI' nge'lu'pu'bogh {sha} Daq tlhIl'a'? choHlaHbe'lu'. nuD veb, ghItlhvo' Hevqa'lu'.",
+      "confirmAll": "Hoch nge'lu'pu'bogh VCS ngaSwI' tlhIl'a'? choHlaHbe'lu'. 'ach nuD veb, ghItlhDajvo' Hevqa'lu'.",
+      "confirmConnection": "{connection} rar ngaSwI'mey nge'lu'pu'bogh Hoch tlhIl'a'? choHlaHbe'lu'.",
+      "confirmAge": "{days} jajmey ret ghItlhlu'pu'bogh ngaSwI'mey tlhIl'a'? choHlaHbe'lu'.",
+      "confirmConnectionAge": "{connection} rar ngaSwI'mey {days} jajmey ret ghItlhlu'pu'bogh tlhIl'a'? choHlaHbe'lu'.",
+      "confirmFigures": "DaH {archives} ngaSwI'mey {size} je.",
+      "successRow": "{repo} ngaSwI' {sha} Daq tlhIllu'pu'",
+      "successBulk": "{archives} ngaSwI'mey tlhIllu'pu', {size} tlhaplu'pu'",
+      "errorRow": "ngaSwI' tlhIlmeH lujpu'",
+      "errorBulk": "VCS ngaSwI'mey tlhIlmeH lujpu'"
+    },
+    "sealedWarning": "De'wI'vam ngaQlu'. vaj naDev tlhIllu'bogh Doch Hevqa'lu'laHbe'. vaj nge'wI'meyvam buSHa' Doch teqmeH pIj qaSbogh Qu'. reH Qaw'lu'."
   },
   "catalog": {
     "title": "vum tetlh",

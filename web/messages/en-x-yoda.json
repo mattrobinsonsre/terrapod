@@ -19,7 +19,7 @@
     "policySets": "Sets, Policy",
     "providerTemplates": "Templates, Provider",
     "catalogAdmin": "Admin, Catalog",
-    "cache": "Cache",
+    "cache": "Caches, the",
     "auditLog": "Log, Audit",
     "help": "Help you, I can",
     "apiReference": "Reference, API",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "CLI binary and provider cache management",
+    "title": "Caches, they are",
+    "description": "CLI binaries, provider binaries, package artifacts and VCS archives, these are",
     "errors": {
       "loadBinary": "Load the binary cache, it did not",
-      "loadCache": "Load the cache, it did not"
+      "loadCache": "Load the cache, it did not",
+      "loadPackages": "Load the package cache, we could not",
+      "loadArchives": "Load the VCS archive cache, we could not"
     },
     "sections": {
       "cliBinaries": "Binaries, CLI",
-      "providerBinaries": "Binaries, Provider"
+      "providerBinaries": "Binaries, Provider",
+      "packages": "Cache, Package",
+      "vcsArchives": "Cache, VCS Archive"
     },
     "empty": {
       "binaries": "No cached CLI binaries yet, there are.",
-      "providers": "No cached provider binaries yet, there are."
+      "providers": "No cached provider binaries yet, there are.",
+      "packages": "No cached package artifacts yet, there are.",
+      "archives": "No cached VCS archives yet, there are."
     },
     "columns": {
       "tool": "Tool",
@@ -1750,7 +1756,16 @@
       "cachedAt": "At, Cached",
       "provider": "Provider",
       "hostname": "Hostname",
-      "actions": "Actions"
+      "actions": "Actions",
+      "ecosystem": "Ecosystem, the",
+      "name": "Name, the",
+      "filename": "File, the",
+      "size": "Size, the",
+      "lastAccessed": "Accessed last",
+      "repository": "Repository, the",
+      "commit": "Commit, the",
+      "paths": "Paths, the",
+      "written": "Written, when"
     },
     "warm": {
       "heading": "cache, Warm",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "For {provider} {version}, the purge failed",
       "successBinary": "Purged {count} binary cache entries",
       "successProvider": "Purged {count} provider cache entries"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# file} other {# files}} · {size}, there is",
+      "archives": "{archives, plural, one {# archive} other {# archives}} · {size}, there is"
+    },
+    "bulk": {
+      "button": "The matching ones, purge"
+    },
+    "packages": {
+      "ecosystemAll": "Ecosystems, all of them",
+      "namePlaceholder": "Prefix of the name, community. for instance",
+      "totalsHeading": "By ecosystem, the totals",
+      "bulkHeading": "Package artifacts, purge",
+      "bulkDaysLabel": "In this many days, not used",
+      "bulkDaysHint": "From the last access the age here is measured, and not from when cached the artifact was — so something every run pulls, never purged merely for being old it is. Empty leave it, to purge whatever the age.",
+      "confirmRow": "{name} {version} ({filename}) from the package cache, purge? Undone this cannot be. On the next request, from upstream fetched again it will be.",
+      "confirmAll": "The whole package cache, purge? Undone this cannot be, although from the registry it came from, everything in it fetchable again is.",
+      "confirmEcosystem": "Every {ecosystem} artifact from the package cache, purge? Undone this cannot be.",
+      "confirmAge": "Package artifacts not used in the last {days} days, purge? Undone this cannot be.",
+      "confirmEcosystemAge": "{ecosystem} artifacts not used in the last {days} days, purge? Undone this cannot be.",
+      "confirmFigures": "{files} artifacts and {size}, as things stand that is.",
+      "successRow": "{filename}, purged it is",
+      "successBulk": "{files} artifacts purged, {size} freed",
+      "errorRow": "Purge the artifact, we could not",
+      "errorBulk": "Purge the package artifacts, we could not",
+      "capabilityOff": "Switched off, the package cache is. Nothing to list here, there is. Kept, anything already cached is, and back it comes when on again it is turned."
+    },
+    "archives": {
+      "connectionLabel": "Connection, the",
+      "connectionPlaceholder": "Id of the VCS connection",
+      "totalsHeading": "By repository, the totals",
+      "totalsAll": "Repositories, all of them",
+      "truncated": "A floor rather than a total, this is: after {limit} archives the walk stopped, so anything past that counted here is not.",
+      "pathsFull": "repo, the whole",
+      "loadMore": "More, load",
+      "loadingMore": "Loading, we are…",
+      "listedAll": "{count, plural, one {# archive} other {# archives}} listed — the whole cache, that is.",
+      "bulkHeading": "VCS archives, purge",
+      "bulkDaysLabel": "More than this many days ago, written",
+      "bulkDaysHint": "Once written, change an archive never does, and no access time it carries — so its write time its age is. Empty leave it, to purge whatever the age.",
+      "confirmRow": "The cached archive for {repo} at {sha}, purge? Undone this cannot be. On the next poll, from the repository fetched again it will be.",
+      "confirmAll": "Every cached VCS archive, purge? Undone this cannot be, although on the next poll each one from its repository fetched again is.",
+      "confirmConnection": "Every cached archive for connection {connection}, purge? Undone this cannot be.",
+      "confirmAge": "Archives written more than {days} days ago, purge? Undone this cannot be.",
+      "confirmConnectionAge": "Archives for connection {connection} written more than {days} days ago, purge? Undone this cannot be.",
+      "confirmFigures": "{archives} archives and {size}, as things stand that is.",
+      "successRow": "The archive for {repo} at {sha}, purged it is",
+      "successBulk": "{archives} archives purged, {size} freed",
+      "errorRow": "Purge the archive, we could not",
+      "errorBulk": "Purge the VCS archives, we could not"
+    },
+    "sealedWarning": "Sealed, this node is, so nothing purged here fetched again can be. For that reason, these caches the scheduled cleanup skips — a permanent deletion, this is."
   },
   "catalog": {
     "title": "Catalog, Service",

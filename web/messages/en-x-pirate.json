@@ -19,7 +19,7 @@
     "policySets": "Policy Sets",
     "providerTemplates": "Provider Templates",
     "catalogAdmin": "Catalog Admin",
-    "cache": "Cache",
+    "cache": "Holds",
     "auditLog": "Audit Log",
     "help": "Help",
     "apiReference": "API Reference",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "CLI binary an'' provider cache management",
+    "title": "Holds",
+    "description": "CLI binaries, provider binaries, package booty an'' VCS archives",
     "errors": {
       "loadBinary": "Failed t'' load binary cache",
-      "loadCache": "Failed t'' load cache"
+      "loadCache": "Failed t'' load cache",
+      "loadPackages": "Failed t'' load th'' package cache",
+      "loadArchives": "Failed t'' load th'' VCS archive cache"
     },
     "sections": {
       "cliBinaries": "CLI Binaries",
-      "providerBinaries": "Provider Binaries"
+      "providerBinaries": "Provider Binaries",
+      "packages": "Package Hold",
+      "vcsArchives": "VCS Archive Hold"
     },
     "empty": {
       "binaries": "Nay cached CLI binaries yet.",
-      "providers": "Nay cached provider binaries yet."
+      "providers": "Nay cached provider binaries yet.",
+      "packages": "Nay cached package booty yet.",
+      "archives": "Nay cached VCS archives yet."
     },
     "columns": {
       "tool": "Tool",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Cached At",
       "provider": "Provider",
       "hostname": "Hostname",
-      "actions": "Actions"
+      "actions": "Actions",
+      "ecosystem": "Waters",
+      "name": "Handle",
+      "filename": "Scroll",
+      "size": "Weight",
+      "lastAccessed": "Last hauled",
+      "repository": "Port",
+      "commit": "Log mark",
+      "paths": "Courses",
+      "written": "Writ"
     },
     "warm": {
       "heading": "Warm cache",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Purge failed fer {provider} {version}",
       "successBinary": "Purged {count} binary cache entries",
       "successProvider": "Purged {count} provider cache entries"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# scroll} other {# scrolls}} · {size}",
+      "archives": "{archives, plural, one {# archive} other {# archives}} aboard · {size}"
+    },
+    "bulk": {
+      "button": "Purge th'' matchin'' lot"
+    },
+    "packages": {
+      "ecosystemAll": "All waters",
+      "namePlaceholder": "Name prefix, say community.",
+      "totalsHeading": "Tallies by waters",
+      "bulkHeading": "Purge package booty",
+      "bulkDaysLabel": "Unhauled this many days",
+      "bulkDaysHint": "Age be reckoned here from th'' last haul an'' not from when it were stowed, so what every voyage fetches be never purged merely fer bein'' old. Leave it empty t'' purge whatever th'' age.",
+      "confirmRow": "Purge {name} {version} ({filename}) from th'' package cache? There be nay undoin'' it. It''ll be fetched again from upstream on th'' next request.",
+      "confirmAll": "Purge th'' whole package cache? There be nay undoin'' it, though all of it can be fetched again from th'' registry it came from.",
+      "confirmEcosystem": "Purge every {ecosystem} piece o'' booty from th'' package cache? There be nay undoin'' it.",
+      "confirmAge": "Purge package booty unhauled these past {days} days? There be nay undoin'' it.",
+      "confirmEcosystemAge": "Purge {ecosystem} booty unhauled these past {days} days? There be nay undoin'' it.",
+      "confirmFigures": "That be {files} pieces o'' booty an'' {size} as she stands.",
+      "successRow": "Purged {filename}, aye",
+      "successBulk": "Purged {files} pieces o'' booty, freein'' {size}",
+      "errorRow": "Failed t'' purge th'' booty",
+      "errorBulk": "Failed t'' purge th'' package booty",
+      "capabilityOff": "The package hold be shut, so there be naught to muster here. Whatever ye stowed away stays stowed, an' sails back when ye open her up again."
+    },
+    "archives": {
+      "connectionLabel": "Linkin''",
+      "connectionPlaceholder": "VCS linkin'' id",
+      "totalsHeading": "Tallies by port",
+      "totalsAll": "All ports",
+      "truncated": "A floor an'' nay a tally: th'' search halted after {limit} archives, so aught beyond that bain''t counted here.",
+      "pathsFull": "whole port",
+      "loadMore": "Haul more",
+      "loadingMore": "Haulin''…",
+      "listedAll": "{count, plural, one {# archive} other {# archives}} listed — that be th'' whole cache.",
+      "bulkHeading": "Scuttle VCS archives",
+      "bulkDaysLabel": "Writ more than this many days past",
+      "bulkDaysHint": "An archive never changes once writ an'' carries nay haul time, so its age be when it were writ. Leave it empty t'' purge whatever th'' age.",
+      "confirmRow": "Purge th'' cached archive fer {repo} at {sha}? There be nay undoin'' it. It''ll be fetched again from th'' port on th'' next watch.",
+      "confirmAll": "Purge every cached VCS archive? There be nay undoin'' it, though each be fetched again from its port on th'' next watch.",
+      "confirmConnection": "Purge every cached archive fer linkin'' {connection}? There be nay undoin'' it.",
+      "confirmAge": "Purge archives writ more than {days} days past? There be nay undoin'' it.",
+      "confirmConnectionAge": "Purge archives fer linkin'' {connection} writ more than {days} days past? There be nay undoin'' it.",
+      "confirmFigures": "That be {archives} archives an'' {size} as she stands.",
+      "successRow": "Purged th'' archive fer {repo} at {sha}",
+      "successBulk": "Purged {archives} archives, freein'' {size}",
+      "errorRow": "Failed t'' purge th'' archive",
+      "errorBulk": "Failed t'' purge th'' VCS archives"
+    },
+    "sealedWarning": "This vessel be battened down, so nothin'' purged here can be fetched again. Th'' scheduled swabbin'' skips these holds fer that reason — this be a permanent deletion."
   },
   "catalog": {
     "title": "Service Catalog",

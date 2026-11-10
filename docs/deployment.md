@@ -304,7 +304,7 @@ This uses a [generic ephemeral volume](https://kubernetes.io/docs/concepts/stora
 
 **Local dev (Tilt, Rancher Desktop):** `values-local.yaml` already disables ephemeral storage. The local stack falls back to the system tempdir, which is fine for the small repos used in dev.
 
-**Cache layer:** stripped tarballs are persisted to object storage under `vcs_archives/{conn_id}/{owner}/{repo}/{sha}.tar.gz`. Multiple workspaces tracking the same `(repo, sha)` only trigger one GitHub download per cycle (single-flight in-process + storage cache across cycles + replicas). The cache is evicted by the artifact-retention sweeper after `vcs.archive_cache_retention_days` (default 7).
+**Cache layer:** stripped tarballs are persisted to object storage under `vcs_archives/{conn_id}/{owner}/{repo}/{sha}-{paths_hash}.tar.gz` (see [Caches](caches.md#the-vcs-archive-cache) for how to inspect and evict it). Multiple workspaces tracking the same `(repo, sha)` only trigger one GitHub download per cycle (single-flight in-process + storage cache across cycles + replicas). The cache is evicted by the artifact-retention sweeper after `vcs.archive_cache_retention_days` (default 7).
 
 **Sizing the ephemeral PVC:** the default 50 GiB covers fleets with monorepos up to ~500 MB and the default 10 parallel workspace polls (`_MAX_PARALLEL_WORKSPACE_POLLS = 10`). Each concurrent poll holds the raw + stripped tarball on disk (~2 × tarball size), so peak usage scales with `2 × tarball_size × parallel_polls`. Past releases used 10 GiB which was adequate for small repos but starved larger fleets — the new 50 GiB default solves that for most deployments. Sizing rule of thumb:
 

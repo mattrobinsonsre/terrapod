@@ -19,7 +19,7 @@
     "policySets": "Conjuntos de políticas",
     "providerTemplates": "Plantillas de proveedor",
     "catalogAdmin": "Administración del catálogo",
-    "cache": "Caché",
+    "cache": "Cachés",
     "auditLog": "Registro de auditoría",
     "help": "Ayuda",
     "apiReference": "Referencia de la API",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Caché",
-    "description": "Gestión de la caché de binarios de la CLI y de proveedores",
+    "title": "Cachés",
+    "description": "Binarios de la CLI, binarios de proveedores, artefactos de paquetes y archivos VCS",
     "errors": {
       "loadBinary": "No se pudo cargar la caché de binarios",
-      "loadCache": "No se pudo cargar la caché"
+      "loadCache": "No se pudo cargar la caché",
+      "loadPackages": "No se pudo cargar la caché de paquetes",
+      "loadArchives": "No se pudo cargar la caché de archivos VCS"
     },
     "sections": {
       "cliBinaries": "Binarios de la CLI",
-      "providerBinaries": "Binarios de proveedor"
+      "providerBinaries": "Binarios de proveedor",
+      "packages": "Caché de paquetes",
+      "vcsArchives": "Caché de archivos VCS"
     },
     "empty": {
       "binaries": "Aún no hay binarios de la CLI en caché.",
-      "providers": "Aún no hay binarios de proveedor en caché."
+      "providers": "Aún no hay binarios de proveedor en caché.",
+      "packages": "Aún no hay artefactos de paquetes en caché.",
+      "archives": "Aún no hay archivos VCS en caché."
     },
     "columns": {
       "tool": "Herramienta",
@@ -1750,7 +1756,16 @@
       "cachedAt": "En caché desde",
       "provider": "Proveedor",
       "hostname": "Nombre de host",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "ecosystem": "Ecosistema",
+      "name": "Nombre",
+      "filename": "Archivo",
+      "size": "Tamaño",
+      "lastAccessed": "Último acceso",
+      "repository": "Repositorio",
+      "commit": "Commit",
+      "paths": "Rutas",
+      "written": "Escrito"
     },
     "warm": {
       "heading": "Precalentar caché",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Error al purgar {provider} {version}",
       "successBinary": "Se purgaron {count} entradas de caché de binarios",
       "successProvider": "Se purgaron {count} entradas de caché de proveedor"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# archivo} other {# archivos}} · {size}",
+      "archives": "{archives, plural, one {# archivo} other {# archivos}} · {size}"
+    },
+    "bulk": {
+      "button": "Purgar coincidencias"
+    },
+    "packages": {
+      "ecosystemAll": "Todos los ecosistemas",
+      "namePlaceholder": "Prefijo del nombre, p. ej. community.",
+      "totalsHeading": "Totales por ecosistema",
+      "bulkHeading": "Purgar artefactos de paquetes",
+      "bulkDaysLabel": "Sin usar durante estos días",
+      "bulkDaysHint": "Aquí la antigüedad se mide desde el último acceso, no desde que el artefacto se guardó en caché, así que algo que cada ejecución descarga nunca se purga solo por ser antiguo. Déjalo vacío para purgar sin importar la antigüedad.",
+      "confirmRow": "¿Purgar {name} {version} ({filename}) de la caché de paquetes? No se puede deshacer. Se volverá a obtener del origen en la siguiente solicitud.",
+      "confirmAll": "¿Purgar toda la caché de paquetes? No se puede deshacer, aunque todo su contenido se puede volver a obtener del registro del que vino.",
+      "confirmEcosystem": "¿Purgar todos los artefactos de {ecosystem} de la caché de paquetes? No se puede deshacer.",
+      "confirmAge": "¿Purgar los artefactos de paquetes sin usar durante los últimos {days} días? No se puede deshacer.",
+      "confirmEcosystemAge": "¿Purgar los artefactos de {ecosystem} sin usar durante los últimos {days} días? No se puede deshacer.",
+      "confirmFigures": "Eso son {files} artefactos y {size} por ahora.",
+      "successRow": "{filename} purgado",
+      "successBulk": "{files} artefactos purgados, {size} liberados",
+      "errorRow": "No se pudo purgar el artefacto",
+      "errorBulk": "No se pudieron purgar los artefactos de paquetes",
+      "capabilityOff": "La caché de paquetes está desactivada, así que no hay nada que mostrar aquí. Todo lo ya almacenado en caché se conserva y vuelve a aparecer cuando se active de nuevo."
+    },
+    "archives": {
+      "connectionLabel": "Conexión",
+      "connectionPlaceholder": "Id. de conexión VCS",
+      "totalsHeading": "Totales por repositorio",
+      "totalsAll": "Todos los repositorios",
+      "truncated": "Un mínimo, no un total: el recorrido se detuvo tras {limit} archivos, así que lo que haya más allá no se cuenta aquí.",
+      "pathsFull": "repositorio completo",
+      "loadMore": "Cargar más",
+      "loadingMore": "Cargando…",
+      "listedAll": "{count, plural, one {# archivo listado} other {# archivos listados}}: esa es toda la caché.",
+      "bulkHeading": "Purgar archivos VCS",
+      "bulkDaysLabel": "Escrito hace más de estos días",
+      "bulkDaysHint": "Un archivo no cambia una vez escrito y no lleva hora de acceso, así que su antigüedad es su hora de escritura. Déjalo vacío para purgar sin importar la antigüedad.",
+      "confirmRow": "¿Purgar el archivo en caché de {repo} en {sha}? No se puede deshacer. Se volverá a obtener del repositorio en el siguiente sondeo.",
+      "confirmAll": "¿Purgar todos los archivos VCS en caché? No se puede deshacer, aunque cada uno se volverá a obtener de su repositorio en el siguiente sondeo.",
+      "confirmConnection": "¿Purgar todos los archivos en caché de la conexión {connection}? No se puede deshacer.",
+      "confirmAge": "¿Purgar los archivos escritos hace más de {days} días? No se puede deshacer.",
+      "confirmConnectionAge": "¿Purgar los archivos de la conexión {connection} escritos hace más de {days} días? No se puede deshacer.",
+      "confirmFigures": "Eso son {archives} archivos y {size} por ahora.",
+      "successRow": "Archivo de {repo} en {sha} purgado",
+      "successBulk": "{archives} archivos purgados, {size} liberados",
+      "errorRow": "No se pudo purgar el archivo",
+      "errorBulk": "No se pudieron purgar los archivos VCS"
+    },
+    "sealedWarning": "Este nodo está sellado, así que nada de lo que se purgue aquí se podrá volver a obtener. Por eso la limpieza programada omite estas cachés — se trata de una eliminación permanente."
   },
   "catalog": {
     "title": "Catálogo de servicios",

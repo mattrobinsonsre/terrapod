@@ -19,7 +19,7 @@
     "policySets": "Beleidssets",
     "providerTemplates": "Providersjablonen",
     "catalogAdmin": "Catalogusbeheer",
-    "cache": "Cache",
+    "cache": "Caches",
     "auditLog": "Auditlogboek",
     "help": "Help",
     "apiReference": "API-referentie",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "Beheer van CLI-binary- en providercache",
+    "title": "Caches",
+    "description": "CLI-binaries, providerbinaries, pakketartefacten en VCS-archieven",
     "errors": {
       "loadBinary": "Kan binarycache niet laden",
-      "loadCache": "Kan cache niet laden"
+      "loadCache": "Kan cache niet laden",
+      "loadPackages": "Kon de pakketcache niet laden",
+      "loadArchives": "Kon de VCS-archiefcache niet laden"
     },
     "sections": {
       "cliBinaries": "CLI-binaries",
-      "providerBinaries": "Providerbinaries"
+      "providerBinaries": "Providerbinaries",
+      "packages": "Pakketcache",
+      "vcsArchives": "VCS-archiefcache"
     },
     "empty": {
       "binaries": "Nog geen gecachte CLI-binaries.",
-      "providers": "Nog geen gecachte providerbinaries."
+      "providers": "Nog geen gecachte providerbinaries.",
+      "packages": "Nog geen pakketartefacten in de cache.",
+      "archives": "Nog geen VCS-archieven in de cache."
     },
     "columns": {
       "tool": "Tool",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Gecacht op",
       "provider": "Provider",
       "hostname": "Hostnaam",
-      "actions": "Acties"
+      "actions": "Acties",
+      "ecosystem": "Ecosysteem",
+      "name": "Naam",
+      "filename": "Bestand",
+      "size": "Grootte",
+      "lastAccessed": "Laatst gebruikt",
+      "repository": "Repository",
+      "commit": "Commit",
+      "paths": "Paden",
+      "written": "Geschreven"
     },
     "warm": {
       "heading": "Cache opwarmen",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Wissen mislukt voor {provider} {version}",
       "successBinary": "{count} binarycachevermeldingen gewist",
       "successProvider": "{count} providercachevermeldingen gewist"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# bestand} other {# bestanden}} · {size}",
+      "archives": "{archives, plural, one {# archief} other {# archieven}} · {size}"
+    },
+    "bulk": {
+      "button": "Overeenkomende wissen"
+    },
+    "packages": {
+      "ecosystemAll": "Alle ecosystemen",
+      "namePlaceholder": "Naamprefix, bijv. community.",
+      "totalsHeading": "Totalen per ecosysteem",
+      "bulkHeading": "Pakketartefacten wissen",
+      "bulkDaysLabel": "Dit aantal dagen niet gebruikt",
+      "bulkDaysHint": "De leeftijd wordt hier gemeten vanaf het laatste gebruik, niet vanaf het moment van cachen, dus iets dat elke run ophaalt wordt nooit gewist louter omdat het oud is. Laat leeg om ongeacht de leeftijd te wissen.",
+      "confirmRow": "{name} {version} ({filename}) uit de pakketcache wissen? Dit kan niet ongedaan worden gemaakt. Bij het volgende verzoek wordt het opnieuw van upstream opgehaald.",
+      "confirmAll": "De hele pakketcache wissen? Dit kan niet ongedaan worden gemaakt, al is alles erin opnieuw op te halen uit het register waar het vandaan kwam.",
+      "confirmEcosystem": "Elk {ecosystem}-artefact uit de pakketcache wissen? Dit kan niet ongedaan worden gemaakt.",
+      "confirmAge": "Pakketartefacten wissen die de laatste {days} dagen niet zijn gebruikt? Dit kan niet ongedaan worden gemaakt.",
+      "confirmEcosystemAge": "{ecosystem}-artefacten wissen die de laatste {days} dagen niet zijn gebruikt? Dit kan niet ongedaan worden gemaakt.",
+      "confirmFigures": "Dat zijn op dit moment {files} artefacten en {size}.",
+      "successRow": "{filename} gewist",
+      "successBulk": "{files} artefacten gewist, {size} vrijgemaakt",
+      "errorRow": "Kon het artefact niet wissen",
+      "errorBulk": "Kon de pakketartefacten niet wissen",
+      "capabilityOff": "De pakketcache staat uit, dus er is hier niets om weer te geven. Alles wat al in de cache staat blijft bewaard en komt terug zodra de cache weer aan wordt gezet."
+    },
+    "archives": {
+      "connectionLabel": "Verbinding",
+      "connectionPlaceholder": "VCS-verbindings-id",
+      "totalsHeading": "Totalen per repository",
+      "totalsAll": "Alle repository's",
+      "truncated": "Een ondergrens en geen totaal: de doorloop stopte na {limit} archieven, dus wat daarna komt wordt hier niet meegeteld.",
+      "pathsFull": "hele repository",
+      "loadMore": "Meer laden",
+      "loadingMore": "Laden…",
+      "listedAll": "{count, plural, one {# archief} other {# archieven}} weergegeven — dat is de hele cache.",
+      "bulkHeading": "VCS-archieven wissen",
+      "bulkDaysLabel": "Meer dan dit aantal dagen geleden geschreven",
+      "bulkDaysHint": "Een archief verandert nooit meer nadat het is geschreven en heeft geen gebruikstijd, dus zijn leeftijd is het moment van schrijven. Laat leeg om ongeacht de leeftijd te wissen.",
+      "confirmRow": "Het gecachte archief voor {repo} bij {sha} wissen? Dit kan niet ongedaan worden gemaakt. Bij de volgende poll wordt het opnieuw uit de repository gehaald.",
+      "confirmAll": "Elk gecacht VCS-archief wissen? Dit kan niet ongedaan worden gemaakt, al wordt elk archief bij de volgende poll opnieuw uit zijn repository gehaald.",
+      "confirmConnection": "Elk gecacht archief van verbinding {connection} wissen? Dit kan niet ongedaan worden gemaakt.",
+      "confirmAge": "Archieven wissen die meer dan {days} dagen geleden zijn geschreven? Dit kan niet ongedaan worden gemaakt.",
+      "confirmConnectionAge": "Archieven van verbinding {connection} wissen die meer dan {days} dagen geleden zijn geschreven? Dit kan niet ongedaan worden gemaakt.",
+      "confirmFigures": "Dat zijn op dit moment {archives} archieven en {size}.",
+      "successRow": "Archief voor {repo} bij {sha} gewist",
+      "successBulk": "{archives} archieven gewist, {size} vrijgemaakt",
+      "errorRow": "Kon het archief niet wissen",
+      "errorBulk": "Kon de VCS-archieven niet wissen"
+    },
+    "sealedWarning": "Deze node is verzegeld, dus niets wat hier gewist wordt kan opnieuw worden opgehaald. De geplande opruiming slaat deze caches juist daarom over — dit is een permanente verwijdering."
   },
   "catalog": {
     "title": "Servicecatalogus",

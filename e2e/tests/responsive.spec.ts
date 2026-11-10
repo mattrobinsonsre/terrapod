@@ -2626,4 +2626,37 @@ test.describe('Workspace form sections (#2253)', () => {
 
     await expectNoHorizontalPageScroll(page)
   })
+
+  test('the caches page carries its two new sections at phone width (#2474)', async ({ page }) => {
+    // The page gained a package-cache and a VCS-archive-cache section, each
+    // with a filter row, a purge panel and a table. Four stacked sections of
+    // controls is exactly the shape that overflows at 412px, and the archive
+    // table's widest cell is a repository path that does not wrap on its own.
+    await page.goto('/admin/binary-cache')
+    await expect(page.getByTestId('package-cache-section')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('vcs-archive-cache-section')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // The desktop tables are gated `hidden md:block`, so at this width the
+    // list reflows to the shared mobile card primitive rather than putting a
+    // nested horizontal scroller inside a scrolling page.
+    await expect(page.locator('[data-testid="package-cache-section"] table')).toBeHidden()
+    await expect(page.locator('[data-testid="vcs-archive-cache-section"] table')).toBeHidden()
+
+    // Both bulk purges are real buttons with a thumb-sized target.
+    for (const id of ['package-bulk-purge', 'archive-bulk-purge']) {
+      const box = await page.getByTestId(id).boundingBox()
+      expect(box, `${id} has no box`).not.toBeNull()
+      expect(box!.height, `${id} is ${box!.height}px tall`).toBeGreaterThanOrEqual(44)
+    }
+
+    // Irreversible, so it prompts here too — the touch-only tier would be
+    // wrong for an action with no undo, and this project is the coarse pointer.
+    let msg = ''
+    page.once('dialog', async (d) => { msg = d.message(); await d.dismiss() })
+    await page.getByTestId('package-bulk-purge').click()
+    await expect.poll(() => msg, { timeout: 5_000 }).toMatch(/cannot be undone/i)
+    await expectNoHorizontalPageScroll(page)
+  })
+
 })

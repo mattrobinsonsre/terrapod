@@ -1729,18 +1729,24 @@
   },
   "adminBinaryCache": {
     "title": "캐시",
-    "description": "CLI 바이너리 및 프로바이더 캐시 관리",
+    "description": "CLI 바이너리, 프로바이더 바이너리, 패키지 아티팩트 및 VCS 아카이브",
     "errors": {
       "loadBinary": "바이너리 캐시를 불러오지 못했습니다",
-      "loadCache": "캐시를 불러오지 못했습니다"
+      "loadCache": "캐시를 불러오지 못했습니다",
+      "loadPackages": "패키지 캐시를 불러오지 못했습니다",
+      "loadArchives": "VCS 아카이브 캐시를 불러오지 못했습니다"
     },
     "sections": {
       "cliBinaries": "CLI 바이너리",
-      "providerBinaries": "프로바이더 바이너리"
+      "providerBinaries": "프로바이더 바이너리",
+      "packages": "패키지 캐시",
+      "vcsArchives": "VCS 아카이브 캐시"
     },
     "empty": {
       "binaries": "아직 캐시된 CLI 바이너리가 없습니다.",
-      "providers": "아직 캐시된 프로바이더 바이너리가 없습니다."
+      "providers": "아직 캐시된 프로바이더 바이너리가 없습니다.",
+      "packages": "아직 캐시된 패키지 아티팩트가 없습니다.",
+      "archives": "아직 캐시된 VCS 아카이브가 없습니다."
     },
     "columns": {
       "tool": "도구",
@@ -1750,7 +1756,16 @@
       "cachedAt": "캐시된 시점",
       "provider": "프로바이더",
       "hostname": "호스트 이름",
-      "actions": "작업"
+      "actions": "작업",
+      "ecosystem": "에코시스템",
+      "name": "이름",
+      "filename": "파일",
+      "size": "크기",
+      "lastAccessed": "마지막 사용",
+      "repository": "리포지터리",
+      "commit": "커밋",
+      "paths": "경로",
+      "written": "기록 시각"
     },
     "warm": {
       "heading": "캐시 워밍",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "{provider} {version} 삭제 실패",
       "successBinary": "바이너리 캐시 항목 {count}개 삭제됨",
       "successProvider": "프로바이더 캐시 항목 {count}개 삭제됨"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, other {#개 파일}} · {size}",
+      "archives": "{archives, plural, other {#개 아카이브}} · {size}"
+    },
+    "bulk": {
+      "button": "해당 항목 삭제"
+    },
+    "packages": {
+      "ecosystemAll": "모든 에코시스템",
+      "namePlaceholder": "이름 접두사, 예: community.",
+      "totalsHeading": "에코시스템별 합계",
+      "bulkHeading": "패키지 아티팩트 삭제",
+      "bulkDaysLabel": "이 일수 동안 사용되지 않음",
+      "bulkDaysHint": "여기서 경과 기간은 캐시에 들어온 시점이 아니라 마지막 사용 시점부터 측정합니다. 따라서 모든 실행이 받아 가는 항목은 오래되었다는 이유만으로 삭제되지 않습니다. 기간과 무관하게 삭제하려면 비워 두세요.",
+      "confirmRow": "{name} {version}({filename})을(를) 패키지 캐시에서 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다. 다음 요청 시 업스트림에서 다시 가져옵니다.",
+      "confirmAll": "패키지 캐시 전체를 삭제하시겠습니까? 이 작업은 되돌릴 수 없지만, 내용은 모두 원래 레지스트리에서 다시 가져올 수 있습니다.",
+      "confirmEcosystem": "패키지 캐시에서 모든 {ecosystem} 아티팩트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "confirmAge": "최근 {days}일 동안 사용되지 않은 패키지 아티팩트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "confirmEcosystemAge": "최근 {days}일 동안 사용되지 않은 {ecosystem} 아티팩트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "confirmFigures": "현재 아티팩트 {files}개, {size}입니다.",
+      "successRow": "{filename}을(를) 삭제했습니다",
+      "successBulk": "아티팩트 {files}개를 삭제하여 {size}을(를) 확보했습니다",
+      "errorRow": "아티팩트를 삭제하지 못했습니다",
+      "errorBulk": "패키지 아티팩트를 삭제하지 못했습니다",
+      "capabilityOff": "패키지 캐시가 꺼져 있어 여기에 표시할 항목이 없습니다. 이미 캐시된 항목은 그대로 유지되며 다시 켜면 돌아옵니다."
+    },
+    "archives": {
+      "connectionLabel": "연결",
+      "connectionPlaceholder": "VCS 연결 ID",
+      "totalsHeading": "리포지터리별 합계",
+      "totalsAll": "모든 리포지터리",
+      "truncated": "합계가 아니라 최소치입니다. 탐색이 아카이브 {limit}개에서 멈췄으므로 그 이후는 여기에 포함되지 않습니다.",
+      "pathsFull": "리포지터리 전체",
+      "loadMore": "더 불러오기",
+      "loadingMore": "불러오는 중…",
+      "listedAll": "{count, plural, other {#개 아카이브}}를 표시했습니다. 캐시 전체입니다.",
+      "bulkHeading": "VCS 아카이브 삭제",
+      "bulkDaysLabel": "이 일수보다 전에 기록됨",
+      "bulkDaysHint": "아카이브는 한번 기록되면 바뀌지 않고 사용 시각도 없으므로, 경과 기간은 기록 시각을 기준으로 합니다. 기간과 무관하게 삭제하려면 비워 두세요.",
+      "confirmRow": "{repo}의 커밋 {sha}에 대한 캐시된 아카이브를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다. 다음 폴링 시 리포지터리에서 다시 가져옵니다.",
+      "confirmAll": "캐시된 모든 VCS 아카이브를 삭제하시겠습니까? 이 작업은 되돌릴 수 없지만, 각 아카이브는 다음 폴링 시 해당 리포지터리에서 다시 가져옵니다.",
+      "confirmConnection": "연결 {connection}의 캐시된 아카이브를 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "confirmAge": "{days}일보다 전에 기록된 아카이브를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "confirmConnectionAge": "연결 {connection}에서 {days}일보다 전에 기록된 아카이브를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "confirmFigures": "현재 아카이브 {archives}개, {size}입니다.",
+      "successRow": "{repo}의 커밋 {sha} 아카이브를 삭제했습니다",
+      "successBulk": "아카이브 {archives}개를 삭제하여 {size}을(를) 확보했습니다",
+      "errorRow": "아카이브를 삭제하지 못했습니다",
+      "errorBulk": "VCS 아카이브를 삭제하지 못했습니다"
+    },
+    "sealedWarning": "이 노드는 봉인되어 있어 여기서 삭제한 것은 다시 가져올 수 없습니다. 예정된 정리 작업이 이 캐시들을 건너뛰는 것도 그 때문입니다 — 이것은 영구적인 삭제입니다."
   },
   "catalog": {
     "title": "서비스 카탈로그",

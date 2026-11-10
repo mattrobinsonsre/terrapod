@@ -335,7 +335,12 @@ class TestAuthenticationIsRequired:
 
     def _routes(self):
         app = create_app()
-        return [route for route in app.routes if "/package-cache/" in getattr(route, "path", "")]
+        # `package-cache`, not `/package-cache/`: the trailing slash excluded any
+        # route whose path ENDS at the cache -- which is `GET /admin/package-cache`,
+        # the listing, i.e. the first route an operator reaches and the one most
+        # worth knowing refuses an anonymous caller. It was outside this gate
+        # entirely until #2474 widened the match.
+        return [route for route in app.routes if "package-cache" in getattr(route, "path", "")]
 
     #: path → (method, url, json body). The method matters: warming is a POST
     #: (#1420), and issuing a GET against it answers 405 without ever consulting
@@ -445,6 +450,28 @@ class TestAuthenticationIsRequired:
             "/api/v1/admin/package-cache/warm",
             {"packages": [{"ecosystem": "pypi", "name": "requests"}]},
         ),
+        # List, totals, per-file delete and bulk eviction (#2474). Admin routes,
+        # so they refuse without the proxy's Basic challenge -- see the walk below.
+        "/api/v1/admin/package-cache": (
+            "GET",
+            "/api/v1/admin/package-cache",
+            None,
+        ),
+        "/api/v1/admin/package-cache/totals": (
+            "GET",
+            "/api/v1/admin/package-cache/totals",
+            None,
+        ),
+        "/api/v1/admin/package-cache/{file_id}": (
+            "DELETE",
+            "/api/v1/admin/package-cache/01a06dfc-9451-798c-bed0-348d71a4ac26",
+            None,
+        ),
+        "/api/v1/admin/package-cache/evict": (
+            "POST",
+            "/api/v1/admin/package-cache/evict",
+            {"ecosystem": "pypi"},
+        ),
     }
 
     def test_every_route_has_a_sample_request(self) -> None:
@@ -480,10 +507,19 @@ class TestAuthenticationIsRequired:
         async with await _client(app) as c:
             r = await c.request(method, path, json=body)
 
+        if "/admin/" in path:
+            # An admin route answers 401 or 403 rather than the proxy's Basic
+            # challenge: it is not a route pip or npm ever calls, so there is
+            # nothing to challenge. What matters is that it refuses.
+            #
+            # Keyed on the route, not on the method: this branch used to be
+            # `method != "GET"`, which was right while every admin sample was the
+            # warm POST and wrong the moment an admin GET arrived -- it would have
+            # been held to pip's `WWW-Authenticate: Basic`. It also caught the
+            # galaxy publish POST, which is a proxy route rather than an admin one.
+            assert r.status_code in (401, 403)
+            return
         if method != "GET":
-            # An admin route answers 403 rather than the proxy's Basic challenge:
-            # it is not a route pip or npm ever calls, so there is nothing to
-            # challenge. What matters is that it refuses.
             assert r.status_code in (401, 403)
             return
         assert r.status_code == 401

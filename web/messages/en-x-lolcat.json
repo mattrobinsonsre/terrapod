@@ -19,7 +19,7 @@
     "policySets": "Polisee Setz",
     "providerTemplates": "Providr Templatez",
     "catalogAdmin": "Catalog Admin",
-    "cache": "Cache",
+    "cache": "Cachez",
     "auditLog": "Audit Log",
     "help": "Halp",
     "apiReference": "API Referens",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "CLI binry an providr cache managment",
+    "title": "Cachez",
+    "description": "CLI binariez, providr binariez, packige artifaktz an VCS arkivez",
     "errors": {
       "loadBinary": "Faild ta load binry cache",
-      "loadCache": "Faild ta load cache"
+      "loadCache": "Faild ta load cache",
+      "loadPackages": "Could not haz teh packige cache",
+      "loadArchives": "Could not haz teh VCS arkive cache"
     },
     "sections": {
       "cliBinaries": "CLI Binariez",
-      "providerBinaries": "Providr Binariez"
+      "providerBinaries": "Providr Binariez",
+      "packages": "Packige Cache",
+      "vcsArchives": "VCS Arkive Cache"
     },
     "empty": {
       "binaries": "No cachd CLI binariez yet.",
-      "providers": "No cachd providr binariez yet."
+      "providers": "No cachd providr binariez yet.",
+      "packages": "No cachd packige artifaktz yet.",
+      "archives": "No cachd VCS arkivez yet."
     },
     "columns": {
       "tool": "Tool",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Cachd At",
       "provider": "Providr",
       "hostname": "Hostnaim",
-      "actions": "Akshunz"
+      "actions": "Akshunz",
+      "ecosystem": "Ekosistem",
+      "name": "Naem",
+      "filename": "Fyle",
+      "size": "Siez",
+      "lastAccessed": "Last touchd",
+      "repository": "Repozitry",
+      "commit": "Kommit",
+      "paths": "Pathz",
+      "written": "Writed"
     },
     "warm": {
       "heading": "Warm cache",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Purj faild fer {provider} {version}",
       "successBinary": "Purjd {count} binry cache entriez",
       "successProvider": "Purjd {count} providr cache entriez"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# fyle} other {# fylez}} · {size}",
+      "archives": "{archives, plural, one {# arkive} other {# arkivez}} · {size}"
+    },
+    "bulk": {
+      "button": "Purj teh matchin wunz"
+    },
+    "packages": {
+      "ecosystemAll": "All teh ekosistemz",
+      "namePlaceholder": "Naem prefiks, liek community.",
+      "totalsHeading": "Totulz by ekosistem",
+      "bulkHeading": "Purj packige artifaktz",
+      "bulkDaysLabel": "Not touchd in dis many dayz",
+      "bulkDaysHint": "Teh age heer iz countd frum teh last touch, not frum wen it got cachd, so sumthin evry run grabz nevr getz purjd jus for bein old. Leev it emptee to purj no mattr teh age.",
+      "confirmRow": "Purj {name} {version} ({filename}) frum teh packige cache? Can not be undun. It will be fetchd agin frum upstreem on teh nekst request.",
+      "confirmAll": "Purj teh hole packige cache? Can not be undun, tho evrythin in it can be fetchd agin frum teh registree it came frum.",
+      "confirmEcosystem": "Purj evry {ecosystem} artifakt frum teh packige cache? Can not be undun.",
+      "confirmAge": "Purj packige artifaktz not touchd in teh last {days} dayz? Can not be undun.",
+      "confirmEcosystemAge": "Purj {ecosystem} artifaktz not touchd in teh last {days} dayz? Can not be undun.",
+      "confirmFigures": "Dat iz {files} artifaktz an {size} rite now.",
+      "successRow": "Purjd {filename}",
+      "successBulk": "Purjd {files} artifaktz, freein {size}",
+      "errorRow": "Could not purj teh artifakt",
+      "errorBulk": "Could not purj teh packige artifaktz",
+      "capabilityOff": "package cache iz off, so no has anyfing to show heer. evryfing u alreddy cached stayz, an comez bak when u turn it on agen. kthx"
+    },
+    "archives": {
+      "connectionLabel": "Konnekshun",
+      "connectionPlaceholder": "VCS konnekshun id",
+      "totalsHeading": "Totulz by repozitry",
+      "totalsAll": "All teh repozitriez",
+      "truncated": "Dis iz a floor, not a totul: teh walk stoppd aftr {limit} arkivez, so evrythin past dat iz not countd heer.",
+      "pathsFull": "hole repo",
+      "loadMore": "Moar plz",
+      "loadingMore": "Loadin…",
+      "listedAll": "{count, plural, one {# arkive} other {# arkivez}} listd — dat iz teh hole cache.",
+      "bulkHeading": "Purj VCS arkivez",
+      "bulkDaysLabel": "Writed moar dan dis many dayz ago",
+      "bulkDaysHint": "An arkive nevr changez wunce it iz writed an haz no touch tiem, so itz age iz wen it wuz writed. Leev it emptee to purj no mattr teh age.",
+      "confirmRow": "Purj teh cachd arkive for {repo} at {sha}? Can not be undun. It will be fetchd agin frum teh repo on teh nekst poll.",
+      "confirmAll": "Purj evry cachd VCS arkive? Can not be undun, tho each wun getz fetchd agin frum itz repo on teh nekst poll.",
+      "confirmConnection": "Purj evry cachd arkive for konnekshun {connection}? Can not be undun.",
+      "confirmAge": "Purj arkivez writed moar dan {days} dayz ago? Can not be undun.",
+      "confirmConnectionAge": "Purj arkivez for konnekshun {connection} writed moar dan {days} dayz ago? Can not be undun.",
+      "confirmFigures": "Dat iz {archives} arkivez an {size} rite now.",
+      "successRow": "Purjd teh arkive for {repo} at {sha}",
+      "successBulk": "Purjd {archives} arkivez, freein {size}",
+      "errorRow": "Could not purj teh arkive",
+      "errorBulk": "Could not purj teh VCS arkivez"
+    },
+    "sealedWarning": "Dis node iz seeld up, so nuffin purjd heer can be fetchd agin. Teh scheduld cleenup skipz deez cachez for dat reezon — dis iz a permanunt deleshun."
   },
   "catalog": {
     "title": "Servis Catalog",

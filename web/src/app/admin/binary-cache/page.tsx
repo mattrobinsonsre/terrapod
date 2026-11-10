@@ -14,6 +14,8 @@ import { usePollingInterval } from '@/lib/use-polling-interval'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { PackageCachePanel } from '@/components/package-cache-panel'
+import { VcsArchiveCachePanel } from '@/components/vcs-archive-cache-panel'
 
 interface CachedBinary {
   id: string
@@ -539,6 +541,16 @@ export default function CachePage() {
                 </table>
               </div>
             )}
+
+            {/* The two caches that had no admin surface at all (#2474). Each
+                owns its own loading, filters and purges and reports through
+                this page's single error/success banner pair -- two more
+                banners would leave the reader working out which of four
+                sections a message belonged to. Neither is on the 60s poll:
+                the archive list is cursor-paged, and a tick that restarted
+                the walk would throw away the pages just loaded. */}
+            <PackageCachePanel onError={setError} onSuccess={setSuccess} formatDate={formatDate} />
+            <VcsArchiveCachePanel onError={setError} onSuccess={setSuccess} formatDate={formatDate} />
           </>
         )}
       </main>

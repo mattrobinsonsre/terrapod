@@ -1082,6 +1082,32 @@
     }
   },
   {
+    "name": "terrapod_package_cache_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ecosystem": {
+          "description": "return only one ecosystem's artifacts: galaxy, pypi, npm, go, nuget or pulumi. Omit for all of them",
+          "type": "string"
+        },
+        "name": {
+          "description": "filter by package name as a PREFIX, not an exact match: community. returns the whole collection family, and an exact name is the degenerate case of the same query",
+          "type": "string"
+        },
+        "page_number": {
+          "description": "1-indexed page to return (default 1)",
+          "type": "integer"
+        },
+        "page_size": {
+          "description": "max artifacts to return in this page (default 50). The totals always cover the whole cache regardless",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_policy_check_override",
     "destructive": true,
     "input_schema": {
@@ -2018,6 +2044,28 @@
     "read_only": true,
     "input_schema": {
       "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_vcs_archive_cache_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "description": "the key cursor to resume from: pass back the next_cursor of the previous call. Omit to start at the beginning. There is no page number -- this listing walks object storage, which is ordered by key",
+          "type": "string"
+        },
+        "connection_id": {
+          "description": "return only one VCS connection's archives. This narrows the storage walk itself rather than filtering a page, so prefer it over reading everything",
+          "type": "string"
+        },
+        "limit": {
+          "description": "max archives to return in this page (default 100)",
+          "type": "integer"
+        }
+      },
       "type": "object"
     }
   },

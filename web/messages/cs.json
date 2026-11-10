@@ -1729,18 +1729,24 @@
   },
   "adminBinaryCache": {
     "title": "Cache",
-    "description": "Správa cache CLI binárních souborů a providerů",
+    "description": "Binární soubory CLI, binární soubory providerů, artefakty balíčků a archivy VCS",
     "errors": {
       "loadBinary": "Nepodařilo se načíst cache binárních souborů",
-      "loadCache": "Nepodařilo se načíst cache"
+      "loadCache": "Nepodařilo se načíst cache",
+      "loadPackages": "Nepodařilo se načíst cache balíčků",
+      "loadArchives": "Nepodařilo se načíst cache archivů VCS"
     },
     "sections": {
       "cliBinaries": "CLI binární soubory",
-      "providerBinaries": "Binární soubory providerů"
+      "providerBinaries": "Binární soubory providerů",
+      "packages": "Cache balíčků",
+      "vcsArchives": "Cache archivů VCS"
     },
     "empty": {
       "binaries": "Zatím žádné cachované CLI binární soubory.",
-      "providers": "Zatím žádné cachované binární soubory providerů."
+      "providers": "Zatím žádné cachované binární soubory providerů.",
+      "packages": "Zatím žádné artefakty balíčků v cache.",
+      "archives": "Zatím žádné archivy VCS v cache."
     },
     "columns": {
       "tool": "Nástroj",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Cachováno v",
       "provider": "Provider",
       "hostname": "Hostname",
-      "actions": "Akce"
+      "actions": "Akce",
+      "ecosystem": "Ekosystém",
+      "name": "Název",
+      "filename": "Soubor",
+      "size": "Velikost",
+      "lastAccessed": "Poslední použití",
+      "repository": "Repozitář",
+      "commit": "Commit",
+      "paths": "Cesty",
+      "written": "Zapsáno"
     },
     "warm": {
       "heading": "Předehřát cache",
@@ -1787,7 +1802,58 @@
       "errorProviderItem": "Vymazání selhalo pro {provider} {version}",
       "successBinary": "Vymazáno {count} záznamů cache binárních souborů",
       "successProvider": "Vymazáno {count} záznamů cache providerů"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# soubor} few {# soubory} other {# souborů}} · {size}",
+      "archives": "{archives, plural, one {# archiv} few {# archivy} other {# archivů}} · {size}"
+    },
+    "bulk": {
+      "button": "Vymazat odpovídající"
+    },
+    "packages": {
+      "ecosystemAll": "Všechny ekosystémy",
+      "namePlaceholder": "Předpona názvu, např. community.",
+      "totalsHeading": "Součty podle ekosystému",
+      "bulkHeading": "Vymazat artefakty balíčků",
+      "bulkDaysLabel": "Nepoužito tolik dní",
+      "bulkDaysHint": "Věk se zde měří od posledního použití, ne od uložení do cache, takže něco, co si každý běh stahuje, se nikdy nevymaže jen proto, že je staré. Ponechte prázdné, chcete-li mazat bez ohledu na věk.",
+      "confirmRow": "Vymazat {name} {version} ({filename}) z cache balíčků? Tuto akci nelze vzít zpět. Při dalším požadavku bude znovu stažen z upstreamu.",
+      "confirmAll": "Vymazat celou cache balíčků? Tuto akci nelze vzít zpět, vše v ní však lze znovu stáhnout z registru, odkud to přišlo.",
+      "confirmEcosystem": "Vymazat každý artefakt {ecosystem} z cache balíčků? Tuto akci nelze vzít zpět.",
+      "confirmAge": "Vymazat artefakty balíčků nepoužité za posledních {days} dní? Tuto akci nelze vzít zpět.",
+      "confirmEcosystemAge": "Vymazat artefakty {ecosystem} nepoužité za posledních {days} dní? Tuto akci nelze vzít zpět.",
+      "confirmFigures": "Zatím jde o {files} artefaktů a {size}.",
+      "successRow": "{filename} vymazán",
+      "successBulk": "Vymazáno {files} artefaktů, uvolněno {size}",
+      "errorRow": "Artefakt se nepodařilo vymazat",
+      "errorBulk": "Artefakty balíčků se nepodařilo vymazat",
+      "capabilityOff": "Mezipaměť balíčků je vypnutá, takže zde není co vypsat. Vše, co je již v mezipaměti, zůstává zachováno a vrátí se, až ji znovu zapnete."
+    },
+    "archives": {
+      "connectionLabel": "Připojení",
+      "connectionPlaceholder": "ID připojení VCS",
+      "totalsHeading": "Součty podle repozitáře",
+      "totalsAll": "Všechny repozitáře",
+      "truncated": "Spodní hranice, ne součet: průchod skončil po {limit} archivech, takže cokoli dalšího se zde nepočítá.",
+      "pathsFull": "celý repozitář",
+      "loadMore": "Načíst další",
+      "loadingMore": "Načítání…",
+      "listedAll": "{count, plural, one {# vypsaný archiv} few {# vypsané archivy} other {# vypsaných archivů}} — to je celá cache.",
+      "bulkHeading": "Vymazat archivy VCS",
+      "bulkDaysLabel": "Zapsáno před více než tolika dny",
+      "bulkDaysHint": "Archiv se po zapsání už nemění a nenese čas použití, jeho věk je tedy čas zápisu. Ponechte prázdné, chcete-li mazat bez ohledu na věk.",
+      "confirmRow": "Vymazat archiv v cache pro {repo} na commitu {sha}? Tuto akci nelze vzít zpět. Při dalším dotazování bude znovu stažen z repozitáře.",
+      "confirmAll": "Vymazat každý archiv VCS v cache? Tuto akci nelze vzít zpět, každý z nich se však při dalším dotazování znovu stáhne ze svého repozitáře.",
+      "confirmConnection": "Vymazat každý archiv v cache pro připojení {connection}? Tuto akci nelze vzít zpět.",
+      "confirmAge": "Vymazat archivy zapsané před více než {days} dny? Tuto akci nelze vzít zpět.",
+      "confirmConnectionAge": "Vymazat archivy připojení {connection} zapsané před více než {days} dny? Tuto akci nelze vzít zpět.",
+      "confirmFigures": "Zatím jde o {archives} archivů a {size}.",
+      "successRow": "Archiv pro {repo} na commitu {sha} vymazán",
+      "successBulk": "Vymazáno {archives} archivů, uvolněno {size}",
+      "errorRow": "Archiv se nepodařilo vymazat",
+      "errorBulk": "Archivy VCS se nepodařilo vymazat"
+    },
+    "sealedWarning": "Tento uzel je zapečetěný, takže nic, co zde vymažete, už nelze znovu stáhnout. Plánované čištění proto tyto cache vynechává — jde o trvalé smazání."
   },
   "catalog": {
     "title": "Servisní katalog",
