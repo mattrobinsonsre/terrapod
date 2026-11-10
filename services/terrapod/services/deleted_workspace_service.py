@@ -122,6 +122,14 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         # declared inventory still attached and nothing to run it.
         "plan_apply_enabled": ws.plan_apply_enabled,
         "configure_enabled": ws.configure_enabled,
+        # Which of them got the prominent button (#2479). Snapshotted for the
+        # same reason as the pair above, and it is the half this project has
+        # recorded being missed twice: a default flip or a new declaration
+        # touches more sites than the obvious ones, AND THE RESTORE PATH IS ONE
+        # OF THEM. A restored workspace that came back offering the most
+        # complete run again would quietly undo a deliberate choice, on exactly
+        # the workspace whose everyday action is not the biggest one.
+        "default_run_kind": ws.default_run_kind,
         # How a configure STARTS (#1974). Snapshotted for the same reason as
         # the declaration above: a restored workspace that came back with its
         # triggers off would stop configuring on push with nothing to say why,
@@ -654,6 +662,12 @@ async def restore_workspace(
         # rather than being read as opted in.
         plan_apply_enabled=_restored_plan_apply(settings),
         configure_enabled=_restored_configure(settings),
+        # A STRING rather than a boolean, so the `is True` reading its
+        # neighbours use does not apply: `""` is the real value meaning "no
+        # preference", which is also what a marker written before this column
+        # should restore to. `or ""` therefore covers both an absent key and a
+        # null, and the column is NOT NULL so neither may reach it.
+        default_run_kind=settings.get("default_run_kind") or "",
         # `is True` for both, like `configure_enabled`: an absent key means a
         # marker written before these columns, and a trigger is opt-in, so the
         # safe reading of "the marker does not say" is OFF. Restoring a
