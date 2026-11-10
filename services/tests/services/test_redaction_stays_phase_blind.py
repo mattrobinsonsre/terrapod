@@ -76,3 +76,48 @@ class TestRedactionIsPhaseBlind:
                 "the run-delivery site must narrow by phase; this call does not: "
                 f"line {call.lineno}"
             )
+
+
+class TestTheResourceListResolverIsPhaseBlindToo:
+    """`plan_resource_list.strict_sensitive_literals` builds the list of values
+    scrubbed from the PR comment, so it has the same requirement as the
+    summariser's: every sensitive value that could appear, apply-only included.
+    Narrowing it would make the redaction weaker with nothing behavioural to
+    notice, which is the reason the summariser's has this gate."""
+
+    def test_it_resolves_without_a_phase(self):
+        from terrapod.services import plan_resource_list
+
+        calls = _resolve_calls("strict_sensitive_literals", plan_resource_list)
+        assert calls == [] or all(
+            "phase" not in {kw.arg for kw in c.keywords} and len(c.args) <= 2 for c in calls
+        )
+
+    def test_it_makes_a_resolve_call_at_all(self):
+        """Attribute calls (`variable_service.resolve_variables(...)`) are the
+        shape used here, so look for either spelling rather than passing
+        vacuously because the Name-only walk above finds nothing."""
+        import ast
+        import pathlib
+
+        from terrapod.services import plan_resource_list
+
+        tree = ast.parse(pathlib.Path(plan_resource_list.__file__).read_text())
+        fn = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.AsyncFunctionDef) and n.name == "strict_sensitive_literals"
+        )
+        calls = [
+            n
+            for n in ast.walk(fn)
+            if isinstance(n, ast.Call)
+            and (
+                (isinstance(n.func, ast.Attribute) and n.func.attr == "resolve_variables")
+                or (isinstance(n.func, ast.Name) and n.func.id == "resolve_variables")
+            )
+        ]
+        assert calls, "no resolve_variables call found -- has the helper been renamed?"
+        for call in calls:
+            assert "phase" not in {kw.arg for kw in call.keywords}
+            assert len(call.args) <= 2, "a third positional argument narrows the resolution"

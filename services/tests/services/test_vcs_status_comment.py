@@ -21,6 +21,7 @@ class _FakeRun:
         self.resource_additions = kw.get("resource_additions")
         self.resource_changes = kw.get("resource_changes")
         self.resource_destructions = kw.get("resource_destructions")
+        self.plan_resources = kw.get("plan_resources")
 
 
 class TestPlanSummaryCounts:

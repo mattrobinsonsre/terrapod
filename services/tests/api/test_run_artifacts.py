@@ -422,6 +422,172 @@ class TestUploadPlanJsonOutput:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch(
+        "terrapod.api.routers.run_artifacts.strict_sensitive_literals",
+        new_callable=AsyncMock,
+    )
+    async def test_records_which_resources_change_with_secrets_removed(
+        self, mock_literals, mock_get_storage, *_mocks
+    ):
+        """The PR comment names the resources a plan changes. The list is built
+        here, once, bounded and redacted, so the comment never reads the plan.
+
+        The workspace's own sensitive variable values are scrubbed as well as the
+        values the plan marks, because a secret can reach an attribute the
+        provider never marked.
+        """
+        mock_literals.return_value = ["workspace-secret-9999"]
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {
+            "resource_changes": [
+                {
+                    "address": "aws_instance.web",
+                    "change": {"actions": ["create"], "before": None, "after": {"t": "x"}},
+                },
+                {
+                    "address": "aws_db_instance.main",
+                    "change": {
+                        "actions": ["update"],
+                        "before": {"instance_class": "t3.medium", "note": "a"},
+                        "after": {
+                            "instance_class": "t3.large",
+                            "note": "uses workspace-secret-9999 inline",
+                        },
+                    },
+                },
+            ]
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        recorded = run.plan_resources
+        assert [e["address"] for e in recorded["entries"]] == [
+            "aws_instance.web",
+            "aws_db_instance.main",
+        ]
+        attrs = {a["path"]: a for a in recorded["entries"][1]["attributes"]}
+        assert attrs["instance_class"]["after"] == "t3.large"
+        assert "workspace-secret-9999" not in json.dumps(recorded)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.services.variable_service.resolve_variables", new_callable=AsyncMock)
+    async def test_a_failure_to_resolve_secrets_records_no_list_rather_than_an_unredacted_one(
+        self, mock_resolve, mock_get_storage, *_mocks
+    ):
+        """If the workspace's sensitive values cannot be resolved, the list must
+        not be recorded: showing values with the backstop missing is the unsafe
+        way to be wrong. The counts still land and the upload still succeeds.
+
+        This breaks the REAL variable resolver. An earlier version of this test
+        patched the summariser's `_sensitive_literals` to raise, which the real
+        one never does: it catches every exception and returns `[]`, so the list
+        was recorded with the backstop silently missing.
+        """
+        mock_resolve.side_effect = RuntimeError("variables unavailable")
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.run_variables = None
+        run.plan_resources = "untouched"
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {"resource_changes": [{"address": "a.b", "change": {"actions": ["create"]}}]}
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.resource_additions == 1  # the counts are unaffected
+        assert run.plan_resources is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.services.variable_service.resolve_variables", new_callable=AsyncMock)
+    async def test_an_unreadable_var_snapshot_records_no_list(
+        self, mock_resolve, mock_get_storage, *_mocks
+    ):
+        """`decoded_run_variables` returns `[]` for a corrupt envelope, which is
+        safe for delivery (deliver nothing) and would here mean redacting
+        nothing. A non-empty column that decodes to nothing is a failure."""
+        mock_resolve.return_value = []
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.run_variables = "{not json"
+        run.plan_resources = "untouched"
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {"resource_changes": [{"address": "a.b", "change": {"actions": ["create"]}}]}
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.plan_resources is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.services.variable_service.resolve_variables", new_callable=AsyncMock)
+    async def test_a_pulumi_preview_records_no_resource_list(
+        self, mock_resolve, mock_get_storage, *_mocks
+    ):
+        """A preview digest has no resource addresses, so there is nothing to
+        list, and recording an empty list would claim the plan changes nothing."""
+        run_id = uuid.uuid4()
+        mock_resolve.return_value = []
+        run = _mock_run(run_id=run_id)
+        run.run_variables = None
+        run.plan_resources = "untouched"
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        digest = {"engine": "pulumi", "change_summary": {"create": 2}}
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(digest).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.resource_additions == 2
+        assert run.plan_resources is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
     async def test_malformed_plan_leaves_counts_null_but_still_204(self, mock_get_storage, *_mocks):
         """A parse failure must not fail the upload — the download URL
         is still served, the UI just won't show a summary.
