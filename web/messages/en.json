@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Killed (likely OOM)",
       "memory": "Memory",
       "requested": "Requested {value}",
-      "limit": "Limit {value}"
+      "limit": "Limit {value}",
+      "phaseConfigure": "Configure"
     },
     "labelsEditor": {
       "none": "None",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Anyone who can merge the PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become the gate. Terrapod role/label RBAC does<em>not</em> apply to comment-driven actions in this mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash before merge) so the commit you apply is the commit that lands.",
-        "slackDescription": "Opt this workspace into Slack run notifications — approval requests, applies, errors, and drift. Leave the channel empty and this workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled by an administrator."
+        "slackDescription": "Opt this workspace into Slack run notifications — approval requests, applies, errors, and drift. Leave the channel empty and this workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled by an administrator.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Apply"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Anyone who can merge the PR can update. Branch protection rules (required reviews, status checks, code owner approval) become the gate. Terrapod role/label RBAC does<em>not</em> apply to comment-driven actions in this mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash before merge) so the commit you update from is the commit that lands.",
-        "slackDescription": "Opt this workspace into Slack run notifications — approval requests, updates, errors, and drift. Leave the channel empty and this workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled by an administrator."
+        "slackDescription": "Opt this workspace into Slack run notifications — approval requests, updates, errors, and drift. Leave the channel empty and this workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled by an administrator.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Update"
       }
     }
   },

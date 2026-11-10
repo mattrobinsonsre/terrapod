@@ -1517,11 +1517,38 @@ Run objects include peak resource usage + an abnormal-exit signal so the UI (and
 | `ee-resource-memory` | string | Workspace setting (snapshot, **resolved**) | Memory request for the same container. Limit is `2×` this |
 | `ee-image` | string | Resolved at run creation | The Ansible execution environment this run used, as a full image reference. Recorded because the built-in tags **move** — a line's image is rebuilt when upstream patches it — so without this a finished run could not be identified afterwards. Empty on every plan and apply, and an empty value is what renders no sidecar at all |
 | `last-output-at` | RFC3339 string | Reconciler (Redis marker) | When a live configure's output last **changed**, which is what distinguishes "quiet for twenty minutes" from "stuck" (#1977). **Present only while `status` is `configuring`** — absent on every other run and on every run of a terraform-only deployment, which is deliberate runtime adaptation rather than an omission, and is also what keeps it to one Redis read for exactly the runs a run page is polling. It measures CHANGE rather than arrival, because the live log is refreshed every few seconds whether or not ansible produced anything. A configure silent past `runners.configureNoProgressSeconds` is errored, so a stuck one becomes a failed run naming the silence rather than a stale timestamp |
-| `peak-memory-bytes` | integer or null | Runner (cgroup v2) | Peak resident memory observed during the run — `/sys/fs/cgroup/memory.peak` |
+| `peak-memory-bytes` | integer or null | Runner (cgroup v2) | Peak resident memory observed during the run — `/sys/fs/cgroup/memory.peak`. **Whichever phase reported LAST** — see `phase-profiles` below before sizing anything off it |
 | `peak-cpu-usec` | integer or null | Runner (cgroup v2) | Cumulative CPU time consumed by the run, microseconds — `usage_usec` from `/sys/fs/cgroup/cpu.stat`. **Captured but not surfaced in the UI** — see note below |
 | `runner-exit-code` | integer or null | Runner | Runner script's exit code captured at exit. `null` if the trap didn't fire (e.g. SIGKILL) |
 | `runner-exit-reason` | string | Listener (K8s) | Raw K8s `container.state.terminated.reason` (e.g. `"OOMKilled"`, `"Error"`, `"Completed"`). `""` if not observed |
 | `runner-exit-status` | string | Reconciler (typed bucket) | Stable typed value: `""` (unknown / not yet observed), `"clean"`, `"oom"`, `"killed"`, `"error"`. The UI keys on this; reason is shown for context |
+| `phase-profiles` | object | Runner, per phase | The three figures above **per phase**, keyed `plan`, `apply`, `configure`, each `{"peak-memory-bytes", "peak-cpu-usec", "exit-code"}`. `{}` for a run from before this was recorded. See below |
+
+#### Why the per-phase figures exist, and when the flat ones mislead
+
+A composite run — an apply followed by an Ansible configure — is **two runner
+Jobs driven by one Run**. Both report to the same three flat fields, so the
+second one in wins: `peak-memory-bytes` on such a run is the *configure's* peak,
+and a configure typically needs a fraction of what the apply did. Sizing a
+workspace's `resource-memory` off it is how a runner ends up provisioned for a
+tenth of what it needs.
+
+`phase-profiles` keeps each phase's own figures, so:
+
+- to size a runner, take the **maximum** across the phases — which is what the
+  run page's resource panel shows, rather than the flat value;
+- to ask how a run ended, the flat `runner-exit-*` fields are still the right
+  ones: they describe the Job that finished last, which is the one that decided
+  the run's outcome.
+
+A phase is absent from the object when it did not run, and absent when it ran
+and could read none of the cgroup files. The two are not distinguished, because
+nothing downstream has a use for the difference and an entry of three nulls
+reads as "measured, and nothing".
+
+`{}` on a run created before this was recorded. Deliberately not back-filled
+from the flat fields: those were never recorded per phase, and attributing them
+to one would be a guess presented as a measurement.
 
 Two independent capture paths feed these fields:
 

@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Terminado (provavelmente OOM)",
       "memory": "Memória",
       "requested": "Pedido {value}",
-      "limit": "Limite {value}"
+      "limit": "Limite {value}",
+      "phaseConfigure": "Configuração"
     },
     "labelsEditor": {
       "none": "Nenhum",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Qualquer pessoa que possa fazer merge do PR pode aplicar. As regras de proteção de branch (revisões obrigatórias, verificações de estado, aprovação de code owner) passam a ser a barreira. O RBAC de função/etiqueta do Terrapod<em>não</em> se aplica a ações acionadas por comentários neste modo.",
         "vcsWorkflowWarningRecommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit que aplica seja o commit que fica.",
-        "slackDescription": "Inscreva este workspace nas notificações de execução do Slack — pedidos de aprovação, applies, erros e drift. Deixe o canal vazio e este workspace fica silencioso (não há distribuição a toda a implementação). Requer que a app do Slack seja ativada por um administrador."
+        "slackDescription": "Inscreva este workspace nas notificações de execução do Slack — pedidos de aprovação, applies, erros e drift. Deixe o canal vazio e este workspace fica silencioso (não há distribuição a toda a implementação). Requer que a app do Slack seja ativada por um administrador.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Apply"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Qualquer pessoa que possa fazer merge do PR pode atualizar. As regras de proteção de branch (revisões obrigatórias, verificações de estado, aprovação de code owner) passam a ser a barreira. O RBAC de função/etiqueta do Terrapod<em>não</em> se aplica a ações acionadas por comentários neste modo.",
         "vcsWorkflowWarningRecommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit a partir do qual atualiza seja o commit que fica.",
-        "slackDescription": "Inscreva este workspace nas notificações de execução do Slack — pedidos de aprovação, updates, erros e drift. Deixe o canal vazio e este workspace fica silencioso (não há distribuição a toda a implementação). Requer que a app do Slack seja ativada por um administrador."
+        "slackDescription": "Inscreva este workspace nas notificações de execução do Slack — pedidos de aprovação, updates, erros e drift. Deixe o canal vazio e este workspace fica silencioso (não há distribuição a toda a implementação). Requer que a app do Slack seja ativada por um administrador.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Update"
       }
     }
   },

@@ -1390,7 +1390,25 @@ _MAX_FAILURE_REASON_CHARS = 2000
 # Which run status a failure reason from each phase's Job may land on (#1631).
 # A plan Job still finishing its post-plan work after an auto-apply has
 # started must not put its reason on the apply, and vice versa.
-_REASON_STATUS_BY_PHASE = {"plan": ("planning",), "apply": ("applying",)}
+_REASON_STATUS_BY_PHASE = {
+    "plan": ("planning",),
+    "apply": ("applying",),
+    # `configure` was MISSING, and the whole report was refused with a 400
+    # because of it (#2475): the configure phase posts `phase: "configure"`, so
+    # its peak memory, CPU, exit code and failure reason were never recorded and
+    # a configure failure's reason was lost. The run carried only the earlier
+    # phases' figures.
+    #
+    # `configuring` alone, by this map's own rule rather than by copying
+    # `run_service.LIVE_STATES_FOR_PHASE`, which answers a different question
+    # ("when may this phase's token act") and deliberately admits `confirmed`
+    # for the apply where this one does not.
+    #
+    # `test_every_runner_phase_is_accepted` derives the key set from
+    # `RUNNER_PHASES`, so a fourth phase cannot arrive and be refused the way
+    # this one was.
+    "configure": ("configuring",),
+}
 _ANSI_ESCAPES = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
@@ -1468,7 +1486,8 @@ async def record_resource_profile(
         raise HTTPException(status_code=400, detail="failure_reason must be a string")
     phase = body.get("phase")
     if phase is not None and phase not in _REASON_STATUS_BY_PHASE:
-        raise HTTPException(status_code=400, detail="phase must be 'plan' or 'apply'")
+        known = ", ".join(f"'{p}'" for p in sorted(_REASON_STATUS_BY_PHASE))
+        raise HTTPException(status_code=400, detail=f"phase must be one of {known}")
 
     if peak_memory_bytes is not None:
         run.peak_memory_bytes = peak_memory_bytes
@@ -1476,6 +1495,26 @@ async def record_resource_profile(
         run.peak_cpu_usec = peak_cpu_usec
     if exit_code is not None:
         run.runner_exit_code = exit_code
+
+    # And the same figures under this phase's own key, so a composite run's
+    # apply is not overwritten by its configure (#2475). The scalars above are
+    # still written, unchanged, and still mean "the last phase to report" --
+    # every existing reader is untouched.
+    #
+    # Reassigned rather than mutated in place: SQLAlchemy does not track a
+    # mutation inside a JSONB dict, so `run.phase_profiles[phase] = ...` would
+    # commit nothing and the column would stay NULL for ever. That is the shape
+    # of bug this would ship with and no test of the route's response could see.
+    if phase is not None:
+        reported = {
+            "peak_memory_bytes": peak_memory_bytes,
+            "peak_cpu_usec": peak_cpu_usec,
+            "exit_code": exit_code,
+        }
+        if any(v is not None for v in reported.values()):
+            profiles = dict(run.phase_profiles or {})
+            profiles[phase] = reported
+            run.phase_profiles = profiles
 
     # The runner's own account of why it failed (#1631), kept as the run's
     # error message so the reconciler reports it instead of the bare exit

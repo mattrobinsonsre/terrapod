@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Sonlandırıldı (muhtemelen OOM)",
       "memory": "Bellek",
       "requested": "İstenen {value}",
-      "limit": "Sınır {value}"
+      "limit": "Sınır {value}",
+      "phaseConfigure": "Yapılandırma"
     },
     "labelsEditor": {
       "none": "Yok",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "PR''ı birleştirebilen herkes uygulayabilir. Dal koruma kuralları (gerekli incelemeler, durum denetimleri, kod sahibi onayı) kapı haline gelir. Terrapod rol/etiket RBAC''si bu modda yorum güdümlü eylemlere<em>uygulanmaz</em>.",
         "vcsWorkflowWarningRecommended": "<strong>Önerilir:</strong> uyguladığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın).",
-        "slackDescription": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, uygulamalar, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir."
+        "slackDescription": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, uygulamalar, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Uygulama"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "PR''ı birleştirebilen herkes güncelleyebilir. Dal koruma kuralları (gerekli incelemeler, durum denetimleri, kod sahibi onayı) kapı haline gelir. Terrapod rol/etiket RBAC''si bu modda yorum güdümlü eylemlere<em>uygulanmaz</em>.",
         "vcsWorkflowWarningRecommended": "<strong>Önerilir:</strong> güncellemeyi yaptığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın).",
-        "slackDescription": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, güncellemeler, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir."
+        "slackDescription": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, güncellemeler, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Güncelleme"
       }
     }
   },

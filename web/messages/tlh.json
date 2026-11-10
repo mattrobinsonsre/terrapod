@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "HoHlu' (OOMlaw')",
       "memory": "qawHaq",
       "requested": "tlhoblu'pu' {value}",
-      "limit": "veH {value}"
+      "limit": "veH {value}",
+      "phaseConfigure": "Qum"
     },
     "labelsEditor": {
       "none": "pagh",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "nab + lo'",
         "vcsWorkflowWarningRbac": "PR merge laHbogh Hoch lo''laH. paQ ''avmeH chutmey (poQlu''bogh laDmey, Dotlh toblu''mey, code ghajwI'' chaw'') moj lojmIt. mIwvamDaq QIn-ra''lu''bogh vangmeyDaq Terrapod patlh/per RBAC <em>lo''be''</em>.",
         "vcsWorkflowWarningRecommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj lo'lu'bogh chum 'oH pumbogh chum'e'.",
-        "slackDescription": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, lo'mey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ."
+        "slackDescription": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, lo'mey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ.",
+        "phaseLabelPlan": "nab",
+        "phaseLabelApply": "lo''"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "tI'ang + choH",
         "vcsWorkflowWarningRbac": "PR merge laHbogh Hoch choHlaH. paQ ''avmeH chutmey (poQlu''bogh laDmey, Dotlh toblu''mey, code ghajwI'' chaw'') moj lojmIt. mIwvamDaq QIn-ra''lu''bogh vangmeyDaq Terrapod patlh/per RBAC <em>lo''be''</em>.",
         "vcsWorkflowWarningRecommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj choHlu'bogh chum 'oH pumbogh chum'e'.",
-        "slackDescription": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, choHmey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ."
+        "slackDescription": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, choHmey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ.",
+        "phaseLabelPlan": "tI''ang",
+        "phaseLabelApply": "choH"
       }
     }
   },

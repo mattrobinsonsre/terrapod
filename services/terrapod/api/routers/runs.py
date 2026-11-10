@@ -295,6 +295,34 @@ def _run_variable_keys(run: Run) -> list[str]:
     return [e["key"] for e in _run_variables(run)]
 
 
+#: The wire names for a phase profile's figures, keyed by the column-shaped names
+#: `run_artifacts` stores. Named here rather than converted with a generic
+#: snake-to-kebab rule, so the stored shape and the wire shape are each written
+#: down once and neither follows the other by accident.
+_PHASE_PROFILE_WIRE = {
+    "peak_memory_bytes": "peak-memory-bytes",
+    "peak_cpu_usec": "peak-cpu-usec",
+    "exit_code": "exit-code",
+}
+
+
+def _phase_profiles_json(run) -> dict[str, dict[str, int | None]]:
+    """`{phase: {wire-name: value}}` for the phases that reported (#2475).
+
+    Only the keys this knows about are emitted, so a stored document carrying
+    something a newer runner sent cannot leak an unnamed field onto the wire --
+    the attribute contract pins what we serialise, and a passthrough would make
+    that pin meaningless.
+    """
+    stored = run.phase_profiles or {}
+    out: dict[str, dict[str, int | None]] = {}
+    for phase, figures in stored.items():
+        if not isinstance(figures, dict):
+            continue
+        out[phase] = {wire: figures.get(col) for col, wire in _PHASE_PROFILE_WIRE.items()}
+    return out
+
+
 def _run_json(
     run: Run,
     *,
@@ -426,6 +454,16 @@ def _run_json(
                 "peak-memory-bytes": run.peak_memory_bytes,
                 "peak-cpu-usec": run.peak_cpu_usec,
                 "runner-exit-code": run.runner_exit_code,
+                # The same figures PER PHASE (#2475). The three above are the
+                # last phase to report, which on a composite run -- two runner
+                # Jobs, one Run -- means the configure's figures overwrote the
+                # apply's, so an operator sizing a runner read the wrong number.
+                #
+                # `{}` rather than null for a run that predates the column: the
+                # honest answer is that no per-phase figures were recorded, and
+                # they cannot be reconstructed from the scalars. An empty object
+                # says that without a consumer needing a null branch.
+                "phase-profiles": _phase_profiles_json(run),
                 "runner-exit-reason": run.runner_exit_reason or "",
                 "runner-exit-status": run.runner_exit_status or "",
                 "error-message": run.error_message,

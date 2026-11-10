@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "종료됨 (OOM 가능성)",
       "memory": "메모리",
       "requested": "요청 {value}",
-      "limit": "한도 {value}"
+      "limit": "한도 {value}",
+      "phaseConfigure": "구성"
     },
     "labelsEditor": {
       "none": "없음",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "계획 + 적용",
         "vcsWorkflowWarningRbac": "PR을 병합할 수 있는 사람은 누구나 적용할 수 있습니다. 브랜치 보호 규칙(필수 검토, 상태 검사, 코드 소유자 승인)이 관문이 됩니다. Terrapod 역할/라벨 RBAC는 이 모드에서 댓글 기반 작업에는 적용되지<em>않습니다</em>.",
         "vcsWorkflowWarningRecommended": "<strong>권장:</strong> 선형 히스토리(병합 전 rebase/squash)를 요구하여 적용하는 커밋이 실제로 반영되는 커밋이 되도록 하세요.",
-        "slackDescription": "이 워크스페이스를 Slack 실행 알림(승인 요청, 적용, 오류, 드리프트)에 등록합니다. 채널을 비워두면 이 워크스페이스는 알림을 보내지 않습니다(배포 전체 팬아웃은 없습니다). 관리자가 Slack 앱을 활성화해야 합니다."
+        "slackDescription": "이 워크스페이스를 Slack 실행 알림(승인 요청, 적용, 오류, 드리프트)에 등록합니다. 채널을 비워두면 이 워크스페이스는 알림을 보내지 않습니다(배포 전체 팬아웃은 없습니다). 관리자가 Slack 앱을 활성화해야 합니다.",
+        "phaseLabelPlan": "계획",
+        "phaseLabelApply": "적용"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "미리보기 + 업데이트",
         "vcsWorkflowWarningRbac": "PR을 병합할 수 있는 사람은 누구나 업데이트할 수 있습니다. 브랜치 보호 규칙(필수 검토, 상태 검사, 코드 소유자 승인)이 관문이 됩니다. Terrapod 역할/라벨 RBAC는 이 모드에서 댓글 기반 작업에는 적용되지<em>않습니다</em>.",
         "vcsWorkflowWarningRecommended": "<strong>권장:</strong> 선형 히스토리(병합 전 rebase/squash)를 요구하여 업데이트의 기준이 되는 커밋이 실제로 반영되는 커밋이 되도록 하세요.",
-        "slackDescription": "이 워크스페이스를 Slack 실행 알림(승인 요청, 업데이트, 오류, 드리프트)에 등록합니다. 채널을 비워두면 이 워크스페이스는 알림을 보내지 않습니다(배포 전체 팬아웃은 없습니다). 관리자가 Slack 앱을 활성화해야 합니다."
+        "slackDescription": "이 워크스페이스를 Slack 실행 알림(승인 요청, 업데이트, 오류, 드리프트)에 등록합니다. 채널을 비워두면 이 워크스페이스는 알림을 보내지 않습니다(배포 전체 팬아웃은 없습니다). 관리자가 Slack 앱을 활성화해야 합니다.",
+        "phaseLabelPlan": "미리보기",
+        "phaseLabelApply": "업데이트"
       }
     }
   },

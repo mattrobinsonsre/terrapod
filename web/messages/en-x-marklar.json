@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Killed (likely Marklar)",
       "memory": "Marklar",
       "requested": "Requested {value}",
-      "limit": "Marklar {value}"
+      "limit": "Marklar {value}",
+      "phaseConfigure": "Marklar"
     },
     "labelsEditor": {
       "none": "None",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Marklar who can merge the marklar can apply. Marklar marklar marklars (required marklars, marklar marklars, marklar marklar marklar) become the marklar. Terrapod marklar/marklar marklar does<em>not</em> apply to comment-driven marklars in this marklar.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before marklar) so the marklar you apply is the marklar that lands.",
-        "slackDescription": "Opt this marklar into Slack run marklars — marklar marklars, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide marklar). Requires the Slack marklar to be enabled by an marklar."
+        "slackDescription": "Opt this marklar into Slack run marklars — marklar marklars, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide marklar). Requires the Slack marklar to be enabled by an marklar.",
+        "phaseLabelPlan": "Marklar",
+        "phaseLabelApply": "Marklar"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Marklar who can merge the marklar can update. Marklar marklar marklars (required marklars, marklar marklars, marklar marklar marklar) become the marklar. Terrapod marklar/marklar marklar does<em>not</em> apply to comment-driven marklars in this marklar.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before marklar) so the marklar you update is the marklar that lands.",
-        "slackDescription": "Opt this marklar into Slack run marklars — marklar marklars, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide marklar). Requires the Slack marklar to be enabled by an marklar."
+        "slackDescription": "Opt this marklar into Slack run marklars — marklar marklars, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide marklar). Requires the Slack marklar to be enabled by an marklar.",
+        "phaseLabelPlan": "Marklar",
+        "phaseLabelApply": "Marklar"
       }
     }
   },

@@ -31,6 +31,20 @@ type RunStatusTimestamps struct {
 	AppliedAt    string `json:"applied-at,omitempty"`
 }
 
+// RunPhaseProfile is one phase's resource profile (#2475).
+//
+// Nil fields mean the runner could not read that cgroup file, not zero. Keyed by
+// phase on Run.PhaseProfiles, because a composite run is two runner Jobs driven
+// by one Run: the flat PeakMemoryBytes / PeakCPUUsec / RunnerExitCode fields are
+// whichever phase reported LAST, so on such a run they describe the configure
+// and not the apply. Read these when the question is "how much did the apply
+// need"; read the flat ones for "how did this run end".
+type RunPhaseProfile struct {
+	PeakMemoryBytes *int64 `json:"peak-memory-bytes,omitempty"`
+	PeakCPUUsec     *int64 `json:"peak-cpu-usec,omitempty"`
+	ExitCode        *int64 `json:"exit-code,omitempty"`
+}
+
 // Run is the decoded form of one Terrapod run. Field tags mirror the JSON:API
 // attribute names.
 //
@@ -178,6 +192,11 @@ type Run struct {
 	// Nested blocks.
 	Actions          RunActions          `json:"actions"`
 	StatusTimestamps RunStatusTimestamps `json:"status-timestamps"`
+	// PhaseProfiles is the resource profile per phase, keyed "plan", "apply",
+	// "configure". Empty for a run that predates the field, which is the honest
+	// answer: those figures were never recorded per phase and cannot be derived
+	// from the flat ones.
+	PhaseProfiles map[string]RunPhaseProfile `json:"phase-profiles,omitempty"`
 }
 
 // CreateRunRequest describes a run to queue against a workspace. WorkspaceID is
@@ -697,6 +716,7 @@ func runFromResource(res *Resource) *Run {
 	r.CostMonthlyMax = nullableFloat(res, "cost-monthly-max")
 	unmarshalAttr(res, "actions", &r.Actions)
 	unmarshalAttr(res, "status-timestamps", &r.StatusTimestamps)
+	unmarshalAttr(res, "phase-profiles", &r.PhaseProfiles)
 	return r
 }
 

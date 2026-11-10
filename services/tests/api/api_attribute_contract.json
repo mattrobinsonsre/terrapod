@@ -926,6 +926,7 @@
     "permissions.can-force-cancel",
     "permissions.can-force-execute",
     "permissions.can-retry",
+    "phase-profiles",
     "plan-only",
     "plan-summary",
     "playbook",

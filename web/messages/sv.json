@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Dödad (troligen OOM)",
       "memory": "Minne",
       "requested": "Begärt {value}",
-      "limit": "Gräns {value}"
+      "limit": "Gräns {value}",
+      "phaseConfigure": "Konfiguration"
     },
     "labelsEditor": {
       "none": "Ingen",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Alla som kan merga PR:en kan applicera. Grenskyddsregler (obligatoriska granskningar, statuskontroller, godkännande av kodägare) blir grinden. Terrapods roll-/etikett-RBAC gäller<em>inte</em> för kommentarsdrivna åtgärder i detta läge.",
         "vcsWorkflowWarningRecommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du applicerar är den commit som landar.",
-        "slackDescription": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, appliceringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör."
+        "slackDescription": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, appliceringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Apply"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Alla som kan merga PR:en kan uppdatera. Grenskyddsregler (obligatoriska granskningar, statuskontroller, godkännande av kodägare) blir grinden. Terrapods roll-/etikett-RBAC gäller<em>inte</em> för kommentarsdrivna åtgärder i detta läge.",
         "vcsWorkflowWarningRecommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du uppdaterar från är den commit som landar.",
-        "slackDescription": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, uppdateringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör."
+        "slackDescription": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, uppdateringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Uppdatering"
       }
     }
   },

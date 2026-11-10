@@ -245,6 +245,8 @@ const MARKLAR_NOUN_COLLAPSE = new Set([
   'en-x-marklar:words.logIndexSummary',
   'en-x-marklar:words.logIndexTitle',
   'en-x-marklar:words.logPlanEmpty',
+  'en-x-marklar:words.phaseLabelApply',
+  'en-x-marklar:words.phaseLabelPlan',
   'en-x-marklar:words.planExpiryTitle',
   'en-x-marklar:words.planOptions',
   'en-x-marklar:words.planSummaryChatPlaceholder',

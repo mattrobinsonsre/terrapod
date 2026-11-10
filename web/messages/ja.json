@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "強制終了（OOMの可能性）",
       "memory": "メモリ",
       "requested": "リクエスト {value}",
-      "limit": "上限 {value}"
+      "limit": "上限 {value}",
+      "phaseConfigure": "構成"
     },
     "labelsEditor": {
       "none": "なし",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "PRをマージできる者は誰でも適用できます。ブランチ保護ルール（必須レビュー、ステータスチェック、コードオーナーの承認）がゲートになります。このモードでは、Terrapodのロール/ラベルRBACはコメント駆動のアクションに<em>適用されません</em>。",
         "vcsWorkflowWarningRecommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、適用するコミットが実際に取り込まれるコミットになります。",
-        "slackDescription": "このワークスペースをSlackの実行通知（承認リクエスト、適用、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。"
+        "slackDescription": "このワークスペースをSlackの実行通知（承認リクエスト、適用、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。",
+        "phaseLabelPlan": "プラン",
+        "phaseLabelApply": "適用"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "PRをマージできる者は誰でもアップデートできます。ブランチ保護ルール（必須レビュー、ステータスチェック、コードオーナーの承認）がゲートになります。このモードでは、Terrapodのロール/ラベルRBACはコメント駆動のアクションに<em>適用されません</em>。",
         "vcsWorkflowWarningRecommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、アップデートの元になるコミットが実際に取り込まれるコミットになります。",
-        "slackDescription": "このワークスペースをSlackの実行通知（承認リクエスト、アップデート、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。"
+        "slackDescription": "このワークスペースをSlackの実行通知（承認リクエスト、アップデート、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。",
+        "phaseLabelPlan": "プレビュー",
+        "phaseLabelApply": "アップデート"
       }
     }
   },

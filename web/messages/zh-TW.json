@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "已終止（可能因 OOM）",
       "memory": "記憶體",
       "requested": "已請求 {value}",
-      "limit": "限制 {value}"
+      "limit": "限制 {value}",
+      "phaseConfigure": "設定"
     },
     "labelsEditor": {
       "none": "無",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "任何能夠合併 PR 的人都可以應用。分支保護規則（必需的審查、狀態檢查、程式碼所有者批准）成為把關。在此模式下，Terrapod 的角色/標籤 RBAC <em>不</em>適用於由評論驅動的操作。",
         "vcsWorkflowWarningRecommended": "<strong>建議：</strong>要求線性歷史（合併前進行 rebase/squash），以便您應用的提交就是最終落地的提交。",
-        "slackDescription": "讓此工作區選擇接收 Slack 執行通知 — 審批請求、應用、錯誤和漂移。將頻道留空則此工作區保持靜默（沒有部署級扇出）。需要管理員啟用 Slack 應用。"
+        "slackDescription": "讓此工作區選擇接收 Slack 執行通知 — 審批請求、應用、錯誤和漂移。將頻道留空則此工作區保持靜默（沒有部署級扇出）。需要管理員啟用 Slack 應用。",
+        "phaseLabelPlan": "計畫",
+        "phaseLabelApply": "應用"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "任何能夠合併 PR 的人都可以更新。分支保護規則（必需的審查、狀態檢查、程式碼所有者批准）成為把關。在此模式下，Terrapod 的角色/標籤 RBAC <em>不</em>適用於由評論驅動的操作。",
         "vcsWorkflowWarningRecommended": "<strong>建議：</strong>要求線性歷史（合併前進行 rebase/squash），以便您據以更新的提交就是最終落地的提交。",
-        "slackDescription": "讓此工作區選擇接收 Slack 執行通知 — 審批請求、更新、錯誤和漂移。將頻道留空則此工作區保持靜默（沒有部署級扇出）。需要管理員啟用 Slack 應用。"
+        "slackDescription": "讓此工作區選擇接收 Slack 執行通知 — 審批請求、更新、錯誤和漂移。將頻道留空則此工作區保持靜默（沒有部署級扇出）。需要管理員啟用 Slack 應用。",
+        "phaseLabelPlan": "預覽",
+        "phaseLabelApply": "更新"
       }
     }
   },

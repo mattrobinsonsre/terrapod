@@ -2936,3 +2936,58 @@ class TestALockedWorkspaceRefusesAConfigureOnTheRoute:
             "held at dispatch instead, and refusing here would change behaviour for "
             "every Terraform workspace."
         )
+
+
+class TestThePhaseProfilesAreSerialisedByName:
+    """`phase-profiles` on the run document (#2475).
+
+    The stored document names its figures after the COLUMNS and the wire names
+    them in kebab-case, so there is a conversion, and the conversion is the one
+    place the two shapes could drift into each other. These drive the serialiser
+    directly because the property is the mapping rather than the route.
+    """
+
+    @staticmethod
+    def _json(stored):
+        from terrapod.api.routers.runs import _phase_profiles_json
+
+        run = MagicMock()
+        run.phase_profiles = stored
+        return _phase_profiles_json(run)
+
+    def test_the_column_names_become_the_wire_names(self):
+        out = self._json({"apply": {"peak_memory_bytes": 5, "peak_cpu_usec": 6, "exit_code": 0}})
+        assert out == {"apply": {"peak-memory-bytes": 5, "peak-cpu-usec": 6, "exit-code": 0}}
+
+    def test_a_run_from_before_the_column_is_an_empty_object(self):
+        """`{}` rather than null, so no consumer needs a null branch -- and not
+        back-filled from the flat scalars, because those were never recorded per
+        phase and attributing them to one would be a guess."""
+        assert self._json(None) == {}
+        assert self._json({}) == {}
+
+    def test_a_figure_the_runner_could_not_read_is_null_not_absent(self):
+        """A phase that reported some figures and not others keeps the shape, so
+        a consumer reads three keys for every phase it is given."""
+        out = self._json({"plan": {"peak_memory_bytes": 7}})
+        assert out == {"plan": {"peak-memory-bytes": 7, "peak-cpu-usec": None, "exit-code": None}}
+
+    def test_a_stored_key_this_build_does_not_know_is_NOT_passed_through(self):
+        """A newer runner could store a figure this build has no name for.
+
+        The attribute contract pins what we serialise, so a passthrough would
+        make that pin meaningless -- the wire would carry a field no snapshot
+        has ever seen. Only the named keys are emitted.
+        """
+        out = self._json({"apply": {"peak_memory_bytes": 1, "peak_swap_bytes": 999}})
+        assert out == {"apply": {"peak-memory-bytes": 1, "peak-cpu-usec": None, "exit-code": None}}
+        assert "peak_swap_bytes" not in json.dumps(out)
+        assert "999" not in json.dumps(out)
+
+    def test_a_malformed_stored_entry_is_skipped_rather_than_crashing(self):
+        """The column is JSONB and nothing but this code writes it, so a
+        non-object entry should be impossible -- which is exactly why it must not
+        take the whole run document down if it happens."""
+        out = self._json({"apply": "not-an-object", "plan": {"peak_memory_bytes": 2}})
+        assert "apply" not in out
+        assert out["plan"]["peak-memory-bytes"] == 2

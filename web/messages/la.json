@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Occisum (verisimiliter OOM)",
       "memory": "Memoria",
       "requested": "Postulatum {value}",
-      "limit": "Limes {value}"
+      "limit": "Limes {value}",
+      "phaseConfigure": "Configuratio"
     },
     "labelsEditor": {
       "none": "Nulli",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Quisquis PR conflare potest applicare potest. Regulae protectionis ramorum (recognitiones requisitae, probationes status, approbatio dominorum codicis) fiunt porta. RBAC partium/titulorum Terrapod<em>non</em> applicatur ad actiones commentario-actas in hoc modo.",
         "vcsWorkflowWarningRecommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio quam applicas sit commissio quae terram tangit.",
-        "slackDescription": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, applicationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur."
+        "slackDescription": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, applicationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur.",
+        "phaseLabelPlan": "Consilium",
+        "phaseLabelApply": "Applicatio"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "praevisio + renovatio",
         "vcsWorkflowWarningRbac": "Quisquis PR conflare potest renovare potest. Regulae protectionis ramorum (recognitiones requisitae, probationes status, approbatio dominorum codicis) fiunt porta. RBAC partium/titulorum Terrapod<em>non</em> applicatur ad actiones commentario-actas in hoc modo.",
         "vcsWorkflowWarningRecommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio ex qua renovas sit commissio quae terram tangit.",
-        "slackDescription": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, renovationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur."
+        "slackDescription": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, renovationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur.",
+        "phaseLabelPlan": "Praevisio",
+        "phaseLabelApply": "Renovatio"
       }
     }
   },
