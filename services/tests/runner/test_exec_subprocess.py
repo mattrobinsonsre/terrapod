@@ -655,8 +655,7 @@ class TestAShortCredentialIsRedactedOnTokenBoundaries:
         assert b"-dash-" not in out
 
     def test_resetting_invalidates_the_compiled_pattern(self) -> None:
-        """The pattern is cached against the set's contents. Clearing the set
-        without clearing the cache would leave a compiled alternation that still
+        """Clearing the set must not leave a compiled alternation that still
         redacts a previous test's secret -- a test passing on another test's
         registration, which is the kind of green that hides a real failure."""
         exec_subprocess.register_secret(self.VAULT)
@@ -664,6 +663,24 @@ class TestAShortCredentialIsRedactedOnTokenBoundaries:
         exec_subprocess._reset_secrets_for_tests()
         assert exec_subprocess._bounded_pattern() is None
         assert self._through([f"{self.VAULT}\n".encode()]) == f"{self.VAULT}\n".encode()
+
+    def test_resetting_leaves_no_secret_in_the_pattern_cache(self) -> None:
+        """The cache is keyed on the SET OF SECRETS, so its keys are the secrets.
+
+        Asserted separately from the test above because the two are no longer the
+        same property, and only this one can fail. The cache is keyed on
+        contents, so an empty set already yields None whether or not the cache
+        was cleared -- which means behaviour alone cannot tell you the clear
+        happened, and a helper called "reset" leaving credentials in an
+        `lru_cache` is worth more than an unobservable line.
+        """
+        exec_subprocess.register_secret(self.VAULT)
+        assert exec_subprocess._bounded_pattern() is not None
+        assert exec_subprocess._compile_bounded.cache_info().currsize > 0
+        exec_subprocess._reset_secrets_for_tests()
+        assert exec_subprocess._compile_bounded.cache_info().currsize == 0, (
+            "the reset left the secret in the compiled-pattern cache's keys"
+        )
 
     def test_a_longer_credential_wins_over_one_that_is_its_prefix(self) -> None:
         """Alternation order: matched shortest-first, the prefix is replaced and

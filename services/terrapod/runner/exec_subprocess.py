@@ -37,6 +37,7 @@ exit — same formula bash uses.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import re
@@ -273,19 +274,24 @@ _BOUNDED_MIN_LEN = 4
 #: per value inside the matcher -- which is where the length rule would come back.
 _BOUNDED_SECRETS: set[bytes] = set()
 
-#: `(frozenset of bounded secrets, compiled pattern)`. The pattern is rebuilt
-#: only when the set changes: `_redact` runs per chunk, and recompiling an
-#: alternation on every 4 KB read would be the one expensive thing in the path.
-_bounded_cache: tuple[frozenset[bytes], re.Pattern[bytes] | None] = (frozenset(), None)
-
 #: What counts as part of a longer token, for the boundary. `\w` in a bytes
 #: pattern is this set, spelled out because the boundary is the whole point and a
 #: reader should not have to remember whether `\w` includes the underscore.
 _TOKEN_BYTE = re.compile(rb"[0-9A-Za-z_]")
 
 
-def _bounded_pattern() -> re.Pattern[bytes] | None:
+@functools.lru_cache(maxsize=8)
+def _compile_bounded(secrets: frozenset[bytes]) -> re.Pattern[bytes] | None:
     """One alternation over every boundary-matched secret, or None if there are none.
+
+    Cached on its argument, because `_redact` runs per chunk and recompiling an
+    alternation on every 4 KB read would be the one expensive thing in the path.
+    Keyed on the SET rather than held in a module global: the global version was
+    a `(key, pattern)` tuple reassigned under `global`, which is the same cache
+    written by hand and which CodeQL reads as an unused global -- correctly
+    enough that satisfying it by restructuring is shorter than arguing. The
+    bound is small because the set only changes while credentials are being
+    registered, a handful of times at phase start.
 
     Longest first, so a secret that is another's prefix cannot win the shorter
     match and leave the rest of the longer one in the log.
@@ -296,21 +302,19 @@ def _bounded_pattern() -> re.Pattern[bytes] | None:
     the preceding byte happened to be a letter, which is a miss rather than the
     false positive the guard exists to prevent.
     """
-    global _bounded_cache
-    current = frozenset(_BOUNDED_SECRETS)
-    key, cached = _bounded_cache
-    if key == current:
-        return cached
-    pattern = None
-    if current:
-        parts = []
-        for secret in sorted(current, key=len, reverse=True):
-            pre = rb"(?<![0-9A-Za-z_])" if _TOKEN_BYTE.match(secret[:1]) else b""
-            post = rb"(?![0-9A-Za-z_])" if _TOKEN_BYTE.match(secret[-1:]) else b""
-            parts.append(pre + re.escape(secret) + post)
-        pattern = re.compile(b"|".join(parts))
-    _bounded_cache = (current, pattern)
-    return pattern
+    if not secrets:
+        return None
+    parts = []
+    for secret in sorted(secrets, key=len, reverse=True):
+        pre = rb"(?<![0-9A-Za-z_])" if _TOKEN_BYTE.match(secret[:1]) else b""
+        post = rb"(?![0-9A-Za-z_])" if _TOKEN_BYTE.match(secret[-1:]) else b""
+        parts.append(pre + re.escape(secret) + post)
+    return re.compile(b"|".join(parts))
+
+
+def _bounded_pattern() -> re.Pattern[bytes] | None:
+    """The alternation for the secrets registered right now."""
+    return _compile_bounded(frozenset(_BOUNDED_SECRETS))
 
 
 #: What a stripped secret is replaced with. Deliberately NOT naming a kind of
@@ -424,13 +428,13 @@ def register_secret(value: str, *, min_length: int = _MIN_SECRET_LEN) -> bool:
 
 
 def _reset_secrets_for_tests() -> None:
-    global _bounded_cache
     _SECRETS.clear()
     _BOUNDED_SECRETS.clear()
-    # The pattern is cached against the set's contents, so clearing the set
-    # without this leaves a compiled alternation that would still redact the
-    # previous test's secret -- a test passing on another test's registration.
-    _bounded_cache = (frozenset(), None)
+    # The compiled alternation is cached on the set it was built from, so an
+    # empty set already yields None and nothing stale can be returned. The cache
+    # is cleared anyway, because its KEYS are the secrets themselves and a test
+    # helper called "reset" should not leave them in a cache.
+    _compile_bounded.cache_clear()
 
 
 def redact_file(path: str | os.PathLike[str]) -> bool:
