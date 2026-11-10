@@ -21,6 +21,18 @@ import (
 // A configured value always wins, and an existing resource keeps its state value
 // through UseStateForUnknown, so this only ever supplies a value nobody named.
 //
+// **It asks the CONFIGURATION whether the attribute was left out, not the plan
+// (#2467).** Those are different questions and the plan cannot tell them apart:
+// the attribute is Optional+Computed, so a configuration that omits it plans as
+// unknown -- and so does a configuration that sets it to a reference whose value
+// is not known yet, such as a workspace created in the same plan. Deciding from
+// the planned value alone therefore read `workspace_id = terrapod_workspace.x.id`
+// as an omission, and either raised "Missing workspace" on a configuration that
+// names one, or -- with a default available, which inside a Terrapod run it
+// always is -- silently overwrote the reference with the run's own workspace and
+// sent the resource to the wrong place. The configured value is the only input
+// that distinguishes the two, so it is the one consulted first.
+//
 // **With no workspace from any source it raises a plan-time error**, which is the
 // point rather than a nicety. Making a Required attribute Optional costs the
 // framework's own "argument is required" error, and without this the omission
@@ -37,13 +49,25 @@ func DefaultWorkspaceID(
 	if req.Plan.Raw.IsNull() {
 		return
 	}
-	var planned types.String
-	if d := resp.Plan.GetAttribute(ctx, path.Root("workspace_id"), &planned); d.HasError() {
+	var configured types.String
+	if d := req.Config.GetAttribute(ctx, path.Root("workspace_id"), &configured); d.HasError() {
 		// A resource without the attribute is not this helper's business.
 		return
 	}
-	// Already named, or carried over from state by UseStateForUnknown (whose
-	// attribute-level modifier has run by now), so there is nothing to supply.
+	// Named in the configuration. Whether that value is known yet is none of our
+	// business -- an unknown here is a reference to something being created in
+	// this same plan, and it has to stay unknown so the framework resolves it at
+	// apply. Filling a default over it would retarget the resource.
+	if !configured.IsNull() {
+		return
+	}
+	var planned types.String
+	if d := resp.Plan.GetAttribute(ctx, path.Root("workspace_id"), &planned); d.HasError() {
+		return
+	}
+	// Carried over from state by UseStateForUnknown (whose attribute-level
+	// modifier has run by now), so there is nothing to supply -- and supplying
+	// one would move an existing resource to a different workspace.
 	if !planned.IsNull() && !planned.IsUnknown() {
 		return
 	}
