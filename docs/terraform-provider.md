@@ -194,6 +194,24 @@ Configuration attributes (all also settable via environment variables):
 | `skip_tls_verify` | — | Skip TLS verification (local/dev only). |
 | `workspace` | `TERRAPOD_WORKSPACE` | The workspace a resource uses when its own `workspace_id` is not set. **A Terrapod run exports this from its own workspace, in both the plan and the apply phase** — so inside a run `provider "terrapod" {}` needs nothing and no resource needs a workspace id. Supply it for a local apply, where there is no run to export it. |
 
+"Not set" means not set in the configuration. A `workspace_id` pointing at a
+workspace created in the same configuration is set, even though its value is not
+known until the apply, so the default does not apply to it and the reference
+resolves as any other would:
+
+```hcl
+resource "terrapod_workspace" "example" {
+  name = "example"
+}
+
+resource "terrapod_variable" "example" {
+  workspace_id = terrapod_workspace.example.id   # the default is not substituted here
+  key          = "foo"
+  value        = "bar"
+  category     = "terraform"
+}
+```
+
 The default applies to **every** resource and data source that takes a workspace id —
 `terrapod_variable`, `terrapod_run_task`, `terrapod_notification_configuration`,
 `terrapod_run_trigger`, the three workspace joins, the three inventory resources that
