@@ -105,6 +105,7 @@ data terrapod_workspace.created_at required=false optional=false computed=true s
 data terrapod_workspace.debug_mode required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.default_limit required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.default_playbook required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.default_run_kind required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.drift_detection_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.drift_detection_interval_seconds required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_workspace.drift_ignore_rules required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]

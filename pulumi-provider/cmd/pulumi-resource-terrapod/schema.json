@@ -7988,6 +7988,9 @@
                     "defaultPlaybook": {
                         "type": "string"
                     },
+                    "defaultRunKind": {
+                        "type": "string"
+                    },
                     "driftDetectionEnabled": {
                         "type": "boolean"
                     },
@@ -8196,6 +8199,7 @@
                     "debugMode",
                     "defaultLimit",
                     "defaultPlaybook",
+                    "defaultRunKind",
                     "driftDetectionEnabled",
                     "driftDetectionIntervalSeconds",
                     "driftIgnoreRules",
