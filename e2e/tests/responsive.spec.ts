@@ -754,6 +754,11 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByText('Total', { exact: true })).toBeHidden();
     await expect(page.getByText('Locked', { exact: true })).toBeHidden();
     await expect(page.getByText('Health', { exact: true })).toBeVisible();
+    // The Flags dropdown is desktop-only too, so a phone keeps three controls
+    // (Health, Status, Label) and reaches one condition through the filter
+    // input. Asserting it ABSENT is what stops it being reintroduced.
+    await expect(page.getByRole('button', { name: 'Flags' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Status' })).toBeVisible();
     await expectNoHorizontalPageScroll(page);
   });
 

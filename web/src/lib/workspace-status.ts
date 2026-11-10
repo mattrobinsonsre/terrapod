@@ -58,6 +58,16 @@ export const WORKSPACE_STATUSES: ReadonlyArray<WorkspaceStatusDef> = [
   { filter: 'discarded', label: 'Discarded', color: 'slate', dot: 'bg-slate-500', priority: 8 },
 ]
 
+/** The statuses `status:` filters on and the Status dropdown offers: the run's
+ *  own status, one per workspace. The workspace-level conditions
+ *  (`state-diverged`, `vcs-error`, `drifted`) are health conditions, filtered
+ *  with `flag:` against the server's authoritative `health-conditions` array,
+ *  so they are not here. The status PILL still resolves all of them, with its
+ *  own precedence, because a pill has one slot and a filter does not. */
+export const RUN_STATUSES: ReadonlyArray<WorkspaceStatusDef> = WORKSPACE_STATUSES.filter(
+  s => !s.isWorkspaceLevel,
+)
+
 const STATUS_BY_FILTER: ReadonlyMap<string, WorkspaceStatusDef> = new Map(
   WORKSPACE_STATUSES.map(s => [s.filter, s] as const),
 )

@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (dowolna)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "kondycja",
       "hintLabel": "etykieta",
       "hintLabelKey": "klucz etykiety",
       "hintName": "nazwa",
       "engineLabel": "Silnik",
-      "engineAll": "Wszystkie silniki"
+      "engineAll": "Wszystkie silniki",
+      "flags": "Flagi",
+      "termFlag": "flaga: {value}",
+      "termLocked": "zablokowane: {value}",
+      "hintFlag": "flaga",
+      "hintLocked": "zablokowane"
     },
     "row": {
       "removeLabelFilter": "Kliknij, aby usunąć z filtra",
@@ -149,6 +153,14 @@
       "local": "Lokalne",
       "collapseAll": "Zwiń wszystko",
       "expandAll": "Rozwiń wszystko"
+    },
+    "flagName": {
+      "state-diverged": "Stan rozbieżny",
+      "no-agent-pool": "Brak puli agentów",
+      "no-live-agent-pool": "Brak aktywnej puli agentów",
+      "vcs-error": "Błąd VCS",
+      "drifted": "Dryf",
+      "drift-errored": "Wykrywanie dryfu nie powiodło się"
     }
   },
   "status": {

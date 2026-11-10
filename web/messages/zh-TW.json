@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (任意)",
       "termLabel": "{key}: {value}",
       "hintStatus": "狀態",
-      "hintHealth": "健康狀況",
       "hintLabel": "標籤",
       "hintLabelKey": "標籤鍵",
       "hintName": "名稱",
       "engineLabel": "引擎",
-      "engineAll": "所有引擎"
+      "engineAll": "所有引擎",
+      "flags": "標記",
+      "termFlag": "標記: {value}",
+      "termLocked": "已鎖定: {value}",
+      "hintFlag": "標記",
+      "hintLocked": "已鎖定"
     },
     "row": {
       "removeLabelFilter": "點選以從篩選中移除",
@@ -149,6 +153,14 @@
       "local": "本機",
       "collapseAll": "全部收合",
       "expandAll": "全部展開"
+    },
+    "flagName": {
+      "state-diverged": "狀態已偏離",
+      "no-agent-pool": "無代理池",
+      "no-live-agent-pool": "無作用中的代理池",
+      "vcs-error": "VCS 錯誤",
+      "drifted": "已漂移",
+      "drift-errored": "漂移偵測失敗"
     }
   },
   "status": {

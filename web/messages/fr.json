@@ -117,12 +117,16 @@
       "termLabelAny": "{key} : (toutes)",
       "termLabel": "{key} : {value}",
       "hintStatus": "statut",
-      "hintHealth": "santé",
       "hintLabel": "label",
       "hintLabelKey": "clé de label",
       "hintName": "nom",
       "engineLabel": "Moteur",
-      "engineAll": "Tous les moteurs"
+      "engineAll": "Tous les moteurs",
+      "flags": "Indicateurs",
+      "termFlag": "indicateur: {value}",
+      "termLocked": "verrouillé: {value}",
+      "hintFlag": "indicateur",
+      "hintLocked": "verrouillé"
     },
     "row": {
       "removeLabelFilter": "Cliquez pour retirer du filtre",
@@ -149,6 +153,14 @@
       "local": "Local",
       "collapseAll": "Tout réduire",
       "expandAll": "Tout développer"
+    },
+    "flagName": {
+      "state-diverged": "État divergent",
+      "no-agent-pool": "Aucun pool d’agents",
+      "no-live-agent-pool": "Aucun pool d’agents actif",
+      "vcs-error": "Erreur VCS",
+      "drifted": "Dérive détectée",
+      "drift-errored": "Échec de la détection de dérive"
     }
   },
   "status": {

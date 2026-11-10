@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (enny)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "helth",
       "hintLabel": "labul",
       "hintLabelKey": "labul key",
       "hintName": "naym",
       "engineLabel": "Enginz",
-      "engineAll": "All teh enginz"
+      "engineAll": "All teh enginz",
+      "flags": "Flagz",
+      "termFlag": "flag: {value}",
+      "termLocked": "lockd: {value}",
+      "hintFlag": "flag",
+      "hintLocked": "lockd"
     },
     "row": {
       "removeLabelFilter": "Clik ta remoove frum filtur",
@@ -149,6 +153,14 @@
       "local": "Lokal",
       "collapseAll": "Collaps all teh thingz",
       "expandAll": "Expand all teh thingz"
+    },
+    "flagName": {
+      "state-diverged": "Stayt Diverjd",
+      "no-agent-pool": "No Agent Pul",
+      "no-live-agent-pool": "No Livez Agent Pul",
+      "vcs-error": "VCS Errur",
+      "drifted": "Driftd",
+      "drift-errored": "Drift Detekshun Faild"
     }
   },
   "status": {

@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (будь-яке)",
       "termLabel": "{key}: {value}",
       "hintStatus": "статус",
-      "hintHealth": "стан",
       "hintLabel": "мітка",
       "hintLabelKey": "ключ мітки",
       "hintName": "назва",
       "engineLabel": "Рушій",
-      "engineAll": "Усі рушії"
+      "engineAll": "Усі рушії",
+      "flags": "Прапорці",
+      "termFlag": "прапорець: {value}",
+      "termLocked": "заблоковано: {value}",
+      "hintFlag": "прапорець",
+      "hintLocked": "заблоковано"
     },
     "row": {
       "removeLabelFilter": "Натисніть, щоб видалити з фільтра",
@@ -149,6 +153,14 @@
       "local": "Локальні",
       "collapseAll": "Згорнути все",
       "expandAll": "Розгорнути все"
+    },
+    "flagName": {
+      "state-diverged": "Стан розійшовся",
+      "no-agent-pool": "Немає пулу агентів",
+      "no-live-agent-pool": "Немає активного пулу агентів",
+      "vcs-error": "Помилка VCS",
+      "drifted": "Дрейф",
+      "drift-errored": "Збій виявлення дрейфу"
     }
   },
   "status": {

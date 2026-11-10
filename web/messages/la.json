@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (quilibet)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "salus",
       "hintLabel": "titulus",
       "hintLabelKey": "clavis tituli",
       "hintName": "nomen",
       "engineLabel": "Machina",
-      "engineAll": "Omnes machinae"
+      "engineAll": "Omnes machinae",
+      "flags": "Vexilla",
+      "termFlag": "vexillum: {value}",
+      "termLocked": "clausum: {value}",
+      "hintFlag": "vexillum",
+      "hintLocked": "clausum"
     },
     "row": {
       "removeLabelFilter": "Preme ut ex cribro removeatur",
@@ -149,6 +153,14 @@
       "local": "Locale",
       "collapseAll": "Omnia contrahere",
       "expandAll": "Omnia extendere"
+    },
+    "flagName": {
+      "state-diverged": "Status Divergens",
+      "no-agent-pool": "Nulla piscina agentium",
+      "no-live-agent-pool": "Nulla piscina agentium viva",
+      "vcs-error": "Error VCS",
+      "drifted": "Aberratum",
+      "drift-errored": "Deprehensio aberrationis defecit"
     }
   },
   "status": {

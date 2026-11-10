@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (herhangi)",
       "termLabel": "{key}: {value}",
       "hintStatus": "durum",
-      "hintHealth": "sağlık",
       "hintLabel": "etiket",
       "hintLabelKey": "etiket anahtarı",
       "hintName": "ad",
       "engineLabel": "Motor",
-      "engineAll": "Tüm motorlar"
+      "engineAll": "Tüm motorlar",
+      "flags": "Bayraklar",
+      "termFlag": "bayrak: {value}",
+      "termLocked": "kilitli: {value}",
+      "hintFlag": "bayrak",
+      "hintLocked": "kilitli"
     },
     "row": {
       "removeLabelFilter": "Filtreden kaldırmak için tıklayın",
@@ -149,6 +153,14 @@
       "local": "Yerel",
       "collapseAll": "Tümünü daralt",
       "expandAll": "Tümünü genişlet"
+    },
+    "flagName": {
+      "state-diverged": "Durum Ayrıştı",
+      "no-agent-pool": "Aracı havuzu yok",
+      "no-live-agent-pool": "Etkin aracı havuzu yok",
+      "vcs-error": "VCS Hatası",
+      "drifted": "Sürüklendi",
+      "drift-errored": "Sapma algılama başarısız"
     }
   },
   "status": {

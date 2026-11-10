@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (valfri)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "hälsa",
       "hintLabel": "etikett",
       "hintLabelKey": "etikettnyckel",
       "hintName": "namn",
       "engineLabel": "Motor",
-      "engineAll": "Alla motorer"
+      "engineAll": "Alla motorer",
+      "flags": "Flaggor",
+      "termFlag": "flagga: {value}",
+      "termLocked": "låst: {value}",
+      "hintFlag": "flagga",
+      "hintLocked": "låst"
     },
     "row": {
       "removeLabelFilter": "Klicka för att ta bort från filtret",
@@ -149,6 +153,14 @@
       "local": "Lokal",
       "collapseAll": "Fäll ihop alla",
       "expandAll": "Expandera alla"
+    },
+    "flagName": {
+      "state-diverged": "Tillstånd avvikande",
+      "no-agent-pool": "Ingen agentpool",
+      "no-live-agent-pool": "Ingen aktiv agentpool",
+      "vcs-error": "VCS-fel",
+      "drifted": "Drift",
+      "drift-errored": "Driftdetektering misslyckades"
     }
   },
   "status": {

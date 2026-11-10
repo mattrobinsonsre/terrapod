@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (任意)",
       "termLabel": "{key}: {value}",
       "hintStatus": "状态",
-      "hintHealth": "健康状况",
       "hintLabel": "标签",
       "hintLabelKey": "标签键",
       "hintName": "名称",
       "engineLabel": "引擎",
-      "engineAll": "所有引擎"
+      "engineAll": "所有引擎",
+      "flags": "标记",
+      "termFlag": "标记: {value}",
+      "termLocked": "已锁定: {value}",
+      "hintFlag": "标记",
+      "hintLocked": "已锁定"
     },
     "row": {
       "removeLabelFilter": "点击以从筛选中移除",
@@ -149,6 +153,14 @@
       "local": "本地",
       "collapseAll": "全部折叠",
       "expandAll": "全部展开"
+    },
+    "flagName": {
+      "state-diverged": "状态已偏离",
+      "no-agent-pool": "无代理池",
+      "no-live-agent-pool": "无活动代理池",
+      "vcs-error": "VCS 错误",
+      "drifted": "已漂移",
+      "drift-errored": "漂移检测失败"
     }
   },
   "status": {

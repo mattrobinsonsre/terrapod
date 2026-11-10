@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (cualquiera)",
       "termLabel": "{key}: {value}",
       "hintStatus": "estado",
-      "hintHealth": "salud",
       "hintLabel": "etiqueta",
       "hintLabelKey": "clave de etiqueta",
       "hintName": "nombre",
       "engineLabel": "Motor",
-      "engineAll": "Todos los motores"
+      "engineAll": "Todos los motores",
+      "flags": "Indicadores",
+      "termFlag": "indicador: {value}",
+      "termLocked": "bloqueado: {value}",
+      "hintFlag": "indicador",
+      "hintLocked": "bloqueado"
     },
     "row": {
       "removeLabelFilter": "Haga clic para quitar del filtro",
@@ -149,6 +153,14 @@
       "local": "Local",
       "collapseAll": "Contraer todo",
       "expandAll": "Expandir todo"
+    },
+    "flagName": {
+      "state-diverged": "Estado divergente",
+      "no-agent-pool": "Sin pool de agentes",
+      "no-live-agent-pool": "Sin pool de agentes activo",
+      "vcs-error": "Error de VCS",
+      "drifted": "Con desviación",
+      "drift-errored": "Falló la detección de desviaciones"
     }
   },
   "status": {

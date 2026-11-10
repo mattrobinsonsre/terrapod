@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (هر مقدار)",
       "termLabel": "{key}: {value}",
       "hintStatus": "وضعیت",
-      "hintHealth": "سلامت",
       "hintLabel": "برچسب",
       "hintLabelKey": "کلید برچسب",
       "hintName": "نام",
       "engineLabel": "موتور",
-      "engineAll": "همه موتورها"
+      "engineAll": "همه موتورها",
+      "flags": "پرچم‌ها",
+      "termFlag": "پرچم: {value}",
+      "termLocked": "قفل‌شده: {value}",
+      "hintFlag": "پرچم",
+      "hintLocked": "قفل‌شده"
     },
     "row": {
       "removeLabelFilter": "برای حذف از فیلتر کلیک کنید",
@@ -149,6 +153,14 @@
       "local": "محلی",
       "collapseAll": "جمع کردن همه",
       "expandAll": "باز کردن همه"
+    },
+    "flagName": {
+      "state-diverged": "وضعیت واگرا",
+      "no-agent-pool": "بدون استخر عامل",
+      "no-live-agent-pool": "بدون استخر عامل فعال",
+      "vcs-error": "خطای VCS",
+      "drifted": "منحرف‌شده",
+      "drift-errored": "تشخیص انحراف ناموفق بود"
     }
   },
   "status": {

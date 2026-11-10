@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (unrhyw un)",
       "termLabel": "{key}: {value}",
       "hintStatus": "statws",
-      "hintHealth": "iechyd",
       "hintLabel": "label",
       "hintLabelKey": "allwedd label",
       "hintName": "enw",
       "engineLabel": "Peiriant",
-      "engineAll": "Pob peiriant"
+      "engineAll": "Pob peiriant",
+      "flags": "Baneri",
+      "termFlag": "baner: {value}",
+      "termLocked": "cloi: {value}",
+      "hintFlag": "baner",
+      "hintLocked": "cloi"
     },
     "row": {
       "removeLabelFilter": "Cliciwch i dynnu o'r hidlydd",
@@ -149,6 +153,14 @@
       "local": "Lleol",
       "collapseAll": "Crebachu popeth",
       "expandAll": "Ehangu popeth"
+    },
+    "flagName": {
+      "state-diverged": "Cyflwr Wedi Gwyro",
+      "no-agent-pool": "Dim pwl asiantiaid",
+      "no-live-agent-pool": "Dim pwl asiantiaid byw",
+      "vcs-error": "Gwall VCS",
+      "drifted": "Wedi Drifftio",
+      "drift-errored": "Canfod drifft wedi methu"
     }
   },
   "status": {

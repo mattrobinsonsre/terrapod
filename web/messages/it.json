@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (qualsiasi)",
       "termLabel": "{key}: {value}",
       "hintStatus": "stato",
-      "hintHealth": "salute",
       "hintLabel": "etichetta",
       "hintLabelKey": "chiave etichetta",
       "hintName": "nome",
       "engineLabel": "Motore",
-      "engineAll": "Tutti i motori"
+      "engineAll": "Tutti i motori",
+      "flags": "Indicatori",
+      "termFlag": "indicatore: {value}",
+      "termLocked": "bloccato: {value}",
+      "hintFlag": "indicatore",
+      "hintLocked": "bloccato"
     },
     "row": {
       "removeLabelFilter": "Clicca per rimuovere dal filtro",
@@ -149,6 +153,14 @@
       "local": "Locale",
       "collapseAll": "Comprimi tutto",
       "expandAll": "Espandi tutto"
+    },
+    "flagName": {
+      "state-diverged": "Stato divergente",
+      "no-agent-pool": "Nessun pool di agenti",
+      "no-live-agent-pool": "Nessun pool di agenti attivo",
+      "vcs-error": "Errore VCS",
+      "drifted": "In deriva",
+      "drift-errored": "Rilevamento della deriva non riuscito"
     }
   },
   "status": {

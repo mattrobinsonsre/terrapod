@@ -107,6 +107,7 @@
       "ariaLabel": "Filter workspaces",
       "clear": "Clear",
       "status": "Status",
+      "flags": "Flags",
       "label": "Label",
       "back": "back",
       "valueCount": "{count, plural, one {# value} other {# values}}",
@@ -114,10 +115,13 @@
       "showing": "Showing {filtered} of {total}",
       "termName": "name: {value}",
       "termStatus": "status: {value}",
+      "termFlag": "flag: {value}",
+      "termLocked": "locked: {value}",
       "termLabelAny": "{key}: (any)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "health",
+      "hintFlag": "flag",
+      "hintLocked": "locked",
       "hintLabel": "label",
       "hintLabelKey": "label key",
       "hintName": "name",
@@ -149,6 +153,14 @@
     "empty": {
       "none": "No workspaces yet. Create one to get started.",
       "noMatch": "No workspaces match this filter."
+    },
+    "flagName": {
+      "state-diverged": "State diverged",
+      "no-agent-pool": "No agent pool",
+      "no-live-agent-pool": "No live agent pool",
+      "vcs-error": "VCS error",
+      "drifted": "Drifted",
+      "drift-errored": "Drift detection errored"
     }
   },
   "status": {

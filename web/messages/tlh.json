@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (vay')",
       "termLabel": "{key}: {value}",
       "hintStatus": "Dotlh",
-      "hintHealth": "pIvlaw'",
       "hintLabel": "per",
       "hintLabelKey": "per ngaQHa'wI'",
       "hintName": "pong",
       "engineLabel": "QuQ",
-      "engineAll": "Hoch QuQ"
+      "engineAll": "Hoch QuQ",
+      "flags": "Beh",
+      "termFlag": "beh: {value}",
+      "termLocked": "ngaQ: {value}",
+      "hintFlag": "beh",
+      "hintLocked": "ngaQ"
     },
     "row": {
       "removeLabelFilter": "DarSeHvo' teqmeH qIp",
@@ -149,6 +153,14 @@
       "local": "naDev",
       "collapseAll": "Hoch chIm",
       "expandAll": "Hoch tetlh"
+    },
+    "flagName": {
+      "state-diverged": "Dotlh chevlu'",
+      "no-agent-pool": "jan wIv natlh Daq tu'lu'be'",
+      "no-live-agent-pool": "jan wIv natlh Daq yIn tu'lu'be'",
+      "vcs-error": "VCS Qagh",
+      "drifted": "tlhotlhpu'",
+      "drift-errored": "tlhotlh Sovmey Qagh"
     }
   },
   "status": {
