@@ -36,7 +36,12 @@ export function reportedPhases(
     // A phase that could read none of the cgroup files reported nothing worth
     // a row: showing it as "—" would read as "measured, and nothing", and
     // showing it as 0 would read as "measured, and zero".
-    if (prof && prof['peak-memory-bytes'] !== null) out.push([phase, prof])
+    // `!= null`, not `!== null`: a MISSING key is `undefined`, which `!==`
+    // admits, and `shownPeakBytes` then casts it into `Math.max(...)` and
+    // renders NaN for the figure and the bar. The server writes a profile when
+    // ANY figure is non-null, so a document carrying only an exit code is a
+    // real shape rather than a hypothetical one.
+    if (prof && prof['peak-memory-bytes'] != null) out.push([phase, prof])
   }
   return out
 }

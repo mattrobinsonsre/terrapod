@@ -246,7 +246,7 @@ export default function VariableSetDetailPage() {
 
   const loadVarset = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}`)
+      const res = await apiFetch(`/api/v1/varsets/${varsetId}`)
       if (!res.ok) throw new Error(t('errors.load'))
       const data = await res.json()
       setVarset(data.data)
@@ -347,7 +347,7 @@ export default function VariableSetDetailPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}`, {
+      const res = await apiFetch(`/api/v1/varsets/${varsetId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -387,7 +387,7 @@ export default function VariableSetDetailPage() {
   async function handleDelete() {
     setDeleting(true)
     try {
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/v1/varsets/${varsetId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(t('detail.errors.delete'))
       router.push('/admin/variable-sets')
     } catch (err) {
@@ -528,7 +528,7 @@ export default function VariableSetDetailPage() {
     setAddingWs(true)
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/workspaces`, {
+      const res = await apiFetch(`/api/v1/varsets/${varsetId}/relationships/workspaces`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -555,7 +555,7 @@ export default function VariableSetDetailPage() {
     if (!confirmDelete(t('detail.confirmRemoveWorkspace'))) return
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/workspaces`, {
+      const res = await apiFetch(`/api/v1/varsets/${varsetId}/relationships/workspaces`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

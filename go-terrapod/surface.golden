@@ -130,6 +130,7 @@ field ArchiveEvictRequest.OlderThanDays *int `json:"older_than_days,omitempty"`
 field ArchiveTotalsMeta.Archives int64 `json:"archives"`
 field ArchiveTotalsMeta.Bytes int64 `json:"bytes"`
 field ArchiveTotalsMeta.ScanLimit int `json:"scan-limit"`
+field ArchiveTotalsMeta.Sealed bool `json:"sealed"`
 field ArchiveTotalsMeta.Truncated bool `json:"truncated"`
 field AuthenticationError.Detail string
 field AuthorizationError.Detail string
@@ -152,6 +153,7 @@ field BulkWarmResponse.Succeeded int `json:"succeeded"`
 field BulkWarmResponse.Total int `json:"total"`
 field CacheTotalsMeta.Bytes int64 `json:"bytes"`
 field CacheTotalsMeta.Files int64 `json:"files"`
+field CacheTotalsMeta.Sealed bool `json:"sealed"`
 field CachedPackageFile.CachedAt string `json:"cached-at"`
 field CachedPackageFile.Digest string `json:"digest"`
 field CachedPackageFile.Ecosystem string `json:"ecosystem"`
@@ -508,6 +510,8 @@ field EstateNode.Name string `json:"name"`
 field EstateNode.Pool string `json:"pool"`
 field EvictionResult.Bytes int64
 field EvictionResult.Files int64
+field EvictionResult.Sealed bool `json:"sealed"`
+field EvictionResult.Warning string `json:"warning"`
 field ExecutionHook.CreatedAt string `json:"created-at,omitempty"`
 field ExecutionHook.Description string `json:"description,omitempty"`
 field ExecutionHook.Enabled bool `json:"enabled"`

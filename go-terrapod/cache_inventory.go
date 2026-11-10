@@ -107,6 +107,13 @@ type PackageCacheTotal struct {
 type CacheTotalsMeta struct {
 	Files int64 `json:"files"`
 	Bytes int64 `json:"bytes"`
+	// Sealed is true when this node cannot re-fetch what it evicts
+	// (`registry.cache_only`), so an eviction here is a PERMANENT deletion
+	// rather than a purge. READ IT before presenting an eviction as reversible:
+	// the scheduled retention sweep skips these caches for exactly this reason,
+	// and the server reports the fact on the TOTALS as well as on the eviction
+	// result so a caller can say so BEFORE it asks, not after.
+	Sealed bool `json:"sealed"`
 }
 
 // PackageEvictRequest targets a bulk package eviction. NEITHER filter means
@@ -133,6 +140,17 @@ type PackageEvictRequest struct {
 type EvictionResult struct {
 	Files int64
 	Bytes int64
+	// Sealed is true when this node cannot re-fetch what it evicts
+	// (`registry.cache_only`), so an eviction here is a PERMANENT deletion
+	// rather than a purge. READ IT before presenting an eviction as reversible:
+	// the scheduled retention sweep skips these caches for exactly this reason,
+	// and the server reports the fact on the TOTALS as well as on the eviction
+	// result so a caller can say so BEFORE it asks, not after.
+	Sealed bool `json:"sealed"`
+	// Warning is the server's own sentence for a sealed node, empty otherwise.
+	// Carried verbatim rather than reconstructed, so one wording serves every
+	// consumer and none of them has to know what `cache_only` implies.
+	Warning string `json:"warning"`
 }
 
 // ListPackageCache returns one page of cached package artifacts,
@@ -269,13 +287,17 @@ func (c *Client) EvictPackageCache(ctx context.Context, req PackageEvictRequest)
 		return nil, err
 	}
 	var out struct {
-		Files int64 `json:"files"`
-		Bytes int64 `json:"bytes"`
+		Files   int64  `json:"files"`
+		Bytes   int64  `json:"bytes"`
+		Sealed  bool   `json:"sealed"`
+		Warning string `json:"warning"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		return nil, fmt.Errorf("parse package eviction result: %w", err)
 	}
-	return &EvictionResult{Files: out.Files, Bytes: out.Bytes}, nil
+	return &EvictionResult{
+		Files: out.Files, Bytes: out.Bytes, Sealed: out.Sealed, Warning: out.Warning,
+	}, nil
 }
 
 // ── the VCS archive cache ──────────────────────────────────────────────────
@@ -360,6 +382,13 @@ type ArchiveTotalsMeta struct {
 	// ScanLimit is the ceiling the walk stopped at, so a caller can say how
 	// much of the estate the number covers.
 	ScanLimit int `json:"scan-limit"`
+	// Sealed is true when this node cannot re-fetch what it evicts
+	// (`registry.cache_only`), so an eviction here is a PERMANENT deletion
+	// rather than a purge. READ IT before presenting an eviction as reversible:
+	// the scheduled retention sweep skips these caches for exactly this reason,
+	// and the server reports the fact on the TOTALS as well as on the eviction
+	// result so a caller can say so BEFORE it asks, not after.
+	Sealed bool `json:"sealed"`
 }
 
 // ArchiveEvictRequest targets a bulk archive eviction. As with packages,
@@ -516,11 +545,15 @@ func (c *Client) EvictVCSArchiveCache(ctx context.Context, req ArchiveEvictReque
 		return nil, err
 	}
 	var out struct {
-		Archives int64 `json:"archives"`
-		Bytes    int64 `json:"bytes"`
+		Archives int64  `json:"archives"`
+		Bytes    int64  `json:"bytes"`
+		Sealed   bool   `json:"sealed"`
+		Warning  string `json:"warning"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		return nil, fmt.Errorf("parse archive eviction result: %w", err)
 	}
-	return &EvictionResult{Files: out.Archives, Bytes: out.Bytes}, nil
+	return &EvictionResult{
+		Files: out.Archives, Bytes: out.Bytes, Sealed: out.Sealed, Warning: out.Warning,
+	}, nil
 }

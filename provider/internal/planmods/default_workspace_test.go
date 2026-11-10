@@ -100,6 +100,34 @@ func TestAnOmittedWorkspacePlannedUnknownTakesTheDefault(t *testing.T) {
 	}
 }
 
+func TestAConfiguredButBLANKWorkspaceIsNotTreatedAsNamed(t *testing.T) {
+	// `workspace_id = var.ws` with `var.ws` unset arrives as a present, non-null
+	// EMPTY STRING. `IsNull()` alone read that as "the practitioner named a
+	// workspace", so the default was skipped AND the "Missing workspace"
+	// diagnostic this modifier exists to raise was skipped too -- the apply then
+	// posted to a path with an empty segment and the practitioner got a
+	// server-side refusal in place of a plan-time error.
+	//
+	// With a default configured, the default applies.
+	resp := runDefault(t, tftypes.NewValue(tftypes.String, ""), pending, "ws-default")
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("unexpected error: %v", resp.Diagnostics)
+	}
+	if got := plannedWorkspace(t, resp); got.ValueString() != "ws-default" {
+		t.Errorf("expected ws-default, got %q", got.ValueString())
+	}
+}
+
+func TestABlankWorkspaceWithNoDefaultIsAPlanTimeError(t *testing.T) {
+	// The other half: with no provider default there is nothing to fall back to,
+	// so the blank must produce the diagnostic rather than an empty id on the
+	// wire. Without this, returning early on blank would pass the test above.
+	resp := runDefault(t, tftypes.NewValue(tftypes.String, ""), pending, "")
+	if !resp.Diagnostics.HasError() {
+		t.Fatal("a blank workspace_id with no default produced no diagnostic")
+	}
+}
+
 func TestAConfiguredWorkspaceIsNeverOverwritten(t *testing.T) {
 	// The whole point of the default being a fallback: declaring into another
 	// workspace from inside a run has to keep working.
