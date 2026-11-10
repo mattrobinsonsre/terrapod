@@ -85,7 +85,8 @@ func (c *Client) CreateVarsetVariable(ctx context.Context, varsetID string, req 
 	if err != nil {
 		return nil, fmt.Errorf("marshal create varset-var: %w", err)
 	}
-	data, err := c.Post(ctx,
+	data, err := c.postDual(ctx,
+		fmt.Sprintf("/api/v1/varsets/%s/relationships/vars", url.PathEscape(varsetID)),
 		fmt.Sprintf("/api/v2/varsets/%s/relationships/vars", url.PathEscape(varsetID)),
 		body)
 	if err != nil {
@@ -113,7 +114,8 @@ func (c *Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) 
 
 // ListVarsetVariables returns every variable in the varset.
 func (c *Client) ListVarsetVariables(ctx context.Context, varsetID string) ([]VariableSetVariable, error) {
-	data, err := c.Get(ctx,
+	data, err := c.getDual(ctx,
+		fmt.Sprintf("/api/v1/varsets/%s/relationships/vars", url.PathEscape(varsetID)),
 		fmt.Sprintf("/api/v2/varsets/%s/relationships/vars", url.PathEscape(varsetID)))
 	if err != nil {
 		return nil, err
@@ -135,7 +137,9 @@ func (c *Client) UpdateVarsetVariable(ctx context.Context, varsetID, varID strin
 	if err != nil {
 		return nil, fmt.Errorf("marshal update varset-var: %w", err)
 	}
-	data, err := c.Patch(ctx,
+	data, err := c.patchDual(ctx,
+		fmt.Sprintf("/api/v1/varsets/%s/relationships/vars/%s",
+			url.PathEscape(varsetID), url.PathEscape(varID)),
 		fmt.Sprintf("/api/v2/varsets/%s/relationships/vars/%s",
 			url.PathEscape(varsetID), url.PathEscape(varID)),
 		body)
@@ -147,7 +151,9 @@ func (c *Client) UpdateVarsetVariable(ctx context.Context, varsetID, varID strin
 
 // DeleteVarsetVariable removes a variable from a varset.
 func (c *Client) DeleteVarsetVariable(ctx context.Context, varsetID, varID string) error {
-	return c.Delete(ctx,
+	return c.deleteDual(ctx,
+		fmt.Sprintf("/api/v1/varsets/%s/relationships/vars/%s",
+			url.PathEscape(varsetID), url.PathEscape(varID)),
 		fmt.Sprintf("/api/v2/varsets/%s/relationships/vars/%s",
 			url.PathEscape(varsetID), url.PathEscape(varID)))
 }

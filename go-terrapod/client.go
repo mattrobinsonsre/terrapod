@@ -488,7 +488,7 @@ func classifyError(statusCode int, body []byte) error {
 	case http.StatusForbidden:
 		return &AuthorizationError{Detail: detail}
 	case http.StatusNotFound:
-		return &NotFoundError{}
+		return &NotFoundError{Detail: detail}
 	case http.StatusConflict:
 		return &ConflictError{Detail: detail}
 	case http.StatusUnprocessableEntity:
@@ -591,16 +591,10 @@ func isTransientNetError(err error) bool {
 // attributes from its responses, so a consumer that reads back what it just
 // wrote can only see the whole resource through the native door (#2469).
 //
-// It does NOT yet reach variables or variable sets, and the reason is a limit
-// of this helper rather than a decision: a supported 1.x server has no
-// `/api/v1` mount at all (measured -- 0 routes under it in the 1.10 and 1.11
-// route contracts, which serve `/api/terrapod/v1` and `/api/v2`), so a native
-// probe there is answered 404 by the router rather than 405 by a route. Only a
-// 405 falls back, so for a resource whose native route is 2.0-only the fallback
-// cannot fire on exactly the servers it exists for. Teaching it to recognise a
-// route-level 404 -- FastAPI's unmatched-path body, which is distinguishable
-// from a resource 404 carrying Terrapod's own detail -- is what the rest of the
-// move waits on.
+// It reaches workspaces, workspace variables, variable sets and their
+// variables. Variables and variable sets arrived second, and only once this
+// could see a route-level 404: the limitation that held them back is described
+// on `routeAbsent`, which is where the two kinds of 404 are told apart.
 //
 // Only a 405 falls back. A 404 is the answer, not an absence: asking the
 // Terraform-only surface afterwards could find nothing, or something else.
@@ -608,9 +602,96 @@ func isTransientNetError(err error) bool {
 // the caller's fallback must refuse rather than send it.
 func (c *Client) nativeFirst(native, legacy func() ([]byte, error)) ([]byte, error) {
 	data, err := native()
-	var apiErr *APIError
-	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusMethodNotAllowed {
+	if routeAbsent(err) {
 		return legacy()
 	}
 	return data, err
+}
+
+// nativeFirstErr is nativeFirst for a call that returns only an error.
+func (c *Client) nativeFirstErr(native, legacy func() error) error {
+	if err := native(); routeAbsent(err) {
+		return legacy()
+	} else {
+		return err
+	}
+}
+
+// routeAbsent reports whether err means "this ROUTE is not served here", as
+// opposed to "the resource you asked for does not exist".
+//
+// Two answers mean the first, and the second one is the reason this predicate
+// exists rather than an inline status check:
+//
+//   - 405 Method Not Allowed -- the path matched a route and the method did
+//     not, which is how a server with the prefix mounted reports a route it
+//     does not have yet.
+//   - 404 with FastAPI's unmatched-path detail -- the prefix itself is not
+//     mounted. Every supported 1.x line serves `/api/terrapod/v1` and
+//     `/api/v2` and has NO `/api/v1` mount at all (0 routes under it in the
+//     1.10 and 1.11 route contracts), so a native probe there never reaches a
+//     route to be refused by method. Keying only on 405 therefore meant the
+//     fallback could not fire on precisely the servers it was written for.
+//
+// A RESOURCE 404 stays final, which is what the detail is read for. Terrapod's
+// own 404s carry their own wording ("Workspace not found"); an unmatched path
+// carries FastAPI's, verbatim "Not Found", and nothing in the server raises
+// that as a handler detail. Re-asking the compatibility surface for a resource
+// that genuinely does not exist could find nothing, or -- worse, since that
+// surface is engine-filtered and name-keyed in places -- something else.
+func routeAbsent(err error) bool {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusMethodNotAllowed {
+		return true
+	}
+	var notFound *NotFoundError
+	return errors.As(err, &notFound) && notFound.Detail == unroutedDetail
+}
+
+// unroutedDetail is FastAPI's detail for a path it serves no route for. It
+// reaches us through Terrapod's JSON:API error envelope, which wraps even the
+// router's own 404: `{"errors":[{"detail":"Not Found","status":"404"}],...}`.
+const unroutedDetail = "Not Found"
+
+// getDual, postDual, patchDual and deleteDual run a request against the
+// Terrapod-native path and retry on the TFE-compatible one when the server
+// answers 405 -- see nativeFirst for why, and for why only a 405 falls back.
+//
+// Both paths are given explicitly because they are not always the same tail
+// under a different prefix: the variable-set collection is `/varsets` natively
+// and `/organizations/default/varsets` on the compatibility surface, since an
+// org segment may never appear on the native one (architecture principle 9).
+func (c *Client) getDual(ctx context.Context, nativePath, legacyPath string) ([]byte, error) {
+	return c.nativeFirst(
+		func() ([]byte, error) { return c.Get(ctx, nativePath) },
+		func() ([]byte, error) { return c.Get(ctx, legacyPath) },
+	)
+}
+
+func (c *Client) postDual(ctx context.Context, nativePath, legacyPath string, body []byte) ([]byte, error) {
+	return c.nativeFirst(
+		func() ([]byte, error) { return c.Post(ctx, nativePath, body) },
+		func() ([]byte, error) { return c.Post(ctx, legacyPath, body) },
+	)
+}
+
+func (c *Client) patchDual(ctx context.Context, nativePath, legacyPath string, body []byte) ([]byte, error) {
+	return c.nativeFirst(
+		func() ([]byte, error) { return c.Patch(ctx, nativePath, body) },
+		func() ([]byte, error) { return c.Patch(ctx, legacyPath, body) },
+	)
+}
+
+func (c *Client) deleteDual(ctx context.Context, nativePath, legacyPath string) error {
+	return c.nativeFirstErr(
+		func() error { return c.Delete(ctx, nativePath) },
+		func() error { return c.Delete(ctx, legacyPath) },
+	)
+}
+
+func (c *Client) deleteWithBodyDual(ctx context.Context, nativePath, legacyPath string, body []byte) error {
+	return c.nativeFirstErr(
+		func() error { return c.DeleteWithBody(ctx, nativePath, body) },
+		func() error { return c.DeleteWithBody(ctx, legacyPath, body) },
+	)
 }

@@ -20,6 +20,13 @@ type NotFoundError struct {
 	// when the request wasn't id-keyed (e.g. a list with a filter
 	// that matched zero rows is not a NotFoundError).
 	ID string
+	// Detail is the message the server sent, decoded from the JSON:API
+	// error body. It distinguishes the two very different things a 404
+	// means: a resource that does not exist (Terrapod's own wording,
+	// "Workspace not found") from a path that is not served here at all
+	// (FastAPI's, verbatim "Not Found"). `routeAbsent` keys the
+	// native-first fallback on exactly that -- see client.go.
+	Detail string
 }
 
 func (e *NotFoundError) Error() string {

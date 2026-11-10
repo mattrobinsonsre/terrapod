@@ -35,6 +35,9 @@ type recordedWrite struct {
 
 func (f *fakeVaultVarServer) handler(t *testing.T, collectionSuffix string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		w.Header().Set("Content-Type", "application/vnd.api+json")

@@ -436,3 +436,27 @@ func TestTheEnvVarMustBeExactlyOne(t *testing.T) {
 		}
 	}
 }
+
+// legacySpellingOf maps a Terrapod-native request path onto the
+// TFE-compatible spelling of the same resource.
+//
+// A 2.0 server serves both, so a fixture that answers only the legacy spellings
+// is still a faithful server -- it just has to recognise a caller that asks
+// natively first (#2469). Folding here rather than rewriting every fixture's
+// switch keeps each test asserting what it was written to assert.
+//
+// The collection is the one that is not a prefix swap: it carries an
+// `organizations/default/` segment on the TFE surface and may not carry one
+// natively (architecture principle 9), so the two spellings differ in shape.
+func legacySpellingOf(path string) string {
+	switch path {
+	case "/api/v1/varsets":
+		return "/api/v2/organizations/default/varsets"
+	case "/api/v1/workspaces":
+		return "/api/v2/organizations/default/workspaces"
+	}
+	if strings.HasPrefix(path, "/api/v1/") {
+		return "/api/v2/" + strings.TrimPrefix(path, "/api/v1/")
+	}
+	return path
+}

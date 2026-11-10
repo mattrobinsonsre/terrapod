@@ -165,7 +165,7 @@ func (c *Client) CreateVariable(ctx context.Context, workspaceID string, req Cre
 	if err != nil {
 		return nil, fmt.Errorf("marshal create variable: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars", body)
+	data, err := c.postDual(ctx, "/api/v1/workspaces/"+url.PathEscape(workspaceID)+"/vars", "/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars", body)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func (c *Client) GetVariableByKey(ctx context.Context, workspaceID, category, ke
 // doesn't paginate this endpoint (variable counts per workspace are
 // small); the SDK returns the full set in one call.
 func (c *Client) ListVariables(ctx context.Context, workspaceID string) ([]Variable, error) {
-	data, err := c.Get(ctx, "/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars")
+	data, err := c.getDual(ctx, "/api/v1/workspaces/"+url.PathEscape(workspaceID)+"/vars", "/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars")
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ func (c *Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Va
 		q := url.Values{}
 		q.Set("page[number]", strconv.Itoa(page))
 		q.Set("page[size]", strconv.Itoa(pageSize))
-		data, err := c.Get(ctx, "/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars?"+q.Encode())
+		data, err := c.getDual(ctx, "/api/v1/workspaces/"+url.PathEscape(workspaceID)+"/vars?"+q.Encode(), "/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars?"+q.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +338,8 @@ func (c *Client) UpdateVariable(ctx context.Context, workspaceID, id string, req
 	if err != nil {
 		return nil, fmt.Errorf("marshal update variable: %w", err)
 	}
-	data, err := c.Patch(ctx,
+	data, err := c.patchDual(ctx,
+		"/api/v1/workspaces/"+url.PathEscape(workspaceID)+"/vars/"+url.PathEscape(id),
 		"/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars/"+url.PathEscape(id),
 		body,
 	)
@@ -350,7 +351,8 @@ func (c *Client) UpdateVariable(ctx context.Context, workspaceID, id string, req
 
 // DeleteVariable removes a variable.
 func (c *Client) DeleteVariable(ctx context.Context, workspaceID, id string) error {
-	return c.Delete(ctx,
+	return c.deleteDual(ctx,
+		"/api/v1/workspaces/"+url.PathEscape(workspaceID)+"/vars/"+url.PathEscape(id),
 		"/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars/"+url.PathEscape(id),
 	)
 }

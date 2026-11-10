@@ -44,6 +44,9 @@ type fakeTerrapodVar struct {
 
 func (f *fakeTerrapodVar) serve(t *testing.T, collection string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		w.Header().Set("Content-Type", "application/vnd.api+json")
@@ -411,4 +414,24 @@ func TestAVaultFileReferenceCyclesWithoutDriftAndRenamesInPlace(t *testing.T) {
 			}
 		})
 	}
+}
+
+// legacySpellingOf maps a Terrapod-native request path onto the TFE-compatible
+// spelling of the same resource, so a fixture that answers only the legacy
+// spellings is still a faithful 2.0 server -- which serves both (#2469).
+//
+// The collection is the one that is not a prefix swap: it carries an
+// `organizations/default/` segment on the TFE surface and may not carry one
+// natively (architecture principle 9), so the two differ in shape.
+func legacySpellingOf(path string) string {
+	switch path {
+	case "/api/v1/varsets":
+		return "/api/v2/organizations/default/varsets"
+	case "/api/v1/workspaces":
+		return "/api/v2/organizations/default/workspaces"
+	}
+	if strings.HasPrefix(path, "/api/v1/") {
+		return "/api/v2/" + strings.TrimPrefix(path, "/api/v1/")
+	}
+	return path
 }

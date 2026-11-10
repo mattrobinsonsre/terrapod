@@ -31,6 +31,9 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 	t.Helper()
 	fs := &rollbackFakeServer{currentSerial: currentSerial}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/current-state-version"):
@@ -332,4 +335,24 @@ func TestRollback_Apply_SkipsAdvancedState_UnlessForce(t *testing.T) {
 	if len(fs2.deleted) != 1 || report2.DeletedCount != 1 {
 		t.Fatalf("--force did not delete advanced workspace: deleted=%v", fs2.deleted)
 	}
+}
+
+// legacySpellingOf maps a Terrapod-native request path onto the TFE-compatible
+// spelling of the same resource, so a fixture that answers only the legacy
+// spellings is still a faithful 2.0 server -- which serves both (#2469).
+//
+// The collection is the one that is not a prefix swap: it carries an
+// `organizations/default/` segment on the TFE surface and may not carry one
+// natively (architecture principle 9), so the two differ in shape.
+func legacySpellingOf(path string) string {
+	switch path {
+	case "/api/v1/varsets":
+		return "/api/v2/organizations/default/varsets"
+	case "/api/v1/workspaces":
+		return "/api/v2/organizations/default/workspaces"
+	}
+	if strings.HasPrefix(path, "/api/v1/") {
+		return "/api/v2/" + strings.TrimPrefix(path, "/api/v1/")
+	}
+	return path
 }

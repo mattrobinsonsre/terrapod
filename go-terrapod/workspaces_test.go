@@ -1027,6 +1027,36 @@ func TestWorkspace_FallsBackToTheTFESurfaceOnAnOlderServer(t *testing.T) {
 	}
 }
 
+// A 1.x server has no `/api/v1` mount at all, so it answers a native probe with
+// the ROUTER's 404 rather than a route's 405 -- which is the case the fallback
+// exists for and the one it could not see (#2469). The two 404s are told apart
+// by their detail: FastAPI's unmatched-path wording against Terrapod's own.
+func TestWorkspace_FallsBackWhenTheNativePrefixIsNotMountedAtAll(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if strings.HasPrefix(r.URL.Path, "/api/v1/") {
+			// Exactly what a server with no such prefix sends, envelope and all.
+			w.Header().Set("Content-Type", "application/vnd.api+json")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"errors":[{"detail":"Not Found","status":"404"}],"detail":"Not Found"}`))
+			return
+		}
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-a", "a", nil)))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.GetWorkspace(t.Context(), "ws-a"); err != nil {
+		t.Fatalf("GetWorkspace should have fallen back: %v", err)
+	}
+	if len(paths) != 2 || !strings.HasPrefix(paths[0], "/api/v1/") || !strings.HasPrefix(paths[1], "/api/v2/") {
+		t.Errorf("want native then TFE; got %v", paths)
+	}
+}
+
 // Only a 405 means "not here yet". A 404 from the native route is the answer —
 // falling back would ask the Terraform-only surface and could find nothing, or
 // the wrong thing.
