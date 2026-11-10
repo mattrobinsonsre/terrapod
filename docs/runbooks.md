@@ -182,6 +182,61 @@ Fix what the message names, then queue a new run. The message only ever carries 
 
 ---
 
+## A run will not start: the code could not be fetched
+
+**Symptom**: `POST` to create a run — or pressing a run button — fails, and **no
+run appears**. The response names the repository and the ref, ends with
+`Nothing was created`, and carries git's own message.
+
+Starting a run on a commit that has no configuration version yet fetches the
+code from VCS **inside the request**. That is the only step that can fail this
+way; once a run exists, a fetch problem shows up as a failed run instead and
+belongs under [Why did my run fail?](#why-did-my-run-fail-reading-a-runs-error-message).
+
+### Which status you get, and what it means
+
+| Status | Meaning | What to do |
+|---|---|---|
+| **422** | The credential cannot reach the repository, or it does not exist, or the server lacks a capability the fetch needs. A retry cannot help. | Check the connection's token and its scope, the repository URL and the branch. Note that providers deliberately answer `Repository not found` for a private repository a token cannot see, so "not found" and "no access" look the same — check access first, since that is the likelier of the two. |
+| **502** | A transient failure on the provider's side. | Try again. One retry already happened for the step where this is most common (see below), so a 502 means it failed twice. |
+| **504** | The fetch exceeded its timeout. | Try again. A very large repository fetched over a slow link can genuinely need more than one attempt; if it is repeatable, narrow the workspace's `working_directory` and `trigger_prefixes` so less of the tree is fetched. |
+
+**Before 2.0 all three were a bare `500 Internal Server Error`**, with the git
+error only in the API's own log (#2471) — indistinguishable from a Terrapod bug.
+If you see a 500 from run creation, that is a defect worth reporting rather than
+something to diagnose here.
+
+### A one-off `Repository not found` that then works
+
+This one is worth knowing because it reads like a permissions problem and is
+not. The fetch happens in two steps: a partial clone that takes the commit and
+its trees, then a checkout that lazily pulls the file contents it needs from the
+provider. A failure in that **second** step has been observed answering
+`Repository not found` on a repository the first step had just read
+successfully, with the same sequence working minutes later.
+
+Terrapod treats a failure there as transient for exactly that reason, and
+**retries it once** before giving up. So:
+
+- a `Repository not found` at **422** came from the first step, and is a real
+  access or configuration problem;
+- the same words at **502** came from the second step and failed twice. Try
+  again before changing anything.
+
+### Nothing falls back to older code
+
+A failed fetch creates no run, and Terrapod will **not** start the run against
+the last code that did fetch successfully. That is deliberate: every available
+fallback amounts to applying code nobody asked for, which is worse than not
+running. The same rule governs run triggers, where reusing whichever
+configuration version happened to be newest once applied unmerged code from an
+open pull request.
+
+So the resolution is always to fix the cause and start the run again — there is
+nothing stale to clear out, and no partial state to undo.
+
+---
+
 ## A Webhook or Run-Task Callback Stopped Being Delivered
 
 **New in 1.7**, and the one upgrade that can break a working configuration

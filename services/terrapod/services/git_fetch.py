@@ -260,6 +260,130 @@ async def _resolve_auth(conn: VCSConnection) -> str:
     return f"Basic {encoded}"
 
 
+#: Pause before the single retry. Short on purpose: the thing being waited out
+#: is a provider blip, and this sits inside a request a person is waiting on.
+_RETRY_BACKOFF_SECONDS = 1.0
+
+
+class GitError(RuntimeError):
+    """A git invocation failed.
+
+    Subclasses `RuntimeError` deliberately: every existing caller catches that
+    (or `Exception`), so introducing these types changes nothing for them. What
+    it adds is the ability to tell "this workspace cannot be fetched" from "the
+    provider was briefly unavailable" -- which a caller could not do when every
+    failure was a bare `RuntimeError`, so a run-creation request answered 500
+    for both (#2471).
+    """
+
+
+class GitTimeout(GitError):
+    """The command exceeded its timeout. Transient by nature."""
+
+
+class GitAccessDenied(GitError):
+    """The credential cannot reach the repository, or it does not exist.
+
+    ONE class for both, because the providers do not distinguish them and are
+    right not to: GitHub answers `Repository not found` for a private repository
+    the token cannot see, precisely so that it does not leak which repositories
+    exist. Splitting them here would mean inventing a distinction from the same
+    string.
+    """
+
+
+class GitUnsupported(GitError):
+    """The server lacks a capability this fetch needs (partial clone, a filter).
+
+    A property of the server rather than of the request, so a retry cannot help
+    and the operator has something to act on.
+    """
+
+
+class GitTransient(GitError):
+    """A network or server-side failure worth retrying."""
+
+
+#: stderr fragments that identify a failure class, longest-standing first.
+#:
+#: Matched on git's own words rather than on an exit code, because git exits
+#: 128 for nearly everything. Lowercased before matching.
+_ACCESS_DENIED = (
+    "repository not found",
+    "authentication failed",
+    "could not read username",
+    "permission denied",
+    "access denied",
+    "403 forbidden",
+    "invalid username or password",
+)
+_UNSUPPORTED = (
+    "does not support",
+    "unexpected disconnect while reading sideband",
+    "filtering not recognized by server",
+)
+_TRANSIENT = (
+    "could not resolve host",
+    "connection reset",
+    "connection timed out",
+    "failed to connect",
+    "operation timed out",
+    "the remote end hung up",
+    "early eof",
+    "rpc failed",
+    "502 bad gateway",
+    "503 service unavailable",
+    "504 gateway",
+    "internal server error",
+)
+
+
+def _classify(stderr: str, *, reachability_proven: bool) -> type[GitError]:
+    """Which failure class `stderr` describes.
+
+    `reachability_proven` says that an EARLIER git invocation in this same
+    sequence already authenticated against this same repository with this same
+    credential and succeeded. When it has, an access-denied message cannot be a
+    property of the credential or of the repository's existence -- both were
+    just demonstrated -- so it is reported as transient.
+
+    That is not a guess, it is the reported failure (#2471): the partial-clone
+    `fetch` succeeded and the following `checkout` failed its promisor refetch
+    with `Repository not found`, and the same sequence replayed later against
+    the same commit worked. Classified the other way, a one-off blip on the
+    provider's side would tell an operator their connection cannot see a
+    repository it had just read.
+    """
+    low = stderr.lower()
+    if any(frag in low for frag in _UNSUPPORTED):
+        return GitUnsupported
+    if any(frag in low for frag in _TRANSIENT):
+        return GitTransient
+    if any(frag in low for frag in _ACCESS_DENIED):
+        return GitTransient if reachability_proven else GitAccessDenied
+    return GitTransient
+
+
+def _redact(text: str, auth_header: str | None) -> str:
+    """Strip the credential from git's output.
+
+    The comment here used to say "Redact any tokens from stderr just in case
+    git echoed them back" and nothing did it -- the message was decoded and
+    raised as-is. That was survivable only while the exception stayed in the
+    API's own log; #2471 puts this text in front of whoever started the run, so
+    the claim has to become true.
+
+    Both the whole header and the token inside it: `Authorization: Bearer x` is
+    what we pass, and `x` on its own is what a URL-shaped echo would carry.
+    """
+    if not auth_header:
+        return text
+    for secret in (auth_header, auth_header.split()[-1] if " " in auth_header else auth_header):
+        if secret and len(secret) >= 8:
+            text = text.replace(secret, "[redacted]")
+    return text
+
+
 async def _run_git(
     args: list[str],
     *,
@@ -268,6 +392,8 @@ async def _run_git(
     auth_host: str | None = None,
     extra_config: list[str] | None = None,
     timeout: float = 300.0,
+    retries: int = 0,
+    reachability_proven: bool = False,
 ) -> None:
     """Run `git <args>` and raise if it exits non-zero.
 
@@ -288,9 +414,21 @@ async def _run_git(
     `extra_config` passes further `-c key=value` entries verbatim, for the
     `url.<base>.insteadOf` rewrites the submodule fetch needs.
 
-    stdout is discarded (git status is communicated via exit code);
-    stderr is captured and included in the exception message on failure
-    so callers see the actual git error.
+    stdout is discarded (git status is communicated via exit code); stderr is
+    captured, REDACTED of the credential, and included in the exception message
+    so callers see the actual git error. The exception is typed (`GitError` and
+    its subclasses) so a caller can tell a workspace that cannot be fetched
+    from a provider that was briefly unavailable (#2471).
+
+    `retries` is how many EXTRA attempts to make after a transient failure.
+    Zero for everything that is cheap to let fail and be re-driven; one for the
+    checkout, whose promisor refetch is the step that was observed failing
+    once and succeeding on a replay.
+
+    `reachability_proven` marks a step that runs AFTER another git invocation in
+    the same sequence has already authenticated against the same repository --
+    see `_classify`, where it is what stops a one-off provider blip being
+    reported as "your connection cannot see this repository".
     """
     cmd: list[str] = ["git"]
     if auth_header is not None:
@@ -305,24 +443,45 @@ async def _run_git(
     for entry in extra_config or []:
         cmd += ["-c", entry]
     cmd += args
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.PIPE,
-        env={**os.environ, **_GIT_ENV},
-    )
-    try:
-        _stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except TimeoutError:
-        proc.kill()
-        await proc.wait()
-        raise RuntimeError(f"git command timed out after {timeout}s: {' '.join(args)}") from None
-    if proc.returncode != 0:
-        # Redact any tokens from stderr just in case `git` echoed them
-        # back. We pass auth via header so this is belt-and-braces.
-        msg = stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(f"git {' '.join(args)} failed (exit {proc.returncode}): {msg}")
+
+    async def _attempt() -> None:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=cwd,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, **_GIT_ENV},
+        )
+        try:
+            _stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise GitTimeout(f"git command timed out after {timeout}s: {' '.join(args)}") from None
+        if proc.returncode == 0:
+            return
+        msg = _redact(stderr.decode("utf-8", errors="replace").strip(), auth_header)
+        kind = _classify(msg, reachability_proven=reachability_proven)
+        raise kind(f"git {' '.join(args)} failed (exit {proc.returncode}): {msg}")
+
+    # A bounded retry, which is the house rule for any outbound call -- and
+    # retried only for the classes where another attempt can help. An
+    # access-denied or unsupported-server failure is the same the second time,
+    # and retrying it only doubles the wait before the operator is told.
+    for attempt in range(retries + 1):
+        try:
+            await _attempt()
+            return
+        except (GitTransient, GitTimeout) as e:
+            if attempt >= retries:
+                raise
+            logger.warning(
+                "git command failed transiently; retrying once",
+                args=" ".join(args),
+                attempt=attempt + 1,
+                error=str(e),
+            )
+            await asyncio.sleep(_RETRY_BACKOFF_SECONDS)
 
 
 def _declared_submodules(clone_dir: str) -> list[tuple[str, str]]:
@@ -559,10 +718,20 @@ async def sparse_archive_to_storage(
     # promisor lazy-fetch for blobs the cone needs. Blobs OUTSIDE the
     # cone are never pulled. With no sparse-checkout, the whole tree is
     # checked out and all blobs are lazy-fetched.
+    # One retry, and classified knowing the fetch above already succeeded.
+    #
+    # This is the step that was observed failing in #2471: the partial-clone
+    # fetch completed and the checkout's promisor refetch of the first blob came
+    # back `Repository not found`, on a repository the fetch had just read. The
+    # same sequence replayed against the same commit worked. So a failure here
+    # is transient until proven otherwise, and worth one more attempt before a
+    # person is told to start again.
     await _run_git(
         ["-C", clone_dir, "checkout", "--quiet", sha],
         auth_header=auth_header,
         auth_host=host,
+        retries=1,
+        reachability_proven=True,
     )
 
     # Step 4b: initialise submodules inside the sparse set.
