@@ -796,32 +796,33 @@ func TestWorkspace_SingularAgentPoolID_UnchangedWire(t *testing.T) {
 	}
 }
 
-// Workspaces are created by Terrapod, never by an engine's own CLI (#1535). The
-// engine can only be expressed on the native surface, so setting it has to move
-// the request there — and NOT setting it has to leave every existing caller on
-// the path it has always used, which is also the only one an older server
-// serves.
-func TestCreateWorkspace_EngineChoosesTheSurface(t *testing.T) {
+// Workspaces are created by Terrapod, never by an engine's own CLI (#1535), and
+// the create goes to the native route like every other workspace call.
+//
+// It used to go to the TFE route unless `engine` was set, on the reasoning that
+// the engine was the only attribute needing the native one. That stopped being
+// true when the operation flags (#1966) and the configure roots (#1929) arrived,
+// and the cost was not cosmetic: the TFE serialiser strips native-only
+// attributes from its RESPONSE, so a create answered without them and a
+// provider writing its own create response into state read them back as null
+// (#2469). Old servers are served by the 405 fallback below, which is what that
+// reasoning was really protecting.
+func TestCreateWorkspace_UsesTheNativeRoute(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		engine   string
-		wantPath string
-		wantAttr any
+		name   string
+		engine string
 	}{
-		{"default stays on the compatibility path", "", "/api/v2/organizations/default/workspaces", nil},
-		{"an engine moves it to the native path", "pulumi", "/api/v1/workspaces", "pulumi"},
+		{"a plain create", ""},
+		{"an engine-bearing create", "pulumi"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var gotPath string
-			var gotBody []byte
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotPath = r.URL.Path
-				gotBody, _ = io.ReadAll(r.Body)
 				w.WriteHeader(http.StatusCreated)
 				_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", nil)))
 			}))
 			defer srv.Close()
-
 			c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
 			if err != nil {
 				t.Fatalf("NewClient: %v", err)
@@ -832,21 +833,87 @@ func TestCreateWorkspace_EngineChoosesTheSurface(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("CreateWorkspace: %v", err)
 			}
+			if gotPath != "/api/v1/workspaces" {
+				t.Errorf("path = %q, want the native /api/v1/workspaces", gotPath)
+			}
+		})
+	}
+}
 
-			if gotPath != tc.wantPath {
-				t.Errorf("path = %q, want %q", gotPath, tc.wantPath)
-			}
+// A server predating the native create answers it 405, and an ordinary create
+// has to keep working there -- that is the whole reason the fallback exists.
+func TestCreateWorkspace_FallsBackToTheTFESurfaceOnAnOlderServer(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path == "/api/v1/workspaces" {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", nil)))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{Name: "api-prod"}); err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	want := []string{"/api/v1/workspaces", "/api/v2/organizations/default/workspaces"}
+	if len(paths) != 2 || paths[0] != want[0] || paths[1] != want[1] {
+		t.Errorf("paths = %v, want native then TFE %v", paths, want)
+	}
+}
 
-			var payload struct {
-				Data struct {
-					Attributes map[string]any `json:"attributes"`
-				} `json:"data"`
+// ...but it must NOT fall back when the request carries something that surface
+// cannot express. Accepting it there would store a workspace missing the very
+// fields the caller asked for, which is #2469 arriving through the fallback
+// instead of through the default -- so each one is refused by name.
+func TestCreateWorkspace_RefusesToDowngradeANativeOnlyCreate(t *testing.T) {
+	yes, no := true, false
+	for _, tc := range []struct {
+		name string
+		req  CreateWorkspaceRequest
+		want string
+	}{
+		{"engine", CreateWorkspaceRequest{Engine: "pulumi"}, "an engine"},
+		{"configure", CreateWorkspaceRequest{ConfigureEnabled: &yes}, "a configure operation"},
+		{"plan/apply off", CreateWorkspaceRequest{PlanApplyEnabled: &no}, "plan/apply disabled"},
+		{"config directory", CreateWorkspaceRequest{ConfigDirectory: "ansible"}, "a config directory"},
+		{"inventory paths", CreateWorkspaceRequest{InventoryPaths: []string{"hosts.d"}}, "inventory paths"},
+		{"default playbook", CreateWorkspaceRequest{DefaultPlaybook: "site.yml"}, "a default playbook"},
+		{"default limit", CreateWorkspaceRequest{DefaultLimit: "web"}, "a default limit"},
+		{"hard limit", CreateWorkspaceRequest{HardLimit: "web"}, "a hard limit"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var legacyHits int
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/v1/workspaces" {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				legacyHits++
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "x", nil)))
+			}))
+			defer srv.Close()
+			c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+			if err != nil {
+				t.Fatalf("NewClient: %v", err)
 			}
-			if err := json.Unmarshal(gotBody, &payload); err != nil {
-				t.Fatalf("unmarshal body: %v", err)
+			req := tc.req
+			req.Name = "x"
+			_, err = c.CreateWorkspace(t.Context(), req)
+			if err == nil {
+				t.Fatalf("expected a refusal rather than a silent downgrade")
 			}
-			if got := payload.Data.Attributes["engine"]; got != tc.wantAttr {
-				t.Errorf("engine attribute = %v, want %v", got, tc.wantAttr)
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error should name %q; got %v", tc.want, err)
+			}
+			if legacyHits != 0 {
+				t.Errorf("the TFE route was called %d time(s); it must not be", legacyHits)
 			}
 		})
 	}

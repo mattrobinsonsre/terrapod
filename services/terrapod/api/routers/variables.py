@@ -83,12 +83,25 @@ native_router = APIRouter(tags=["variables"])
 #: with only the TFE mount, the honest name has nowhere to come out and the
 #: branch that chooses it can never be taken.
 #:
-#: Exactly these routes, and not the rest of this module: `tfci` drives them, so
-#: they cannot *move*, but AGENTS.md puts variable management on the native
-#: surface and serving both is purely additive. The varset *collection* route
-#: stays TFE-only because it carries an `organizations/default/` segment, which
-#: the native surface must never have (architecture principle 9) — giving
-#: varsets a native home is its own change, not a re-mount.
+#: `tfci` drives these, so they cannot *move*, but AGENTS.md puts variable
+#: management on the native surface and serving both is purely additive.
+#:
+#: The varset routes joined them in #2469, which is the change this comment used
+#: to say was still owed ("giving varsets a native home is its own change, not a
+#: re-mount"). It was both, in two parts. Everything that carries no
+#: `organizations/default/` segment is a re-mount and sits here. The varset
+#: *collection* genuinely could not move, because that segment may never appear
+#: on the native surface (architecture principle 9, and
+#: `test_no_native_route_anywhere_carries_an_org_segment` enforces it), so it has
+#: an org-free native path of its own on `native_router` reaching the same
+#: handler. The TFE spelling is untouched either way: `tfci` consumes it.
+#:
+#: The reason it was owed at all: the provider reads workspaces and variable sets
+#: through this module, and the TFE surface strips every native-only attribute
+#: from its responses (`_native_only` in `tfe_v2.py`). A provider that wrote
+#: `configure_enabled` and read it back through `/api/v2` saw `false`, so every
+#: apply failed with "Provider produced inconsistent result after apply" (#2469).
+#: A native door is what lets a native consumer see what it just wrote.
 dual_router = APIRouter(tags=["variables"])
 logger = get_logger(__name__)
 
@@ -935,6 +948,10 @@ async def _visible_varsets(
     return visible
 
 
+# The native path drops the org segment rather than mirroring it: principle 9
+# forbids one on this surface, so the two spellings are not interchangeable and
+# this is a second path to one handler rather than a re-mount.
+@native_router.get("/varsets")
 @router.get("/organizations/default/varsets")
 async def list_varsets(
     request: Request = None,
@@ -1049,6 +1066,7 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
     return rule
 
 
+@native_router.post("/varsets", status_code=201)
 @router.post("/organizations/default/varsets", status_code=201)
 async def create_varset(
     body: dict = Body(...),
@@ -1111,7 +1129,7 @@ async def _require_visible_varset(
     return vs
 
 
-@router.get("/varsets/{varset_id}")
+@dual_router.get("/varsets/{varset_id}")
 async def show_varset(
     varset_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -1122,7 +1140,7 @@ async def show_varset(
     return JSONResponse(content={"data": _varset_json(vs)})
 
 
-@router.patch("/varsets/{varset_id}")
+@dual_router.patch("/varsets/{varset_id}")
 async def update_varset(
     varset_id: str = Path(...),
     body: dict = Body(...),
@@ -1159,7 +1177,7 @@ async def update_varset(
     return JSONResponse(content={"data": _varset_json(vs)})
 
 
-@router.delete("/varsets/{varset_id}", status_code=204)
+@dual_router.delete("/varsets/{varset_id}", status_code=204)
 async def delete_varset(
     varset_id: str = Path(...),
     user: AuthenticatedUser = Depends(require_admin),
@@ -1546,7 +1564,7 @@ async def list_workspace_varsets(
     return JSONResponse(content={"data": page_items, "meta": meta})
 
 
-@router.post("/varsets/{varset_id}/relationships/workspaces", status_code=204)
+@dual_router.post("/varsets/{varset_id}/relationships/workspaces", status_code=204)
 async def add_varset_workspaces(
     varset_id: str = Path(...),
     body: dict = Body(...),
@@ -1609,7 +1627,7 @@ async def add_varset_workspaces(
     await db.commit()
 
 
-@router.delete("/varsets/{varset_id}/relationships/workspaces", status_code=204)
+@dual_router.delete("/varsets/{varset_id}/relationships/workspaces", status_code=204)
 async def remove_varset_workspaces(
     varset_id: str = Path(...),
     body: dict = Body(...),
