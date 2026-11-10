@@ -325,8 +325,19 @@ async def archive_totals(storage: ObjectStore) -> tuple[list[RepoTotal], bool]:
     an operator looking for what is filling a bucket would be shown a number
     smaller than the problem. So the ceiling is reported and the caller says so.
     """
-    objects = await storage.list_prefix(VCS_ARCHIVE_PREFIX, limit=MAX_ARCHIVE_SCAN)
-    truncated = len(objects) >= MAX_ARCHIVE_SCAN
+    # ONE OBJECT PAST THE CEILING, which is what makes the flag exact.
+    #
+    # Asking for exactly `MAX_ARCHIVE_SCAN` cannot tell "the cache holds exactly
+    # that many" from "it holds more and the walk stopped": both come back as a
+    # full page. `>=` therefore reported a cache of precisely 5000 archives as
+    # truncated and rendered "these numbers understate the problem" over figures
+    # that were exact -- and `>` alone, with the same limit, is WORSE: the store
+    # never returns more than it was asked for, so nothing could ever exceed the
+    # ceiling and the flag would be dead. Ask for one more than we will use, and
+    # the comparison means what it says.
+    objects = await storage.list_prefix(VCS_ARCHIVE_PREFIX, limit=MAX_ARCHIVE_SCAN + 1)
+    truncated = len(objects) > MAX_ARCHIVE_SCAN
+    objects = objects[:MAX_ARCHIVE_SCAN]
 
     buckets: dict[tuple[str, str, str], RepoTotal] = {}
     for obj in objects:

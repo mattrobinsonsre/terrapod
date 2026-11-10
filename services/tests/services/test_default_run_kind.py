@@ -210,3 +210,76 @@ class TestTheVocabularyHasOneProducer:
                 f"{kind} requires {needs}, which names something other than the two "
                 "operation flags a workspace actually has"
             )
+
+
+class TestAnOrphanedPreferenceIsDroppedRatherThanWedging:
+    """The skew case `validate_` alone could not answer (#2489).
+
+    `validate_default_run_kind` is the right question when a caller NAMES a
+    value. It was the wrong one when the caller named only an operation flag: the
+    refusal says "leave default-run-kind empty", and **a client two minors behind
+    has no such field to send** -- its schema predates the attribute. So a `PATCH`
+    setting `configure-enabled: false` on a workspace somebody preferred
+    Configure on returned a permanent 422 naming a field the caller could not
+    clear, and every later apply stayed wedged. That is OLD client against NEW
+    server, which the support policy covers (`api >= sdk`), so it was a defect.
+
+    The split is by WHO SAID IT, and both halves matter: a named contradiction is
+    still refused (the caller can see both fields and fix it), and a preference
+    orphaned by a flag the caller moved alone is dropped to `""`.
+    """
+
+    def test_a_named_contradiction_is_still_refused(self):
+        with pytest.raises(ValueError, match="configure-enabled"):
+            ws.reconcile_default_run_kind(
+                sent="configure", stored="", plan_apply=True, configure=False
+            )
+
+    def test_a_preference_the_caller_never_mentioned_is_dropped(self):
+        # The wedge: configure turned off, nothing said about the preference.
+        assert (
+            ws.reconcile_default_run_kind(
+                sent=None, stored="configure", plan_apply=True, configure=False
+            )
+            == ""
+        )
+
+    def test_a_preference_the_write_still_honours_is_kept(self):
+        """Without this, returning `""` unconditionally would pass the test above."""
+        assert (
+            ws.reconcile_default_run_kind(
+                sent=None, stored="configure", plan_apply=True, configure=True
+            )
+            == "configure"
+        )
+
+    def test_an_explicit_clear_is_honoured_and_is_not_the_same_as_silence(self):
+        # `sent=""` is a value: the caller asked for no preference.
+        assert (
+            ws.reconcile_default_run_kind(sent="", stored="full", plan_apply=True, configure=True)
+            == ""
+        )
+
+    def test_an_empty_stored_preference_needs_no_work(self):
+        assert (
+            ws.reconcile_default_run_kind(sent=None, stored="", plan_apply=False, configure=False)
+            == ""
+        )
+
+    @pytest.mark.parametrize("stored", sorted(ws.RUN_KIND_REQUIREMENTS))
+    def test_every_kind_survives_a_write_that_keeps_both_operations(self, stored):
+        assert (
+            ws.reconcile_default_run_kind(sent=None, stored=stored, plan_apply=True, configure=True)
+            == stored
+        )
+
+    @pytest.mark.parametrize("stored", sorted(ws.RUN_KIND_REQUIREMENTS))
+    def test_no_kind_survives_a_write_that_turns_both_operations_off(self, stored):
+        """Derived over the whole vocabulary: every kind needs at least one
+        operation, so with neither there is nothing any of them can mean."""
+        assert (
+            ws.reconcile_default_run_kind(
+                sent=None, stored=stored, plan_apply=False, configure=False
+            )
+            == ""
+        )

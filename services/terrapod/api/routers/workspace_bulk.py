@@ -687,11 +687,16 @@ def _reject_a_run_kind_a_workspace_cannot_offer(fields: dict[str, Any], workspac
     same update, or narrows the filter.
     """
     kinds = workspace_settings.RUN_KIND_REQUIREMENTS
-    if not ({"default_run_kind", "plan_apply_enabled", "configure_enabled"} & set(fields)):
+    if "default_run_kind" not in fields:
+        # The caller moved an operation flag and said nothing about the
+        # preference. Refusing here wedged a client that has no such field to
+        # send -- see `workspace_settings.reconcile_default_run_kind`. The
+        # applier clears the orphaned preference per workspace instead, which
+        # keeps the invariant without a 422 the caller cannot answer.
         return
     offenders: list[str] = []
     for w in workspaces:
-        kind = fields.get("default_run_kind", w.default_run_kind or "")
+        kind = fields["default_run_kind"]
         if not kind:
             continue
         have = {
@@ -952,6 +957,10 @@ async def _apply(
         for attr, new in plan["fields"].items():
             if attr == _POOL_SET_FIELD:
                 pool_set.set_workspace_pools(ws, new)
+            elif attr == "default_run_kind":
+                # Named explicitly, so the guard above already refused any
+                # workspace that could not offer it.
+                setattr(ws, attr, new)
             elif attr == "auto_configure_enabled":
                 # Not a plain setattr: turning the trigger off must forget the
                 # auto-configure baseline too, or a later re-enable fires across
@@ -960,6 +969,18 @@ async def _apply(
                 workspace_settings.set_auto_configure_enabled(ws, new)
             else:
                 setattr(ws, attr, new)
+
+        # A flag change can orphan a preference the caller never mentioned, and
+        # the single-workspace PATCH drops it rather than refusing (see
+        # `reconcile_default_run_kind`). Same answer here, or the two surfaces
+        # disagree about one question.
+        if "default_run_kind" not in plan["fields"]:
+            ws.default_run_kind = workspace_settings.reconcile_default_run_kind(
+                sent=None,
+                stored=ws.default_run_kind,
+                plan_apply=ws.plan_apply_enabled,
+                configure=ws.configure_enabled,
+            )
 
         for spec in plan["run_tasks"] or []:
             existing = (

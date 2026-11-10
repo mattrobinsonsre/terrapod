@@ -171,13 +171,23 @@ class TestPatch:
     async def test_turning_the_operation_off_is_refused_while_the_kind_names_it(
         self, mock_resolve, _pub, *_m
     ):
-        """The direction that is easy to miss, and the one an operator meets by
-        accident.
+        """SUPERSEDED, and which half of its reason still holds.
 
-        The payload mentions only `configure-enabled`, so a guard that fired
-        only when `default-run-kind` is submitted would let the workspace end up
-        holding a preference nothing can honour -- stored and ignored, with
-        nothing to tell the operator.
+        This asserted a 422. The reason stands -- a payload mentioning only
+        `configure-enabled` must not leave the workspace holding a preference
+        nothing can honour, stored and ignored with nothing to tell the operator
+        -- and the ANSWER changed, because the refusal was unanswerable by the
+        caller most likely to trip it: a client two minors behind has no
+        `default-run-kind` field, so "clear default-run-kind" named something it
+        could not send and every later apply stayed wedged. That is OLD client
+        against NEW server, the direction `api >= sdk` supports.
+
+        The orphaned preference is DROPPED instead
+        (`workspace_settings.reconcile_default_run_kind`). The invariant is
+        unchanged -- the workspace does not end up naming a kind it cannot offer
+        -- and the cost is a button's position, because this setting is ordering
+        only. A caller that NAMES a conflicting kind is still refused; that is
+        `test_a_named_contradiction_is_still_refused` below.
         """
         mock_resolve.return_value = caps_for_level("admin")
 
@@ -187,6 +197,31 @@ class TestPatch:
         ws.default_run_kind = "configure"
 
         resp = await _patch(_app_for_patch(ws), ws, {"configure-enabled": False})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["default-run-kind"] == "", (
+            "the orphaned preference survived a write that removed the operation it names"
+        )
+        assert ws.configure_enabled is False
+
+    async def test_a_named_contradiction_is_still_refused(self, mock_resolve, _pub, *_m):
+        """The other half, so the change above cannot read as "the refusal went".
+
+        Both fields in one payload: the caller can see the contradiction and fix
+        it, so it is refused, and the message still names the preference rather
+        than only the flag.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+
+        ws = _mock_workspace(name="names-it")
+        ws.plan_apply_enabled = True
+        ws.configure_enabled = True
+        ws.default_run_kind = ""
+
+        resp = await _patch(
+            _app_for_patch(ws),
+            ws,
+            {"configure-enabled": False, "default-run-kind": "configure"},
+        )
         assert resp.status_code == 422, resp.text
         detail = resp.json()["detail"]
         assert "configure-enabled" in detail
@@ -194,13 +229,6 @@ class TestPatch:
             "the refusal must name the preference that blocks the change, not "
             f"only the flag being changed: {detail}"
         )
-        # Deliberately NOT asserted: that `ws.configure_enabled` is still True.
-        # The handler assigns the flags onto the row BEFORE re-validating the
-        # preference against the merged state -- which is what makes it a merge
-        # check at all -- so the in-memory object is dirty at the moment of the
-        # refusal. Nothing persists it: `get_db` rolls the session back on any
-        # exception, and an HTTPException is one. The property worth pinning here
-        # is the refusal; the rollback is the session dependency's contract.
 
     async def test_clearing_the_kind_in_the_same_call_lets_the_operation_go_off(
         self, mock_resolve, _pub, *_m

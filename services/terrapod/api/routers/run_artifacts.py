@@ -1523,7 +1523,15 @@ async def record_resource_profile(
     # finishing after an auto-apply started must not mark the apply. A runner
     # that sends no phase (older image) gets either phase.
     reason = _clean_failure_reason(failure_reason or "")
-    allowed = _REASON_STATUS_BY_PHASE.get(phase or "", ("planning", "applying"))
+    # DERIVED from the table rather than restated, because restating it is how
+    # this went wrong: `configure` was added to `_REASON_STATUS_BY_PHASE` (#2475)
+    # and this fallback kept its hand-written `("planning", "applying")`, so a
+    # runner image old enough to send no phase at all lost a CONFIGURE's failure
+    # reason -- the same symptom #2475 set out to fix, in the one path the fix
+    # did not touch. A phase-less report now gets every phase the table knows.
+    allowed = _REASON_STATUS_BY_PHASE.get(
+        phase or "", tuple(s for statuses in _REASON_STATUS_BY_PHASE.values() for s in statuses)
+    )
     if reason and exit_code and run.status in allowed:
         run.error_message = reason
 

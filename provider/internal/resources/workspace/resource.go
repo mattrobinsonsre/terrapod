@@ -708,7 +708,8 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"default_run_kind": schema.StringAttribute{
 				MarkdownDescription: "Which run kind gets the prominent button on " +
-					"this workspace, and which the API offers first. One of `full` " +
+					"this workspace. ORDERING IN THE UI ONLY -- no API response is " +
+					"reordered by it. One of `full` " +
 					"(plan + apply + configure), `plan_apply`, `configure` or `plan`. " +
 					"**Omitted or empty means no preference**, and the platform " +
 					"offers the most complete kind the workspace has — usually what " +

@@ -118,9 +118,11 @@ func (f *fakeWorkspaceAPI) serve(t *testing.T) http.HandlerFunc {
 			return map[string]any{"id": "ws-1", "type": "workspaces", "attributes": attrs}
 		}
 
-		// The provider addresses the canonical native surface first and falls
-		// back to the frozen TFE one (go-terrapod's nativeFirst), and a real
-		// Terrapod mounts both. So route on the path WITHOUT its surface prefix,
+		// The provider addresses the canonical native surface. It USED to fall
+		// back to the frozen TFE one via go-terrapod's `nativeFirst`; that is
+		// gone (#2478) and a test now bans the identifier, so the prefix
+		// handling below is defensiveness rather than a live constraint.
+		// A real Terrapod mounts both surfaces. So route on the path WITHOUT its surface prefix,
 		// or this fake stands in for a server that mounts only one of them and
 		// the provider's first request 404s — which Read turns into
 		// RemoveResource, emptying state and making every assertion below fail

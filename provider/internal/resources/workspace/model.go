@@ -7,7 +7,7 @@
 //	Create:  POST   /api/v1/workspaces
 //	Read:    GET    /api/v1/workspaces/{id}
 //	Update:  PATCH  /api/v1/workspaces/{id}
-//	Delete:  DELETE /api/terrapod/v1/workspaces/{id}
+//	Delete:  DELETE /api/v1/workspaces/{id}
 //	By name: GET    /api/v1/workspaces/{name}       (the native show takes either)
 //	List:    GET    /api/v1/workspaces
 //
@@ -20,7 +20,13 @@
 // listed the `/api/v2` spellings until then.
 //
 // go-terrapod asks these natively and falls back to the TFE spelling only on a
-// 405, for a server that predates them; see `nativeFirst` in `client.go`.
+// 405, for a server that predates them.
+//
+// THAT FALLBACK IS GONE (#2478). go-terrapod addresses the native routes and
+// nothing else; `nativeFirst`, `routeAbsent` and the `*Dual` helpers were
+// deleted, and `go-terrapod/tfe_surface_test.go` now FAILS if any of them is
+// reintroduced -- so a reader chasing the helper this comment used to name
+// will find a test banning it. A 405 produces no fallback.
 //
 // Attribute mapping (JSON:API attribute → Terraform schema attribute):
 //

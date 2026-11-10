@@ -245,6 +245,26 @@ class TestTheArchiveTotals:
         assert sum(t.archives for t in totals) == 3
 
     @pytest.mark.asyncio
+    async def test_a_cache_EXACTLY_at_the_ceiling_is_exact_rather_than_truncated(self, monkeypatch):
+        """The boundary, which nothing distinguished.
+
+        A full page cannot, by itself, tell "this is everything" from "the walk
+        stopped" -- so `>=` flagged a cache holding precisely the ceiling as
+        truncated and put "these numbers understate the problem" over figures
+        that were exact. `archive_totals` asks for one object PAST the ceiling to
+        separate the two, which is the only way the comparison can mean anything;
+        with the old limit, `>` could never be true at all and the flag was dead.
+
+        Both halves are here, because either alone passes under one of the two
+        wrong forms.
+        """
+        monkeypatch.setattr(ci, "MAX_ARCHIVE_SCAN", 3)
+        objs = [_Obj(f"vcs_archives/c/o/r/s{i}-full.tar.gz", 1) for i in range(3)]
+        totals, truncated = await ci.archive_totals(_Storage(objs))
+        assert truncated is False, "a complete walk is reported as truncated"
+        assert sum(t.archives for t in totals) == 3
+
+    @pytest.mark.asyncio
     async def test_an_unparseable_key_is_left_out_of_the_TOTALS(self):
         """The opposite choice from the listing, deliberately: a total is
         per-repository and an unreadable key names no repository, so there is no

@@ -388,8 +388,11 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     if "default-run-kind" in attrs or "plan-apply-enabled" in attrs or "configure-enabled" in attrs:
         _stored = "" if on_create else getattr(existing, "default_run_kind", "")
         try:
-            out["default_run_kind"] = workspace_settings.validate_default_run_kind(
-                attrs.get("default-run-kind", _stored),
+            # See the PATCH path in `tfe_v2.py`: a named conflict is refused, a
+            # preference orphaned by a flag the caller moved alone is dropped.
+            out["default_run_kind"] = workspace_settings.reconcile_default_run_kind(
+                sent=attrs["default-run-kind"] if "default-run-kind" in attrs else None,
+                stored=_stored,
                 plan_apply=out.get(
                     "plan_apply_enabled",
                     True if on_create else getattr(existing, "plan_apply_enabled", True),
