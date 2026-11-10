@@ -137,11 +137,19 @@ class TestTheFormsAValueCanAppearIn:
 
 
 class TestTheFloorIsPerCaller:
-    def test_the_default_floor_skips_a_short_value_and_registers_no_form_either(self):
-        assert exec_subprocess.register_secret("short") is False
+    def test_the_default_floor_routes_a_short_value_to_the_BOUNDED_matcher(self):
+        """The floor is still per caller; what it selects has changed (#2477).
+
+        It used to select registered-or-skipped, and a value below it was left in
+        the log. It now selects substring-or-boundary, so the floor still means
+        something and nothing falls through it.
+        """
+        assert exec_subprocess.register_secret("short") is True
         assert exec_subprocess._SECRETS == set(), (
-            "a value below the floor contributed a form, so the floor is not a floor"
+            "a value below the substring floor contributed a substring form, so "
+            "the floor is not a floor"
         )
+        assert b"short" in exec_subprocess._BOUNDED_SECRETS
 
     def test_a_caller_whose_secret_has_no_mechanism_may_lower_it(self):
         """`password` and `become_password` are substituted into the inventory as
@@ -152,8 +160,46 @@ class TestTheFloorIsPerCaller:
         assert b"hunter22" in exec_subprocess._SECRETS
 
     def test_the_lowered_floor_is_still_a_floor(self):
-        assert exec_subprocess.register_secret("prod", min_length=8) is False
-        assert exec_subprocess._SECRETS == set()
+        """`prod` is the example the floor's own docstring is written around, so
+        it is the right fixture for what the floor now does.
+
+        Below the lowered floor it is boundary-matched rather than skipped: it is
+        removed where it stands as its own token, and left alone inside
+        `production` or `prod-eu1`, which is the false positive the floor existed
+        to prevent. The cost is real and accepted -- a standalone `prod` in the
+        log is replaced -- because the alternative is a credential in the clear,
+        and the runner logs that the weaker matcher is in use.
+        """
+        assert exec_subprocess.register_secret("prod", min_length=8) is True
+        assert exec_subprocess._SECRETS == set(), "it took substring matching below the floor"
+        assert b"prod" in exec_subprocess._BOUNDED_SECRETS
+
+        r = exec_subprocess.StreamRedactor()
+        out = b"".join(r.feed(c) for c in [b"env=prod deploying production\n"]) + r.flush()
+        assert b"env=prod " not in out, "the standalone token survived"
+        assert b"production" in out, "a longer word containing it was blacked out"
+
+    def test_nothing_above_three_characters_is_left_unredacted(self):
+        """The property the whole change is for, asserted as a property rather
+        than at one length: there is no length from `_BOUNDED_MIN_LEN` up at
+        which a credential is simply skipped."""
+        for n in range(exec_subprocess._BOUNDED_MIN_LEN, 30):
+            exec_subprocess._reset_secrets_for_tests()
+            value = "p" + "a" * (n - 2) + "z"
+            assert exec_subprocess.register_secret(value) is True, f"skipped at length {n}"
+            assert (
+                value.encode() in exec_subprocess._SECRETS
+                or value.encode() in exec_subprocess._BOUNDED_SECRETS
+            ), f"registered nothing at length {n}"
+
+    def test_below_the_bounded_floor_it_is_refused_and_says_so(self):
+        """The one band where the redactor genuinely cannot help, so it must be
+        the band that warns rather than the band that is silent."""
+        for value in ("a", "ab", "abc"):
+            exec_subprocess._reset_secrets_for_tests()
+            assert exec_subprocess.register_secret(value) is False, value
+            assert exec_subprocess._SECRETS == set()
+            assert exec_subprocess._BOUNDED_SECRETS == set()
 
     def test_the_value_delivered_fields_are_the_ones_that_lowered_it(self):
         """Derived from the credential module's own sets rather than listed here,

@@ -101,8 +101,16 @@ _DEFAULT_CREDENTIALS_DIR = "/tp/credentials"
 #: the redactor stands between it and the two streams. Eight is the floor
 #: `summary_redaction.MIN_LITERAL_LENGTH` already uses for matching a literal in
 #: free text, so this is the house number rather than a new one -- and below it
-#: the trade genuinely inverts, because a value like `prod` matches ordinary
-#: output and a log with half its words blacked out stops being read.
+#: the trade genuinely inverts FOR A SUBSTRING MATCH, because a value like
+#: `prod` occurs inside `production` and `prod-eu1` as well as on its own, and a
+#: log with half its words blacked out stops being read.
+#:
+#: That argument is about the matcher, which is why it no longer ends the story
+#: (#2477): below this floor the value is matched on token boundaries instead of
+#: being skipped, and a boundary match on `prod` hits only the standalone token.
+#: That is a far smaller cost than the substring version this paragraph was
+#: written about, against a leak that is worse than either. The point at which
+#: nothing can be done at all is `exec_subprocess._BOUNDED_MIN_LEN`.
 #:
 #: `private_key` keeps the default floor on purpose: it arrives as a 0600 file,
 #: which is the control, and it cannot be short.
@@ -277,10 +285,15 @@ def _apply_vault(directory: Path, key: str, envelope: dict[str, Any]) -> str:
     if not password:
         raise AnsibleAuthError("it carries no 'password', so there is nothing to decrypt with")
     # Registered BEFORE the file exists, so there is no window in which ansible
-    # could print it unredacted. Short values are not registered -- see
-    # `exec_subprocess.register_secret` -- and that is why the mechanism matters
-    # more than the backstop: the password reaches ansible as a FILE, never on
-    # an argv and never as an environment variable's value.
+    # could print it unredacted.
+    #
+    # The mechanism is still the real control -- the password reaches ansible as
+    # a FILE, never on an argv and never as an environment variable's value --
+    # but this line used to add that short values are not registered, which is
+    # no longer true and was the defect in #2477. A 15-character vault password
+    # was skipped entirely, and every line of the configure carried it. Below
+    # `_MIN_SECRET_LEN` it is now matched on token boundaries instead of being
+    # skipped, so there is no length at which the backstop simply gives up.
     exec_subprocess.register_secret(password)
     written = _write_secret_file(directory, _safe_name(VAULT_CATEGORY, key), password)
     label = key or "default"
@@ -332,6 +345,14 @@ def _apply_machine(directory: Path, key: str, envelope: dict[str, Any]) -> dict[
             # into the rendered inventory as a VALUE, so redaction is the only
             # control over it. The default floor was chosen for a JWT's shape
             # and has nothing to say about a sudo password an operator typed.
+            #
+            # The floor now decides WHICH MATCHER rather than whether to
+            # register at all (#2477), and the override still earns its place
+            # for exactly the reason above: a value substituted into a rendered
+            # file can turn up inside a longer string, which a substring match
+            # catches and a boundary match does not. So this field keeps
+            # substring matching from 8 characters, where the others take it
+            # from 24 and are boundary-matched below that.
             exec_subprocess.register_secret(str(value), min_length=_VALUE_SECRET_MIN_LENGTH)
         out[f"{key}.{field}"] = str(value)
     if not out:
