@@ -4,12 +4,23 @@
 //
 //	JSON:API type: "workspaces"
 //	ID prefix: "ws-"
-//	Create:  POST   /api/v2/organizations/default/workspaces
-//	Read:    GET    /api/v2/workspaces/{id}
-//	Update:  PATCH  /api/v2/workspaces/{id}
-//	Delete:  DELETE /api/v2/workspaces/{id}
-//	By name: GET    /api/v2/organizations/default/workspaces/{name}
-//	List:    GET    /api/v2/organizations/default/workspaces
+//	Create:  POST   /api/v1/workspaces
+//	Read:    GET    /api/v1/workspaces/{id}
+//	Update:  PATCH  /api/v1/workspaces/{id}
+//	Delete:  DELETE /api/terrapod/v1/workspaces/{id}
+//	By name: GET    /api/v1/workspaces/{name}       (the native show takes either)
+//	List:    GET    /api/v1/workspaces
+//
+// All of them native, and that is the contract rather than an implementation
+// detail: the TFE-compatible surface strips every native-only attribute from
+// its responses, so a workspace read there comes back without the operation
+// flags, the configure roots or the limits -- and a provider writes its own
+// read into state, so it saw them as null and every apply failed with
+// "Provider produced inconsistent result after apply" (#2469). This comment
+// listed the `/api/v2` spellings until then.
+//
+// go-terrapod asks these natively and falls back to the TFE spelling only on a
+// 405, for a server that predates them; see `nativeFirst` in `client.go`.
 //
 // Attribute mapping (JSON:API attribute → Terraform schema attribute):
 //

@@ -2,9 +2,7 @@ package terrapod
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 )
@@ -732,6 +730,35 @@ type WorkspaceList struct {
 //   - *ConflictError when the name is already taken
 //   - *ValidationError on invalid attribute values
 //   - *AuthorizationError when the token lacks `admin` on the workspace
+//
+// legacyCreateBlocker names the first field in req that the TFE-compatible
+// create cannot carry, or "" when the request is expressible there.
+//
+// Derived from what that surface strips rather than from a remembered list:
+// `_native_only` in `api/routers/tfe_v2.py` is the server side of this, and
+// anything on it is invisible in a TFE response however it was sent.
+func legacyCreateBlocker(req CreateWorkspaceRequest) string {
+	switch {
+	case req.Engine != "":
+		return "an engine"
+	case req.ConfigureEnabled != nil && *req.ConfigureEnabled:
+		return "a configure operation"
+	case req.PlanApplyEnabled != nil && !*req.PlanApplyEnabled:
+		return "plan/apply disabled"
+	case req.ConfigDirectory != "":
+		return "a config directory"
+	case len(req.InventoryPaths) > 0:
+		return "inventory paths"
+	case req.DefaultPlaybook != "":
+		return "a default playbook"
+	case req.DefaultLimit != "":
+		return "a default limit"
+	case req.HardLimit != "":
+		return "a hard limit"
+	}
+	return ""
+}
+
 func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (*Workspace, error) {
 	attrs := workspaceCreateAttrs(req)
 	// Create keeps a plain string: there is nothing to "leave unchanged" on a
@@ -742,15 +769,32 @@ func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest
 	if err != nil {
 		return nil, fmt.Errorf("marshal create workspace: %w", err)
 	}
-	// Only an engine-bearing create needs the native route, and only a server
-	// new enough to serve it could honour the field anyway. Keeping the default
-	// on the long-standing path means existing callers are byte-identical and
-	// still work against a server that predates the native endpoint.
-	path := "/api/v2/organizations/default/workspaces"
-	if req.Engine != "" {
-		path = "/api/v1/workspaces"
-	}
-	data, err := c.Post(ctx, path, body)
+	// Native first, like every other workspace call (#2469). This used to send
+	// an engine-less create to the TFE route on the grounds that only the
+	// `engine` field needed the native one -- true when that was the only
+	// native-only attribute, and false since the operation flags (#1966) and
+	// the configure roots (#1929) joined it. The TFE serialiser strips every
+	// native-only attribute from its RESPONSE, so a create through it answered
+	// with those fields absent, and a Terraform provider that writes its own
+	// create response into state read them back as null or false: "Provider
+	// produced inconsistent result after apply" on every workspace that set
+	// one, with the values stored correctly on the server all along.
+	data, err := c.nativeFirst(
+		func() ([]byte, error) { return c.Post(ctx, "/api/v1/workspaces", body) },
+		func() ([]byte, error) {
+			// A server too old to serve the native create is also too old to
+			// honour these, and the TFE route would accept the request and
+			// silently drop them -- which is the same defect arriving by a
+			// different door. Refuse instead, naming the field, exactly as the
+			// list does for a non-Terraform engine.
+			if blocker := legacyCreateBlocker(req); blocker != "" {
+				return nil, fmt.Errorf(
+					"this server cannot create a workspace with %s: it predates the native workspace create",
+					blocker)
+			}
+			return c.Post(ctx, "/api/v2/organizations/default/workspaces", body)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1469,21 +1513,4 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ws.PlanExpirySeconds = &v
 	}
 	return ws
-}
-
-// nativeFirst reads or writes a workspace through the native route, and falls
-// back to the TFE-compatible one only when the server predates it (#1554).
-//
-// The TFE surface serves Terraform workspaces alone, so the native route is the
-// one that reaches every engine. An older server answers the native path with
-// 405, because the path exists there for another method; that status, and only
-// that one, means "not here yet". Any other answer, a 404 included, is the real
-// answer and is returned as is.
-func (c *Client) nativeFirst(native, legacy func() ([]byte, error)) ([]byte, error) {
-	data, err := native()
-	var apiErr *APIError
-	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusMethodNotAllowed {
-		return legacy()
-	}
-	return data, err
 }

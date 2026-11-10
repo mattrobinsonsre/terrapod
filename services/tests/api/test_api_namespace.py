@@ -67,15 +67,30 @@ class TestOpenAPIVisibility:
         # differently by design, one scoped to Terraform and one not — which is
         # why both are in the schema rather than one being hidden.
         #
-        # The two below stay forbidden and for different reasons: a varset is
-        # reached through an `organizations/default/` collection, which the
-        # native surface must never carry (architecture principle 9); the
-        # registry paths are the CLI download protocol, which has no native
-        # consumer at all.
-        for path in (
-            "/api/v1/varsets/{varset_id}",
-            "/api/v1/registry/modules/{namespace}/{name}/{provider}/versions",
-        ):
+        # Variable sets became a second such exception in #2469, for the same
+        # shape of reason as runs. The TFE serialiser strips native-only
+        # attributes from its responses, so a Terrapod-native consumer -- the
+        # provider, through go-terrapod -- could not read back what it had just
+        # written, and `terrapod_workspace` failed every apply that set a
+        # configure attribute.
+        #
+        # This list forbade `/api/v1/varsets/{varset_id}` on the grounds that "a
+        # varset is reached through an `organizations/default/` collection, which
+        # the native surface must never carry". The premise was the thing that
+        # changed rather than the principle: the by-id route never carried an org
+        # segment, and the collection now has an org-free native path of its own
+        # (`/api/v1/varsets`) reaching the same handler. Principle 9 is still
+        # enforced, by `test_no_native_route_anywhere_carries_an_org_segment`
+        # below and from the other direction in `test_varset_native_surface.py`.
+        for path in ("/api/v1/varsets/{varset_id}", "/api/v1/varsets"):
+            assert path in schema["paths"], (
+                f"{path} missing: variable sets are managed by the provider, which "
+                f"cannot see its own writes through the compatibility surface (#2469)"
+            )
+
+        # The registry paths stay forbidden, and that reason is untouched: they
+        # are the CLI download protocol, which has no native consumer at all.
+        for path in ("/api/v1/registry/modules/{namespace}/{name}/{provider}/versions",):
             assert path not in schema["paths"], f"{path} should not exist"
 
         # The exception is deliberate, so pin it: if runs stop being served

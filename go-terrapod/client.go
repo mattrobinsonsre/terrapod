@@ -581,3 +581,36 @@ func isTransientNetError(err error) bool {
 	}
 	return false
 }
+
+// nativeFirst runs a call against the Terrapod-native route and falls back to
+// the TFE-compatible one when the server answers 405 Method Not Allowed, which
+// is how a server that predates the native route replies to it (#1554).
+//
+// Used by the workspace calls, whose native home arrived after their TFE one.
+// The native route is preferred because the TFE serialiser strips native-only
+// attributes from its responses, so a consumer that reads back what it just
+// wrote can only see the whole resource through the native door (#2469).
+//
+// It does NOT yet reach variables or variable sets, and the reason is a limit
+// of this helper rather than a decision: a supported 1.x server has no
+// `/api/v1` mount at all (measured -- 0 routes under it in the 1.10 and 1.11
+// route contracts, which serve `/api/terrapod/v1` and `/api/v2`), so a native
+// probe there is answered 404 by the router rather than 405 by a route. Only a
+// 405 falls back, so for a resource whose native route is 2.0-only the fallback
+// cannot fire on exactly the servers it exists for. Teaching it to recognise a
+// route-level 404 -- FastAPI's unmatched-path body, which is distinguishable
+// from a resource 404 carrying Terrapod's own detail -- is what the rest of the
+// move waits on.
+//
+// Only a 405 falls back. A 404 is the answer, not an absence: asking the
+// Terraform-only surface afterwards could find nothing, or something else.
+// Where the legacy route could accept the request and silently drop part of it,
+// the caller's fallback must refuse rather than send it.
+func (c *Client) nativeFirst(native, legacy func() ([]byte, error)) ([]byte, error) {
+	data, err := native()
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusMethodNotAllowed {
+		return legacy()
+	}
+	return data, err
+}
