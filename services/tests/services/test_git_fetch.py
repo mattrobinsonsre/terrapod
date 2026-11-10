@@ -867,7 +867,13 @@ class TestTheCredentialIsStrippedFromGitsOutput:
         """A pathologically short header would black out ordinary words — the
         same trade as the log redactor's floor, and here there is nothing to
         gain, because no real credential is that short."""
-        assert git_fetch._redact("fatal: a bad thing", "ab") == "fatal: a bad thing"
+        # The text must CONTAIN the needle, or the assertion holds with the floor
+        # deleted: "ab" is not a substring of "fatal: a bad thing" (it reads
+        # "a b", with a space), so the original fixture tested nothing. The floor
+        # is what stops a pathologically short credential blacking out ordinary
+        # words in a git error the operator now reads (#2471).
+        assert "ab" in "fatal: ab bad thing"  # the fixture is a real needle
+        assert git_fetch._redact("fatal: ab bad thing", "ab") == "fatal: ab bad thing"
 
 
 class TestTheBoundedRetry:

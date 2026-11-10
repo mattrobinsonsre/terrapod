@@ -176,9 +176,33 @@ class TestTheArchiveListing:
 
     @pytest.mark.asyncio
     async def test_the_limit_is_bounded_by_the_scan_ceiling(self):
+        """The ceiling, with enough objects for it to BITE.
+
+        This seeded 20 and asked for 10**9, which told us nothing: 20 is under
+        `MAX_ARCHIVE_SCAN` either way, so `min(..., MAX_ARCHIVE_SCAN)` could be
+        deleted and the assertion still held. The ceiling is the only thing
+        standing between `?limit=999999999` and a six-figure estate in one
+        response, so it needs a fixture it can actually clamp.
+        """
+        over = ci.MAX_ARCHIVE_SCAN + 7
+        objs = [_Obj(f"vcs_archives/c/o/r/s{i:06d}-full.tar.gz", 1) for i in range(over)]
+        entries, cursor = await ci.list_archives(_Storage(objs), limit=10**9)
+        assert len(entries) == ci.MAX_ARCHIVE_SCAN, (
+            f"asked for 10**9 over {over} objects and got {len(entries)}; "
+            "the ceiling is not being applied"
+        )
+        # A full page hands back a cursor, so the caller can walk the rest.
+        assert cursor == entries[-1].key
+
+    @pytest.mark.asyncio
+    async def test_a_limit_under_the_ceiling_is_honoured_as_asked(self):
+        """The other half: the clamp must not become a floor.
+
+        Without this, `bounded = MAX_ARCHIVE_SCAN` would pass the test above.
+        """
         objs = [_Obj(f"vcs_archives/c/o/r/s{i:05d}-full.tar.gz", 1) for i in range(20)]
-        entries, _ = await ci.list_archives(_Storage(objs), limit=10**9)
-        assert len(entries) == 20  # everything there is, but the ask was clamped
+        entries, _ = await ci.list_archives(_Storage(objs), limit=5)
+        assert len(entries) == 5
 
     @pytest.mark.asyncio
     async def test_a_zero_or_negative_limit_still_returns_a_page(self):
