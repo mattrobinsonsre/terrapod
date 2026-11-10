@@ -72,7 +72,7 @@ export default function VariableSetsPage() {
 
   async function loadVarsets() {
     try {
-      setVarsets(await fetchAllPages<VariableSet>('/api/v2/organizations/default/varsets'))
+      setVarsets(await fetchAllPages<VariableSet>('/api/v1/varsets'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
@@ -85,7 +85,7 @@ export default function VariableSetsPage() {
     setCreating(true)
     setError('')
     try {
-      const res = await apiFetch('/api/v2/organizations/default/varsets', {
+      const res = await apiFetch('/api/v1/varsets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

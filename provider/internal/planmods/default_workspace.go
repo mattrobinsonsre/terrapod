@@ -58,7 +58,13 @@ func DefaultWorkspaceID(
 	// business -- an unknown here is a reference to something being created in
 	// this same plan, and it has to stay unknown so the framework resolves it at
 	// apply. Filling a default over it would retarget the resource.
-	if !configured.IsNull() {
+	// An EMPTY STRING is not "named". `IsNull()` alone asked "is it absent?",
+	// so `workspace_id = var.ws` with an unset variable arrived non-null and
+	// blank: the provider default was skipped, the "Missing workspace"
+	// diagnostic this helper exists to raise was skipped too, and the apply
+	// posted to a path with an empty segment for the server to reject. Unknown
+	// still counts as named -- it is a value that is not resolved yet.
+	if !configured.IsNull() && (configured.IsUnknown() || configured.ValueString() != "") {
 		return
 	}
 	var planned types.String

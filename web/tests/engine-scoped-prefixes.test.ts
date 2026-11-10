@@ -23,10 +23,6 @@ const SRC = fileURLToPath(new URL('../src', import.meta.url))
 
 /** Each entry: the file, and why it may still call the TFE surface. */
 const ALLOWED: Record<string, string> = {
-  'app/admin/variable-sets/page.tsx':
-    'org-scoped varsets — not workspace- or run-scoped, so the engine filter does not apply',
-  'app/admin/variable-sets/[id]/page.tsx':
-    'varset CRUD and its workspace relationships are org-scoped; the workspace LIST here is native',
   'components/nav-bar.tsx': 'GET /api/v2/ping is the TFE service-discovery probe itself',
   'lib/api.ts': 'prose in a doc comment, not a call',
 }

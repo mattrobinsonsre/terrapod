@@ -72,6 +72,11 @@ type packageCacheTotalsOut struct {
 	ByEcosystem []packageCacheTotalOut `json:"by_ecosystem"`
 	Files       int64                  `json:"files"`
 	Bytes       int64                  `json:"bytes"`
+	// Sealed true means this node cannot re-fetch what it evicts
+	// (`registry.cache_only`), so clearing anything here is PERMANENT. Say so
+	// before recommending an eviction: the scheduled retention sweep skips
+	// these caches for exactly that reason.
+	Sealed bool `json:"sealed"`
 }
 
 func registerPackageCacheRead(s *mcp.Server, c *terrapod.Client) {
@@ -124,8 +129,9 @@ func registerPackageCacheRead(s *mcp.Server, c *terrapod.Client) {
 			Total:     total,
 			Truncated: len(list.Items) < total,
 			Totals: packageCacheTotalsOut{
-				Files: meta.Files,
-				Bytes: meta.Bytes,
+				Files:  meta.Files,
+				Bytes:  meta.Bytes,
+				Sealed: meta.Sealed,
 			},
 		}
 		for i := range list.Items {
@@ -185,6 +191,11 @@ type vcsArchiveTotalsOut struct {
 	// exactly what the caller came to find.
 	Truncated bool `json:"truncated"`
 	ScanLimit int  `json:"scan_limit"`
+	// Sealed true means this node cannot re-fetch what it evicts
+	// (`registry.cache_only`), so clearing anything here is PERMANENT. Say so
+	// before recommending an eviction: the scheduled retention sweep skips
+	// these caches for exactly that reason.
+	Sealed bool `json:"sealed"`
 }
 
 func registerVCSArchiveCacheRead(s *mcp.Server, c *terrapod.Client) {
@@ -254,6 +265,7 @@ func registerVCSArchiveCacheRead(s *mcp.Server, c *terrapod.Client) {
 			Bytes:     meta.Bytes,
 			Truncated: meta.Truncated,
 			ScanLimit: meta.ScanLimit,
+			Sealed:    meta.Sealed,
 		}
 		for _, t := range totals {
 			out.Totals.ByRepo = append(out.Totals.ByRepo, vcsArchiveTotalOut{
