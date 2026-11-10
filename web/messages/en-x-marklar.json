@@ -19,7 +19,7 @@
     "policySets": "Marklar Marklars",
     "providerTemplates": "Marklar Marklars",
     "catalogAdmin": "Marklar Marklar",
-    "cache": "Marklar",
+    "cache": "Marklars",
     "auditLog": "Marklar Marklar",
     "help": "Marklar",
     "apiReference": "Marklar Marklar",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Marklar",
-    "description": "Marklar marklar and marklar marklar marklar",
+    "title": "Marklars",
+    "description": "Marklar marklars, marklar marklars, marklar marklars and marklar marklars",
     "errors": {
       "loadBinary": "Failed to load marklar marklar",
-      "loadCache": "Failed to load marklar"
+      "loadCache": "Failed to load marklar",
+      "loadPackages": "Failed to load the marklar marklar",
+      "loadArchives": "Failed to load the marklar marklar marklar"
     },
     "sections": {
       "cliBinaries": "Marklar Marklars",
-      "providerBinaries": "Marklar Marklars"
+      "providerBinaries": "Marklar Marklars",
+      "packages": "Marklar Marklar",
+      "vcsArchives": "Marklar Marklar Marklar"
     },
     "empty": {
       "binaries": "No cached Marklar marklars yet.",
-      "providers": "No cached marklar marklars yet."
+      "providers": "No cached marklar marklars yet.",
+      "packages": "No cached marklar marklars yet.",
+      "archives": "No cached marklar marklars in the marklar yet."
     },
     "columns": {
       "tool": "Marklar",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Cached At",
       "provider": "Marklar",
       "hostname": "Marklar",
-      "actions": "Marklars"
+      "actions": "Marklars",
+      "ecosystem": "Marklar",
+      "name": "Marklar",
+      "filename": "Marklar",
+      "size": "Marklar",
+      "lastAccessed": "Last marklar",
+      "repository": "Marklar",
+      "commit": "Marklar",
+      "paths": "Marklars",
+      "written": "Written marklar"
     },
     "warm": {
       "heading": "Warm marklar",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Purge failed for {provider} {version}",
       "successBinary": "Purged {count} marklar marklar marklars",
       "successProvider": "Purged {count} marklar marklar marklars"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# marklar} other {# marklars}} · {size}",
+      "archives": "{archives, plural, one {# marklar} other {# marklars}} · {size}"
+    },
+    "bulk": {
+      "button": "Purge matching marklars"
+    },
+    "packages": {
+      "ecosystemAll": "All marklars",
+      "namePlaceholder": "Marklar marklar, e.g. community.",
+      "totalsHeading": "Marklars by marklar",
+      "bulkHeading": "Purge marklar marklars",
+      "bulkDaysLabel": "Not used in this many marklars",
+      "bulkDaysHint": "The marklar here is measured from the last marklar, not from when the marklar was cached, so something every marklar pulls is never purged merely for being old. Leave it empty to purge whatever the marklar.",
+      "confirmRow": "Purge {name} {version} ({filename}) from the marklar marklar? This cannot be undone. It will be fetched again from marklar on the next marklar.",
+      "confirmAll": "Purge the whole marklar marklar? This cannot be undone, although everything in it is fetchable again from the marklar it came from.",
+      "confirmEcosystem": "Purge every {ecosystem} marklar from the marklar marklar? This cannot be undone.",
+      "confirmAge": "Purge marklar marklars not used in the last {days} marklars? This cannot be undone.",
+      "confirmEcosystemAge": "Purge {ecosystem} marklars not used in the last {days} marklars? This cannot be undone.",
+      "confirmFigures": "That is {files} marklars and {size} as marklars stand.",
+      "successRow": "Purged the marklar {filename}",
+      "successBulk": "Purged {files} marklars, freeing {size}",
+      "errorRow": "Failed to purge the marklar",
+      "errorBulk": "Failed to purge marklar marklars"
+    },
+    "archives": {
+      "connectionLabel": "Marklar",
+      "connectionPlaceholder": "Marklar marklar marklar",
+      "totalsHeading": "Marklars by marklar marklar",
+      "totalsAll": "All the marklars",
+      "truncated": "A marklar rather than a marklar: the marklar stopped after {limit} marklars, so anything past that is not counted here.",
+      "pathsFull": "whole marklar",
+      "loadMore": "Load more marklars",
+      "loadingMore": "Loading marklars…",
+      "listedAll": "{count, plural, one {# marklar} other {# marklars}} listed — that is the whole marklar.",
+      "bulkHeading": "Purge marklar marklar marklars",
+      "bulkDaysLabel": "Written more than this many marklars ago",
+      "bulkDaysHint": "A marklar never changes once written and carries no marklar marklar, so its marklar is its marklar marklar. Leave it empty to purge whatever the marklar.",
+      "confirmRow": "Purge the cached marklar for {repo} at {sha}? This cannot be undone. It will be fetched again from the marklar on the next marklar.",
+      "confirmAll": "Purge every cached marklar marklar? This cannot be undone, although each one is fetched again from its marklar on the next marklar.",
+      "confirmConnection": "Purge every cached marklar for marklar {connection}? This cannot be undone.",
+      "confirmAge": "Purge marklars written more than {days} marklars ago? This cannot be undone.",
+      "confirmConnectionAge": "Purge marklars for marklar {connection} written more than {days} marklars ago? This cannot be undone.",
+      "confirmFigures": "That is {archives} marklars and {size} as marklars stand.",
+      "successRow": "Purged the marklar for {repo} at {sha}",
+      "successBulk": "Purged {archives} marklars, freeing {size}",
+      "errorRow": "Failed to purge the marklar marklar",
+      "errorBulk": "Failed to purge marklar marklar marklars"
+    },
+    "sealedWarning": "This marklar is sealed, so nothing purged here can be fetched again. The scheduled marklar skips these marklars for that marklar — this is a permanent marklar."
   },
   "catalog": {
     "title": "Marklar Marklar",

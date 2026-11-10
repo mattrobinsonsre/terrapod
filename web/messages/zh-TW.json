@@ -1729,18 +1729,24 @@
   },
   "adminBinaryCache": {
     "title": "快取",
-    "description": "CLI 二進位制檔案和提供者快取管理",
+    "description": "CLI 二進位制檔案、提供者二進位制檔案、套件構件和 VCS 封存",
     "errors": {
       "loadBinary": "載入二進位制檔案快取失敗",
-      "loadCache": "載入快取失敗"
+      "loadCache": "載入快取失敗",
+      "loadPackages": "載入套件快取失敗",
+      "loadArchives": "載入 VCS 封存快取失敗"
     },
     "sections": {
       "cliBinaries": "CLI 二進位制檔案",
-      "providerBinaries": "提供者二進位制檔案"
+      "providerBinaries": "提供者二進位制檔案",
+      "packages": "套件快取",
+      "vcsArchives": "VCS 封存快取"
     },
     "empty": {
       "binaries": "暫無快取的 CLI 二進位制檔案。",
-      "providers": "暫無快取的提供者二進位制檔案。"
+      "providers": "暫無快取的提供者二進位制檔案。",
+      "packages": "暫無快取的套件構件。",
+      "archives": "暫無快取的 VCS 封存。"
     },
     "columns": {
       "tool": "工具",
@@ -1750,7 +1756,16 @@
       "cachedAt": "快取時間",
       "provider": "提供者",
       "hostname": "主機名",
-      "actions": "操作"
+      "actions": "操作",
+      "ecosystem": "生態系",
+      "name": "名稱",
+      "filename": "檔案",
+      "size": "大小",
+      "lastAccessed": "最近存取",
+      "repository": "儲存庫",
+      "commit": "提交",
+      "paths": "路徑",
+      "written": "寫入時間"
     },
     "warm": {
       "heading": "預熱快取",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "清除 {provider} {version} 失敗",
       "successBinary": "已清除 {count} 個二進位制檔案快取條目",
       "successProvider": "已清除 {count} 個提供者快取條目"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, other {# 個檔案}} · {size}",
+      "archives": "{archives, plural, other {# 個封存}} · {size}"
+    },
+    "bulk": {
+      "button": "清除符合項目"
+    },
+    "packages": {
+      "ecosystemAll": "所有生態系",
+      "namePlaceholder": "名稱前綴，例如 community.",
+      "totalsHeading": "依生態系統計",
+      "bulkHeading": "清除套件構件",
+      "bulkDaysLabel": "未使用達此天數",
+      "bulkDaysHint": "這裡的時長是從最近一次存取算起，而非從寫入快取時算起，因此每次執行都會取用的內容絕不會只因為年代久遠就被清除。留空則不論時長一併清除。",
+      "confirmRow": "從套件快取中清除 {name} {version}（{filename}）？此操作無法復原。下次請求時將從上游重新取得。",
+      "confirmAll": "清除整個套件快取？此操作無法復原，但其中的所有內容都可以從原登錄檔重新取得。",
+      "confirmEcosystem": "從套件快取中清除所有 {ecosystem} 構件？此操作無法復原。",
+      "confirmAge": "清除最近 {days} 天未使用的套件構件？此操作無法復原。",
+      "confirmEcosystemAge": "清除最近 {days} 天未使用的 {ecosystem} 構件？此操作無法復原。",
+      "confirmFigures": "目前共 {files} 個構件、{size}。",
+      "successRow": "已清除 {filename}",
+      "successBulk": "已清除 {files} 個構件，釋出 {size}",
+      "errorRow": "清除構件失敗",
+      "errorBulk": "清除套件構件失敗"
+    },
+    "archives": {
+      "connectionLabel": "連線",
+      "connectionPlaceholder": "VCS 連線 ID",
+      "totalsHeading": "依儲存庫統計",
+      "totalsAll": "所有儲存庫",
+      "truncated": "這是下限而非總數：掃描在 {limit} 個封存後停止，因此其後的內容未計入此處。",
+      "pathsFull": "整個儲存庫",
+      "loadMore": "載入更多",
+      "loadingMore": "載入中…",
+      "listedAll": "已列出 {count, plural, other {# 個封存}}，這就是全部快取。",
+      "bulkHeading": "清除 VCS 封存",
+      "bulkDaysLabel": "寫入時間早於此天數",
+      "bulkDaysHint": "封存一旦寫入就不再改變，也沒有存取時間，因此其時長以寫入時間為準。留空則不論時長一併清除。",
+      "confirmRow": "清除 {repo} 在提交 {sha} 的快取封存？此操作無法復原。下次輪詢時將從儲存庫重新取得。",
+      "confirmAll": "清除所有已快取的 VCS 封存？此操作無法復原，但每個封存都會在下次輪詢時從各自的儲存庫重新取得。",
+      "confirmConnection": "清除連線 {connection} 的所有快取封存？此操作無法復原。",
+      "confirmAge": "清除寫入時間早於 {days} 天的封存？此操作無法復原。",
+      "confirmConnectionAge": "清除連線 {connection} 中寫入時間早於 {days} 天的封存？此操作無法復原。",
+      "confirmFigures": "目前共 {archives} 個封存、{size}。",
+      "successRow": "已清除 {repo} 在提交 {sha} 的封存",
+      "successBulk": "已清除 {archives} 個封存，釋出 {size}",
+      "errorRow": "清除封存失敗",
+      "errorBulk": "清除 VCS 封存失敗"
+    },
+    "sealedWarning": "本節點已密封，因此在此清除的內容無法重新取得。定期清理也正因如此會跳過這些快取 — 這是永久刪除。"
   },
   "catalog": {
     "title": "服務目錄",

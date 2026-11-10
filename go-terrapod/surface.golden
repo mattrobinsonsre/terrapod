@@ -125,6 +125,12 @@ field ArchitectureCritiqueMessage.InputTokens int `json:"input-tokens"`
 field ArchitectureCritiqueMessage.Model string `json:"model,omitempty"`
 field ArchitectureCritiqueMessage.OutputTokens int `json:"output-tokens"`
 field ArchitectureCritiqueMessage.Role string `json:"role"`
+field ArchiveEvictRequest.ConnectionID string `json:"connection_id,omitempty"`
+field ArchiveEvictRequest.OlderThanDays *int `json:"older_than_days,omitempty"`
+field ArchiveTotalsMeta.Archives int64 `json:"archives"`
+field ArchiveTotalsMeta.Bytes int64 `json:"bytes"`
+field ArchiveTotalsMeta.ScanLimit int `json:"scan-limit"`
+field ArchiveTotalsMeta.Truncated bool `json:"truncated"`
 field AuthenticationError.Detail string
 field AuthorizationError.Detail string
 field AutodiscoveryRule.Attributes map[string]any
@@ -144,6 +150,25 @@ field BulkWarmResponse.Failed int `json:"failed"`
 field BulkWarmResponse.Results []WarmResult `json:"results"`
 field BulkWarmResponse.Succeeded int `json:"succeeded"`
 field BulkWarmResponse.Total int `json:"total"`
+field CacheTotalsMeta.Bytes int64 `json:"bytes"`
+field CacheTotalsMeta.Files int64 `json:"files"`
+field CachedPackageFile.CachedAt string `json:"cached-at"`
+field CachedPackageFile.Digest string `json:"digest"`
+field CachedPackageFile.Ecosystem string `json:"ecosystem"`
+field CachedPackageFile.Filename string `json:"filename"`
+field CachedPackageFile.ID string `json:"id"`
+field CachedPackageFile.LastAccessedAt string `json:"last-accessed-at"`
+field CachedPackageFile.Name string `json:"name"`
+field CachedPackageFile.Size int64 `json:"size"`
+field CachedPackageFile.Version string `json:"version"`
+field CachedVCSArchive.ConnectionID string `json:"connection-id"`
+field CachedVCSArchive.Key string `json:"key"`
+field CachedVCSArchive.LastModified string `json:"last-modified"`
+field CachedVCSArchive.Owner string `json:"owner"`
+field CachedVCSArchive.PathsHash string `json:"paths-hash"`
+field CachedVCSArchive.Repo string `json:"repo"`
+field CachedVCSArchive.SHA string `json:"sha"`
+field CachedVCSArchive.Size int64 `json:"size"`
 field CatalogInstance.Attributes map[string]any
 field CatalogInstance.ID string
 field CatalogInstance.UpdateBlock map[string]string
@@ -481,6 +506,8 @@ field EstateNode.Kind string `json:"kind"`
 field EstateNode.Labels map[string]string `json:"labels"`
 field EstateNode.Name string `json:"name"`
 field EstateNode.Pool string `json:"pool"`
+field EvictionResult.Bytes int64
+field EvictionResult.Files int64
 field ExecutionHook.CreatedAt string `json:"created-at,omitempty"`
 field ExecutionHook.Description string `json:"description,omitempty"`
 field ExecutionHook.Enabled bool `json:"enabled"`
@@ -765,6 +792,20 @@ field Options.MaxRetries int
 field Options.SkipTLSVerify bool
 field Options.Token string
 field Options.UserAgent string
+field PackageCacheList.CurrentPage int
+field PackageCacheList.Items []CachedPackageFile
+field PackageCacheList.PageSize int
+field PackageCacheList.TotalCount int
+field PackageCacheList.TotalPages int
+field PackageCacheListOptions.Ecosystem string
+field PackageCacheListOptions.Name string
+field PackageCacheListOptions.PageNumber int
+field PackageCacheListOptions.PageSize int
+field PackageCacheTotal.Bytes int64 `json:"bytes"`
+field PackageCacheTotal.Ecosystem string `json:"ecosystem"`
+field PackageCacheTotal.Files int64 `json:"files"`
+field PackageEvictRequest.Ecosystem string `json:"ecosystem,omitempty"`
+field PackageEvictRequest.OlderThanDays *int `json:"older_than_days,omitempty"`
 field PlanSummary.CreatedAt string `json:"created-at,omitempty"`
 field PlanSummary.Description string `json:"description,omitempty"`
 field PlanSummary.ErrorMessage string `json:"error-message,omitempty"`
@@ -1340,6 +1381,17 @@ field User.HasPassword bool `json:"has-password"`
 field User.IsActive bool `json:"is-active"`
 field User.LastLoginAt string `json:"last-login-at,omitempty"`
 field User.UpdatedAt string `json:"updated-at,omitempty"`
+field VCSArchiveList.Items []CachedVCSArchive
+field VCSArchiveList.NextCursor string
+field VCSArchiveList.PageSize int
+field VCSArchiveListOptions.After string
+field VCSArchiveListOptions.ConnectionID string
+field VCSArchiveListOptions.Limit int
+field VCSArchiveTotal.Archives int64 `json:"archives"`
+field VCSArchiveTotal.Bytes int64 `json:"bytes"`
+field VCSArchiveTotal.ConnectionID string `json:"connection-id"`
+field VCSArchiveTotal.Owner string `json:"owner"`
+field VCSArchiveTotal.Repo string `json:"repo"`
 field VCSConnection.AllowedRepositories []string `json:"allowed-repositories,omitempty"`
 field VCSConnection.BudgetWindowSeconds *int64 `json:"budget-window-seconds,omitempty"`
 field VCSConnection.CallsPerHour *int64 `json:"calls-per-hour,omitempty"`
@@ -1720,6 +1772,7 @@ method (*Client) DeleteInventoryHostVar(ctx context.Context, id string) error
 method (*Client) DeleteModuleAutodiscoveryRule(ctx context.Context, id string) error
 method (*Client) DeleteModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) error
 method (*Client) DeleteNotificationConfiguration(ctx context.Context, id string) error
+method (*Client) DeletePackageCacheFile(ctx context.Context, id string) error
 method (*Client) DeletePolicy(ctx context.Context, policyID string) error
 method (*Client) DeletePolicySet(ctx context.Context, id string) error
 method (*Client) DeleteProviderTemplate(ctx context.Context, id string) error
@@ -1731,6 +1784,7 @@ method (*Client) DeleteRunTask(ctx context.Context, id string) error
 method (*Client) DeleteRunTrigger(ctx context.Context, id string) error
 method (*Client) DeleteStateVersion(ctx context.Context, stateVersionID string) error
 method (*Client) DeleteUser(ctx context.Context, email string) error
+method (*Client) DeleteVCSArchive(ctx context.Context, key string) error
 method (*Client) DeleteVCSConnection(ctx context.Context, id string) error
 method (*Client) DeleteVariable(ctx context.Context, workspaceID, id string) error
 method (*Client) DeleteVariableSet(ctx context.Context, id string) error
@@ -1740,6 +1794,8 @@ method (*Client) DeleteWorkspace(ctx context.Context, id string) error
 method (*Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
 method (*Client) DiscardCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error)
 method (*Client) DiscardRun(ctx context.Context, runID string) (*Run, error)
+method (*Client) EvictPackageCache(ctx context.Context, req PackageEvictRequest) (*EvictionResult, error)
+method (*Client) EvictVCSArchiveCache(ctx context.Context, req ArchiveEvictRequest) (*EvictionResult, error)
 method (*Client) Get(ctx context.Context, path string) ([]byte, error)
 method (*Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error)
@@ -1829,6 +1885,8 @@ method (*Client) ListAllInventoryGroups( ctx context.Context, workspaceID string
 method (*Client) ListAllInventoryHosts( ctx context.Context, workspaceID string, ) ([]InventoryHost, error)
 method (*Client) ListAllModuleAutodiscoveryRuleRepositories(ctx context.Context, id, status string) ([]ModuleAutodiscoveryRepository, error)
 method (*Client) ListAllModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
+method (*Client) ListAllPackageCache(ctx context.Context, opts PackageCacheListOptions) ([]CachedPackageFile, error)
+method (*Client) ListAllVCSArchiveCache(ctx context.Context, opts VCSArchiveListOptions) ([]CachedVCSArchive, error)
 method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
 method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error)
@@ -1861,6 +1919,7 @@ method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID
 method (*Client) ListOIDCSigningKeys(ctx context.Context) (*OIDCSigningKeySet, error)
 method (*Client) ListOnboardingSessions(ctx context.Context, workspaceID string) ([]OnboardingSession, error)
 method (*Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
+method (*Client) ListPackageCache(ctx context.Context, opts PackageCacheListOptions) (*PackageCacheList, error)
 method (*Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*PlanSummaryMessage, error)
 method (*Client) ListPolicies(ctx context.Context, policySetID string) ([]Policy, error)
 method (*Client) ListPolicySets(ctx context.Context) ([]PolicySet, error)
@@ -1879,6 +1938,7 @@ method (*Client) ListRunQueue( ctx context.Context, pageNumber, pageSize int, ) 
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
 method (*Client) ListUsers(ctx context.Context) ([]User, error)
+method (*Client) ListVCSArchiveCache(ctx context.Context, opts VCSArchiveListOptions) (*VCSArchiveList, error)
 method (*Client) ListVCSConnections(ctx context.Context) ([]VCSConnection, error)
 method (*Client) ListVariableSets(ctx context.Context) ([]VariableSet, error)
 method (*Client) ListVariables(ctx context.Context, workspaceID string) ([]Variable, error)
@@ -1891,6 +1951,7 @@ method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) OverridePolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error)
 method (*Client) OverrideRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
+method (*Client) PackageCacheTotals(ctx context.Context) ([]PackageCacheTotal, CacheTotalsMeta, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PinIdentitySubject(ctx context.Context, providerName, email, subject string) error
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
@@ -1959,6 +2020,7 @@ method (*Client) UploadProviderPlatform(ctx context.Context, name, version, goos
 method (*Client) UploadProviderSHASUMS(ctx context.Context, name, version string, shasums []byte) error
 method (*Client) UploadProviderSignature(ctx context.Context, name, version string, sig []byte) error
 method (*Client) UploadStateContent(ctx context.Context, stateVersionID string, raw []byte) error
+method (*Client) VCSArchiveCacheTotals(ctx context.Context) ([]VCSArchiveTotal, ArchiveTotalsMeta, error)
 method (*Client) VersionCheck(ctx context.Context) error
 method (*Client) WarmCacheBulk(ctx context.Context, req BulkWarmRequest) (*BulkWarmResponse, error)
 method (*Client) WhoAmI(ctx context.Context) (*HANode, error)
@@ -1982,12 +2044,17 @@ type ArchitectureCritique struct
 type ArchitectureCritiqueArchitecture struct
 type ArchitectureCritiqueFinding struct
 type ArchitectureCritiqueMessage struct
+type ArchiveEvictRequest struct
+type ArchiveTotalsMeta struct
 type AuthenticationError struct
 type AuthorizationError struct
 type AutodiscoveryRule struct
 type BulkUpdateResult struct
 type BulkWarmRequest struct
 type BulkWarmResponse struct
+type CacheTotalsMeta struct
+type CachedPackageFile struct
+type CachedVCSArchive struct
 type CatalogInstance struct
 type CatalogItem struct
 type CatalogItemInterface struct
@@ -2040,6 +2107,7 @@ type EstateEdge struct
 type EstateGraph struct
 type EstateGraphMeta struct
 type EstateNode struct
+type EvictionResult struct
 type ExecutionHook struct
 type GPGKey struct
 type HAFinding struct
@@ -2086,6 +2154,10 @@ type OnboardingAvailability struct
 type OnboardingDataSource struct
 type OnboardingSession struct
 type Options struct
+type PackageCacheList struct
+type PackageCacheListOptions struct
+type PackageCacheTotal struct
+type PackageEvictRequest struct
 type PlanSummary struct
 type PlanSummaryMessage struct
 type PlanSummaryRiskFactor struct
@@ -2155,6 +2227,9 @@ type UpdateVarsetVariableRequest struct
 type UpdateWorkspaceRequest struct
 type UsageAssumption struct
 type User struct
+type VCSArchiveList struct
+type VCSArchiveListOptions struct
+type VCSArchiveTotal struct
 type VCSConnection struct
 type VCSConsumer struct
 type VCSLabelTotal struct

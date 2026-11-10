@@ -119,7 +119,8 @@ Notes:
 
 - **Absent params → full list.** Omitting `page[size]` (or sending `page[size]=0`) returns every item, so a client that just wants the whole collection can ignore paging entirely. This is a deliberate Terrapod behaviour; on `/api/tfe/v2/` the `meta.pagination` shape still matches what a `go-tfe` client expects.
 - **To fetch everything robustly, page and loop** rather than relying on the absent-params default — request `page[size]=100`, then `page[number]=1,2,…` until `total-pages` is reached. go-terrapod exposes `ListAll*` helpers that do this; the web UI uses `fetchAllPages()`.
-- **Unbounded-history collections are the one exception:** the runs list (`GET /api/tfe/v2/workspaces/{id}/runs`) keeps a **bounded default page (20)** instead of returning all history, but still honours `page[size]` and emits `meta.pagination` so you can page the full history.
+- **Unbounded-history collections are one exception:** the runs list (`GET /api/tfe/v2/workspaces/{id}/runs`) keeps a **bounded default page (20)** instead of returning all history, but still honours `page[size]` and emits `meta.pagination` so you can page the full history.
+- **The cached-VCS-archive listing is the other exception:** `GET /api/v1/admin/vcs-archive-cache` pages with a **key cursor** (`after` + `meta.next-cursor`) and carries no `meta.pagination` at all, because there are no rows to offset into — a page is a storage walk. See [Cache Administration](#cache-administration).
 - `total-count` is the size of the whole (RBAC-filtered) collection, not the returned page.
 
 ---
@@ -4757,6 +4758,241 @@ See [Cache pre-population](registry.md#cache-pre-population).
 ```
 DELETE /api/v1/admin/binary-cache/{tool}/{version}
 ```
+
+## Cache Administration
+
+Terrapod keeps four pull-through caches. The CLI-binary and provider caches are
+above; this section covers the other two — the **package cache** (one table for
+all six language ecosystems) and the **VCS archive cache** (object storage only,
+no table). Every route here requires platform `admin`.
+
+For what fills each cache, how the scheduled sweep evicts it, and the operator
+walkthrough, see [Caches](caches.md).
+
+> **Two of these endpoints deliberately do not match their siblings.** The
+> archive listing pages with a **key cursor** rather than `page[size]`, and the
+> archive totals carry **`meta.truncated`**. Both follow from the archive cache
+> having no database table; see
+> [Where the two caches differ](caches.md#where-the-two-caches-differ-and-why).
+
+### List Cached Package Artifacts (Admin)
+
+```
+GET /api/v1/admin/package-cache
+```
+
+Ordered by **last access, newest first** — the column retention reads, so the
+order answers "what has nothing touched". Ordinary optional
+[pagination](#pagination).
+
+| Query param | Matching |
+|---|---|
+| `ecosystem` | exact — `galaxy` \| `pypi` \| `npm` \| `go` \| `nuget` \| `pulumi`. An unrecognised value matches nothing rather than erroring |
+| `name` | **prefix**, not equality — `community.` returns the collection family |
+
+**Response attributes** (`data[].type` = `cached-package-files`; `id` is a bare
+UUID):
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `ecosystem` | string | Which registry it came from |
+| `name` | string | Package name as that ecosystem normalises it (an npm scope keeps its `/`) |
+| `version` | string | The version this file belongs to |
+| `filename` | string | The artifact file. One version has many — an sdist plus a wheel per platform and ABI — so the cache is keyed on the filename |
+| `size` | int | Bytes |
+| `digest` | string | **Upstream's own** digest as that ecosystem publishes it (`sha256:…`, or an SRI `sha512-…`); empty when upstream published none. Never re-derived — it is what the client checks our bytes against |
+| `cached-at` | string | RFC3339; first fetch |
+| `last-accessed-at` | string | RFC3339; what retention and the age filter read |
+
+### Package Cache Totals (Admin)
+
+```
+GET /api/v1/admin/package-cache/totals
+```
+
+One row per ecosystem (`data[].type` = `package-cache-totals`, `id` = the
+ecosystem), ordered by name, with the grand total in `meta`. Aggregated in the
+database over the **whole** cache — a total summed from a page would be wrong by
+whatever the page omitted, and wrong in the reassuring direction.
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `ecosystem` | string | The ecosystem this row totals |
+| `files` | int | Artifacts held |
+| `bytes` | int | Bytes held |
+
+`meta.files` and `meta.bytes` are the totals across every ecosystem.
+
+### Evict One Cached Package Artifact (Admin)
+
+```
+DELETE /api/v1/admin/package-cache/{file_id}
+```
+
+`file_id` is the entry's `id`. By id rather than by `(ecosystem, name, filename)`
+— that tuple is the unique constraint so either would address one row, but an id
+cannot be mangled by a filename carrying a slash or a `+`. **404** when the row
+is already gone, and equally when the id is not a well-formed UUID.
+
+### Evict Package Artifacts in Bulk (Admin)
+
+```
+POST /api/v1/admin/package-cache/evict
+```
+
+```json
+{ "ecosystem": "npm", "older_than_days": 14 }
+```
+
+| Field | Meaning |
+|---|---|
+| `ecosystem` | Optional. Omitted or empty, every ecosystem |
+| `older_than_days` | Optional, `>= 0`. Artifacts **not accessed** in this many days. Access-based, never write-based: an artifact every run pulls would otherwise be evicted merely for being old and re-fetched immediately |
+
+Neither field means **the whole cache**, which is deliberate — a thing an
+operator legitimately wants after a bad publish, and nothing is lost because
+every artifact is re-fetchable. `older_than_days: 0` is a cutoff of *now*, so it
+also means everything; it is not "disabled" the way a `0` retention key is.
+
+An unknown **field** is rejected with **422** rather than widening the eviction.
+An unknown `ecosystem` **value** is not validated and simply matches nothing, so
+check the returned count:
+
+```json
+{ "status": "evicted", "files": 318, "bytes": 2104725504 }
+```
+
+### List Cached VCS Archives (Admin)
+
+```
+GET /api/v1/admin/vcs-archive-cache
+```
+
+| Query param | Meaning |
+|---|---|
+| `connection_id` | Narrow to one VCS connection. Narrows the **storage prefix walked**, not an already-fetched page |
+| `after` | Key cursor — return only keys strictly after this one. Pass back the `meta.next-cursor` you were given |
+| `limit` | Entries per page; default `100`, clamped to between 1 and the `scan-limit` the totals report |
+
+**There is no `page[number]` and no `meta.pagination` here.** There are no rows
+to offset into: a page is a storage walk, `list_prefix` is key-ordered on every
+backend as part of the storage contract, and an offset would re-walk the whole
+prefix for each page.
+
+**Response attributes** (`data[].type` = `cached-vcs-archives`; `id` is the
+storage key):
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `key` | string | The storage key, `vcs_archives/{connection}/{owner}/{repo}/{sha}-{paths_hash}.tar.gz`. Also the handle `DELETE` takes |
+| `connection-id` | string | The VCS connection whose credential fetched it — archives are scoped per connection |
+| `owner` | string | Repository owner, read out of the key |
+| `repo` | string | Repository name, read out of the key |
+| `sha` | string | The commit the tarball was cut at |
+| `paths-hash` | string | Hash of the path-narrowing set, or the literal `full` for a whole-repository archive |
+| `size` | int | Bytes |
+| `last-modified` | string | RFC3339 write time — the archive's age. Empty when the backend reports none |
+
+Every field but `size` and `last-modified` is read **out of the key**; there is no
+row to read instead. A key that does not parse is still listed, with those fields
+empty, rather than skipped — a key this surface cannot read is the one most worth
+seeing. It is not counted in the totals below.
+
+```json
+{
+  "data": [ /* ... */ ],
+  "meta": {
+    "next-cursor": "vcs_archives/vcs-1b3f/acme/platform/9c1d4b7a3e5f82061d9c4a7b2e8f3015d6a9c47b-4f2e91c7.tar.gz",
+    "page-size": 50
+  }
+}
+```
+
+`meta.next-cursor` is **empty when you have reached the end**; it is empty
+whenever a page comes back shorter than the requested `limit`, so a short page is
+itself the end signal. A final page that is exactly `limit` long returns a cursor
+whose next fetch is an empty `data` array. `meta.page-size` is how many entries
+this page holds, not the limit requested.
+
+### VCS Archive Cache Totals (Admin)
+
+```
+GET /api/v1/admin/vcs-archive-cache/totals
+```
+
+One row per repository (`data[].type` = `vcs-archive-cache-totals`,
+`id` = `{connection-id}/{owner}/{repo}`), **largest first**.
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `connection-id` | string | The VCS connection |
+| `owner` | string | Repository owner |
+| `repo` | string | Repository name |
+| `archives` | int | Archives held for this repository |
+| `bytes` | int | Bytes held for this repository |
+
+```json
+{
+  "data": [ /* ... */ ],
+  "meta": { "archives": 1612, "bytes": 4017836032, "truncated": true, "scan-limit": 5000 }
+}
+```
+
+**`meta.truncated` is the honest half.** There are no rows to aggregate, so this
+walks storage and a walk has to stop somewhere — `meta.scan-limit` is where.
+`true` means the figures are a **floor**, not a total; a total that silently
+omitted whatever lay past the ceiling would understate exactly what the caller
+came to find. The endpoint is not filterable; to get inside the ceiling, total up
+the per-connection listing instead.
+
+### Evict One Cached VCS Archive (Admin)
+
+```
+DELETE /api/v1/admin/vcs-archive-cache?key=…
+```
+
+The key is a **query parameter rather than a path segment**, because it contains
+slashes.
+
+**422** unless the key starts with `vcs_archives/` and contains no `..`. This
+route takes a storage key straight from a request, so without that check a typo
+could delete a state version, a plan artifact or a provider binary through an
+endpoint whose name says "cache".
+
+The delete is **idempotent**: a well-formed key that is already gone returns the
+same `{"status": "evicted"}`. There is no row to miss, so nothing a 404 could
+report — unlike the package-cache delete, where a row genuinely is absent.
+
+### Evict Cached VCS Archives in Bulk (Admin)
+
+```
+POST /api/v1/admin/vcs-archive-cache/evict
+```
+
+```json
+{ "connection_id": "vcs-1b3f", "older_than_days": 7 }
+```
+
+| Field | Meaning |
+|---|---|
+| `connection_id` | Optional. Omitted or empty, every connection |
+| `older_than_days` | Optional, `>= 0`. Archives **written** more than this many days ago. Write-based here, because an archive is immutable once written and there is no access column to prefer |
+
+Neither field means every archive. `older_than_days: 0` means everything, as
+above.
+
+```json
+{ "status": "evicted", "archives": 406, "bytes": 1178927104 }
+```
+
+One call considers at most `scan-limit` archives and the response does not say
+whether it stopped early, so on a large estate **repeat until `archives` is `0`**.
+
+> **On a sealed node (`api.config.registry.cache_only`) a package-cache eviction
+> is a deletion.** The scheduled sweep skips the binary, provider and package
+> caches there because nothing can be refilled; these manual routes do not. VCS
+> archives are unaffected — sealing forbids reaching a package registry, not your
+> own VCS. See [Sealed deployments](caches.md#sealed-deployments).
 
 ---
 

@@ -19,7 +19,7 @@
     "policySets": "Policyuppsättningar",
     "providerTemplates": "Provider-mallar",
     "catalogAdmin": "Katalogadmin",
-    "cache": "Cache",
+    "cache": "Cachar",
     "auditLog": "Granskningslogg",
     "help": "Hjälp",
     "apiReference": "API-referens",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "Hantering av CLI-binärer och providercache",
+    "title": "Cachar",
+    "description": "CLI-binärer, providerbinärer, paketartefakter och VCS-arkiv",
     "errors": {
       "loadBinary": "Det gick inte att läsa in binärcachen",
-      "loadCache": "Det gick inte att läsa in cachen"
+      "loadCache": "Det gick inte att läsa in cachen",
+      "loadPackages": "Kunde inte läsa in paketcachen",
+      "loadArchives": "Kunde inte läsa in VCS-arkivcachen"
     },
     "sections": {
       "cliBinaries": "CLI-binärer",
-      "providerBinaries": "Providerbinärer"
+      "providerBinaries": "Providerbinärer",
+      "packages": "Paketcache",
+      "vcsArchives": "VCS-arkivcache"
     },
     "empty": {
       "binaries": "Inga cachade CLI-binärer ännu.",
-      "providers": "Inga cachade providerbinärer ännu."
+      "providers": "Inga cachade providerbinärer ännu.",
+      "packages": "Inga cachade paketartefakter ännu.",
+      "archives": "Inga cachade VCS-arkiv ännu."
     },
     "columns": {
       "tool": "Verktyg",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Cachad",
       "provider": "Provider",
       "hostname": "Värdnamn",
-      "actions": "Åtgärder"
+      "actions": "Åtgärder",
+      "ecosystem": "Ekosystem",
+      "name": "Namn",
+      "filename": "Fil",
+      "size": "Storlek",
+      "lastAccessed": "Senast använd",
+      "repository": "Arkiv",
+      "commit": "Commit",
+      "paths": "Sökvägar",
+      "written": "Skriven"
     },
     "warm": {
       "heading": "Förvärm cache",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Rensning misslyckades för {provider} {version}",
       "successBinary": "Rensade {count} poster i binärcachen",
       "successProvider": "Rensade {count} poster i providercachen"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# fil} other {# filer}} · {size}",
+      "archives": "{archives, plural, one {# arkiv} other {# arkiv}} · {size}"
+    },
+    "bulk": {
+      "button": "Rensa matchande"
+    },
+    "packages": {
+      "ecosystemAll": "Alla ekosystem",
+      "namePlaceholder": "Namnprefix, t.ex. community.",
+      "totalsHeading": "Summor per ekosystem",
+      "bulkHeading": "Rensa paketartefakter",
+      "bulkDaysLabel": "Oanvänd så här många dagar",
+      "bulkDaysHint": "Åldern mäts här från senaste användningen, inte från när artefakten cachades, så något som varje körning hämtar rensas aldrig bara för att det är gammalt. Lämna tomt för att rensa oavsett ålder.",
+      "confirmRow": "Rensa {name} {version} ({filename}) från paketcachen? Detta kan inte ångras. Den hämtas på nytt från uppströms vid nästa förfrågan.",
+      "confirmAll": "Rensa hela paketcachen? Detta kan inte ångras, men allt i den kan hämtas på nytt från registret det kom från.",
+      "confirmEcosystem": "Rensa alla {ecosystem}-artefakter från paketcachen? Detta kan inte ångras.",
+      "confirmAge": "Rensa paketartefakter som inte använts de senaste {days} dagarna? Detta kan inte ångras.",
+      "confirmEcosystemAge": "Rensa {ecosystem}-artefakter som inte använts de senaste {days} dagarna? Detta kan inte ångras.",
+      "confirmFigures": "Det är {files} artefakter och {size} just nu.",
+      "successRow": "{filename} rensad",
+      "successBulk": "Rensade {files} artefakter och frigjorde {size}",
+      "errorRow": "Kunde inte rensa artefakten",
+      "errorBulk": "Kunde inte rensa paketartefakterna"
+    },
+    "archives": {
+      "connectionLabel": "Anslutning",
+      "connectionPlaceholder": "VCS-anslutningens id",
+      "totalsHeading": "Summor per arkiv",
+      "totalsAll": "Alla arkiv",
+      "truncated": "En nedre gräns, inte en summa: genomgången stannade efter {limit} arkiv, så allt därutöver räknas inte här.",
+      "pathsFull": "hela arkivet",
+      "loadMore": "Läs in mer",
+      "loadingMore": "Läser in…",
+      "listedAll": "{count, plural, one {# arkiv} other {# arkiv}} visas — det är hela cachen.",
+      "bulkHeading": "Rensa VCS-arkiv",
+      "bulkDaysLabel": "Skriven för mer än så här många dagar sedan",
+      "bulkDaysHint": "Ett arkiv ändras aldrig när det en gång skrivits och har ingen användningstid, så dess ålder är när det skrevs. Lämna tomt för att rensa oavsett ålder.",
+      "confirmRow": "Rensa det cachade arkivet för {repo} vid {sha}? Detta kan inte ångras. Det hämtas på nytt från arkivet vid nästa avfrågning.",
+      "confirmAll": "Rensa varje cachat VCS-arkiv? Detta kan inte ångras, men varje arkiv hämtas på nytt från sitt eget arkiv vid nästa avfrågning.",
+      "confirmConnection": "Rensa varje cachat arkiv för anslutningen {connection}? Detta kan inte ångras.",
+      "confirmAge": "Rensa arkiv som skrevs för mer än {days} dagar sedan? Detta kan inte ångras.",
+      "confirmConnectionAge": "Rensa arkiv för anslutningen {connection} som skrevs för mer än {days} dagar sedan? Detta kan inte ångras.",
+      "confirmFigures": "Det är {archives} arkiv och {size} just nu.",
+      "successRow": "Arkivet för {repo} vid {sha} rensades",
+      "successBulk": "Rensade {archives} arkiv och frigjorde {size}",
+      "errorRow": "Kunde inte rensa arkivet",
+      "errorBulk": "Kunde inte rensa VCS-arkiven"
+    },
+    "sealedWarning": "Den här noden är förseglad, så inget som rensas här kan hämtas på nytt. Den schemalagda rensningen hoppar över dessa cachar av just det skälet — detta är en permanent borttagning."
   },
   "catalog": {
     "title": "Tjänstekatalog",

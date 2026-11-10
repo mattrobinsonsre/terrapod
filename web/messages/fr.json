@@ -19,7 +19,7 @@
     "policySets": "Ensembles de politiques",
     "providerTemplates": "Modèles de fournisseur",
     "catalogAdmin": "Administration du catalogue",
-    "cache": "Cache",
+    "cache": "Caches",
     "auditLog": "Journal d'audit",
     "help": "Aide",
     "apiReference": "Référence de l'API",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Cache",
-    "description": "Gestion du cache des binaires CLI et des fournisseurs",
+    "title": "Caches",
+    "description": "Binaires CLI, binaires de fournisseurs, artefacts de paquets et archives VCS",
     "errors": {
       "loadBinary": "Échec du chargement du cache des binaires",
-      "loadCache": "Échec du chargement du cache"
+      "loadCache": "Échec du chargement du cache",
+      "loadPackages": "Échec du chargement du cache des paquets",
+      "loadArchives": "Échec du chargement du cache des archives VCS"
     },
     "sections": {
       "cliBinaries": "Binaires CLI",
-      "providerBinaries": "Binaires de fournisseur"
+      "providerBinaries": "Binaires de fournisseur",
+      "packages": "Cache des paquets",
+      "vcsArchives": "Cache des archives VCS"
     },
     "empty": {
       "binaries": "Aucun binaire CLI en cache pour l'instant.",
-      "providers": "Aucun binaire de fournisseur en cache pour l'instant."
+      "providers": "Aucun binaire de fournisseur en cache pour l'instant.",
+      "packages": "Aucun artefact de paquet en cache pour l'instant.",
+      "archives": "Aucune archive VCS en cache pour l'instant."
     },
     "columns": {
       "tool": "Outil",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Mis en cache le",
       "provider": "Fournisseur",
       "hostname": "Nom d'hôte",
-      "actions": "Actions"
+      "actions": "Actions",
+      "ecosystem": "Écosystème",
+      "name": "Nom",
+      "filename": "Fichier",
+      "size": "Taille",
+      "lastAccessed": "Dernier accès",
+      "repository": "Dépôt",
+      "commit": "Commit",
+      "paths": "Chemins",
+      "written": "Écrite"
     },
     "warm": {
       "heading": "Préchauffer le cache",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Échec de la purge pour {provider} {version}",
       "successBinary": "{count} entrées de cache de binaires purgées",
       "successProvider": "{count} entrées de cache de fournisseurs purgées"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# fichier} other {# fichiers}} · {size}",
+      "archives": "{archives, plural, one {# archive} other {# archives}} · {size}"
+    },
+    "bulk": {
+      "button": "Purger la sélection"
+    },
+    "packages": {
+      "ecosystemAll": "Tous les écosystèmes",
+      "namePlaceholder": "Préfixe du nom, par ex. community.",
+      "totalsHeading": "Totaux par écosystème",
+      "bulkHeading": "Purger des artefacts de paquets",
+      "bulkDaysLabel": "Non utilisé depuis ce nombre de jours",
+      "bulkDaysHint": "L'âge est mesuré ici depuis le dernier accès, et non depuis la mise en cache : ce qu'une exécution récupère à chaque fois n'est donc jamais purgé au seul motif de son ancienneté. Laissez vide pour purger quel que soit l'âge.",
+      "confirmRow": "Purger {name} {version} ({filename}) du cache des paquets ? C'est irréversible. L'artefact sera récupéré de nouveau depuis l'amont à la prochaine requête.",
+      "confirmAll": "Purger tout le cache des paquets ? C'est irréversible, même si tout son contenu peut être récupéré de nouveau depuis le registre d'origine.",
+      "confirmEcosystem": "Purger tous les artefacts {ecosystem} du cache des paquets ? C'est irréversible.",
+      "confirmAge": "Purger les artefacts de paquets non utilisés depuis {days} jours ? C'est irréversible.",
+      "confirmEcosystemAge": "Purger les artefacts {ecosystem} non utilisés depuis {days} jours ? C'est irréversible.",
+      "confirmFigures": "Cela représente actuellement {files} artefacts et {size}.",
+      "successRow": "{filename} purgé",
+      "successBulk": "{files} artefacts purgés, {size} libérés",
+      "errorRow": "Échec de la purge de l'artefact",
+      "errorBulk": "Échec de la purge des artefacts de paquets"
+    },
+    "archives": {
+      "connectionLabel": "Connexion",
+      "connectionPlaceholder": "Identifiant de connexion VCS",
+      "totalsHeading": "Totaux par dépôt",
+      "totalsAll": "Tous les dépôts",
+      "truncated": "Un plancher plutôt qu'un total : le parcours s'est arrêté après {limit} archives, donc tout ce qui suit n'est pas compté ici.",
+      "pathsFull": "dépôt entier",
+      "loadMore": "Charger plus",
+      "loadingMore": "Chargement…",
+      "listedAll": "{count, plural, one {# archive listée} other {# archives listées}} — c'est tout le cache.",
+      "bulkHeading": "Purger des archives VCS",
+      "bulkDaysLabel": "Écrite il y a plus de ce nombre de jours",
+      "bulkDaysHint": "Une archive ne change jamais une fois écrite et ne porte aucune date d'accès : son âge est donc sa date d'écriture. Laissez vide pour purger quel que soit l'âge.",
+      "confirmRow": "Purger l'archive en cache de {repo} au commit {sha} ? C'est irréversible. Elle sera récupérée de nouveau depuis le dépôt au prochain sondage.",
+      "confirmAll": "Purger toutes les archives VCS en cache ? C'est irréversible, même si chacune sera récupérée de nouveau depuis son dépôt au prochain sondage.",
+      "confirmConnection": "Purger toutes les archives en cache de la connexion {connection} ? C'est irréversible.",
+      "confirmAge": "Purger les archives écrites il y a plus de {days} jours ? C'est irréversible.",
+      "confirmConnectionAge": "Purger les archives de la connexion {connection} écrites il y a plus de {days} jours ? C'est irréversible.",
+      "confirmFigures": "Cela représente actuellement {archives} archives et {size}.",
+      "successRow": "Archive de {repo} au commit {sha} purgée",
+      "successBulk": "{archives} archives purgées, {size} libérés",
+      "errorRow": "Échec de la purge de l'archive",
+      "errorBulk": "Échec de la purge des archives VCS"
+    },
+    "sealedWarning": "Ce nœud est scellé : rien de ce qui est purgé ici ne pourra être récupéré de nouveau. Le nettoyage planifié ignore ces caches pour cette raison — il s'agit d'une suppression définitive."
   },
   "catalog": {
     "title": "Catalogue de services",

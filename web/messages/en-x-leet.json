@@ -19,7 +19,7 @@
     "policySets": "P0l1cy 5375",
     "providerTemplates": "Pr0v1d3r 73mpl4735",
     "catalogAdmin": "C474l0g 4dm1n",
-    "cache": "C4ch3",
+    "cache": "C4ch35",
     "auditLog": "4ud17 L0g",
     "help": "H3lp",
     "apiReference": "4P1 R3f3r3nc3",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "C4ch3",
-    "description": "CL1 b1n4ry 4nd pr0v1d3r c4ch3 m4n4g3m3n7",
+    "title": "C4ch35",
+    "description": "CL1 b1n4r135, pr0v1d3r b1n4r135, p4ck4g3 4r71f4c75 4nd VC5 4rch1v35",
     "errors": {
       "loadBinary": "F41l3d 70 l04d b1n4ry c4ch3",
-      "loadCache": "F41l3d 70 l04d c4ch3"
+      "loadCache": "F41l3d 70 l04d c4ch3",
+      "loadPackages": "F41l3d 70 l04d 7h3 p4ck4g3 c4ch3",
+      "loadArchives": "F41l3d 70 l04d 7h3 VC5 4rch1v3 c4ch3"
     },
     "sections": {
       "cliBinaries": "CL1 B1n4r135",
-      "providerBinaries": "Pr0v1d3r B1n4r135"
+      "providerBinaries": "Pr0v1d3r B1n4r135",
+      "packages": "P4ck4g3 C4ch3",
+      "vcsArchives": "VC5 4rch1v3 C4ch3"
     },
     "empty": {
       "binaries": "N0 c4ch3d CL1 b1n4r135 y37.",
-      "providers": "N0 c4ch3d pr0v1d3r b1n4r135 y37."
+      "providers": "N0 c4ch3d pr0v1d3r b1n4r135 y37.",
+      "packages": "N0 c4ch3d p4ck4g3 4r71f4c75 y37.",
+      "archives": "N0 c4ch3d VC5 4rch1v35 y37."
     },
     "columns": {
       "tool": "700l",
@@ -1750,7 +1756,16 @@
       "cachedAt": "C4ch3d 47",
       "provider": "Pr0v1d3r",
       "hostname": "H057n4m3",
-      "actions": "4c710n5"
+      "actions": "4c710n5",
+      "ecosystem": "3c05y573m",
+      "name": "N4m3",
+      "filename": "F1l3",
+      "size": "51z3",
+      "lastAccessed": "L457 4cc3553d",
+      "repository": "R3p05170ry",
+      "commit": "C0mm17",
+      "paths": "P47h5",
+      "written": "Wr1773n"
     },
     "warm": {
       "heading": "W4rm c4ch3",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Purg3 f41l3d f0r {provider} {version}",
       "successBinary": "Purg3d {count} b1n4ry c4ch3 3n7r135",
       "successProvider": "Purg3d {count} pr0v1d3r c4ch3 3n7r135"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# f1l3} other {# f1l35}} · {size}",
+      "archives": "{archives, plural, one {# 4rch1v3} other {# 4rch1v35}} · {size}"
+    },
+    "bulk": {
+      "button": "Purg3 m47ch1ng"
+    },
+    "packages": {
+      "ecosystemAll": "4ll 3c05y573m5",
+      "namePlaceholder": "N4m3 pr3f1x, 3.g. c0mmun17y.",
+      "totalsHeading": "7074l5 by 3c05y573m",
+      "bulkHeading": "Purg3 p4ck4g3 4r71f4c75",
+      "bulkDaysLabel": "N07 u53d 1n 7h15 m4ny d4y5",
+      "bulkDaysHint": "4g3 h3r3 15 m345ur3d fr0m 7h3 l457 4cc355, n07 fr0m wh3n 7h3 4r71f4c7 w45 c4ch3d, 50 50m37h1ng 3v3ry run pull5 15 n3v3r purg3d m3r3ly f0r b31ng 0ld. L34v3 17 3mp7y 70 purg3 wh473v3r 7h3 4g3.",
+      "confirmRow": "Purg3 {name} {version} ({filename}) fr0m 7h3 p4ck4g3 c4ch3? 7h15 c4nn07 b3 und0n3. 17 w1ll b3 f37ch3d 4g41n fr0m up57r34m 0n 7h3 n3x7 r3qu357.",
+      "confirmAll": "Purg3 7h3 wh0l3 p4ck4g3 c4ch3? 7h15 c4nn07 b3 und0n3, 4l7h0ugh 3v3ry7h1ng 1n 17 15 f37ch4bl3 4g41n fr0m 7h3 r3g157ry 17 c4m3 fr0m.",
+      "confirmEcosystem": "Purg3 3v3ry {ecosystem} 4r71f4c7 fr0m 7h3 p4ck4g3 c4ch3? 7h15 c4nn07 b3 und0n3.",
+      "confirmAge": "Purg3 p4ck4g3 4r71f4c75 n07 u53d 1n 7h3 l457 {days} d4y5? 7h15 c4nn07 b3 und0n3.",
+      "confirmEcosystemAge": "Purg3 {ecosystem} 4r71f4c75 n07 u53d 1n 7h3 l457 {days} d4y5? 7h15 c4nn07 b3 und0n3.",
+      "confirmFigures": "7h47 15 {files} 4r71f4c75 4nd {size} 45 7h1ng5 574nd.",
+      "successRow": "Purg3d {filename}",
+      "successBulk": "Purg3d {files} 4r71f4c75, fr331ng {size}",
+      "errorRow": "F41l3d 70 purg3 7h3 4r71f4c7",
+      "errorBulk": "F41l3d 70 purg3 p4ck4g3 4r71f4c75"
+    },
+    "archives": {
+      "connectionLabel": "C0nn3c710n",
+      "connectionPlaceholder": "VC5 c0nn3c710n 1d",
+      "totalsHeading": "7074l5 by r3p05170ry",
+      "totalsAll": "4ll r3p05170r135",
+      "truncated": "4 fl00r r47h3r 7h4n 4 7074l: 7h3 w4lk 570pp3d 4f73r {limit} 4rch1v35, 50 4ny7h1ng p457 7h47 15 n07 c0un73d h3r3.",
+      "pathsFull": "wh0l3 r3p0",
+      "loadMore": "L04d m0r3",
+      "loadingMore": "L04d1ng…",
+      "listedAll": "{count, plural, one {# 4rch1v3} other {# 4rch1v35}} l1573d — 7h47 15 7h3 wh0l3 c4ch3.",
+      "bulkHeading": "Purg3 VC5 4rch1v35",
+      "bulkDaysLabel": "Wr1773n m0r3 7h4n 7h15 m4ny d4y5 4g0",
+      "bulkDaysHint": "4n 4rch1v3 n3v3r ch4ng35 0nc3 wr1773n 4nd c4rr135 n0 4cc355 71m3, 50 175 4g3 15 175 wr173 71m3. L34v3 17 3mp7y 70 purg3 wh473v3r 7h3 4g3.",
+      "confirmRow": "Purg3 7h3 c4ch3d 4rch1v3 f0r {repo} 47 {sha}? 7h15 c4nn07 b3 und0n3. 17 w1ll b3 f37ch3d 4g41n fr0m 7h3 r3p05170ry 0n 7h3 n3x7 p0ll.",
+      "confirmAll": "Purg3 3v3ry c4ch3d VC5 4rch1v3? 7h15 c4nn07 b3 und0n3, 4l7h0ugh 34ch 0n3 15 f37ch3d 4g41n fr0m 175 r3p05170ry 0n 7h3 n3x7 p0ll.",
+      "confirmConnection": "Purg3 3v3ry c4ch3d 4rch1v3 f0r c0nn3c710n {connection}? 7h15 c4nn07 b3 und0n3.",
+      "confirmAge": "Purg3 4rch1v35 wr1773n m0r3 7h4n {days} d4y5 4g0? 7h15 c4nn07 b3 und0n3.",
+      "confirmConnectionAge": "Purg3 4rch1v35 f0r c0nn3c710n {connection} wr1773n m0r3 7h4n {days} d4y5 4g0? 7h15 c4nn07 b3 und0n3.",
+      "confirmFigures": "7h47 15 {archives} 4rch1v35 4nd {size} 45 7h1ng5 574nd.",
+      "successRow": "Purg3d 7h3 4rch1v3 f0r {repo} 47 {sha}",
+      "successBulk": "Purg3d {archives} 4rch1v35, fr331ng {size}",
+      "errorRow": "F41l3d 70 purg3 7h3 4rch1v3",
+      "errorBulk": "F41l3d 70 purg3 VC5 4rch1v35"
+    },
+    "sealedWarning": "7h15 n0d3 15 534l3d, 50 n07h1ng purg3d h3r3 c4n b3 f37ch3d 4g41n. 7h3 5ch3dul3d cl34nup 5k1p5 7h353 c4ch35 f0r 7h47 r3450n — 7h15 15 4 p3rm4n3n7 d3l3710n."
   },
   "catalog": {
     "title": "53rv1c3 C474l0g",

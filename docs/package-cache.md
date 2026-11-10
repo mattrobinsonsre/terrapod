@@ -24,6 +24,11 @@ NPM_CONFIG_REGISTRY: https://terrapod.example.com/api/v1/package-cache/npm/
 Each has its own section below; they share one substrate, so the integrity,
 air-gap and retention behaviour described here applies to all six.
 
+They also share **one cache**, with one row per artifact whatever ecosystem it
+came from. To see what is in it, total it per ecosystem, or evict an artifact —
+one, or in bulk by ecosystem and age — see
+[Caches](caches.md#the-package-cache).
+
 ## Why this exists
 
 Terrapod already caches engine binaries, providers and container images, and the
@@ -119,7 +124,7 @@ off — pointing at an internal mirror if you have one — then seal.
 | `api.config.registry.package_cache.pulumi.first_party_url` | `https://github.com/mattrobinsonsre/terrapod/releases/download` | Where **Terrapod's own** bridged Pulumi provider plugin is published. Separate from `upstream` deliberately: pointing that one here would send every other plugin to a host which does not have it. |
 | `api.config.registry.package_cache.go.upstream` | `https://proxy.golang.org` | As above. |
 | `api.config.registry.package_cache.nuget.upstream` | `https://api.nuget.org/v3-flatcontainer` | As above. |
-| `api.config.artifact_retention.package_cache_retention_days` | `30` | Days since **last access** before an artifact is eligible for cleanup. Skipped entirely on a sealed node, where an evicted artifact cannot be re-fetched. |
+| `api.config.artifact_retention.package_cache_retention_days` | `30` | Days since **last access** before an artifact is eligible for cleanup. Skipped entirely on a sealed node, where an evicted artifact cannot be re-fetched — note the [manual eviction routes](caches.md#sealed-deployments) are not, so on a sealed node they are a deletion. |
 | `api.config.registry.cache_only` | `false` | Seals every cache, these included. |
 
 The upstream is a single operator-set URL rather than a client-chosen host. A

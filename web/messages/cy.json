@@ -19,7 +19,7 @@
     "policySets": "Setiau Polisi",
     "providerTemplates": "Templedi Darparwr",
     "catalogAdmin": "Gweinyddu'r Catalog",
-    "cache": "Storfa",
+    "cache": "Storfeydd",
     "auditLog": "Cofnod Archwilio",
     "help": "Cymorth",
     "apiReference": "Cyfeirlyfr API",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Storfa",
-    "description": "Rheoli storfa deuaidd y CLI a darparwyr",
+    "title": "Storfeydd",
+    "description": "Deuaidd CLI, deuaidd darparwyr, arteffactau pecynnau ac archifau VCS",
     "errors": {
       "loadBinary": "Methwyd llwytho'r storfa ddeuaidd",
-      "loadCache": "Methwyd llwytho'r storfa"
+      "loadCache": "Methwyd llwytho'r storfa",
+      "loadPackages": "Methwyd llwytho storfa'r pecynnau",
+      "loadArchives": "Methwyd llwytho storfa archifau VCS"
     },
     "sections": {
       "cliBinaries": "Deuaidd CLI",
-      "providerBinaries": "Deuaidd Darparwr"
+      "providerBinaries": "Deuaidd Darparwr",
+      "packages": "Storfa Pecynnau",
+      "vcsArchives": "Storfa Archifau VCS"
     },
     "empty": {
       "binaries": "Dim deuaidd CLI wedi'u storio eto.",
-      "providers": "Dim deuaidd darparwr wedi'u storio eto."
+      "providers": "Dim deuaidd darparwr wedi'u storio eto.",
+      "packages": "Dim arteffactau pecynnau wedi'u storio eto.",
+      "archives": "Dim archifau VCS wedi'u storio eto."
     },
     "columns": {
       "tool": "Offeryn",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Storiwyd Am",
       "provider": "Darparwr",
       "hostname": "Enw Gwesteiwr",
-      "actions": "Gweithredoedd"
+      "actions": "Gweithredoedd",
+      "ecosystem": "Ecosystem",
+      "name": "Enw",
+      "filename": "Ffeil",
+      "size": "Maint",
+      "lastAccessed": "Defnyddiwyd ddiwethaf",
+      "repository": "Ystorfa",
+      "commit": "Ymrwymiad",
+      "paths": "Llwybrau",
+      "written": "Ysgrifennwyd"
     },
     "warm": {
       "heading": "Cynhesu'r storfa",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Methodd y gwaredu ar gyfer {provider} {version}",
       "successBinary": "Gwaredwyd {count} cofnod storfa ddeuaidd",
       "successProvider": "Gwaredwyd {count} cofnod storfa darparwr"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# ffeil} other {# ffeil}} · {size}",
+      "archives": "{archives, plural, one {# archif} other {# archif}} · {size}"
+    },
+    "bulk": {
+      "button": "Gwaredu'r rhai cyfatebol"
+    },
+    "packages": {
+      "ecosystemAll": "Pob ecosystem",
+      "namePlaceholder": "Rhagddodiad enw, e.e. community.",
+      "totalsHeading": "Cyfansymiau fesul ecosystem",
+      "bulkHeading": "Gwaredu arteffactau pecynnau",
+      "bulkDaysLabel": "Heb ei ddefnyddio am gynifer o ddiwrnodau",
+      "bulkDaysHint": "Mesurir yr oedran yma o'r defnydd diwethaf, nid o'r pryd y storiwyd yr arteffact, felly ni chaiff rhywbeth y mae pob rhediad yn ei nôl ei waredu dim ond am ei fod yn hen. Gadewch yn wag i waredu beth bynnag fo'r oedran.",
+      "confirmRow": "Gwaredu {name} {version} ({filename}) o storfa'r pecynnau? Nid oes modd dadwneud hyn. Fe'i hail-nôlir o'r ffynhonnell ar y cais nesaf.",
+      "confirmAll": "Gwaredu storfa'r pecynnau yn gyfan gwbl? Nid oes modd dadwneud hyn, er y gellir ail-nôl popeth ynddi o'r gofrestrfa y daeth ohoni.",
+      "confirmEcosystem": "Gwaredu pob arteffact {ecosystem} o storfa'r pecynnau? Nid oes modd dadwneud hyn.",
+      "confirmAge": "Gwaredu arteffactau pecynnau heb eu defnyddio yn y {days} diwrnod diwethaf? Nid oes modd dadwneud hyn.",
+      "confirmEcosystemAge": "Gwaredu arteffactau {ecosystem} heb eu defnyddio yn y {days} diwrnod diwethaf? Nid oes modd dadwneud hyn.",
+      "confirmFigures": "Dyna {files} arteffact a {size} ar hyn o bryd.",
+      "successRow": "Gwaredwyd {filename}",
+      "successBulk": "Gwaredwyd {files} arteffact, gan ryddhau {size}",
+      "errorRow": "Methwyd gwaredu'r arteffact",
+      "errorBulk": "Methwyd gwaredu arteffactau'r pecynnau"
+    },
+    "archives": {
+      "connectionLabel": "Cysylltiad",
+      "connectionPlaceholder": "Dynodydd cysylltiad VCS",
+      "totalsHeading": "Cyfansymiau fesul ystorfa",
+      "totalsAll": "Pob ystorfa",
+      "truncated": "Isafswm yn hytrach na chyfanswm: daeth y chwilio i ben ar ôl {limit} archif, felly nid yw unrhyw beth y tu hwnt i hynny wedi'i gyfrif yma.",
+      "pathsFull": "yr ystorfa gyfan",
+      "loadMore": "Llwytho mwy",
+      "loadingMore": "Wrthi'n llwytho…",
+      "listedAll": "{count, plural, one {# archif} other {# archif}} wedi'u rhestru — dyna'r storfa gyfan.",
+      "bulkHeading": "Gwaredu archifau VCS",
+      "bulkDaysLabel": "Ysgrifennwyd fwy na chynifer o ddiwrnodau yn ôl",
+      "bulkDaysHint": "Nid yw archif byth yn newid ar ôl ei ysgrifennu ac nid oes amser defnydd ganddo, felly ei oedran yw'r amser ysgrifennu. Gadewch yn wag i waredu beth bynnag fo'r oedran.",
+      "confirmRow": "Gwaredu'r archif a storiwyd ar gyfer {repo} ar {sha}? Nid oes modd dadwneud hyn. Fe'i hail-nôlir o'r ystorfa ar y holiad nesaf.",
+      "confirmAll": "Gwaredu pob archif VCS a storiwyd? Nid oes modd dadwneud hyn, er y bydd pob un yn cael ei ail-nôl o'i ystorfa ei hun ar y holiad nesaf.",
+      "confirmConnection": "Gwaredu pob archif a storiwyd ar gyfer y cysylltiad {connection}? Nid oes modd dadwneud hyn.",
+      "confirmAge": "Gwaredu archifau a ysgrifennwyd fwy na {days} diwrnod yn ôl? Nid oes modd dadwneud hyn.",
+      "confirmConnectionAge": "Gwaredu archifau'r cysylltiad {connection} a ysgrifennwyd fwy na {days} diwrnod yn ôl? Nid oes modd dadwneud hyn.",
+      "confirmFigures": "Dyna {archives} archif a {size} ar hyn o bryd.",
+      "successRow": "Gwaredwyd yr archif ar gyfer {repo} ar {sha}",
+      "successBulk": "Gwaredwyd {archives} archif, gan ryddhau {size}",
+      "errorRow": "Methwyd gwaredu'r archif",
+      "errorBulk": "Methwyd gwaredu archifau VCS"
+    },
+    "sealedWarning": "Mae'r nod hwn wedi'i selio, felly ni ellir ail-nôl dim a waredir yma. Mae'r glanhau amserlennus yn hepgor y storfeydd hyn am y rheswm hwnnw — dileu parhaol yw hyn."
   },
   "catalog": {
     "title": "Catalog Gwasanaethau",

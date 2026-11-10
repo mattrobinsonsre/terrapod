@@ -1729,18 +1729,24 @@
   },
   "adminBinaryCache": {
     "title": "缓存",
-    "description": "CLI 二进制文件和提供程序缓存管理",
+    "description": "CLI 二进制文件、提供程序二进制文件、软件包构件和 VCS 归档",
     "errors": {
       "loadBinary": "加载二进制文件缓存失败",
-      "loadCache": "加载缓存失败"
+      "loadCache": "加载缓存失败",
+      "loadPackages": "加载软件包缓存失败",
+      "loadArchives": "加载 VCS 归档缓存失败"
     },
     "sections": {
       "cliBinaries": "CLI 二进制文件",
-      "providerBinaries": "提供程序二进制文件"
+      "providerBinaries": "提供程序二进制文件",
+      "packages": "软件包缓存",
+      "vcsArchives": "VCS 归档缓存"
     },
     "empty": {
       "binaries": "暂无缓存的 CLI 二进制文件。",
-      "providers": "暂无缓存的提供程序二进制文件。"
+      "providers": "暂无缓存的提供程序二进制文件。",
+      "packages": "暂无缓存的软件包构件。",
+      "archives": "暂无缓存的 VCS 归档。"
     },
     "columns": {
       "tool": "工具",
@@ -1750,7 +1756,16 @@
       "cachedAt": "缓存时间",
       "provider": "提供程序",
       "hostname": "主机名",
-      "actions": "操作"
+      "actions": "操作",
+      "ecosystem": "生态系统",
+      "name": "名称",
+      "filename": "文件",
+      "size": "大小",
+      "lastAccessed": "最近访问",
+      "repository": "仓库",
+      "commit": "提交",
+      "paths": "路径",
+      "written": "写入时间"
     },
     "warm": {
       "heading": "预热缓存",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "清除 {provider} {version} 失败",
       "successBinary": "已清除 {count} 个二进制文件缓存条目",
       "successProvider": "已清除 {count} 个提供程序缓存条目"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, other {# 个文件}} · {size}",
+      "archives": "{archives, plural, other {# 个归档}} · {size}"
+    },
+    "bulk": {
+      "button": "清除匹配项"
+    },
+    "packages": {
+      "ecosystemAll": "所有生态系统",
+      "namePlaceholder": "名称前缀，例如 community.",
+      "totalsHeading": "按生态系统统计",
+      "bulkHeading": "清除软件包构件",
+      "bulkDaysLabel": "未使用达此天数",
+      "bulkDaysHint": "这里的时长从最近一次访问开始计算，而不是从写入缓存时开始，因此每次运行都会拉取的内容绝不会仅因为年代久远而被清除。留空则不论时长一并清除。",
+      "confirmRow": "从软件包缓存中清除 {name} {version}（{filename}）？此操作无法撤销。下次请求时将从上游重新获取。",
+      "confirmAll": "清除整个软件包缓存？此操作无法撤销，但其中的所有内容都可以从原注册表重新获取。",
+      "confirmEcosystem": "从软件包缓存中清除所有 {ecosystem} 构件？此操作无法撤销。",
+      "confirmAge": "清除最近 {days} 天未使用的软件包构件？此操作无法撤销。",
+      "confirmEcosystemAge": "清除最近 {days} 天未使用的 {ecosystem} 构件？此操作无法撤销。",
+      "confirmFigures": "目前共 {files} 个构件、{size}。",
+      "successRow": "已清除 {filename}",
+      "successBulk": "已清除 {files} 个构件，释放 {size}",
+      "errorRow": "清除构件失败",
+      "errorBulk": "清除软件包构件失败"
+    },
+    "archives": {
+      "connectionLabel": "连接",
+      "connectionPlaceholder": "VCS 连接 ID",
+      "totalsHeading": "按仓库统计",
+      "totalsAll": "所有仓库",
+      "truncated": "这是下限而非总数：遍历在 {limit} 个归档后停止，因此之后的内容未计入此处。",
+      "pathsFull": "整个仓库",
+      "loadMore": "加载更多",
+      "loadingMore": "加载中…",
+      "listedAll": "已列出 {count, plural, other {# 个归档}}，这就是全部缓存。",
+      "bulkHeading": "清除 VCS 归档",
+      "bulkDaysLabel": "写入时间早于此天数",
+      "bulkDaysHint": "归档一旦写入便不再改变，也没有访问时间，因此其时长以写入时间为准。留空则不论时长一并清除。",
+      "confirmRow": "清除 {repo} 在提交 {sha} 的缓存归档？此操作无法撤销。下次轮询时将从仓库重新获取。",
+      "confirmAll": "清除所有已缓存的 VCS 归档？此操作无法撤销，但每个归档都会在下次轮询时从各自的仓库重新获取。",
+      "confirmConnection": "清除连接 {connection} 的所有缓存归档？此操作无法撤销。",
+      "confirmAge": "清除写入时间早于 {days} 天的归档？此操作无法撤销。",
+      "confirmConnectionAge": "清除连接 {connection} 中写入时间早于 {days} 天的归档？此操作无法撤销。",
+      "confirmFigures": "目前共 {archives} 个归档、{size}。",
+      "successRow": "已清除 {repo} 在提交 {sha} 的归档",
+      "successBulk": "已清除 {archives} 个归档，释放 {size}",
+      "errorRow": "清除归档失败",
+      "errorBulk": "清除 VCS 归档失败"
+    },
+    "sealedWarning": "本节点已密封，因此在此清除的内容无法重新获取。定期清理也正因如此会跳过这些缓存 — 这是永久删除。"
   },
   "catalog": {
     "title": "服务目录",

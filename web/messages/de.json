@@ -1729,18 +1729,24 @@
   },
   "adminBinaryCache": {
     "title": "Zwischenspeicher",
-    "description": "Verwaltung des Befehlszeilen-Binärdatei- und Anbieter-Zwischenspeichers",
+    "description": "Befehlszeilen-Binärdateien, Anbieter-Binärdateien, Paket-Artefakte und VCS-Archive",
     "errors": {
       "loadBinary": "Binärdatei-Zwischenspeicher konnte nicht geladen werden",
-      "loadCache": "Zwischenspeicher konnte nicht geladen werden"
+      "loadCache": "Zwischenspeicher konnte nicht geladen werden",
+      "loadPackages": "Paket-Zwischenspeicher konnte nicht geladen werden",
+      "loadArchives": "VCS-Archiv-Zwischenspeicher konnte nicht geladen werden"
     },
     "sections": {
       "cliBinaries": "Befehlszeilen-Binärdateien",
-      "providerBinaries": "Anbieter-Binärdateien"
+      "providerBinaries": "Anbieter-Binärdateien",
+      "packages": "Paket-Zwischenspeicher",
+      "vcsArchives": "VCS-Archiv-Zwischenspeicher"
     },
     "empty": {
       "binaries": "Noch keine Befehlszeilen-Binärdateien im Zwischenspeicher.",
-      "providers": "Noch keine Anbieter-Binärdateien im Zwischenspeicher."
+      "providers": "Noch keine Anbieter-Binärdateien im Zwischenspeicher.",
+      "packages": "Noch keine Paket-Artefakte im Zwischenspeicher.",
+      "archives": "Noch keine VCS-Archive im Zwischenspeicher."
     },
     "columns": {
       "tool": "Werkzeug",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Zwischengespeichert am",
       "provider": "Anbieter",
       "hostname": "Hostname",
-      "actions": "Aktionen"
+      "actions": "Aktionen",
+      "ecosystem": "Ökosystem",
+      "name": "Name",
+      "filename": "Datei",
+      "size": "Größe",
+      "lastAccessed": "Letzter Zugriff",
+      "repository": "Repository",
+      "commit": "Commit",
+      "paths": "Pfade",
+      "written": "Geschrieben"
     },
     "warm": {
       "heading": "Zwischenspeicher vorwärmen",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Löschen für {provider} {version} fehlgeschlagen",
       "successBinary": "{count} Binärdatei-Zwischenspeichereinträge gelöscht",
       "successProvider": "{count} Anbieter-Zwischenspeichereinträge gelöscht"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# Datei} other {# Dateien}} · {size}",
+      "archives": "{archives, plural, one {# Archiv} other {# Archive}} · {size}"
+    },
+    "bulk": {
+      "button": "Passende löschen"
+    },
+    "packages": {
+      "ecosystemAll": "Alle Ökosysteme",
+      "namePlaceholder": "Namenspräfix, z. B. community.",
+      "totalsHeading": "Summen je Ökosystem",
+      "bulkHeading": "Paket-Artefakte löschen",
+      "bulkDaysLabel": "Seit so vielen Tagen nicht genutzt",
+      "bulkDaysHint": "Das Alter wird hier ab dem letzten Zugriff gemessen, nicht ab dem Zeitpunkt der Zwischenspeicherung – etwas, das jeder Lauf abruft, wird also nie nur wegen seines Alters gelöscht. Leer lassen, um unabhängig vom Alter zu löschen.",
+      "confirmRow": "{name} {version} ({filename}) aus dem Paket-Zwischenspeicher löschen? Das kann nicht rückgängig gemacht werden. Bei der nächsten Anfrage wird es erneut vom Upstream abgerufen.",
+      "confirmAll": "Den gesamten Paket-Zwischenspeicher löschen? Das kann nicht rückgängig gemacht werden, alles darin ist jedoch erneut von der Registry abrufbar, aus der es kam.",
+      "confirmEcosystem": "Jedes {ecosystem}-Artefakt aus dem Paket-Zwischenspeicher löschen? Das kann nicht rückgängig gemacht werden.",
+      "confirmAge": "Paket-Artefakte löschen, die in den letzten {days} Tagen nicht genutzt wurden? Das kann nicht rückgängig gemacht werden.",
+      "confirmEcosystemAge": "{ecosystem}-Artefakte löschen, die in den letzten {days} Tagen nicht genutzt wurden? Das kann nicht rückgängig gemacht werden.",
+      "confirmFigures": "Das sind derzeit {files} Artefakte und {size}.",
+      "successRow": "{filename} gelöscht",
+      "successBulk": "{files} Artefakte gelöscht, {size} freigegeben",
+      "errorRow": "Artefakt konnte nicht gelöscht werden",
+      "errorBulk": "Paket-Artefakte konnten nicht gelöscht werden"
+    },
+    "archives": {
+      "connectionLabel": "Verbindung",
+      "connectionPlaceholder": "VCS-Verbindungs-ID",
+      "totalsHeading": "Summen je Repository",
+      "totalsAll": "Alle Repositorys",
+      "truncated": "Eine Untergrenze, keine Gesamtsumme: der Durchlauf endete nach {limit} Archiven, alles darüber hinaus ist hier nicht mitgezählt.",
+      "pathsFull": "ganzes Repository",
+      "loadMore": "Mehr laden",
+      "loadingMore": "Wird geladen …",
+      "listedAll": "{count, plural, one {# Archiv} other {# Archive}} aufgeführt – das ist der gesamte Zwischenspeicher.",
+      "bulkHeading": "VCS-Archive löschen",
+      "bulkDaysLabel": "Vor mehr als so vielen Tagen geschrieben",
+      "bulkDaysHint": "Ein Archiv ändert sich nach dem Schreiben nie und hat keine Zugriffszeit, sein Alter ist also der Schreibzeitpunkt. Leer lassen, um unabhängig vom Alter zu löschen.",
+      "confirmRow": "Das zwischengespeicherte Archiv für {repo} bei {sha} löschen? Das kann nicht rückgängig gemacht werden. Beim nächsten Abruf wird es erneut aus dem Repository geholt.",
+      "confirmAll": "Jedes zwischengespeicherte VCS-Archiv löschen? Das kann nicht rückgängig gemacht werden, jedes wird jedoch beim nächsten Abruf erneut aus seinem Repository geholt.",
+      "confirmConnection": "Jedes zwischengespeicherte Archiv der Verbindung {connection} löschen? Das kann nicht rückgängig gemacht werden.",
+      "confirmAge": "Archive löschen, die vor mehr als {days} Tagen geschrieben wurden? Das kann nicht rückgängig gemacht werden.",
+      "confirmConnectionAge": "Archive der Verbindung {connection} löschen, die vor mehr als {days} Tagen geschrieben wurden? Das kann nicht rückgängig gemacht werden.",
+      "confirmFigures": "Das sind derzeit {archives} Archive und {size}.",
+      "successRow": "Archiv für {repo} bei {sha} gelöscht",
+      "successBulk": "{archives} Archive gelöscht, {size} freigegeben",
+      "errorRow": "Archiv konnte nicht gelöscht werden",
+      "errorBulk": "VCS-Archive konnten nicht gelöscht werden"
+    },
+    "sealedWarning": "Dieser Knoten ist versiegelt, nichts hier Gelöschtes kann also erneut abgerufen werden. Die geplante Bereinigung überspringt diese Zwischenspeicher genau deshalb – dies ist eine dauerhafte Löschung."
   },
   "catalog": {
     "title": "Dienstleistungskatalog",

@@ -21,6 +21,8 @@ When enabled, a daily background task (via the distributed scheduler) iterates s
 | **VCS archives** | `vcs.archive_cache_retention_days` | 7 days | Cached VCS archive tarballs older than the threshold. The only category keyed on **age** rather than last access, because these have no database table -- they are content-addressed by commit SHA, so the sweep lists the prefix and reads each object's own `last_modified`. Its key lives under `vcs`, not `artifact_retention` |
 | **Deleted workspaces** | `deleted_workspace_retention_days` | 30 days | State left behind by a deleted workspace, once it has been recoverable for the full window |
 
+The four **cache** categories above can also be inspected and evicted by hand — see [Caches](caches.md), which covers all four in one place and is where to look when a bucket has grown and the question is what is in it.
+
 Set any per-category value to `0` to disable cleanup for that category. Every key above sits
 under `api.config.artifact_retention` except `vcs.archive_cache_retention_days`, which is under
 `api.config.vcs`.

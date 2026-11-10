@@ -1729,18 +1729,24 @@
   },
   "adminBinaryCache": {
     "title": "Cache",
-    "description": "Gestione della cache dei binari CLI e dei provider",
+    "description": "Binari CLI, binari dei provider, artefatti di pacchetti e archivi VCS",
     "errors": {
       "loadBinary": "Impossibile caricare la cache dei binari",
-      "loadCache": "Impossibile caricare la cache"
+      "loadCache": "Impossibile caricare la cache",
+      "loadPackages": "Impossibile caricare la cache dei pacchetti",
+      "loadArchives": "Impossibile caricare la cache degli archivi VCS"
     },
     "sections": {
       "cliBinaries": "Binari CLI",
-      "providerBinaries": "Binari dei provider"
+      "providerBinaries": "Binari dei provider",
+      "packages": "Cache dei pacchetti",
+      "vcsArchives": "Cache degli archivi VCS"
     },
     "empty": {
       "binaries": "Nessun binario CLI ancora in cache.",
-      "providers": "Nessun binario di provider ancora in cache."
+      "providers": "Nessun binario di provider ancora in cache.",
+      "packages": "Nessun artefatto di pacchetto ancora in cache.",
+      "archives": "Nessun archivio VCS ancora in cache."
     },
     "columns": {
       "tool": "Strumento",
@@ -1750,7 +1756,16 @@
       "cachedAt": "In cache dal",
       "provider": "Provider",
       "hostname": "Hostname",
-      "actions": "Azioni"
+      "actions": "Azioni",
+      "ecosystem": "Ecosistema",
+      "name": "Nome",
+      "filename": "File",
+      "size": "Dimensione",
+      "lastAccessed": "Ultimo accesso",
+      "repository": "Repository",
+      "commit": "Commit",
+      "paths": "Percorsi",
+      "written": "Scritto"
     },
     "warm": {
       "heading": "Precarica cache",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Svuotamento non riuscito per {provider} {version}",
       "successBinary": "Svuotate {count} voci di cache dei binari",
       "successProvider": "Svuotate {count} voci di cache dei provider"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# file} other {# file}} · {size}",
+      "archives": "{archives, plural, one {# archivio} other {# archivi}} · {size}"
+    },
+    "bulk": {
+      "button": "Svuota le corrispondenze"
+    },
+    "packages": {
+      "ecosystemAll": "Tutti gli ecosistemi",
+      "namePlaceholder": "Prefisso del nome, ad es. community.",
+      "totalsHeading": "Totali per ecosistema",
+      "bulkHeading": "Svuota artefatti di pacchetti",
+      "bulkDaysLabel": "Non usato da questo numero di giorni",
+      "bulkDaysHint": "Qui l''età si misura dall''ultimo accesso, non da quando l''artefatto è entrato in cache: qualcosa che ogni esecuzione scarica non viene quindi mai svuotato solo perché è vecchio. Lascia vuoto per svuotare a prescindere dall''età.",
+      "confirmRow": "Svuotare {name} {version} ({filename}) dalla cache dei pacchetti? L''operazione è irreversibile. Alla prossima richiesta verrà recuperato di nuovo dall''upstream.",
+      "confirmAll": "Svuotare tutta la cache dei pacchetti? L''operazione è irreversibile, anche se tutto ciò che contiene è recuperabile di nuovo dal registro di provenienza.",
+      "confirmEcosystem": "Svuotare ogni artefatto {ecosystem} dalla cache dei pacchetti? L''operazione è irreversibile.",
+      "confirmAge": "Svuotare gli artefatti di pacchetti non usati negli ultimi {days} giorni? L''operazione è irreversibile.",
+      "confirmEcosystemAge": "Svuotare gli artefatti {ecosystem} non usati negli ultimi {days} giorni? L''operazione è irreversibile.",
+      "confirmFigures": "Al momento si tratta di {files} artefatti e {size}.",
+      "successRow": "{filename} svuotato",
+      "successBulk": "Svuotati {files} artefatti, liberando {size}",
+      "errorRow": "Impossibile svuotare l''artefatto",
+      "errorBulk": "Impossibile svuotare gli artefatti di pacchetti"
+    },
+    "archives": {
+      "connectionLabel": "Connessione",
+      "connectionPlaceholder": "ID della connessione VCS",
+      "totalsHeading": "Totali per repository",
+      "totalsAll": "Tutti i repository",
+      "truncated": "Un minimo, non un totale: la scansione si è fermata dopo {limit} archivi, quindi quanto sta oltre non è conteggiato qui.",
+      "pathsFull": "intero repository",
+      "loadMore": "Carica altri",
+      "loadingMore": "Caricamento…",
+      "listedAll": "{count, plural, one {# archivio elencato} other {# archivi elencati}}: è tutta la cache.",
+      "bulkHeading": "Svuota archivi VCS",
+      "bulkDaysLabel": "Scritto più di questo numero di giorni fa",
+      "bulkDaysHint": "Un archivio non cambia più una volta scritto e non porta un orario di accesso, quindi la sua età è l''orario di scrittura. Lascia vuoto per svuotare a prescindere dall''età.",
+      "confirmRow": "Svuotare l''archivio in cache di {repo} al commit {sha}? L''operazione è irreversibile. Verrà recuperato di nuovo dal repository al prossimo controllo.",
+      "confirmAll": "Svuotare ogni archivio VCS in cache? L''operazione è irreversibile, anche se ciascuno verrà recuperato di nuovo dal proprio repository al prossimo controllo.",
+      "confirmConnection": "Svuotare ogni archivio in cache della connessione {connection}? L''operazione è irreversibile.",
+      "confirmAge": "Svuotare gli archivi scritti più di {days} giorni fa? L''operazione è irreversibile.",
+      "confirmConnectionAge": "Svuotare gli archivi della connessione {connection} scritti più di {days} giorni fa? L''operazione è irreversibile.",
+      "confirmFigures": "Al momento si tratta di {archives} archivi e {size}.",
+      "successRow": "Archivio di {repo} al commit {sha} svuotato",
+      "successBulk": "Svuotati {archives} archivi, liberando {size}",
+      "errorRow": "Impossibile svuotare l''archivio",
+      "errorBulk": "Impossibile svuotare gli archivi VCS"
+    },
+    "sealedWarning": "Questo nodo è sigillato, quindi nulla di ciò che viene svuotato qui può essere recuperato di nuovo. La pulizia pianificata salta queste cache proprio per questo — è un''eliminazione definitiva."
   },
   "catalog": {
     "title": "Catalogo dei servizi",

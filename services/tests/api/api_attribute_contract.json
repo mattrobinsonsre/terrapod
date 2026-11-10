@@ -184,6 +184,52 @@
     "pulumi-version",
     "trivy-version"
   ],
+  "cache_admin.list_package_cache": [
+    "cached-at",
+    "digest",
+    "ecosystem",
+    "filename",
+    "last-accessed-at",
+    "name",
+    "size",
+    "version"
+  ],
+  "cache_admin.list_vcs_archive_cache": [
+    "connection-id",
+    "key",
+    "last-modified",
+    "owner",
+    "paths-hash",
+    "repo",
+    "sha",
+    "size"
+  ],
+  "cache_admin.list_vcs_archive_cache:meta": [
+    "next-cursor",
+    "page-size"
+  ],
+  "cache_admin.package_cache_totals": [
+    "bytes",
+    "ecosystem",
+    "files"
+  ],
+  "cache_admin.package_cache_totals:meta": [
+    "bytes",
+    "files"
+  ],
+  "cache_admin.vcs_archive_cache_totals": [
+    "archives",
+    "bytes",
+    "connection-id",
+    "owner",
+    "repo"
+  ],
+  "cache_admin.vcs_archive_cache_totals:meta": [
+    "archives",
+    "bytes",
+    "scan-limit",
+    "truncated"
+  ],
   "cache_warm._submit": [
     "status",
     "total"

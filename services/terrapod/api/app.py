@@ -1419,6 +1419,16 @@ def create_application() -> FastAPI:
 
         include_terrapod(cache_warm_router)
 
+    # Admin list, totals and eviction for the package cache and the VCS archive
+    # cache (#2474). UNCONDITIONAL, unlike the warm router above: the warm
+    # endpoints are only meaningful while a proxy is serving, where these answer
+    # "what is in here" — and the question an operator most needs answered is
+    # what a cache they have just turned OFF is still holding. A list route that
+    # disappeared with the capability would hide exactly that.
+    from terrapod.api.routers.cache_admin import router as cache_admin_router
+
+    include_terrapod(cache_admin_router)
+
     # Language package proxies — PyPI and npm (#1417). Native surface rather than
     # a root mount: both clients take their registry URL as configuration, so
     # unlike /v2/ there is no mandated prefix to honour, and the BFF's existing

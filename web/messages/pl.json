@@ -19,7 +19,7 @@
     "policySets": "Zestawy zasad",
     "providerTemplates": "Szablony dostawców",
     "catalogAdmin": "Administracja katalogiem",
-    "cache": "Pamięć podręczna",
+    "cache": "Pamięci podręczne",
     "auditLog": "Dziennik audytu",
     "help": "Pomoc",
     "apiReference": "Dokumentacja API",
@@ -1728,19 +1728,25 @@
     }
   },
   "adminBinaryCache": {
-    "title": "Pamięć podręczna",
-    "description": "Zarządzanie pamięcią podręczną plików binarnych CLI i dostawców",
+    "title": "Pamięci podręczne",
+    "description": "Pliki binarne CLI, pliki binarne dostawców, artefakty pakietów i archiwa VCS",
     "errors": {
       "loadBinary": "Nie udało się wczytać pamięci podręcznej plików binarnych",
-      "loadCache": "Nie udało się wczytać pamięci podręcznej"
+      "loadCache": "Nie udało się wczytać pamięci podręcznej",
+      "loadPackages": "Nie udało się wczytać pamięci podręcznej pakietów",
+      "loadArchives": "Nie udało się wczytać pamięci podręcznej archiwów VCS"
     },
     "sections": {
       "cliBinaries": "Pliki binarne CLI",
-      "providerBinaries": "Pliki binarne dostawców"
+      "providerBinaries": "Pliki binarne dostawców",
+      "packages": "Pamięć podręczna pakietów",
+      "vcsArchives": "Pamięć podręczna archiwów VCS"
     },
     "empty": {
       "binaries": "Brak plików binarnych CLI w pamięci podręcznej.",
-      "providers": "Brak plików binarnych dostawców w pamięci podręcznej."
+      "providers": "Brak plików binarnych dostawców w pamięci podręcznej.",
+      "packages": "Brak artefaktów pakietów w pamięci podręcznej.",
+      "archives": "Brak archiwów VCS w pamięci podręcznej."
     },
     "columns": {
       "tool": "Narzędzie",
@@ -1750,7 +1756,16 @@
       "cachedAt": "Zapisano w pamięci",
       "provider": "Dostawca",
       "hostname": "Nazwa hosta",
-      "actions": "Akcje"
+      "actions": "Akcje",
+      "ecosystem": "Ekosystem",
+      "name": "Nazwa",
+      "filename": "Plik",
+      "size": "Rozmiar",
+      "lastAccessed": "Ostatnio użyty",
+      "repository": "Repozytorium",
+      "commit": "Commit",
+      "paths": "Ścieżki",
+      "written": "Zapisano"
     },
     "warm": {
       "heading": "Rozgrzej pamięć podręczną",
@@ -1787,7 +1802,57 @@
       "errorProviderItem": "Czyszczenie nie powiodło się dla {provider} {version}",
       "successBinary": "Wyczyszczono {count} wpisów pamięci podręcznej plików binarnych",
       "successProvider": "Wyczyszczono {count} wpisów pamięci podręcznej dostawców"
-    }
+    },
+    "stats": {
+      "packages": "{files, plural, one {# plik} few {# pliki} other {# plików}} · {size}",
+      "archives": "{archives, plural, one {# archiwum} few {# archiwa} other {# archiwów}} · {size}"
+    },
+    "bulk": {
+      "button": "Wyczyść pasujące"
+    },
+    "packages": {
+      "ecosystemAll": "Wszystkie ekosystemy",
+      "namePlaceholder": "Przedrostek nazwy, np. community.",
+      "totalsHeading": "Sumy według ekosystemu",
+      "bulkHeading": "Czyszczenie artefaktów pakietów",
+      "bulkDaysLabel": "Nieużywane od tylu dni",
+      "bulkDaysHint": "Wiek liczony jest tutaj od ostatniego użycia, a nie od zapisania w pamięci podręcznej, więc coś, co pobiera każde uruchomienie, nigdy nie zostanie usunięte tylko dlatego, że jest stare. Pozostaw puste, aby czyścić bez względu na wiek.",
+      "confirmRow": "Wyczyścić {name} {version} ({filename}) z pamięci podręcznej pakietów? Tego nie można cofnąć. Przy następnym żądaniu zostanie ponownie pobrany ze źródła nadrzędnego.",
+      "confirmAll": "Wyczyścić całą pamięć podręczną pakietów? Tego nie można cofnąć, choć wszystko z niej można ponownie pobrać z rejestru, z którego pochodzi.",
+      "confirmEcosystem": "Wyczyścić każdy artefakt {ecosystem} z pamięci podręcznej pakietów? Tego nie można cofnąć.",
+      "confirmAge": "Wyczyścić artefakty pakietów nieużywane od {days} dni? Tego nie można cofnąć.",
+      "confirmEcosystemAge": "Wyczyścić artefakty {ecosystem} nieużywane od {days} dni? Tego nie można cofnąć.",
+      "confirmFigures": "To na razie {files} artefaktów i {size}.",
+      "successRow": "Wyczyszczono {filename}",
+      "successBulk": "Wyczyszczono {files} artefaktów, zwalniając {size}",
+      "errorRow": "Nie udało się wyczyścić artefaktu",
+      "errorBulk": "Nie udało się wyczyścić artefaktów pakietów"
+    },
+    "archives": {
+      "connectionLabel": "Połączenie",
+      "connectionPlaceholder": "Identyfikator połączenia VCS",
+      "totalsHeading": "Sumy według repozytorium",
+      "totalsAll": "Wszystkie repozytoria",
+      "truncated": "To dolna granica, a nie suma: przegląd zatrzymał się po {limit} archiwach, więc nic poza tym nie jest tu liczone.",
+      "pathsFull": "całe repozytorium",
+      "loadMore": "Wczytaj więcej",
+      "loadingMore": "Wczytywanie…",
+      "listedAll": "Wyświetlono {count, plural, one {# archiwum} few {# archiwa} other {# archiwów}} — to cała pamięć podręczna.",
+      "bulkHeading": "Czyszczenie archiwów VCS",
+      "bulkDaysLabel": "Zapisane dawniej niż tyle dni temu",
+      "bulkDaysHint": "Archiwum po zapisaniu już się nie zmienia i nie ma czasu użycia, więc jego wiekiem jest czas zapisu. Pozostaw puste, aby czyścić bez względu na wiek.",
+      "confirmRow": "Wyczyścić archiwum w pamięci podręcznej dla {repo} na commicie {sha}? Tego nie można cofnąć. Przy następnym odpytaniu zostanie ponownie pobrane z repozytorium.",
+      "confirmAll": "Wyczyścić każde archiwum VCS z pamięci podręcznej? Tego nie można cofnąć, choć każde z nich zostanie ponownie pobrane ze swojego repozytorium przy następnym odpytaniu.",
+      "confirmConnection": "Wyczyścić każde archiwum z pamięci podręcznej dla połączenia {connection}? Tego nie można cofnąć.",
+      "confirmAge": "Wyczyścić archiwa zapisane dawniej niż {days} dni temu? Tego nie można cofnąć.",
+      "confirmConnectionAge": "Wyczyścić archiwa połączenia {connection} zapisane dawniej niż {days} dni temu? Tego nie można cofnąć.",
+      "confirmFigures": "To na razie {archives} archiwów i {size}.",
+      "successRow": "Wyczyszczono archiwum dla {repo} na commicie {sha}",
+      "successBulk": "Wyczyszczono {archives} archiwów, zwalniając {size}",
+      "errorRow": "Nie udało się wyczyścić archiwum",
+      "errorBulk": "Nie udało się wyczyścić archiwów VCS"
+    },
+    "sealedWarning": "Ten węzeł jest zapieczętowany, więc nic wyczyszczonego tutaj nie da się ponownie pobrać. Właśnie dlatego zaplanowane czyszczenie pomija te pamięci podręczne — jest to trwałe usunięcie."
   },
   "catalog": {
     "title": "Katalog usług",
