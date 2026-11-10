@@ -24,7 +24,14 @@ down_revision = "9c864f64ed11"
 branch_labels = None
 depends_on = None
 
-_TABLES = ("workspaces", "workspace_autodiscovery_rules")
+#: The two tables, by their REAL names. The autodiscovery rule's class is
+#: `WorkspaceAutodiscoveryRule` and its table is `autodiscovery_rules` -- the
+#: `workspace_` prefix exists only in the class name, and a sibling class
+#: (`ModuleAutodiscoveryRule`) does own `module_autodiscovery_rules`, so the
+#: wrong guess is a plausible one. This migration first carried it, and no pytest
+#: tier could see that: the integration tier builds its tables from
+#: `Base.metadata` rather than by running the chain.
+_TABLES = ("workspaces", "autodiscovery_rules")
 
 
 def upgrade() -> None:
