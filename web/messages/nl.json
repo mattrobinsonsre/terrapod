@@ -1826,7 +1826,8 @@
       "successRow": "{filename} gewist",
       "successBulk": "{files} artefacten gewist, {size} vrijgemaakt",
       "errorRow": "Kon het artefact niet wissen",
-      "errorBulk": "Kon de pakketartefacten niet wissen"
+      "errorBulk": "Kon de pakketartefacten niet wissen",
+      "capabilityOff": "De pakketcache staat uit, dus er is hier niets om weer te geven. Alles wat al in de cache staat blijft bewaard en komt terug zodra de cache weer aan wordt gezet."
     },
     "archives": {
       "connectionLabel": "Verbinding",

@@ -4775,6 +4775,13 @@ walkthrough, see [Caches](caches.md).
 > having no database table; see
 > [Where the two caches differ](caches.md#where-the-two-caches-differ-and-why).
 
+> **The four package-cache routes are absent when the package cache is.** With
+> `api.config.registry.package_cache.enabled` set to `false` they are not
+> registered at all — a 404 as an unrouted path, which is what a switched-off
+> capability means everywhere in Terrapod. The four archive routes have no such
+> flag and are always there. Nothing cached is lost while a capability is off;
+> see [Caches](caches.md#where-the-two-caches-differ-and-why).
+
 ### List Cached Package Artifacts (Admin)
 
 ```

@@ -1826,7 +1826,8 @@
       "successRow": "{filename} ryddet",
       "successBulk": "Ryddede {files} artefakter og frigjorde {size}",
       "errorRow": "Kunne ikke rydde artefaktet",
-      "errorBulk": "Kunne ikke rydde pakkeartefakterne"
+      "errorBulk": "Kunne ikke rydde pakkeartefakterne",
+      "capabilityOff": "Pakkecachen er slået fra, så der er intet at vise her. Alt, der allerede er cachet, bevares og kommer tilbage, når den slås til igen."
     },
     "archives": {
       "connectionLabel": "Forbindelse",

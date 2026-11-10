@@ -69,6 +69,12 @@ export function PackageCachePanel({
   // rather than from an eviction response, because the confirmation needs it
   // before it asks (#2474).
   const [sealed, setSealed] = useState(false)
+  // Whether the surface exists at all. The package cache is an optional
+  // capability and its admin routes go with it (#2474), so a 404 here means
+  // `registry.package_cache.enabled` is false rather than that something is
+  // broken -- and an error banner on a page where everything else works is
+  // the wrong way to say that.
+  const [absent, setAbsent] = useState(false)
 
   // The LIST filters. Both are applied server-side — `name` as a prefix, which
   // the placeholder says, because a practitioner hunting `community.` wants the
@@ -109,10 +115,25 @@ export function PackageCachePanel({
     if (appliedName) params.set('name', appliedName)
     const query = params.toString() ? `?${params.toString()}` : ''
     try {
-      const [list, totalsRes] = await Promise.all([
+      // `allSettled`, not `all`: with the capability off `fetchAllPages` throws
+      // on the 404 before the totals response can be inspected, and the 404 is
+      // what distinguishes "switched off" from "broken".
+      const [listResult, totalsResult] = await Promise.allSettled([
         fetchAllPages<CachedPackageFile>(`/api/v1/admin/package-cache${query}`),
         apiFetch('/api/v1/admin/package-cache/totals'),
       ])
+      // A rejection is a transport failure and belongs in the banner; a 404 is
+      // the capability being off. Taken in that order, so one is never read as
+      // the other.
+      if (totalsResult.status === 'rejected') throw totalsResult.reason
+      const totalsRes = totalsResult.value
+      if (totalsRes.status === 404) {
+        setAbsent(true)
+        return
+      }
+      setAbsent(false)
+      if (listResult.status === 'rejected') throw listResult.reason
+      const list = listResult.value
       setEntries(list)
       if (totalsRes.ok) {
         const body = await totalsRes.json()
@@ -234,6 +255,17 @@ export function PackageCachePanel({
   return (
     <section data-testid="package-cache-section" className="mt-8 mb-8">
       <h2 className="text-lg font-semibold text-slate-200 mb-3">{t('sections.packages')}</h2>
+
+      {absent ? (
+        /* The section is kept rather than hidden: an operator who knows the cache
+           exists should be told why there is nothing here, and "nothing rendered"
+           reads as a broken panel. Nothing is lost while it is off -- the stored
+           artifacts stay and come back when it is turned on. */
+        <p data-testid="package-cache-disabled" className="text-sm text-slate-400">
+          {t('packages.capabilityOff')}
+        </p>
+      ) : (
+        <>
 
       {/* Totals strip: computed over the whole table server-side, so it is a
           total rather than a sum of whatever the page happened to show. */}
@@ -386,6 +418,8 @@ export function PackageCachePanel({
               />
             ))}
           </MobileCardList>
+        </>
+      )}
         </>
       )}
     </section>

@@ -1826,7 +1826,8 @@
       "successRow": "Purg3d {filename}",
       "successBulk": "Purg3d {files} 4r71f4c75, fr331ng {size}",
       "errorRow": "F41l3d 70 purg3 7h3 4r71f4c7",
-      "errorBulk": "F41l3d 70 purg3 p4ck4g3 4r71f4c75"
+      "errorBulk": "F41l3d 70 purg3 p4ck4g3 4r71f4c75",
+      "capabilityOff": "7h3 p4ck4g3 c4ch3 15 5w17ch3d 0ff, 50 7h3r3 15 n07h1ng 70 l157 h3r3. 4ny7h1ng 4lr34dy c4ch3d 15 k3p7 4nd c0m35 b4ck wh3n 17 15 7urn3d 0n 4g41n."
     },
     "archives": {
       "connectionLabel": "C0nn3c710n",

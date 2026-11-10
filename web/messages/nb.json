@@ -1826,7 +1826,8 @@
       "successRow": "{filename} tømt",
       "successBulk": "Tømte {files} artefakter og frigjorde {size}",
       "errorRow": "Kunne ikke tømme artefaktet",
-      "errorBulk": "Kunne ikke tømme pakkeartefaktene"
+      "errorBulk": "Kunne ikke tømme pakkeartefaktene",
+      "capabilityOff": "Pakkebufferen er slått av, så det er ingenting å vise her. Alt som allerede er bufret, beholdes og kommer tilbake når den slås på igjen."
     },
     "archives": {
       "connectionLabel": "Tilkobling",

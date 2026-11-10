@@ -10,6 +10,25 @@ reassuring direction -- an operator looking for what is filling a bucket would b
 shown a number smaller than the problem. For the package cache that is a `GROUP
 BY` in the database; for the archive cache there is nothing to group, so the walk
 carries a ceiling and the response says when it hit it.
+
+**Two routers, because the two caches are gated differently.** The package cache
+is an optional capability (`registry.package_cache.enabled`) and the convention
+this repository enforces is that a switched-off capability's surface is ABSENT
+rather than answering 404 -- `scripts/airgap-gate.sh --gated-off` asserts it
+against a running stack, and `oci_admin` is the direct precedent: its comment
+reads "it exists only for the registry, so it goes when the registry does".
+`POST /admin/package-cache/warm` already behaves that way, so mounting these four
+unconditionally made that namespace half-present -- four routes visible and the
+fifth gone, which is worse than either consistent answer. The VCS archive cache
+has no capability flag at all (it is part of what Terrapod is, like the provider
+mirror), so its routes are unconditional.
+
+The capability's own documented meaning is what makes gating these right rather
+than merely tidy: `services/capabilities.py` states that turning one off "stops
+serving and stops its background work; stored images and cached artifacts stay
+where they are and come back untouched when it is turned back on". Off is a
+pause, not a decommission -- so there is no state an operator is locked out of,
+only a surface that is quiet while the thing it describes is.
 """
 
 from __future__ import annotations
@@ -31,6 +50,11 @@ from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
 
+#: The package cache's admin surface, mounted only while that capability serves.
+#: See the module docstring: this is the gated half.
+package_router = APIRouter(tags=["cache-admin"])
+
+#: The VCS archive cache's admin surface, always mounted.
 router = APIRouter(tags=["cache-admin"])
 
 
@@ -104,9 +128,15 @@ def _sealed_note() -> dict[str, object]:
 
 
 # ── package cache ──────────────────────────────────────────────────────────
+#
+# On `package_router`: these go when `registry.package_cache.enabled` does.
+# A new route here belongs on that router, and needs a sample request in
+# `tests/api/test_package_cache.py::SAMPLES` -- the auth gate there walks
+# every route whose path carries `package-cache` and fails on one it has no
+# sample for, which is how it stays unable to skip a new endpoint.
 
 
-@router.get("/admin/package-cache")
+@package_router.get("/admin/package-cache")
 async def list_package_cache(
     ecosystem: str | None = None,
     name: str | None = None,
@@ -144,7 +174,7 @@ async def list_package_cache(
     return JSONResponse(content={"data": page_items, "meta": meta})
 
 
-@router.get("/admin/package-cache/totals")
+@package_router.get("/admin/package-cache/totals")
 async def package_cache_totals(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -175,7 +205,7 @@ async def package_cache_totals(
     )
 
 
-@router.delete("/admin/package-cache/{file_id}")
+@package_router.delete("/admin/package-cache/{file_id}")
 async def delete_package_cache_file(
     file_id: str,
     user: AuthenticatedUser = Depends(require_admin),
@@ -198,7 +228,7 @@ async def delete_package_cache_file(
     return JSONResponse(content={"status": "evicted", **_sealed_note()})
 
 
-@router.post("/admin/package-cache/evict")
+@package_router.post("/admin/package-cache/evict")
 async def evict_package_cache(
     body: PackageEvictRequest,
     user: AuthenticatedUser = Depends(require_admin),
@@ -230,6 +260,9 @@ async def evict_package_cache(
 
 
 # ── VCS archive cache ──────────────────────────────────────────────────────
+#
+# On `router`: unconditional. The archive cache has no capability flag, so
+# there is nothing for these to be gated on.
 
 
 @router.get("/admin/vcs-archive-cache")

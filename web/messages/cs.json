@@ -1826,7 +1826,8 @@
       "successRow": "{filename} vymazán",
       "successBulk": "Vymazáno {files} artefaktů, uvolněno {size}",
       "errorRow": "Artefakt se nepodařilo vymazat",
-      "errorBulk": "Artefakty balíčků se nepodařilo vymazat"
+      "errorBulk": "Artefakty balíčků se nepodařilo vymazat",
+      "capabilityOff": "Mezipaměť balíčků je vypnutá, takže zde není co vypsat. Vše, co je již v mezipaměti, zůstává zachováno a vrátí se, až ji znovu zapnete."
     },
     "archives": {
       "connectionLabel": "Připojení",

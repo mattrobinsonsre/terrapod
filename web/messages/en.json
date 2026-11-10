@@ -1826,7 +1826,8 @@
       "successRow": "Purged {filename}",
       "successBulk": "Purged {files} artifacts, freeing {size}",
       "errorRow": "Failed to purge the artifact",
-      "errorBulk": "Failed to purge package artifacts"
+      "errorBulk": "Failed to purge package artifacts",
+      "capabilityOff": "The package cache is switched off, so there is nothing to list here. Anything already cached is kept and comes back when it is turned on again."
     },
     "archives": {
       "connectionLabel": "Connection",

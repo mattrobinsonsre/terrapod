@@ -397,6 +397,7 @@ to be tidied, and expecting either to behave like the other will mislead you.
 | **Paging** | `page[size]` / `page[number]`, with `meta.pagination` | a **key cursor** — `after` and `meta.next-cursor`, and **no** `meta.pagination` |
 | **Age filter** | **last access** (`last-accessed-at`) | **write time** (`last-modified`) |
 | **Totals** | exact, aggregated in the database | a bounded walk, with **`meta.truncated`** when it hit the ceiling |
+| **When the capability is off** | the routes are **not there** | the routes stay |
 
 1. **The archive listing uses a key cursor.** There are no rows to offset into; a
    page comes from a storage walk, and object storage lists keys in
@@ -416,6 +417,25 @@ to be tidied, and expecting either to behave like the other will mislead you.
 Two smaller consequences of the same fact, so they do not surprise you: the
 archive delete is idempotent where the package delete 404s, and an archive key
 that does not parse appears in the listing but not in the totals.
+
+The fourth row has a different cause, and it is worth knowing before you go
+looking for a route that is not there. The package cache is an **optional
+capability**: with `api.config.registry.package_cache.enabled` set to `false`
+every route under `/admin/package-cache` is absent — a 404 as an unrouted path,
+not a route that exists and refuses — because that is what a switched-off
+capability means everywhere in Terrapod (the container registry behaves the same
+way, and `scripts/airgap-gate.sh --gated-off` holds it to that against a running
+stack). The admin page says so in place of the section rather than reporting an
+error. The VCS archive cache has no such flag — it is part of what Terrapod is,
+like the provider mirror and the module registry — so its routes are always
+there.
+
+**Nothing is locked away while a capability is off.** Turning one off stops it
+serving and stops its background work; everything already cached stays exactly
+where it is and is listed again the moment it is turned back on. So the way to
+inspect or purge a switched-off package cache is to turn it on, do the work, and
+turn it off again — and if the goal is to reclaim the space without serving
+anything, the scheduled retention sweep still runs.
 
 ---
 

@@ -1826,7 +1826,8 @@
       "successRow": "{filename} tlhIllu'pu'",
       "successBulk": "{files} janmey tlhIllu'pu', {size} tlhaplu'pu'",
       "errorRow": "jan tlhIlmeH lujpu'",
-      "errorBulk": "De' janmey tlhIlmeH lujpu'"
+      "errorBulk": "De' janmey tlhIlmeH lujpu'",
+      "capabilityOff": "lo'laHbe'law' ngaSwI' pat. vaj pagh tetlh vIDel. ngaSta'bogh Hoch polta' 'ej chu'qa'DI' chegh."
     },
     "archives": {
       "connectionLabel": "rar",

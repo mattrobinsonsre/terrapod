@@ -153,9 +153,14 @@ class TestTheAdminGate:
         """
         from terrapod.api.routers import cache_admin
 
+        # BOTH routers. The module exports two -- the package half is mounted
+        # only while its capability serves -- so reading one of them would have
+        # halved this gate's subject the moment they were split, and halved it
+        # silently, which is the failure this test exists to be.
         live = [
             (sorted(r.methods)[0], r.path)
-            for r in cache_admin.router.routes
+            for router in (cache_admin.package_router, cache_admin.router)
+            for r in router.routes
             if getattr(r, "methods", None)
         ]
         assert len(live) >= 8, (
@@ -186,6 +191,69 @@ class TestTheAdminGate:
             f"{len(missing)} route(s) in cache_admin have no admin-gate row in ROUTES: "
             f"{sorted(missing)}"
         )
+
+
+class TestTheCapabilityGate:
+    """The package half goes with its capability; the archive half does not.
+
+    The convention is that a switched-off capability's surface is ABSENT rather
+    than answering 404 -- `scripts/airgap-gate.sh --gated-off` asserts it against
+    a running stack, and `oci_admin` is the precedent. These four routes were
+    mounted unconditionally when they were written, which left the
+    `/admin/package-cache/` namespace half-present: these answering and the
+    pre-existing `warm` route, on the same prefix, gone.
+
+    Asserted here as well as in the live gate because the live gate is an
+    expensive place to learn it, and because the live gate's matcher is
+    `'/package-cache/' in path` -- which does not even see `GET
+    /admin/package-cache`, the listing.
+    """
+
+    def _paths(self) -> list[str]:
+        from terrapod.api.app import create_application
+
+        return [getattr(r, "path", "") for r in create_application().routes]
+
+    #: The paths this module owns, derived from its own router so a fifth cannot
+    #: arrive outside this test's reach.
+    def _owned(self) -> set[str]:
+        from terrapod.api.routers import cache_admin
+
+        return {r.path for r in cache_admin.package_router.routes if getattr(r, "methods", None)}
+
+    def test_the_package_routes_are_absent_when_the_cache_is_off(self, monkeypatch):
+        from terrapod.config import settings
+
+        monkeypatch.setattr(settings.registry.package_cache, "enabled", False)
+        mounted = set(self._paths())
+        # Matched on the OWNED set rather than on the substring `package-cache`,
+        # because one route on that prefix is not ours and legitimately survives:
+        # `POST /admin/package-cache/warm` lives on the shared warm router, which
+        # stays mounted while the container registry is on so that
+        # `/admin/warm-jobs/{id}` remains reachable, and refuses per ecosystem
+        # with a 404 instead. Asserting the bare substring here would fail on a
+        # correct tree -- and would be a test about somebody else's router.
+        still_there = sorted(path for path in self._owned() if path in mounted)
+        assert still_there == [], f"still mounted with the capability off: {still_there}"
+        # ...and the bare listing specifically, because the live gate's own
+        # matcher (`'/package-cache/' in path`) cannot see a path that ENDS at
+        # the cache, so that one route would pass it either way.
+        assert "/api/v1/admin/package-cache" not in mounted
+
+    def test_the_archive_routes_stay_when_the_cache_is_off(self, monkeypatch):
+        """Without this half, unmounting everything would pass the test above."""
+        from terrapod.config import settings
+
+        monkeypatch.setattr(settings.registry.package_cache, "enabled", False)
+        assert [p for p in self._paths() if "vcs-archive-cache" in p] != []
+
+    def test_both_halves_are_there_when_the_cache_is_on(self, monkeypatch):
+        from terrapod.config import settings
+
+        monkeypatch.setattr(settings.registry.package_cache, "enabled", True)
+        paths = self._paths()
+        assert [p for p in paths if "admin/package-cache" in p] != []
+        assert [p for p in paths if "vcs-archive-cache" in p] != []
 
 
 @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)

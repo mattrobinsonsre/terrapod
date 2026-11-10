@@ -1826,7 +1826,8 @@
       "successRow": "{filename} temizlendi",
       "successBulk": "{files} yapıt temizlendi, {size} boşaltıldı",
       "errorRow": "Yapıt temizlenemedi",
-      "errorBulk": "Paket yapıtları temizlenemedi"
+      "errorBulk": "Paket yapıtları temizlenemedi",
+      "capabilityOff": "Paket önbelleği kapalı olduğundan burada listelenecek bir şey yok. Önbelleğe alınmış olanlar korunur ve önbellek yeniden açıldığında geri gelir."
     },
     "archives": {
       "connectionLabel": "Bağlantı",

@@ -1826,7 +1826,8 @@
       "successRow": "Purjd {filename}",
       "successBulk": "Purjd {files} artifaktz, freein {size}",
       "errorRow": "Could not purj teh artifakt",
-      "errorBulk": "Could not purj teh packige artifaktz"
+      "errorBulk": "Could not purj teh packige artifaktz",
+      "capabilityOff": "package cache iz off, so no has anyfing to show heer. evryfing u alreddy cached stayz, an comez bak when u turn it on agen. kthx"
     },
     "archives": {
       "connectionLabel": "Konnekshun",

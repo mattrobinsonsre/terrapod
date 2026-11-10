@@ -1826,7 +1826,8 @@
       "successRow": "{filename} purgé",
       "successBulk": "{files} artefacts purgés, {size} libérés",
       "errorRow": "Échec de la purge de l'artefact",
-      "errorBulk": "Échec de la purge des artefacts de paquets"
+      "errorBulk": "Échec de la purge des artefacts de paquets",
+      "capabilityOff": "Le cache de paquets est désactivé, il n'y a donc rien à lister ici. Tout ce qui est déjà en cache est conservé et réapparaît dès qu'il est réactivé."
     },
     "archives": {
       "connectionLabel": "Connexion",

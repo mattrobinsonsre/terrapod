@@ -1826,7 +1826,8 @@
       "successRow": "{filename} svuotato",
       "successBulk": "Svuotati {files} artefatti, liberando {size}",
       "errorRow": "Impossibile svuotare l''artefatto",
-      "errorBulk": "Impossibile svuotare gli artefatti di pacchetti"
+      "errorBulk": "Impossibile svuotare gli artefatti di pacchetti",
+      "capabilityOff": "La cache dei pacchetti è disattivata, quindi qui non c'è nulla da elencare. Tutto ciò che è già in cache viene conservato e torna disponibile quando viene riattivata."
     },
     "archives": {
       "connectionLabel": "Connessione",

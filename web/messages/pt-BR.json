@@ -1826,7 +1826,8 @@
       "successRow": "{filename} expurgado",
       "successBulk": "{files} artefatos expurgados, liberando {size}",
       "errorRow": "Falha ao expurgar o artefato",
-      "errorBulk": "Falha ao expurgar os artefatos de pacotes"
+      "errorBulk": "Falha ao expurgar os artefatos de pacotes",
+      "capabilityOff": "O cache de pacotes está desativado, então não há nada para listar aqui. Tudo o que já está em cache é mantido e volta quando ele for ativado novamente."
     },
     "archives": {
       "connectionLabel": "Conexão",

@@ -1826,7 +1826,8 @@
       "successRow": "{filename} gelöscht",
       "successBulk": "{files} Artefakte gelöscht, {size} freigegeben",
       "errorRow": "Artefakt konnte nicht gelöscht werden",
-      "errorBulk": "Paket-Artefakte konnten nicht gelöscht werden"
+      "errorBulk": "Paket-Artefakte konnten nicht gelöscht werden",
+      "capabilityOff": "Der Paket-Cache ist abgeschaltet, daher gibt es hier nichts aufzulisten. Alles bereits Zwischengespeicherte bleibt erhalten und ist wieder da, sobald er erneut eingeschaltet wird."
     },
     "archives": {
       "connectionLabel": "Verbindung",

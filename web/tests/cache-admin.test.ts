@@ -106,6 +106,59 @@ test('a truncated walk withholds the figures from the bulk prompt', () => {
   )
 })
 
+test('a 404 from the package totals is read as "switched off", before any throw', () => {
+  // The package cache is an optional capability and its admin routes go with it
+  // (#2474), so the 404 is a normal state rather than a failure. The ORDER is
+  // the property: both throws must come after the 404 branch, or an operator
+  // with the cache off gets a red error banner on a page where everything else
+  // works.
+  const body = code(PACKAGES)
+  const at404 = body.indexOf('404')
+  assert.ok(at404 > 0, 'the panel does not look at the status, so it cannot tell off from broken')
+  // The two rejections sit on OPPOSITE sides of the 404 check, and each side is
+  // load-bearing:
+  //
+  //   totals rejected -> re-thrown FIRST. A rejected promise has no `.status`,
+  //                      so there is nothing to compare against 404.
+  //   list rejected   -> re-thrown LAST. With the capability off this IS the
+  //                      404, so re-throwing it earlier is the error banner the
+  //                      whole branch exists to avoid.
+  const atTotalsThrow = body.indexOf('throw totalsResult.reason')
+  const atListThrow = body.indexOf('throw listResult.reason')
+  assert.ok(atTotalsThrow > 0, 'a rejected totals response is swallowed')
+  assert.ok(atListThrow > 0, 'a rejected list is swallowed')
+  assert.ok(
+    atTotalsThrow < at404,
+    'the totals rejection is re-thrown after reading a status it cannot have',
+  )
+  assert.ok(
+    atListThrow > at404,
+    "the list's 404 is re-thrown as an error before it is read as the capability being off",
+  )
+  // allSettled rather than all: `all` rejects on the list's 404 before the
+  // totals status can be read at all.
+  assert.ok(/Promise\.allSettled/.test(body), 'Promise.all cannot distinguish off from broken')
+})
+
+test('the switched-off package cache says so in words, in the section that is still there', () => {
+  // Rendering nothing is indistinguishable from a broken panel, so the heading
+  // stays and carries one sentence. In the catalogue, so it is translated.
+  assert.ok(
+    /packages\.capabilityOff/.test(PACKAGES),
+    'the panel renders no explanation when the surface is absent',
+  )
+  assert.ok(
+    typeof EN.packages.capabilityOff === 'string' && EN.packages.capabilityOff.length > 20,
+    'adminBinaryCache.packages.capabilityOff is missing or too short to explain anything',
+  )
+  // And it says the artifacts are kept, which is the half an operator acts on:
+  // turning the capability off is a pause, not a decommission.
+  assert.ok(
+    /kept|comes back/.test(EN.packages.capabilityOff),
+    'the sentence does not say the cached artifacts survive being switched off',
+  )
+})
+
 test('the two age filters say which clock they mean, and they do not agree', () => {
   // Package age is measured from the LAST ACCESS — evicting an artifact every
   // run pulls, merely for being old, would re-fetch it immediately. An archive

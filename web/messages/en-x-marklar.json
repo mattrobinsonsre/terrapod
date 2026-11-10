@@ -1826,7 +1826,8 @@
       "successRow": "Purged the marklar {filename}",
       "successBulk": "Purged {files} marklars, freeing {size}",
       "errorRow": "Failed to purge the marklar",
-      "errorBulk": "Failed to purge marklar marklars"
+      "errorBulk": "Failed to purge marklar marklars",
+      "capabilityOff": "The marklar marklar is switched off, so there is no marklar to list here. Any marklar already cached is kept and comes back when it is turned on again."
     },
     "archives": {
       "connectionLabel": "Marklar",

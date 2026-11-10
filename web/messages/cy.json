@@ -1826,7 +1826,8 @@
       "successRow": "Gwaredwyd {filename}",
       "successBulk": "Gwaredwyd {files} arteffact, gan ryddhau {size}",
       "errorRow": "Methwyd gwaredu'r arteffact",
-      "errorBulk": "Methwyd gwaredu arteffactau'r pecynnau"
+      "errorBulk": "Methwyd gwaredu arteffactau'r pecynnau",
+      "capabilityOff": "Mae storfa'r pecynnau wedi'i diffodd, felly nid oes dim i'w restru yma. Cedwir popeth sydd eisoes yn y storfa, a daw'n ôl pan gaiff ei throi ymlaen eto."
     },
     "archives": {
       "connectionLabel": "Cysylltiad",

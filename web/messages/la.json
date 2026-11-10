@@ -1826,7 +1826,8 @@
       "successRow": "{filename} purgatum",
       "successBulk": "Purgata sunt {files} artificia, liberatis {size}",
       "errorRow": "Artificium purgari non potuit",
-      "errorBulk": "Artificia fasciculorum purgari non potuerunt"
+      "errorBulk": "Artificia fasciculorum purgari non potuerunt",
+      "capabilityOff": "Promptuarium fasciculorum exstinctum est, itaque nihil hic est quod enumeretur. Quidquid iam conditum est servatur et redit cum rursus accenditur."
     },
     "archives": {
       "connectionLabel": "Nexus",

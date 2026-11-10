@@ -1826,7 +1826,8 @@
       "successRow": "Wyczyszczono {filename}",
       "successBulk": "Wyczyszczono {files} artefaktów, zwalniając {size}",
       "errorRow": "Nie udało się wyczyścić artefaktu",
-      "errorBulk": "Nie udało się wyczyścić artefaktów pakietów"
+      "errorBulk": "Nie udało się wyczyścić artefaktów pakietów",
+      "capabilityOff": "Pamięć podręczna pakietów jest wyłączona, więc nie ma tu czego wyświetlać. Wszystko, co już zostało zapisane w pamięci podręcznej, jest zachowane i wróci po jej ponownym włączeniu."
     },
     "archives": {
       "connectionLabel": "Połączenie",

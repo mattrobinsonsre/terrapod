@@ -1826,7 +1826,8 @@
       "successRow": "已清除 {filename}",
       "successBulk": "已清除 {files} 個構件，釋出 {size}",
       "errorRow": "清除構件失敗",
-      "errorBulk": "清除套件構件失敗"
+      "errorBulk": "清除套件構件失敗",
+      "capabilityOff": "套件快取已關閉，因此這裡沒有可列出的內容。已快取的內容會保留下來，重新開啟後即會恢復。"
     },
     "archives": {
       "connectionLabel": "連線",

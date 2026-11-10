@@ -1826,7 +1826,8 @@
       "successRow": "{filename} rensad",
       "successBulk": "Rensade {files} artefakter och frigjorde {size}",
       "errorRow": "Kunde inte rensa artefakten",
-      "errorBulk": "Kunde inte rensa paketartefakterna"
+      "errorBulk": "Kunde inte rensa paketartefakterna",
+      "capabilityOff": "Paketcachen är avstängd, så det finns inget att visa här. Allt som redan är cachat behålls och kommer tillbaka när den slås på igen."
     },
     "archives": {
       "connectionLabel": "Anslutning",

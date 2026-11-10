@@ -1826,7 +1826,8 @@
       "successRow": "{filename} poistettu",
       "successBulk": "Poistettiin {files} artefaktia ja vapautettiin {size}",
       "errorRow": "Artefaktin poisto ei onnistunut",
-      "errorBulk": "Pakettiartefaktien poisto ei onnistunut"
+      "errorBulk": "Pakettiartefaktien poisto ei onnistunut",
+      "capabilityOff": "Pakettivälimuisti on pois käytöstä, joten täällä ei ole mitään listattavaa. Kaikki jo välimuistissa oleva säilyy ja tulee takaisin, kun se otetaan uudelleen käyttöön."
     },
     "archives": {
       "connectionLabel": "Yhteys",

@@ -1826,7 +1826,8 @@
       "successRow": "{filename}을(를) 삭제했습니다",
       "successBulk": "아티팩트 {files}개를 삭제하여 {size}을(를) 확보했습니다",
       "errorRow": "아티팩트를 삭제하지 못했습니다",
-      "errorBulk": "패키지 아티팩트를 삭제하지 못했습니다"
+      "errorBulk": "패키지 아티팩트를 삭제하지 못했습니다",
+      "capabilityOff": "패키지 캐시가 꺼져 있어 여기에 표시할 항목이 없습니다. 이미 캐시된 항목은 그대로 유지되며 다시 켜면 돌아옵니다."
     },
     "archives": {
       "connectionLabel": "연결",

@@ -1826,7 +1826,8 @@
       "successRow": "已清除 {filename}",
       "successBulk": "已清除 {files} 个构件，释放 {size}",
       "errorRow": "清除构件失败",
-      "errorBulk": "清除软件包构件失败"
+      "errorBulk": "清除软件包构件失败",
+      "capabilityOff": "软件包缓存已关闭，因此这里没有可列出的内容。已缓存的内容会保留下来，重新开启后即会恢复。"
     },
     "archives": {
       "connectionLabel": "连接",

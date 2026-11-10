@@ -1826,7 +1826,8 @@
       "successRow": "{filename} をパージしました",
       "successBulk": "{files} 件の成果物をパージし、{size} を解放しました",
       "errorRow": "成果物のパージに失敗しました",
-      "errorBulk": "パッケージ成果物のパージに失敗しました"
+      "errorBulk": "パッケージ成果物のパージに失敗しました",
+      "capabilityOff": "パッケージキャッシュは無効になっているため、ここに表示するものはありません。すでにキャッシュされているものは保持され、再度有効にすると元に戻ります。"
     },
     "archives": {
       "connectionLabel": "接続",

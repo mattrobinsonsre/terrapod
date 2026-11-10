@@ -1826,7 +1826,8 @@
       "successRow": "{filename} purgado",
       "successBulk": "{files} artefactos purgados, {size} liberados",
       "errorRow": "No se pudo purgar el artefacto",
-      "errorBulk": "No se pudieron purgar los artefactos de paquetes"
+      "errorBulk": "No se pudieron purgar los artefactos de paquetes",
+      "capabilityOff": "La caché de paquetes está desactivada, así que no hay nada que mostrar aquí. Todo lo ya almacenado en caché se conserva y vuelve a aparecer cuando se active de nuevo."
     },
     "archives": {
       "connectionLabel": "Conexión",

@@ -1420,13 +1420,26 @@ def create_application() -> FastAPI:
         include_terrapod(cache_warm_router)
 
     # Admin list, totals and eviction for the package cache and the VCS archive
-    # cache (#2474). UNCONDITIONAL, unlike the warm router above: the warm
-    # endpoints are only meaningful while a proxy is serving, where these answer
-    # "what is in here" — and the question an operator most needs answered is
-    # what a cache they have just turned OFF is still holding. A list route that
-    # disappeared with the capability would hide exactly that.
+    # cache (#2474). Two routers, gated differently.
+    #
+    # The package half goes with its capability, like `oci_admin` above and like
+    # `POST /admin/package-cache/warm` in the router above this one: a
+    # switched-off capability's surface is ABSENT rather than answering 404, and
+    # `scripts/airgap-gate.sh --gated-off` asserts that against a running stack.
+    # Mounting these unconditionally left the `/admin/package-cache/` namespace
+    # half-present — four routes answering and the fifth gone — which is worse
+    # than either consistent answer. Nothing is locked away by this: a capability
+    # that is off has stopped serving, not been decommissioned, and the stored
+    # artifacts are still there when it comes back (`services/capabilities.py`).
+    #
+    # The archive half is unconditional because the VCS archive cache has no
+    # capability flag: it is part of what Terrapod is, like the provider mirror
+    # and the module registry, which the same gate asserts must keep answering.
+    from terrapod.api.routers.cache_admin import package_router as cache_admin_package_router
     from terrapod.api.routers.cache_admin import router as cache_admin_router
 
+    if settings.registry.package_cache.enabled:
+        include_terrapod(cache_admin_package_router)
     include_terrapod(cache_admin_router)
 
     # Language package proxies — PyPI and npm (#1417). Native surface rather than

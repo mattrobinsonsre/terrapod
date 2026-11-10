@@ -1826,7 +1826,8 @@
       "successRow": "Purged {filename}, aye",
       "successBulk": "Purged {files} pieces o'' booty, freein'' {size}",
       "errorRow": "Failed t'' purge th'' booty",
-      "errorBulk": "Failed t'' purge th'' package booty"
+      "errorBulk": "Failed t'' purge th'' package booty",
+      "capabilityOff": "The package hold be shut, so there be naught to muster here. Whatever ye stowed away stays stowed, an' sails back when ye open her up again."
     },
     "archives": {
       "connectionLabel": "Linkin''",
