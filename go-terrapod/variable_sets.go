@@ -83,7 +83,7 @@ func (c *Client) CreateVariableSet(ctx context.Context, req CreateVariableSetReq
 	if err != nil {
 		return nil, fmt.Errorf("marshal create varset: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/v2/organizations/default/varsets", body)
+	data, err := c.postDual(ctx, "/api/v1/varsets", "/api/v2/organizations/default/varsets", body)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (c *Client) CreateVariableSet(ctx context.Context, req CreateVariableSetReq
 
 // GetVariableSet reads a varset by id.
 func (c *Client) GetVariableSet(ctx context.Context, id string) (*VariableSet, error) {
-	data, err := c.Get(ctx, "/api/v2/varsets/"+url.PathEscape(id))
+	data, err := c.getDual(ctx, "/api/v1/varsets/"+url.PathEscape(id), "/api/v2/varsets/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (c *Client) GetVariableSet(ctx context.Context, id string) (*VariableSet, e
 // the SDK fetches the first page (which is currently the only page —
 // the API doesn't paginate varsets yet).
 func (c *Client) ListVariableSets(ctx context.Context) ([]VariableSet, error) {
-	data, err := c.Get(ctx, "/api/v2/organizations/default/varsets")
+	data, err := c.getDual(ctx, "/api/v1/varsets", "/api/v2/organizations/default/varsets")
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (c *Client) UpdateVariableSet(ctx context.Context, id string, req UpdateVar
 	if err != nil {
 		return nil, fmt.Errorf("marshal update varset: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/v2/varsets/"+url.PathEscape(id), body)
+	data, err := c.patchDual(ctx, "/api/v1/varsets/"+url.PathEscape(id), "/api/v2/varsets/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (c *Client) UpdateVariableSet(ctx context.Context, id string, req UpdateVar
 // (via assignment) lose the varset binding; varset variables are
 // also deleted.
 func (c *Client) DeleteVariableSet(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/v2/varsets/"+url.PathEscape(id))
+	return c.deleteDual(ctx, "/api/v1/varsets/"+url.PathEscape(id), "/api/v2/varsets/"+url.PathEscape(id))
 }
 
 // ── Workspace assignment ─────────────────────────────────────────────
@@ -148,7 +148,8 @@ func (c *Client) AssignWorkspaceToVarset(ctx context.Context, varsetID, workspac
 	if err != nil {
 		return fmt.Errorf("marshal assign body: %w", err)
 	}
-	_, err = c.Post(ctx,
+	_, err = c.postDual(ctx,
+		fmt.Sprintf("/api/v1/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)),
 		fmt.Sprintf("/api/v2/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)),
 		body)
 	return err
@@ -160,7 +161,8 @@ func (c *Client) UnassignWorkspaceFromVarset(ctx context.Context, varsetID, work
 	if err != nil {
 		return fmt.Errorf("marshal unassign body: %w", err)
 	}
-	return c.DeleteWithBody(ctx,
+	return c.deleteWithBodyDual(ctx,
+		fmt.Sprintf("/api/v1/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)),
 		fmt.Sprintf("/api/v2/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)),
 		body)
 }
@@ -170,7 +172,7 @@ func (c *Client) UnassignWorkspaceFromVarset(ctx context.Context, varsetID, work
 // Terraform Read paths that need to verify the assignment still
 // exists.
 func (c *Client) IsWorkspaceAssignedToVarset(ctx context.Context, varsetID, workspaceID string) (bool, error) {
-	data, err := c.Get(ctx, "/api/v2/varsets/"+url.PathEscape(varsetID))
+	data, err := c.getDual(ctx, "/api/v1/varsets/"+url.PathEscape(varsetID), "/api/v2/varsets/"+url.PathEscape(varsetID))
 	if err != nil {
 		return false, err
 	}

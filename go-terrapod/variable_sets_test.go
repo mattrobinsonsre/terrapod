@@ -14,6 +14,9 @@ func newVarsetFixture(t *testing.T) (*Client, *[]byte) {
 	t.Helper()
 	var lastBody []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		if r.Body != nil {
 			b, _ := io.ReadAll(r.Body)
 			lastBody = b
@@ -167,6 +170,9 @@ func TestListVarsetWorkspacesCarriesTheSource(t *testing.T) {
 	// The source is the point of the endpoint, not decoration: it tells a
 	// consumer which rows it may offer to unbind and which are derived.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		if r.URL.Path != "/api/terrapod/v1/varsets/varset-1/relationships/workspaces" {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}
@@ -194,6 +200,9 @@ func TestListVarsetWorkspacesCarriesTheSource(t *testing.T) {
 
 func TestListWorkspaceVarsetsCarriesTheSource(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		if r.URL.Path != "/api/terrapod/v1/workspaces/ws-1/varsets" {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}

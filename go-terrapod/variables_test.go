@@ -14,6 +14,9 @@ func newVarFixture(t *testing.T) (*Client, *httptest.Server, *[]byte) {
 	t.Helper()
 	var lastBody []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		if r.Body != nil {
 			b, _ := io.ReadAll(r.Body)
 			lastBody = b
@@ -246,6 +249,9 @@ func TestDeleteVariable(t *testing.T) {
 
 func TestVariableCreate_Conflict409(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		w.WriteHeader(http.StatusConflict)
 		_, _ = w.Write([]byte(`{"errors":[{"status":"409","detail":"key already exists"}]}`))
 	}))
@@ -292,6 +298,9 @@ func TestListAllVariables_LoopsAllPages(t *testing.T) {
 	}
 	var requested []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		if r.URL.Path != "/api/v2/workspaces/ws-1/vars" {
 			t.Fatalf("unexpected path: %q", r.URL.Path)
 		}
@@ -335,6 +344,9 @@ func TestListAllVariables_LoopsAllPages(t *testing.T) {
 // together are what a caller written before the rename depends on.
 func TestVariableCarriesBothNamesForTheTypedFlag(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"data":{"id":"var-a","type":"vars","attributes":{` +
@@ -498,6 +510,9 @@ func TestVariable_CategoryIsWhateverTheSurfaceSaid(t *testing.T) {
 		t.Run(want, func(t *testing.T) {
 			body := `{"data":[{"id":"var-a","type":"vars","attributes":{"key":"k","category":"` + want + `"}}]}`
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// A 2.0 server serves both surfaces; this fixture answers the legacy
+				// spellings, so recognise a native request rather than 404 it.
+				r.URL.Path = legacySpellingOf(r.URL.Path)
 				w.Header().Set("Content-Type", "application/vnd.api+json")
 				_, _ = w.Write([]byte(body))
 			}))
@@ -564,6 +579,9 @@ func TestGetVariableByKey_AcceptsEitherSpelling(t *testing.T) {
 			t.Run(served+"/"+asked, func(t *testing.T) {
 				body := `{"data":[{"id":"var-a","type":"vars","attributes":{"key":"region","category":"` + served + `"}}]}`
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// A 2.0 server serves both surfaces; this fixture answers the legacy
+					// spellings, so recognise a native request rather than 404 it.
+					r.URL.Path = legacySpellingOf(r.URL.Path)
 					w.Header().Set("Content-Type", "application/vnd.api+json")
 					_, _ = w.Write([]byte(body))
 				}))
@@ -593,6 +611,9 @@ func TestGetVariableByKey_StillSeparatesRealCategories(t *testing.T) {
 		{"id":"var-tf","type":"vars","attributes":{"key":"region","category":"terraform"}}
 	]}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		_, _ = w.Write([]byte(body))
 	}))

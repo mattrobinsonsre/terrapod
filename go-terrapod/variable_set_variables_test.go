@@ -11,6 +11,9 @@ import (
 func newVarsetVarFixture(t *testing.T) *Client {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 2.0 server serves both surfaces; this fixture answers the legacy
+		// spellings, so recognise a native request rather than 404 it.
+		r.URL.Path = legacySpellingOf(r.URL.Path)
 		if r.Body != nil {
 			_, _ = io.ReadAll(r.Body)
 			_ = r.Body.Close()

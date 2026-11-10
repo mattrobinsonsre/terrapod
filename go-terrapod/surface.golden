@@ -698,6 +698,7 @@ field ModuleWorkspaceLink.CreatedBy string `json:"created-by,omitempty"`
 field ModuleWorkspaceLink.ID string `json:"id"`
 field ModuleWorkspaceLink.WorkspaceID string `json:"workspace-id"`
 field ModuleWorkspaceLink.WorkspaceName string `json:"workspace-name,omitempty"`
+field NotFoundError.Detail string
 field NotFoundError.ID string
 field NotFoundError.Resource string
 field NotificationConfiguration.CreatedAt string `json:"created-at,omitempty"`
