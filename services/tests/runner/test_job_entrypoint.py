@@ -18,6 +18,7 @@ from __future__ import annotations
 import ast
 import inspect
 import os
+import stat
 import textwrap
 from unittest.mock import patch
 
@@ -1024,3 +1025,126 @@ class TestThePulumiPhaseMintsCloudIdentity:
         _, calls, _ = self._drive(monkeypatch, mint={}, phase="update")
         assert len(calls) == 1
         assert calls[0]["discover_providers"] is False
+
+
+class TestTheCheckoutIsNotWorldWritable:
+    """The configuration is checked out into a directory the runner owns (#2473).
+
+    `/workspace` is an `emptyDir`, and the kubelet creates one world-writable:
+    measured on k8s 1.35 with the runner's own `securityContext`, `root:1000`
+    mode 2777. Ansible refuses to read `ansible.cfg` from a world-writable
+    working directory, so a committed one was ignored -- with only ansible's own
+    warning to say so -- taking `library`, `roles_path`, `become`, `remote_user`,
+    `strategy`, `forks` and `gathering` with it. A missing `library` fails at
+    parse time; the rest fail silently, and a play can run as the wrong user.
+
+    These assert OUR property -- the checkout is not world-writable -- rather
+    than ansible's refusal, which is ansible's behaviour to keep and is recorded
+    in `_DEFAULT_WORK_DIR`'s own comment from the measurement.
+    """
+
+    def test_the_default_is_BELOW_the_mount_point_and_not_the_mount_point(self) -> None:
+        """The structural half, and the one worth having.
+
+        A directory the runner creates comes out 2755; the mount point itself is
+        2777 and cannot be chmod-ed by uid 1000 -- measured, refused -- nor
+        fixed with a `subPath`, because the kubelet applies the `fsGroup` chown
+        and chmod recursively. So the subdirectory IS the fix, and collapsing it
+        back to the mount point as a tidy-up would silently restore the defect.
+        """
+        default = job_entrypoint._DEFAULT_WORK_DIR
+        mount = job_entrypoint._WORKSPACE_MOUNT
+        assert default != mount, (
+            "the checkout is back at the volume's own mount point, which the kubelet "
+            "creates world-writable and which the runner cannot chmod"
+        )
+        assert mount in default.parents, f"{default} is not inside the mounted volume {mount}"
+
+    def test_a_directory_created_inside_a_world_writable_parent_is_not_world_writable(
+        self, tmp_path
+    ) -> None:
+        """Driven through the real `mkdir`, because the claim is about what the
+        filesystem does rather than about what we intended.
+
+        The parent is made 0777 to reproduce the emptyDir, and the child is the
+        shape the runner creates. If a umask ever made this inherit the parent's
+        mode, the relocation would buy nothing and this is what says so.
+        """
+        parent = tmp_path / "volume"
+        parent.mkdir()
+        parent.chmod(0o777)
+        assert parent.stat().st_mode & stat.S_IWOTH, "the fixture does not reproduce the defect"
+
+        child = parent / "src"
+        child.mkdir(parents=True, exist_ok=True)
+        assert not child.stat().st_mode & stat.S_IWOTH, (
+            f"a created checkout directory is world-writable ({oct(child.stat().st_mode & 0o7777)})"
+        )
+
+    def test_a_world_writable_work_dir_is_reported(self, tmp_path, caplog) -> None:
+        """Only reachable by an operator setting `WORK_DIR` to the mount point,
+        and still worth a line: ansible's own warning names the symptom and not
+        one of the settings it has just dropped, which is the whole of what the
+        operator had to go on."""
+        d = tmp_path / "ww"
+        d.mkdir()
+        d.chmod(0o777)
+        logged: list[tuple] = []
+        job_entrypoint._warn_if_world_writable(
+            d, type("L", (), {"warning": lambda _s, *a, **k: logged.append((a, k))})()
+        )
+        assert logged, "a world-writable checkout was not reported"
+        assert "ansible.cfg" in logged[0][0][0]
+
+    def test_a_private_work_dir_is_not_reported(self, tmp_path) -> None:
+        """The other direction, so the warning cannot be the kind that always
+        fires and is therefore always ignored."""
+        d = tmp_path / "ok"
+        d.mkdir(mode=0o755)
+        logged: list[tuple] = []
+        job_entrypoint._warn_if_world_writable(
+            d, type("L", (), {"warning": lambda _s, *a, **k: logged.append((a, k))})()
+        )
+        assert logged == []
+
+    def test_a_work_dir_that_does_not_exist_is_not_a_finding(self, tmp_path) -> None:
+        """It reports; creating is the callers' job, and both already do it."""
+        logged: list[tuple] = []
+        job_entrypoint._warn_if_world_writable(
+            tmp_path / "absent",
+            type("L", (), {"warning": lambda _s, *a, **k: logged.append((a, k))})(),
+        )
+        assert logged == []
+
+    def test_the_warning_is_actually_WIRED_to_the_resolved_work_dir(self) -> None:
+        """The behavioural tests above call the helper directly, so they say
+        nothing about whether anything calls it.
+
+        Asserted positionally as well as by presence: the call has to come after
+        `work_dir` is resolved, because a check run before it would be examining
+        whatever the name held previously -- which is the shape where a guard is
+        present, green, and inspecting the wrong thing.
+        """
+        src = textwrap.dedent(inspect.getsource(job_entrypoint.main))
+        tree = ast.parse(src)
+        calls = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "_warn_if_world_writable"
+        ]
+        assert len(calls) == 1, "main() does not call _warn_if_world_writable exactly once"
+        passed = [a.id for a in calls[0].args if isinstance(a, ast.Name)]
+        assert "work_dir" in passed, f"it is called with {passed}, not the resolved work_dir"
+
+        assigns = [
+            n.lineno
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "work_dir" for t in n.targets)
+        ]
+        assert assigns, "work_dir is no longer assigned in main(); re-point this gate"
+        assert calls[0].lineno > max(assigns), (
+            "the check runs before work_dir is resolved, so it inspects the wrong path"
+        )
