@@ -1,15 +1,13 @@
 // Package workspace implements the terrapod_workspace data source.
 //
-// API Contract: GET /api/v2/organizations/default/workspaces/{name}
+// API Contract: GET /api/v1/workspaces/{name}  (the native show takes an id or a name)
 // Looks up a single workspace by name. Returns all workspace attributes.
 // See resources/workspace/model.go for full attribute mapping.
 package workspace
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -243,22 +241,14 @@ func (d *workspaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	// Native first. The TFE-compatible surface strips every native-only
-	// attribute from its response (`_native_only` in `api/routers/tfe_v2.py`),
-	// and this data source exposes a dozen of them -- the operation flags, the
-	// configure roots, the limits -- so reading it there returned false and null
-	// for whatever the workspace actually held (#2469).
-	//
-	// The prefix cannot simply be swapped: the native workspace routes arrived
-	// in 2.0, so a server on a supported 1.x line answers them 405 and the TFE
-	// route is still the only way to reach it there. Same rule as the SDK's own
-	// `nativeFirst`, and only a 405 falls back -- a 404 is the answer.
+	// Native, and only native. The TFE-compatible surface strips every
+	// native-only attribute from its response (`_native_only` in
+	// `api/routers/tfe_v2.py`), and this data source exposes a dozen of them --
+	// the operation flags, the configure roots, the limits -- so reading it
+	// there returned false and null for whatever the workspace actually held
+	// (#2469). The native show route takes an id or a name.
 	name := config.Name.ValueString()
 	data, err := d.tc.Get(ctx, "/api/v1/workspaces/"+name)
-	var apiErr *terrapod.APIError
-	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusMethodNotAllowed {
-		data, err = d.tc.Get(ctx, "/api/v2/organizations/default/workspaces/"+name)
-	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read workspace", err.Error())
 		return

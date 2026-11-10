@@ -126,6 +126,22 @@ ephemeral Jobs / long-lived Deployments that may lag the control plane during a
 rolling upgrade or live in a separate, independently-upgraded cluster.
 
 - **API ↔ web (BFF):** always the same version (one Helm release). No skew.
+- **API ↔ the provider, the Pulumi provider, `terrapod-migrate`, `terrapod-mcp`
+  and go-terrapod:** **the same MAJOR.** These are Terrapod's own native
+  consumers and they use the Terrapod-native API only — never the
+  TFE-compatibility surface, which exists for `terraform`, `tofu` and `tfci` and
+  returns a deliberately narrower document (it is engine-filtered to Terraform
+  and omits native-only attributes). A consumer reading a resource there cannot
+  see fields it has itself just written, which is a defect rather than a
+  trade-off, so there is no version of this pair worth buying with it.
+
+  This is stated because its absence was read as a promise. go-terrapod briefly
+  carried a native-first-with-TFE-fallback helper so that a 2.0 provider could
+  reach a 1.x server; nothing ever asked for that window, and the cost was that
+  every call site had to reason about which surface answered and what each one
+  omits (#2469). A fallback is also how "native only" stops being true without
+  anyone deciding it, so the provider and go-terrapod each carry a test refusing
+  one. Widening this pair is a decision to take here first.
 - **API ↔ runner / listener:** a runner or listener image is **forward-compatible
   with a newer API across at least 2 minor versions** (`N-2`). You can upgrade the
   control plane and let runners/listeners catch up later; the reverse (a newer

@@ -722,43 +722,6 @@ type WorkspaceList struct {
 	TotalCount  int
 }
 
-// CreateWorkspace creates a new workspace in the default organisation
-// (Terrapod is single-org by design). Returns the created Workspace
-// with server-populated fields filled in (id, created_at, etc.).
-//
-// Common errors:
-//   - *ConflictError when the name is already taken
-//   - *ValidationError on invalid attribute values
-//   - *AuthorizationError when the token lacks `admin` on the workspace
-//
-// legacyCreateBlocker names the first field in req that the TFE-compatible
-// create cannot carry, or "" when the request is expressible there.
-//
-// Derived from what that surface strips rather than from a remembered list:
-// `_native_only` in `api/routers/tfe_v2.py` is the server side of this, and
-// anything on it is invisible in a TFE response however it was sent.
-func legacyCreateBlocker(req CreateWorkspaceRequest) string {
-	switch {
-	case req.Engine != "":
-		return "an engine"
-	case req.ConfigureEnabled != nil && *req.ConfigureEnabled:
-		return "a configure operation"
-	case req.PlanApplyEnabled != nil && !*req.PlanApplyEnabled:
-		return "plan/apply disabled"
-	case req.ConfigDirectory != "":
-		return "a config directory"
-	case len(req.InventoryPaths) > 0:
-		return "inventory paths"
-	case req.DefaultPlaybook != "":
-		return "a default playbook"
-	case req.DefaultLimit != "":
-		return "a default limit"
-	case req.HardLimit != "":
-		return "a hard limit"
-	}
-	return ""
-}
-
 func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (*Workspace, error) {
 	attrs := workspaceCreateAttrs(req)
 	// Create keeps a plain string: there is nothing to "leave unchanged" on a
@@ -779,22 +742,7 @@ func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest
 	// create response into state read them back as null or false: "Provider
 	// produced inconsistent result after apply" on every workspace that set
 	// one, with the values stored correctly on the server all along.
-	data, err := c.nativeFirst(
-		func() ([]byte, error) { return c.Post(ctx, "/api/v1/workspaces", body) },
-		func() ([]byte, error) {
-			// A server too old to serve the native create is also too old to
-			// honour these, and the TFE route would accept the request and
-			// silently drop them -- which is the same defect arriving by a
-			// different door. Refuse instead, naming the field, exactly as the
-			// list does for a non-Terraform engine.
-			if blocker := legacyCreateBlocker(req); blocker != "" {
-				return nil, fmt.Errorf(
-					"this server cannot create a workspace with %s: it predates the native workspace create",
-					blocker)
-			}
-			return c.Post(ctx, "/api/v2/organizations/default/workspaces", body)
-		},
-	)
+	data, err := c.Post(ctx, "/api/v1/workspaces", body)
 	if err != nil {
 		return nil, err
 	}
@@ -804,10 +752,7 @@ func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest
 // GetWorkspace reads a workspace by id ("ws-..."). Returns
 // *NotFoundError when the id is unknown.
 func (c *Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error) {
-	data, err := c.nativeFirst(
-		func() ([]byte, error) { return c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(id)) },
-		func() ([]byte, error) { return c.Get(ctx, "/api/v2/workspaces/"+url.PathEscape(id)) },
-	)
+	data, err := c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -819,12 +764,7 @@ func (c *Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error
 // where the operator types the name they see in the UI rather than
 // the typed-id form.
 func (c *Client) GetWorkspaceByName(ctx context.Context, name string) (*Workspace, error) {
-	data, err := c.nativeFirst(
-		func() ([]byte, error) { return c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(name)) },
-		func() ([]byte, error) {
-			return c.Get(ctx, "/api/v2/organizations/default/workspaces/"+url.PathEscape(name))
-		},
-	)
+	data, err := c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(name))
 	if err != nil {
 		return nil, err
 	}
@@ -844,10 +784,7 @@ func (c *Client) UpdateWorkspace(ctx context.Context, id string, req UpdateWorks
 	if err != nil {
 		return nil, fmt.Errorf("marshal update workspace: %w", err)
 	}
-	data, err := c.nativeFirst(
-		func() ([]byte, error) { return c.Patch(ctx, "/api/v1/workspaces/"+url.PathEscape(id), body) },
-		func() ([]byte, error) { return c.Patch(ctx, "/api/v2/workspaces/"+url.PathEscape(id), body) },
-	)
+	data, err := c.Patch(ctx, "/api/v1/workspaces/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -887,17 +824,7 @@ func (c *Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) 
 	if encoded := q.Encode(); encoded != "" {
 		query = "?" + encoded
 	}
-	data, err := c.nativeFirst(
-		func() ([]byte, error) { return c.Get(ctx, "/api/v1/workspaces"+query) },
-		func() ([]byte, error) {
-			// The TFE list is Terraform-only, so it cannot answer for another
-			// engine; say so rather than return the wrong set.
-			if opts.Engine != "" && opts.Engine != "terraform" {
-				return nil, fmt.Errorf("this server cannot list %s workspaces: it predates the native workspace list", opts.Engine)
-			}
-			return c.Get(ctx, "/api/v2/organizations/default/workspaces"+query)
-		},
-	)
+	data, err := c.Get(ctx, "/api/v1/workspaces"+query)
 	if err != nil {
 		return nil, err
 	}

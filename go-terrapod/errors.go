@@ -21,11 +21,9 @@ type NotFoundError struct {
 	// that matched zero rows is not a NotFoundError).
 	ID string
 	// Detail is the message the server sent, decoded from the JSON:API
-	// error body. It distinguishes the two very different things a 404
-	// means: a resource that does not exist (Terrapod's own wording,
-	// "Workspace not found") from a path that is not served here at all
-	// (FastAPI's, verbatim "Not Found"). `routeAbsent` keys the
-	// native-first fallback on exactly that -- see client.go.
+	// error body, as every other error type here carries. This one used
+	// to discard it, which made NotFoundError the only error in this
+	// package that threw away what Terrapod actually said.
 	Detail string
 }
 

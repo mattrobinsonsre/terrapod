@@ -797,16 +797,19 @@ func TestWorkspace_SingularAgentPoolID_UnchangedWire(t *testing.T) {
 }
 
 // Workspaces are created by Terrapod, never by an engine's own CLI (#1535), and
-// the create goes to the native route like every other workspace call.
+// the create goes to the native route -- as every call in this SDK now does.
 //
 // It used to go to the TFE route unless `engine` was set, on the reasoning that
 // the engine was the only attribute needing the native one. That stopped being
 // true when the operation flags (#1966) and the configure roots (#1929) arrived,
 // and the cost was not cosmetic: the TFE serialiser strips native-only
-// attributes from its RESPONSE, so a create answered without them and a
-// provider writing its own create response into state read them back as null
-// (#2469). Old servers are served by the 405 fallback below, which is what that
-// reasoning was really protecting.
+// attributes from its RESPONSE, so a create answered without them and a provider
+// writing its own create response into state read them back as null (#2469).
+//
+// There is no longer a fallback to the compatibility surface to assert about:
+// that surface is for `terraform`, `tofu` and `tfci`, and the provider and this
+// SDK target the same major as the API. `TestNothingTheProviderReachesPrefersTheTFESurface`
+// is the general form of this test.
 func TestCreateWorkspace_UsesTheNativeRoute(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -835,85 +838,6 @@ func TestCreateWorkspace_UsesTheNativeRoute(t *testing.T) {
 			}
 			if gotPath != "/api/v1/workspaces" {
 				t.Errorf("path = %q, want the native /api/v1/workspaces", gotPath)
-			}
-		})
-	}
-}
-
-// A server predating the native create answers it 405, and an ordinary create
-// has to keep working there -- that is the whole reason the fallback exists.
-func TestCreateWorkspace_FallsBackToTheTFESurfaceOnAnOlderServer(t *testing.T) {
-	var paths []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		paths = append(paths, r.URL.Path)
-		if r.URL.Path == "/api/v1/workspaces" {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", nil)))
-	}))
-	defer srv.Close()
-	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
-	if err != nil {
-		t.Fatalf("NewClient: %v", err)
-	}
-	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{Name: "api-prod"}); err != nil {
-		t.Fatalf("CreateWorkspace: %v", err)
-	}
-	want := []string{"/api/v1/workspaces", "/api/v2/organizations/default/workspaces"}
-	if len(paths) != 2 || paths[0] != want[0] || paths[1] != want[1] {
-		t.Errorf("paths = %v, want native then TFE %v", paths, want)
-	}
-}
-
-// ...but it must NOT fall back when the request carries something that surface
-// cannot express. Accepting it there would store a workspace missing the very
-// fields the caller asked for, which is #2469 arriving through the fallback
-// instead of through the default -- so each one is refused by name.
-func TestCreateWorkspace_RefusesToDowngradeANativeOnlyCreate(t *testing.T) {
-	yes, no := true, false
-	for _, tc := range []struct {
-		name string
-		req  CreateWorkspaceRequest
-		want string
-	}{
-		{"engine", CreateWorkspaceRequest{Engine: "pulumi"}, "an engine"},
-		{"configure", CreateWorkspaceRequest{ConfigureEnabled: &yes}, "a configure operation"},
-		{"plan/apply off", CreateWorkspaceRequest{PlanApplyEnabled: &no}, "plan/apply disabled"},
-		{"config directory", CreateWorkspaceRequest{ConfigDirectory: "ansible"}, "a config directory"},
-		{"inventory paths", CreateWorkspaceRequest{InventoryPaths: []string{"hosts.d"}}, "inventory paths"},
-		{"default playbook", CreateWorkspaceRequest{DefaultPlaybook: "site.yml"}, "a default playbook"},
-		{"default limit", CreateWorkspaceRequest{DefaultLimit: "web"}, "a default limit"},
-		{"hard limit", CreateWorkspaceRequest{HardLimit: "web"}, "a hard limit"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var legacyHits int
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/api/v1/workspaces" {
-					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-					return
-				}
-				legacyHits++
-				w.WriteHeader(http.StatusCreated)
-				_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "x", nil)))
-			}))
-			defer srv.Close()
-			c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
-			if err != nil {
-				t.Fatalf("NewClient: %v", err)
-			}
-			req := tc.req
-			req.Name = "x"
-			_, err = c.CreateWorkspace(t.Context(), req)
-			if err == nil {
-				t.Fatalf("expected a refusal rather than a silent downgrade")
-			}
-			if !strings.Contains(err.Error(), tc.want) {
-				t.Errorf("error should name %q; got %v", tc.want, err)
-			}
-			if legacyHits != 0 {
-				t.Errorf("the TFE route was called %d time(s); it must not be", legacyHits)
 			}
 		})
 	}
@@ -979,105 +903,6 @@ func TestWorkspace_PulumiBindPlan_RoundTrip(t *testing.T) {
 	}
 	if _, ok := attrsOf()["pulumi-bind-plan"]; ok {
 		t.Errorf("an update that did not set pulumi-bind-plan sent it anyway")
-	}
-}
-
-// A server older than the native routes answers them with 405 (#1554); every
-// workspace call must then fall back to the TFE surface and still work.
-func TestWorkspace_FallsBackToTheTFESurfaceOnAnOlderServer(t *testing.T) {
-	var native, legacy []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/v1/") {
-			native = append(native, r.Method+" "+r.URL.Path)
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		legacy = append(legacy, r.Method+" "+r.URL.Path)
-		if r.URL.Path == "/api/v2/organizations/default/workspaces" {
-			_, _ = w.Write([]byte(`{"data":[{"id":"ws-a","type":"workspaces","attributes":{"name":"a"}}]}`))
-			return
-		}
-		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-a", "a", nil)))
-	}))
-	t.Cleanup(srv.Close)
-	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := t.Context()
-	if _, err := c.GetWorkspace(ctx, "ws-a"); err != nil {
-		t.Errorf("GetWorkspace: %v", err)
-	}
-	if _, err := c.GetWorkspaceByName(ctx, "a"); err != nil {
-		t.Errorf("GetWorkspaceByName: %v", err)
-	}
-	if _, err := c.UpdateWorkspace(ctx, "ws-a", UpdateWorkspaceRequest{}); err != nil {
-		t.Errorf("UpdateWorkspace: %v", err)
-	}
-	if list, err := c.ListWorkspaces(ctx, WorkspaceListOptions{}); err != nil || len(list.Items) != 1 {
-		t.Errorf("ListWorkspaces: %v (%d items)", err, len(list.Items))
-	}
-	if len(native) != 4 || len(legacy) != 4 {
-		t.Errorf("want each call tried natively then on the TFE surface; native=%v legacy=%v", native, legacy)
-	}
-	// The TFE list cannot answer for another engine, so it must refuse rather
-	// than hand back Terraform workspaces as if they were the answer.
-	if _, err := c.ListWorkspaces(ctx, WorkspaceListOptions{Engine: "pulumi"}); err == nil {
-		t.Error("listing pulumi workspaces on an old server should fail, not return the Terraform list")
-	}
-}
-
-// A 1.x server has no `/api/v1` mount at all, so it answers a native probe with
-// the ROUTER's 404 rather than a route's 405 -- which is the case the fallback
-// exists for and the one it could not see (#2469). The two 404s are told apart
-// by their detail: FastAPI's unmatched-path wording against Terrapod's own.
-func TestWorkspace_FallsBackWhenTheNativePrefixIsNotMountedAtAll(t *testing.T) {
-	var paths []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		paths = append(paths, r.URL.Path)
-		if strings.HasPrefix(r.URL.Path, "/api/v1/") {
-			// Exactly what a server with no such prefix sends, envelope and all.
-			w.Header().Set("Content-Type", "application/vnd.api+json")
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"errors":[{"detail":"Not Found","status":"404"}],"detail":"Not Found"}`))
-			return
-		}
-		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-a", "a", nil)))
-	}))
-	t.Cleanup(srv.Close)
-	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := c.GetWorkspace(t.Context(), "ws-a"); err != nil {
-		t.Fatalf("GetWorkspace should have fallen back: %v", err)
-	}
-	if len(paths) != 2 || !strings.HasPrefix(paths[0], "/api/v1/") || !strings.HasPrefix(paths[1], "/api/v2/") {
-		t.Errorf("want native then TFE; got %v", paths)
-	}
-}
-
-// Only a 405 means "not here yet". A 404 from the native route is the answer —
-// falling back would ask the Terraform-only surface and could find nothing, or
-// the wrong thing.
-func TestWorkspace_ANativeNotFoundIsFinal(t *testing.T) {
-	var legacyHits int
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/v2/") {
-			legacyHits++
-		}
-		http.Error(w, `{"errors":[{"detail":"Workspace not found"}]}`, http.StatusNotFound)
-	}))
-	t.Cleanup(srv.Close)
-	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := c.GetWorkspace(t.Context(), "ws-gone"); !IsNotFound(err) {
-		t.Errorf("want NotFound, got %v", err)
-	}
-	if legacyHits != 0 {
-		t.Errorf("a native 404 fell back to the TFE surface %d time(s)", legacyHits)
 	}
 }
 
