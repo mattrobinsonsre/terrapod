@@ -537,23 +537,47 @@ the value as given would find nothing in that file and report success — so the
 encoded forms are matched too, to two levels of nesting. Beyond that (JSON
 inside JSON inside JSON) is a stated limit rather than a covered case.
 
-### The floor, and what it means for a short password
+### Length decides how a credential is matched, not whether it is redacted
 
-A very short value is deliberately **not** registered, because a short string
-matches ordinary output and a log with half its words blacked out stops being
-read. Where the floor sits depends on what else protects the value:
+**No length leaves a credential in the clear.** A short value used to be skipped
+entirely, and the reasoning was right about the cost and wrong about the
+conclusion: a short string replaced *wherever it occurs* really would black out
+ordinary output, but that is an argument for matching it more carefully rather
+than for leaving it in the log. So length chooses the matcher.
+
+- **At or above the substring floor**, the value is removed wherever it appears,
+  including inside a longer string — which is what you want for a token that can
+  turn up in a URL or a base64 blob.
+- **Below it, down to 4 characters**, the value is removed where it stands as its
+  own token: delimited by anything that is not a letter, a digit or an
+  underscore, which covers `password=…`, a quoted value, a list entry and a line
+  of its own. It is deliberately *not* removed from the middle of a longer run of
+  those characters, because an occurrence there is a coincidence rather than your
+  credential, and blacking it out is how a log stops being readable.
+- **Below 4 characters**, nothing can be done. A one-to-three character token
+  occurs in ordinary output on its own — `ok`, `id`, a single digit — so even a
+  boundary match would hide the lines you came to read. The runner logs a
+  **warning** naming the length but never the value, and the credential will
+  appear in the run's log if anything prints it. A credential that short is a
+  larger problem than its log; lengthen it.
+
+Where the substring floor sits depends on what else protects the value:
 
 - A **private key** and a **vault password** reach ansible as `0600` files. The
   file is the control and the redactor is a backstop, so they keep the higher
-  floor — and neither is ever short.
+  floor of **24 characters** — and a private key is never short.
 - A **connection password** and a **become password** are substituted into the
   rendered inventory as values, so the redactor is the only thing standing
-  between them and these two streams. Their floor is **8 characters**. A
-  password shorter than that is delivered and used normally, and is not
-  redacted; if that matters to you, lengthen it.
+  between them and these two streams. Theirs is **8 characters**, so they take
+  substring matching sooner.
 
-The runner says so in the log when it skips a value, naming the length and the
-floor but never the value.
+One residual, stated because it is a real if small cost of always redacting.
+Output is read in chunks, and a short credential finishing exactly at a chunk
+boundary is matched without seeing the byte that follows. If that byte continued
+a longer token, a few characters of ordinary output are replaced by the marker.
+The alternative — holding it back to look — would mean not redacting it on that
+pass, and a stream that ended there would emit the credential. Over-redacting a
+coincidence is the better of the two.
 
 ### What it cannot cover
 

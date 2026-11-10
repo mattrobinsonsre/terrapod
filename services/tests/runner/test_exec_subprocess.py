@@ -12,6 +12,7 @@ prematurely kill pytest if we ran in-process).
 
 from __future__ import annotations
 
+import json
 import os
 import random
 import signal
@@ -475,30 +476,38 @@ class TestTheLogStreamRedactsRegisteredSecrets:
         assert second not in out
         assert out.count("[redacted]") == 2
 
-    def test_a_short_value_is_SKIPPED_rather_than_registered(self) -> None:
-        """A short string would match ordinary output and mangle the log, which is
-        worse than the leak it would prevent.
+    def test_a_value_below_the_BOUNDED_floor_is_skipped_rather_than_registered(self) -> None:
+        """Superseded in part by #2477, and the half that survives is why.
 
-        Skipped, not raised. Raising was the first shape and it put the power to
-        FAIL A RUN inside a log-hygiene mechanism: the only caller hands over
-        whatever the API returned, so a short or malformed token would have
-        aborted a run that was otherwise fine. Nothing of value is lost, because
-        a value this short cannot be a JWT and so is not the credential this
-        exists to hide.
+        This test used to assert that any value under 24 characters was skipped,
+        on the reasoning that a short string "would match ordinary output and
+        mangle the log, which is worse than the leak it would prevent". That
+        reasoning is about the MATCHER and it no longer reaches the conclusion:
+        from `_BOUNDED_MIN_LEN` up, a credential is matched on token boundaries
+        instead of being skipped, so there is no band left where a credential is
+        simply left in the clear for want of length.
+
+        What still holds unchanged is the floor's shape at the very bottom. A
+        one-to-three character token stands alone in ordinary output (`ok`, `id`,
+        a digit), so even a boundary match would blank out enough of the log to
+        hide the line an operator came for. And it is SKIPPED, not raised:
+        raising would put the power to fail a run inside a log-hygiene
+        mechanism, and the caller hands over whatever the API returned.
         """
-        assert exec_subprocess.register_secret("short") is False
+        assert exec_subprocess.register_secret("abc") is False
         assert exec_subprocess.register_secret("") is False
-        assert exec_subprocess._SECRETS == set(), "a short value was registered anyway"
+        assert exec_subprocess._SECRETS == set()
+        assert exec_subprocess._BOUNDED_SECRETS == set(), "a 3-char value was registered anyway"
 
-    def test_a_short_value_does_not_turn_the_redactor_on(self, tmp_path) -> None:
-        """The property that matters about the skip: output stays byte-identical.
+    def test_a_value_below_the_BOUNDED_floor_does_not_turn_the_redactor_on(self, tmp_path) -> None:
+        """The property that matters about that skip: output stays byte-identical.
 
-        If a skipped value left the machinery armed, `overlap` would be computed
-        from it and the stream would be chunked and re-assembled for nothing --
-        and a one-character value would match everywhere.
+        If a skipped value left the machinery armed, the carry would be computed
+        from it and the stream chunked and re-assembled for nothing -- and a
+        one-character value would match everywhere.
         """
-        exec_subprocess.register_secret("short")
-        payload = "short short short\nplan complete\n"
+        exec_subprocess.register_secret("abc")
+        payload = "abc abc abc\nplan complete\n"
         assert self._emit(tmp_path, payload) == payload
 
     def test_a_long_value_reports_that_it_registered(self) -> None:
@@ -510,6 +519,172 @@ class TestTheLogStreamRedactsRegisteredSecrets:
         exec_subprocess.register_secret(self.TOKEN)
         exec_subprocess.register_secret(self.TOKEN)
         assert len(exec_subprocess._SECRETS) == 1
+
+
+class TestAShortCredentialIsRedactedOnTokenBoundaries:
+    """A credential is redacted however short it is (#2477).
+
+    The floor used to skip, and the reported consequence was not hypothetical:
+    on 2.0.0-beta.2 a 15-character Ansible Vault password was below it, so it was
+    never registered and every line of the configure carried it in the clear.
+    The only signal was a warning in the runner's own log.
+
+    The reasoning behind the floor was right about the matcher and wrong about
+    the conclusion. A short string replaced wherever it occurs really would black
+    out ordinary output -- so below the floor it is matched as its own token
+    instead, which is available precisely because the runner holds the exact
+    bytes rather than a pattern.
+    """
+
+    #: The reported length, so the regression test is the reported case.
+    VAULT = "s3cret-vault-pw"
+
+    @pytest.fixture(autouse=True)
+    def _clean(self):
+        exec_subprocess._reset_secrets_for_tests()
+        yield
+        exec_subprocess._reset_secrets_for_tests()
+
+    @staticmethod
+    def _through(chunks: list[bytes]) -> bytes:
+        """Feed `chunks` through one redactor and return everything it emitted."""
+        r = exec_subprocess.StreamRedactor()
+        return b"".join(r.feed(c) for c in chunks) + r.flush()
+
+    def test_a_15_character_vault_password_does_not_reach_the_log(self) -> None:
+        assert exec_subprocess.register_secret(self.VAULT) is True
+        out = self._through([f"ok: [host] => password={self.VAULT}\n".encode()])
+        assert self.VAULT.encode() not in out
+        assert b"[redacted]" in out
+
+    def test_it_is_registered_as_BOUNDED_not_as_a_substring(self) -> None:
+        """Which set it lands in is the whole behaviour, so assert it directly
+        rather than inferring it from a match that both sets would produce."""
+        exec_subprocess.register_secret(self.VAULT)
+        assert self.VAULT.encode() in exec_subprocess._BOUNDED_SECRETS
+        assert self.VAULT.encode() not in exec_subprocess._SECRETS
+
+    def test_it_is_NOT_redacted_inside_a_longer_token(self) -> None:
+        """The false positive the floor existed to prevent, now prevented by the
+        matcher instead of by giving up.
+
+        An occurrence inside a longer run of token bytes is not the credential --
+        it is a coincidence -- and blacking it out is how a log stops being
+        readable.
+        """
+        exec_subprocess.register_secret(self.VAULT)
+        payload = f"deploying {self.VAULT}xyz and abc{self.VAULT}\n".encode()
+        assert self._through([payload]) == payload
+
+    @pytest.mark.parametrize(
+        "around",
+        [
+            ("password=", "\n"),
+            ('"', '"'),
+            ("'", "'"),
+            (" ", " "),
+            ("[", "]"),
+            ("=", ","),
+            ("\n", "\n"),
+        ],
+    )
+    def test_it_IS_redacted_when_it_stands_alone(self, around) -> None:
+        """Every delimiter a credential realistically sits between in a log or in
+        a rendered inventory."""
+        exec_subprocess.register_secret(self.VAULT)
+        before, after = around
+        out = self._through([f"{before}{self.VAULT}{after}".encode()])
+        assert self.VAULT.encode() not in out, f"survived between {before!r} and {after!r}"
+
+    def test_it_is_removed_when_it_STRADDLES_a_read_boundary(self) -> None:
+        """The carry has to be computed over the bounded set as well.
+
+        A chunk boundary is a property of how the bytes arrived and says nothing
+        about which matcher will claim them, so a carry built from the substring
+        set alone would hold nothing back for a short credential and the boundary
+        matcher would never see it whole.
+        """
+        payload = f"ok: password={self.VAULT}\n".encode()
+        exec_subprocess.register_secret(self.VAULT)
+        for cut in range(1, len(payload)):
+            exec_subprocess._reset_secrets_for_tests()
+            exec_subprocess.register_secret(self.VAULT)
+            out = self._through([payload[:cut], payload[cut:]])
+            assert self.VAULT.encode() not in out, f"survived a split at byte {cut}"
+
+    def test_a_short_credential_alone_still_arms_the_redactor(self) -> None:
+        """`feed` returns its chunk unexamined when nothing is registered, which
+        is what makes redaction free for a deployment that uses none. With only a
+        BOUNDED secret registered that early return must not fire -- it would
+        bypass the matcher completely, which is the one-line version of the whole
+        defect."""
+        exec_subprocess.register_secret(self.VAULT)
+        assert exec_subprocess._SECRETS == set()
+        out = self._through([f"x {self.VAULT} y\n".encode()])
+        assert self.VAULT.encode() not in out
+
+    def test_the_json_escaped_form_is_matched_too(self) -> None:
+        """A configure's structured stream is JSON, so the form that appears is
+        the escaped one -- the same reason `_match_forms` exists for long values
+        (#1934)."""
+        pw = 'pa"ss\\word-x'
+        assert exec_subprocess.register_secret(pw) is True
+        out = self._through([json.dumps({"password": pw}).encode() + b"\n"])
+        assert json.dumps(pw)[1:-1].encode() not in out
+        assert pw.encode() not in out
+
+    def test_a_long_credential_still_matches_as_a_substring(self) -> None:
+        """Unchanged, and asserted because the change could plausibly have moved
+        everything onto boundaries: a long value is long enough that an
+        occurrence inside a larger token is the value rather than a coincidence,
+        and a JWT in a URL or a base64 blob has no boundary around it."""
+        token = "A" * 40
+        exec_subprocess.register_secret(token)
+        out = self._through([f"prefix{token}suffix\n".encode()])
+        assert token.encode() not in out
+
+    def test_a_secret_whose_edge_is_not_a_token_byte_asserts_no_boundary_there(self) -> None:
+        """A blanket word boundary would be a MISS, not a false positive.
+
+        `-dash` has no token byte at its left edge, so there is no boundary to
+        assert there; requiring one would refuse to match whenever the preceding
+        byte happened to be a letter.
+        """
+        exec_subprocess.register_secret("-dash-")
+        out = self._through([b"x-dash-y\n"])
+        assert b"-dash-" not in out
+
+    def test_resetting_invalidates_the_compiled_pattern(self) -> None:
+        """The pattern is cached against the set's contents. Clearing the set
+        without clearing the cache would leave a compiled alternation that still
+        redacts a previous test's secret -- a test passing on another test's
+        registration, which is the kind of green that hides a real failure."""
+        exec_subprocess.register_secret(self.VAULT)
+        assert exec_subprocess._bounded_pattern() is not None
+        exec_subprocess._reset_secrets_for_tests()
+        assert exec_subprocess._bounded_pattern() is None
+        assert self._through([f"{self.VAULT}\n".encode()]) == f"{self.VAULT}\n".encode()
+
+    def test_a_longer_credential_wins_over_one_that_is_its_prefix(self) -> None:
+        """Alternation order: matched shortest-first, the prefix is replaced and
+        the REST of the longer credential is left in the log.
+
+        The fixture's values are dash-edged on purpose, and finding out why is
+        what makes this test mean anything. With token-edged values
+        (`abcd`/`abcdefgh`) the ordering is unobservable, because the shorter
+        one's own trailing boundary guard already refuses to match inside the
+        longer one -- so a test written that way passes whichever order the
+        alternation is built in, which is how a redundant-looking line comes to
+        be deleted and the real case with it. A secret whose edge is not a token
+        byte has no guard asserted there (see the test above), so for those the
+        order is the only thing standing between a full redaction and a partial
+        one.
+        """
+        exec_subprocess.register_secret("-ab-")
+        exec_subprocess.register_secret("-ab-cd-")
+        out = self._through([b"x-ab-cd-y\n"])
+        assert b"-ab-" not in out
+        assert b"cd-" not in out, "the longer credential was cut and its tail left behind"
 
 
 class TestTheHeldBackTailIsBoundedInTimeAsWellAsBytes:

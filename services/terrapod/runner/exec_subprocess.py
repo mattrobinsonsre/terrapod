@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -232,18 +233,85 @@ def _split_tail(buf: bytes, *, secrets: tuple[bytes, ...], ceiling: int) -> tupl
     return buf[:cut], buf[cut:]
 
 
-#: Below this, a value is SKIPPED rather than registered. A short string would
-#: match ordinary output and mangle the log, which is a worse failure than the
-#: leak it would prevent.
+#: Below this, a value is matched on TOKEN BOUNDARIES rather than as a substring.
+#: It is NOT skipped (#2477).
 #:
-#: Skipped and warned rather than raised, which it was first. Raising put the
-#: power to FAIL A RUN in a log-hygiene mechanism: the only caller hands over
-#: whatever the API returned, so a short or malformed token would have aborted a
-#: run that was otherwise fine -- a security measure breaking legitimate
-#: function, which is the one thing it must not do. Nothing of value is lost by
-#: skipping, because a value this short cannot be a JWT and so is not the
-#: credential this exists to hide.
+#: The floor used to skip, and the reasoning was sound about the matcher and
+#: wrong about the conclusion: a short string replaced wherever it occurs would
+#: black out ordinary output, which is a real cost. But that is an argument for
+#: matching it more carefully, not for leaving it in the clear -- and the value
+#: reaching this function is a credential whose exact bytes we hold, so the
+#: careful match is available. Measured on 2.0.0-beta.2: a 15-character Ansible
+#: Vault password was skipped and every line of the configure carried it, with
+#: the only signal a warning in the runner's own log.
+#:
+#: The original note said "a value this short cannot be a JWT and so is not the
+#: credential this exists to hide". That was true while the cloud identity token
+#: was the only caller and stopped being true at #1933, which registers vault
+#: passwords and machine credentials through the same door. A human-chosen
+#: password is exactly the value most likely to be under 24 characters.
+#:
+#: Still a floor and not a refusal: raising would put the power to FAIL A RUN in
+#: a log-hygiene mechanism, and a caller hands over whatever the API returned.
 _MIN_SECRET_LEN = 24
+
+#: Below THIS, nothing can be done: a one-to-three character token occurs in
+#: ordinary output on its own (`ok`, `id`, `yes`, a single digit), so even a
+#: boundary match would blank out enough of the log to hide the lines an operator
+#: needs -- including a security-relevant one. Four is the shortest length at
+#: which a boundary match is more likely to be the credential than a coincidence,
+#: and a credential this short is already a far larger problem than its log.
+#:
+#: This band warns, because it is the one case where the redactor genuinely
+#: cannot help and the operator has to know. `docs/ansible-credentials.md`
+#: carries the same number.
+_BOUNDED_MIN_LEN = 4
+
+#: Credentials matched on token boundaries: too short to replace as substrings,
+#: never too short to redact. Separate from `_SECRETS` because the two are
+#: matched by different mechanisms, and one set carrying both would mean deciding
+#: per value inside the matcher -- which is where the length rule would come back.
+_BOUNDED_SECRETS: set[bytes] = set()
+
+#: `(frozenset of bounded secrets, compiled pattern)`. The pattern is rebuilt
+#: only when the set changes: `_redact` runs per chunk, and recompiling an
+#: alternation on every 4 KB read would be the one expensive thing in the path.
+_bounded_cache: tuple[frozenset[bytes], re.Pattern[bytes] | None] = (frozenset(), None)
+
+#: What counts as part of a longer token, for the boundary. `\w` in a bytes
+#: pattern is this set, spelled out because the boundary is the whole point and a
+#: reader should not have to remember whether `\w` includes the underscore.
+_TOKEN_BYTE = re.compile(rb"[0-9A-Za-z_]")
+
+
+def _bounded_pattern() -> re.Pattern[bytes] | None:
+    """One alternation over every boundary-matched secret, or None if there are none.
+
+    Longest first, so a secret that is another's prefix cannot win the shorter
+    match and leave the rest of the longer one in the log.
+
+    The guards are per secret rather than a blanket `\b`, because a secret whose
+    own first or last byte is NOT a token byte has no boundary to assert there:
+    for `-----BEGIN ...` a leading `(?<![0-9A-Za-z_])` would refuse to match when
+    the preceding byte happened to be a letter, which is a miss rather than the
+    false positive the guard exists to prevent.
+    """
+    global _bounded_cache
+    current = frozenset(_BOUNDED_SECRETS)
+    key, cached = _bounded_cache
+    if key == current:
+        return cached
+    pattern = None
+    if current:
+        parts = []
+        for secret in sorted(current, key=len, reverse=True):
+            pre = rb"(?<![0-9A-Za-z_])" if _TOKEN_BYTE.match(secret[:1]) else b""
+            post = rb"(?![0-9A-Za-z_])" if _TOKEN_BYTE.match(secret[-1:]) else b""
+            parts.append(pre + re.escape(secret) + post)
+        pattern = re.compile(b"|".join(parts))
+    _bounded_cache = (current, pattern)
+    return pattern
+
 
 #: What a stripped secret is replaced with. Deliberately NOT naming a kind of
 #: secret: it said `cloud identity token` while that was the only caller, and
@@ -322,22 +390,47 @@ def register_secret(value: str, *, min_length: int = _MIN_SECRET_LEN) -> bool:
             nothing to say about one. 8 is the floor `summary_redaction` already
             uses for matching a literal in free text.
 
-    Returns whether it was registered.
+    Returns whether it was registered by either mechanism. False means the value
+    is too short to redact at all (`_BOUNDED_MIN_LEN`) and WILL appear in the log
+    if anything prints it.
     """
-    if not value or len(value) < min_length:
-        logger.warning(
-            "not registering a redaction value below the minimum length; it would "
-            "match ordinary output and mangle the log",
-            length=len(value or ""),
-            minimum=min_length,
-        )
+    if not value:
         return False
-    _SECRETS.update(_match_forms(value))
-    return True
+    forms = _match_forms(value)
+    if len(value) >= min_length:
+        _SECRETS.update(forms)
+        return True
+    if len(value) >= _BOUNDED_MIN_LEN:
+        # Registered, by the weaker matcher. `info` rather than `warning`: a
+        # human-chosen password under 24 characters is ordinary, it IS redacted,
+        # and warning on every configure teaches an operator to skip the line
+        # that matters -- the one below.
+        _BOUNDED_SECRETS.update(forms)
+        logger.info(
+            "redacting a short credential on token boundaries rather than as a "
+            "substring; it will be stripped where it appears as its own token",
+            length=len(value),
+            substring_minimum=min_length,
+        )
+        return True
+    logger.warning(
+        "NOT redacting a credential: too short to match without blanking out "
+        "ordinary log output. It will appear in this run's log if anything "
+        "prints it. Use a longer credential.",
+        length=len(value),
+        minimum=_BOUNDED_MIN_LEN,
+    )
+    return False
 
 
 def _reset_secrets_for_tests() -> None:
+    global _bounded_cache
     _SECRETS.clear()
+    _BOUNDED_SECRETS.clear()
+    # The pattern is cached against the set's contents, so clearing the set
+    # without this leaves a compiled alternation that would still redact the
+    # previous test's secret -- a test passing on another test's registration.
+    _bounded_cache = (frozenset(), None)
 
 
 def redact_file(path: str | os.PathLike[str]) -> bool:
@@ -414,8 +507,28 @@ def redact_file(path: str | os.PathLike[str]) -> bool:
 
 
 def _redact(buf: bytes) -> bytes:
+    """Strip every registered secret from `buf`, by both mechanisms.
+
+    Substrings first: a value long enough for that is also long enough that a
+    boundary-matched short secret inside it would be a coincidence, and doing it
+    the other way round could cut a long secret in half and leave the halves.
+
+    One edge is accepted deliberately. The boundary guards treat the END of
+    `buf` as a boundary, so a short secret finishing exactly at a chunk edge is
+    redacted without seeing what follows. If the next chunk continued the token,
+    that is an over-redaction of a few bytes of ordinary output. The other
+    direction -- holding it back to look -- would mean not redacting it on this
+    pass, and `flush` emits the carry at end of stream, so a truncated stream
+    would emit the secret. Over-redacting a coincidence beats that.
+    """
     for secret in _SECRETS:
         buf = buf.replace(secret, _REDACTED)
+    pattern = _bounded_pattern()
+    if pattern is not None:
+        # A lambda, not `_REDACTED`: `sub` reads backslashes in a replacement as
+        # group references. `[redacted]` has none today, which is exactly how
+        # that becomes a surprise when the placeholder next changes.
+        buf = pattern.sub(lambda _: _REDACTED, buf)
     return buf
 
 
@@ -455,15 +568,21 @@ class StreamRedactor:
 
     def feed(self, chunk: bytes) -> bytes:
         """The bytes safe to emit now, holding back a possible secret prefix."""
-        if not _SECRETS:
+        if not _SECRETS and not _BOUNDED_SECRETS:
             return chunk
         buf = _redact(self._carry + chunk)
         # Read live, per chunk, rather than snapshotted once: `_redact` above
-        # reads `_SECRETS` live, so a snapshot here could redact a secret whose
+        # reads both sets live, so a snapshot here could redact a secret whose
         # PREFIX the split does not know to hold -- a straddle hole for exactly
         # that secret. Two reads of the same state or neither; a tuple and a max
         # over at most a handful of values is nothing against a 4 KB read.
-        secrets = tuple(_SECRETS)
+        #
+        # BOTH sets, because the straddle is a property of the bytes arriving in
+        # pieces and has nothing to do with which matcher will claim them. A
+        # carry computed over the substring set alone would hold nothing for a
+        # short credential split across two reads, and the boundary matcher would
+        # then never see it whole (#2477).
+        secrets = tuple(_SECRETS | _BOUNDED_SECRETS)
         send, self._carry = _split_tail(buf, secrets=secrets, ceiling=_scan_ceiling(secrets))
         return send
 
