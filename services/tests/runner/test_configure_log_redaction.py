@@ -165,7 +165,7 @@ class TestTheFloorIsPerCaller:
 
         Below the lowered floor it is boundary-matched rather than skipped: it is
         removed where it stands as its own token, and left alone inside
-        `production` or `prod-eu1`, which is the false positive the floor existed
+        `production` or `prod-west-1`, which is the false positive the floor existed
         to prevent. The cost is real and accepted -- a standalone `prod` in the
         log is replaced -- because the alternative is a credential in the clear,
         and the runner logs that the weaker matcher is in use.

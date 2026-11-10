@@ -188,7 +188,7 @@ async def _create_drift_run_vcs(
     tarball wrapped in a top-level `<owner>-<repo>-<sha>/` directory;
     the runner's `chdir /workspace` after extraction lands one level
     above the actual repo content, and any `var-files` referenced from
-    the workspace's settings (e.g. `envs/prod-us2.tfvars`) resolve as
+    the workspace's settings (e.g. `envs/prod.tfvars`) resolve as
     missing. Pre-v0.35.1 this latent bug was masked because drift
     detection rarely fired (the `_is_workspace_busy` gate was so wide
     it skipped almost everything); when v0.35.1 narrowed the gate to

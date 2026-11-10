@@ -102,7 +102,7 @@ _DEFAULT_CREDENTIALS_DIR = "/tp/credentials"
 #: `summary_redaction.MIN_LITERAL_LENGTH` already uses for matching a literal in
 #: free text, so this is the house number rather than a new one -- and below it
 #: the trade genuinely inverts FOR A SUBSTRING MATCH, because a value like
-#: `prod` occurs inside `production` and `prod-eu1` as well as on its own, and a
+#: `prod` occurs inside `production` and `prod-west-1` as well as on its own, and a
 #: log with half its words blacked out stops being read.
 #:
 #: That argument is about the matcher, which is why it no longer ends the story
