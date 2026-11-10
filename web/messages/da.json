@@ -2724,7 +2724,11 @@
       "hardLimit": "Hård grænse",
       "hardLimitPlaceholder": "f.eks. canary",
       "hardLimitTitle": "Den kombineres med den grænse, kørslen selv angiver, så en kørsel kan indsnævre inden for den, og ingen kan udvide ud over den. Den angiver højst én gruppe eller ét værtsmønster — for eksempel canary eller !prod for alt undtagen produktion — fordi ansible ikke har nogen måde at sige »en af disse« i en grænse. Skal loftet dække to grupper, opretter du en overordnet gruppe af dem i dit inventar og angiver den.",
-      "hardLimitLead": "En --limit, ingen kørsel kan slippe uden om. Lad feltet være tomt, hvis der ikke skal være noget loft."
+      "hardLimitLead": "En --limit, ingen kørsel kan slippe uden om. Lad feltet være tomt, hvis der ikke skal være noget loft.",
+      "defaultRunKind": "Primær kørselsknap",
+      "defaultRunKindAuto": "Automatisk (mest komplette kørsel)",
+      "defaultRunKindLead": "Hvilken handling der får den fremhævede knap i dette arbejdsområde. Automatisk tilbyder den mest komplette kørsel, der er mulig.",
+      "defaultRunKindTitle": "Hvilken handling der får den fremhævede knap i dette arbejdsområde. Automatisk tilbyder den mest komplette kørsel, der er mulig — oftest rigtigt, og forkert hvor den daglige handling ikke er den største: et arbejdsområde, hvis Terraform-halvdel kun vedligeholder Ansible-inventaret, anvender uden opsyn og aldrig konfigurerer efter en anvendelse, vil have Konfigurer her. Et valg, som dette arbejdsområde ikke kan tilbyde, afvises, når du gemmer det, og et valg, som din rolle ikke må køre, falder tilbage til Automatisk for dig."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

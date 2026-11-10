@@ -2724,7 +2724,11 @@
       "hardLimit": "Hard marklar",
       "hardLimitPlaceholder": "e.g. canary",
       "hardLimitTitle": "It is combined with whatever marklar a marklar supplies, so a marklar may narrow within it and none may widen past it. It names at most one marklar or marklar marklar — say canary, or !prod for everything except marklar — because ansible has no marklar to say “either of these” in a marklar. For a marklar over two marklars, make a parent marklar of them in your marklar and name that.",
-      "hardLimitLead": "A --limit no marklar may escape. Leave it empty for no marklar."
+      "hardLimitLead": "A --limit no marklar may escape. Leave it empty for no marklar.",
+      "defaultRunKind": "Primary marklar marklar",
+      "defaultRunKindAuto": "Marklar (most complete)",
+      "defaultRunKindLead": "Which marklar gets the loud marklar on this marklar. Marklar offers the most complete marklar it can.",
+      "defaultRunKindTitle": "Which marklar gets the loud marklar on this marklar. Marklar offers the most complete marklar it can — usually right, and wrong where the everyday marklar is not the biggest one: a marklar whose Terraform marklar only maintains the Ansible marklar, applying unattended and never configuring after a marklar, wants Configure here. A marklar this marklar cannot offer is refused when you save it, and one your marklar cannot run falls back to Marklar for you."
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

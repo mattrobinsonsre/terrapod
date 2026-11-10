@@ -2724,7 +2724,11 @@
       "hardLimit": "強制 limit",
       "hardLimitPlaceholder": "例如 canary",
       "hardLimitTitle": "它會與執行所提供的 limit 結合，因此執行只能在其範圍內進一步收窄，而無法越過它擴大範圍。它最多只能指定一個主機組或一個主機模式 — 例如 canary，或代表除生產環境之外一切的 !prod — 因為 ansible 無法在 limit 中表達「其中任一個」。若要讓上限涵蓋兩個主機組，請在清冊中為它們建立一個父組並指定該父組。",
-      "hardLimitLead": "任何執行都無法逾越的 --limit。不設上限則留空。"
+      "hardLimitLead": "任何執行都無法逾越的 --limit。不設上限則留空。",
+      "defaultRunKind": "主要執行按鈕",
+      "defaultRunKindAuto": "自動（最完整的執行）",
+      "defaultRunKindLead": "決定此工作區中哪個操作佔據醒目的按鈕。自動會在可能的範圍內提供最完整的執行。",
+      "defaultRunKindTitle": "決定此工作區中哪個操作佔據醒目的按鈕。自動會在可能的範圍內提供最完整的執行 — 通常這是對的，但在日常操作並非最大的那一項時就不對了：若某個工作區的 Terraform 部分只負責維護 Ansible 清單，以無人值守的方式套用，且從不在套用之後執行設定，那麼這裡應當選擇設定。此工作區無法提供的選項會在儲存時被拒絕，而您的角色無法執行的選項則會為您回退為自動。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

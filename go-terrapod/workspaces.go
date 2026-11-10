@@ -116,6 +116,17 @@ type Workspace struct {
 	// boolean for whether the workspace uses remote operations.
 	PlanApplyEnabled bool `json:"plan-apply-enabled"`
 	ConfigureEnabled bool `json:"configure-enabled"`
+	// DefaultRunKind is which run kind gets the prominent button on this
+	// workspace, and which the API offers first (#2479). One of "full",
+	// "plan_apply", "configure", "plan", or "" for no preference -- in which
+	// case the platform offers the most complete kind the workspace has.
+	//
+	// No `omitempty`, for the reason the pair above gives: "" is a real value
+	// meaning "no preference", so it has to survive a round trip.
+	//
+	// Not served on /api/tfe/v2 -- native-only, like the pair above -- so it
+	// reads as "" through the compatibility route whatever it holds.
+	DefaultRunKind string `json:"default-run-kind"`
 	// AutoConfigureEnabled and ConfigureAfterApply are HOW a configure starts
 	// (#1974). Both opt-in, both default false, and neither means anything
 	// without ConfigureEnabled.
@@ -413,6 +424,13 @@ type CreateWorkspaceRequest struct {
 	// The server refuses both false with a 422.
 	PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 	ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
+	// DefaultRunKind is which run kind the new workspace puts the prominent
+	// button on (#2479). A plain string rather than a pointer, unlike the
+	// pair above: "" is a real value meaning "no preference" AND the server
+	// default, so omitted and empty mean the same thing here and there is no
+	// third state to express. Refused with a 422 when it names an operation
+	// the new workspace does not have.
+	DefaultRunKind string `json:"default-run-kind,omitempty"`
 	// AutoConfigureEnabled and ConfigureAfterApply say how a configure starts
 	// on the new workspace (#1974). POINTERS for the same reason as the pair
 	// above, though the direction is gentler here: both server-side defaults
@@ -592,6 +610,13 @@ type UpdateWorkspaceRequest struct {
 	// not is a 422 rather than an inert workspace.
 	PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 	ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
+	// DefaultRunKind moves the prominent button to another run kind (#2479).
+	// A POINTER, unlike the create request's plain string: here "leave the
+	// stored preference alone" and "clear it" are different acts, so nil
+	// sends nothing and a pointer to "" clears it. Checked against the merged
+	// row, so a kind the workspace does not have is refused unless the same
+	// call gives it the operation.
+	DefaultRunKind *string `json:"default-run-kind,omitempty"`
 	// AutoConfigureEnabled and ConfigureAfterApply turn a configure trigger on
 	// or off (#1974). POINTERS so that nil leaves the stored value alone.
 	AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
@@ -948,6 +973,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ConfigureEnabled != nil {
 		attrs["configure-enabled"] = *req.ConfigureEnabled
 	}
+	// A plain string here, so an empty one is simply not sent -- on create "" is
+	// both "no preference" and the server default, so the two are the same act
+	// (#2479).
+	if req.DefaultRunKind != "" {
+		attrs["default-run-kind"] = req.DefaultRunKind
+	}
 	if req.AutoConfigureEnabled != nil {
 		attrs["auto-configure-enabled"] = *req.AutoConfigureEnabled
 	}
@@ -1139,6 +1170,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.ConfigureEnabled != nil {
 		attrs["configure-enabled"] = *req.ConfigureEnabled
+	}
+	// An explicit "" is SENT, not dropped: it is how the preference is cleared
+	// (#2479), and the server reads an absent key as "leave the stored value
+	// alone". Hence the nil check rather than a truthiness one.
+	if req.DefaultRunKind != nil {
+		attrs["default-run-kind"] = *req.DefaultRunKind
 	}
 	if req.AutoConfigureEnabled != nil {
 		attrs["auto-configure-enabled"] = *req.AutoConfigureEnabled
@@ -1371,6 +1408,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		// configure operation at the top of every repository.
 		PlanApplyEnabled:              GetBoolAttr(res, "plan-apply-enabled"),
 		ConfigureEnabled:              GetBoolAttr(res, "configure-enabled"),
+		DefaultRunKind:                GetStringAttr(res, "default-run-kind"),
 		AutoConfigureEnabled:          GetBoolAttr(res, "auto-configure-enabled"),
 		ConfigureAfterApply:           GetBoolAttr(res, "configure-after-apply"),
 		ConfigureAllHosts:             GetBoolAttr(res, "configure-all-hosts"),

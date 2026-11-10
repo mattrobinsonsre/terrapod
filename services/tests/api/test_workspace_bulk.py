@@ -116,6 +116,14 @@ def _mock_ws(
     # it exists to catch.
     w.plan_apply_enabled = True
     w.configure_enabled = False
+    # Which of them gets the prominent button (#2479). Set for the same reason
+    # as the pair above, and the failure mode is sharper: the sweep reads
+    # `w.default_run_kind or ""` and then looks the result up in
+    # RUN_KIND_REQUIREMENTS. A MagicMock is truthy AND absent from that dict, so
+    # it resolves to "requires nothing" and no matched workspace could ever be
+    # an offender -- a fixture that silently disarms the guard it is meant to
+    # exercise.
+    w.default_run_kind = ""
     return w
 
 
@@ -1165,3 +1173,177 @@ class TestABulkUpdateCannotLeaveAWorkspaceInert:
         assert resp.status_code == 200, resp.text
         assert ws.plan_apply_enabled is False
         assert ws.configure_enabled is True
+
+
+class TestBulkUpdateRefusesAnUnofferableRunKind:
+    """`default-run-kind` across a matched set (#2479).
+
+    Two halves, and only the second needs a matched set. The FORMAT half --
+    type and vocabulary -- is judged from the payload alone, because bulk update
+    has no single workspace to merge against until it has matched one. The
+    CROSS-FIELD half is over the merge of the payload with each matched
+    workspace's own row, which is the half an update reaching a hundred
+    workspaces is exactly where you lose: a preference naming `configure` is
+    right for the workspaces that have it and unhonourable for the ones that do
+    not.
+
+    Driven through the ROUTE throughout. The mutation to run against this class
+    is deleting the `_reject_a_run_kind_a_workspace_cannot_offer(...)` call from
+    the handler -- the helper's own unit tests pass without it.
+    """
+
+    async def _post(self, body, workspaces, user=None):
+        """`dry_run` defaults to TRUE on this endpoint, and a dry run rolls
+        back rather than committing -- so a test asserting the commit has to ask
+        for a real apply. The refusals are reached either way, before the
+        transaction is decided."""
+        body = {"dry_run": False, **body}
+        app, db = _make_app(user or _admin())
+        db.execute = AsyncMock(return_value=_list_result(workspaces))
+        db.commit = AsyncMock()
+        db.rollback = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update",
+                json=body,
+                headers=_AUTH,
+            )
+        return resp, db
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_word_outside_the_vocabulary_is_refused_from_the_payload_alone(self, *_mocks):
+        """No matched workspace is needed for this half, and the refusal must
+        not depend on one -- a set that happens to be empty would otherwise
+        accept nonsense."""
+        resp, db = await self._post(
+            {"filter": {"all": True}, "update": {"default-run-kind": "deploy"}}, []
+        )
+        assert resp.status_code == 422, resp.text
+        assert "must be empty or one of" in resp.json()["detail"]
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_kind_a_matched_workspace_cannot_offer_is_refused(self, *_mocks):
+        """The merge check, with the offender NAMED.
+
+        Half the matched set can honour it. The refusal has to name the half
+        that cannot, or the operator is told the update failed and left to find
+        out which workspaces caused it by hand -- which on a fleet-wide update
+        is the whole difficulty.
+        """
+        ok = _mock_ws(name="has-configure")
+        ok.configure_enabled = True
+        bad = _mock_ws(name="plan-only")
+        bad.configure_enabled = False
+
+        resp, db = await self._post(
+            {"filter": {"all": True}, "update": {"default-run-kind": "configure"}},
+            [ok, bad],
+        )
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "plan-only" in detail, f"the refusal does not name the offender: {detail}"
+        assert "has-configure" not in detail, (
+            f"the refusal names a workspace that CAN offer the kind: {detail}"
+        )
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_same_update_is_accepted_when_it_grants_the_operation_too(self, *_mocks):
+        """The remedy the refusal names has to work, or the refusal is a dead
+        end: the guard reads the MERGE, so turning the operation on in the same
+        submission makes the preference honourable everywhere."""
+        a = _mock_ws(name="plan-only-a")
+        b = _mock_ws(name="plan-only-b")
+
+        resp, db = await self._post(
+            {
+                "filter": {"all": True},
+                "update": {"configure-enabled": True, "default-run-kind": "configure"},
+            },
+            [a, b],
+        )
+        assert resp.status_code == 200, resp.text
+        assert a.default_run_kind == "configure"
+        assert b.default_run_kind == "configure"
+        db.commit.assert_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_turning_an_operation_off_is_refused_while_a_matched_workspace_prefers_it(
+        self, *_mocks
+    ):
+        """The direction that is easy to miss, and the one that makes this a
+        sweep rather than a field check.
+
+        The payload does not mention `default-run-kind` at all. A guard that
+        fired only when the preference is submitted would leave every workspace
+        that preferred Configure holding a preference nothing can honour --
+        stored and ignored, across a whole fleet, with nothing to say so.
+        """
+        prefers = _mock_ws(name="prefers-configure")
+        prefers.configure_enabled = True
+        prefers.default_run_kind = "configure"
+        plain = _mock_ws(name="plain")
+        plain.configure_enabled = True
+
+        resp, db = await self._post(
+            {"filter": {"all": True}, "update": {"configure-enabled": False}},
+            [prefers, plain],
+        )
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "prefers-configure" in detail, (
+            f"the refusal does not name the workspace it protects: {detail}"
+        )
+        assert "plain" not in detail, (
+            f"the refusal names a workspace with no preference to break: {detail}"
+        )
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_clearing_the_preference_in_the_same_update_lets_the_flag_go_off(self, *_mocks):
+        prefers = _mock_ws(name="prefers-configure")
+        prefers.configure_enabled = True
+        prefers.default_run_kind = "configure"
+
+        resp, db = await self._post(
+            {
+                "filter": {"all": True},
+                "update": {"configure-enabled": False, "default-run-kind": ""},
+            },
+            [prefers],
+        )
+        assert resp.status_code == 200, resp.text
+        assert prefers.default_run_kind == ""
+        assert prefers.configure_enabled is False
+        db.commit.assert_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_update_about_something_else_does_not_consult_the_rule(self, *_mocks):
+        """The sweep is gated on one of the three fields being submitted, so an
+        unrelated fleet update must not be refused by a preference it never
+        touches. A workspace already holding an unofferable preference -- one
+        written before the guard existed -- must not become uneditable, which is
+        the #316 trap this shape is otherwise prone to.
+        """
+        stuck = _mock_ws(name="legacy-stuck")
+        stuck.configure_enabled = False
+        stuck.default_run_kind = "configure"
+
+        resp, db = await self._post(
+            {"filter": {"all": True}, "update": {"slack-channel": "#ops"}}, [stuck]
+        )
+        assert resp.status_code == 200, resp.text
+        db.commit.assert_awaited()

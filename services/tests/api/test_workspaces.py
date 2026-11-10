@@ -80,6 +80,14 @@ def _mock_workspace(
     # `configure_enabled` (#1966), which defaults False.
     ws.plan_apply_enabled = True
     ws.configure_enabled = False
+    # Which of them gets the prominent button (#2479). Set explicitly, and the
+    # reason is worth keeping: a MagicMock here is TRUTHY, so the serialiser's
+    # `ws.default_run_kind or ""` puts the mock itself in the response dict and
+    # the whole document fails to serialise -- while on the PATCH path the
+    # stored value is what an unmentioned attribute falls back to, so the mock
+    # reaches the validator and answers 422 "must be a string" on a request
+    # that never mentioned the field. '' is the real default: no preference.
+    ws.default_run_kind = ""
     # #1974's pair, serialised beside them.
     ws.auto_configure_enabled = False
     ws.configure_after_apply = False
@@ -2827,6 +2835,11 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
             "default-playbook",
             "default-limit",
             "hard-limit",
+            # Which run button is primary (#2479). `terraform` and `tofu` have
+            # no run button, so it could only ever be noise on this wire -- and
+            # a provider reading a workspace back from here would see a value
+            # it had just written come back absent.
+            "default-run-kind",
         ):
             assert key not in a, f"{key} reached the TFE-compatible wire"
 

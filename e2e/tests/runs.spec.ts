@@ -16,7 +16,7 @@
  * surfaces with API-seeded runs.
  */
 import { test, expect, type Route, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, seedRun, uniqueName, API_URL } from '../helpers/api';
 import { queueRunKind } from '../helpers/run-kinds';
 
 test.describe('Run lifecycle UI', () => {
@@ -87,6 +87,48 @@ test.describe('Run lifecycle UI', () => {
     // mechanisms could disagree about what the next run is.
     await page.getByRole('button', { name: /Options/ }).click();
     await expect(page.getByText('Plan Only', { exact: true })).toHaveCount(0);
+  });
+
+  test('default-run-kind moves the primary, and the displaced kind stays offered', async ({
+    page,
+  }) => {
+    // The test above pins the DEFAULT ordering: the most complete kind the
+    // workspace declares is the primary. This one pins that a workspace may
+    // choose otherwise (#2479) -- which is the whole of the feature, and the
+    // one claim no unit test can make, because the derivation is a pure
+    // function and what is under test here is that the page passes it the
+    // stored value at all.
+    //
+    // Both positions are asserted, in both directions. "Plan is now the
+    // primary" alone would pass against a page that had simply lost its menu,
+    // and the point of the setting is that it reorders rather than removes:
+    // every kind the workspace offers stays reachable.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-primary-run-kind'));
+
+    // Written through the NATIVE route, which is the only surface that serves
+    // this attribute -- the TFE-compatible prefix strips it, because
+    // `terraform` and `tofu` have no run button.
+    const res = await fetch(`${API_URL}/api/v1/workspaces/${wsId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/vnd.api+json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ data: { attributes: { 'default-run-kind': 'plan' } } }),
+    });
+    expect(res.ok, `setting default-run-kind failed: ${res.status}`).toBe(true);
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+
+    // Swapped: `Plan` is the loud control and `Plan + apply` has moved behind
+    // the caret -- the exact inverse of the default this workspace started on.
+    await expect(page.getByTestId('ws-run-plan')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('ws-run-planApply')).toHaveCount(0);
+
+    await page.getByTestId('ws-run-more').click();
+    await expect(page.getByTestId('ws-run-planApply')).toBeVisible();
+    await page.keyboard.press('Escape');
   });
 
   test('Plan queues a plan-only run', async ({ page }) => {

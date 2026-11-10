@@ -2724,7 +2724,11 @@
       "hardLimit": "Harde limiet",
       "hardLimitPlaceholder": "bijv. canary",
       "hardLimitTitle": "Hij wordt gecombineerd met de limiet die een run zelf meegeeft, dus een run kan daarbinnen verder versmallen en geen enkele run kan erbuiten uitbreiden. Hij benoemt ten hoogste één groep of hostpatroon — bijvoorbeeld canary, of !prod voor alles behalve productie — omdat ansible in een limiet geen manier heeft om “een van deze” te zeggen. Maak voor een plafond over twee groepen in je inventaris een bovenliggende groep van die twee en benoem die.",
-      "hardLimitLead": "Een --limit waaraan geen enkele run kan ontsnappen. Laat het veld leeg als er geen plafond moet gelden."
+      "hardLimitLead": "Een --limit waaraan geen enkele run kan ontsnappen. Laat het veld leeg als er geen plafond moet gelden.",
+      "defaultRunKind": "Primaire runknop",
+      "defaultRunKindAuto": "Automatisch (meest volledige run)",
+      "defaultRunKindLead": "Welke actie in deze workspace de opvallende knop krijgt. Automatisch biedt de meest volledige run die mogelijk is.",
+      "defaultRunKindTitle": "Welke actie in deze workspace de opvallende knop krijgt. Automatisch biedt de meest volledige run die mogelijk is — meestal goed, en verkeerd waar de dagelijkse actie niet de grootste is: een workspace waarvan de Terraform-helft alleen de Ansible-inventaris onderhoudt, onbeheerd toepast en na een toepassing nooit configureert, wil hier Configureren. Een keuze die deze workspace niet kan aanbieden wordt geweigerd als je opslaat, en een keuze die je rol niet mag uitvoeren valt voor jou terug op Automatisch."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

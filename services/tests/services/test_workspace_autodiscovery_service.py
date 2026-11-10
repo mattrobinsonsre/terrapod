@@ -519,6 +519,11 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "engine_version",
         "ansible_version",
         "ansible_execution_environment",
+        # Which run kind the materialised workspaces make primary (#2479).
+        # Templated for the same reason as the rest: a fleet whose Terraform
+        # half only maintains an inventory wants Configure as its everyday
+        # action on every one of its workspaces, not on each one by hand.
+        "default_run_kind",
         # Whether a configure verifies its targets' SSH host keys (#2318).
         # Templated for the same reason as the version above: a fleet reached
         # through a bastion that rewrites host keys should not be edited one

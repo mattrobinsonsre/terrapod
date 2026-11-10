@@ -34,11 +34,16 @@ import (
 // is tested separately below. Its schema records a decision against Computed,
 // so it cannot take the unconditional read-back the VCS triplet gets.
 
-// theFourEmptyStringAttributes is the write-leg subject: the model field each
+// theEmptyStringAttributes is the write-leg subject: the model field each
 // attribute reads from, and the request field it must reach. Driving them from
 // one table is what keeps a later addition from being wired to only one of the
 // two legs.
-var theFourEmptyStringAttributes = []struct {
+//
+// Named without a count on purpose. It was `theEmptyStringAttributes` and
+// `default_run_kind` made it five (#2479) -- a number in an identifier is a
+// claim with nothing enforcing it, and the next addition would have left the
+// name asserting something false.
+var theEmptyStringAttributes = []struct {
 	name string
 	set  func(*workspaceModel, types.String)
 	get  func(terrapod.UpdateWorkspaceRequest) *string
@@ -63,6 +68,14 @@ var theFourEmptyStringAttributes = []struct {
 		set:  func(m *workspaceModel, v types.String) { m.VCSConnectionID = v },
 		get:  func(r terrapod.UpdateWorkspaceRequest) *string { return r.VCSConnectionID },
 	},
+	// Which run kind gets the prominent button (#2479). The same class as the
+	// VCS triplet: Optional+Computed, and `= ""` is the one configuration that
+	// CLEARS the preference, so it has to survive as far as the SDK.
+	{
+		name: "default_run_kind",
+		set:  func(m *workspaceModel, v types.String) { m.DefaultRunKind = v },
+		get:  func(r terrapod.UpdateWorkspaceRequest) *string { return r.DefaultRunKind },
+	},
 }
 
 // TestAnExplicitEmptyStringReachesTheUpdateRequest is the write leg: an
@@ -76,7 +89,7 @@ var theFourEmptyStringAttributes = []struct {
 func TestAnExplicitEmptyStringReachesTheUpdateRequest(t *testing.T) {
 	ctx := context.Background()
 
-	for _, a := range theFourEmptyStringAttributes {
+	for _, a := range theEmptyStringAttributes {
 		t.Run(a.name, func(t *testing.T) {
 			var m workspaceModel
 			a.set(&m, types.StringValue(""))
@@ -111,7 +124,7 @@ func TestAnExplicitEmptyStringReachesTheUpdateRequest(t *testing.T) {
 func TestAnOmittedAttributeIsNotClearedByTheUpdateRequest(t *testing.T) {
 	ctx := context.Background()
 
-	for _, a := range theFourEmptyStringAttributes {
+	for _, a := range theEmptyStringAttributes {
 		t.Run(a.name, func(t *testing.T) {
 			var m workspaceModel
 			a.set(&m, types.StringNull())
@@ -130,11 +143,16 @@ func TestAnOmittedAttributeIsNotClearedByTheUpdateRequest(t *testing.T) {
 	}
 }
 
-// theVCSTriplet is the read-leg subject. `ansible_execution_environment` is
-// absent on purpose: it is Optional-only and reads back through
-// `optionalStringKeepingExplicitEmpty`, so an unconditional projection would be
-// wrong for it. See TestTheExecutionEnvironmentLabelReadsBackFourWays.
-var theVCSTriplet = []struct {
+// theUnconditionallyProjectedStrings is the read-leg subject: every
+// Optional+Computed string attribute whose server value is projected straight
+// into state. `ansible_execution_environment` is absent on purpose: it is
+// Optional-only and reads back through `optionalStringKeepingExplicitEmpty`, so
+// an unconditional projection would be wrong for it. See
+// TestTheExecutionEnvironmentLabelReadsBackFourWays.
+//
+// It was `theUnconditionallyProjectedStrings` until `default_run_kind` joined it (#2479), which is
+// the same lesson the write-leg table above records: do not count in a name.
+var theUnconditionallyProjectedStrings = []struct {
 	name     string
 	onServer func(*terrapod.Workspace, string)
 	inModel  func(*workspaceModel) types.String
@@ -158,11 +176,18 @@ var theVCSTriplet = []struct {
 		inModel:  func(m *workspaceModel) types.String { return m.VCSConnectionID },
 		setModel: func(m *workspaceModel, v types.String) { m.VCSConnectionID = v },
 	},
+	{
+		name:     "default_run_kind",
+		onServer: func(ws *terrapod.Workspace, v string) { ws.DefaultRunKind = v },
+		inModel:  func(m *workspaceModel) types.String { return m.DefaultRunKind },
+		setModel: func(m *workspaceModel, v types.String) { m.DefaultRunKind = v },
+	},
 }
 
-// TestTheVCSTripletReadsBackAnEmptyServerValueConcretely is the read leg.
+// TestAnEmptyServerValueReadsBackConcretely is the read leg.
 //
-// All three are Optional+Computed, which is what makes the unconditional
+// Every attribute in the table is Optional+Computed, which is what makes the
+// unconditional
 // projection the right answer: a config that omits the attribute plans UNKNOWN
 // rather than null, so the server's "" fills it in and no spurious diff follows.
 // Mapping "" to null instead — the `if x != "" { … } else { StringNull }` shape
@@ -173,7 +198,7 @@ var theVCSTriplet = []struct {
 // either: the one that would have caught #2310 is the explicit "", and the null
 // row is the one that proves the attribute is genuinely Computed rather than
 // quietly relying on the config to supply its own answer back.
-func TestTheVCSTripletReadsBackAnEmptyServerValueConcretely(t *testing.T) {
+func TestAnEmptyServerValueReadsBackConcretely(t *testing.T) {
 	ctx := context.Background()
 
 	configured := []struct {
@@ -184,7 +209,7 @@ func TestTheVCSTripletReadsBackAnEmptyServerValueConcretely(t *testing.T) {
 		{"no value at all", types.StringNull()},
 	}
 
-	for _, a := range theVCSTriplet {
+	for _, a := range theUnconditionallyProjectedStrings {
 		for _, c := range configured {
 			t.Run(a.name+"/"+c.what, func(t *testing.T) {
 				ws := &terrapod.Workspace{ID: "ws-a", Name: "a"}

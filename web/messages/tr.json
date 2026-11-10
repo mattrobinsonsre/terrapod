@@ -2724,7 +2724,11 @@
       "hardLimit": "Katı limit",
       "hardLimitPlaceholder": "örn. canary",
       "hardLimitTitle": "Çalıştırmanın kendi verdiği limitle birleştirilir; böylece bir çalıştırma kapsamı bunun içinde daraltabilir, ancak hiçbiri bunun ötesine genişletemez. En fazla bir grup veya bir ana makine deseni belirtir — örneğin canary ya da üretim dışındaki her şey için !prod — çünkü ansible bir limitte “bunlardan herhangi biri” diyemez. İki grubu birlikte kapsayan bir üst sınır için envanterinizde bunlardan bir üst grup oluşturun ve onu belirtin.",
-      "hardLimitLead": "Hiçbir çalıştırmanın aşamayacağı bir --limit. Üst sınır olmaması için boş bırakın."
+      "hardLimitLead": "Hiçbir çalıştırmanın aşamayacağı bir --limit. Üst sınır olmaması için boş bırakın.",
+      "defaultRunKind": "Birincil çalıştırma düğmesi",
+      "defaultRunKindAuto": "Otomatik (en kapsamlı)",
+      "defaultRunKindLead": "Bu çalışma alanında hangi eylemin öne çıkan düğmeyi alacağı. Otomatik, yapabildiği en kapsamlı çalıştırmayı önerir.",
+      "defaultRunKindTitle": "Bu çalışma alanında hangi eylemin öne çıkan düğmeyi alacağı. Otomatik, yapabildiği en kapsamlı çalıştırmayı önerir — çoğunlukla doğrudur, günlük eylemin en büyüğü olmadığı yerlerde ise yanlıştır: Terraform tarafı yalnızca Ansible envanterini güncel tutan, gözetimsiz uygulayan ve bir uygulamanın ardından asla yapılandırmayan bir çalışma alanı burada Yapılandır''ı ister. Bu çalışma alanının sunamadığı bir seçim, kaydettiğinizde reddedilir; rolünüzün çalıştıramadığı bir seçim ise sizin için Otomatik''e geri döner."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

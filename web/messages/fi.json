@@ -2724,7 +2724,11 @@
       "hardLimit": "Ehdoton rajaus",
       "hardLimitPlaceholder": "esim. canary",
       "hardLimitTitle": "Se yhdistetään ajon itse antamaan rajaukseen, joten ajo voi kapeuttaa kohdistusta sen sisällä, mutta mikään ei voi laajentaa sitä sen yli. Se nimeää enintään yhden ryhmän tai yhden isäntäkuvion — esimerkiksi canary tai !prod kaikelle muulle kuin tuotannolle — koska ansible ei osaa sanoa rajauksessa ”mikä tahansa näistä”. Jos yläraja halutaan kahdelle ryhmälle, tee niistä inventaarioon yläryhmä ja nimeä se.",
-      "hardLimitLead": "--limit, jota mikään ajo ei voi kiertää. Jätä tyhjäksi, jos ylärajaa ei haluta."
+      "hardLimitLead": "--limit, jota mikään ajo ei voi kiertää. Jätä tyhjäksi, jos ylärajaa ei haluta.",
+      "defaultRunKind": "Ensisijainen ajopainike",
+      "defaultRunKindAuto": "Automaattinen (täydellisin ajo)",
+      "defaultRunKindLead": "Mikä toiminto saa korostetun painikkeen tässä työtilassa. Automaattinen tarjoaa täydellisimmän ajon, joka on mahdollinen.",
+      "defaultRunKindTitle": "Mikä toiminto saa korostetun painikkeen tässä työtilassa. Automaattinen tarjoaa täydellisimmän ajon, joka on mahdollinen — useimmiten oikein, mutta väärin silloin, kun jokapäiväinen toiminto ei ole laajin: työtila, jonka Terraform-puoli vain ylläpitää Ansible-inventaariota, ottaa muutokset käyttöön valvomatta eikä koskaan määritä käyttöönoton jälkeen, haluaa tähän Määritä. Valintaa, jota tämä työtila ei voi tarjota, ei hyväksytä tallennettaessa, ja valinta, jota roolisi ei voi ajaa, vaihtuu sinulle Automaattiseksi."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

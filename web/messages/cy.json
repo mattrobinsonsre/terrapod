@@ -2724,7 +2724,11 @@
       "hardLimit": "Terfyn caled",
       "hardLimitPlaceholder": "e.e. canary",
       "hardLimitTitle": "Fe''i cyfunir ag unrhyw derfyn a ddarperir gan rediad, felly gall rhediad gulhau o''i fewn ond ni all unrhyw un ymestyn y tu hwnt iddo. Un grŵp neu un patrwm gwesteiwr ar y mwyaf y caiff ei enwi — canary, dyweder, neu !prod ar gyfer popeth heblaw cynhyrchu — oherwydd nid oes modd i ansible ddweud \"unrhyw un o''r rhain\" mewn terfyn. Ar gyfer terfyn uchaf sy''n cwmpasu dau grŵp, gwnewch riant-grŵp ohonynt yn eich rhestr eiddo ac enwch hwnnw.",
-      "hardLimitLead": "Patrwm --limit na all unrhyw rediad ddianc ohono. Gadewch yn wag i beidio â gosod unrhyw derfyn uchaf."
+      "hardLimitLead": "Patrwm --limit na all unrhyw rediad ddianc ohono. Gadewch yn wag i beidio â gosod unrhyw derfyn uchaf.",
+      "defaultRunKind": "Prif fotwm rhediad",
+      "defaultRunKindAuto": "Awtomatig (y mwyaf cyflawn)",
+      "defaultRunKindLead": "Pa weithred sy''n cael y botwm amlwg ar y weithfan hon. Mae Awtomatig yn cynnig y rhediad mwyaf cyflawn y gall.",
+      "defaultRunKindTitle": "Pa weithred sy''n cael y botwm amlwg ar y weithfan hon. Mae Awtomatig yn cynnig y rhediad mwyaf cyflawn y gall — yn gywir fel arfer, ac yn anghywir lle nad y weithred fwyaf yw''r un feunyddiol: ar weithfan nad yw ei hanner Terraform yn gwneud dim ond cynnal y rhestr eiddo Ansible, sy''n gweithredu heb oruchwyliaeth ac nad yw byth yn cyflunio ar ôl gweithredu, Cyflunio sydd eisiau yma. Caiff dewis na all y weithfan hon ei gynnig ei wrthod pan fyddwch yn ei gadw, ac mae un na all eich rôl ei redeg yn dychwelyd i Awtomatig ar eich cyfer."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

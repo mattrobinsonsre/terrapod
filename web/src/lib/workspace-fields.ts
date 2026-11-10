@@ -220,6 +220,12 @@ export const FIELDS: readonly FieldSpec[] = [
   // --- operations -------------------------------------------------------
   { attr: 'plan-apply-enabled', id: 'ws-plan-apply-enabled', group: 'operations' },
   { attr: 'configure-enabled', id: 'ws-configure-enabled', group: 'operations' },
+  // Which run kind is the primary button (#2479). In `operations` because it is
+  // a statement about which of this workspace's operations is the everyday one,
+  // and NOT `dependsOn`-gated: `dependsOn` names a single boolean, while this
+  // is meaningful whenever either operation is on — which is always, since
+  // plan/apply defaults on and a workspace with neither is refused.
+  { attr: 'default-run-kind', id: 'ws-default-run-kind', group: 'operations' },
   {
     attr: 'auto-configure-enabled',
     id: 'ws-auto-configure-enabled',
@@ -558,6 +564,7 @@ export const LABEL_KEY: Record<string, string> = {
   'engine-version': 'fields.version',
   'working-directory': 'fields.workingDirectory',
   'auto-apply-mode': 'fields.autoApply',
+  'default-run-kind': 'fields.defaultRunKind',
   // NOT `fields.terragruntEnabledAgent` ('Enabled (agent mode)') -- that is a
   // STATE word the read view shows, not a label. And emphatically not
   // `fields.terragruntEnabledVersion`, which is `'Enabled (v{version})'`: an

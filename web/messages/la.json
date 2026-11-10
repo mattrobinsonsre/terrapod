@@ -2724,7 +2724,11 @@
       "hardLimit": "Limes firmus",
       "hardLimitPlaceholder": "ex. gr. canary",
       "hardLimitTitle": "Cum limite quem executio ipsa praebet coniungitur, ita ut executio eum artiorem reddere possit, latiorem autem nulla. Unum tantum gregem aut exemplar hospitis nominat — veluti canary, aut !prod pro omnibus praeter productionem — quia ansible nullo modo in limite “unum ex his” dicere potest. Si limes supremus duos greges complecti debet, in inventario tuo gregem superiorem eorum constitue eumque nomina.",
-      "hardLimitLead": "Exemplar --limit quod nulla executio transgredi potest. Vacuum relinque ne ullus limes supremus imponatur."
+      "hardLimitLead": "Exemplar --limit quod nulla executio transgredi potest. Vacuum relinque ne ullus limes supremus imponatur.",
+      "defaultRunKind": "Bulla exsecutionis praecipua",
+      "defaultRunKindAuto": "Automaticum (exsecutio plenissima)",
+      "defaultRunKindLead": "Quae actio bullam conspicuam in hoc loco operis accipit. Automaticum exsecutionem plenissimam quam potest offert.",
+      "defaultRunKindTitle": "Quae actio bullam conspicuam in hoc loco operis accipit. Automaticum exsecutionem plenissimam quam potest offert — plerumque rectum, et falsum ubi actio quotidiana non est maxima: locus operis cuius pars Terraform solum inventarium Ansible curat, qui sine custode adhibet et numquam post applicationem configurat, hic Configurare vult. Electio quam hic locus operis offerre non potest respuitur cum eam servas, et ea quam partes tuae exsequi non possunt ad Automaticum tibi recidit."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

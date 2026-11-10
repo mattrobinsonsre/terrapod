@@ -2724,7 +2724,11 @@
       "hardLimit": "Hård gräns",
       "hardLimitPlaceholder": "t.ex. canary",
       "hardLimitTitle": "Den kombineras med den gräns körningen själv anger, så en körning kan smalna av inom den och ingen kan vidga sig utanför den. Den anger högst en grupp eller ett värdmönster — till exempel canary, eller !prod för allt utom produktion — eftersom ansible inte har något sätt att säga ”någon av dessa” i en gräns. Ska taket täcka två grupper skapar du en överordnad grupp av dem i ditt inventarium och anger den.",
-      "hardLimitLead": "En --limit som ingen körning kan komma runt. Lämna tomt om inget tak ska gälla."
+      "hardLimitLead": "En --limit som ingen körning kan komma runt. Lämna tomt om inget tak ska gälla.",
+      "defaultRunKind": "Primär körningsknapp",
+      "defaultRunKindAuto": "Automatiskt (mest fullständig körning)",
+      "defaultRunKindLead": "Vilken åtgärd som får den framhävda knappen på denna arbetsyta. Automatiskt erbjuder den mest fullständiga körning som är möjlig.",
+      "defaultRunKindTitle": "Vilken åtgärd som får den framhävda knappen på denna arbetsyta. Automatiskt erbjuder den mest fullständiga körning som är möjlig — oftast rätt, och fel där den vardagliga åtgärden inte är den största: en arbetsyta vars Terraform-hälft bara underhåller Ansible-inventariet, tillämpar obevakat och aldrig konfigurerar efter en tillämpning, vill ha Konfigurera här. Ett val som denna arbetsyta inte kan erbjuda avvisas när du sparar det, och ett val som din roll inte får köra faller tillbaka till Automatiskt för dig."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

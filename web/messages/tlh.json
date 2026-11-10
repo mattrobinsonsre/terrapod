@@ -2724,7 +2724,11 @@
       "hardLimit": "veH let",
       "hardLimitPlaceholder": "Da canary",
       "hardLimitTitle": "Qu'' veH je boSlu''. vaj veH qoDDaq machchoHlaH Qu'', ''ach veH Dung tInchoHlaHbe''. wa'' ghom pagh wa'' host tem neH pong: Da canary, pagh prod Hutlhbogh Hoch''e''vaD Da !prod. veHDaq “wa'' ghap latlh” jatlhmeH mIw Hutlh ansible. cha'' ghommeyvaD veH DaneHchugh, ghom tetlhlIjDaq ghom''a'' chenmoH ''ej ''oH pong.",
-      "hardLimitLead": "--limit ''oH veH''e''; Qu'' Haw''laHbe''. veH DaHutlh DaneHchugh, chImmoH."
+      "hardLimitLead": "--limit ''oH veH''e''; Qu'' Haw''laHbe''. veH DaHutlh DaneHchugh, chImmoH.",
+      "defaultRunKind": "ta SeHlaw wa'DIch",
+      "defaultRunKindAuto": "tlhoS (naQqu')",
+      "defaultRunKindLead": "nuq Qu' SeHlaw potlh Suq Qumwo'vamDaq. ta naQqu' noblaHbogh nob tlhoS.",
+      "defaultRunKindTitle": "nuq Qu' SeHlaw potlh Suq Qumwo'vamDaq. ta naQqu' noblaHbogh nob tlhoS — motlh QaQ, 'ach Qu' motlh 'oH Qu' tIn'e' 'oHbe'chugh qab: Qumwo' Terraform 'ay' Ansible ghom tetlh neH vu'bogh, nudwI' Hutlhbogh lo' 'ej lo' tlha' not Qumbogh, naDev Qum poQ. wIv noblaHbe'bogh Qumwo'vam, DapolDI' lajbe'lu'; 'ej ta vangmeH patlhlIj chaw'be'chugh, SoHvaD tlhoS wIvlu'."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

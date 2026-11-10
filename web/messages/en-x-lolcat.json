@@ -2724,7 +2724,11 @@
       "hardLimit": "Hard Limit",
       "hardLimitPlaceholder": "e.g. canary",
       "hardLimitTitle": "It getz mixd wif whatevr limit a run bringz, so a run can go smallr insied it but noen can go biggr dan it. It namez at most wun groop or host pattrn — say canary, or !prod fer evrythin cept producshun — coz ansible haz noe way ta say “eithr ov deez” in a limit. Fer a ceilin ovr too groopz, make a parent groop ov dem in ur inventoree an name dat wun. srsly",
-      "hardLimitLead": "A --limit wot noe run can evr escape. Leev it empteh fer noe ceilin."
+      "hardLimitLead": "A --limit wot noe run can evr escape. Leev it empteh fer noe ceilin.",
+      "defaultRunKind": "Primree run buttun",
+      "defaultRunKindAuto": "Automatik (teh mostest complete)",
+      "defaultRunKindLead": "Wich akshun getz teh loud buttun on dis workspace. Automatik offerz teh mostest complete run it can. srsly",
+      "defaultRunKindTitle": "Wich akshun getz teh loud buttun on dis workspace. Automatik offerz teh mostest complete run it can — usually rite, an rong wen teh evryday akshun aint teh biggest wun: a workspace wot haz a Terraform half wot only lookz after teh Ansibul inventoree, doin applyz all by itself an nevr konfigurin after a do-it, wantz Konfigur heer. A choyce dis workspace cant offur, we sez NO to it wen u savez it; an wun ur role cant run fallz bak 2 Automatik fer u. srsly"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

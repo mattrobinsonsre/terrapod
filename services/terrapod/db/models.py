@@ -443,6 +443,27 @@ class Workspace(Base):
     #: attribute contract.
     plan_apply_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     configure_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Which run kind is the PRIMARY button on this workspace (#2479).
+    #:
+    #: `""` is the default and means "today's ordering", which offers the most
+    #: complete kind the workspace declares. That is right almost always, and
+    #: wrong for a workspace whose Terraform half only maintains the Ansible
+    #: inventory: with `auto_apply` on and `configure_after_apply` off, the
+    #: everyday action is Configure, and the composite sits behind the caret.
+    #:
+    #: An OVERRIDE rather than a replacement. It reorders what the workspace
+    #: already offers and can neither add a kind nor remove one, so it cannot
+    #: surface a button the API would refuse: a value naming an operation the
+    #: workspace does not declare is refused at the write, and one that is
+    #: merely unavailable to a particular caller -- or blocked right now, by a
+    #: non-default `vcs-ref` -- falls back to the ordering for that caller.
+    #:
+    #: Stored in the API's own vocabulary (`plan_apply`, not the frontend's
+    #: `planApply`), matching `auto_apply_mode`'s `create_update`. `run-kinds.ts`
+    #: owns the one mapping to the ids the UI uses.
+    default_run_kind: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="", default=""
+    )
     #: How a configure STARTS on this workspace (#1974). Both opt-in, both
     #: default off, and neither means anything without `configure_enabled`.
     #:
@@ -2048,6 +2069,13 @@ class AutodiscoveryRule(Base):
     #: now. `config_directory` is an ordinary templated path alongside it.
     plan_apply_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     configure_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Templated onto every workspace the rule materialises (#2479), for the
+    #: same reason every other run setting here is: a rule that can declare a
+    #: configure operation and not say which button is primary would leave an
+    #: operator editing each materialised workspace by hand.
+    default_run_kind: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="", default=""
+    )
     #: How a configure starts on the workspaces this rule materialises (#1974),
     #: templated for the same reason every other Ansible setting here is: a
     #: rule that can declare a configure operation and not say how it starts

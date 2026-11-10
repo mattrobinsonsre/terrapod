@@ -35,6 +35,7 @@ import {
 } from '@/components/workspace-fields'
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
+import { engineWord } from '@/lib/phase-vocabulary'
 import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
@@ -68,6 +69,11 @@ interface AutodiscoveryRule {
     // written before #1966 goes on producing plan/apply workspaces.
     'plan-apply-enabled'?: boolean
     'configure-enabled'?: boolean
+    // Which of those operations gets the prominent button on a materialised
+    // workspace (#2479). '' is a real value -- no preference -- so a rule
+    // written before #2479 goes on materialising workspaces that offer the
+    // most complete kind they have.
+    'default-run-kind'?: string
     // And how a configure starts on them (#1974), both default false.
     'auto-configure-enabled'?: boolean
     'configure-after-apply'?: boolean
@@ -214,6 +220,8 @@ export default function AutodiscoveryPage() {
   // Reuses the workspace page's own labels (#1763) so a rule's template and the
   // setting it produces are described in the same words, in every locale.
   const tWs = useTranslations('workspaceDetail')
+  // Root-scoped: a phase word's key is `phases.<engine>.words.<name>`.
+  const tPhase = useTranslations()
   // The yes/no pair the templated booleans need is read by `RuleYesNo` itself,
   // so the page no longer binds `runDetail.common`.
   const fmt = useFormat()
@@ -256,6 +264,10 @@ export default function AutodiscoveryPage() {
   // every rule produced before #1966: plan/apply on, configure off.
   const [planApplyEnabled, setPlanApplyEnabled] = useState(true)
   const [configureEnabled, setConfigureEnabled] = useState(false)
+  // Which run kind the materialised workspaces put the prominent button on
+  // (#2479). '' is the value meaning "no preference", which is also the
+  // default, so there is no third state and a plain string is the honest type.
+  const [defaultRunKind, setDefaultRunKind] = useState('')
   const [autoConfigureEnabled, setAutoConfigureEnabled] = useState(false)
   const [configureAfterApply, setConfigureAfterApply] = useState(false)
   const [configureAllHosts, setConfigureAllHosts] = useState(false)
@@ -440,6 +452,7 @@ export default function AutodiscoveryPage() {
     // rule means by not mentioning them.
     setPlanApplyEnabled(true)
     setConfigureEnabled(false)
+    setDefaultRunKind('')
     setAutoConfigureEnabled(false)
     setConfigureAfterApply(false)
     setConfigureAllHosts(false)
@@ -516,6 +529,7 @@ export default function AutodiscoveryPage() {
     // to turn it back on (#1966).
     setPlanApplyEnabled(a['plan-apply-enabled'] ?? true)
     setConfigureEnabled(a['configure-enabled'] ?? false)
+    setDefaultRunKind(a['default-run-kind'] ?? '')
     setAutoConfigureEnabled(a['auto-configure-enabled'] ?? false)
     setConfigureAfterApply(a['configure-after-apply'] ?? false)
     setConfigureAllHosts(a['configure-all-hosts'] ?? false)
@@ -600,6 +614,11 @@ export default function AutodiscoveryPage() {
       // concrete value for each, so there is no "leave alone" to express.
       'plan-apply-enabled': planApplyEnabled,
       'configure-enabled': configureEnabled,
+      // Sent verbatim, '' included: the endpoint checks it against the
+      // operations this same payload declares, so a rule naming a kind its own
+      // workspaces would not have is refused here rather than materialising
+      // one of them per matched directory on every future scan.
+      'default-run-kind': defaultRunKind,
       'auto-configure-enabled': autoConfigureEnabled,
       'configure-after-apply': configureAfterApply,
       'configure-all-hosts': configureAllHosts,
@@ -897,6 +916,7 @@ export default function AutodiscoveryPage() {
     'resource-memory': resourceMemory,
     'plan-apply-enabled': planApplyEnabled,
     'configure-enabled': configureEnabled,
+    'default-run-kind': defaultRunKind,
     'auto-configure-enabled': autoConfigureEnabled,
     'configure-after-apply': configureAfterApply,
     'configure-all-hosts': configureAllHosts,
@@ -968,6 +988,7 @@ export default function AutodiscoveryPage() {
       case 'resource-memory': setResourceMemory(s); break
       case 'plan-apply-enabled': setPlanApplyEnabled(b); break
       case 'configure-enabled': setConfigureEnabled(b); break
+      case 'default-run-kind': setDefaultRunKind(s); break
       case 'auto-configure-enabled': setAutoConfigureEnabled(b); break
       case 'configure-after-apply': setConfigureAfterApply(b); break
       case 'configure-all-hosts': setConfigureAllHosts(b); break
@@ -1087,6 +1108,8 @@ export default function AutodiscoveryPage() {
         return hintText(tWs('fields.planApplyEnabledHint'))
       case 'configure-enabled':
         return hintText(tWs('fields.configureEnabledHint'))
+      case 'default-run-kind':
+        return tieredHint(tWs, 'fields.defaultRunKindTitle')
       case 'auto-configure-enabled':
         return hintText(tWs('fields.autoConfigureEnabledHint'))
       case 'configure-after-apply':
@@ -1191,6 +1214,17 @@ export default function AutodiscoveryPage() {
   const backendOptions = [
     { value: 'tofu', label: 'OpenTofu' },
     { value: 'terraform', label: 'Terraform' },
+  ]
+  // The same labels the run button itself uses, as on the workspace forms.
+  // The two engine-specific ones follow the rule's OWN engine picker, which
+  // this form has -- so a Pulumi rule reads "preview" where a Terraform one
+  // reads "plan" (#2479).
+  const defaultRunKindOptions = [
+    { value: '', label: tWs('fields.defaultRunKindAuto') },
+    { value: 'full', label: tWs('runs.queueFullRun') },
+    { value: 'plan_apply', label: engineWord(tPhase, engine, 'queueRun') },
+    { value: 'configure', label: tWs('runs.queueConfigure') },
+    { value: 'plan', label: engineWord(tPhase, engine, 'queuePlan') },
   ]
   const autoApplyOptions = [
     { value: 'never', label: tMode('never') },
@@ -1298,6 +1332,12 @@ export default function AutodiscoveryPage() {
       <>
         <RuleYesNo attr="plan-apply-enabled" ctx={ruleCtx} />
         <RuleYesNo attr="configure-enabled" ctx={ruleCtx} />
+        <Field
+          attr="default-run-kind"
+          ctx={ruleCtx}
+          kind="select"
+          options={defaultRunKindOptions}
+        />
         <RuleYesNo attr="auto-configure-enabled" ctx={ruleCtx} />
         <RuleYesNo attr="configure-after-apply" ctx={ruleCtx} />
         <RuleYesNo attr="configure-all-hosts" ctx={ruleCtx} />

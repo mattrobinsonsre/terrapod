@@ -706,6 +706,28 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"default_run_kind": schema.StringAttribute{
+				MarkdownDescription: "Which run kind gets the prominent button on " +
+					"this workspace, and which the API offers first. One of `full` " +
+					"(plan + apply + configure), `plan_apply`, `configure` or `plan`. " +
+					"**Omitted or empty means no preference**, and the platform " +
+					"offers the most complete kind the workspace has — usually what " +
+					"you want. Set it where the everyday action is not the biggest " +
+					"one: a workspace whose Terraform half only maintains the Ansible " +
+					"inventory, applying unattended and never configuring after an " +
+					"apply, wants `configure` here. **Refused (422) when it names an " +
+					"operation the workspace does not have** — `configure` needs " +
+					"`configure_enabled` and `full` needs both — rather than being " +
+					"stored and ignored, so declare the operation in the same " +
+					"configuration. It changes only the ORDERING: every kind the " +
+					"workspace offers stays available, and a caller whose role " +
+					"cannot run the preferred kind falls back to the usual order.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"auto_configure_enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether a push that changes this workspace's " +
 					"ansible config root queues a configure. **Defaults to false.** " +
@@ -1528,6 +1550,12 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureEnabled.ValueBool()
 		req.ConfigureEnabled = &v
 	}
+	// A plain string on the create request, so an empty one is simply not
+	// sent: on create "" is both "no preference" and the server default,
+	// which makes omitted and empty the same act (#2479).
+	if !m.DefaultRunKind.IsNull() && !m.DefaultRunKind.IsUnknown() {
+		req.DefaultRunKind = m.DefaultRunKind.ValueString()
+	}
 	if !m.AutoConfigureEnabled.IsNull() && !m.AutoConfigureEnabled.IsUnknown() {
 		v := m.AutoConfigureEnabled.ValueBool()
 		req.AutoConfigureEnabled = &v
@@ -1794,6 +1822,14 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureEnabled.ValueBool()
 		req.ConfigureEnabled = &v
 	}
+	// A POINTER on the update request, unlike create: here clearing the
+	// preference and leaving it alone are different acts, so an explicit ""
+	// has to reach the wire. The SDK sends it on a non-nil pointer whatever
+	// its value (#2479).
+	if !m.DefaultRunKind.IsNull() && !m.DefaultRunKind.IsUnknown() {
+		v := m.DefaultRunKind.ValueString()
+		req.DefaultRunKind = &v
+	}
 	if !m.AutoConfigureEnabled.IsNull() && !m.AutoConfigureEnabled.IsUnknown() {
 		v := m.AutoConfigureEnabled.ValueBool()
 		req.AutoConfigureEnabled = &v
@@ -2059,6 +2095,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	// so a false survives the round trip rather than vanishing as absent.
 	m.PlanApplyEnabled = types.BoolValue(ws.PlanApplyEnabled)
 	m.ConfigureEnabled = types.BoolValue(ws.ConfigureEnabled)
+	m.DefaultRunKind = types.StringValue(ws.DefaultRunKind)
 	m.AutoConfigureEnabled = types.BoolValue(ws.AutoConfigureEnabled)
 	m.ConfigureAfterApply = types.BoolValue(ws.ConfigureAfterApply)
 	m.ConfigureAllHosts = types.BoolValue(ws.ConfigureAllHosts)

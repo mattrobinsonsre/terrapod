@@ -145,7 +145,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | Tool | Safety | What it does |
 |---|---|---|
 | `terrapod_workspace_create` | — | Create a workspace (name required; execution mode, VCS wiring, agent pool, labels, …). |
-| `terrapod_workspace_update` | — | Update a workspace's settings (only the fields you pass change; applies on its next run). Covers every settable workspace attribute **except four held back deliberately** — see the note below. |
+| `terrapod_workspace_update` | — | Update a workspace's settings (only the fields you pass change; applies on its next run). Covers **every** settable workspace attribute — see the note below on why that is deliberate rather than incidental, and on what the tool annotation does and does not buy. |
 | `terrapod_workspace_delete` | destructive | Delete a workspace + its Terrapod records. Does **not** destroy the tracked infra — queue a destroy run first. Catalog-managed workspaces are refused. Its **state survives** and stays recoverable for the deployment's retention window (default 30 days) via `terrapod_deleted_workspace_restore`, but recovery yields a NEW workspace with a NEW id and is admin-only — so this is reversible-with-effort, not undoable. |
 | `terrapod_deleted_workspace_restore` | destructive | Recover a deleted workspace's state into a **new** workspace. Platform admin only. A salvage operation, not an undo: new id, comes back inert (auto-apply and drift off, VCS not re-attached), variables and run history do not return. Refuses a second restore of the same deletion. |
 | `terrapod_variable_list` | read-only | List a workspace's variables (sensitive values masked). |

@@ -684,6 +684,60 @@ Settable on workspace create, workspace update, bulk update, and as autodiscover
 rule template fields. A rule's `configure-enabled` is what decides whether the
 workspaces it materialises have a configure operation.
 
+### Which operation is the primary one
+
+A workspace that has both operations can start four kinds of run, and the UI
+gives one of them the prominent button and the rest a dropdown. `default-run-kind`
+chooses which.
+
+| Attribute | Type | Default | Meaning |
+|---|---|---|---|
+| `default-run-kind` | string | `""` | Which run kind the UI makes prominent and the API offers first. `""` means **no preference**: the most complete kind the workspace has is offered. Otherwise one of `full` (plan + apply + configure), `plan_apply`, `configure` or `plan` |
+
+The default is almost always right, because the most complete run is almost
+always the one somebody means. Set it where the everyday action is not the
+biggest one — a workspace whose Terraform half only maintains the Ansible
+inventory, applying unattended and never configuring after an apply, wants
+`configure` here.
+
+**It changes the ordering, never the permissions.** Every kind the workspace
+offers stays available behind the dropdown, and a caller whose role cannot run
+the preferred kind is offered the ordinary order instead rather than a control
+that would be refused.
+
+**A kind the workspace does not have is refused with a 422**, rather than stored
+and ignored:
+
+```
+default-run-kind 'configure' needs configure-enabled on this workspace. Set it, or leave default-run-kind empty to take the usual ordering
+```
+
+A stored setting nothing can honour is a promise the platform does not keep, and
+the operator has no way to find out it is being ignored. So `configure` needs
+`configure-enabled`, `plan_apply` and `plan` need `plan-apply-enabled`, and
+`full` needs both — and the refusal names the flag to set.
+
+Like the operation flags themselves, the rule is evaluated against the row the
+write would produce. Two consequences worth knowing:
+
+- setting only `default-run-kind` is judged against the operations the workspace
+  **already** declares, so a PATCH naming no flags is still checked;
+- turning an operation **off** is refused while the preference still names it.
+  Clear `default-run-kind` in the same request — or, in bulk update, in the same
+  submission, where the refusal names the matched workspaces that block it.
+
+The value is stored **byte for byte**. It is validated and never normalised, so
+whitespace is refused rather than trimmed; that is what lets a Terraform provider
+write the value, read it back and find the same string.
+
+Native surface only (`/api/v1` and the deprecated `/api/terrapod/v1` alias), and
+deliberately absent from the TFE-compatible prefix: `terraform` and `tofu` have
+no run button, so it could only be noise on that wire.
+
+Settable on workspace create, workspace update, bulk update, and as an
+autodiscovery rule template field — a rule's `default-run-kind` is what the
+workspaces it materialises start with.
+
 ### The configure-operation attributes
 
 These attributes name where a workspace's Ansible configuration lives and what a
