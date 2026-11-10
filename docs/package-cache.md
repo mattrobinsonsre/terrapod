@@ -222,18 +222,37 @@ and installing the collection does nothing about those — so it installs cleanl
 and then fails at the first task, or at plugin load for a dynamic inventory, with
 an import error naming the SDK.
 
-A configure installs them through the PyPI proxy above, from two places, in this
-order:
+A configure installs them through the PyPI proxy above, from two places:
 
-1. **each installed collection's own** `requirements.txt`, found under
-   `ansible_collections/<namespace>/<name>/` once the collection is on disk;
+1. **every installed collection's own** `requirements.txt`, found under
+   `ansible_collections/<namespace>/<name>/` once the collection is on disk.
+   These are installed **together, in one `pip install`**, so pip's resolver sees
+   every collection's pins at once and either finds a set that satisfies all of
+   them or says which cannot be satisfied together. One file at a time, a later
+   collection could upgrade a shared dependency past a constraint an earlier one
+   needed — and pip reports that and exits 0, so the configure carried on with
+   controller imports already broken.
 2. **yours**, a `requirements.txt` beside the `requirements.yml` you already
    declare, for a package no collection names — a client a `uri` task needs, or a
-   filter plugin of your own.
+   filter plugin of your own. Installed **after** step 1, as a separate step, so
+   a later install still wins a conflicting pin and your file remains the one
+   that decides. That is what makes it usable for pinning around a collection's
+   bad constraint; folded into step 1 it would be one more equal requirement, and
+   a pin that deliberately contradicts a collection would fail to resolve rather
+   than win.
 
-A later install wins a conflicting pin, so your file is the one that decides. Two
-collections pinning the same package differently is yours to resolve, and the
-order within step 1 is sorted so it will not vary between runs.
+The order within step 1 is sorted, so a conflict cannot vary between runs.
+
+**The result is checked, and an inconsistent one fails the configure.** `pip
+install` prints a dependency conflict and exits 0, so `pip check` runs afterwards
+and a non-zero exit fails the phase, naming the conflict in the run log. Fix it
+by pinning the package in your own `requirements.txt`, which is applied last.
+
+`pip check` also runs **before** anything is installed. If the execution
+environment's packages were already inconsistent, that is not something the
+configure did, so it is reported as a warning and the run continues — a
+configure that has been working is not failed in order to report a conflict the
+image shipped with.
 
 The install runs **inside the execution environment**, because that is the
 interpreter which has to import the package, and `--user` into its home on the

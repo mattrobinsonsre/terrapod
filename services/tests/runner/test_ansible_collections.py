@@ -449,6 +449,107 @@ class TestRealAnsibleGalaxyHonoursTheEnvironment:
         assert "127.0.0.1:9" in out, out
 
 
+class TestEveryCollectionsRequirementsAreResolvedTogether:
+    """One pip invocation for every collection's requirements (#2476).
+
+    pip's resolver only considers the packages in the invocation it is given, so
+    installing one file at a time let a later collection upgrade a shared
+    dependency past a constraint an earlier one needed. Observed: one
+    collection's file pulled `python-dateutil` 4.0.0 over the 2.9 that
+    `botocore` (`<3.0.0`) had just been installed with. pip printed the conflict
+    and **exited 0**, so the runner carried on and any task importing botocore
+    on the controller failed a long way from the cause.
+    """
+
+    def _collection(self, ns: str, name: str, body: str = "boto3>=1.38\n") -> Path:
+        d = ac.collections_dir() / "ansible_collections" / ns / name
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / ac.PYTHON_REQUIREMENTS
+        f.write_text(body)
+        return f
+
+    def _pip_argvs(self, run) -> list[list[str]]:
+        return [[c.args[0], *c.args[1]] for c in run.call_args_list if c.args[0] == "pip"]
+
+    @staticmethod
+    def _run_with(check_rcs: list[int]):
+        """A fake `ee_client.run` giving `pip check` the listed exit codes in
+        order, and success to everything else."""
+        checks = iter(check_rcs)
+
+        def _run(binary, args, **kw):
+            if binary == "pip" and args and args[0] == "check":
+                return SimpleNamespace(rc=next(checks, 0), error="")
+            return SimpleNamespace(rc=0, error="")
+
+        return _run
+
+    def test_two_collections_are_installed_in_ONE_invocation(self, tmp_path: Path) -> None:
+        """The fix, as the property rather than as a call count: both files reach
+        the same pip, so the resolver sees both sets of pins at once."""
+        a = self._collection("amazon", "aws")
+        b = self._collection("community", "general", "netaddr\n")
+        with patch.object(ac.ee_client, "run", side_effect=self._run_with([0, 0])) as run:
+            ac.install_python_requirements(_cfg(), tmp_path)
+        installs = [v for v in self._pip_argvs(run) if v[:2] == ["pip", "install"]]
+        assert len(installs) == 1, installs
+        assert str(a) in installs[0] and str(b) in installs[0]
+        assert installs[0].count("-r") == 2, installs[0]
+
+    def test_the_operators_own_file_stays_a_separate_later_invocation(self, tmp_path: Path) -> None:
+        """Deliberately NOT merged into the resolution above.
+
+        It is documented as the override -- later wins a conflicting pin -- and
+        it is the only lever an operator has for pinning around a collection's
+        bad constraint. Merged in, it would become one more equal requirement,
+        so a pin that deliberately contradicts a collection would fail to
+        resolve instead of winning.
+        """
+        self._collection("amazon", "aws")
+        declared = tmp_path / ac.PYTHON_REQUIREMENTS
+        declared.write_text("python-dateutil==2.9.0\n")
+        with patch.object(ac.ee_client, "run", side_effect=self._run_with([0, 0])) as run:
+            ac.install_python_requirements(_cfg(), tmp_path)
+        installs = [v for v in self._pip_argvs(run) if v[:2] == ["pip", "install"]]
+        assert len(installs) == 2, installs
+        assert str(declared) not in installs[0], "the override was merged into the resolution"
+        assert str(declared) in installs[1]
+
+    def test_an_inconsistent_result_fails_the_phase(self, tmp_path: Path) -> None:
+        """pip install exits 0 on a conflict, so `pip check` is the only thing
+        that turns a broken environment into a failure."""
+        self._collection("amazon", "aws")
+        with patch.object(ac.ee_client, "run", side_effect=self._run_with([0, 1])):
+            with pytest.raises(ac.CollectionInstallError) as e:
+                ac.install_python_requirements(_cfg(), tmp_path)
+        assert "inconsistent" in str(e.value)
+
+    def test_an_environment_ALREADY_inconsistent_is_not_made_fatal(self, tmp_path: Path) -> None:
+        """An operator-supplied image is theirs, and failing a configure that has
+        been working for them over a conflict they shipped would be us breaking
+        their setup in order to report it. The baseline check is what tells the
+        two apart, and without it this change would be a regression for every
+        such image rather than a fix.
+        """
+        self._collection("amazon", "aws")
+        with patch.object(ac.ee_client, "run", side_effect=self._run_with([1, 1])):
+            ac.install_python_requirements(_cfg(), tmp_path)  # must not raise
+
+    def test_nothing_declared_runs_no_pip_check_either(self, tmp_path: Path) -> None:
+        """The common case pays nothing for any of this."""
+        with patch.object(ac.ee_client, "run", side_effect=self._run_with([0, 0])) as run:
+            ac.install_python_requirements(_cfg(), tmp_path)
+        assert self._pip_argvs(run) == []
+
+    def test_a_pip_that_cannot_RUN_is_not_read_as_inconsistent(self, tmp_path: Path) -> None:
+        """A missing pip has its own handling and its own reason -- the custom-EE
+        contract -- so reporting it a second time as a dependency conflict would
+        send an operator after the wrong thing."""
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=127, error="exec: pip: not found")
+            assert ac._pip_check({}, tmp_path, None) is True
+
+
 class TestThePythonRequirementsOfInstalledCollections:
     """A collection's Python dependencies, installed through the cache (#2305).
 
@@ -644,8 +745,11 @@ class TestThePythonRequirementsOfInstalledCollections:
 
         with patch.object(ac.ee_client, "run", side_effect=_run):
             ac.install(_cfg(), tmp_path)
-        assert order[-1] == "pip install", order
+        assert order.index("pip install") > order.index("ansible-galaxy collection"), order
         assert order.index("pip --version") > order.index("ansible-galaxy collection"), order
+        # `pip check` is last, because it is the verdict on what the installs
+        # left behind (#2476). It used to be the install that was last.
+        assert order[-1] == "pip check", order
 
     def test_the_operators_file_is_installed_with_no_galaxy_requirements_at_all(
         self, tmp_path: Path
@@ -659,5 +763,6 @@ class TestThePythonRequirementsOfInstalledCollections:
             run.return_value = SimpleNamespace(rc=0, error="")
             ac.install(_cfg(), tmp_path)
         argvs = self._pip_argvs(run)
-        assert ["pip", "install"] == argvs[-1][:2], argvs
-        assert str(tmp_path / ac.PYTHON_REQUIREMENTS) in argvs[-1]
+        installs = [a for a in argvs if a[:2] == ["pip", "install"]]
+        assert len(installs) == 1, argvs
+        assert str(tmp_path / ac.PYTHON_REQUIREMENTS) in installs[0]

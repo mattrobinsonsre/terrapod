@@ -207,14 +207,25 @@ def python_requirements_files(config_dir: Path) -> list[Path]:
       Galaxy requirements already do.
 
     Sorted within the collection pass so a fleet installs in a stable order --
-    two collections pinning the same package differently is the operator's to
-    resolve, and an order that varies per run would make it intermittent.
+    an order that varies per run would make a conflict intermittent.
     """
-    files = sorted((collections_dir() / "ansible_collections").glob(f"*/*/{PYTHON_REQUIREMENTS}"))
+    collections, declared = requirement_groups(config_dir)
+    return [*collections, *([declared] if declared is not None else [])]
+
+
+def requirement_groups(config_dir: Path) -> tuple[list[Path], Path | None]:
+    """`(the collections' requirements files, the operator's own or None)`.
+
+    The split exists because the two groups are installed differently, and
+    #2476 is what the undifferentiated version cost. One producer rather than a
+    second glob beside the first: the two would be a pair that must agree about
+    which files exist, which is the shape that goes out of step.
+    """
+    collections = sorted(
+        (collections_dir() / "ansible_collections").glob(f"*/*/{PYTHON_REQUIREMENTS}")
+    )
     declared = config_dir / PYTHON_REQUIREMENTS
-    if declared.is_file():
-        files.append(declared)
-    return files
+    return collections, (declared if declared.is_file() else None)
 
 
 def pip_env(api_url: str) -> dict[str, str]:
@@ -397,6 +408,26 @@ def _pip_is_available(env: dict[str, str], cwd: Path, log_file: str | None) -> b
     return not result.error and result.rc == 0
 
 
+def _pip_check(env: dict[str, str], cwd: Path, log_file: str | None) -> bool:
+    """Whether pip considers the installed set self-consistent.
+
+    `pip check` is the only thing that reports a broken environment as a
+    FAILURE. `pip install` prints "pip's dependency resolver does not currently
+    take into account all the packages that are installed" and exits **0**, so
+    the runner carried on with a configure whose controller imports were already
+    broken -- the whole of #2476's second half.
+
+    A missing pip answers True rather than False: that case is already handled,
+    with its own warning and its own reason (the custom-EE contract), and
+    reporting it twice as an inconsistency would send an operator after the
+    wrong thing.
+    """
+    result = ee_client.run("pip", ["check"], cwd=str(cwd), env=env, log_file=log_file)
+    if result.error:
+        return True
+    return result.rc == 0
+
+
 def install_python_requirements(
     cfg,  # RunnerConfig
     config_dir: Path,
@@ -447,27 +478,104 @@ def install_python_requirements(
         )
         return
 
-    for path in files:
-        logger.info("installing Python requirements", requirements=str(path))
-        result = ee_client.run(
-            "pip",
-            ["install", "--no-input", "--disable-pip-version-check", "-r", str(path)],
-            cwd=str(config_dir),
+    # Was the environment already inconsistent before we touched it? An
+    # operator-supplied image is theirs, and failing a configure that has worked
+    # for them over a conflict they shipped would be us breaking their setup to
+    # report it. Measured once, and only on a run that has requirements to
+    # install, so a configure declaring none pays nothing for this.
+    was_consistent = _pip_check(env, config_dir, log_file)
+
+    collections, declared = requirement_groups(config_dir)
+
+    # ONE invocation for every collection's requirements, which is the fix.
+    # pip's resolver only considers the packages in the current invocation, so
+    # installing them one file at a time let a later collection upgrade a shared
+    # dependency past a constraint an earlier one needed -- observed, one
+    # collection's file pulling `python-dateutil` 4.0.0 over the 2.9 that
+    # `botocore` (<3.0.0) had just been installed with. Resolved together, pip
+    # either finds a set that satisfies all of them or says which pins cannot be
+    # satisfied at once, instead of printing a conflict and exiting 0.
+    if collections:
+        argv = ["install", "--no-input", "--disable-pip-version-check"]
+        for path in collections:
+            argv += ["-r", str(path)]
+        logger.info(
+            "installing the collections' Python requirements together",
+            requirements=[str(p) for p in collections],
+        )
+        _run_pip(argv, collections, env=env, cwd=config_dir, log_file=log_file)
+
+    # The operator's own file stays a SEPARATE, later invocation, and that is
+    # deliberate rather than an omission from the merge above. It is documented
+    # as the override -- "later wins a conflicting pin" -- and it is the only
+    # lever they have for pinning around a collection's bad constraint. Merged
+    # into the resolution it would stop being an override and become one more
+    # equal requirement, so a pin that deliberately contradicts a collection
+    # would fail to resolve rather than win. `pip check` below still has the
+    # last word, so an override that breaks something is caught; one that fixes
+    # something works.
+    if declared is not None:
+        logger.info(
+            "installing the configuration's own Python requirements", requirements=str(declared)
+        )
+        _run_pip(
+            ["install", "--no-input", "--disable-pip-version-check", "-r", str(declared)],
+            [declared],
             env=env,
+            cwd=config_dir,
             log_file=log_file,
         )
-        if result.error:
-            raise CollectionInstallError(
-                f"the execution environment could not run pip to install {path}: {result.error}",
-                exit_code=result.rc,
-            )
-        if result.rc != 0:
-            raise CollectionInstallError(
-                f"installing the Python requirements in {path} failed; pip's own output "
-                f"is in the run log. A collection declaring a dependency Terrapod cannot "
-                f"install is a configure that would fail at its first task instead",
-                exit_code=result.rc,
-            )
+
+    if _pip_check(env, config_dir, log_file):
+        return
+    if not was_consistent:
+        logger.warning(
+            "the execution environment's installed packages are inconsistent, and "
+            "were already inconsistent before this run installed anything -- so "
+            "this is not something the configure did. pip check's own output is in "
+            "the run log. A task importing one of these on the controller can fail "
+            "a long way from the cause",
+            requirements=[str(p) for p in files],
+        )
+        return
+    raise CollectionInstallError(
+        "the Python requirements installed, but pip check reports the result is "
+        "inconsistent: a package needed by one of them has been replaced by a "
+        "version another cannot use. pip check's own output is in the run log. "
+        "Pin the conflicting package in the configuration's own requirements.txt, "
+        "which is applied last and wins",
+        exit_code=1,
+    )
+
+
+def _run_pip(
+    argv: list[str],
+    sources: list[Path],
+    *,
+    env: dict[str, str],
+    cwd: Path,
+    log_file: str | None,
+) -> None:
+    """One pip invocation, with both failure shapes kept distinct.
+
+    `result.error` is the EE not being able to RUN pip; a non-zero `rc` is pip
+    running and refusing. They want different messages, and one caller rather
+    than three is what keeps the two from drifting apart.
+    """
+    named = ", ".join(str(p) for p in sources)
+    result = ee_client.run("pip", argv, cwd=str(cwd), env=env, log_file=log_file)
+    if result.error:
+        raise CollectionInstallError(
+            f"the execution environment could not run pip to install {named}: {result.error}",
+            exit_code=result.rc,
+        )
+    if result.rc != 0:
+        raise CollectionInstallError(
+            f"installing the Python requirements in {named} failed; pip's own output "
+            f"is in the run log. A collection declaring a dependency Terrapod cannot "
+            f"install is a configure that would fail at its first task instead",
+            exit_code=result.rc,
+        )
 
 
 def requirement_arguments(declared: list[str]) -> list[str]:

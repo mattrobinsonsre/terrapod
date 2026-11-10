@@ -52,7 +52,7 @@ USER 1000:1000
 Important:
 - Switch back to `USER 1000:1000` -- runner Jobs run as non-root
 - The canonical entrypoint is `python -m terrapod.runner.job_entrypoint` -- it drives signal forwarding, graceful shutdown, phase orchestration, and artifact uploads. Custom images should not override `ENTRYPOINT`; layer additional tooling on top via `RUN` and let the inherited entrypoint stand.
-- The working directory is `/workspace` and `/tmp` is writable (both are emptyDir volumes)
+- The working directory is `/workspace/src` and `/tmp` is writable (both are on emptyDir volumes). The checkout is a **subdirectory** rather than the volume's own mount point, because the kubelet creates an `emptyDir` world-writable and some tools refuse to read configuration from a world-writable directory — ansible is one, and it ignores a committed `ansible.cfg` there
 
 ### Using a Custom Image
 
@@ -497,8 +497,19 @@ hosts it holds only through its children.
 **`ansible.cfg` is the operator's, untouched.** Terrapod writes none and sets
 `ANSIBLE_CONFIG` nowhere, so a committed `ansible.cfg` at the config root is
 read normally, with its `roles_path`, `forks`, `strategy` and
-`inventory_ignore_extensions` intact. Five settings are forced through the
-**environment**, which beats the file:
+`inventory_ignore_extensions` intact.
+
+That depends on the checkout not being world-writable, which is why it is a
+subdirectory of the volume rather than the volume's own mount point. Ansible
+refuses to read `ansible.cfg` from a world-writable working directory, and the
+kubelet creates an `emptyDir` world-writable — so while the checkout was the
+mount point itself this paragraph was not true: the file was ignored, with only
+ansible's own warning to say so, and `library`, `roles_path`, `become`,
+`remote_user`, `strategy`, `forks` and `gathering` went with it. A missing
+`library` fails at parse time; the rest fail silently, and a play can then run as
+the wrong user or without privilege escalation.
+
+Five settings are forced through the **environment**, which beats the file:
 
 | variable | why |
 |---|---|

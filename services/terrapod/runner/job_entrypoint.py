@@ -37,6 +37,7 @@ from __future__ import annotations
 import hashlib
 import os
 import signal
+import stat
 import sys
 from pathlib import Path
 
@@ -82,7 +83,42 @@ from terrapod.runner.phases.state import (
 )
 from terrapod.runner.runner_config import RunnerConfig
 
-_DEFAULT_WORK_DIR = Path("/workspace")
+#: Where the configuration is checked out.
+#:
+#: A SUBDIRECTORY of the volume rather than the volume's own mount point, and
+#: the reason is a permission the runner cannot set for itself (#2473).
+#:
+#: `/workspace` is an `emptyDir`, and the kubelet creates one **world-writable**:
+#: measured on k8s 1.35 with the runner's own `securityContext`, it is
+#: `root:1000` mode **2777**. Ansible deliberately refuses to read `ansible.cfg`
+#: from a world-writable working directory, so a committed `ansible.cfg` was
+#: ignored with only a warning to say so -- taking `library`, `roles_path`,
+#: `become`, `remote_user`, `strategy`, `forks` and `gathering` with it. A
+#: missing `library` fails at parse time; the rest fail silently, and a play can
+#: run as the wrong user or without privilege escalation.
+#:
+#: It cannot be fixed in place. The directory is owned by **root**, so the
+#: runner's uid 1000 cannot chmod it -- measured, refused -- and a `subPath`
+#: mount does not help either, because the kubelet applies the `fsGroup` chown
+#: and chmod recursively and the subdirectory comes out 2777 as well. A root
+#: init container could do it, at the cost of a root container in every runner
+#: pod.
+#:
+#: A directory the runner CREATES inside the volume needs none of that: measured
+#: 2755, owner 1000, setgid inherited so the shared group is preserved for the
+#: execution environment. `work_dir.mkdir` already runs on both paths that use
+#: it, so relocating the default is the whole fix.
+#:
+#: Runner-side only, deliberately. The Job spec does not set `WORK_DIR`, so
+#: nothing about this couples the runner to the listener: an older runner image
+#: keeps checking out at the mount point and keeps the old behaviour, rather
+#: than being handed a path it would not create.
+_DEFAULT_WORK_DIR = Path("/workspace/src")
+
+#: The volume's mount point, which is what `_DEFAULT_WORK_DIR` must stay below.
+#: Named rather than spelled twice, because the gate compares them and two
+#: copies of a path is how the comparison comes to pass vacuously.
+_WORKSPACE_MOUNT = Path("/workspace")
 # Per-run vars Secret mount (terraform variable values). Keep in sync with
 # runner/job_template.py (_TFVARS_MOUNT_DIR + _TFVARS_FILENAME).
 _VARS_FILE = Path("/var/run/terrapod/vars/terraform.tfvars.json")
@@ -147,6 +183,34 @@ def _configure_logging() -> None:
         wrapper_class=structlog.make_filtering_bound_logger(20),  # INFO
         cache_logger_on_first_use=True,
     )
+
+
+def _warn_if_world_writable(work_dir: Path, log) -> None:
+    """Say so when the checkout sits in a world-writable directory (#2473).
+
+    Only reachable now by an operator setting `WORK_DIR` to the volume's own
+    mount point, since the default is a subdirectory the runner creates. It is
+    worth a line anyway: ansible then ignores a committed `ansible.cfg` and says
+    only that it is "being run in a world writable directory", which names the
+    symptom and not one of the settings it has just dropped. That warning with
+    no explanation is the whole of what the operator had to go on.
+
+    `mkdir` is left to the callers that already do it. This only reports, so a
+    directory that does not exist yet is not a finding.
+    """
+    try:
+        mode = work_dir.stat().st_mode
+    except OSError:
+        return
+    if mode & stat.S_IWOTH:
+        log.warning(
+            "the checkout directory is world-writable, so ansible will IGNORE a "
+            "committed ansible.cfg there and every setting in it -- library, "
+            "roles_path, become, remote_user, strategy, forks, gathering. Leave "
+            "WORK_DIR unset so the runner checks out into a subdirectory it owns",
+            work_dir=str(work_dir),
+            mode=oct(mode & 0o7777),
+        )
 
 
 def _install_signal_logger() -> None:
@@ -1547,6 +1611,7 @@ def main(argv: list[str] | None = None) -> int:
 
     work_dir_env = os.environ.get("WORK_DIR")
     work_dir = Path(work_dir_env) if work_dir_env else _DEFAULT_WORK_DIR
+    _warn_if_world_writable(work_dir, log)
 
     cfg = RunnerConfig.from_env()
     # Phase-aware artifact name: combined log uploads to {phase}-log.
