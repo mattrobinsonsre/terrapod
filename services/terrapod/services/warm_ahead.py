@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.logging_config import get_logger
-from terrapod.redis.client import get_redis
+from terrapod.redis.client import get_redis_client
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -102,7 +102,11 @@ async def create_job(items: list[WarmItem]) -> WarmJob:
 
 
 async def get_job(job_id: str) -> WarmJob | None:
-    redis = get_redis()
+    # `get_redis_client()`, NOT `get_redis()`: the latter is the FastAPI
+    # dependency (`async def` + `yield`), so calling it here returns an async
+    # generator and every attribute access on it raises. See the gate in
+    # `tests/services/test_warm_ahead_redis.py`.
+    redis = get_redis_client()
     raw = await redis.get(_KEY.format(job_id=job_id))
     if raw is None:
         return None
@@ -112,7 +116,11 @@ async def get_job(job_id: str) -> WarmJob | None:
 
 
 async def _save(job: WarmJob) -> None:
-    redis = get_redis()
+    # `get_redis_client()`, NOT `get_redis()`: the latter is the FastAPI
+    # dependency (`async def` + `yield`), so calling it here returns an async
+    # generator and every attribute access on it raises. See the gate in
+    # `tests/services/test_warm_ahead_redis.py`.
+    redis = get_redis_client()
     payload = {
         "job_id": job.job_id,
         "status": job.status,

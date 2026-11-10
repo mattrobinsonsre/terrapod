@@ -1280,13 +1280,21 @@ class TestBulkUpdateRefusesAnUnofferableRunKind:
     async def test_turning_an_operation_off_is_refused_while_a_matched_workspace_prefers_it(
         self, *_mocks
     ):
-        """The direction that is easy to miss, and the one that makes this a
-        sweep rather than a field check.
+        """SUPERSEDED, and which half of its reason still holds.
 
-        The payload does not mention `default-run-kind` at all. A guard that
-        fired only when the preference is submitted would leave every workspace
-        that preferred Configure holding a preference nothing can honour --
-        stored and ignored, across a whole fleet, with nothing to say so.
+        This asserted a 422. The reason it gave remains exactly right -- a
+        preference nothing can honour must not be left stored and ignored across
+        a fleet with nothing to say so -- and the ANSWER changed, because
+        refusing wedged a caller that cannot comply: a client two minors behind
+        has no `default-run-kind` field, so "clear default-run-kind, or narrow
+        the filter" named a field it could not send and every later apply
+        failed. That is the supported skew direction (`api >= sdk`).
+
+        So the orphaned preference is DROPPED instead. The invariant is kept --
+        no workspace is left naming a kind it cannot offer -- without a refusal
+        the caller cannot answer, and the cost is a button's position, because
+        `default-run-kind` is ordering only. A caller that NAMES a conflicting
+        kind is still refused; that is the test below.
         """
         prefers = _mock_ws(name="prefers-configure")
         prefers.configure_enabled = True
@@ -1298,15 +1306,17 @@ class TestBulkUpdateRefusesAnUnofferableRunKind:
             {"filter": {"all": True}, "update": {"configure-enabled": False}},
             [prefers, plain],
         )
-        assert resp.status_code == 422, resp.text
-        detail = resp.json()["detail"]
-        assert "prefers-configure" in detail, (
-            f"the refusal does not name the workspace it protects: {detail}"
+        assert resp.status_code == 200, resp.text
+        assert prefers.default_run_kind == "", (
+            "the orphaned preference survived a write that removed the operation "
+            f"it names: {prefers.default_run_kind!r}"
         )
-        assert "plain" not in detail, (
-            f"the refusal names a workspace with no preference to break: {detail}"
-        )
-        db.commit.assert_not_awaited()
+        # The workspace that never had a preference is untouched, so this cannot
+        # be satisfied by blanking the column for everybody.
+        assert plain.default_run_kind == ""
+        # The update is COMMITTED now, where the refusal rolled it back. That is
+        # the behaviour change in one line.
+        db.commit.assert_awaited()
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

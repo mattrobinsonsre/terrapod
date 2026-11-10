@@ -316,9 +316,13 @@ either way the pod fails at startup rather than part way through a playbook. See
 
 There are two kinds, and the difference is who vouches for the image.
 
-**Built-in.** Terrapod publishes one image per ansible-core line — `2.12`
-through `2.21` — builds and smoke-tests each one, scans them with the release
-re-scan and rebuilds them when an upstream patch lands. A workspace selects one
+**Built-in.** Terrapod publishes one image per ansible-core line, builds and
+smoke-tests each one, scans them with the release re-scan and rebuilds them when
+an upstream patch lands. **The floor is pinned at `2.12` and the ceiling
+floats**: a scheduled job asks PyPI which lines exist and builds any new one with
+no Terrapod release at all, so the set is whatever
+`GET /api/v1/ansible/execution-environments` reports rather than a list written
+down here. A workspace selects one
 with `ansible_version`, which names a **line** (`2.21`), not a patch: the line's
 tag moves as that line is rebuilt, and the run records the reference it actually
 used so a finished run stays identifiable afterwards.

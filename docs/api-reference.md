@@ -693,7 +693,7 @@ chooses which.
 
 | Attribute | Type | Default | Meaning |
 |---|---|---|---|
-| `default-run-kind` | string | `""` | Which run kind the UI makes prominent and the API offers first. `""` means **no preference**: the most complete kind the workspace has is offered. Otherwise one of `full` (plan + apply + configure), `plan_apply`, `configure` or `plan` |
+| `default-run-kind` | string | `""` | Which run kind the UI makes prominent. **The UI only** — no API response is ordered by it. `""` means **no preference**: the most complete kind the workspace has is offered. Otherwise one of `full` (plan + apply + configure), `plan_apply`, `configure` or `plan` |
 
 The default is almost always right, because the most complete run is almost
 always the one somebody means. Set it where the everyday action is not the

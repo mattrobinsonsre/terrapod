@@ -2743,9 +2743,15 @@ async def update_workspace(
     # re-validated whenever either side of the pair moves, and the stored
     # preference is the input when the caller sent none.
     if "default-run-kind" in attrs or "plan-apply-enabled" in attrs or "configure-enabled" in attrs:
+        # `reconcile_` rather than `validate_`: a caller that NAMED a conflicting
+        # value is still refused, while one that only moved a flag has its
+        # orphaned preference dropped. A client two minors behind has no
+        # `default-run-kind` field to clear, so refusing it wedged every later
+        # apply -- and that skew direction is supported.
         ws.default_run_kind = _422(
-            workspace_settings.validate_default_run_kind,
-            attrs.get("default-run-kind", ws.default_run_kind),
+            workspace_settings.reconcile_default_run_kind,
+            sent=attrs["default-run-kind"] if "default-run-kind" in attrs else None,
+            stored=ws.default_run_kind,
             plan_apply=ws.plan_apply_enabled,
             configure=ws.configure_enabled,
         )

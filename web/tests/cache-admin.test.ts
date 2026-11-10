@@ -92,17 +92,23 @@ test('a truncated walk withholds the figures from the bulk prompt', () => {
   // correct change that broke a test about something else, because the anchor
   // described one spelling of the branch instead of what the branch must not do.
   // The next wrapper would have broken it again.
-  const branch = ARCHIVES.match(/if \(truncated\) return[^\n]*(\n[^\n]*?\)\n)?/)
-  assert.ok(branch, 'the truncated branch no longer returns early')
+  // Asserted as an ORDER, not as a text window. The previous version matched the
+  // `if (truncated) return …` line and checked that line for `confirmFigures` —
+  // which a mutation that HOISTS the interpolation above the guard satisfies
+  // perfectly, leaving the truncated prompt quoting a floor as a total. That is
+  // the single outcome this test exists to prevent, so the assertion has to be
+  // about which comes first.
+  const body = code(ARCHIVES)
+  const atGuard = body.indexOf('if (truncated) return')
+  const atFigures = body.indexOf("archives.confirmFigures")
+  assert.ok(atGuard > 0, 'the truncated branch no longer returns early')
   assert.ok(
-    !/confirmFigures/.test(branch[0]),
-    'the truncated branch quotes the figures, which are a floor rather than a total',
-  )
-  // And the figures ARE quoted on the path where they are exact, so this cannot
-  // be satisfied by removing them everywhere.
-  assert.ok(
-    /archives\.confirmFigures/.test(ARCHIVES),
+    atFigures > 0,
     'the figures are never quoted, so the untruncated prompt says less than it can',
+  )
+  assert.ok(
+    atFigures > atGuard,
+    'the figures are built before the truncated guard returns, so a floor is quoted as a total',
   )
 })
 
@@ -156,6 +162,34 @@ test('the switched-off package cache says so in words, in the section that is st
   assert.ok(
     /kept|comes back/.test(EN.packages.capabilityOff),
     'the sentence does not say the cached artifacts survive being switched off',
+  )
+})
+
+test('a narrowed purge sends the scope it promised in the confirmation', () => {
+  // The prompt and the request body read the panel's ecosystem state
+  // SEPARATELY, so nothing but this ties them together: a request that sent `''`
+  // where the prompt said "every npm artifact" would purge the whole cache
+  // after a confirmation that named one ecosystem — on an irreversible action,
+  // which is the worst place for a promise the request does not keep. The e2e
+  // spec asserts the prompt's wording; it cannot see the body.
+  const body = code(PACKAGES)
+  // Anchored on the EVICT REQUEST, not on the first `ecosystem:` in the file --
+  // which is a TypeScript type annotation (`ecosystem: string`) in the row
+  // interface and told us nothing.
+  const evict = body.match(/admin\/package-cache\/evict[\s\S]{0,420}/)
+  assert.ok(evict, 'the bulk evict request is gone from this panel')
+  const sent = evict[0].match(/ecosystem:\s*([A-Za-z_$][\w$]*)/)
+  assert.ok(sent, 'the evict request no longer sends an ecosystem at all')
+  assert.equal(
+    sent[1],
+    'purgeEcosystem',
+    `the purge request sends \`${sent[1]}\` while the confirmation is built from ` +
+      '`purgeEcosystem`; the two must be one value',
+  )
+  // ...and the confirmation is built from that same state.
+  assert.ok(
+    /const eco = purgeEcosystem/.test(body),
+    'the confirmation no longer reads purgeEcosystem, so the two can diverge',
   )
 })
 

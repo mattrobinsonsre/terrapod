@@ -23,7 +23,7 @@ class TestAccepts:
         "name",
         [
             "prod",
-            "core-dev-eu1",
+            "core-dev-01",
             "web_app",
             "a",
             "0",

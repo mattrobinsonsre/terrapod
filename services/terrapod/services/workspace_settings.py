@@ -608,6 +608,55 @@ def validate_default_run_kind(raw: object, *, plan_apply: bool, configure: bool)
     return value
 
 
+def reconcile_default_run_kind(
+    *, sent: object | None, stored: object, plan_apply: bool, configure: bool
+) -> str:
+    """The preference after a write, refusing a contradiction and dropping a
+    preference the write has orphaned (#2479).
+
+    `validate_default_run_kind` answers "is this value honourable", which is the
+    right question when a caller NAMES a value. It is the wrong question when the
+    caller names only an operation flag, and getting that wrong wedged a lagging
+    client:
+
+    * the preference is re-checked whenever either flag moves, because turning an
+      operation off can orphan a preference set earlier;
+    * the refusal tells the caller to "leave default-run-kind empty";
+    * **a client two minors behind has no such field to send.** Its schema
+      predates the attribute, so a `PATCH` that merely sets
+      `configure-enabled: false` on a workspace somebody preferred Configure on
+      got a permanent 422 naming a field it could not clear, and
+      `terraform apply` stayed wedged until a human reached the server another
+      way. That is the OLD-client-against-NEW-server direction, which
+      `docs/versioning-and-support.md` supports (`api >= sdk`), so it is a
+      defect rather than an unsupported combination.
+
+    So the two cases are separated by WHO SAID IT:
+
+    * `sent is not None` -- the caller named a value. A conflict is a
+      contradiction inside one payload, the caller can see both halves, and it is
+      **refused** exactly as before.
+    * `sent is None` -- the caller moved a flag and said nothing about the
+      preference. A preference the result cannot honour is **dropped to `""`**,
+      which is "no preference, use the ordering".
+
+    Dropping it is safe in a way refusing is not, and the reason is what the
+    setting is: `default-run-kind` is ORDERING ONLY. Every kind the workspace
+    offers stays available whatever it says, so clearing it costs a button's
+    position and never a capability. The invariant the refusal protects -- that a
+    workspace never names a run kind it cannot perform -- holds either way.
+    """
+    if sent is not None:
+        return validate_default_run_kind(sent, plan_apply=plan_apply, configure=configure)
+    if not stored:
+        return ""
+    try:
+        return validate_default_run_kind(stored, plan_apply=plan_apply, configure=configure)
+    except ValueError:
+        # Orphaned by this write, and the caller never mentioned it.
+        return ""
+
+
 class PlanApplyNotEnabled(ValueError):
     """Raised when a plan or apply is asked for on a workspace that declares no
     such operation (#2116).

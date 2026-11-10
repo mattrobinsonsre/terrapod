@@ -67,7 +67,7 @@ that does not exist.
 Set `TERRAPOD_VERSION` to a tag that matches what you cloned:
 
 ```sh
-TERRAPOD_VERSION=v2.0.0-beta.2 make eval   # 2.0 pre-release images for a 2.0 clone
+TERRAPOD_VERSION=v2.0.0-beta.3 make eval   # 2.0 pre-release images for a 2.0 clone
 TERRAPOD_VERSION=v1.11.4        make eval   # or pin the stable line explicitly
 ```
 

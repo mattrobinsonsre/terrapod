@@ -822,9 +822,9 @@ class TestCleanPlanJsonBytes:
     def test_drift_without_resource_changes_all_moves(self):
         """When no resource_changes match, every drift entry moves to
         drift_observed_no_apply_action and its actions are neutralised.
-        Reproduces the failure mode from the prod-us2-services1 AKS
-        plan summary: node pools missing in Azure showed as drift
-        deletes, model hallucinated them as planned destroys.
+        Reproduces a failure mode seen on a real AKS plan summary:
+        node pools missing in Azure showed as drift deletes, and the
+        model hallucinated them as planned destroys.
         """
         plan = {
             "resource_drift": [

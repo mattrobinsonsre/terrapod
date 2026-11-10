@@ -1775,7 +1775,16 @@ class TestARuleCannotPreferARunKindItsWorkspacesWouldNotHave:
         assert rule.default_run_kind == "configure"
 
         # (b) the identical rule, now asked to drop the operation the stored
-        # preference names. The payload never mentions the preference.
+        # preference names, with the payload never mentioning the preference.
+        #
+        # SUPERSEDED: this asserted a 422. The reason still holds -- a rule must
+        # not be left preferring a kind its workspaces would not have -- and the
+        # ANSWER changed, because refusing wedged a caller that cannot comply: a
+        # client two minors behind has no `default-run-kind` field, so a refusal
+        # telling it to clear one named something it could not send. That is the
+        # supported skew direction (`api >= sdk`), so the orphaned preference is
+        # dropped instead. A caller that NAMES a conflicting kind is still
+        # refused -- case (d) below.
         rule2 = _mock_rule()
         rule2.configure_enabled = True
         rule2.default_run_kind = "configure"
@@ -1788,6 +1797,27 @@ class TestARuleCannotPreferARunKindItsWorkspacesWouldNotHave:
             resp = await c.patch(
                 f"/api/terrapod/v1/autodiscovery-rules/{rule2.id}",
                 json={"data": {"attributes": {"configure-enabled": False}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["default-run-kind"] == "", (
+            "the orphaned preference survived a write that removed the operation it names"
+        )
+
+        # (d) a NAMED contradiction in one payload is still refused, because the
+        # caller can see both halves and fix it. Without this the change above
+        # would read as "the refusal was deleted".
+        rule4 = _mock_rule()
+        rule4.configure_enabled = False
+        app4, db4 = _make_app(_admin())
+        db4.get = AsyncMock(side_effect=[rule4])
+        db4.commit = AsyncMock()
+        db4.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app4), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule4.id}",
+                json={"data": {"attributes": {"default-run-kind": "configure"}}},
                 headers=_AUTH,
             )
         assert resp.status_code == 422, resp.text

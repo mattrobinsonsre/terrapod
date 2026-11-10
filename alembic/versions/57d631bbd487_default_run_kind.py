@@ -1,7 +1,7 @@
 """workspaces/rules.default_run_kind: which run button is primary
 
 Revision ID: 57d631bbd487
-Revises: 2e06ea7f06e4
+Revises: 9c864f64ed11
 Create Date: 2026-11-10
 
 `availableRunKinds` offers the most complete kind a workspace declares and the

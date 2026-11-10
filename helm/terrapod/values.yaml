@@ -790,7 +790,7 @@ api:
       # They are fetched lazily and only when needed: opa when a policy set
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
-        opa_version: "1.22.2"
+        opa_version: "1.22.3"
         trivy_version: "0.76.2"
         checkov_version: "3.4.3"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
@@ -865,7 +865,11 @@ api:
     # a sidecar beside the orchestrator.
     ansible:
       # Where the built-in environments come from: one tag per ansible-core
-      # line (2.12 … 2.21). Same convention as the five component image
+      # line. The floor is pinned at 2.12 and the ceiling FLOATS -- a scheduled
+      # job asks PyPI which lines exist and builds any new one with no Terrapod
+      # release -- so this comment names no ceiling: ask
+      # `GET /api/v1/ansible/execution-environments`. Same convention as the
+      # five component image
       # repositories above — the kubelet pulls it directly, so a
       # restricted-network deployment re-points it at its own mirror, which may
       # be Terrapod's own registry:
