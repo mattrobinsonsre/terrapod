@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Drept (sannsynligvis OOM)",
       "memory": "Minne",
       "requested": "Forespurt {value}",
-      "limit": "Grense {value}"
+      "limit": "Grense {value}",
+      "phaseConfigure": "Konfigurasjon"
     },
     "labelsEditor": {
       "none": "Ingen",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + anvend",
         "vcsWorkflowWarningRbac": "Alle som kan slå sammen PR-en kan anvende. Grenbeskyttelsesregler (påkrevde gjennomganger, statuskontroller, kodeierens godkjenning) blir porten. Terrapod rolle-/etikett-RBAC gjelder<em>ikke</em> for kommentardrevne handlinger i denne modusen.",
         "vcsWorkflowWarningRecommended": "<strong>Anbefalt:</strong> krev lineær historikk (rebase/squash før sammenslåing) slik at kommitteringen du anvender er den kommitteringen som lander.",
-        "slackDescription": "Meld dette arbeidsområdet på Slack-kjøringsvarsler – godkjenningsforespørsler, anvendelser, feil og avdrift. La kanalen stå tom, så forblir dette arbeidsområdet stille (det finnes ingen utrullingsdekkende utsending). Krever at Slack-appen er aktivert av en administrator."
+        "slackDescription": "Meld dette arbeidsområdet på Slack-kjøringsvarsler – godkjenningsforespørsler, anvendelser, feil og avdrift. La kanalen stå tom, så forblir dette arbeidsområdet stille (det finnes ingen utrullingsdekkende utsending). Krever at Slack-appen er aktivert av en administrator.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Anvend"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + oppdater",
         "vcsWorkflowWarningRbac": "Alle som kan slå sammen PR-en kan oppdatere. Grenbeskyttelsesregler (påkrevde gjennomganger, statuskontroller, kodeierens godkjenning) blir porten. Terrapod rolle-/etikett-RBAC gjelder<em>ikke</em> for kommentardrevne handlinger i denne modusen.",
         "vcsWorkflowWarningRecommended": "<strong>Anbefalt:</strong> krev lineær historikk (rebase/squash før sammenslåing) slik at kommitteringen du oppdaterer fra er den kommitteringen som lander.",
-        "slackDescription": "Meld dette arbeidsområdet på Slack-kjøringsvarsler – godkjenningsforespørsler, oppdateringer, feil og avdrift. La kanalen stå tom, så forblir dette arbeidsområdet stille (det finnes ingen utrullingsdekkende utsending). Krever at Slack-appen er aktivert av en administrator."
+        "slackDescription": "Meld dette arbeidsområdet på Slack-kjøringsvarsler – godkjenningsforespørsler, oppdateringer, feil og avdrift. La kanalen stå tom, så forblir dette arbeidsområdet stille (det finnes ingen utrullingsdekkende utsending). Krever at Slack-appen er aktivert av en administrator.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Oppdatering"
       }
     }
   },

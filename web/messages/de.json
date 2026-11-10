@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Beendet (wahrscheinlich Speichermangel)",
       "memory": "Arbeitsspeicher",
       "requested": "Angefordert {value}",
-      "limit": "Limit {value}"
+      "limit": "Limit {value}",
+      "phaseConfigure": "Konfigurieren"
     },
     "labelsEditor": {
       "none": "Keine",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Jeder, der den PR zusammenführen kann, kann anwenden. Branch-Schutzregeln (erforderliche Reviews, Statusprüfungen, Code-Owner-Freigabe) werden zur Kontrollinstanz. Die Rollen-/Label-RBAC von Terrapod gilt in diesem Modus <em>nicht</em> für kommentargesteuerte Aktionen.",
         "vcsWorkflowWarningRecommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, den Sie anwenden, auch der Commit ist, der landet.",
-        "slackDescription": "Aktivieren Sie für diesen Arbeitsbereich Slack-Benachrichtigungen zu Ausführungen — Freigabeanfragen, Applies, Fehler und Drift. Lassen Sie den Kanal leer, bleibt dieser Arbeitsbereich stumm (es gibt keine bereitstellungsweite Verteilung). Erfordert, dass die Slack-App von einem Administrator aktiviert wurde."
+        "slackDescription": "Aktivieren Sie für diesen Arbeitsbereich Slack-Benachrichtigungen zu Ausführungen — Freigabeanfragen, Applies, Fehler und Drift. Lassen Sie den Kanal leer, bleibt dieser Arbeitsbereich stumm (es gibt keine bereitstellungsweite Verteilung). Erfordert, dass die Slack-App von einem Administrator aktiviert wurde.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Anwenden"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Jeder, der den PR zusammenführen kann, kann aktualisieren. Branch-Schutzregeln (erforderliche Reviews, Statusprüfungen, Code-Owner-Freigabe) werden zur Kontrollinstanz. Die Rollen-/Label-RBAC von Terrapod gilt in diesem Modus <em>nicht</em> für kommentargesteuerte Aktionen.",
         "vcsWorkflowWarningRecommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, von dem aus Sie aktualisieren, auch der Commit ist, der landet.",
-        "slackDescription": "Aktivieren Sie für diesen Arbeitsbereich Slack-Benachrichtigungen zu Ausführungen — Freigabeanfragen, Aktualisierungen, Fehler und Drift. Lassen Sie den Kanal leer, bleibt dieser Arbeitsbereich stumm (es gibt keine bereitstellungsweite Verteilung). Erfordert, dass die Slack-App von einem Administrator aktiviert wurde."
+        "slackDescription": "Aktivieren Sie für diesen Arbeitsbereich Slack-Benachrichtigungen zu Ausführungen — Freigabeanfragen, Aktualisierungen, Fehler und Drift. Lassen Sie den Kanal leer, bleibt dieser Arbeitsbereich stumm (es gibt keine bereitstellungsweite Verteilung). Erfordert, dass die Slack-App von einem Administrator aktiviert wurde.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Aktualisierung"
       }
     }
   },

@@ -129,6 +129,12 @@ interface RunAttrs {
   'resource-cpu': string
   'resource-memory': string
   'peak-memory-bytes': number | null
+  // Per phase (#2475): the flat peak above is whichever phase reported LAST,
+  // which on a composite run is the configure rather than the apply.
+  'phase-profiles'?: Record<
+    string,
+    { 'peak-memory-bytes': number | null; 'peak-cpu-usec': number | null; 'exit-code': number | null }
+  >
   'peak-cpu-usec': number | null
   'runner-exit-code': number | null
   'runner-exit-reason': string
@@ -2474,6 +2480,11 @@ function RunDetailPageInner() {
             resourceMemory={attrs['resource-memory']}
             peakMemoryBytes={attrs['peak-memory-bytes']}
             runnerExitStatus={attrs['runner-exit-status']}
+            phaseProfiles={attrs['phase-profiles']}
+            phaseLabels={{
+              plan: tPhase(phaseKey(engine, 'words', 'phaseLabelPlan')),
+              apply: tPhase(phaseKey(engine, 'words', 'phaseLabelApply')),
+            }}
           />
         </div>
 

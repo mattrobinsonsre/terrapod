@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Killd (likely OOM)",
       "memory": "Memry",
       "requested": "Requestd {value}",
-      "limit": "Limit {value}"
+      "limit": "Limit {value}",
+      "phaseConfigure": "Konfigur"
     },
     "labelsEditor": {
       "none": "Noes",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Anywun hoo can merge teh PR can apply. Branch protecshun rulez (requird reviewz, statuz checkz, code ownr approvul) becum teh gate. Terrapod role/labul RBAC do<em>not</em> apply ta comment-driven acshunz in dis mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommendd:</strong> requir linear histry (rebase/squash befor merge) so teh commit u apply iz teh commit dat landz.",
-        "slackDescription": "Opt dis workspace into Slack run notificashunz — approvul requestz, appliez, errorz, an drift. Leev teh channul empty an dis workspace stayz silent (dere iz noes deployment-wide fan-out). Requirez teh Slack app ta be enabuld by an administraytor."
+        "slackDescription": "Opt dis workspace into Slack run notificashunz — approvul requestz, appliez, errorz, an drift. Leev teh channul empty an dis workspace stayz silent (dere iz noes deployment-wide fan-out). Requirez teh Slack app ta be enabuld by an administraytor.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Apply"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "previu + updayt",
         "vcsWorkflowWarningRbac": "Anywun hoo can merge teh PR can updayt. Branch protecshun rulez (requird reviewz, statuz checkz, code ownr approvul) becum teh gate. Terrapod role/labul RBAC do<em>not</em> apply ta comment-driven acshunz in dis mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommendd:</strong> requir linear histry (rebase/squash befor merge) so teh commit u updayt iz teh commit dat landz.",
-        "slackDescription": "Opt dis workspace into Slack run notificashunz — approvul requestz, updaytz, errorz, an drift. Leev teh channul empty an dis workspace stayz silent (dere iz noes deployment-wide fan-out). Requirez teh Slack app ta be enabuld by an administraytor."
+        "slackDescription": "Opt dis workspace into Slack run notificashunz — approvul requestz, updaytz, errorz, an drift. Leev teh channul empty an dis workspace stayz silent (dere iz noes deployment-wide fan-out). Requirez teh Slack app ta be enabuld by an administraytor.",
+        "phaseLabelPlan": "Previu",
+        "phaseLabelApply": "Updayt"
       }
     }
   },

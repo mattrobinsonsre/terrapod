@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Killed (likely OOM)",
       "memory": "Memory",
       "requested": "Requested {value}",
-      "limit": "Limit {value}"
+      "limit": "Limit {value}",
+      "phaseConfigure": "Riggin''"
     },
     "labelsEditor": {
       "none": "None",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Any scallywag who can merge th'' PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become th'' gate. Terrapod role/label RBAC does<em>not</em> apply t'' comment-driven actions in this mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye apply be th'' commit that lands.",
-        "slackDescription": "Opt this work-deck into Slack voyage notifications — approval requests, applies, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator."
+        "slackDescription": "Opt this work-deck into Slack voyage notifications — approval requests, applies, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Apply"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Any scallywag who can merge th'' PR can update. Branch protection rules (required reviews, status checks, code owner approval) become th'' gate. Terrapod role/label RBAC does<em>not</em> apply t'' comment-driven actions in this mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye update be th'' commit that lands.",
-        "slackDescription": "Opt this work-deck into Slack voyage notifications — approval requests, refits, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator."
+        "slackDescription": "Opt this work-deck into Slack voyage notifications — approval requests, refits, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Update"
       }
     }
   },

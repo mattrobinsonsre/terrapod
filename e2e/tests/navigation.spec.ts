@@ -1,4 +1,27 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * Open the account menu, retrying the trigger until the menu is actually open.
+ *
+ * The click on `Account` can be LOST: it is a client component and the menu is
+ * a Radix dropdown, so a click that lands before React has attached its handler
+ * does nothing at all — and the failure then surfaces one line later, as a
+ * 10-second timeout waiting for a menu item that was never going to appear.
+ * Observed twice in a row on one run, because a Playwright retry re-runs the
+ * `goto` and so hits the same window again.
+ *
+ * Retrying the TRIGGER is the fix rather than a longer timeout on the item: the
+ * item's timeout was never the problem, and raising it would only make the same
+ * failure slower. Clicking `Account` a second time while the menu is already
+ * open would close it, which is why the assertion is inside the retry — once it
+ * passes, no further click happens.
+ */
+async function openAccountMenu(page: Page, item: string): Promise<void> {
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Account' }).click();
+    await expect(page.getByRole('menuitem', { name: item })).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20000 });
+}
 
 test.describe('Navigation', () => {
   test('nav bar renders with Terrapod branding', async ({ page }) => {
@@ -55,7 +78,7 @@ test.describe('Navigation', () => {
     const html = page.locator('html');
     await expect(html).not.toHaveClass(/\bdark\b/);
 
-    await page.getByRole('button', { name: 'Account' }).click();
+    await openAccountMenu(page, 'Dark theme');
     await page.getByRole('menuitem', { name: 'Dark theme' }).click();
     await expect(html).toHaveClass(/\bdark\b/);
     // The menu stays open and the item now offers the way back.
@@ -70,7 +93,7 @@ test.describe('Navigation', () => {
     await page.reload();
     await expect(html).toHaveClass(/\bdark\b/);
 
-    await page.getByRole('button', { name: 'Account' }).click();
+    await openAccountMenu(page, 'Light theme');
     await page.getByRole('menuitem', { name: 'Light theme' }).click();
     await expect(html).not.toHaveClass(/\bdark\b/);
   });

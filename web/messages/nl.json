@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Beëindigd (waarschijnlijk OOM)",
       "memory": "Geheugen",
       "requested": "Aangevraagd {value}",
-      "limit": "Limiet {value}"
+      "limit": "Limiet {value}",
+      "phaseConfigure": "Configureren"
     },
     "labelsEditor": {
       "none": "Geen",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Iedereen die de PR kan samenvoegen, kan toepassen. Branch-beschermingsregels (vereiste beoordelingen, statuscontroles, goedkeuring van code-eigenaar) worden de poort. Terrapod-rol-/label-RBAC is in deze modus<em>niet</em> van toepassing op comment-gestuurde acties.",
         "vcsWorkflowWarningRecommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit die u toepast de commit is die landt.",
-        "slackDescription": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, applies, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld."
+        "slackDescription": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, applies, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Apply"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Iedereen die de PR kan samenvoegen, kan bijwerken. Branch-beschermingsregels (vereiste beoordelingen, statuscontroles, goedkeuring van code-eigenaar) worden de poort. Terrapod-rol-/label-RBAC is in deze modus<em>niet</em> van toepassing op comment-gestuurde acties.",
         "vcsWorkflowWarningRecommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit van waaruit u bijwerkt de commit is die landt.",
-        "slackDescription": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, updates, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld."
+        "slackDescription": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, updates, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Update"
       }
     }
   },

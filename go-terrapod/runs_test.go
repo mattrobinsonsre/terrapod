@@ -949,3 +949,77 @@ func TestRunParsesRunVariableKeys(t *testing.T) {
 		})
 	}
 }
+
+// A composite run is two runner Jobs driven by one Run, so the flat
+// PeakMemoryBytes / PeakCPUUsec / RunnerExitCode fields are whichever phase
+// reported LAST (#2475). These are the per-phase figures, and the pairing with
+// the flat ones is the property worth pinning: a consumer reading the flat
+// number for "how much did the apply need" gets the configure's answer.
+func TestRunParsesPhaseProfiles(t *testing.T) {
+	attrs := `{"status":"applied",` +
+		`"peak-memory-bytes":104857600,"peak-cpu-usec":90,"runner-exit-code":0,` +
+		`"phase-profiles":{` +
+		`"apply":{"peak-memory-bytes":5368709120,"peak-cpu-usec":4200,"exit-code":0},` +
+		`"configure":{"peak-memory-bytes":104857600,"peak-cpu-usec":90,"exit-code":0}}}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = fmt.Fprintf(w, `{"data":{"id":"run-p","type":"runs","attributes":%s}}`, attrs)
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := c.GetRun(t.Context(), "run-p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(run.PhaseProfiles) != 2 {
+		t.Fatalf("PhaseProfiles = %#v, want 2 entries", run.PhaseProfiles)
+	}
+	apply, ok := run.PhaseProfiles["apply"]
+	if !ok || apply.PeakMemoryBytes == nil || *apply.PeakMemoryBytes != 5368709120 {
+		t.Fatalf("apply profile = %#v, want 5368709120 bytes", apply)
+	}
+	// The whole point, as a contrast rather than as two separate assertions:
+	// the flat field and the apply's own figure DISAGREE on this run, and the
+	// flat one is the configure's.
+	if run.PeakMemoryBytes == nil || *run.PeakMemoryBytes == *apply.PeakMemoryBytes {
+		t.Fatalf("the flat peak equals the apply's; this fixture no longer "+
+			"reproduces the overwrite the per-phase figures exist for (flat=%#v)",
+			run.PeakMemoryBytes)
+	}
+	if cfg := run.PhaseProfiles["configure"]; cfg.PeakMemoryBytes == nil ||
+		*cfg.PeakMemoryBytes != *run.PeakMemoryBytes {
+		t.Errorf("configure profile = %#v, want it to match the flat peak", cfg)
+	}
+}
+
+func TestRunWithNoPhaseProfilesIsEmptyNotAnError(t *testing.T) {
+	// A run from before the field, which is most of them. Empty rather than an
+	// error, and empty rather than synthesised from the flat fields: those were
+	// never recorded per phase and attributing them to one would be a guess.
+	for _, attrs := range []string{
+		`{"status":"applied"}`,
+		`{"status":"applied","phase-profiles":null}`,
+		`{"status":"applied","phase-profiles":{}}`,
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/vnd.api+json")
+			_, _ = fmt.Fprintf(w, `{"data":{"id":"run-e","type":"runs","attributes":%s}}`, attrs)
+		}))
+		c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+		if err != nil {
+			srv.Close()
+			t.Fatal(err)
+		}
+		run, err := c.GetRun(t.Context(), "run-e")
+		srv.Close()
+		if err != nil {
+			t.Fatalf("%s: %v", attrs, err)
+		}
+		if len(run.PhaseProfiles) != 0 {
+			t.Errorf("%s: PhaseProfiles = %#v, want empty", attrs, run.PhaseProfiles)
+		}
+	}
+}

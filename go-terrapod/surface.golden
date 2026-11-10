@@ -995,6 +995,7 @@ field Run.Message string `json:"message,omitempty"`
 field Run.Parallelism int64 `json:"parallelism,omitempty"`
 field Run.PeakCPUUsec *int64 `json:"peak-cpu-usec,omitempty"`
 field Run.PeakMemoryBytes *int64 `json:"peak-memory-bytes,omitempty"`
+field Run.PhaseProfiles map[string]RunPhaseProfile `json:"phase-profiles,omitempty"`
 field Run.PlanOnly bool `json:"plan-only"`
 field Run.Playbook string `json:"playbook,omitempty"`
 field Run.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
@@ -1067,6 +1068,9 @@ field RunHostResult.Skipped *int `json:"skipped"`
 field RunHostResult.Status string `json:"status"`
 field RunHostResult.Unreachable *int `json:"unreachable"`
 field RunHostResult.UpdatedAt string `json:"updated-at,omitempty"`
+field RunPhaseProfile.ExitCode *int64 `json:"exit-code,omitempty"`
+field RunPhaseProfile.PeakCPUUsec *int64 `json:"peak-cpu-usec,omitempty"`
+field RunPhaseProfile.PeakMemoryBytes *int64 `json:"peak-memory-bytes,omitempty"`
 field RunStatusTimestamps.AppliedAt string `json:"applied-at,omitempty"`
 field RunStatusTimestamps.ApplyingAt string `json:"applying-at,omitempty"`
 field RunStatusTimestamps.PlanQueuedAt string `json:"plan-queued-at,omitempty"`
@@ -2114,6 +2118,7 @@ type RunCapacity struct
 type RunComplianceReport struct
 type RunHostEvent struct
 type RunHostResult struct
+type RunPhaseProfile struct
 type RunStatusTimestamps struct
 type RunTask struct
 type RunTrigger struct

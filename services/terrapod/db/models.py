@@ -3152,6 +3152,25 @@ class Run(Base):
     runner_exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     runner_exit_reason: Mapped[str] = mapped_column(String(50), nullable=False, default="")
     runner_exit_status: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    # The same figures kept PER PHASE (#2475), because the three scalars above
+    # cannot be: a composite run is two runner Jobs, so the configure Job's
+    # report overwrote the apply's and an operator sizing a runner read the
+    # wrong number -- on exactly the runs that are hardest to size, which is
+    # what #430 built this for.
+    #
+    # `{"plan": {"peak_memory_bytes": …, "peak_cpu_usec": …, "exit_code": …},
+    #   "apply": {…}, "configure": {…}}`, with the inner keys named after the
+    # columns rather than after the wire, so the serialiser converts and the two
+    # shapes cannot drift into each other.
+    #
+    # One JSONB column rather than six more scalars. The read is always the
+    # whole document -- nothing queries one phase's peak -- so there is nothing
+    # to gain from columns, and a fourth phase would cost two more of them.
+    # `module_overrides` above is the precedent for a snapshot-shaped run
+    # column. The three scalars are LEFT ALONE and keep meaning "the last phase
+    # to report", so every existing reader is untouched and the migration is
+    # expand-only.
+    phase_profiles: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # Run options (CLI flags)
     target_addrs: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)

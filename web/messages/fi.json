@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Lopetettu (todennäköisesti OOM)",
       "memory": "Muisti",
       "requested": "Pyydetty {value}",
-      "limit": "Raja {value}"
+      "limit": "Raja {value}",
+      "phaseConfigure": "Määritys"
     },
     "labelsEditor": {
       "none": "Ei mitään",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "suunnittelu + käyttöönotto",
         "vcsWorkflowWarningRbac": "Kuka tahansa, joka voi yhdistää PR:n, voi ottaa käyttöön. Haaran suojaussäännöistä (vaaditut tarkastelut, tilatarkistukset, koodinomistajan hyväksyntä) tulee portti. Terrapod-roolien/-tunnisteiden RBAC<em>ei</em> koske kommenttivetoisia toimintoja tässä tilassa.",
         "vcsWorkflowWarningRecommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta käyttöönotettava commit on se commit, joka päätyy kohteeseen.",
-        "slackDescription": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, käyttöönotot, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön."
+        "slackDescription": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, käyttöönotot, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön.",
+        "phaseLabelPlan": "Suunnitelma",
+        "phaseLabelApply": "Käyttöönotto"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "esikatselu + päivitys",
         "vcsWorkflowWarningRbac": "Kuka tahansa, joka voi yhdistää PR:n, voi päivittää. Haaran suojaussäännöistä (vaaditut tarkastelut, tilatarkistukset, koodinomistajan hyväksyntä) tulee portti. Terrapod-roolien/-tunnisteiden RBAC<em>ei</em> koske kommenttivetoisia toimintoja tässä tilassa.",
         "vcsWorkflowWarningRecommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta commit, josta päivität, on se commit, joka päätyy kohteeseen.",
-        "slackDescription": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, päivitykset, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön."
+        "slackDescription": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, päivitykset, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön.",
+        "phaseLabelPlan": "Esikatselu",
+        "phaseLabelApply": "Päivitys"
       }
     }
   },

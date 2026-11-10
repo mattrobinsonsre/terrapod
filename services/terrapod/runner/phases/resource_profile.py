@@ -108,11 +108,21 @@ def post_profile(
         try:
             resp = client.post(url, json=body, headers=headers)
         except httpx.RequestError as exc:
-            logger.info("resource-profile POST failed", err=str(exc))
+            # `warning`, not `info`. Best-effort means the run does not fail
+            # over it -- which is right -- and reporting it at `info` is why a
+            # configure's whole profile being refused with a 400 went unnoticed
+            # for a release (#2475). Non-fatal is a decision about the run; it
+            # is not a reason to be quiet about the thing not working.
+            logger.warning("resource-profile POST failed", err=str(exc))
             return False
         ok = 200 <= resp.status_code < 300
         if not ok:
-            logger.info("resource-profile non-2xx", status=resp.status_code)
+            logger.warning(
+                "resource-profile non-2xx: this phase's peak memory, CPU, exit "
+                "code and failure reason were NOT recorded",
+                status=resp.status_code,
+                phase=getattr(cfg, "phase", None),
+            )
         return ok
     finally:
         if own_client:

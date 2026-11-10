@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Dræbt (sandsynligvis OOM)",
       "memory": "Hukommelse",
       "requested": "Anmodet {value}",
-      "limit": "Grænse {value}"
+      "limit": "Grænse {value}",
+      "phaseConfigure": "Konfiguration"
     },
     "labelsEditor": {
       "none": "Ingen",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Enhver, der kan merge PR'en, kan anvende. Branch-beskyttelsesregler (påkrævede reviews, statustjek, code owner-godkendelse) bliver porten. Terrapods rolle-/label-RBAC gælder<em>ikke</em> for kommentar-drevne handlinger i denne tilstand.",
         "vcsWorkflowWarningRecommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du anvender, er den commit, der lander.",
-        "slackDescription": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, applies, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator."
+        "slackDescription": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, applies, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator.",
+        "phaseLabelPlan": "Plan",
+        "phaseLabelApply": "Apply"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Enhver, der kan merge PR'en, kan opdatere. Branch-beskyttelsesregler (påkrævede reviews, statustjek, code owner-godkendelse) bliver porten. Terrapods rolle-/label-RBAC gælder<em>ikke</em> for kommentar-drevne handlinger i denne tilstand.",
         "vcsWorkflowWarningRecommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du opdaterer fra, er den commit, der lander.",
-        "slackDescription": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, opdateringer, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator."
+        "slackDescription": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, opdateringer, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator.",
+        "phaseLabelPlan": "Preview",
+        "phaseLabelApply": "Opdatering"
       }
     }
   },

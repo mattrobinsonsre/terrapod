@@ -794,6 +794,197 @@ class TestLogUploadPublishesEvent:
 # ── resource-profile (#430) ──────────────────────────────────────────
 
 
+class TestTheResourceProfileIsKeptPerPhase:
+    """`configure` is accepted, and each phase keeps its own figures (#2475).
+
+    Two faults, one report. The configure phase posts `phase: "configure"`,
+    which was not in the map, so the WHOLE report was refused with a 400 -- its
+    peak memory, CPU, exit code and failure reason were never recorded. And a
+    composite run is two runner Jobs driven by one Run, so even once accepted
+    the configure's figures would overwrite the apply's on the three scalar
+    columns, which is the number an operator reads when sizing a runner.
+    """
+
+    @staticmethod
+    def _db_for(run):
+        """The same shape every test in this file uses: a mock whose `get`
+        returns the run under test."""
+        db = AsyncMock()
+        db.get.return_value = run
+        return db
+
+    @classmethod
+    def _post(cls, run, body):
+        async def _go():
+            app = _make_app(_runner_user(run.id), cls._db_for(run))
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                return await client.post(
+                    f"/api/terrapod/v1/runs/{run.id}/resource-profile",
+                    json=body,
+                    headers=_AUTH,
+                )
+
+        return _go()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_every_runner_phase_is_accepted(self, *_mocks):
+        """DERIVED from `RUNNER_PHASES`, which is the authority on what phases
+        exist, rather than from a list here.
+
+        A list would have been written with the same two entries the route had,
+        so it would have agreed with the defect. This is the gate that makes a
+        fourth phase impossible to forget.
+        """
+        from terrapod.api.routers import run_artifacts
+        from terrapod.auth.runner_tokens import RUNNER_PHASES
+
+        assert set(run_artifacts._REASON_STATUS_BY_PHASE) == set(RUNNER_PHASES), (
+            "a runner phase can post a resource profile the route refuses, which "
+            "discards that phase's whole report"
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_configure_phase_report_is_accepted(self, *_mocks):
+        """The reported case, end to end through the route: it answered 400."""
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = "configuring"
+        run.phase_profiles = None
+        resp = await self._post(
+            run,
+            {"peak_memory_bytes": 900, "peak_cpu_usec": 90, "exit_code": 4, "phase": "configure"},
+        )
+        assert resp.status_code == 204, resp.text
+        assert run.phase_profiles["configure"]["peak_memory_bytes"] == 900
+        assert run.phase_profiles["configure"]["exit_code"] == 4
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_configure_does_not_overwrite_the_applys_figures(self, *_mocks):
+        """The composite run, which is the case the feature exists for and the
+        one the three scalars cannot represent."""
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = "applying"
+        run.phase_profiles = None
+        assert (
+            await self._post(
+                run,
+                {"peak_memory_bytes": 5000, "peak_cpu_usec": 500, "exit_code": 0, "phase": "apply"},
+            )
+        ).status_code == 204
+        run.status = "configuring"
+        assert (
+            await self._post(
+                run,
+                {
+                    "peak_memory_bytes": 100,
+                    "peak_cpu_usec": 10,
+                    "exit_code": 0,
+                    "phase": "configure",
+                },
+            )
+        ).status_code == 204
+
+        assert run.phase_profiles["apply"]["peak_memory_bytes"] == 5000, (
+            "the configure Job's report replaced the apply's"
+        )
+        assert run.phase_profiles["configure"]["peak_memory_bytes"] == 100
+        # And the scalars still mean "the last phase to report", unchanged, so
+        # every existing reader behaves exactly as before.
+        assert run.peak_memory_bytes == 100
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_column_is_REASSIGNED_not_mutated_in_place(self, *_mocks):
+        """SQLAlchemy does not track a mutation inside a JSONB dict.
+
+        `run.phase_profiles[phase] = ...` would commit nothing and the column
+        would stay NULL for ever, while every assertion about the response and
+        about the in-memory object passed. So the property is that the attribute
+        holds a DIFFERENT object afterwards, which is the only observable
+        difference between the version that persists and the one that does not.
+        """
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = "applying"
+        existing = {"plan": {"peak_memory_bytes": 1, "peak_cpu_usec": 1, "exit_code": 0}}
+        run.phase_profiles = existing
+        await self._post(run, {"peak_memory_bytes": 2, "phase": "apply"})
+        assert run.phase_profiles is not existing, "mutated in place; the write would not persist"
+        assert run.phase_profiles["plan"]["peak_memory_bytes"] == 1, "the earlier phase was lost"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_report_with_no_figures_records_no_phase_entry(self, *_mocks):
+        """A phase that could read none of the cgroup files has nothing to say,
+        and an entry of three nulls would read as "measured, and zero"."""
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = "configuring"
+        run.phase_profiles = None
+        resp = await self._post(run, {"phase": "configure", "failure_reason": "boom"})
+        assert resp.status_code == 204, resp.text
+        assert not (run.phase_profiles or {})
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unphased_report_still_records_the_scalars_only(self, *_mocks):
+        """An older runner image sends no phase. It must keep working, and it has
+        no phase to file its figures under."""
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = "applying"
+        run.phase_profiles = None
+        resp = await self._post(run, {"peak_memory_bytes": 7, "exit_code": 0})
+        assert resp.status_code == 204, resp.text
+        assert run.peak_memory_bytes == 7
+        assert not (run.phase_profiles or {})
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unknown_phase_is_still_refused_and_names_the_known_ones(self, *_mocks):
+        """Widening the map must not become accepting anything: a phase we do not
+        know is a runner we do not understand, and filing its figures under its
+        own name would invent a phase in the API's output."""
+        run = _mock_run(run_id=uuid.uuid4())
+        resp = await self._post(run, {"peak_memory_bytes": 1, "phase": "destroy"})
+        assert resp.status_code == 400
+        assert "configure" in resp.text, "the refusal does not name the phases it accepts"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_configure_failure_reason_lands_on_the_configuring_run(self, *_mocks):
+        """The other half of the 400: a configure failure's reason was lost, so
+        the reconciler reported a bare exit code."""
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = "configuring"
+        run.phase_profiles = None
+        run.error_message = ""
+        await self._post(
+            run, {"exit_code": 4, "phase": "configure", "failure_reason": "the playbook failed"}
+        )
+        assert run.error_message == "the playbook failed"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_configure_reason_does_not_mark_a_run_that_is_applying(self, *_mocks):
+        """The reason this map is narrower than `LIVE_STATES_FOR_PHASE`: a Job
+        still finishing after the next phase has started must not mark it."""
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = "applying"
+        run.phase_profiles = None
+        run.error_message = ""
+        await self._post(run, {"exit_code": 4, "phase": "configure", "failure_reason": "late"})
+        assert run.error_message == ""
+
+
 class TestResourceProfile:
     """The runner POSTs its cgroup-v2 peak memory/CPU + exit code at exit.
 

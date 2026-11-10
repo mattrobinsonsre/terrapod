@@ -1930,7 +1930,8 @@
       "killedLikelyOom": "Lladdwyd (OOM yn debygol)",
       "memory": "Cof",
       "requested": "Gofynnwyd {value}",
-      "limit": "Terfyn {value}"
+      "limit": "Terfyn {value}",
+      "phaseConfigure": "Cyflunio"
     },
     "labelsEditor": {
       "none": "Dim",
@@ -3863,7 +3864,9 @@
         "typePlanApply": "cynllun + gweithredu",
         "vcsWorkflowWarningRbac": "Gall unrhyw un a all gyfuno'r PR weithredu. Daw rheolau diogelu cangen (adolygiadau gofynnol, gwiriadau statws, cymeradwyaeth perchennog cod) yn gât. <em>Nid</em> yw RBAC rôl/label Terrapod yn berthnasol i weithredoedd a yrrir gan sylwadau yn y modd hwn.",
         "vcsWorkflowWarningRecommended": "<strong>Argymhellir:</strong> mynnu hanes llinol (rebase/squash cyn cyfuno) fel mai'r ymrwymiad a weithredwch yw'r ymrwymiad sy'n glanio.",
-        "slackDescription": "Optiwch y weithfan hon i mewn i hysbysiadau rhediad Slack — ceisiadau cymeradwyo, gweithrediadau, gwallau a drifft. Gadewch y sianel yn wag ac mae'r weithfan hon yn aros yn dawel (nid oes lledaenu ledled y defnydd). Angen i'r ap Slack gael ei alluogi gan weinyddwr."
+        "slackDescription": "Optiwch y weithfan hon i mewn i hysbysiadau rhediad Slack — ceisiadau cymeradwyo, gweithrediadau, gwallau a drifft. Gadewch y sianel yn wag ac mae'r weithfan hon yn aros yn dawel (nid oes lledaenu ledled y defnydd). Angen i'r ap Slack gael ei alluogi gan weinyddwr.",
+        "phaseLabelPlan": "Cynllun",
+        "phaseLabelApply": "Gweithredu"
       }
     },
     "pulumi": {
@@ -3949,7 +3952,9 @@
         "typePlanApply": "rhagolwg + diweddaru",
         "vcsWorkflowWarningRbac": "Gall unrhyw un a all gyfuno''r PR ddiweddaru. Daw rheolau diogelu cangen (adolygiadau gofynnol, gwiriadau statws, cymeradwyaeth perchennog cod) yn gât. <em>Nid</em> yw RBAC rôl/label Terrapod yn berthnasol i weithredoedd a yrrir gan sylwadau yn y modd hwn.",
         "vcsWorkflowWarningRecommended": "<strong>Argymhellir:</strong> mynnu hanes llinol (rebase/squash cyn cyfuno) fel mai''r ymrwymiad y diweddarwch ohono yw''r ymrwymiad sy''n glanio.",
-        "slackDescription": "Optiwch y weithfan hon i mewn i hysbysiadau rhediad Slack — ceisiadau cymeradwyo, diweddariadau, gwallau a drifft. Gadewch y sianel yn wag ac mae''r weithfan hon yn aros yn dawel (nid oes lledaenu ledled y defnydd). Angen i''r ap Slack gael ei alluogi gan weinyddwr."
+        "slackDescription": "Optiwch y weithfan hon i mewn i hysbysiadau rhediad Slack — ceisiadau cymeradwyo, diweddariadau, gwallau a drifft. Gadewch y sianel yn wag ac mae''r weithfan hon yn aros yn dawel (nid oes lledaenu ledled y defnydd). Angen i''r ap Slack gael ei alluogi gan weinyddwr.",
+        "phaseLabelPlan": "Rhagolwg",
+        "phaseLabelApply": "Diweddaru"
       }
     }
   },

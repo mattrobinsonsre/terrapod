@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl'
 
+import { reportedPhases, shownPeakBytes, type PhaseProfile } from '@/lib/phase-profiles'
+
 // ResourceUsage — surface the runner Job's actual memory + CPU usage
 // alongside its configured requests and limits (#430). Renders only
 // when peak data is available (post-#430 runs); silent for older runs.
@@ -15,7 +17,18 @@ interface ResourceUsageProps {
   resourceMemory: string // "2Gi", "4Gi", "64Mi", etc.
   peakMemoryBytes: number | null
   runnerExitStatus: string // "" | "clean" | "oom" | "killed" | "error"
+  // Per phase, keyed "plan" | "apply" | "configure" (#2475). Empty for a run
+  // that predates the field, which is most of them.
+  phaseProfiles?: Record<string, PhaseProfile>
+  // Which engine's vocabulary names the phases. REQUIRED rather than
+  // defaulted: a plan is a "preview" on Pulumi and an apply an "update", and a
+  // default would render a Pulumi run in Terraform's words -- which is exactly
+  // what 26 locales did for a whole release (#1915). `configure` needs no
+  // engine, being the Ansible half of either.
+  phaseLabels: { plan: string; apply: string }
 }
+
+
 
 // CPU is intentionally NOT rendered here. peak_cpu_usec is cumulative
 // core-time over the whole run; comparing it to the cores-allocated
@@ -68,6 +81,8 @@ export function ResourceUsage({
   resourceMemory,
   peakMemoryBytes,
   runnerExitStatus,
+  phaseProfiles,
+  phaseLabels,
 }: ResourceUsageProps) {
   const t = useTranslations('common')
   // Only render when we have anything to show — peak from runner, OR an
@@ -80,9 +95,15 @@ export function ResourceUsage({
   const reqMem = parseMemoryToBytes(resourceMemory)
   const limitMem = Number.isFinite(reqMem) ? reqMem * 2 : NaN
 
+  // Both decisions live in `@/lib/phase-profiles` so they can be asserted
+  // directly: which number is chosen is the whole of #2475, and through this
+  // component it is only observable as a bar's width.
+  const phases = reportedPhases(phaseProfiles)
+  const shownPeak = shownPeakBytes(phaseProfiles, peakMemoryBytes)
+
   const memPct =
-    peakMemoryBytes !== null && Number.isFinite(limitMem) && limitMem > 0
-      ? Math.min(100, (peakMemoryBytes / limitMem) * 100)
+    shownPeak !== null && Number.isFinite(limitMem) && limitMem > 0
+      ? Math.min(100, (shownPeak / limitMem) * 100)
       : null
 
   // Bar colour: red ≥95% (OOM cliff), amber 80–95%, green <80%.
@@ -118,7 +139,7 @@ export function ResourceUsage({
         <div className="mb-1 flex items-baseline justify-between text-xs text-slate-400">
           <span>{t('resourceUsage.memory')}</span>
           <span className="font-mono">
-            {peakMemoryBytes !== null ? humanBytes(peakMemoryBytes) : '—'}
+            {shownPeak !== null ? humanBytes(shownPeak) : '—'}
             {memPct !== null && (
               <span className="ms-2 text-slate-500">{memPct.toFixed(0)}%</span>
             )}
@@ -143,6 +164,31 @@ export function ResourceUsage({
             })}
           </span>
         </div>
+
+        {phases.length > 0 && (
+          <dl
+            className="mt-3 space-y-1 border-t border-slate-800 pt-2"
+            data-testid="resource-usage-phases"
+          >
+            {phases.map(([phase, prof]) => (
+              <div key={phase} className="flex items-baseline justify-between text-xs">
+                <dt className="text-slate-400">
+                  {phase === 'plan'
+                    ? phaseLabels.plan
+                    : phase === 'apply'
+                      ? phaseLabels.apply
+                      : t('resourceUsage.phaseConfigure')}
+                </dt>
+                <dd
+                  className="font-mono text-slate-300"
+                  data-testid={`resource-usage-phase-${phase}`}
+                >
+                  {humanBytes(prof['peak-memory-bytes'] as number)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
     </div>
   )
