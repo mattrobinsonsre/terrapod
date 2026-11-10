@@ -27,6 +27,7 @@ wrappers containing them are admin-only configuration archives.
 """
 
 import asyncio
+import gzip
 import io
 import json
 import os
@@ -369,14 +370,28 @@ def _build_tarball(files: dict[str, str | bytes]) -> bytes:
     all text -- a role may ship a binary file, and re-encoding one through `str`
     would corrupt it silently.
     """
-    buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+    # Two steps rather than `mode="w:gz"`, and the reason is the whole of the
+    # determinism claim below: `tarfile` builds the gzip wrapper itself and
+    # stamps the CURRENT TIME into the gzip header's MTIME field, which no
+    # per-entry `info.mtime` can reach. So the tar stream was deterministic and
+    # the envelope around it was not -- two provisions of one catalog item a
+    # second apart produced different bytes, and `test_deterministic` passed
+    # only when both builds landed inside the same second.
+    #
+    # It is not merely a flaky test: a configuration version records
+    # `archive_provenance`, so a digest of this artifact is only comparable if
+    # identical inputs give identical bytes.
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as tar:
         for name, content in files.items():
             data = content.encode("utf-8") if isinstance(content, str) else content
             info = tarfile.TarInfo(name=name)
             info.size = len(data)
             info.mtime = 0  # deterministic
             tar.addfile(info, io.BytesIO(data))
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz:
+        gz.write(raw.getvalue())
     return buf.getvalue()
 
 

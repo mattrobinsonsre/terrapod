@@ -506,6 +506,15 @@ class TestBuildTarball:
         files = {"main.tf": "x"}
         assert catalog_service._build_tarball(files) == catalog_service._build_tarball(files)
 
+        # Asserted on the GZIP HEADER too, because the comparison above is
+        # satisfied by two builds landing in the same second -- which is exactly
+        # how a non-deterministic envelope passed this test until it did not.
+        # Bytes 4..7 are the gzip MTIME field, little-endian.
+        header = catalog_service._build_tarball(files)[:8]
+        assert header[4:8] == b"\x00\x00\x00\x00", (
+            f"the gzip header carries a timestamp: {header[4:8]!r}"
+        )
+
 
 @pytest.mark.asyncio
 async def test_single_chunk_generator():
