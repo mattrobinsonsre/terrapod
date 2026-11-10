@@ -36,7 +36,9 @@
     "ha": "Vysoká dostupnost",
     "deletedWorkspaces": "Smazané pracovní prostory",
     "version": "Verze {version}",
-    "vault": "Stav OpenBao/Vault"
+    "vault": "Stav OpenBao/Vault",
+    "darkTheme": "Tmavý motiv",
+    "lightTheme": "Světlý motiv"
   },
   "switcher": {
     "language": "Jazyk",

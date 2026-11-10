@@ -36,7 +36,9 @@
     "ha": "高可用性",
     "deletedWorkspaces": "已刪除的工作區",
     "version": "版本 {version}",
-    "vault": "OpenBao/Vault 狀態"
+    "vault": "OpenBao/Vault 狀態",
+    "darkTheme": "深色主題",
+    "lightTheme": "淺色主題"
   },
   "switcher": {
     "language": "語言",

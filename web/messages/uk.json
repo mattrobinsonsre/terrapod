@@ -36,7 +36,9 @@
     "ha": "Висока доступність",
     "deletedWorkspaces": "Видалені робочі області",
     "version": "Версія {version}",
-    "vault": "Стан OpenBao/Vault"
+    "vault": "Стан OpenBao/Vault",
+    "darkTheme": "Темна тема",
+    "lightTheme": "Світла тема"
   },
   "switcher": {
     "language": "Мова",

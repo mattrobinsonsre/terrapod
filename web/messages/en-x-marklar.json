@@ -36,7 +36,9 @@
     "ha": "High marklar",
     "deletedWorkspaces": "Deleted marklars",
     "version": "Marklar {version}",
-    "vault": "Marklar/Marklar marklar"
+    "vault": "Marklar/Marklar marklar",
+    "darkTheme": "Dark marklar",
+    "lightTheme": "Light marklar"
   },
   "switcher": {
     "language": "Marklar",

@@ -102,7 +102,7 @@ from their own sign-in
 time](#a-web-session-ends-when-the-roles-behind-it-change-and-has-a-hard-ceiling),
 so some will end shortly after you upgrade rather than at the 24-hour mark; and
 [the UI opens in the light
-theme](#the-uis-default-theme-is-light-and-dark-is-a-source-edit), which no gate,
+theme](#the-uis-default-theme-is-light-and-dark-is-a-per-user-toggle), which no gate,
 snapshot or test reports because nothing fails.
 
 ### Two orderings that are **not** tied to the upgrade
@@ -1560,26 +1560,25 @@ enforced in both directions by `test_run_status_contract.py`: every status the
 TFE surface reports must be one `go-tfe` defines, and the native surface must
 report the stored status verbatim.
 
-### The UI's default theme is light, and dark is a source edit
+### The UI's default theme is light, and dark is a per-user toggle
 
 The web UI defaulted to dark through 1.x and **defaults to light from 2.0**
-(#2337). The dark theme is kept, not removed — but it is no longer what an
-operator gets by opening the page, and there is **no Helm value or config key
-that selects it**. The only way back is a source edit:
+(#2337). The dark theme is kept, not removed: each user can switch to it with
+**Account → Dark theme** (the account drawer on a phone). The choice is
+stored in a `terrapod-theme` cookie in that browser and rendered on the server,
+so it loads without a flash of the light theme.
 
-```tsx
-// web/src/app/layout.tsx
-<html lang={locale} dir={dir} translate="no" className="dark">
-```
+There is still **no Helm value or config key that sets the default** for
+everyone, and the UI does not follow the browser's `prefers-color-scheme`. A
+deployment that wants dark for every user by default changes `DEFAULT_THEME` to
+`'dark'` in `web/src/lib/theme.ts`; a user's own choice still wins over it.
 
-That restores it exactly rather than approximately, which is a property of how
+Dark is restored exactly rather than approximately, which is a property of how
 the themes are built rather than a promise: the dark values are Tailwind's own
 plus the `brand` ramp and are declared nowhere, and light is a single
 `:root:not(.dark)` override that wins on specificity. So `class="dark"` takes
 the override out of play and leaves the stock values — dark has nothing to
 drift from.
 
-Listed here because it is the one breaking change in 2.0 that no gate, snapshot
-or test will tell you about: nothing fails, the UI simply looks different, and
-an operator who wants the old appearance will go looking for a setting that does
-not exist.
+Listed here because no gate, snapshot or test will tell you about it: nothing
+fails, the UI simply looks different until each user flips the toggle.

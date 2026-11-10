@@ -36,7 +36,9 @@
     "ha": "taH laH",
     "deletedWorkspaces": "Qumwo'mey Qaw'lu'bogh",
     "version": "mI' {version}",
-    "vault": "OpenBao/Vault Dotlh"
+    "vault": "OpenBao/Vault Dotlh",
+    "darkTheme": "Hurgh Qogh",
+    "lightTheme": "wov Qogh"
   },
   "switcher": {
     "language": "Hol",

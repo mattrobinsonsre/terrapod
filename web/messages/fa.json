@@ -36,7 +36,9 @@
     "ha": "دسترس‌پذیری بالا",
     "deletedWorkspaces": "فضاهای کاری حذف‌شده",
     "version": "نسخهٔ {version}",
-    "vault": "وضعیت OpenBao/Vault"
+    "vault": "وضعیت OpenBao/Vault",
+    "darkTheme": "پوسته تیره",
+    "lightTheme": "پوسته روشن"
   },
   "switcher": {
     "language": "زبان",

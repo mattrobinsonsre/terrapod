@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
+import { cookies } from 'next/headers'
 import { dirForLocale } from '@/i18n/config'
+import { parseTheme, THEME_COOKIE } from '@/lib/theme'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -38,13 +40,15 @@ export default async function RootLayout({
   // flash on load. Arabic, Hebrew and Persian resolve to `rtl`; every other
   // offered locale renders `dir="ltr"`.
   const dir = dirForLocale(locale)
+  // Server-rendered from the cookie the Account menu toggle writes, so dark loads without a flash.
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value)
   // The app ships its own professionally-translated catalogs + a language
   // switcher (#767), so tell the browser's built-in translator (Chrome/Edge/
   // Safari) to stand down: `translate="no"` suppresses the "Translate this
   // page?" prompt and stops a machine-translation layer from fighting — and
   // degrading — our own next-intl strings. Users switch language in-app.
   return (
-    <html lang={locale} dir={dir} translate="no">
+    <html lang={locale} dir={dir} translate="no" className={theme === 'dark' ? 'dark' : undefined}>
       <body className={inter.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}

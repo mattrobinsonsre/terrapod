@@ -38,6 +38,8 @@ import {
   KeyRound,
   type LucideIcon,
   Link2,
+  Moon,
+  Sun,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { clearAuth, isAdmin, isAdminOrAudit, getAuthState } from '@/lib/auth'
@@ -45,6 +47,7 @@ import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 import { TokenExpiryBanner } from '@/components/token-expiry-banner'
 import { LocaleSwitcher } from '@/components/locale-switcher'
 import { HAIndicator } from '@/components/ha-indicator'
+import { useDarkTheme } from '@/lib/use-theme'
 
 /**
  * Navigation is one DRY, viewport-driven component (#719). The link model
@@ -471,6 +474,7 @@ export default function NavBar() {
   // Whether to offer Vault status. Asked only of admin/audit sessions, and a
   // failed probe just leaves the entry out — an affordance, never a gate.
   const [vaultEnabled, setVaultEnabled] = useState(false)
+  const [dark, setDark] = useDarkTheme()
   useEffect(() => {
     if (!adminOrAudit) return
     const token = getAuthState()?.token
@@ -633,6 +637,17 @@ export default function NavBar() {
               footer={
                 <>
                   <DropdownMenu.Separator className="my-1 h-px bg-slate-700" />
+                  {/* Labelled with what a click does; kept open so the switch is visible. */}
+                  <DropdownMenu.Item
+                    onSelect={(e) => {
+                      e.preventDefault()
+                      setDark(!dark)
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 cursor-pointer outline-none transition-colors data-[highlighted]:bg-slate-700 data-[highlighted]:text-slate-100"
+                  >
+                    {dark ? <Sun size={16} /> : <Moon size={16} />}
+                    {t(dark ? 'lightTheme' : 'darkTheme')}
+                  </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
                     <button
                       type="button"
@@ -767,6 +782,15 @@ export default function NavBar() {
               {ACCOUNT_ITEMS.map((it) => (
                 <MobileLink key={it.href} item={it} onClick={closeDrawers} />
               ))}
+              <div className="my-1 h-px bg-slate-800" />
+              <button
+                type="button"
+                onClick={() => setDark(!dark)}
+                className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium min-h-[44px] text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                {dark ? <Sun size={18} /> : <Moon size={18} />}
+                {t(dark ? 'lightTheme' : 'darkTheme')}
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium min-h-[44px] text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"

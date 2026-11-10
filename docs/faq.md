@@ -306,28 +306,22 @@ server; Digger runs inside your existing CI. See [Alternatives](alternatives.md)
 
 ## Can I make the UI dark? Where is the theme setting?
 
-There is no setting, and that is the answer rather than a gap.
+Each user can switch it themselves: **Account → Dark theme** (the account
+drawer on a phone). The choice is stored in a `terrapod-theme` cookie in that
+browser and rendered on the server, so the page loads in the chosen theme
+without a flash of the other one.
 
-The web UI defaults to **light** from 2.0 (it defaulted to dark through 1.x), and
-dark is kept but is **a source edit, not a configuration value** — there is no
-Helm value, no config key and no per-user preference that selects it. Adding
-`className="dark"` to the `<html>` element in `web/src/app/layout.tsx` restores
-it, and restores it exactly rather than approximately: the dark values are
-Tailwind's own plus the `brand` ramp, and light is a single
-`:root:not(.dark)` override that wins on specificity, so the class takes the
-override out of play and leaves the stock values.
+The web UI defaults to **light** from 2.0 (it defaulted to dark through 1.x).
+There is no Helm value or config key that sets the default for everyone, and the
+UI does not follow the viewer's `prefers-color-scheme`: a browser set to dark
+still opens light until its user flips the toggle. A deployment that wants dark
+for every user changes `DEFAULT_THEME` to `'dark'` in `web/src/lib/theme.ts`; a
+user's own choice still wins over it.
 
-**And it does not follow the viewer's own preference either.** `globals.css`
-carries no `prefers-color-scheme` block and nothing writes a `data-theme`
-override — measured, zero occurrences anywhere under `web/` — so a browser set to
-dark still gets the light UI. The deployment's build decides, for everyone.
-
-That is worth saying plainly rather than leaving someone to discover it: "the
-default is light" invites the reading that a preference would win, and none does.
-
-This question is here because the thing an operator goes looking for does not
-exist, so searching for it finds nothing and reads as a missing feature. The
-reasoning behind the change, and the exact edit, are in [Upgrading to
+Dark is restored exactly rather than approximately: the dark values are
+Tailwind's own plus the `brand` ramp, and light is a single `:root:not(.dark)`
+override that wins on specificity, so the class takes the override out of play
+and leaves the stock values. The reasoning behind the change is in [Upgrading to
 2.0](upgrading-to-2.0.md).
 
 ## What does Terrapod cost to run?

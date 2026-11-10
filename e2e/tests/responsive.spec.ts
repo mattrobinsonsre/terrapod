@@ -659,6 +659,22 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(account.getByRole('link', { name: 'API Tokens' })).toBeVisible();
     await expect(account.getByRole('button', { name: 'Log out' })).toBeVisible();
     await expectNoHorizontalPageScroll(page);
+
+    // The theme toggle is a full-size tap target labelled with what it will do.
+    const html = page.locator('html');
+    const startDark = /\bdark\b/.test((await html.getAttribute('class')) ?? '');
+    const toggle = account.getByRole('button', { name: startDark ? 'Light theme' : 'Dark theme' });
+    const box = await toggle.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await toggle.click();
+    const back = account.getByRole('button', { name: startDark ? 'Dark theme' : 'Light theme' });
+    await expect(back).toBeVisible();
+    await back.click();
+    await expect(account.getByRole('button', { name: startDark ? 'Light theme' : 'Dark theme' })).toBeVisible();
+    // Let the cookie write settle so it cannot leak into the next test.
+    await expect.poll(async () =>
+      (await page.context().cookies()).find((c) => c.name === 'terrapod-theme')?.value,
+    ).toBe(startDark ? 'dark' : 'light');
   });
 
   test('workspace list surfaces status in-row at phone width', async ({ page }) => {

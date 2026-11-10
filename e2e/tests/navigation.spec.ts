@@ -47,4 +47,31 @@ test.describe('Navigation', () => {
     await page.waitForURL('**/workspaces');
     await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
   });
+
+  test('account menu toggles the theme, labelled with what it will do, and survives a reload', async ({ page, context }) => {
+    // The theme cookie is per-browser-context, so this test owns its own state.
+    await context.clearCookies({ name: 'terrapod-theme' });
+    await page.goto('/workspaces');
+    const html = page.locator('html');
+    await expect(html).not.toHaveClass(/\bdark\b/);
+
+    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('menuitem', { name: 'Dark theme' }).click();
+    await expect(html).toHaveClass(/\bdark\b/);
+    // The menu stays open and the item now offers the way back.
+    await expect(page.getByRole('menuitem', { name: 'Light theme' })).toBeVisible();
+
+    await expect.poll(async () =>
+      (await context.cookies()).find((c) => c.name === 'terrapod-theme')?.value,
+    ).toBe('dark');
+    // Server-rendered from the cookie: the raw HTML is dark before any client JS runs.
+    const raw = await (await page.request.get('/workspaces')).text();
+    expect(raw).toMatch(/<html[^>]*class="dark"/);
+    await page.reload();
+    await expect(html).toHaveClass(/\bdark\b/);
+
+    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('menuitem', { name: 'Light theme' }).click();
+    await expect(html).not.toHaveClass(/\bdark\b/);
+  });
 });

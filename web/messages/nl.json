@@ -36,7 +36,9 @@
     "ha": "Hoge beschikbaarheid",
     "deletedWorkspaces": "Verwijderde workspaces",
     "version": "Versie {version}",
-    "vault": "OpenBao/Vault-status"
+    "vault": "OpenBao/Vault-status",
+    "darkTheme": "Donker thema",
+    "lightTheme": "Licht thema"
   },
   "switcher": {
     "language": "Taal",
