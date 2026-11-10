@@ -49,7 +49,7 @@ from terrapod.api.dependencies import (
     require_runner_for_run,
 )
 from terrapod.api.engine_scope import load_workspace_scoped
-from terrapod.api.errors import vcs_unavailable
+from terrapod.api.errors import UPSTREAM_FAILURE_HEADER, vcs_unavailable
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta, paginate
 from terrapod.api.prefixes import TFE_PREFIX, is_tfe_path
@@ -747,17 +747,53 @@ async def _fetch_vcs_config(
     share it; this keeps the HTTP mapping where it belongs. A workspace we
     cannot fetch for is a 422; a provider outage is somebody else's 5xx, not
     ours, and gets 502/504 with the marker header (#1358).
+
+    That contract was stated here and INCOMPLETE, which is #2471. The two
+    handlers below covered the provider's HTTP API; the git CLI raised a bare
+    `RuntimeError`, which is neither, so a failed clone sailed past both into
+    the catch-all and a run-creation request answered a bare 500 with the git
+    error only in the API's own log. The typed `GitError` classes close it.
+
+    **A failed fetch creates NO RUN, and must never fall back to an older
+    configuration version.** That is not a consequence of raising here -- it is
+    the property worth naming, because the tempting way to "handle" this error
+    is to create the run against the last code that did fetch, and applying code
+    nobody asked for is worse than not running. The trigger path says the same
+    thing in the same words for the same reason (#1396), and
+    `test_a_failed_fetch_never_falls_back_to_older_code` fails anyone who
+    changes it.
     """
-    from terrapod.services import vcs_config_service
+    from terrapod.services import git_fetch, vcs_config_service
 
     conn = await db.get(VCSConnection, ws.vcs_connection_id)
+    repo = ws.vcs_repo_url or ""
+    ref = ref_override or ws.vcs_branch
     try:
         return await vcs_config_service.fetch_config_version(db, ws, ref_override=ref_override)
     except vcs_config_service.VCSConfigError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except (git_fetch.GitAccessDenied, git_fetch.GitUnsupported) as e:
+        # A property of the connection, the repository or the server -- the
+        # operator has something to change, and a retry would not help. The
+        # message is git's own, already redacted of the credential by `_run_git`.
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not fetch {repo}@{ref}: {e}. Nothing was created.",
+        ) from e
+    except git_fetch.GitTimeout as e:
+        raise HTTPException(
+            status_code=504,
+            detail=f"Timed out fetching {repo}@{ref}: {e}. Nothing was created.",
+            headers={UPSTREAM_FAILURE_HEADER: "vcs"},
+        ) from e
+    except git_fetch.GitTransient as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not fetch {repo}@{ref}: {e}. Nothing was created — try again.",
+            headers={UPSTREAM_FAILURE_HEADER: "vcs"},
+        ) from e
     except httpx.HTTPError as e:
-        repo = ws.vcs_repo_url or ""
-        raise vcs_unavailable(conn, repo, ref_override or ws.vcs_branch, e) from e
+        raise vcs_unavailable(conn, repo, ref, e) from e
 
 
 #: Run-create attributes that only some engines consume, and which engine each

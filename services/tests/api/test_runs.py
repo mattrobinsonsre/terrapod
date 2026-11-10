@@ -1,6 +1,7 @@
 """Tests for run CRUD and lifecycle endpoints with RBAC."""
 
 import json
+import textwrap
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -2991,3 +2992,160 @@ class TestThePhaseProfilesAreSerialisedByName:
         out = self._json({"apply": "not-an-object", "plan": {"peak_memory_bytes": 2}})
         assert "apply" not in out
         assert out["plan"]["peak-memory-bytes"] == 2
+
+
+class TestAFailedVCSFetchDuringRunCreation:
+    """A failed fetch is a handled error, and creates NO RUN (#2471).
+
+    Starting a run on a commit with no configuration version fetches the VCS
+    archive inside the request. When the git CLI failed, it raised a bare
+    `RuntimeError` — which is neither of the two exception types
+    `_fetch_vcs_config` catches, so it sailed past both into the catch-all and
+    the client got a bare 500 with the git error only in the API's own log.
+
+    The second property here matters more than the status codes, and it is why
+    these are one class: **a failed fetch must never fall back to an older
+    configuration version.** That is the tempting way to "handle" this error —
+    create the run against the last code that did fetch — and it means applying
+    code nobody asked for. The trigger path refuses for the same reason and says
+    so in the same words (#1396, where reusing the newest configuration version
+    applied unmerged code from an open pull request).
+    """
+
+    @staticmethod
+    def _vcs_workspace():
+        ws = _mock_workspace()
+        ws.vcs_connection_id = uuid.uuid4()
+        ws.vcs_repo_url = "https://github.com/o/r"
+        ws.vcs_branch = "main"
+        return ws
+
+    async def _post(self, ws, raising):
+        """POST a run against `ws`, with the config fetch raising `raising`."""
+        from terrapod.services import git_fetch  # noqa: F401  (imported for the caller's sake)
+
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for") as caps,
+            patch(
+                "terrapod.services.vcs_config_service.fetch_config_version",
+                side_effect=raising,
+            ),
+            patch("terrapod.api.routers.runs.run_service.create_run") as create,
+            patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv") as latest,
+        ):
+            caps.return_value = caps_for_level("write")
+            app, mock_db = _make_app(_user())
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = ws
+            mock_db.execute.return_value = result
+            mock_db.refresh = AsyncMock()
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/v2/runs",
+                    json={
+                        "data": {
+                            "attributes": {"plan-only": True},
+                            "relationships": {
+                                "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                            },
+                        }
+                    },
+                    headers=_AUTH,
+                )
+            return resp, create, latest
+
+    @pytest.mark.parametrize(
+        ("exc_name", "status"),
+        [
+            ("GitAccessDenied", 422),
+            ("GitUnsupported", 422),
+            ("GitTimeout", 504),
+            ("GitTransient", 502),
+        ],
+    )
+    async def test_each_failure_class_gets_its_own_status_never_a_500(self, exc_name, status):
+        from terrapod.services import git_fetch
+
+        kind = getattr(git_fetch, exc_name)
+        resp, _create, _latest = await self._post(
+            self._vcs_workspace(), kind("git checkout failed (exit 128): remote: boom")
+        )
+        assert resp.status_code == status, resp.text
+        assert resp.status_code != 500
+
+    async def test_the_git_error_reaches_the_caller_rather_than_only_the_log(self):
+        """The whole complaint: the client got "Internal Server Error" and the
+        git error was in the API's log, where the person who clicked cannot see
+        it."""
+        from terrapod.services import git_fetch
+
+        resp, _c, _l = await self._post(
+            self._vcs_workspace(),
+            git_fetch.GitTransient("git checkout failed (exit 128): remote: Repository not found."),
+        )
+        assert "Repository not found" in resp.text
+        assert "Nothing was created" in resp.text
+
+    @pytest.mark.parametrize(
+        "exc_name", ["GitAccessDenied", "GitUnsupported", "GitTimeout", "GitTransient"]
+    )
+    async def test_a_failed_fetch_never_falls_back_to_older_code(self, exc_name):
+        """The invariant. No run, and the older-configuration-version lookup is
+        never even reached.
+
+        Asserted on BOTH, because either alone would pass the wrong fix: a run
+        created against stale code still answers 201 with no run-creation error,
+        and a lookup that happens but is discarded is one edit away from being
+        used.
+        """
+        from terrapod.services import git_fetch
+
+        kind = getattr(git_fetch, exc_name)
+        resp, create, latest = await self._post(
+            self._vcs_workspace(), kind("git fetch failed (exit 128): remote: boom")
+        )
+        assert resp.status_code >= 400, "a run was created despite the fetch failing"
+        create.assert_not_called()
+        latest.assert_not_called()
+
+    def test_the_older_CV_fallback_still_REQUIRES_a_non_VCS_workspace(self):
+        """A structural pin on the guard, because the behavioural tests above
+        cannot reach it.
+
+        They cannot because the exception propagates, so the fallback is never
+        evaluated — which means relaxing its condition is invisible to them
+        (checked: that mutation passes every test above). The condition is what
+        keeps a VCS workspace off the stale-code path if some future change ever
+        leaves `cv_uuid` unset WITHOUT raising, and it is one edit from being
+        dropped as redundant.
+        """
+        import ast
+        import inspect
+
+        from terrapod.api.routers import runs as runs_router
+
+        src = inspect.getsource(runs_router.create_run)
+        tree = ast.parse(textwrap.dedent(src))
+        guards = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.If)
+            and any(
+                isinstance(c, ast.Call)
+                and isinstance(c.func, ast.Attribute)
+                and c.func.attr == "get_latest_uploaded_cv"
+                for c in ast.walk(n)
+            )
+        ]
+        assert guards, "create_run no longer reaches get_latest_uploaded_cv; re-point this gate"
+        # The innermost `if` containing the call is the guard itself.
+        guard = min(guards, key=lambda n: (n.end_lineno or 0) - n.lineno)
+        cond = ast.dump(guard.test)
+        assert "vcs_connection_id" in cond and "vcs_repo_url" in cond, (
+            "the older-configuration-version fallback no longer requires the workspace to "
+            "have no VCS connection, so a VCS workspace could be run against whatever code "
+            "last fetched successfully"
+        )

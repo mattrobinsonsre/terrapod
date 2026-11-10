@@ -1416,6 +1416,27 @@ The `configuration-version` relationship is optional. Resolution rules:
 
 The CLI plan/apply flow always supplies a CV (it uploads one first), so it's unaffected by the fallback.
 
+**When the automatic fetch fails**, the request fails and **no run is created**
+(#2471). The response names the repository and ref, ends with `Nothing was
+created`, and carries git's own message with the credential stripped:
+
+| Status | Cause |
+|---|---|
+| `422` | The credential cannot reach the repository, the repository does not exist, or the server lacks a capability the fetch needs. A retry cannot help. Note that providers answer `Repository not found` for a private repository a token cannot see, so this status does not distinguish the two. |
+| `502` | A transient provider failure. The step where this is most common is retried once automatically, so a 502 means it failed twice. Carries `X-Terrapod-Upstream-Failure: vcs`. |
+| `504` | The fetch exceeded its timeout. Also carries the header above. |
+
+Before 2.0 all three were a bare `500`, with the git error only in the API's own
+log — so a client could not tell a provider outage from a Terrapod bug.
+
+**There is no fallback to an older configuration version**, on a VCS-connected
+workspace, ever. The `latest fully-uploaded CV` rule above applies only to a
+workspace with no VCS connection; a VCS workspace whose fetch fails produces no
+run rather than a run against whatever code last fetched successfully. Applying
+code nobody asked for is the worse outcome, and the same rule governs run
+triggers for the same reason. See
+[A run will not start](runbooks.md#a-run-will-not-start-the-code-could-not-be-fetched).
+
 #### Optional Run Attributes
 
 | Attribute | Type | Default | Description |

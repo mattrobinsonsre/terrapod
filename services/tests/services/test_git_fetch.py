@@ -752,3 +752,221 @@ class TestSubmoduleStepIsWiredIntoTheFetch:
         checkout_at = next(i for i, c in enumerate(calls) if "checkout" in c)
         submodule_at = next(i for i, c in enumerate(calls) if "submodule" in c)
         assert submodule_at > checkout_at
+
+
+class TestWhichKindOfFailureGitReported:
+    """A git failure is typed, so a caller can tell a workspace that cannot be
+    fetched from a provider that was briefly unavailable (#2471).
+
+    Every failure used to be a bare `RuntimeError`, which is neither of the two
+    things `_fetch_vcs_config` catches — so a failed clone during run creation
+    sailed past both handlers into the catch-all and answered a bare 500, with
+    the git error only in the API's own log.
+    """
+
+    @pytest.mark.parametrize(
+        ("stderr", "want"),
+        [
+            ("fatal: Authentication failed for 'https://host/o/r.git/'", git_fetch.GitAccessDenied),
+            ("remote: Repository not found.", git_fetch.GitAccessDenied),
+            ("fatal: could not read Username for 'https://host'", git_fetch.GitAccessDenied),
+            ("remote: Permission denied", git_fetch.GitAccessDenied),
+            ("error: 403 Forbidden", git_fetch.GitAccessDenied),
+            ("fatal: server does not support --filter", git_fetch.GitUnsupported),
+            ("fatal: filtering not recognized by server, ignoring", git_fetch.GitUnsupported),
+            ("fatal: unable to access: Could not resolve host: github.com", git_fetch.GitTransient),
+            ("fatal: unable to access: Connection reset by peer", git_fetch.GitTransient),
+            ("error: RPC failed; HTTP 502", git_fetch.GitTransient),
+            ("fatal: the remote end hung up unexpectedly", git_fetch.GitTransient),
+            ("fatal: early EOF", git_fetch.GitTransient),
+            ("error: 503 Service Unavailable", git_fetch.GitTransient),
+        ],
+    )
+    def test_gits_own_words_decide_the_class(self, stderr, want) -> None:
+        assert git_fetch._classify(stderr, reachability_proven=False) is want
+
+    def test_something_unrecognised_is_TRANSIENT_not_permanent(self) -> None:
+        """Fail toward "try again" rather than toward "your configuration is
+        wrong". An unknown message told to an operator as a permanent fault
+        sends them to check a connection that is fine; told as transient, the
+        worst case is one wasted retry and an honest 502.
+        """
+        assert (
+            git_fetch._classify("fatal: something nobody has seen", reachability_proven=False)
+            is git_fetch.GitTransient
+        )
+
+    def test_a_refusal_AFTER_a_successful_fetch_is_transient(self) -> None:
+        """The reported case, and the whole reason `reachability_proven` exists.
+
+        The partial-clone fetch succeeded and the checkout's promisor refetch
+        answered `Repository not found` — on a repository that same credential
+        had just read, and the sequence replayed later worked. Classified as
+        access-denied it would tell an operator their connection cannot see a
+        repository it demonstrably could.
+        """
+        assert (
+            git_fetch._classify("remote: Repository not found.", reachability_proven=True)
+            is git_fetch.GitTransient
+        )
+
+    def test_but_an_UNSUPPORTED_server_stays_unsupported_either_way(self) -> None:
+        """Proving the flip is narrow. A server that lacks a capability lacks it
+        whether or not an earlier step worked, so a blanket "everything after a
+        good fetch is transient" would retry something that cannot succeed and
+        then report it as an outage."""
+        for proven in (True, False):
+            assert (
+                git_fetch._classify(
+                    "fatal: server does not support --filter", reachability_proven=proven
+                )
+                is git_fetch.GitUnsupported
+            )
+
+    def test_every_class_is_a_RuntimeError(self) -> None:
+        """Existing callers catch `RuntimeError` or `Exception`, so introducing
+        these types must change nothing for them. The archive cache's
+        delete-the-partial-entry handler is the one that matters."""
+        for kind in (
+            git_fetch.GitError,
+            git_fetch.GitTimeout,
+            git_fetch.GitAccessDenied,
+            git_fetch.GitUnsupported,
+            git_fetch.GitTransient,
+        ):
+            assert issubclass(kind, RuntimeError)
+
+
+class TestTheCredentialIsStrippedFromGitsOutput:
+    """`_run_git` promised this in a comment and did not do it (#2471).
+
+    Survivable while the message only reached the API's own log; the run-creation
+    path now puts it in front of whoever started the run, so the claim has to
+    become true.
+    """
+
+    HEADER = "Bearer ghs_exampletokenvalue123456"
+
+    def test_the_whole_header_is_removed(self) -> None:
+        out = git_fetch._redact(f"fatal: sent {self.HEADER} upstream", self.HEADER)
+        assert self.HEADER not in out
+        assert "[redacted]" in out
+
+    def test_the_bare_token_is_removed_too(self) -> None:
+        """A URL-shaped echo carries the token without the scheme word."""
+        token = self.HEADER.split()[-1]
+        out = git_fetch._redact(f"fatal: https://x:{token}@host/o/r.git not found", self.HEADER)
+        assert token not in out
+
+    def test_nothing_to_redact_leaves_the_message_alone(self) -> None:
+        msg = "fatal: repository 'https://host/o/r.git/' not found"
+        assert git_fetch._redact(msg, None) == msg
+        assert git_fetch._redact(msg, self.HEADER) == msg
+
+    def test_a_short_value_is_not_used_as_a_needle(self) -> None:
+        """A pathologically short header would black out ordinary words — the
+        same trade as the log redactor's floor, and here there is nothing to
+        gain, because no real credential is that short."""
+        assert git_fetch._redact("fatal: a bad thing", "ab") == "fatal: a bad thing"
+
+
+class TestTheBoundedRetry:
+    """The checkout gets one more attempt; nothing else does (#2471).
+
+    Driven by replacing the subprocess, which is the seam: the loop's property
+    is HOW MANY times git is invoked, and that is not observable from the
+    outside any other way.
+    """
+
+    @staticmethod
+    def _fake_exec(outcomes: list[tuple[int, bytes]], calls: list[list[str]]):
+        """A `create_subprocess_exec` that returns each outcome in turn."""
+        it = iter(outcomes)
+
+        async def _exec(*cmd, **_kw):
+            calls.append(list(cmd))
+            rc, err = next(it)
+            proc = MagicMock()
+
+            async def _communicate():
+                return (b"", err)
+
+            proc.communicate = _communicate
+            proc.returncode = rc
+            return proc
+
+        return _exec
+
+    async def test_a_transient_failure_is_retried_once_and_then_succeeds(self, monkeypatch) -> None:
+        calls: list[list[str]] = []
+        monkeypatch.setattr(
+            git_fetch.asyncio,
+            "create_subprocess_exec",
+            self._fake_exec([(128, b"fatal: early EOF"), (0, b"")], calls),
+        )
+        monkeypatch.setattr(git_fetch, "_RETRY_BACKOFF_SECONDS", 0)
+        await git_fetch._run_git(["status"], retries=1)
+        assert len(calls) == 2, "the transient failure was not retried"
+
+    async def test_a_transient_failure_that_persists_raises_after_the_retry(
+        self, monkeypatch
+    ) -> None:
+        calls: list[list[str]] = []
+        monkeypatch.setattr(
+            git_fetch.asyncio,
+            "create_subprocess_exec",
+            self._fake_exec([(128, b"fatal: early EOF")] * 2, calls),
+        )
+        monkeypatch.setattr(git_fetch, "_RETRY_BACKOFF_SECONDS", 0)
+        with pytest.raises(git_fetch.GitTransient):
+            await git_fetch._run_git(["status"], retries=1)
+        assert len(calls) == 2, "retried more than the bound, or not at all"
+
+    async def test_an_access_denial_is_NOT_retried(self, monkeypatch) -> None:
+        """It would be the same the second time, and retrying only doubles the
+        wait before the operator is told something they can act on."""
+        calls: list[list[str]] = []
+        monkeypatch.setattr(
+            git_fetch.asyncio,
+            "create_subprocess_exec",
+            self._fake_exec([(128, b"remote: Repository not found.")], calls),
+        )
+        monkeypatch.setattr(git_fetch, "_RETRY_BACKOFF_SECONDS", 0)
+        with pytest.raises(git_fetch.GitAccessDenied):
+            await git_fetch._run_git(["status"], retries=1)
+        assert len(calls) == 1, "a permanent failure was retried"
+
+    async def test_nothing_is_retried_by_default(self, monkeypatch) -> None:
+        """`retries` defaults to 0, so every step except the checkout keeps
+        exactly the behaviour it had — a fetch that fails is re-driven by the
+        caller, not silently doubled in cost."""
+        calls: list[list[str]] = []
+        monkeypatch.setattr(
+            git_fetch.asyncio,
+            "create_subprocess_exec",
+            self._fake_exec([(128, b"fatal: early EOF")], calls),
+        )
+        with pytest.raises(git_fetch.GitTransient):
+            await git_fetch._run_git(["status"])
+        assert len(calls) == 1
+
+    def test_the_CHECKOUT_is_the_step_that_carries_the_retry(self) -> None:
+        """A source gate, because the behavioural tests above drive `_run_git`
+        directly and so say nothing about which caller asks for a retry.
+
+        The checkout is the step whose promisor refetch was observed failing
+        once and succeeding on a replay (#2471). If the retry moves to the
+        fetch, or the checkout loses it, this is what says so.
+        """
+        import inspect
+
+        src = inspect.getsource(git_fetch)
+        checkout = src.index('"checkout", "--quiet", sha')
+        after = src[checkout : checkout + 400]
+        assert "retries=1" in after, "the checkout no longer retries"
+        assert "reachability_proven=True" in after, (
+            "the checkout no longer tells the classifier that the fetch already "
+            "succeeded, so a one-off blip reads as a missing repository"
+        )
+        # And nothing else asks for one, so the bound stays where it was argued.
+        assert src.count("retries=1") == 1, "another step gained a retry without a reason"
