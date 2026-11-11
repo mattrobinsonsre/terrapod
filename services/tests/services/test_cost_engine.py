@@ -213,6 +213,11 @@ def _res(addr, rtype, name, values):
     return {"address": addr, "type": rtype, "name": name, "mode": "managed", "values": values}
 
 
+def _data(addr, rtype, name, values):
+    """A data source, which is what `mode` distinguishes (#2505)."""
+    return {"address": addr, "type": rtype, "name": name, "mode": "data", "values": values}
+
+
 def test_resources_from_plan_add_remove_noop():
     web = _res("aws_instance.web", "aws_instance", "web", {"instance_type": "m5.large"})
     db = _res("aws_db_instance.db", "aws_db_instance", "db", {"instance_class": "db.t3.medium"})
@@ -230,6 +235,69 @@ def resources_from_plan_helper(plan):
     from terrapod.services.cost.tf import resources_from_plan
 
     return resources_from_plan(plan)
+
+
+def test_a_data_source_in_prior_state_is_not_a_removal():
+    """`refresh` records data sources in prior_state and planned_values does not
+    carry them, so without a mode filter every data source of a priced type is
+    classed `remove` -- and the pricer signs a removal negative (#2505).
+
+    The managed resource beside it is the control: it is in exactly the same
+    position (prior only) and MUST still be a removal, so this cannot pass by
+    the filter dropping everything.
+    """
+    read = _data("data.aws_instance.selected", "aws_instance", "selected", {})
+    gone = _res("aws_instance.old", "aws_instance", "old", {})
+    plan = _plan(resources=[], prior=[read, gone])
+    got = {r.address: change for r, change in resources_from_plan_helper(plan)}
+    assert got == {"aws_instance.old": "remove"}
+
+
+def test_a_data_source_in_the_planned_side_is_not_an_addition():
+    read = _data("data.aws_instance.selected", "aws_instance", "selected", {})
+    plan = _plan(resources=[read], prior=[])
+    assert resources_from_plan_helper(plan) == []
+
+
+def test_a_data_source_in_a_child_module_is_also_skipped():
+    """The filter is in the recursive loader, so nesting does not evade it."""
+    read = _data("module.m.data.aws_instance.r", "aws_instance", "r", {})
+    kept = _res("module.m.aws_instance.k", "aws_instance", "k", {})
+    plan = {
+        "format_version": "1.2",
+        "terraform_version": "1.9.0",
+        "planned_values": {"root_module": {"resources": []}},
+        "prior_state": {
+            "values": {
+                "root_module": {
+                    "resources": [],
+                    "child_modules": [{"resources": [read, kept]}],
+                }
+            }
+        },
+    }
+    got = {r.address: change for r, change in resources_from_plan_helper(plan)}
+    assert got == {"module.m.aws_instance.k": "remove"}
+
+
+def test_a_data_source_in_state_output_is_not_a_current_cost():
+    from terrapod.services.cost.tf import resources_from_state
+
+    read = _data("data.aws_instance.selected", "aws_instance", "selected", {})
+    kept = _res("aws_instance.web", "aws_instance", "web", {})
+    state = {"values": {"root_module": {"resources": [read, kept]}}}
+    assert [r.address for r, _ in resources_from_state(state)] == ["aws_instance.web"]
+
+
+def test_a_resource_with_no_mode_is_treated_as_managed():
+    """Absent only in hand-built or older documents; erring toward pricing it
+    matches `resources_from_state_v4` and never silently drops a real resource.
+    """
+    from terrapod.services.cost.tf import resources_from_state
+
+    bare = {"address": "aws_instance.web", "type": "aws_instance", "name": "web", "values": {}}
+    state = {"values": {"root_module": {"resources": [bare]}}}
+    assert [r.address for r, _ in resources_from_state(state)] == ["aws_instance.web"]
 
 
 def test_resources_from_state_v4_lifts_attributes():
@@ -466,6 +534,36 @@ def test_estimate_remove_negates_and_diffs():
     assert est.diff_min == pytest.approx(-73.0)
     assert est.prev_min == pytest.approx(0.0)  # total - diff
     assert est.resources[0].change == "remove"
+
+
+def test_estimate_does_not_price_reads_as_a_large_negative_delta():
+    """The issue's own reproduce (#2505): a configuration that only *reads*
+    instances and changes nothing priced must not report a negative monthly
+    total. Three reads of a priced type at full price came to -974.11.
+    """
+    reads = [
+        _data(f'data.aws_instance.selected["i-{n}"]', "aws_instance", "selected", {})
+        for n in ("aaa", "bbb", "ccc")
+    ]
+    plan = _plan(resources=[], prior=reads)
+    est = estimate(plan, _sheet())
+    assert est.total_min == pytest.approx(0.0)
+    assert est.total_max == pytest.approx(0.0)
+    assert est.diff_min == pytest.approx(0.0)
+    assert est.resources == []
+    assert est.unpriced == []
+
+
+def test_estimate_still_negates_a_real_removal_alongside_a_read():
+    """The control for the test above: a managed resource removed in the same
+    plan as the reads is still priced, and still negative.
+    """
+    read = _data('data.aws_instance.selected["i-aaa"]', "aws_instance", "selected", {})
+    gone = _res("aws_instance.old", "aws_instance", "old", {})
+    plan = _plan(resources=[], prior=[read, gone])
+    est = estimate(plan, _sheet())
+    assert est.total_min == pytest.approx(-73.0)
+    assert [r.address for r in est.resources] == ["aws_instance.old"]
 
 
 def test_estimate_unpriced_bucket():

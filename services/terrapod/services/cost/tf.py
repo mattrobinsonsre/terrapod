@@ -138,8 +138,29 @@ def _resource_of_obj(obj: dict[str, Any]) -> Resource:
 
 
 def _load_module_resources(module: dict[str, Any]) -> list[Resource]:
-    """Recursively collect resources from a ``root_module`` / child module."""
-    resources = [_resource_of_obj(r) for r in module.get("resources", [])]
+    """Recursively collect *managed* resources from a ``root_module`` / child module.
+
+    Data sources are skipped, and the filter lives here rather than in each
+    caller because all three of them need it: the plan diff reads this for both
+    the prior and planned sides, and the state reader for the whole state.
+
+    A data source costs nothing, and leaving it in did worse than add a zero.
+    `refresh` records data sources in `prior_state` while `planned_values` does
+    not carry them at all, so every data source of a priced type landed in
+    `prior_addrs - planned_addrs`, was classed `remove`, and the pricer signs a
+    removal negative. A configuration that only *read* instances therefore
+    reported a large negative monthly delta -- one per instance read, at that
+    instance's full price -- for changing nothing priced (#2505).
+
+    `mode` is absent only in hand-built or older documents; defaulting it to
+    managed matches `resources_from_state_v4` below and errs toward pricing
+    something rather than silently dropping it.
+    """
+    resources = [
+        _resource_of_obj(r)
+        for r in module.get("resources", [])
+        if r.get("mode", "managed") == "managed"
+    ]
     for child in module.get("child_modules", []):
         resources.extend(_load_module_resources(child))
     return resources

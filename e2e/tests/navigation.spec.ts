@@ -96,5 +96,21 @@ test.describe('Navigation', () => {
     await openAccountMenu(page, 'Light theme');
     await page.getByRole('menuitem', { name: 'Light theme' }).click();
     await expect(html).not.toHaveClass(/\bdark\b/);
+    await expect(page.getByRole('menuitem', { name: 'Dark theme' })).toBeVisible();
+
+    // The way back is asserted as fully as the way out (#2501). Removing the
+    // class is the client's own doing and says nothing about whether the choice
+    // was stored, so without these three the `light` write could fail silently:
+    // the page would turn light, the next load would come back dark, and the
+    // only symptom is a theme that "does not stick". The dark direction was
+    // checked this way from the start and the light one was not, which is the
+    // asymmetry rather than the round trip itself.
+    await expect
+      .poll(async () => (await context.cookies()).find((c) => c.name === 'terrapod-theme')?.value)
+      .toBe('light');
+    const rawLight = await (await page.request.get('/workspaces')).text();
+    expect(rawLight).not.toMatch(/<html[^>]*class="[^"]*\bdark\b/);
+    await page.reload();
+    await expect(html).not.toHaveClass(/\bdark\b/);
   });
 });
