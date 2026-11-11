@@ -43,9 +43,16 @@ async def ready(response: Response) -> dict[str, str | dict[str, str]]:
     # DB hasn't got must report NOT READY (and get pulled from the LB) rather
     # than 500 every request against the missing column. Only meaningful once
     # the DB is reachable — a DB-down failure already fails readiness above.
+    #
+    # The prefix is "skew" rather than "behind" because skew has two directions
+    # and only one of them is behind (#2500). A schema *ahead* of this code is
+    # the normal state of a rolling upgrade and reports healthy; what reaches
+    # this branch is either a genuinely behind schema or a contraction this
+    # code predates, and labelling both "behind" sent an operator looking for
+    # a migration that had in fact succeeded.
     if checks["database"] == "healthy":
         schema_ok, schema_detail = await schema_is_current()
-        checks["migrations"] = "healthy" if schema_ok else f"behind: {schema_detail}"
+        checks["migrations"] = "healthy" if schema_ok else f"skew: {schema_detail}"
 
     all_healthy = all(v == "healthy" for v in checks.values())
 

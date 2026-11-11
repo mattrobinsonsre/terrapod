@@ -1721,18 +1721,29 @@ Fires from the bundled `TerrapodAPIDown` alert: no `terrapod-api` scrape target 
    ```bash
    kubectl exec -n <ns> deploy/terrapod-api -- python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/ready').read())" 2>&1 || true
    ```
-   Read the `checks` map: a `database`/`redis` down almost always means a dependency is down — see [DB Pool Exhaustion](#db-pool-exhaustion) / [Redis Connection Loss](#redis-connection-loss). A `"migrations": "behind: ..."` means **app ↔ schema skew** (#544) — this pod's code expects a migration the DB hasn't got, so it deliberately reports NOT READY (and is pulled from the LB) instead of 500-ing every request against the missing column. Startup also logs a loud `SCHEMA SKEW` warning.
+   Read the `checks` map: a `database`/`redis` down almost always means a dependency is down — see [DB Pool Exhaustion](#db-pool-exhaustion) / [Redis Connection Loss](#redis-connection-loss). A `"migrations": "skew: ..."` means **app ↔ schema skew** (#544) — this pod cannot safely serve against the schema it found, so it deliberately reports NOT READY (and is pulled from the LB) instead of 500-ing every request. Startup also logs a loud `SCHEMA SKEW` warning.
+
+   **Read the detail, because skew has two directions and only one of them is a missed migration (#2500):**
+
+   | detail says | what it means | ready? |
+   |---|---|---|
+   | `BEHIND this code's head …` | the migration for this version did not apply. This pod's code expects a column the database has not got. | no — correct |
+   | `ahead of this code's head …` | the schema is newer than this pod's image. **This is normal during a rolling upgrade** and the pod stays ready; you will see it in the log, not in a failing probe. | yes |
+   | `a CONTRACTING migration (…) has been applied that this code predates` | a newer release removed a column this pod's image still reads. The pod is correctly out of service and **cannot** be made ready — it has to be replaced. | no — correct |
+
+   A pod reporting the middle row is not a fault to chase. Before #2500 it reported as *behind*, which sent operators looking for a migration that had in fact succeeded.
 3. **Recent rollout:**
    ```bash
    kubectl rollout history deploy/terrapod-api -n <ns>
    ```
    A bad image/config (e.g. a migration that didn't run) often correlates with the outage start.
-4. **Migrations** — if `checks.migrations` is `behind`, the migration Job for the current version did not apply (failed pre-upgrade hook that let the rollout proceed, a bare `kubectl set image`, or ArgoCD sync ordering). The `detail` names the DB revision vs the code head.
+4. **Migrations** — if the detail says `BEHIND`, the migration Job for the current version did not apply (failed pre-upgrade hook that let the rollout proceed, a bare `kubectl set image`, or ArgoCD sync ordering). The detail names the DB revision and this code's head.
 
 ### Resolution
 
 - **Dependency down** → restore Postgres/Redis (their runbooks above); the API recovers on the next readiness probe.
-- **Schema skew (`checks.migrations` behind)** → run the Alembic migration Job (`helm upgrade` re-runs the pre-upgrade hook, or trigger the migration Job directly). Once the DB reaches the code head, the pods flip to ready on the next probe with no restart needed.
+- **Schema BEHIND** → run the Alembic migration Job (`helm upgrade` re-runs the pre-upgrade hook, or trigger the migration Job directly). Once the DB reaches the code head, the pods flip to ready on the next probe with no restart needed.
+- **A contraction this pod predates** → there is nothing to fix on the database side, and re-running migrations will not help: a column this image reads has been removed by a newer release. Finish the rollout so the pod is replaced by one that expects the new schema. If you need to go back, roll the *database* back first (every migration has a real `downgrade()`), then the image — not the other way round.
 - **Bad rollout** → `kubectl rollout undo deploy/terrapod-api -n <ns>`.
 - **OOM/crash** → check `kubectl logs --previous`; raise `api.resources` if genuinely under-provisioned (confirm with the OOM `reason` field, don't assume).
 - **Unschedulable** → free capacity or fix nodeSelector/taints.

@@ -574,6 +574,32 @@ multi-language implementation ships in the same PR**:
   (`tests/db/migration_contractions.json`); a new one fails CI until you
   consciously acknowledge it followed this discipline (regenerate the ledger
   with `UPDATE_API_CONTRACT=1 pytest tests/db/test_migration_contract.py`).
+
+  **A contraction that drops a column or table must also record itself at
+  runtime**, because the ledger is a review gate and the old pod cannot read it.
+  An API pod stays ready when the schema is *ahead* of its code — that is the
+  normal state of a rolling upgrade, and reporting those pods not ready empties
+  the load balancer for the length of the rollout (#2500) — so the only thing
+  that tells such a pod the schema is no longer safe for it is a row in
+  `schema_contractions`:
+
+  ```python
+  op.execute(
+      "INSERT INTO schema_contractions (revision, note) "
+      "VALUES ('<this revision>', '<what it drops and why it is safe>') "
+      "ON CONFLICT (revision) DO NOTHING"
+  )
+  ```
+
+  A pod refuses readiness on finding a revision there that its **own** revision
+  graph does not contain, which needs no ordering between revisions: a
+  contraction it has never heard of is newer than it, and one already in its
+  graph is one it is at or after. `drop_constraint` and `alter_column` need no
+  row — every column stays present and readable — which is why the gate asks
+  only for the two ops that remove something old code may still be reading.
+  `test_a_breaking_contraction_records_itself_in_the_marker_table` derives its
+  subject from the revision graph (the migrations descending from the one that
+  creates the table), so it needs no second ledger and no grandfather list.
 - **A release line's migrations are a prefix of `main`'s (hard requirement,
   gated)** — a release branch (`release/vX.Y`) and `main` can both add
   migrations, and a deployment on the release line must later upgrade to a

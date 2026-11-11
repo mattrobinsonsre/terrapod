@@ -47,9 +47,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await init_db()
     logger.info("Database initialized")
 
-    # App ↔ schema skew guard (#544): warm the code-head cache and loudly warn
-    # if the DB schema is behind this app's expected migration head. Doesn't
-    # raise — a schema-behind pod boots and reports NOT READY via /ready.
+    # App ↔ schema skew guard (#544, #2500): warm the revision caches and warn
+    # about whichever direction the skew runs in. A schema *behind* this app
+    # means a migration did not run, and the pod boots so it can report NOT
+    # READY via /ready rather than crash-looping. A schema *ahead* is the normal
+    # state of a rolling upgrade and stays ready — it is logged as a warning
+    # because it is worth seeing, not because it is a fault. Doesn't raise.
     from terrapod.db.schema_version import check_schema_at_startup
 
     await check_schema_at_startup()

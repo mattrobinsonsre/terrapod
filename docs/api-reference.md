@@ -146,7 +146,8 @@ Returns 200 if the API process is running.
 GET /ready
 ```
 
-Checks database, Redis, and storage subsystems. Returns 200 if all healthy, 503 otherwise.
+Checks the database, Redis, storage, and whether this pod can safely serve
+against the schema it found. Returns 200 if all healthy, 503 otherwise.
 
 **Response (healthy):**
 ```json
@@ -155,10 +156,21 @@ Checks database, Redis, and storage subsystems. Returns 200 if all healthy, 503 
   "checks": {
     "database": "healthy",
     "redis": "healthy",
-    "storage": "healthy"
+    "storage": "healthy",
+    "migrations": "healthy"
   }
 }
 ```
+
+`migrations` is reported only once `database` is healthy — an unreachable
+database already fails readiness, and the check needs to read the applied
+revision. When it is not healthy the value is `skew: <detail>`, and the detail
+distinguishes three cases: the schema is **behind** this pod's code (the
+migration did not run), the schema is **ahead** of it (normal during a rolling
+upgrade — this one reports healthy and stays in service), or a **contracting**
+migration has been applied that this pod's image predates, in which case the pod
+must be replaced rather than fixed. See
+[runbooks.md](runbooks.md#api-down--not-ready) for the table.
 
 ---
 

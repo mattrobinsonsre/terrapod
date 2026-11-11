@@ -509,24 +509,33 @@ old a release later:
 | `terraform_version` → `engine_version` | `workspaces`, `runs`, `autodiscovery_rules` | it pins the version of whichever engine the workspace runs, and two of the three engines Terrapod now supports are not Terraform |
 | `hcl` → `structured` | `variables`, `variable_set_variables` | the flag answers whether a value is a raw expression rather than a string, which is the same question for Pulumi's stack config and Ansible's extra vars as it is for Terraform |
 
-**What that costs you.** Migrations run as a pre-upgrade hook, and the API rolls
-with `maxSurge: 1, maxUnavailable: 0`, so between the hook finishing and the last
-old pod being replaced there are replicas running code that selects a column no
-longer there. Requests those pods serve in that window fail. It is seconds to a
-couple of minutes, and it self-heals — no data is at risk and nothing needs
+**What that costs you.** Migrations run as a pre-upgrade hook, so the schema is
+renamed before any 2.0 pod exists. A 1.x pod then finds a revision its own
+migrations have never heard of and reports **not ready**, so it is pulled from
+the load balancer rather than left serving requests against a column that is no
+longer there. The API is therefore *unavailable* from the moment the hook
+completes until the first 2.0 pod passes its readiness probe — seconds to a
+couple of minutes. It self-heals, no data is at risk, and nothing needs
 re-running.
 
-**Which requests fail.** For `engine_version`, anything reading or writing a
-workspace, a run or an autodiscovery rule — most of the API. For `structured`,
-variable and variable-set reads and writes, which is the surface `tofu`,
-`terraform` and `tfci` drive — **and** the server-side variable resolution a
-runner's run claim depends on, so a run claimed in that window fails to be handed
-its variables rather than only a variable edit failing. Expect CLI and `tfci`
-variable operations to error in the window, not just the UI's variables tab.
+Unavailable is the better of the two outcomes: no request is served a wrong
+answer and no write lands half-applied against a renamed column. But it is a
+gap, not a trickle of errors, and it is worth planning for if you front Terrapod
+with something that alarms on a hard outage.
 
-**If you cannot take even that**, scale the API to one replica for the upgrade and
-back up afterwards; a single replica is replaced rather than overlapped, so there
-is no window at all.
+**Scaling the API down does not remove the gap**, which an earlier version of
+this page said it would. The hook runs before any new pod is created, so a single
+replica is just as unready as three; what decides the length of the gap is how
+fast one 2.0 pod reaches readiness. If you need a genuinely silent upgrade, take
+a deliberate window: stop traffic, upgrade, resume.
+
+**This is the last upgrade that behaves this way.** From 2.0 onward an API pod
+stays ready when the schema is merely *ahead* of its code, which is what makes a
+rolling upgrade zero-downtime for an additive migration (#2500). The fix lives in
+2.0's image, so it cannot help the upgrade *into* 2.0 — the pods being replaced
+are 1.x pods running 1.x code. A later release that genuinely removes a column
+records itself in `schema_contractions`, and pods that predate it go not-ready
+deliberately, as these ones do.
 
 Terrapod's normal rule is expand/contract — add the new column, dual-write, drop
 the old one a release later — precisely so this window does not exist. It is
