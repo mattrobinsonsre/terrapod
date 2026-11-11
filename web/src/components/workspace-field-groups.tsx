@@ -87,6 +87,7 @@ function Control({
   placeholder,
   min,
   max,
+  nullable,
 }: {
   attr: string
   ctx: GroupCtx
@@ -95,6 +96,18 @@ function Control({
   placeholder?: string
   min?: number
   max?: number
+  /**
+   * Empty box means `null` rather than `0`, for a number whose unset state is a
+   * real value -- `configure_parallelism`'s unset means "inherit parallelism"
+   * (#2499).
+   *
+   * Needed because `Number('')` is `0`, so without it clearing the box sends a
+   * zero. For this setting the server REFUSES zero deliberately (terraform
+   * reads `-parallelism=0` as "no limit"), so the box would 422 on being
+   * cleared -- and for any other nullable number it would silently store 0
+   * where the author meant "unset".
+   */
+  nullable?: boolean
 }) {
   const spec = FIELD_BY_ATTR[attr]
   const id = spec?.id ?? attr
@@ -172,9 +185,19 @@ function Control({
       min={min}
       max={max}
       disabled={disabled}
-      onChange={(e) =>
-        ctx.onChange(attr, kind === 'number' ? Number(e.target.value) : e.target.value)
-      }
+      onChange={(e) => {
+        if (kind !== 'number') {
+          ctx.onChange(attr, e.target.value)
+          return
+        }
+        // `Number('')` is 0, so an empty box has to be handled before the
+        // coercion rather than after it.
+        if (nullable && e.target.value === '') {
+          ctx.onChange(attr, null)
+          return
+        }
+        ctx.onChange(attr, Number(e.target.value))
+      }}
       className={cls}
     />
   )
@@ -190,6 +213,7 @@ export function Field({
   placeholder,
   min,
   max,
+  nullable,
   control,
 }: {
   attr: string
@@ -201,6 +225,8 @@ export function Field({
   placeholder?: string
   min?: number
   max?: number
+  /** Empty box means `null` rather than `0`; see `Control` above (#2499). */
+  nullable?: boolean
   /**
    * A bespoke control in place of the primitive.
    *
@@ -270,6 +296,7 @@ export function Field({
           placeholder={placeholder}
           min={min}
           max={max}
+          nullable={nullable}
         />
       )}
     </WsField>

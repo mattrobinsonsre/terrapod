@@ -418,6 +418,11 @@ def _run_json(
                 "terragrunt-version": run.terragrunt_version,
                 "resource-cpu": run.resource_cpu,
                 "parallelism": run.parallelism,
+                # The configure phase's own (#2499). Always emitted, like its
+                # sibling: the runner cannot know the workspace's setting
+                # otherwise, and a default drifting between API and runner
+                # across a version skew would be invisible.
+                "configure-parallelism": run.configure_parallelism,
                 "resource-memory": run.resource_memory,
                 # The Ansible execution environment this run uses, and how big
                 # its sidecar is (#2154). Already RESOLVED on the run, so the

@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Główny przycisk uruchamiania",
       "defaultRunKindAuto": "Automatycznie (najpełniejszy)",
       "defaultRunKindLead": "Która akcja otrzymuje w tym obszarze roboczym wyróżniony przycisk. Automatycznie proponuje najpełniejszy przebieg, jaki jest możliwy.",
-      "defaultRunKindTitle": "Która akcja otrzymuje w tym obszarze roboczym wyróżniony przycisk. Automatycznie proponuje najpełniejszy przebieg, jaki jest możliwy — zwykle słusznie, a niesłusznie tam, gdzie codzienną akcją nie jest ta największa: obszar roboczy, którego część Terraform tylko utrzymuje inwentarz Ansible, w którym stosowanie przebiega bez nadzoru i po którym nigdy nie następuje konfiguracja, chce tu mieć Konfiguruj. Wybór, którego ten obszar roboczy nie może zaoferować, zostaje odrzucony przy zapisie, a ten, którego nie może uruchomić Twoja rola, wraca dla Ciebie do Automatycznie."
+      "defaultRunKindTitle": "Która akcja otrzymuje w tym obszarze roboczym wyróżniony przycisk. Automatycznie proponuje najpełniejszy przebieg, jaki jest możliwy — zwykle słusznie, a niesłusznie tam, gdzie codzienną akcją nie jest ta największa: obszar roboczy, którego część Terraform tylko utrzymuje inwentarz Ansible, w którym stosowanie przebiega bez nadzoru i po którym nigdy nie następuje konfiguracja, chce tu mieć Konfiguruj. Wybór, którego ten obszar roboczy nie może zaoferować, zostaje odrzucony przy zapisie, a ten, którego nie może uruchomić Twoja rola, wraca dla Ciebie do Automatycznie.",
+      "configureParallelism": "Równoległość konfiguracji",
+      "configureParallelismTitle": "Ile hostów konfiguracja obsługuje jednocześnie — forks w ansible (1-256). Pozostaw puste, aby odziedziczyć Równoległość. Osobne ustawienie, ponieważ rozmiar środowiska wykonawczego ustala się niezależnie od orkiestratora.",
+      "configureParallelismLead": "Ile hostów konfiguracja obsługuje jednocześnie — forks w ansible (1-256). Pozostaw puste, aby odziedziczyć Równoległość."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

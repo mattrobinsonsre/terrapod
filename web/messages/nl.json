@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Primaire runknop",
       "defaultRunKindAuto": "Automatisch (meest volledige run)",
       "defaultRunKindLead": "Welke actie in deze workspace de opvallende knop krijgt. Automatisch biedt de meest volledige run die mogelijk is.",
-      "defaultRunKindTitle": "Welke actie in deze workspace de opvallende knop krijgt. Automatisch biedt de meest volledige run die mogelijk is — meestal goed, en verkeerd waar de dagelijkse actie niet de grootste is: een workspace waarvan de Terraform-helft alleen de Ansible-inventaris onderhoudt, onbeheerd toepast en na een toepassing nooit configureert, wil hier Configureren. Een keuze die deze workspace niet kan aanbieden wordt geweigerd als je opslaat, en een keuze die je rol niet mag uitvoeren valt voor jou terug op Automatisch."
+      "defaultRunKindTitle": "Welke actie in deze workspace de opvallende knop krijgt. Automatisch biedt de meest volledige run die mogelijk is — meestal goed, en verkeerd waar de dagelijkse actie niet de grootste is: een workspace waarvan de Terraform-helft alleen de Ansible-inventaris onderhoudt, onbeheerd toepast en na een toepassing nooit configureert, wil hier Configureren. Een keuze die deze workspace niet kan aanbieden wordt geweigerd als je opslaat, en een keuze die je rol niet mag uitvoeren valt voor jou terug op Automatisch.",
+      "configureParallelism": "Configure-parallellisme",
+      "configureParallelismTitle": "Hoeveel hosts een configure tegelijk aanstuurt — de forks van ansible (1-256). Laat leeg om Parallellisme over te nemen. Apart, omdat de uitvoeringsomgeving los van de orchestrator wordt gedimensioneerd.",
+      "configureParallelismLead": "Hoeveel hosts een configure tegelijk aanstuurt — de forks van ansible (1-256). Laat leeg om Parallellisme over te nemen."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

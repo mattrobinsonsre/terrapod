@@ -261,6 +261,24 @@ def effective_ee_resources(
     )
 
 
+def effective_configure_parallelism(configure_parallelism: int | None, parallelism: int) -> int:
+    """How many hosts a configure drives at once, for a workspace (#2499).
+
+    The single resolver, for the reason `effective_ee_resources` above is single:
+    two sites deciding the number is how a run's recorded concurrency comes to
+    differ from the concurrency its Job was actually given. Resolved once at run
+    creation and snapshotted onto the run, so the figure survives the workspace
+    being edited mid-flight.
+
+    `None` means inherit `parallelism`, which is what every workspace did before
+    this setting existed -- so adding it changed nothing. Deliberately NOT `0` as
+    the inherit marker: `validate_parallelism` rejects `0` because terraform
+    reads `-parallelism=0` as "no limit", and reusing it here would make one
+    setting's inherit marker another's unbounded.
+    """
+    return configure_parallelism if configure_parallelism is not None else parallelism
+
+
 #: A guard against a value that is certainly a mistake, not a limit the
 #: scanners impose.
 MAX_SCAN_SKIP_RULES = 200

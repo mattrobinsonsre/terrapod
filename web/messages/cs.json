@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Hlavní tlačítko spuštění",
       "defaultRunKindAuto": "Automaticky (nejúplnější)",
       "defaultRunKindLead": "Která akce dostane v tomto pracovním prostoru výrazné tlačítko. Automaticky nabídne nejúplnější běh, jaký může.",
-      "defaultRunKindTitle": "Která akce dostane v tomto pracovním prostoru výrazné tlačítko. Automaticky nabídne nejúplnější běh, jaký může — obvykle správně, a nesprávně tam, kde každodenní akcí není ta největší: pracovní prostor, jehož část Terraform pouze udržuje inventář Ansible, kde použití probíhá bez dozoru a po němž se nikdy nekonfiguruje, chce zde Konfigurovat. Volba, kterou tento pracovní prostor nabídnout nemůže, je při uložení odmítnuta, a ta, kterou vaše role nemůže spustit, se pro vás vrátí na Automaticky."
+      "defaultRunKindTitle": "Která akce dostane v tomto pracovním prostoru výrazné tlačítko. Automaticky nabídne nejúplnější běh, jaký může — obvykle správně, a nesprávně tam, kde každodenní akcí není ta největší: pracovní prostor, jehož část Terraform pouze udržuje inventář Ansible, kde použití probíhá bez dozoru a po němž se nikdy nekonfiguruje, chce zde Konfigurovat. Volba, kterou tento pracovní prostor nabídnout nemůže, je při uložení odmítnuta, a ta, kterou vaše role nemůže spustit, se pro vás vrátí na Automaticky.",
+      "configureParallelism": "Paralelismus konfigurace",
+      "configureParallelismTitle": "Kolik hostitelů konfigurace obsluhuje současně — forks v ansible (1-256). Nechte prázdné, aby se zdědil Paralelismus. Samostatné nastavení, protože běhové prostředí se dimenzuje nezávisle na orchestrátoru.",
+      "configureParallelismLead": "Kolik hostitelů konfigurace obsluhuje současně — forks v ansible (1-256). Nechte prázdné, aby se zdědil Paralelismus."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

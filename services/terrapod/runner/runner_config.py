@@ -104,7 +104,15 @@ class RunnerConfig:
     ansible_limit: str
     #: How many operations the engine runs at once (#1431). Set on every run
     #: by the API, so the runner never has to know an engine's own default.
+    #:
+    #: The PLAN/APPLY phase's. The configure phase reads the field below, and
+    #: the two are separate because the containers are sized separately (#2499).
     parallelism: int
+    #: The configure phase's `forks` (#2499). Already resolved by the API, so the
+    #: runner never falls back -- a fallback here is a second place deciding the
+    #: number, which is how a run's recorded concurrency comes to differ from
+    #: the one its Job was given.
+    configure_parallelism: int
     refresh: bool
     refresh_only: bool
     allow_empty_apply: bool
@@ -201,6 +209,7 @@ class RunnerConfig:
             ansible_limit=e.get("TP_ANSIBLE_LIMIT", ""),
             refresh=_bool("TP_REFRESH", default=True),
             parallelism=_int("TP_PARALLELISM", 10),
+            configure_parallelism=_int("TP_CONFIGURE_PARALLELISM", 10),
             refresh_only=_bool("TP_REFRESH_ONLY"),
             allow_empty_apply=_bool("TP_ALLOW_EMPTY_APPLY"),
             destroy=_bool("TP_DESTROY"),

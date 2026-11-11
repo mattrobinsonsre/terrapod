@@ -294,6 +294,10 @@ function createDefaults(engine: string): Record<string, unknown> {
     'working-directory': '',
     'auto-apply-mode': 'never',
     parallelism: 10,
+    // null, not 10: unset means it inherits `parallelism` (#2499), and a
+    // number here would make every new workspace pin a configure concurrency
+    // nobody chose.
+    'configure-parallelism': null,
     'resource-cpu': '1',
     'resource-memory': '2Gi',
     // operations
@@ -1333,6 +1337,16 @@ function WorkspacesPageInner() {
         />
         <Field attr="pulumi-bind-plan" ctx={createCtx} kind="checkbox" />
         <Field attr="parallelism" ctx={createCtx} kind="number" min={1} max={256} />
+        {/* `nullable`: clearing the box must send null rather than 0 -- the server
+            refuses 0, because terraform reads -parallelism=0 as "no limit". */}
+        <Field
+          attr="configure-parallelism"
+          ctx={createCtx}
+          kind="number"
+          min={1}
+          max={256}
+          nullable
+        />
         <Field
           attr="resource-cpu"
           ctx={createCtx}

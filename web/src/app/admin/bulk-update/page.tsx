@@ -220,6 +220,7 @@ export default function BulkUpdatePage() {
   const [uDriftInterval, setUDriftInterval] = useState('')
   const [uPlanExpiry, setUPlanExpiry] = useState('')
   const [uParallelism, setUParallelism] = useState('')
+  const [uConfigureParallelism, setUConfigureParallelism] = useState('')
   const [uSlackChannel, setUSlackChannel] = useState('')
   const [uBindPlan, setUBindPlan] = useState('')
   const [uDebugMode, setUDebugMode] = useState('')
@@ -367,6 +368,12 @@ export default function BulkUpdatePage() {
     if (uDriftInterval.trim()) u['drift-detection-interval-seconds'] = Number(uDriftInterval)
     if (uPlanExpiry.trim()) u['plan-expiry-seconds'] = Number(uPlanExpiry)
     if (uParallelism.trim()) u['parallelism'] = Number(uParallelism)
+    // Empty means UNCHANGED here, as every box on this form does -- not "set to
+    // inherit" (#2499). Resetting a workspace to inheriting is the single-workspace
+    // form's job, where an empty box is the field's own value rather than a
+    // not-filled-in marker shared with forty other fields.
+    if (uConfigureParallelism.trim())
+      u['configure-parallelism'] = Number(uConfigureParallelism)
     if (uSlackChannel.trim()) u['slack-channel'] = uSlackChannel.trim()
     if (uBindPlan) u['pulumi-bind-plan'] = uBindPlan === 'true'
     if (uDebugMode) u['debug-mode'] = uDebugMode === 'true'
@@ -713,6 +720,19 @@ export default function BulkUpdatePage() {
             placeholder={t('unchanged')}
             className={inputCls}
           />
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls}>{tWs('fields.configureParallelism')}</label>
+          <input
+            type="number"
+            min={1}
+            max={256}
+            value={uConfigureParallelism}
+            onChange={(e) => setUConfigureParallelism(e.target.value)}
+            placeholder={t('unchanged')}
+            className={inputCls}
+          />
+          {tieredHint(tWs, 'fields.configureParallelismTitle')}
         </div>
         <div className="min-w-0">
           <label className={labelCls}>{t('update.cpuRequest')}</label>

@@ -214,6 +214,13 @@ export const FIELDS: readonly FieldSpec[] = [
   // a group could collapse behind a summary. Nothing collapses now (#2413 F4),
   // so they are ordinary fields and the note is kept only to say so.
   { attr: 'parallelism', id: 'ws-parallelism', group: 'execution' },
+  // Nullable: empty means it inherits `parallelism` (#2499), which is why the
+  // forms pass `nullable` -- `Number('')` is 0 and the server refuses 0.
+  {
+    attr: 'configure-parallelism',
+    id: 'ws-configure-parallelism',
+    group: 'execution',
+  },
   { attr: 'resource-cpu', id: 'ws-cpu', group: 'execution' },
   { attr: 'resource-memory', id: 'ws-mem', group: 'execution' },
 
@@ -575,6 +582,7 @@ export const LABEL_KEY: Record<string, string> = {
   'terragrunt-version': 'fields.terragruntVersion',
   'pulumi-bind-plan': 'fields.bindPlan',
   parallelism: 'fields.parallelism',
+  'configure-parallelism': 'fields.configureParallelism',
   'resource-cpu': 'fields.cpuRequest',
   'resource-memory': 'fields.memoryRequest',
   // operations

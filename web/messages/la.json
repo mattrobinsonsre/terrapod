@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Bulla exsecutionis praecipua",
       "defaultRunKindAuto": "Automaticum (exsecutio plenissima)",
       "defaultRunKindLead": "Quae actio bullam conspicuam in hoc loco operis accipit. Automaticum exsecutionem plenissimam quam potest offert.",
-      "defaultRunKindTitle": "Quae actio bullam conspicuam in hoc loco operis accipit. Automaticum exsecutionem plenissimam quam potest offert — plerumque rectum, et falsum ubi actio quotidiana non est maxima: locus operis cuius pars Terraform solum inventarium Ansible curat, qui sine custode adhibet et numquam post applicationem configurat, hic Configurare vult. Electio quam hic locus operis offerre non potest respuitur cum eam servas, et ea quam partes tuae exsequi non possunt ad Automaticum tibi recidit."
+      "defaultRunKindTitle": "Quae actio bullam conspicuam in hoc loco operis accipit. Automaticum exsecutionem plenissimam quam potest offert — plerumque rectum, et falsum ubi actio quotidiana non est maxima: locus operis cuius pars Terraform solum inventarium Ansible curat, qui sine custode adhibet et numquam post applicationem configurat, hic Configurare vult. Electio quam hic locus operis offerre non potest respuitur cum eam servas, et ea quam partes tuae exsequi non possunt ad Automaticum tibi recidit.",
+      "configureParallelism": "Parallelismus configurationis",
+      "configureParallelismTitle": "Quot hospites configuratio simul agat — forks ansible (1-256). Vacuum relinque ut Parallelismus hereditetur. Separatum est quia ambitus exsecutionis seorsum a moderatore metitur.",
+      "configureParallelismLead": "Quot hospites configuratio simul agat — forks ansible (1-256). Vacuum relinque ut Parallelismus hereditetur."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

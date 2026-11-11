@@ -394,6 +394,7 @@ async def find_or_autocreate_workspace(
         oidc_audiences=dict(rule.oidc_audiences or {}),
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
+        configure_parallelism=rule.configure_parallelism,
         ansible_version=rule.ansible_version,
         ansible_execution_environment=rule.ansible_execution_environment,
         ansible_collections=list(rule.ansible_collections or []),

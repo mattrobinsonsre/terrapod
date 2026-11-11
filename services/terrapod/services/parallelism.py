@@ -2,9 +2,20 @@
 
 How many operations the engine performs at once: `-parallelism` for
 terraform/tofu, `--parallel` for Pulumi, `forks` for Ansible. The unit differs by
-engine — the first two count concurrent resource operations, Ansible counts hosts
-— but the question the operator is answering is the same one, so it is one
-setting.
+engine — the first two count concurrent resource operations, Ansible counts hosts.
+
+**One setting per PHASE, not per engine** (#1431 for the unification, #2499 for
+the split). Across engines the question really is the same one: terraform and
+Pulumi run in the same container, in the same phase, against a provider API, so
+one number serves both and `parallelism` is it. Across phases it is not — a
+configure runs in the EE sidecar and counts hosts, bounded by that container's
+own CPU and memory, which #2475 made separately configurable. So
+`Workspace.configure_parallelism` is the second setting, and this module's rule
+validates both.
+
+This docstring used to end "so it is one setting", which was true across engines
+and false across phases; it is corrected rather than extended, because leaving it
+standing is how the next reader concludes the split was an oversight.
 
 Lives here rather than in a router because four paths write it: workspace create,
 workspace update, the autodiscovery rule template, and bulk update. A validator
@@ -53,3 +64,21 @@ def validate_parallelism(raw: object) -> int:
     if raw > MAX_PARALLELISM:
         raise ValueError(f"parallelism must be at most {MAX_PARALLELISM}, got {raw}")
     return raw
+
+
+def validate_configure_parallelism(raw: object) -> int | None:
+    """The same rule, plus `None` meaning "inherit `parallelism`" (#2499).
+
+    One rule rather than a second copy: five paths write this setting -- workspace
+    create and update, the autodiscovery rule's create and update, and bulk
+    update -- and a validator only one caller uses is one the next caller
+    forgets, which is why `validate_parallelism` lives here in the first place.
+
+    `None` is the only extra value, and it is accepted so the raw API can RESET a
+    workspace to inheriting. `0` is still refused, by the shared rule below:
+    reusing it as the inherit marker would make one setting's marker another's
+    "unlimited".
+    """
+    if raw is None:
+        return None
+    return validate_parallelism(raw)

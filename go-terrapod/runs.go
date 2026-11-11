@@ -122,11 +122,12 @@ type Run struct {
 	EngineVersion    string `json:"engine-version,omitempty"`
 	TerraformVersion string `json:"terraform-version,omitempty"`
 	// Terragrunt* echo the workspace's terragrunt wrapping for this run.
-	TerragruntEnabled bool   `json:"terragrunt-enabled"`
-	TerragruntVersion string `json:"terragrunt-version,omitempty"`
-	ResourceCPU       string `json:"resource-cpu,omitempty"`
-	Parallelism       int64  `json:"parallelism,omitempty"`
-	ResourceMemory    string `json:"resource-memory,omitempty"`
+	TerragruntEnabled    bool   `json:"terragrunt-enabled"`
+	TerragruntVersion    string `json:"terragrunt-version,omitempty"`
+	ResourceCPU          string `json:"resource-cpu,omitempty"`
+	Parallelism          int64  `json:"parallelism,omitempty"`
+	ConfigureParallelism int64  `json:"configure-parallelism,omitempty"`
+	ResourceMemory       string `json:"resource-memory,omitempty"`
 	// The Ansible execution environment this run used, and how big its sidecar
 	// was (#2154). Recorded on the run because the built-in EE tags MOVE -- a
 	// line's image is rebuilt when upstream patches it -- so without the image
@@ -666,31 +667,32 @@ func runFromResource(res *Resource) *Run {
 		PulumiStack:             GetStringAttr(res, "pulumi-stack"),
 		PulumiBindPlan:          GetBoolPtrAttr(res, "pulumi-bind-plan"),
 		// Both carry the resolved value, whichever name the server used (#1559).
-		EngineVersion:     engineVersionAttr(res),
-		TerraformVersion:  engineVersionAttr(res),
-		TerragruntEnabled: GetBoolAttr(res, "terragrunt-enabled"),
-		TerragruntVersion: GetStringAttr(res, "terragrunt-version"),
-		ResourceCPU:       GetStringAttr(res, "resource-cpu"),
-		Parallelism:       GetIntAttr(res, "parallelism"),
-		ResourceMemory:    GetStringAttr(res, "resource-memory"),
-		EEImage:           GetStringAttr(res, "ee-image"),
-		EEResourceCPU:     GetStringAttr(res, "ee-resource-cpu"),
-		EEResourceMemory:  GetStringAttr(res, "ee-resource-memory"),
-		RunnerExitReason:  GetStringAttr(res, "runner-exit-reason"),
-		RunnerExitStatus:  GetStringAttr(res, "runner-exit-status"),
-		ErrorMessage:      GetStringAttr(res, "error-message"),
-		TargetAddrs:       GetListAttr(res, "target-addrs"),
-		ReplaceAddrs:      GetListAttr(res, "replace-addrs"),
-		RefreshOnly:       GetBoolAttr(res, "refresh-only"),
-		Refresh:           GetBoolAttr(res, "refresh"),
-		AllowEmptyApply:   GetBoolAttr(res, "allow-empty-apply"),
-		RunVariableKeys:   GetListAttr(res, "run-variable-keys"),
-		IsDriftDetection:  GetBoolAttr(res, "is-drift-detection"),
-		HasJSONOutput:     GetBoolAttr(res, "has-json-output"),
-		StateDiverged:     GetBoolAttr(res, "state-diverged"),
-		HasCostEstimate:   GetBoolAttr(res, "has-cost-estimate"),
-		CostCurrency:      GetStringAttr(res, "cost-currency"),
-		WorkspaceName:     GetStringAttr(res, "workspace-name"),
+		EngineVersion:        engineVersionAttr(res),
+		TerraformVersion:     engineVersionAttr(res),
+		TerragruntEnabled:    GetBoolAttr(res, "terragrunt-enabled"),
+		TerragruntVersion:    GetStringAttr(res, "terragrunt-version"),
+		ResourceCPU:          GetStringAttr(res, "resource-cpu"),
+		Parallelism:          GetIntAttr(res, "parallelism"),
+		ConfigureParallelism: GetIntAttr(res, "configure-parallelism"),
+		ResourceMemory:       GetStringAttr(res, "resource-memory"),
+		EEImage:              GetStringAttr(res, "ee-image"),
+		EEResourceCPU:        GetStringAttr(res, "ee-resource-cpu"),
+		EEResourceMemory:     GetStringAttr(res, "ee-resource-memory"),
+		RunnerExitReason:     GetStringAttr(res, "runner-exit-reason"),
+		RunnerExitStatus:     GetStringAttr(res, "runner-exit-status"),
+		ErrorMessage:         GetStringAttr(res, "error-message"),
+		TargetAddrs:          GetListAttr(res, "target-addrs"),
+		ReplaceAddrs:         GetListAttr(res, "replace-addrs"),
+		RefreshOnly:          GetBoolAttr(res, "refresh-only"),
+		Refresh:              GetBoolAttr(res, "refresh"),
+		AllowEmptyApply:      GetBoolAttr(res, "allow-empty-apply"),
+		RunVariableKeys:      GetListAttr(res, "run-variable-keys"),
+		IsDriftDetection:     GetBoolAttr(res, "is-drift-detection"),
+		HasJSONOutput:        GetBoolAttr(res, "has-json-output"),
+		StateDiverged:        GetBoolAttr(res, "state-diverged"),
+		HasCostEstimate:      GetBoolAttr(res, "has-cost-estimate"),
+		CostCurrency:         GetStringAttr(res, "cost-currency"),
+		WorkspaceName:        GetStringAttr(res, "workspace-name"),
 		// #1231. The relationship below wins when present; the attribute is
 		// the fallback for a server that only emits the flat form.
 		AgentPoolID:           GetStringAttr(res, "agent-pool-id"),

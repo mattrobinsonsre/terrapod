@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Ensisijainen ajopainike",
       "defaultRunKindAuto": "Automaattinen (täydellisin ajo)",
       "defaultRunKindLead": "Mikä toiminto saa korostetun painikkeen tässä työtilassa. Automaattinen tarjoaa täydellisimmän ajon, joka on mahdollinen.",
-      "defaultRunKindTitle": "Mikä toiminto saa korostetun painikkeen tässä työtilassa. Automaattinen tarjoaa täydellisimmän ajon, joka on mahdollinen — useimmiten oikein, mutta väärin silloin, kun jokapäiväinen toiminto ei ole laajin: työtila, jonka Terraform-puoli vain ylläpitää Ansible-inventaariota, ottaa muutokset käyttöön valvomatta eikä koskaan määritä käyttöönoton jälkeen, haluaa tähän Määritä. Valintaa, jota tämä työtila ei voi tarjota, ei hyväksytä tallennettaessa, ja valinta, jota roolisi ei voi ajaa, vaihtuu sinulle Automaattiseksi."
+      "defaultRunKindTitle": "Mikä toiminto saa korostetun painikkeen tässä työtilassa. Automaattinen tarjoaa täydellisimmän ajon, joka on mahdollinen — useimmiten oikein, mutta väärin silloin, kun jokapäiväinen toiminto ei ole laajin: työtila, jonka Terraform-puoli vain ylläpitää Ansible-inventaariota, ottaa muutokset käyttöön valvomatta eikä koskaan määritä käyttöönoton jälkeen, haluaa tähän Määritä. Valintaa, jota tämä työtila ei voi tarjota, ei hyväksytä tallennettaessa, ja valinta, jota roolisi ei voi ajaa, vaihtuu sinulle Automaattiseksi.",
+      "configureParallelism": "Määrityksen rinnakkaisuus",
+      "configureParallelismTitle": "Kuinka monta isäntää määritys käsittelee samanaikaisesti — ansiblen forks (1-256). Jätä tyhjäksi, niin peritään Rinnakkaisuus. Erillinen, koska suoritusympäristön koko määritetään orkestroijasta riippumatta.",
+      "configureParallelismLead": "Kuinka monta isäntää määritys käsittelee samanaikaisesti — ansiblen forks (1-256). Jätä tyhjäksi, niin peritään Rinnakkaisuus."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

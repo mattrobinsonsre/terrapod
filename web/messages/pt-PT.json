@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Botão de execução principal",
       "defaultRunKindAuto": "Automático (a mais completa)",
       "defaultRunKindLead": "Que ação recebe o botão destacado neste workspace. Automático oferece a execução mais completa que consegue.",
-      "defaultRunKindTitle": "Que ação recebe o botão destacado neste workspace. Automático oferece a execução mais completa que consegue — em geral o correto, e errado quando a ação do dia a dia não é a maior: um workspace cuja parte de Terraform apenas mantém o inventário do Ansible, que aplica sem supervisão e nunca configura após um apply, quer Configurar aqui. Uma escolha que este workspace não pode oferecer é recusada ao guardar, e uma que a sua função não pode executar recai em Automático para si."
+      "defaultRunKindTitle": "Que ação recebe o botão destacado neste workspace. Automático oferece a execução mais completa que consegue — em geral o correto, e errado quando a ação do dia a dia não é a maior: um workspace cuja parte de Terraform apenas mantém o inventário do Ansible, que aplica sem supervisão e nunca configura após um apply, quer Configurar aqui. Uma escolha que este workspace não pode oferecer é recusada ao guardar, e uma que a sua função não pode executar recai em Automático para si.",
+      "configureParallelism": "Paralelismo da configuração",
+      "configureParallelismTitle": "Quantos hosts uma configuração conduz em simultâneo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo. É separado porque o ambiente de execução é dimensionado independentemente do orquestrador.",
+      "configureParallelismLead": "Quantos hosts uma configuração conduz em simultâneo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

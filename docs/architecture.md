@@ -339,7 +339,8 @@ Each workspace has `resource_cpu`, `resource_memory` and `parallelism` columns:
 |---|---|---|
 | `resource_cpu` | `1` | CPU request for runner Jobs |
 | `resource_memory` | `2Gi` | Memory request for runner Jobs |
-| `parallelism` | `10` | How many operations the engine performs at once |
+| `parallelism` | `10` | How many operations the engine performs at once, in the **plan/apply** phase |
+| `configure_parallelism` | unset | How many **hosts** a configure drives at once (ansible's `forks`). Unset inherits `parallelism` |
 
 Limits are computed as 2x the requests automatically. All three are snapshotted to the `runs` table at run creation time so they remain stable even if the workspace is later modified.
 
@@ -349,10 +350,21 @@ concurrency on a small runner is where runs go slow or get OOM-killed, and it is
 to reach for when a provider or upstream API rate-limits under concurrent calls — lowering it
 throttles the caller rather than resizing the machine.
 
-It is one setting for every engine, rendered into whichever flag applies: `-parallelism` for
-terraform/tofu, `--parallel` for Pulumi, `forks` for Ansible. The unit differs — the first two
-count concurrent resource operations, Ansible counts hosts — so read it as "how many things at
-once", and check the engine for which things.
+It is one setting per **phase**, not per engine. Across engines the question really is the
+same one: `-parallelism` for terraform/tofu and `--parallel` for Pulumi run in the same
+container, in the same phase, against a provider API, so `parallelism` serves both.
+
+Across phases it is not. A configure runs in the execution-environment sidecar, which
+`ee_resource_cpu`/`ee_resource_memory` size independently of the orchestrator — by default at
+half of it — and it counts **hosts** rather than resource operations, bounded by that
+container's own CPU and memory. So the configure phase has `configure_parallelism`, and the
+two can be tuned without each other: lowering `parallelism` for a rate-limited provider no
+longer throttles the configure with it, and raising the configure's concurrency for a large
+inventory no longer asks terraform for the same.
+
+Unset means it inherits `parallelism`, which is what every workspace did before the setting
+existed. `0` is not the inherit marker and is refused: terraform reads `-parallelism=0` as
+"no limit", so reusing it would make one setting's marker another's unbounded.
 
 The default of 10 is terraform's own, chosen so that introducing the setting changed no existing
 workspace's behaviour. It is held explicitly rather than left to each engine because Pulumi

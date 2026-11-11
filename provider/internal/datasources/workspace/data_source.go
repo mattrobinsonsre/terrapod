@@ -62,6 +62,7 @@ type workspaceDataSourceModel struct {
 	EEResourceCPU                 types.String `tfsdk:"ee_resource_cpu"`
 	EEResourceMemory              types.String `tfsdk:"ee_resource_memory"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`
+	ConfigureParallelism          types.Int64  `tfsdk:"configure_parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
 	Labels                        types.Map    `tfsdk:"labels"`
 	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`
@@ -160,14 +161,15 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 					},
 				},
 			},
-			"default_playbook":    computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
-			"default_limit":       computedString("The default `--limit` for a configure run. Null means the whole inventory."),
-			"hard_limit":          computedString("A `--limit` no run may escape. Null means no ceiling. Unlike `default_limit`, which a run REPLACES when it supplies its own, this is intersected with whatever limit the run ends up with -- so a run may narrow within it and none may widen past it."),
-			"working_directory":   computedString("Working directory."),
-			"parallelism":         computedInt64("How many operations the engine performs at once."),
-			"debug_mode":          computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
-			"allow_fork_pr_plans": computedBool("Whether a pull request opened from a fork gets a speculative plan. Off by default, because that plan runs the author's code with this workspace's credentials (GHSA-gp5w-76rw-c452); same-repository pull requests always plan regardless."),
-			"resource_cpu":        computedString("CPU request."),
+			"default_playbook":      computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
+			"default_limit":         computedString("The default `--limit` for a configure run. Null means the whole inventory."),
+			"hard_limit":            computedString("A `--limit` no run may escape. Null means no ceiling. Unlike `default_limit`, which a run REPLACES when it supplies its own, this is intersected with whatever limit the run ends up with -- so a run may narrow within it and none may widen past it."),
+			"working_directory":     computedString("Working directory."),
+			"parallelism":           computedInt64("How many operations the engine performs at once in the plan/apply phase."),
+			"configure_parallelism": computedInt64("How many hosts a configure drives at once (ansible's forks). Null means it inherits parallelism."),
+			"debug_mode":            computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
+			"allow_fork_pr_plans":   computedBool("Whether a pull request opened from a fork gets a speculative plan. Off by default, because that plan runs the author's code with this workspace's credentials (GHSA-gp5w-76rw-c452); same-repository pull requests always plan regardless."),
+			"resource_cpu":          computedString("CPU request."),
 			"ee_resource_cpu": computedString(
 				"CPU request for the Ansible execution-environment sidecar. Empty means " +
 					"the workspace takes the deployment default."),
@@ -278,6 +280,11 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.PulumiBindPlan = types.BoolValue(terrapod.GetBoolAttr(res, "pulumi-bind-plan"))
 	m.WorkingDirectory = types.StringValue(terrapod.GetStringAttr(res, "working-directory"))
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
+	if v := terrapod.GetIntAttr(res, "configure-parallelism"); v != 0 {
+		m.ConfigureParallelism = types.Int64Value(v)
+	} else {
+		m.ConfigureParallelism = types.Int64Null()
+	}
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
 	m.OwnerEmail = types.StringValue(terrapod.GetStringAttr(res, "owner-email"))

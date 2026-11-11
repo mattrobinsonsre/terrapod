@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Prif fotwm rhediad",
       "defaultRunKindAuto": "Awtomatig (y mwyaf cyflawn)",
       "defaultRunKindLead": "Pa weithred sy''n cael y botwm amlwg ar y weithfan hon. Mae Awtomatig yn cynnig y rhediad mwyaf cyflawn y gall.",
-      "defaultRunKindTitle": "Pa weithred sy''n cael y botwm amlwg ar y weithfan hon. Mae Awtomatig yn cynnig y rhediad mwyaf cyflawn y gall — yn gywir fel arfer, ac yn anghywir lle nad y weithred fwyaf yw''r un feunyddiol: ar weithfan nad yw ei hanner Terraform yn gwneud dim ond cynnal y rhestr eiddo Ansible, sy''n gweithredu heb oruchwyliaeth ac nad yw byth yn cyflunio ar ôl gweithredu, Cyflunio sydd eisiau yma. Caiff dewis na all y weithfan hon ei gynnig ei wrthod pan fyddwch yn ei gadw, ac mae un na all eich rôl ei redeg yn dychwelyd i Awtomatig ar eich cyfer."
+      "defaultRunKindTitle": "Pa weithred sy''n cael y botwm amlwg ar y weithfan hon. Mae Awtomatig yn cynnig y rhediad mwyaf cyflawn y gall — yn gywir fel arfer, ac yn anghywir lle nad y weithred fwyaf yw''r un feunyddiol: ar weithfan nad yw ei hanner Terraform yn gwneud dim ond cynnal y rhestr eiddo Ansible, sy''n gweithredu heb oruchwyliaeth ac nad yw byth yn cyflunio ar ôl gweithredu, Cyflunio sydd eisiau yma. Caiff dewis na all y weithfan hon ei gynnig ei wrthod pan fyddwch yn ei gadw, ac mae un na all eich rôl ei redeg yn dychwelyd i Awtomatig ar eich cyfer.",
+      "configureParallelism": "Cyfochredd cyflunio",
+      "configureParallelismTitle": "Sawl gwesteiwr y mae cyflunio yn eu gyrru ar yr un pryd — forks ansible (1-256). Gadewch yn wag i etifeddu Cyfochredd. Ar wahân am fod yr amgylchedd gweithredu yn cael ei faintioli ar wahân i''r cydlynydd.",
+      "configureParallelismLead": "Sawl gwesteiwr y mae cyflunio yn eu gyrru ar yr un pryd — forks ansible (1-256). Gadewch yn wag i etifeddu Cyfochredd."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

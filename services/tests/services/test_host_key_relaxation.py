@@ -104,6 +104,7 @@ class TestTheRelaxationIsNotAnEnvironmentVariable:
 
         cfg = types.SimpleNamespace(
             parallelism=4,
+            configure_parallelism=4,
             dynamic_inventory_enabled=False,
             inventory_scripts_enabled=False,
         )

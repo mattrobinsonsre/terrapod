@@ -77,10 +77,11 @@ type Workspace struct {
 	// `omitempty` therefore has the same consequence it has there: omitting
 	// the field on an update leaves the stored value alone rather than
 	// clearing it back to the default.
-	EEResourceCPU    string `json:"ee-resource-cpu,omitempty"`
-	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
-	Parallelism      int64  `json:"parallelism,omitempty"`
-	AnsibleVersion   string `json:"ansible-version,omitempty"`
+	EEResourceCPU        string `json:"ee-resource-cpu,omitempty"`
+	EEResourceMemory     string `json:"ee-resource-memory,omitempty"`
+	Parallelism          int64  `json:"parallelism,omitempty"`
+	ConfigureParallelism int64  `json:"configure-parallelism,omitempty"`
+	AnsibleVersion       string `json:"ansible-version,omitempty"`
 	// AnsibleExecutionEnvironment names one of the deployment's own execution
 	// environments by LABEL (#2154), and OVERRIDES AnsibleVersion when set --
 	// so a workspace carrying one ignores its line entirely.
@@ -383,10 +384,11 @@ type CreateWorkspaceRequest struct {
 	// `omitempty` therefore has the same consequence it has there: omitting
 	// the field on an update leaves the stored value alone rather than
 	// clearing it back to the default.
-	EEResourceCPU    string `json:"ee-resource-cpu,omitempty"`
-	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
-	Parallelism      int64  `json:"parallelism,omitempty"`
-	AnsibleVersion   string `json:"ansible-version,omitempty"`
+	EEResourceCPU        string `json:"ee-resource-cpu,omitempty"`
+	EEResourceMemory     string `json:"ee-resource-memory,omitempty"`
+	Parallelism          int64  `json:"parallelism,omitempty"`
+	ConfigureParallelism int64  `json:"configure-parallelism,omitempty"`
+	AnsibleVersion       string `json:"ansible-version,omitempty"`
 	// AnsibleExecutionEnvironment names one of the deployment's own execution
 	// environments by LABEL (#2154), and OVERRIDES AnsibleVersion when set --
 	// so a workspace carrying one ignores its line entirely.
@@ -573,10 +575,11 @@ type UpdateWorkspaceRequest struct {
 	// `omitempty` therefore has the same consequence it has there: omitting
 	// the field on an update leaves the stored value alone rather than
 	// clearing it back to the default.
-	EEResourceCPU    string `json:"ee-resource-cpu,omitempty"`
-	EEResourceMemory string `json:"ee-resource-memory,omitempty"`
-	Parallelism      int64  `json:"parallelism,omitempty"`
-	AnsibleVersion   string `json:"ansible-version,omitempty"`
+	EEResourceCPU        string `json:"ee-resource-cpu,omitempty"`
+	EEResourceMemory     string `json:"ee-resource-memory,omitempty"`
+	Parallelism          int64  `json:"parallelism,omitempty"`
+	ConfigureParallelism int64  `json:"configure-parallelism,omitempty"`
+	AnsibleVersion       string `json:"ansible-version,omitempty"`
 	// AnsibleExecutionEnvironment names one of the deployment's own execution
 	// environments by LABEL (#2154), and OVERRIDES AnsibleVersion when set --
 	// so a workspace carrying one ignores its line entirely.
@@ -1020,6 +1023,15 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
+	// Zero means "say nothing", exactly as the sibling above does, so an
+	// unset field leaves the server's value alone. There is deliberately no
+	// way to send 0: the server rejects it, because terraform reads
+	// -parallelism=0 as "no limit" (#2499). Resetting to inherit is a
+	// null, which this typed request cannot express -- the same limit
+	// Parallelism already has.
+	if req.ConfigureParallelism != 0 {
+		attrs["configure-parallelism"] = req.ConfigureParallelism
+	}
 	if req.EEResourceCPU != "" {
 		attrs["ee-resource-cpu"] = req.EEResourceCPU
 	}
@@ -1229,6 +1241,15 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
+	// Zero means "say nothing", exactly as the sibling above does, so an
+	// unset field leaves the server's value alone. There is deliberately no
+	// way to send 0: the server rejects it, because terraform reads
+	// -parallelism=0 as "no limit" (#2499). Resetting to inherit is a
+	// null, which this typed request cannot express -- the same limit
+	// Parallelism already has.
+	if req.ConfigureParallelism != 0 {
+		attrs["configure-parallelism"] = req.ConfigureParallelism
+	}
 	if req.EEResourceCPU != "" {
 		attrs["ee-resource-cpu"] = req.EEResourceCPU
 	}
@@ -1398,6 +1419,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		EEResourceCPU:               GetStringAttr(res, "ee-resource-cpu"),
 		EEResourceMemory:            GetStringAttr(res, "ee-resource-memory"),
 		Parallelism:                 GetIntAttr(res, "parallelism"),
+		ConfigureParallelism:        GetIntAttr(res, "configure-parallelism"),
 		AnsibleVersion:              GetStringAttr(res, "ansible-version"),
 		AnsibleExecutionEnvironment: GetStringAttr(res, "ansible-execution-environment"),
 		ResourceMemory:              GetStringAttr(res, "resource-memory"),

@@ -521,7 +521,7 @@ Five settings are forced through the **environment**, which beats the file:
 | `ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED=True` | an unreadable source fails the run rather than resolving a partial host set |
 | `ANSIBLE_FORCE_COLOR=1` | the log viewer renders ANSI and offers a colour toggle, so a configure reads like every other phase. This said `=0` with the reason "nothing reads this log in a terminal", which was backwards: redaction operates on the whole stream, so colour never threatened it (#2413 F18) |
 | `ANSIBLE_RETRY_FILES_ENABLED=False` | a retry file would be written into the fetched tree, and nothing reads it back |
-| `ANSIBLE_FORKS` | the workspace's own `parallelism`, so the platform's per-workspace setting governs rather than the file's `forks`. Set only when the workspace declares one |
+| `ANSIBLE_FORKS` | the workspace's own `configure_parallelism`, so the platform's per-workspace setting governs rather than the file's `forks`. Falls back to `parallelism` when the workspace pins no configure value. Set only when the workspace declares one |
 
 Three more are **forwarded** rather than decided: `TMPDIR`,
 `ANSIBLE_LOCAL_TEMP` and `ANSIBLE_REMOTE_TEMP` are passed through from the Job's

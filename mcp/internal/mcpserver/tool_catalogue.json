@@ -2538,6 +2538,10 @@
             "boolean"
           ]
         },
+        "configure_parallelism": {
+          "description": "how many HOSTS a configure drives at once -- ansible's forks. Separate from parallelism because the two phases run in different containers: the execution environment is sized independently of the orchestrator (ee_resource_cpu, ee_resource_memory), so one number cannot convert both allocations into load. Unset inherits parallelism, which is what every workspace did before this setting existed. Raise it for a large inventory on a well-resourced EE; note that lowering parallelism for a rate-limited provider no longer throttles the configure with it. Omit to leave the stored value alone",
+          "type": "integer"
+        },
         "debug_mode": {
           "description": "hold this workspace's FAILED runner pods open for inspection rather than letting them be cleaned up. The pod keeps the run's auth token and its decrypted tfvars for that window, so this trades an exposure window for debuggability; how long the window lasts is the deployment's call (runners.debugLingerSeconds), not the workspace's. Omit to leave the stored value alone",
           "type": [
@@ -2666,7 +2670,7 @@
           "type": "object"
         },
         "parallelism": {
-          "description": "the engine's -parallelism for this workspace's runs; 10 by default, which is the engine's own. Lower it for a provider that rate-limits; raising it rarely helps and can trip API quotas. Omit to leave the stored value alone",
+          "description": "the engine's -parallelism for this workspace's PLAN/APPLY runs; 10 by default, which is the engine's own. Lower it for a provider that rate-limits; raising it rarely helps and can trip API quotas. The configure phase has configure_parallelism. Omit to leave the stored value alone",
           "type": "integer"
         },
         "plan_apply_enabled": {

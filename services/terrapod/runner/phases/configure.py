@@ -146,10 +146,16 @@ def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     for passthrough in ("TMPDIR", "ANSIBLE_LOCAL_TEMP", "ANSIBLE_REMOTE_TEMP"):
         if value := os.environ.get(passthrough):
             env[passthrough] = value
-    if cfg.parallelism > 0:
-        # The platform's own per-workspace setting (#1431), which is why it is
-        # set rather than left to their `forks`.
-        env["ANSIBLE_FORKS"] = str(cfg.parallelism)
+    if cfg.configure_parallelism > 0:
+        # The platform's own per-workspace setting, which is why it is set rather
+        # than left to their `forks`.
+        #
+        # `configure_parallelism`, NOT `parallelism` (#2499): this phase runs in
+        # the EE sidecar, which #2475 sizes separately from the orchestrator, and
+        # it counts HOSTS where the plan/apply number counts resource operations.
+        # One value for both asked the smaller container to do the same amount of
+        # concurrent work.
+        env["ANSIBLE_FORKS"] = str(cfg.configure_parallelism)
     return env
 
 

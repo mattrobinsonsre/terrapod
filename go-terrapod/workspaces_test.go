@@ -921,3 +921,92 @@ func TestListWorkspaces_EngineFilter(t *testing.T) {
 		t.Errorf("filter[engine] = %q, want pulumi", got)
 	}
 }
+
+// TestWorkspaceParallelism_BothPhasesRoundTrip pins BOTH concurrency settings
+// through a real request and a real response.
+//
+// Both, not just the new one: `parallelism` has shipped since #1431 and was
+// asserted nowhere in this package, so adding `configure-parallelism` (#2499) is
+// the moment the original gets covered too. A test for one of a pair tells you
+// nothing about whether the other is wired.
+//
+// The property that matters is that they are INDEPENDENT -- distinct values must
+// arrive as distinct attributes and come back onto distinct fields. A fixture
+// using one number for both passes whether or not the two are the same wire key.
+func TestWorkspaceParallelism_BothPhasesRoundTrip(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-par", "fleet", map[string]any{
+			"parallelism":           4,
+			"configure-parallelism": 50,
+		})))
+	}
+
+	c := f.client()
+	ws, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
+		Name:                 "fleet",
+		Parallelism:          4,
+		ConfigureParallelism: 50,
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	if ws.Parallelism != 4 {
+		t.Errorf("Parallelism: got %d, want 4", ws.Parallelism)
+	}
+	if ws.ConfigureParallelism != 50 {
+		t.Errorf("ConfigureParallelism: got %d, want 50", ws.ConfigureParallelism)
+	}
+
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(f.lastBody, &req); err != nil {
+		t.Fatalf("request body: %v", err)
+	}
+	if got, ok := req.Data.Attributes["parallelism"].(float64); !ok || got != 4 {
+		t.Errorf("request parallelism: %v", req.Data.Attributes["parallelism"])
+	}
+	if got, ok := req.Data.Attributes["configure-parallelism"].(float64); !ok || got != 50 {
+		t.Errorf("request configure-parallelism: %v", req.Data.Attributes["configure-parallelism"])
+	}
+}
+
+// TestWorkspaceConfigureParallelism_UnsetSendsNothing is the companion the test
+// above needs: zero means "say nothing", so an unset field must not appear in
+// the request at all.
+//
+// Without this, the builder could send `0` unconditionally and the round-trip
+// test would still pass -- and the server rejects 0 deliberately, because
+// terraform reads -parallelism=0 as "no limit". So sending it would turn
+// "inherit" into a 422 on every create that did not set it.
+func TestWorkspaceConfigureParallelism_UnsetSendsNothing(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-par", "fleet", nil)))
+	}
+
+	c := f.client()
+	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{Name: "fleet"}); err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(f.lastBody, &req); err != nil {
+		t.Fatalf("request body: %v", err)
+	}
+	if _, present := req.Data.Attributes["configure-parallelism"]; present {
+		t.Errorf("configure-parallelism sent when unset: %+v", req.Data.Attributes)
+	}
+	if _, present := req.Data.Attributes["parallelism"]; present {
+		t.Errorf("parallelism sent when unset: %+v", req.Data.Attributes)
+	}
+}

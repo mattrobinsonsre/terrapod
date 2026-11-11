@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Birincil çalıştırma düğmesi",
       "defaultRunKindAuto": "Otomatik (en kapsamlı)",
       "defaultRunKindLead": "Bu çalışma alanında hangi eylemin öne çıkan düğmeyi alacağı. Otomatik, yapabildiği en kapsamlı çalıştırmayı önerir.",
-      "defaultRunKindTitle": "Bu çalışma alanında hangi eylemin öne çıkan düğmeyi alacağı. Otomatik, yapabildiği en kapsamlı çalıştırmayı önerir — çoğunlukla doğrudur, günlük eylemin en büyüğü olmadığı yerlerde ise yanlıştır: Terraform tarafı yalnızca Ansible envanterini güncel tutan, gözetimsiz uygulayan ve bir uygulamanın ardından asla yapılandırmayan bir çalışma alanı burada Yapılandır''ı ister. Bu çalışma alanının sunamadığı bir seçim, kaydettiğinizde reddedilir; rolünüzün çalıştıramadığı bir seçim ise sizin için Otomatik''e geri döner."
+      "defaultRunKindTitle": "Bu çalışma alanında hangi eylemin öne çıkan düğmeyi alacağı. Otomatik, yapabildiği en kapsamlı çalıştırmayı önerir — çoğunlukla doğrudur, günlük eylemin en büyüğü olmadığı yerlerde ise yanlıştır: Terraform tarafı yalnızca Ansible envanterini güncel tutan, gözetimsiz uygulayan ve bir uygulamanın ardından asla yapılandırmayan bir çalışma alanı burada Yapılandır''ı ister. Bu çalışma alanının sunamadığı bir seçim, kaydettiğinizde reddedilir; rolünüzün çalıştıramadığı bir seçim ise sizin için Otomatik''e geri döner.",
+      "configureParallelism": "Yapılandırma paralelliği",
+      "configureParallelismTitle": "Bir yapılandırmanın aynı anda kaç ana makineyi yürüttüğü — ansible’ın forks değeri (1-256). Paralellik değerini devralmak için boş bırakın. Ayrı tutulur, çünkü yürütme ortamı orkestratörden bağımsız olarak boyutlandırılır.",
+      "configureParallelismLead": "Bir yapılandırmanın aynı anda kaç ana makineyi yürüttüğü — ansible’ın forks değeri (1-256). Paralellik değerini devralmak için boş bırakın."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

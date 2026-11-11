@@ -181,6 +181,7 @@ type workspaceModel struct {
 	EEResourceCPU                 types.String `tfsdk:"ee_resource_cpu"`
 	EEResourceMemory              types.String `tfsdk:"ee_resource_memory"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`
+	ConfigureParallelism          types.Int64  `tfsdk:"configure_parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
 	Labels                        types.Map    `tfsdk:"labels"`
 	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`

@@ -92,6 +92,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -296,6 +300,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -493,6 +501,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -902,6 +914,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -1383,6 +1399,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -1783,6 +1803,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -1980,6 +2004,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -2192,6 +2220,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -2393,7 +2425,11 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
-                  "value": "10"
+                  "value": "8"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "50"
                 },
                 {
                   "name": "TP_COST_DEFAULT_REGION",
@@ -2805,6 +2841,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -3089,6 +3129,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -3492,6 +3536,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -3697,6 +3745,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -4109,6 +4161,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -4314,6 +4370,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -4730,6 +4790,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_ESTIMATION",
                   "value": "false"
                 },
@@ -4939,6 +5003,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "eu-west-2"
                 },
@@ -5145,6 +5213,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -5365,6 +5437,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -5570,6 +5646,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -5785,6 +5865,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -5991,6 +6075,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -6210,6 +6298,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -6416,6 +6508,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -6644,6 +6740,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -6854,6 +6954,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -7074,6 +7178,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -7272,6 +7380,10 @@
                 {
                   "name": "TP_PARALLELISM",
                   "value": "32"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "64"
                 },
                 {
                   "name": "TP_COST_DEFAULT_REGION",
@@ -7480,6 +7592,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -7700,6 +7816,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -7906,6 +8026,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -8126,6 +8250,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -8343,6 +8471,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -8549,6 +8681,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {
@@ -8822,6 +8958,10 @@
                   "value": "10"
                 },
                 {
+                  "name": "TP_CONFIGURE_PARALLELISM",
+                  "value": "10"
+                },
+                {
                   "name": "TP_COST_DEFAULT_REGION",
                   "value": "us-east-1"
                 },
@@ -9028,6 +9168,10 @@
                 },
                 {
                   "name": "TP_PARALLELISM",
+                  "value": "10"
+                },
+                {
+                  "name": "TP_CONFIGURE_PARALLELISM",
                   "value": "10"
                 },
                 {

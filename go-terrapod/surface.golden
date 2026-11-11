@@ -416,6 +416,7 @@ field CreateWorkspaceRequest.ConfigDirectory string `json:"config-directory,omit
 field CreateWorkspaceRequest.ConfigureAfterApply *bool `json:"configure-after-apply,omitempty"`
 field CreateWorkspaceRequest.ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
 field CreateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
+field CreateWorkspaceRequest.ConfigureParallelism int64 `json:"configure-parallelism,omitempty"`
 field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field CreateWorkspaceRequest.DefaultLimit string `json:"default-limit,omitempty"`
 field CreateWorkspaceRequest.DefaultPlaybook string `json:"default-playbook,omitempty"`
@@ -1016,6 +1017,7 @@ field Run.AutoApplyMode string `json:"auto-apply-mode"`
 field Run.BlockedBy string `json:"blocked-by,omitempty"`
 field Run.CandidateAgentPoolIDs []string `json:"candidate-agent-pool-ids,omitempty"`
 field Run.ConfigureAfterApply bool `json:"configure-after-apply"`
+field Run.ConfigureParallelism int64 `json:"configure-parallelism,omitempty"`
 field Run.CostCurrency string `json:"cost-currency,omitempty"`
 field Run.CostMonthlyMax *float64 `json:"cost-monthly-max,omitempty"`
 field Run.CostMonthlyMin *float64 `json:"cost-monthly-min,omitempty"`
@@ -1329,6 +1331,7 @@ field UpdateWorkspaceRequest.ConfigDirectory *string `json:"config-directory,omi
 field UpdateWorkspaceRequest.ConfigureAfterApply *bool `json:"configure-after-apply,omitempty"`
 field UpdateWorkspaceRequest.ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
 field UpdateWorkspaceRequest.ConfigureEnabled *bool `json:"configure-enabled,omitempty"`
+field UpdateWorkspaceRequest.ConfigureParallelism int64 `json:"configure-parallelism,omitempty"`
 field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field UpdateWorkspaceRequest.DefaultLimit *string `json:"default-limit,omitempty"`
 field UpdateWorkspaceRequest.DefaultPlaybook *string `json:"default-playbook,omitempty"`
@@ -1563,6 +1566,7 @@ field Workspace.ConfigDirectory string `json:"config-directory,omitempty"`
 field Workspace.ConfigureAfterApply bool `json:"configure-after-apply"`
 field Workspace.ConfigureAllHosts bool `json:"configure-all-hosts"`
 field Workspace.ConfigureEnabled bool `json:"configure-enabled"`
+field Workspace.ConfigureParallelism int64 `json:"configure-parallelism,omitempty"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`
 field Workspace.DebugMode bool `json:"debug-mode"`
 field Workspace.DefaultLimit string `json:"default-limit,omitempty"`
