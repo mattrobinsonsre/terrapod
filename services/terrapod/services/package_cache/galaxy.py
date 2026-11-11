@@ -26,6 +26,7 @@ we actually hold, so it never advertises something the node cannot serve.
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 
 import httpx
 
@@ -57,6 +58,22 @@ _VERSION = re.compile(r"^[A-Za-z0-9._+-]+$")
 #: addresses everything as (ecosystem, name, filename).
 COLLECTION_DOC = "collection.json"
 VERSIONS_DOC = "versions.json"
+
+#: How long a *listing* may be served from cache before it is re-read upstream.
+#:
+#: Which of these documents needs a bound is decided per document, by the one
+#: question that matters: can this change upstream? The version list and the
+#: collection detail (which carries `highest_version`) both can, so both are
+#: bounded -- unbounded, a newly published version could never be installed.
+#: A per-version detail cannot, so it is served with no `max_age` at all:
+#: expiring it would re-fetch identical bytes.
+#:
+#: An hour, matching `_VERSION_CACHE_TTL` in `binary_cache_service` -- the same
+#: question (how stale may a list of available versions be) about the same kind
+#: of document. A constant rather than a Helm value because an operator has no
+#: information here that we do not: the number trades one hour of staleness
+#: against one upstream round trip per collection per hour.
+LISTING_TTL = timedelta(hours=1)
 
 
 def valid_segment(value: str) -> bool:

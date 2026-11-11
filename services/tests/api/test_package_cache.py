@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -14,6 +15,7 @@ from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.api.prefixes import canonical_path
 from terrapod.api.routers.package_cache import authenticate_package_request
 from terrapod.db.session import get_db
+from terrapod.services.package_cache import galaxy as galaxy_service
 from terrapod.storage import get_storage
 
 BASE = "/api/v1/package-cache"
@@ -784,3 +786,258 @@ class TestARunnerIsAnsweredWithTheAddressItAskedOn:
             )
         assert "/api/terrapod/v1/package-cache/npm" in legacy
         assert "/api/v1/package-cache/npm" in canonical
+
+
+GALAXY = f"{BASE}/galaxy/v3/collections/community/general"
+
+GALAXY_VERSIONS = {
+    "meta": {"count": 1},
+    "links": {"first": None, "previous": None, "next": None, "last": None},
+    "data": [{"version": "9.0.0", "href": "https://galaxy.ansible.com/x/versions/9.0.0/"}],
+}
+
+GALAXY_VERSION = {
+    "version": "9.0.0",
+    "href": "https://galaxy.ansible.com/api/v3/collections/community/general/versions/9.0.0/",
+    "namespace": {"name": "community"},
+    "collection": {"name": "general"},
+    "artifact": {"filename": "community-general-9.0.0.tar.gz", "sha256": "b" * 64, "size": 1},
+    "download_url": "https://galaxy.ansible.com/download/community-general-9.0.0.tar.gz",
+    "metadata": {"dependencies": {}},
+}
+
+
+@asynccontextmanager
+async def _nothing_published():
+    """No collection of this name published here, so the proxy path is taken.
+
+    Mocked a layer below the route rather than at the route itself: the private
+    read gate (#2300) asks the registry first, and short-circuiting it would
+    leave these tests asserting on a handler that does not run in production.
+    """
+    with (
+        patch(
+            "terrapod.services.registry_collection_service.get_collection",
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
+            "terrapod.services.registry_collection_service.list_versions",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch(
+            "terrapod.services.registry_collection_service.get_version",
+            new=AsyncMock(return_value=None),
+        ),
+    ):
+        yield
+
+
+class TestTheCollectionIndexIsReadBackFromCache:
+    """#2512: an unsealed node served none of what it stored.
+
+    The document was fetched upstream on every request and then written to a
+    copy only a *sealed* node would ever read -- so a warm proxy still paid a
+    full upstream round trip (and `fetch_versions` pages through every version
+    of the collection) for each of the ~20 sequential metadata calls an install
+    of five pinned collections makes. The read below is the fix; these pin that
+    it happens, which is the only thing the old write-only shape lacked.
+
+    Driven through the real route rather than against the helper: the defect was
+    that the handler never consulted the cache, so a test calling the helper
+    itself would have passed throughout.
+    """
+
+    @patch("terrapod.api.routers.package_cache.load_document", new_callable=AsyncMock)
+    @patch("terrapod.services.package_cache.galaxy.fetch_versions", new_callable=AsyncMock)
+    async def test_a_cached_version_list_is_served_without_asking_upstream(
+        self, fetch, load
+    ) -> None:
+        load.return_value = json.dumps(GALAXY_VERSIONS).encode()
+
+        async with _nothing_published():
+            async with await _client(_app()) as c:
+                r = await c.get(f"{GALAXY}/versions/", headers=AUTH)
+
+        assert r.status_code == 200
+        assert [d["version"] for d in r.json()["data"]] == ["9.0.0"]
+        # The whole of the issue: upstream was not asked.
+        fetch.assert_not_awaited()
+
+    @patch("terrapod.api.routers.package_cache.store_document", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.package_cache.load_document", new_callable=AsyncMock)
+    @patch("terrapod.services.package_cache.galaxy.fetch_versions", new_callable=AsyncMock)
+    async def test_an_expired_version_list_goes_upstream_again(self, fetch, load, store) -> None:
+        """An expiry reads as a miss, so the existing cold path answers it."""
+        load.return_value = None
+        fetch.return_value = GALAXY_VERSIONS
+
+        async with _nothing_published():
+            async with await _client(_app()) as c:
+                r = await c.get(f"{GALAXY}/versions/", headers=AUTH)
+
+        assert r.status_code == 200
+        fetch.assert_awaited_once()
+        store.assert_awaited_once()
+
+    @patch("terrapod.api.routers.package_cache.load_document", new_callable=AsyncMock)
+    @patch("terrapod.services.package_cache.galaxy.fetch_version", new_callable=AsyncMock)
+    async def test_a_cached_version_detail_is_served_without_asking_upstream(
+        self, fetch, load
+    ) -> None:
+        load.return_value = json.dumps(GALAXY_VERSION).encode()
+
+        async with _nothing_published():
+            async with await _client(_app()) as c:
+                r = await c.get(f"{GALAXY}/versions/9.0.0/", headers=AUTH)
+
+        assert r.status_code == 200
+        # Still rewritten on the way out. A cached document is upstream's, so
+        # serving it as stored would send the client to galaxy.ansible.com --
+        # an install that resolves through Terrapod and downloads from the
+        # internet, which looks identical to working until there is no route out.
+        assert "galaxy.ansible.com" not in r.text
+        fetch.assert_not_awaited()
+
+    @patch("terrapod.api.routers.package_cache.load_document", new_callable=AsyncMock)
+    @patch("terrapod.services.package_cache.galaxy.fetch_collection", new_callable=AsyncMock)
+    async def test_a_cached_collection_detail_is_served_without_asking_upstream(
+        self, fetch, load
+    ) -> None:
+        load.return_value = json.dumps(
+            {
+                "href": "https://galaxy.ansible.com/api/v3/collections/community/general/",
+                "namespace": "community",
+                "name": "general",
+                "deprecated": False,
+                "versions_url": "https://galaxy.ansible.com/x/versions/",
+                "highest_version": {"version": "9.0.0", "href": "https://galaxy.ansible.com/x/"},
+            }
+        ).encode()
+
+        async with _nothing_published():
+            async with await _client(_app()) as c:
+                r = await c.get(f"{GALAXY}/", headers=AUTH)
+
+        assert r.status_code == 200
+        fetch.assert_not_awaited()
+
+
+class TestWhichDocumentsMayGoStale:
+    """The bound is chosen per document, and getting it backwards is invisible.
+
+    A listing served for ever means a newly published version can never be
+    installed. An immutable per-version detail given an expiry means a round
+    trip that returns identical bytes -- the cost this issue is about. Neither
+    shows in a response body, so the `max_age` the route asks for is asserted.
+    """
+
+    @patch("terrapod.api.routers.package_cache.store_document", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.package_cache.load_document", new_callable=AsyncMock)
+    @patch("terrapod.services.package_cache.galaxy.fetch_versions", new_callable=AsyncMock)
+    async def test_the_version_list_is_bounded(self, fetch, load, store) -> None:
+        load.return_value = None
+        fetch.return_value = GALAXY_VERSIONS
+
+        async with _nothing_published():
+            async with await _client(_app()) as c:
+                await c.get(f"{GALAXY}/versions/", headers=AUTH)
+
+        assert load.await_args.kwargs["max_age"] == galaxy_service.LISTING_TTL
+
+    @patch("terrapod.api.routers.package_cache.store_document", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.package_cache.load_document", new_callable=AsyncMock)
+    @patch("terrapod.services.package_cache.galaxy.fetch_version", new_callable=AsyncMock)
+    async def test_the_version_detail_is_not_bounded(self, fetch, load, store) -> None:
+        load.return_value = None
+        fetch.return_value = GALAXY_VERSION
+
+        async with _nothing_published():
+            async with await _client(_app()) as c:
+                await c.get(f"{GALAXY}/versions/9.0.0/", headers=AUTH)
+
+        assert load.await_args.kwargs["max_age"] is None
+
+    @patch("terrapod.api.routers.package_cache.store_document", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.package_cache.load_document", new_callable=AsyncMock)
+    @patch("terrapod.services.package_cache.galaxy.fetch_versions", new_callable=AsyncMock)
+    async def test_a_cache_read_that_raises_still_serves_the_request(
+        self, fetch, load, store
+    ) -> None:
+        """Reading the cache is best-effort, exactly as writing it already is.
+
+        A database hiccup or a storage blip has an answer upstream can still
+        give, so an install degrades to slow rather than failing outright.
+        """
+        load.side_effect = RuntimeError("database went away mid-request")
+        fetch.return_value = GALAXY_VERSIONS
+
+        async with _nothing_published():
+            async with await _client(_app()) as c:
+                r = await c.get(f"{GALAXY}/versions/", headers=AUTH)
+
+        assert r.status_code == 200
+        fetch.assert_awaited_once()
+
+
+class TestEveryPackageCacheRouteRecordsItsDuration:
+    """#2512's second half: uvicorn's access log carries no duration.
+
+    A line is written when a request *completes* and says nothing about how long
+    it took, so a slow index lookup and a fast one look the same, and a gap
+    between two lines is equally a held request or an idle client. One report
+    arrived with a 60-second hole that could have been either and the logs could
+    not say which. These pin that the number is recorded.
+    """
+
+    def _timings(self, log):
+        return [c for c in log.info.call_args_list if c.args[:1] == ("Package cache request",)]
+
+    @patch("terrapod.services.package_cache.pypi.fetch_index")
+    async def test_a_successful_request_logs_a_duration(self, fetch) -> None:
+        fetch.return_value = PYPI_INDEX
+
+        with patch("terrapod.api.routers.package_cache.logger") as log:
+            async with await _client(_app()) as c:
+                await c.get(f"{BASE}/pypi/simple/flask/", headers=AUTH)
+
+        timings = self._timings(log)
+        assert len(timings) == 1
+        kwargs = timings[0].kwargs
+        assert kwargs["status"] == 200
+        assert kwargs["path"].endswith("/pypi/simple/flask/")
+        assert isinstance(kwargs["duration_ms"], float)
+
+    async def test_a_refused_request_logs_one_too(self) -> None:
+        """The requests most worth timing are the ones that went wrong."""
+        with patch("terrapod.api.routers.package_cache.logger") as log:
+            async with await _client(_app()) as c:
+                await c.get(f"{BASE}/galaxy/v3/collections/Bad.Name/x/", headers=AUTH)
+
+        timings = self._timings(log)
+        assert len(timings) == 1
+        assert timings[0].kwargs["status"] == 404
+
+    def test_every_package_cache_router_is_timed(self) -> None:
+        """Derived rather than listed, so a seventh ecosystem is covered the day
+        it is added -- and `include_router` carries the *source* router's class
+        across, so setting it on the aggregate alone would silently drop it for
+        every route included into it, which is all of them."""
+        from fastapi import APIRouter
+        from fastapi.routing import APIRoute
+
+        from terrapod.api.routers import package_cache as mod
+
+        routers = [
+            getattr(mod, n)
+            for n in dir(mod)
+            if n.endswith("_router") and isinstance(getattr(mod, n), APIRouter)
+        ]
+        assert len(routers) >= 6, routers
+        for router in routers:
+            assert router.route_class is mod.TimedRoute, router
+
+        built = mod.build_router()
+        assert built is not None
+        mounted = [r for r in built.routes if isinstance(r, APIRoute)]
+        assert mounted, "no routes mounted"
+        assert all(isinstance(r, mod.TimedRoute) for r in mounted)

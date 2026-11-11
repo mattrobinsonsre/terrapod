@@ -244,10 +244,20 @@ class TestAnUnpublishedCollectionIsUnaffected:
     proxy path must still be reached — otherwise the gate breaks every upstream
     install, which is the whole feature."""
 
+    # An empty package cache. The proxy serves its own stored copy of an index
+    # before going upstream (#2512), so without this the request is answered
+    # from cache and never reaches the proxy path this test is about.
+    @patch(
+        "terrapod.api.routers.package_cache.load_document",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
     @patch("terrapod.services.package_cache.galaxy.fetch_collection", new_callable=AsyncMock)
     @patch("terrapod.services.registry_collection_service.list_versions", new_callable=AsyncMock)
     @patch("terrapod.services.registry_collection_service.get_collection", new_callable=AsyncMock)
-    async def test_a_stranger_still_reaches_the_proxy(self, get_coll, list_versions, fetch) -> None:
+    async def test_a_stranger_still_reaches_the_proxy(
+        self, get_coll, list_versions, fetch, _load
+    ) -> None:
         get_coll.return_value = None
         list_versions.return_value = []
         fetch.return_value = {"namespace": NS, "name": NAME, "deprecated": False}
