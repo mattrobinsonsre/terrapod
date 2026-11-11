@@ -287,18 +287,35 @@ class TestMarkerContents:
         )
 
     def test_a_conditional_auto_apply_mode_reaches_the_marker(self):
-        """The `auto_apply` boolean is only a projection — true for `always`,
-        `create` and `create_update` alike. Recording it alone tells a restoring
-        operator that auto-apply was on but not that it was deliberately held
-        back from changes and destroys, and the obvious way to turn it back on
-        is `always`, which applies destroys (#1313)."""
+        """Recording a boolean alone told a restoring operator that auto-apply
+        was on but not that it was deliberately held back from changes and
+        destroys — and the obvious way to turn that back on is `always`, which
+        applies destroys (#1313). The boolean is gone (#2503), so the mode is
+        the only thing recorded and the ambiguity is unrepresentable."""
         ws = MagicMock()
         ws.labels = {}
-        ws.auto_apply = True
         ws.auto_apply_mode = "create_update"
         snap = dws._settings_snapshot(ws)
-        assert snap["auto_apply"] is True
         assert snap["auto_apply_mode"] == "create_update"
+        assert "auto_apply" not in snap
+
+    def test_a_marker_written_before_the_drop_still_restores(self):
+        """A marker written by a 1.x deployment carries the BOOLEAN and no
+        mode. The restore path still reads it, which is the whole reason it
+        kept that branch — a workspace deleted before the upgrade and restored
+        after it must not come back with auto-apply silently off.
+
+        Asserted here rather than left to the restore path's own tests because
+        this is the only place that says why the branch exists, and a reader
+        tidying up `auto_apply` would otherwise find a lone `settings.get` with
+        nothing explaining it.
+        """
+        legacy = {"auto_apply": True}
+        modern_off = {"auto_apply_mode": "never"}
+        assert legacy.get("auto_apply") or legacy.get("auto_apply_mode", "never") != "never"
+        assert not (
+            modern_off.get("auto_apply") or modern_off.get("auto_apply_mode", "never") != "never"
+        )
 
 
 @contextlib.asynccontextmanager

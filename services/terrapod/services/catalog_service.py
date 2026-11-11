@@ -1027,7 +1027,6 @@ async def provision_instance(
         # errs towards less automation either way, but a trap for anyone who
         # later reads the column directly. The catalog offers no conditional
         # modes, so the pair is always one of the two flat ones.
-        auto_apply=auto_apply,
         auto_apply_mode="always" if auto_apply else "never",
         execution_backend=backend,
         engine_version=requested,
@@ -1103,8 +1102,7 @@ async def reconfigure_instance(
     ws.engine_version = requested
 
     ws.catalog_version_pin = version_pin
-    # Both columns, always — see the construction above (#1301).
-    ws.auto_apply = auto_apply
+    # One column (#2503). The catalog item carries a boolean, which maps.
     ws.auto_apply_mode = "always" if auto_apply else "never"
     # catalog_input_values (non-sensitive only) is refreshed inside _materialise.
 

@@ -346,13 +346,21 @@ class Workspace(Base):
     execution_mode: Mapped[str] = mapped_column(
         String(20), nullable=False, default="local"
     )  # local, agent
-    auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # Conditional auto-apply (#1274): never | always | create | create_update.
-    # `auto_apply` stays the boolean projection ("does this auto-apply at
-    # all") so an un-upgraded client keeps working; this column carries the
-    # refinement. Resolve with `run_service.resolve_auto_apply_mode` rather
-    # than reading either column directly — the two can disagree during a
-    # rolling upgrade, and the helper is where that is settled safely.
+    #: Conditional auto-apply (#1274): never | always | create | create_update.
+    #: THE setting -- there is no longer a sibling `auto_apply` boolean (#2503).
+    #:
+    #: That boolean was a denormalised projection of this column, written as
+    #: `mode != "never"` at five separate sites and kept "so an un-upgraded
+    #: client keeps working". 2.0 is where that window closes. Two columns for
+    #: one setting is what let `auto_apply = false` with
+    #: `auto_apply_mode = "always"` be accepted, resolved towards MORE
+    #: automation than the configuration asked for, and then fail after the
+    #: workspace had already been changed.
+    #:
+    #: The TFE-compatible surface still speaks `auto-apply`, because that is
+    #: `go-tfe`'s own field name rather than ours to drop: it INFERS the boolean
+    #: from this column on the way out and maps one to a mode on the way in
+    #: (`api/routers/tfe_v2.py`). Nothing is stored twice.
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
     execution_backend: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tofu"
@@ -2193,8 +2201,8 @@ class AutodiscoveryRule(Base):
     oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
-    auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # Templated onto workspaces this rule materialises (#1274).
+    #: Templated onto workspaces this rule materialises (#1274). The sibling
+    #: boolean went with the workspace's (#2503).
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -3077,10 +3085,10 @@ class Run(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
     message: Mapped[str] = mapped_column(Text, nullable=False, default="")
     is_destroy: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # Snapshotted from the workspace at run creation, exactly like
-    # `auto_apply`, so editing the workspace mid-run cannot retroactively
-    # change how an in-flight run decides (#1274).
+    #: Snapshotted from the workspace at run creation, so editing the workspace
+    #: mid-run cannot retroactively change how an in-flight run decides (#1274).
+    #: The sibling boolean this used to be snapshotted "exactly like" is gone
+    #: (#2503) -- the mode is the whole of the setting now.
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
     # Why a conditional auto-apply declined ("2 destroys, 1 replace"), so the
     # UI can say why a run is sitting in `planned` instead of leaving the

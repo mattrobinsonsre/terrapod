@@ -124,7 +124,7 @@ def _mock_run(**kwargs):
     run.apply_started_at = kwargs.get("apply_started_at", None)
     run.apply_finished_at = kwargs.get("apply_finished_at", None)
     run.error_message = kwargs.get("error_message", "")
-    run.auto_apply = kwargs.get("auto_apply", False)
+    run.auto_apply_mode = kwargs.get("auto_apply_mode", "never")
     run.plan_only = kwargs.get("plan_only", False)
     # `terraform plan -out=FILE` (#1903), explicit for the same reason as
     # `configuration_version_id` below: an unset MagicMock attribute is truthy,
@@ -501,7 +501,7 @@ def _mock_workspace(**kwargs):
     ws = MagicMock()
     ws.id = kwargs.get("id", uuid.uuid4())
     ws.name = kwargs.get("name", "test-ws")
-    ws.auto_apply = kwargs.get("auto_apply", False)
+    ws.auto_apply_mode = kwargs.get("auto_apply_mode", "never")
     ws.engine_version = kwargs.get("engine_version", "1.11")
     ws.terragrunt_enabled = kwargs.get("terragrunt_enabled", False)
     ws.terragrunt_version = kwargs.get("terragrunt_version", "1.0")
@@ -588,7 +588,7 @@ class TestCreateRun:
         call_kwargs = MockRun.call_args[1]
         assert call_kwargs["status"] == "pending"
         assert call_kwargs["message"] == "initial run"
-        assert call_kwargs["auto_apply"] == ws.auto_apply
+        assert call_kwargs["auto_apply_mode"] == ws.auto_apply_mode
         db.add.assert_called_once_with(instance)
         db.flush.assert_called_once()
 
@@ -599,13 +599,13 @@ class TestCreateRun:
         mock_result.scalar_one_or_none.return_value = None
         db.execute.return_value = mock_result
 
-        ws = _mock_workspace(auto_apply=False)
+        ws = _mock_workspace(auto_apply_mode="never")
         instance = MockRun.return_value
         instance.id = uuid.uuid4()
         instance.status = "pending"
 
         await create_run(db, ws, auto_apply=True)
-        assert MockRun.call_args[1]["auto_apply"] is True
+        assert MockRun.call_args[1]["auto_apply_mode"] == "always"
 
     @patch("terrapod.services.run_service.Run")
     async def test_resource_snapshot_from_workspace(self, MockRun):
@@ -1200,7 +1200,10 @@ class TestCompletePlan:
         `applied` (no apply Job needed; otherwise we d burn an empty apply
         and trip the duplicate-serial 500 on state upload)."""
         run = _mock_run(
-            status="planning", plan_started_at=datetime.now(UTC), plan_only=False, auto_apply=False
+            status="planning",
+            plan_started_at=datetime.now(UTC),
+            plan_only=False,
+            auto_apply_mode="never",
         )
         result = await complete_plan(_mock_db, run, has_changes=False)
         assert result.status == "applied"
@@ -1214,7 +1217,10 @@ class TestCompletePlan:
     )
     async def test_auto_apply_advances_to_confirmed(self, _stage, _avail, _evt, _mock_db):
         run = _mock_run(
-            status="planning", plan_started_at=datetime.now(UTC), plan_only=False, auto_apply=True
+            status="planning",
+            plan_started_at=datetime.now(UTC),
+            plan_only=False,
+            auto_apply_mode="always",
         )
         result = await complete_plan(_mock_db, run, has_changes=True)
         assert result.status == "confirmed"

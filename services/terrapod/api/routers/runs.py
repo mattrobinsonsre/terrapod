@@ -391,7 +391,14 @@ def _run_json(
                 # superseded), null otherwise (#646/#647).
                 "discard-reason": run.discard_reason,
                 "is-destroy": run.is_destroy,
-                "auto-apply": run.auto_apply,
+                # TFE only, and inferred rather than stored (#2503) -- the
+                # same split the workspace document makes, for the same reason:
+                # the boolean is `go-tfe`'s spelling, the mode is ours.
+                **(
+                    {"auto-apply": run_service.resolve_auto_apply_mode(run) != "never"}
+                    if tfe
+                    else {}
+                ),
                 # Conditional auto-apply (#1274): the mode this run was
                 # created under, and — when it declined — why, so the UI can
                 # explain a run sitting in `planned` rather than leaving the
@@ -564,7 +571,7 @@ def _run_json(
                 # state-upload 500 path.
                 #
                 # The auto-apply test is on the resolved MODE, not the boolean
-                # column. `create_run` sets `run.auto_apply = True` for every
+                # column. `create_run` sets the run's mode to `always` for every
                 # non-`never` mode, so keying off the boolean hid Confirm on a
                 # conditional run that had been *held* — the run sat in
                 # `planned` with a declined-reason and no consumer offered the

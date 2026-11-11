@@ -149,7 +149,6 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "default_limit": ws.default_limit,
         "hard_limit": ws.hard_limit,
         "resource_memory": ws.resource_memory,
-        "auto_apply": ws.auto_apply,
         # The boolean above is only a projection — it is true for `always`,
         # `create` and `create_update` alike. Recording the mode as well is what
         # makes a guardrail recoverable: without it an operator restoring a
@@ -760,20 +759,22 @@ async def restore_workspace(
         trigger_prefixes=list(settings.get("trigger_prefixes") or []),
         auto_merge_strategy=settings.get("auto_merge_strategy") or "merge",
         # Constraint 2 — inert on return. Anything that can act on its own is
-        # off, whatever it was: auto-apply (in both columns, so the boolean and
-        # the mode cannot disagree), drift detection, and auto-merge, which
-        # writes to a VCS provider.
-        auto_apply=False,
+        # off, whatever it was: auto-apply, drift detection, and auto-merge,
+        # which writes to a VCS provider.
         auto_apply_mode="never",
         drift_detection_enabled=False,
         auto_merge=False,
     )
-    if settings.get("auto_apply"):
+    # Reads BOTH spellings on purpose: a marker written before #2503 carries
+    # `auto_apply` and no mode, and one written after carries only the mode.
+    # Missing either would under-report what was suppressed, which is the
+    # direction that matters -- an operator would not be told.
+    if settings.get("auto_apply") or settings.get("auto_apply_mode", "never") != "never":
         # Plain field names, so the list stays machine-readable. What it *was*
-        # — which matters, because "auto_apply" alone would send an operator
+        # — which matters, because the name alone would send an operator
         # restoring a `create_update` workspace to `always` — is on the
         # marker's `settings`, which the undelete surface returns (#1313).
-        report["suppressed"].append("auto_apply")
+        report["suppressed"].append("auto_apply_mode")
     if settings.get("drift_detection_enabled"):
         report["suppressed"].append("drift_detection_enabled")
     if settings.get("auto_merge"):

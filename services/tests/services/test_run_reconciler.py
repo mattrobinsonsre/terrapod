@@ -47,7 +47,7 @@ def _mock_run(**kwargs):
     run.discard_reason = kwargs.get("discard_reason", None)
     run.apply_started_at = kwargs.get("apply_started_at", None)
     run.apply_finished_at = kwargs.get("apply_finished_at", None)
-    run.auto_apply = kwargs.get("auto_apply", False)
+    run.auto_apply_mode = kwargs.get("auto_apply_mode", "never")
     run.plan_only = kwargs.get("plan_only", False)
     run.error_message = kwargs.get("error_message", "")
     run.vcs_pull_request_number = kwargs.get("vcs_pull_request_number", None)
@@ -207,11 +207,11 @@ class TestHandleSucceeded:
         # Auto-apply respects a manual lock — return an unlocked workspace so
         # the auto-confirm proceeds.
         db.get.return_value = MagicMock(locked=False, plan_expiry_seconds=None)
-        run = _mock_run(status="planning", auto_apply=True)
+        run = _mock_run(status="planning", auto_apply_mode="always")
         mock_stage.return_value = None
         # First call returns planned run, second returns confirmed
-        planned_run = _mock_run(status="planned", auto_apply=True, plan_only=False)
-        confirmed_run = _mock_run(status="confirmed", auto_apply=True)
+        planned_run = _mock_run(status="planned", auto_apply_mode="always", plan_only=False)
+        confirmed_run = _mock_run(status="confirmed", auto_apply_mode="always")
         mock_transition.side_effect = [planned_run, confirmed_run]
 
         await _handle_succeeded(db, run, _outcome_for(run))
@@ -233,9 +233,9 @@ class TestHandleSucceeded:
             locked=True, plan_expiry_seconds=None
         )  # workspace is locked
         db.scalar.return_value = None  # no newer run (isolate the lock behaviour)
-        run = _mock_run(status="planning", auto_apply=True)
+        run = _mock_run(status="planning", auto_apply_mode="always")
         mock_stage.return_value = None
-        planned_run = _mock_run(status="planned", auto_apply=True, plan_only=False)
+        planned_run = _mock_run(status="planned", auto_apply_mode="always", plan_only=False)
         mock_transition.side_effect = [planned_run]
 
         await _handle_succeeded(db, run, _outcome_for(run))
@@ -258,13 +258,15 @@ class TestHandleSucceeded:
         and 500s. Skipping the apply Job entirely avoids the round-trip.
         """
         db = AsyncMock()
-        run = _mock_run(status="planning", auto_apply=False, plan_only=False, has_changes=False)
+        run = _mock_run(
+            status="planning", auto_apply_mode="never", plan_only=False, has_changes=False
+        )
         mock_stage.return_value = None
         planned_run = _mock_run(
-            status="planned", auto_apply=False, plan_only=False, has_changes=False
+            status="planned", auto_apply_mode="never", plan_only=False, has_changes=False
         )
         applied_run = _mock_run(
-            status="applied", auto_apply=False, plan_only=False, has_changes=False
+            status="applied", auto_apply_mode="never", plan_only=False, has_changes=False
         )
         mock_transition.side_effect = [planned_run, applied_run]
         ws = MagicMock()
@@ -294,13 +296,15 @@ class TestHandleSucceeded:
         confirm → applying transition and re-trigger the same 500 loop.
         """
         db = AsyncMock()
-        run = _mock_run(status="planning", auto_apply=True, plan_only=False, has_changes=False)
+        run = _mock_run(
+            status="planning", auto_apply_mode="always", plan_only=False, has_changes=False
+        )
         mock_stage.return_value = None
         planned_run = _mock_run(
-            status="planned", auto_apply=True, plan_only=False, has_changes=False
+            status="planned", auto_apply_mode="always", plan_only=False, has_changes=False
         )
         applied_run = _mock_run(
-            status="applied", auto_apply=True, plan_only=False, has_changes=False
+            status="applied", auto_apply_mode="always", plan_only=False, has_changes=False
         )
         mock_transition.side_effect = [planned_run, applied_run]
         db.get.return_value = MagicMock(locked=False, plan_expiry_seconds=None)
@@ -325,7 +329,7 @@ class TestHandleSucceeded:
         db = AsyncMock()
         run = _mock_run(status="planning", plan_only=True)
         mock_stage.return_value = None
-        planned_run = _mock_run(status="planned", plan_only=True, auto_apply=False)
+        planned_run = _mock_run(status="planned", plan_only=True, auto_apply_mode="never")
         mock_transition.return_value = planned_run
         ws = MagicMock()
         ws.locked = True

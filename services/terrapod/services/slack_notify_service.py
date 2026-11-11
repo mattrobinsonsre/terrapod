@@ -469,7 +469,9 @@ async def slack_approval_backfill_cycle() -> None:
                 .join(Workspace, Workspace.id == Run.workspace_id)
                 .where(
                     Run.status == "planned",
-                    Run.auto_apply.is_(False),
+                    # The mode is the whole setting now (#2503); `never` is what the
+                    # boolean's `False` meant.
+                    Run.auto_apply_mode == "never",
                     Run.plan_only.is_(False),
                     Run.is_drift_detection.is_(False),
                     Run.plan_finished_at.is_not(None),

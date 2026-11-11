@@ -690,35 +690,10 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     profile upload."""
     log = structlog.get_logger("runner.job_entrypoint")
 
-    # A configure runs ansible and no engine at all, so every Terraform step
-    # below is skipped rather than merely unused (#2508). Two of them are grants
-    # this phase has no business holding: the workspace's STATE, which can hold
-    # secrets, and a Terrapod provider TOKEN -- both landing in the same pod as
-    # the operator's playbook and whatever collections it installs. A third
-    # writes the workspace's variable values, sensitive ones included, into a
-    # directory the playbook can read. That is the same argument step 4b already
-    # makes for Pulumi, which has another delivery mechanism; a configure has
-    # none, so for it the file is pure disclosure.
-    #
-    # It is asked once, here, because the answer decides six steps -- the same
-    # shape as `is_pulumi` below.
-    #
-    # It is the PHASE, not the run shape: a composite (an apply followed by a
-    # configure) is two runner Jobs driven by one Run, so the configure Job of a
-    # composite is as free of Terraform as a standalone one. Its apply Job is a
-    # separate Job and is untouched.
-    is_configure = cfg.phase == "configure"
-
     # 1. Binary cache download. (download_binary itself logs "binary
     # ready" on success — no need to repeat it here.)
-    #
-    # `_run_configure_phase` documents the binary as deliberately unread, so a
-    # configure fetches and SHA-verifies nothing: the empty string below is what
-    # it is handed, and the plan path's requirement is unchanged.
-    binary = ""
-    if not is_configure:
-        binary_path = download_binary(cfg)
-        binary = str(binary_path)
+    binary_path = download_binary(cfg)
+    binary = str(binary_path)
 
     # 1b. Terragrunt (#534): wrap the cached tofu/terraform with terragrunt so
     # every phase that invokes `binary` actually runs terragrunt. The tg-wrapper
@@ -727,7 +702,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # state). Terragrunt copies the unit into a `.terragrunt-cache` subdir and
     # runs tofu there; after init (step 9b) the orchestrator follows tofu into
     # that dir for state + plan-file capture.
-    if cfg.terragrunt_enabled and not is_configure:
+    if cfg.terragrunt_enabled:
         tg_bin = terragrunt.download_terragrunt(cfg)
         binary = str(terragrunt.write_wrappers(terragrunt_bin=tg_bin, real_tf_bin=binary_path))
         log.info("terragrunt enabled", tg_wrapper=binary)
@@ -752,27 +727,19 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 
     # 2. Configuration tarball.
     work_dir.mkdir(parents=True, exist_ok=True)
-    config_result = download_configuration(
-        cfg, work_dir=work_dir, write_backend_override=not is_configure
-    )
+    config_result = download_configuration(cfg, work_dir=work_dir)
     strip_dir = config_result.strip_dir
 
     # 3. Mirror config + TF_CLI_CONFIG_FILE. Sets env vars on os.environ
     # so subsequent subprocess invocations inherit them.
-    #
-    # Skipped on a configure: every name it exports is a `TF_*` one that only
-    # terraform/tofu reads, and the credential it writes into the RC file is the
-    # run's own token. A configure's own upstreams -- Galaxy and PyPI through
-    # the pull-through -- are configured by `configure._forced_env` instead.
-    if not is_configure:
-        mirror_config.write_terraform_rc(
-            api_url=cfg.api_url,
-            auth_token=cfg.auth_token,
-            public_api_url=cfg.public_api_url,
-            config_path=_TF_RC,
-        )
-        for k, v in mirror_config.export_env(config_path=_TF_RC, env={}).items():
-            os.environ[k] = v
+    mirror_config.write_terraform_rc(
+        api_url=cfg.api_url,
+        auth_token=cfg.auth_token,
+        public_api_url=cfg.public_api_url,
+        config_path=_TF_RC,
+    )
+    for k, v in mirror_config.export_env(config_path=_TF_RC, env={}).items():
+        os.environ[k] = v
 
     # 4. Chdir into working subdirectory.
     cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
@@ -820,14 +787,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # the configuration loads, and an engine that cannot use it should not be
     # handed it. Both engines that exist can, so the gate admits both; it stays
     # because adding a third has to be a decision rather than a default.
-    # Not on a configure (#2508): the token reaches every provider plugin the
-    # configuration loads, and a configure loads none -- it runs a playbook. So
-    # exporting it only puts a credential that can write this run's state into
-    # the environment of the operator's own ansible content.
-    cred_env = (
-        {} if is_configure else provider_credentials.export_env(cfg, env=os.environ, engine=engine)
-    )
-    for k, v in cred_env.items():
+    for k, v in provider_credentials.export_env(cfg, env=os.environ, engine=engine).items():
         os.environ[k] = v
 
     # 4b. Render terrapod.auto.tfvars from the mounted vars Secret (if any),
@@ -849,7 +809,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # delivery is deliberately uniform, sensitive and not, because for Terraform
     # the file IS the mechanism; that is exactly why it must not be written for
     # an engine that has another one.
-    if not is_pulumi and not is_configure and _VARS_FILE.exists():
+    if not is_pulumi and _VARS_FILE.exists():
         try:
             import json as _json
 
@@ -900,7 +860,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # stack through Terrapod's Pulumi service backend, so there is nothing to
     # fetch here; a state file dropped into the working directory would be the
     # stored deployment, secrets still sealed, for nothing to read.
-    if not is_pulumi and not is_configure:
+    if not is_pulumi:
         state_present = download_state(cfg, strip_dir=cwd)
         if state_present:
             log.info("state file present after download")

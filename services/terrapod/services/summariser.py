@@ -1625,11 +1625,20 @@ def _slack_trigger_for(run, kind: str) -> str | None:
     (#556). Only the fresh-AI, always-posted events — needs_attention and
     errored. Drift / auto-apply / plan-only return None (drift posts from its
     own handler with a no-changes gate; the rest aren't approval events)."""
+    # Function-local, matching the three siblings this module already imports
+    # that way: `run_service` imports THIS module, so a top-level import is a
+    # cycle.
+    from terrapod.services import run_service
+
     if kind == "failure_analysis":
         return "run:errored"
     if getattr(run, "is_drift_detection", False):
         return None
-    if run.status == "planned" and not run.auto_apply and not run.plan_only:
+    if (
+        run.status == "planned"
+        and run_service.resolve_auto_apply_mode(run) == "never"
+        and not run.plan_only
+    ):
         return "run:needs_attention"
     return None
 

@@ -126,7 +126,6 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "ee-resource-cpu": rule.ee_resource_cpu,
             "ee-resource-memory": rule.ee_resource_memory,
             "oidc-audiences": dict(rule.oidc_audiences or {}),
-            "auto-apply": rule.auto_apply,
             "auto-apply-mode": run_service.resolve_auto_apply_mode(rule),
             "on-directory-delete": rule.on_directory_delete,
             "labels": dict(rule.labels or {}),
@@ -467,17 +466,20 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     ):
         if key in attrs:
             out[column] = workspace_settings.validate_resource_quantity(attrs[key], key)
-    if "auto-apply" in attrs and "auto-apply-mode" in attrs:
+    if "auto-apply" in attrs:
+        # Refused rather than mapped (#2503). This is a native surface and 2.0
+        # drops the boolean from all of them; a rule template that silently
+        # accepted it would materialise every future workspace with a setting
+        # the caller cannot see in the rule they wrote. `/api/tfe/v2` keeps
+        # speaking `auto-apply` because that is go-tfe's field name.
         raise HTTPException(
             status_code=422,
             detail=(
-                "Set either auto-apply or auto-apply-mode, not both — "
-                "auto-apply-mode supersedes the boolean"
+                "auto-apply is no longer accepted here — use auto-apply-mode "
+                "('never', 'always', 'create' or 'create_update'). The old "
+                "boolean's 'true' is 'always' and its 'false' is 'never'"
             ),
         )
-    if "auto-apply" in attrs:
-        out["auto_apply"] = bool(attrs["auto-apply"])
-        out["auto_apply_mode"] = "always" if attrs["auto-apply"] else "never"
     if "auto-apply-mode" in attrs:
         mode = attrs["auto-apply-mode"]
         if mode not in run_service.AUTO_APPLY_MODES:
@@ -485,9 +487,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
                 status_code=422,
                 detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
             )
-        # Both columns together, so the pair can never disagree (#1274).
         out["auto_apply_mode"] = mode
-        out["auto_apply"] = mode != "never"
     if "on-directory-delete" in attrs:
         odd = str(attrs["on-directory-delete"])
         if odd not in ("flag", "destroy"):
@@ -630,7 +630,11 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     resolved_workflow = out.get(
         "vcs_workflow", getattr(existing, "vcs_workflow", None) or "merge_then_apply"
     )
-    resolved_auto_apply = out.get("auto_apply", getattr(existing, "auto_apply", False))
+    # The pending write is a mode; the check below wants the boolean it implies.
+    resolved_mode = out.get(
+        "auto_apply_mode", run_service.resolve_auto_apply_mode(existing) if existing else "never"
+    )
+    resolved_auto_apply = resolved_mode != "never"
     try:
         workspace_settings.check_apply_then_merge_allowed(
             resolved_workflow or "merge_then_apply",
@@ -926,7 +930,6 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         hard_limit=fields.get("hard_limit", ""),
         resource_memory=fields.get("resource_memory", "2Gi"),
         oidc_audiences=fields.get("oidc_audiences", {}),
-        auto_apply=fields.get("auto_apply", False),
         auto_apply_mode=fields.get("auto_apply_mode", "never"),
         labels=fields.get("labels", {}),
         owner_email=fields.get("owner_email"),

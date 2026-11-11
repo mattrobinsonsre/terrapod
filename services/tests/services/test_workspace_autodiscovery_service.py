@@ -397,7 +397,6 @@ def _materialise_rule(**overrides):
         "resource_memory": "2Gi",
         "ee_resource_cpu": "",
         "ee_resource_memory": "",
-        "auto_apply": True,
         "auto_apply_mode": "create_update",
         "owner_email": "platform@example.com",
         "var_files": [],
@@ -435,12 +434,16 @@ def _autocreate_db() -> AsyncMock:
 class TestMaterialisationInheritsTheRule:
     """The read half of the autodiscovery template.
 
-    `test_auto_apply_mode_admin.py` covers the *write* half — the rule's two
-    columns staying consistent — but nothing asserted the workspace actually
-    inherits the mode when the rule materialises one. Carrying only the
-    boolean would silently turn a `create_update` rule into `always` on every
-    workspace it creates: the operator configured "apply additions and updates
-    only" and gets "apply anything", including destroys (#1297).
+    `test_auto_apply_mode_admin.py` covers the *write* half; this asserts the
+    workspace actually inherits the mode when the rule materialises one.
+
+    It was written when the rule carried a boolean beside the mode, and
+    carrying only the boolean would have turned a `create_update` rule into
+    `always` on every workspace it created — the operator configures "apply
+    additions and updates only" and gets "apply anything", destroys included
+    (#1297). The boolean is gone (#2503), so that particular way of losing the
+    distinction cannot happen; the distinction itself still has to survive
+    materialisation, which is what these assert.
     """
 
     @pytest.mark.asyncio
@@ -449,14 +452,14 @@ class TestMaterialisationInheritsTheRule:
             find_or_autocreate_workspace,
         )
 
-        rule = _materialise_rule(auto_apply=True, auto_apply_mode="create_update")
+        rule = _materialise_rule(auto_apply_mode="create_update")
         db = _autocreate_db()
 
         ws, created = await find_or_autocreate_workspace(db, rule, "accounts/prod/vpc")
 
         assert created is True
         assert ws.auto_apply_mode == "create_update"
-        assert ws.auto_apply is True
+        assert not hasattr(ws, "auto_apply")
 
     @pytest.mark.asyncio
     async def test_a_never_rule_materialises_a_never_workspace(self):
@@ -464,13 +467,13 @@ class TestMaterialisationInheritsTheRule:
             find_or_autocreate_workspace,
         )
 
-        rule = _materialise_rule(auto_apply=False, auto_apply_mode="never")
+        rule = _materialise_rule(auto_apply_mode="never")
         db = _autocreate_db()
 
         ws, _ = await find_or_autocreate_workspace(db, rule, "accounts/dev/vpc")
 
         assert ws.auto_apply_mode == "never"
-        assert ws.auto_apply is False
+        assert not hasattr(ws, "auto_apply")
 
     @pytest.mark.asyncio
     async def test_a_legacy_rule_without_the_column_defaults_to_never(self):
@@ -481,7 +484,7 @@ class TestMaterialisationInheritsTheRule:
             find_or_autocreate_workspace,
         )
 
-        rule = _materialise_rule(auto_apply=False)
+        rule = _materialise_rule()
         del rule.auto_apply_mode
         db = _autocreate_db()
 
@@ -580,7 +583,6 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "ee_resource_memory",
         "parallelism",
         "configure_parallelism",
-        "auto_apply",
         "auto_apply_mode",
         "labels",
         "owner_email",

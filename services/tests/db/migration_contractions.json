@@ -59,6 +59,9 @@
   "c49590b8f20d_fork_pr_plans_defaults_closed": [
     "alter_column(allow_fork_pr_plans)"
   ],
+  "c6ca51805d3d_drop_auto_apply": [
+    "drop_column(auto_apply)"
+  ],
   "d6d5980b9176_configure_only_variables": [
     "drop_constraint()"
   ],

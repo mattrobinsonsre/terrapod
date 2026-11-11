@@ -69,29 +69,23 @@ CONDITIONAL_AUTO_APPLY_MODES = ("create", "create_update")
 
 
 def resolve_auto_apply_mode(obj: Any) -> str:
-    """Resolve the effective auto-apply mode of a workspace or a run.
+    """The effective auto-apply mode of a workspace or a run.
 
-    Two columns describe one setting: the historical `auto_apply` boolean
-    (still written by an un-upgraded API replica, and by any client that
-    only knows the old attribute) and the newer `auto_apply_mode`. A rolling
-    upgrade can therefore observe them disagreeing, and this is where that
-    is settled — never by reading either column directly.
+    ONE column describes the setting since #2503. It used to be two -- this
+    column plus an `auto_apply` boolean kept so an un-upgraded client would
+    keep working -- and this function existed to settle their disagreement.
 
-    The composition is deliberately asymmetric: `auto_apply == False` always
-    wins and means `never`. So the worst a skewed write can do is auto-apply
-    LESS than the operator asked for, never more. Failing towards "a human
+    Still the only way to read the setting, for the reason it was before: an
+    unrecognised value reads as `never`, which keeps the safety property the
+    two-column version had. The worst a bad write can do is auto-apply LESS
+    than the operator asked for, never more, and failing towards "a human
     looks at it" is the only safe direction for a setting that applies
     infrastructure changes unattended.
     """
-    if not getattr(obj, "auto_apply", False):
-        return "never"
     mode = getattr(obj, "auto_apply_mode", None)
-    if mode in CONDITIONAL_AUTO_APPLY_MODES:
+    if mode in AUTO_APPLY_MODES:
         return mode
-    # `auto_apply` is true and the mode column says nothing conditional
-    # (unset, "never" from an old row, or an unrecognised value written by a
-    # newer replica): fall back to the boolean's own meaning.
-    return "always"
+    return "never"
 
 
 def plan_shape_permits_auto_apply(run: Run, mode: str) -> bool | None:
@@ -614,7 +608,7 @@ async def _enqueue_notification(run: Run, target_status: str) -> None:
 
     if target_status == "planned":
         # Distinguish between needs_attention and planned
-        if not run.auto_apply and not run.plan_only:
+        if resolve_auto_apply_mode(run) == "never" and not run.plan_only:
             trigger = "run:needs_attention"
         else:
             trigger = "run:planned"
@@ -1563,7 +1557,6 @@ async def create_run(
     # onto the flat modes. Only an unset argument inherits the workspace's
     # conditional mode (#1274).
     if auto_apply is None:
-        auto_apply = workspace.auto_apply
         auto_apply_mode = resolve_auto_apply_mode(workspace)
     else:
         auto_apply_mode = "always" if auto_apply else "never"
@@ -1646,7 +1639,6 @@ async def create_run(
         ee_image=ee_image,
         playbook=playbook,
         ansible_limit=ansible_limit,
-        auto_apply=auto_apply,
         auto_apply_mode=auto_apply_mode,
         plan_only=plan_only,
         source=source,
@@ -2864,7 +2856,11 @@ async def fire_run_triggers(
                 db,
                 workspace=dest_ws,
                 message=f"Triggered by successful apply in workspace '{source_name}'",
-                auto_apply=dest_ws.auto_apply,
+                # Deliberately NOT passing `auto_apply`: an explicit argument
+                # maps onto the flat modes, so handing it the destination's own
+                # setting COLLAPSED a conditional mode -- a `create_update`
+                # workspace got `always` on every triggered run (#2503). Omitting
+                # it inherits the workspace's mode through the one resolver.
                 plan_only=False,
                 # Its own source (#1307). `tfe-api` is the CLI-upload source, and
                 # labelling a triggered run with it made it indistinguishable from

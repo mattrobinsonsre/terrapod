@@ -112,7 +112,7 @@ func TestCreateDistinguishesAnUnsetBoolFromAnExplicitFalse(t *testing.T) {
 
 func TestUpdateOmitsABoolTheCallerDidNotMention(t *testing.T) {
 	// A plain bool here would flip the field to false on every PATCH that did
-	// not mention it — the trap AutoApply's own comment records.
+	// not mention it.
 	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{Name: "api"})
 	for _, k := range []string{"plan-apply-enabled", "configure-enabled"} {
 		if _, present := attrs[k]; present {

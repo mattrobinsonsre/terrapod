@@ -66,7 +66,6 @@ _FIELD_MAP: dict[str, str] = {
     "engine-version": "engine_version",
     "execution-backend": "execution_backend",
     "execution-mode": "execution_mode",
-    "auto-apply": "auto_apply",
     # NOTE: neither the agent-pool attributes nor `auto-apply-mode` are here —
     # each writes two columns from one input key, so they are validated
     # separately (_validate_pool_set / _validate_auto_apply below).
@@ -352,21 +351,32 @@ async def _validate_pool_set(
 
 
 def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:
-    """Resolve the auto-apply pair for a bulk update (#1274).
+    """Resolve auto-apply for a bulk update (#1274, narrowed by #2503).
 
-    `auto-apply-mode` writes BOTH columns, so it can't go through _FIELD_MAP.
-    Mirrors the single-workspace API exactly: either key alone is fine, both
-    together is a 422 rather than a guess, and the two columns are always
-    written together so they cannot end up disagreeing.
+    `auto-apply-mode` is now the only spelling on this surface. It does not go
+    through `_FIELD_MAP` because the cross-check below needs the resulting mode
+    rather than a raw field value.
+
+    The boolean is **refused**, not ignored and not quietly mapped. 2.0 drops it
+    from every native surface, and a bulk update is the one path that reaches a
+    hundred workspaces at once -- silently accepting a key this surface no
+    longer honours is how a caller discovers the change by finding their fleet
+    in a state they did not ask for. The refusal names the replacement, so the
+    fix is in the message rather than in the release notes.
+
+    `/api/tfe/v2` is unaffected and still speaks `auto-apply`: that is go-tfe's
+    own field name rather than ours to drop, and it infers the boolean from
+    this column on the way out.
     """
     has_bool = "auto-apply" in update
     has_mode = "auto-apply-mode" in update
-    if has_bool and has_mode:
+    if has_bool:
         raise HTTPException(
             status_code=422,
             detail=(
-                "Set either auto-apply or auto-apply-mode, not both — "
-                "auto-apply-mode supersedes the boolean"
+                "auto-apply is no longer accepted here — use auto-apply-mode "
+                "('never', 'always', 'create' or 'create_update'). The old "
+                "boolean's 'true' is 'always' and its 'false' is 'never'"
             ),
         )
     if has_mode:
@@ -376,10 +386,7 @@ def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict
                 status_code=422,
                 detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
             )
-        return {"auto_apply_mode": mode, "auto_apply": mode != "never"}
-    if has_bool:
-        # The boolean maps onto the flat modes, same as everywhere else.
-        return {"auto_apply_mode": "always" if fields.get("auto_apply") else "never"}
+        return {"auto_apply_mode": mode}
     return {}
 
 
@@ -588,10 +595,16 @@ def _reject_apply_then_merge_where_it_cannot_hold(fields: dict[str, Any], worksp
     workflow = fields.get("vcs_workflow")
     if workflow != "apply_then_merge":
         return
-    pending_auto_apply = fields.get("auto_apply")
+    # The pending write is a MODE now (#2503); the check below wants the
+    # boolean it implies.
+    pending_mode = fields.get("auto_apply_mode")
     offenders: list[str] = []
     for w in workspaces:
-        auto_apply = w.auto_apply if pending_auto_apply is None else pending_auto_apply
+        auto_apply = (
+            run_service.resolve_auto_apply_mode(w) != "never"
+            if pending_mode is None
+            else pending_mode != "never"
+        )
         try:
             workspace_settings.check_apply_then_merge_allowed(
                 workflow,
@@ -827,7 +840,7 @@ def _reject_auto_apply_on_apply_then_merge(fields: dict[str, Any], workspaces: l
     matching the endpoint's own contract: a partial application here would be
     worse than a refusal.
     """
-    if not fields.get("auto_apply"):
+    if fields.get("auto_apply_mode", "never") == "never":
         return
     offenders = [w.name for w in workspaces if getattr(w, "vcs_workflow", "") == "apply_then_merge"]
     if not offenders:

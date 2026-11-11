@@ -429,7 +429,6 @@ async def find_or_autocreate_workspace(
         # wants unless the operator sized it deliberately.
         ee_resource_cpu=rule.ee_resource_cpu,
         ee_resource_memory=rule.ee_resource_memory,
-        auto_apply=rule.auto_apply,
         # Inherit the rule's conditional mode too (#1274) — carrying only
         # the boolean would turn a `create_update` rule into `always` on
         # every workspace it materialises.

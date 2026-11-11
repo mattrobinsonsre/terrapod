@@ -85,8 +85,12 @@ type Run struct {
 	ConfigureAfterApply bool   `json:"configure-after-apply"`
 	Playbook            string `json:"playbook,omitempty"`
 	Limit               string `json:"limit,omitempty"`
-	AutoApply           bool   `json:"auto-apply"`
-	// AutoApplyMode is the mode snapshotted at run creation (#1274), and
+	// AutoApplyMode is the mode snapshotted at run creation (#1274) and the
+	// whole of the setting -- the boolean beside it is gone (#2503), for the
+	// reason `Workspace.AutoApplyMode` records. Note `CreateRunRequest`
+	// KEEPS its `AutoApply`: that is a per-run override with no mode form,
+	// catalogued as CLI-consumed, and a different thing from this setting.
+	//
 	// AutoApplyDeclinedReason says why a conditional mode refused to apply
 	// this plan — empty unless the run is parked for a human.
 	AutoApplyMode           string `json:"auto-apply-mode"`
@@ -656,7 +660,6 @@ func runFromResource(res *Resource) *Run {
 		ConfigureAfterApply:     GetBoolAttr(res, "configure-after-apply"),
 		Playbook:                GetStringAttr(res, "playbook"),
 		Limit:                   GetStringAttr(res, "limit"),
-		AutoApply:               GetBoolAttr(res, "auto-apply"),
 		AutoApplyMode:           GetStringAttr(res, "auto-apply-mode"),
 		AutoApplyDeclinedReason: GetStringAttr(res, "auto-apply-declined-reason"),
 		PlanOnly:                GetBoolAttr(res, "plan-only"),

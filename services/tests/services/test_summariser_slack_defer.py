@@ -12,7 +12,7 @@ def _run(**kw):
     base = {
         "is_drift_detection": False,
         "status": "planned",
-        "auto_apply": False,
+        "auto_apply_mode": "never",
         "plan_only": False,
     }
     base.update(kw)
@@ -33,7 +33,7 @@ def test_trigger_drift_is_none():
 
 
 def test_trigger_auto_apply_is_none():
-    assert sm._slack_trigger_for(_run(auto_apply=True), "plan_summary") is None
+    assert sm._slack_trigger_for(_run(auto_apply_mode="always"), "plan_summary") is None
 
 
 def test_trigger_plan_only_is_none():

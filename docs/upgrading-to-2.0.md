@@ -130,6 +130,55 @@ Worth saying, because both look like upgrade steps and are not:
 
 ## Breaking changes
 
+### `auto-apply` is one setting now: `auto-apply-mode`
+
+**Affects:** anything that *writes* `auto-apply` on the native API, the provider, the
+Go SDK or an MCP tool. **A `tofu`/`terraform` cloud backend and `tfci` are unaffected**
+— see the compatibility note below.
+
+One setting was described by two columns: `auto-apply-mode`
+(`never` | `always` | `create` | `create_update`) and an `auto-apply` boolean that was
+its projection, written as `mode != "never"` at five separate sites. The boolean was
+kept so an un-upgraded client would keep working; 2.0 is where that window closes.
+
+Two columns for one setting is what let `auto-apply: false` arrive together with
+`auto-apply-mode: "always"`, be resolved towards *more* automation than the
+configuration asked for, and then fail with "Provider produced inconsistent result
+after apply" — after the workspace had already been changed. With one column the
+contradiction cannot be expressed.
+
+**What to change.** Replace a boolean with the mode that means the same thing:
+
+| was | now |
+|---|---|
+| `auto_apply = true` | `auto_apply_mode = "always"` |
+| `auto_apply = false` | `auto_apply_mode = "never"` (or leave it unset) |
+
+`terrapod_workspace` and `terrapod_autodiscovery_rule` no longer accept `auto_apply`,
+so a configuration still setting it fails at plan time with an unsupported-argument
+error rather than being silently ignored. That is deliberate: a silently ignored
+automation setting is the failure this change exists to remove.
+
+**The TFE-compatible surface still speaks `auto-apply`**, because that is `go-tfe`'s own
+field name rather than ours to drop. `/api/tfe/v2` now *infers* the boolean on the way
+out (`mode != "never"`) and *maps* one onto a mode on the way in (`true` → `always`,
+`false` → `never`). Sending both attributes in one request is still refused with a 422,
+which is what keeps the mapping unambiguous. So nothing changes for the CLI.
+
+**The rollout is briefly unavailable, and that is correct.** This migration drops a
+column, so it is a contraction rather than an expand/contract step — which is why it
+lands on a major. A 1.x pod reports *not ready* against this schema and leaves the load
+balancer, because it still reads the column, so the API is unavailable from the moment
+the pre-upgrade hook completes until the first 2.0 pod passes readiness. Seconds to a
+couple of minutes, and it self-heals. Unavailable is the right outcome here: the
+alternative is replicas serving requests against a column that is gone.
+
+From 2.0 onward this gets better rather than worse. An API pod now stays ready when the
+schema is merely *ahead* of its code, which is what makes a rolling upgrade zero-downtime
+for an additive migration, and a later release that genuinely removes a column records
+itself in `schema_contractions` so pods predating it go not-ready deliberately — as these
+ones do, but by design rather than by accident.
+
 ### `TF_VAR_terrapod_run_phase` is no longer exported
 
 **Affects:** a configuration that declares `variable "terrapod_run_phase"`, on a

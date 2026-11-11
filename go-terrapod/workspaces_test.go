@@ -101,23 +101,24 @@ func TestCreateWorkspace_Happy(t *testing.T) {
 	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", map[string]any{
-			"execution-mode": "agent",
-			"auto-apply":     true,
+			"execution-mode":  "agent",
+			"auto-apply-mode": "always",
 		})))
 	}
 
 	c := f.client()
-	autoApply := true
+	// The mode is the whole setting (#2503); the boolean it replaced is gone.
+	autoApplyMode := "always"
 	ws, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
 		Name:          "api-prod",
 		ExecutionMode: "agent",
-		AutoApply:     &autoApply,
+		AutoApplyMode: &autoApplyMode,
 		Labels:        map[string]string{"env": "prod"},
 	})
 	if err != nil {
 		t.Fatalf("CreateWorkspace: %v", err)
 	}
-	if ws.ID != "ws-aaa" || ws.Name != "api-prod" || ws.ExecutionMode != "agent" || !ws.AutoApply {
+	if ws.ID != "ws-aaa" || ws.Name != "api-prod" || ws.ExecutionMode != "agent" {
 		t.Errorf("workspace: %+v", ws)
 	}
 
@@ -133,9 +134,14 @@ func TestCreateWorkspace_Happy(t *testing.T) {
 	if req.Data.Attributes["name"] != "api-prod" || req.Data.Attributes["execution-mode"] != "agent" {
 		t.Errorf("request attrs: %+v", req.Data.Attributes)
 	}
-	// auto-apply was set via pointer — its presence and value should round-trip.
-	if v, ok := req.Data.Attributes["auto-apply"].(bool); !ok || !v {
-		t.Errorf("auto-apply not set in request: %+v", req.Data.Attributes)
+	// The mode was set via pointer — its presence and value should round-trip.
+	// `auto-apply` is deliberately absent: the boolean is gone from this SDK
+	// (#2503), and the TFE surface infers it rather than being sent it.
+	if v, ok := req.Data.Attributes["auto-apply-mode"].(string); !ok || v != "always" {
+		t.Errorf("auto-apply-mode not set in request: %+v", req.Data.Attributes)
+	}
+	if _, present := req.Data.Attributes["auto-apply"]; present {
+		t.Errorf("auto-apply sent: %+v", req.Data.Attributes)
 	}
 }
 

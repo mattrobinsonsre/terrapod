@@ -31,37 +31,53 @@ def _run(additions=0, changes=0, destructions=0, replacements=0):
 
 
 class TestResolveMode:
-    """`auto_apply` and `auto_apply_mode` can disagree across a rolling
-    upgrade. The composition must always err towards less automation."""
+    """One column now holds the setting (#2503), so there is no pair to
+    compose and nothing to disagree.
+
+    This used to be a 3-way matrix over `(auto_apply, auto_apply_mode,
+    expected)`, because the two could disagree across a rolling upgrade and the
+    composition had to err towards LESS automation. The boolean is gone, so
+    that whole class of disagreement is unrepresentable rather than merely
+    handled. What survives is the property the matrix existed to protect:
+    **anything this code cannot read as a mode resolves to `never`.**
+    """
 
     @pytest.mark.parametrize(
-        ("auto_apply", "mode", "expected"),
+        ("mode", "expected"),
         [
-            # The historical boolean on its own.
-            (False, "never", "never"),
-            (True, "never", "always"),
-            # Conditional modes.
-            (True, "create", "create"),
-            (True, "create_update", "create_update"),
-            # An old replica clearing the boolean must win: less, never more.
-            (False, "create", "never"),
-            (False, "create_update", "never"),
-            (False, "always", "never"),
-            # A value written by a newer replica this code doesn't know:
-            # fall back to the boolean's own meaning rather than guessing.
-            (True, "some_future_mode", "always"),
-            (True, None, "always"),
+            ("never", "never"),
+            ("always", "always"),
+            ("create", "create"),
+            ("create_update", "create_update"),
         ],
     )
-    def test_composition(self, auto_apply, mode, expected):
-        obj = SimpleNamespace(auto_apply=auto_apply, auto_apply_mode=mode)
-        assert resolve_auto_apply_mode(obj) == expected
+    def test_a_known_mode_is_itself(self, mode, expected):
+        assert resolve_auto_apply_mode(SimpleNamespace(auto_apply_mode=mode)) == expected
+
+    @pytest.mark.parametrize("unreadable", ["some_future_mode", None, "", "ALWAYS", 1, []])
+    def test_anything_unreadable_falls_to_never(self, unreadable):
+        """A value written by a NEWER replica that this code does not know must
+        fail towards a human looking at it, never towards more automation.
+
+        `"ALWAYS"` is in here deliberately: a case-insensitive match would be a
+        plausible kindness and would turn an unrecognised value into the most
+        automated one there is.
+        """
+        assert resolve_auto_apply_mode(SimpleNamespace(auto_apply_mode=unreadable)) == "never"
 
     def test_object_without_the_column_at_all(self):
         # Defensive: a stale/partial object must not raise, and must not
         # invent an auto-apply.
-        assert resolve_auto_apply_mode(SimpleNamespace(auto_apply=False)) == "never"
         assert resolve_auto_apply_mode(SimpleNamespace()) == "never"
+
+    def test_the_retired_boolean_is_ignored_rather_than_consulted(self):
+        """An object still carrying the old attribute -- a mock in a test, a
+        pickled row -- must not resurrect it as a source of truth."""
+        assert resolve_auto_apply_mode(SimpleNamespace(auto_apply=True)) == "never"
+        assert (
+            resolve_auto_apply_mode(SimpleNamespace(auto_apply=True, auto_apply_mode="never"))
+            == "never"
+        )
 
 
 class TestPlanShape:
