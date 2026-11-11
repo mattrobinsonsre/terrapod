@@ -60,6 +60,25 @@ _LINE = re.compile(r"^((?:[ \t|])*)\|--(.*)$")
 #: whole remainder, which is what ansible prints.
 _VAR = re.compile(r"^\{(.+?) = (.*)\}$")
 
+#: What an inline-vaulted value reads as in the levels view (#2506).
+#:
+#: The API holds no vault secret, and `--graph --vars` cannot print a value it
+#: cannot decrypt -- so `inventory_vault` substitutes this string into the
+#: scratch copy before the attribution pass. It lives HERE, with the comparison
+#: that has to recognise it, because a second copy of the literal is how the
+#: substitution and the comparison come to disagree and every vaulted variable
+#: silently loses its attribution.
+VAULTED_PLACEHOLDER = "<vaulted>"
+
+#: How `--list` reports a value it did not decrypt: a one-key mapping holding
+#: the ciphertext. Ansible's own wire shape, not ours.
+_VAULT_MARKER = "__ansible_vault"
+
+
+def _is_vault_ciphertext(value: Any) -> bool:
+    """Is this `--list` value an undecrypted vault scalar?"""
+    return isinstance(value, dict) and set(value) == {_VAULT_MARKER}
+
 
 def parse_graph(text: str) -> dict[str, dict[str, str]]:
     """Map each entity to the variables set **at** that entity.
@@ -194,7 +213,16 @@ def attribute(
             for lvl in chain_levels
             if key in at_level.get(lvl, {})
         ]
-        shown = str(value)
+        # A vaulted value is the one case where the two sources CANNOT print
+        # the same text: `--list` carries the ciphertext mapping and the graph
+        # carries the placeholder, because nothing here can decrypt (#2506).
+        # Comparing them raw would leave every vaulted variable unmatched and so
+        # credited to the wrong level -- `here` on a host, `unattributable` on a
+        # group -- which is an attribution error in the view whose whole job is
+        # attribution. Collapsing both sides to the placeholder is not a guess:
+        # the winner is the DEEPEST level carrying the key, whatever the value,
+        # so matching on "this level sets it, vaulted" is exactly right.
+        shown = VAULTED_PLACEHOLDER if _is_vault_ciphertext(value) else str(value)
         # DEEPEST match wins, so walk the chain backwards.
         origin = ""
         for entry in reversed(chain):

@@ -45,6 +45,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import tempfile
@@ -64,6 +65,7 @@ from terrapod.config import settings
 # image ships no PyYAML (see its docstring).
 from terrapod.services.inventory_provenance import parse_graph
 from terrapod.services.inventory_render import build_inventory_document
+from terrapod.services.inventory_vault import mask_vaulted_scalars
 from terrapod.storage.keys import config_version_key, resolved_inventory_key
 
 logger = structlog.get_logger(__name__)
@@ -329,6 +331,70 @@ def _refusal_lead(
     if prov.tier == "config_root":
         lead += _CONFIG_ROOT_REMEDY
     return lead
+
+
+#: The first line of an annotated source excerpt: a right-justified line number,
+#: then a space (or end of line, for a blank source line). Ansible's own shape --
+#: `f'{str(line_num).rjust(width)}{" " if line else ""}{line}'` in
+#: `_internal/_errors/_error_utils.py`, core 2.21.6.
+#:
+#: Anchored on that rather than on "the block after a blank line", because an
+#: `Origin:` with no line number is ALSO followed by a blank line and then the
+#: next message -- measured: an unparseable source emits
+#: `Origin: <inventory plugin 'yaml' with source '…'>`, a blank line, and then
+#: `[WARNING]: Failed to parse inventory with 'ini' plugin: …`. A matcher that
+#: ate "the next block" would swallow the half of the error that says what is
+#: wrong, on the commonest refusal there is.
+_SOURCE_EXCERPT_FIRST_LINE = re.compile(r"^ *\d+( |$)")
+
+
+def _without_source_excerpt(stderr: str) -> str:
+    """Ansible's stderr with the quoted source lines removed (#2506).
+
+    **Ansible quotes the operator's own file back at us, and we must not pass
+    that on.** Since core 2.19 an error carries a `SourceContext`: the `Origin:`
+    line, then a blank line, then the few source lines around the offending one
+    with a caret under the column. Those lines go verbatim into the refusal, the
+    API response and the UI. On the failure this was found by -- an inline
+    `!vault` scalar with no secret to decrypt it -- the excerpt was the three
+    lines above the ciphertext, which were a URL and a username. A plaintext
+    secret sitting beside a vaulted one would travel the same way.
+
+    The ciphertext itself is harmless and its NEIGHBOURS are the exposure, which
+    is why this is unconditional rather than a vault special case: every parse
+    error on this path quotes a file Terrapod fetched on the operator's behalf,
+    and none of them needs to.
+
+    `Origin:` is kept. It carries `path:line:col`, which is the whole of what an
+    operator needs to open the file themselves, and it is the one part of the
+    block that is a pointer rather than a copy.
+
+    Ansible has an in-process `RedactAnnotatedSourceContext` that does exactly
+    this -- it is how it protects a decrypted vault file's own contents -- but it
+    is a private ambient context with no setting or environment variable behind
+    it, so a process we shell out to cannot be asked to enter it. Hence a
+    reader on our side.
+    """
+    lines = stderr.splitlines()
+    out: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        out.append(line)
+        index += 1
+        if not line.startswith("Origin:"):
+            continue
+        # `SourceContext.__str__` emits the origin, then an empty line, then the
+        # annotated lines -- so anything else after the origin is another
+        # message and is left alone.
+        if index >= len(lines) or lines[index] != "":
+            continue
+        if index + 1 >= len(lines) or not _SOURCE_EXCERPT_FIRST_LINE.match(lines[index + 1]):
+            continue
+        index += 1  # the blank line that introduces the excerpt
+        while index < len(lines) and lines[index] != "":
+            index += 1
+    return "\n".join(out)
 
 
 class InventoryResolutionFailed(RuntimeError):
@@ -710,7 +776,10 @@ async def _invoke_ansible_inventory(
         ) from exc
 
     if proc.returncode != 0:
-        detail = err.decode(errors="replace").strip()[-1200:]
+        # Stripped BEFORE the truncation, or the 1200-byte window is spent on
+        # the excerpt and the message that explains the failure falls off the
+        # front of it.
+        detail = _without_source_excerpt(err.decode(errors="replace")).strip()[-1200:]
         lead = _refusal_lead(proc.returncode, sources, scratch, provenance)
         raise InventoryResolutionFailed(f"{lead} ansible said: {detail}")
 
@@ -1484,6 +1553,19 @@ async def _resolve_uncached(
         )
         resolved = _with_skipped(normalise(document), skipped)
         if want_levels:
+            # `--graph --vars` prints every variable's VALUE, so ansible must
+            # decrypt -- and the API holds no vault secret, by design. Without
+            # this the whole read fails on any inventory carrying an inline
+            # `!vault` scalar, discarding a `--list` that already succeeded
+            # (#2506).
+            #
+            # Strictly AFTER `--list` and strictly before the graph: the
+            # resolution is `--list`'s output and keeps its ciphertext, while
+            # the attribution pass reads a copy with `<vaulted>` in its place.
+            # The tree is a scratch extraction deleted in the `finally` below,
+            # so nothing stored is touched.
+            if screened is not None:
+                await asyncio.to_thread(mask_vaulted_scalars, screened.root)
             # In the SAME scratch directory, over the SAME sources and cwd, so
             # the attribution cannot describe a different inventory from the
             # resolution beside it (#2413 F8). A second invocation, which is
