@@ -102,6 +102,27 @@
       "clearLockedFilter": "Clear locked marklar",
       "filterLocked": "Filter to locked marklars"
     },
+    "bulk": {
+      "selectionCount": "Marklar · {count}",
+      "menuLabel": "Marklar for the marklar marklar",
+      "selectAll": "Marklar all marklar",
+      "selectRow": "Marklar {name}",
+      "eligible": "{eligible} of {total} marklar",
+      "action": {
+        "plan": "Marklar",
+        "retry": "Retry Marklar",
+        "cancel": "Cancel Marklar",
+        "apply": "Apply",
+        "discard": "Discard"
+      },
+      "confirmApply": "Marklar the planned marklar on the marklar marklar ({count})?\n\n{names}{more}\n\nThis changes real marklar and cannot be undone.",
+      "confirmDiscard": "Marklar the planned marklar on the marklar marklar ({count})?\n\n{names}{more}\n\nThe marklar are thrown away and cannot be recovered.",
+      "andMore": "\n…and {count} marklar",
+      "running": "Marklar {action} on the marklar marklar ({count})…",
+      "resultSummary": "{action}: {ok} of {total} marklar",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Marklar"
+    },
     "filter": {
       "placeholder": "Filter by marklar, marklar, or marklar — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filter marklars",

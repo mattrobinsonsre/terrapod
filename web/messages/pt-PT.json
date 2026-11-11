@@ -102,6 +102,27 @@
       "clearLockedFilter": "Limpar filtro de bloqueados",
       "filterLocked": "Filtrar workspaces bloqueados"
     },
+    "bulk": {
+      "selectionCount": "Seleção · {count}",
+      "menuLabel": "Ações para os workspaces selecionados",
+      "selectAll": "Selecionar todos os workspaces",
+      "selectRow": "Selecionar {name}",
+      "eligible": "{eligible} de {total} elegíveis",
+      "action": {
+        "plan": "Plan",
+        "retry": "Repetir Execução",
+        "cancel": "Cancelar Execução",
+        "apply": "Aplicar",
+        "discard": "Descartar"
+      },
+      "confirmApply": "Aplicar as execuções planeadas nos workspaces selecionados ({count})?\n\n{names}{more}\n\nIsto altera infraestrutura real e não pode ser desfeito.",
+      "confirmDiscard": "Descartar as execuções planeadas nos workspaces selecionados ({count})?\n\n{names}{more}\n\nOs planos são descartados e não podem ser recuperados.",
+      "andMore": "\n…e mais {count}",
+      "running": "A executar {action} nos workspaces selecionados ({count})…",
+      "resultSummary": "{action}: {ok} de {total} com sucesso",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Fechar"
+    },
     "filter": {
       "placeholder": "Filtrar por nome, etiqueta ou estado — ex.: \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filtrar workspaces",

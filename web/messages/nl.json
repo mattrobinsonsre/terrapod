@@ -102,6 +102,27 @@
       "clearLockedFilter": "Vergrendelingsfilter wissen",
       "filterLocked": "Filteren op vergrendelde workspaces"
     },
+    "bulk": {
+      "selectionCount": "Selectie · {count}",
+      "menuLabel": "Acties voor de geselecteerde workspaces",
+      "selectAll": "Alle workspaces selecteren",
+      "selectRow": "{name} selecteren",
+      "eligible": "{eligible} van {total} geschikt",
+      "action": {
+        "plan": "Plan",
+        "retry": "Uitvoering opnieuw proberen",
+        "cancel": "Uitvoering annuleren",
+        "apply": "Toepassen",
+        "discard": "Verwerpen"
+      },
+      "confirmApply": "De geplande runs op de geselecteerde workspaces toepassen ({count})?\n\n{names}{more}\n\nDit wijzigt echte infrastructuur en kan niet ongedaan worden gemaakt.",
+      "confirmDiscard": "De geplande runs op de geselecteerde workspaces verwerpen ({count})?\n\n{names}{more}\n\nDe plannen worden verworpen en kunnen niet worden hersteld.",
+      "andMore": "\n…en {count} meer",
+      "running": "{action} wordt uitgevoerd op de geselecteerde workspaces ({count})…",
+      "resultSummary": "{action}: {ok} van {total} geslaagd",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Sluiten"
+    },
     "filter": {
       "placeholder": "Filteren op naam, label of status — bijv. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Workspaces filteren",

@@ -102,6 +102,27 @@
       "clearLockedFilter": "Rensa låst-filter",
       "filterLocked": "Filtrera till låsta arbetsytor"
     },
+    "bulk": {
+      "selectionCount": "Markering · {count}",
+      "menuLabel": "Åtgärder för de valda arbetsytorna",
+      "selectAll": "Markera alla arbetsytor",
+      "selectRow": "Markera {name}",
+      "eligible": "{eligible} av {total} kan användas",
+      "action": {
+        "plan": "Plan",
+        "retry": "Kör körningen igen",
+        "cancel": "Avbryt körning",
+        "apply": "Applicera",
+        "discard": "Kassera"
+      },
+      "confirmApply": "Tillämpa de planerade körningarna på de valda arbetsytorna ({count})?\n\n{names}{more}\n\nDetta ändrar verklig infrastruktur och kan inte ångras.",
+      "confirmDiscard": "Förkasta de planerade körningarna på de valda arbetsytorna ({count})?\n\n{names}{more}\n\nPlanerna förkastas och kan inte återställas.",
+      "andMore": "\n…och {count} till",
+      "running": "Kör {action} på de valda arbetsytorna ({count})…",
+      "resultSummary": "{action}: {ok} av {total} lyckades",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Stäng"
+    },
     "filter": {
       "placeholder": "Filtrera efter namn, etikett eller status — t.ex. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filtrera arbetsytor",

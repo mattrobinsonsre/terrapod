@@ -102,6 +102,27 @@
       "clearLockedFilter": "Clear lockd filtur",
       "filterLocked": "Filtur ta lockd werkspacez"
     },
+    "bulk": {
+      "selectionCount": "Pickd · {count}",
+      "menuLabel": "Akshuns 4 teh pickd workspaces",
+      "selectAll": "Pick all teh workspaces",
+      "selectRow": "Pick {name}",
+      "eligible": "{eligible} of {total} can haz",
+      "action": {
+        "plan": "Plan",
+        "retry": "Retry Run",
+        "cancel": "Cancel Run",
+        "apply": "Apply",
+        "discard": "Discard"
+      },
+      "confirmApply": "Apply teh plannd runs on teh pickd workspaces ({count})?\n\n{names}{more}\n\nDis changez real infrastructure an u cant undo it.",
+      "confirmDiscard": "Discard teh plannd runs on teh pickd workspaces ({count})?\n\n{names}{more}\n\nTeh plans go bye bye an u cant get them bak.",
+      "andMore": "\n…an {count} moar",
+      "running": "Runnin {action} on teh pickd workspaces ({count})…",
+      "resultSummary": "{action}: {ok} of {total} werked",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Dismis"
+    },
     "filter": {
       "placeholder": "Filtur by naym, labul, or status — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filtur werkspacez",

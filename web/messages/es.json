@@ -102,6 +102,27 @@
       "clearLockedFilter": "Borrar filtro de bloqueados",
       "filterLocked": "Filtrar por espacios de trabajo bloqueados"
     },
+    "bulk": {
+      "selectionCount": "Selección · {count}",
+      "menuLabel": "Acciones para los espacios de trabajo seleccionados",
+      "selectAll": "Seleccionar todos los espacios de trabajo",
+      "selectRow": "Seleccionar {name}",
+      "eligible": "{eligible} de {total} aptos",
+      "action": {
+        "plan": "Plan",
+        "retry": "Reintentar ejecución",
+        "cancel": "Cancelar ejecución",
+        "apply": "Aplicar",
+        "discard": "Descartar"
+      },
+      "confirmApply": "¿Aplicar las ejecuciones planificadas en los espacios de trabajo seleccionados ({count})?\n\n{names}{more}\n\nEsto cambia infraestructura real y no se puede deshacer.",
+      "confirmDiscard": "¿Descartar las ejecuciones planificadas en los espacios de trabajo seleccionados ({count})?\n\n{names}{more}\n\nLos planes se descartan y no se pueden recuperar.",
+      "andMore": "\n…y {count} más",
+      "running": "Ejecutando {action} en los espacios de trabajo seleccionados ({count})…",
+      "resultSummary": "{action}: {ok} de {total} correctas",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Cerrar"
+    },
     "filter": {
       "placeholder": "Filtrar por nombre, etiqueta o estado — p. ej. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filtrar espacios de trabajo",

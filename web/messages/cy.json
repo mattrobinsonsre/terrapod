@@ -102,6 +102,27 @@
       "clearLockedFilter": "Clirio'r hidlydd cloi",
       "filterLocked": "Hidlo i weithfannau wedi'u cloi"
     },
+    "bulk": {
+      "selectionCount": "Dewis · {count}",
+      "menuLabel": "Gweithredoedd ar gyfer y gweithleoedd a ddewiswyd",
+      "selectAll": "Dewis pob gweithle",
+      "selectRow": "Dewis {name}",
+      "eligible": "{eligible} o {total} yn gymwys",
+      "action": {
+        "plan": "Cynllun",
+        "retry": "Ailgeisio'r Rhediad",
+        "cancel": "Canslo'r Rhediad",
+        "apply": "Gweithredu",
+        "discard": "Taflu"
+      },
+      "confirmApply": "Cymhwyso’r rhediadau arfaethedig ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}\n\nMae hyn yn newid seilwaith go iawn ac ni ellir ei ddadwneud.",
+      "confirmDiscard": "Taflu’r rhediadau arfaethedig ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}\n\nMae’r cynlluniau’n cael eu taflu ac ni ellir eu hadfer.",
+      "andMore": "\n…a {count} arall",
+      "running": "Yn rhedeg {action} ar y gweithleoedd a ddewiswyd ({count})…",
+      "resultSummary": "{action}: llwyddodd {ok} o {total}",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Cau"
+    },
     "filter": {
       "placeholder": "Hidlo yn ôl enw, label neu statws — e.e. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Hidlo gweithfannau",

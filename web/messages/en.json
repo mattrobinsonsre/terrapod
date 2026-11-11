@@ -102,6 +102,27 @@
       "clearLockedFilter": "Clear locked filter",
       "filterLocked": "Filter to locked workspaces"
     },
+    "bulk": {
+      "selectionCount": "Selection · {count}",
+      "menuLabel": "Actions for the selected workspaces",
+      "selectAll": "Select all workspaces",
+      "selectRow": "Select {name}",
+      "eligible": "{eligible} of {total} eligible",
+      "action": {
+        "plan": "Plan",
+        "retry": "Retry run",
+        "cancel": "Cancel run",
+        "apply": "Apply",
+        "discard": "Discard"
+      },
+      "confirmApply": "Apply the planned runs on the selected workspaces ({count})?\n\n{names}{more}\n\nThis changes real infrastructure and cannot be undone.",
+      "confirmDiscard": "Discard the planned runs on the selected workspaces ({count})?\n\n{names}{more}\n\nThe plans are thrown away and cannot be recovered.",
+      "andMore": "\n…and {count} more",
+      "running": "Running {action} on the selected workspaces ({count})…",
+      "resultSummary": "{action}: {ok} of {total} succeeded",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Dismiss"
+    },
     "filter": {
       "placeholder": "Filter by name, label, or status — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filter workspaces",

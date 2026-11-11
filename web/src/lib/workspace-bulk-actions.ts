@@ -41,8 +41,9 @@ function qualifies(action: BulkActionId, w: BulkWorkspace): boolean {
   const run = w.latestRun
   switch (action) {
     case 'plan':
-      // A new run, so no existing run is needed; a locked workspace refuses it.
-      return !w.locked
+      // A new run, so no existing run is needed. A manual lock blocks an apply,
+      // not a plan: the server queues a plan on a locked workspace.
+      return true
     case 'retry':
       // A plan-only run that has planned is finished, as the server treats it.
       return !!run && (TERMINAL.has(run.status) || (run.planOnly && run.status === 'planned'))

@@ -195,6 +195,32 @@ Note the workspace ID from the response (e.g., `ws-abc123...`).
 
 ![Workspaces](images/workspaces.png)
 
+### Running an action on several workspaces
+
+On a desktop-width screen, the Workspaces list has a checkbox on every row. The
+header checkbox selects every visible row; with anything selected it clears the
+selection instead. Filter first, then select all, to act on "every workspace with
+a plan waiting".
+
+Once something is selected, a **Selection** menu appears next to **New Workspace**.
+It has no default action; choosing an item runs it:
+
+| Action | Applies to |
+|---|---|
+| **Plan** | any workspace; queues a plan-only run |
+| **Retry run** | latest run is finished |
+| **Cancel run** | latest run is still in progress |
+| **Apply** | latest run is planned and not plan-only; not on a locked workspace |
+| **Discard** | latest run is planned and not plan-only |
+
+Each item shows `N of M eligible`, and is enabled only when every selected
+workspace qualifies. **Apply** and **Discard** ask for confirmation first, showing
+the count and the first few names.
+
+Each action is one request per workspace to the existing run endpoints, so the
+permissions are the usual per-workspace ones. A workspace the server refuses is
+listed by name with its reason, and stays selected. Nothing is shown on a phone.
+
 ---
 
 ## Configuring the CLI

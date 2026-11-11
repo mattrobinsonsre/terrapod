@@ -102,6 +102,27 @@
       "clearLockedFilter": "Vymazat filtr uzamčení",
       "filterLocked": "Filtrovat na uzamčené pracovní prostory"
     },
+    "bulk": {
+      "selectionCount": "Výběr · {count}",
+      "menuLabel": "Akce pro vybrané pracovní prostory",
+      "selectAll": "Vybrat všechny pracovní prostory",
+      "selectRow": "Vybrat {name}",
+      "eligible": "{eligible} z {total} způsobilých",
+      "action": {
+        "plan": "Plan",
+        "retry": "Zkusit běh znovu",
+        "cancel": "Zrušit běh",
+        "apply": "Aplikovat",
+        "discard": "Zahodit"
+      },
+      "confirmApply": "Použít naplánované běhy na vybraných pracovních prostorech ({count})?\n\n{names}{more}\n\nToto mění skutečnou infrastrukturu a nelze to vrátit.",
+      "confirmDiscard": "Zahodit naplánované běhy na vybraných pracovních prostorech ({count})?\n\n{names}{more}\n\nPlány se zahodí a nelze je obnovit.",
+      "andMore": "\n…a {count} dalších",
+      "running": "Probíhá {action} na vybraných pracovních prostorech ({count})…",
+      "resultSummary": "{action}: uspělo {ok} z {total}",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Zavřít"
+    },
     "filter": {
       "placeholder": "Filtrovat podle názvu, štítku nebo stavu — např. „eu1“, „env:prod“, „status:errored“",
       "ariaLabel": "Filtrovat pracovní prostory",

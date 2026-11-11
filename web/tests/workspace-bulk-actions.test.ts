@@ -98,8 +98,11 @@ describe('plan: queues a new run, so it needs no existing run', () => {
     )
   })
 
-  it('refuses a locked workspace', () => {
-    assert.deepEqual(eligibleFor('plan', [ws('a', null, true)]), [])
+  it('accepts a locked workspace: the server queues a plan on one (verified against the real API)', () => {
+    // A manual lock blocks an APPLY, not a plan. This rule used to refuse a locked
+    // workspace, a guess that turned out to be wrong when it was run against the
+    // real server, which answers 201 and queues the plan.
+    assert.deepEqual(ids(eligibleFor('plan', [ws('a', null, true)])), ['a'])
   })
 })
 

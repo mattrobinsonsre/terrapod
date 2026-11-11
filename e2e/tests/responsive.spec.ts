@@ -757,6 +757,26 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('workspace bulk selection is absent at phone width', async ({ page }) => {
+    // The checkbox column and the Selection control are desktop-only: the
+    // per-workspace flow on a phone is exactly what it was, and nothing is lost
+    // there. Asserting them ABSENT, rather than checking their tap targets, is
+    // what stops them being reintroduced and quietly breaking that row.
+    const token = getStoredToken();
+    const name = uniqueName('resp-sel');
+    await createWorkspace(token, name);
+
+    await page.goto('/workspaces');
+    await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('ws-select-all')).toBeHidden();
+    // Every row's checkbox, not the first: strict mode rejects a locator that
+    // matches several, and "all of them are hidden" is the claim.
+    const boxes = page.getByTestId('ws-row-select');
+    for (let i = 0; i < (await boxes.count()); i++) await expect(boxes.nth(i)).toBeHidden();
+    await expect(page.getByTestId('ws-selection')).toHaveCount(0);
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('grouped workspace tree stays within the phone at repo-path depth', async ({ page }) => {
     // Grouping adds an interactive tree to the list (Group by repo / repo-path).
     // A deep repo-path tree is the shape that pushes a table sideways on a

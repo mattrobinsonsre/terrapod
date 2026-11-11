@@ -102,6 +102,27 @@
       "clearLockedFilter": "Effacer le filtre verrouillé",
       "filterLocked": "Filtrer sur les espaces de travail verrouillés"
     },
+    "bulk": {
+      "selectionCount": "Sélection · {count}",
+      "menuLabel": "Actions pour les espaces de travail sélectionnés",
+      "selectAll": "Sélectionner tous les espaces de travail",
+      "selectRow": "Sélectionner {name}",
+      "eligible": "{eligible} sur {total} éligibles",
+      "action": {
+        "plan": "Plan",
+        "retry": "Réexécuter",
+        "cancel": "Annuler l'exécution",
+        "apply": "Appliquer",
+        "discard": "Abandonner"
+      },
+      "confirmApply": "Appliquer les exécutions planifiées sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}\n\nCela modifie une infrastructure réelle et ne peut pas être annulé.",
+      "confirmDiscard": "Abandonner les exécutions planifiées sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}\n\nLes plans sont abandonnés et ne peuvent pas être récupérés.",
+      "andMore": "\n…et {count} de plus",
+      "running": "Exécution de {action} sur les espaces de travail sélectionnés ({count})…",
+      "resultSummary": "{action} : {ok} sur {total} réussies",
+      "resultFailed": "{name} : {reason}",
+      "resultDismiss": "Fermer"
+    },
     "filter": {
       "placeholder": "Filtrer par nom, label ou statut — par ex. « eu1 », « env:prod », « status:errored »",
       "ariaLabel": "Filtrer les espaces de travail",

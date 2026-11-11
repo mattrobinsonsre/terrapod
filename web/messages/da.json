@@ -102,6 +102,27 @@
       "clearLockedFilter": "Ryd filter for låste",
       "filterLocked": "Filtrér til låste arbejdsområder"
     },
+    "bulk": {
+      "selectionCount": "Markering · {count}",
+      "menuLabel": "Handlinger for de valgte arbejdsområder",
+      "selectAll": "Vælg alle arbejdsområder",
+      "selectRow": "Vælg {name}",
+      "eligible": "{eligible} af {total} kan bruges",
+      "action": {
+        "plan": "Plan",
+        "retry": "Kør igen",
+        "cancel": "Annuller kørsel",
+        "apply": "Anvend",
+        "discard": "Kassér"
+      },
+      "confirmApply": "Anvend de planlagte kørsler på de valgte arbejdsområder ({count})?\n\n{names}{more}\n\nDette ændrer rigtig infrastruktur og kan ikke fortrydes.",
+      "confirmDiscard": "Kassér de planlagte kørsler på de valgte arbejdsområder ({count})?\n\n{names}{more}\n\nPlanerne kasseres og kan ikke gendannes.",
+      "andMore": "\n…og {count} flere",
+      "running": "Kører {action} på de valgte arbejdsområder ({count})…",
+      "resultSummary": "{action}: {ok} af {total} lykkedes",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Luk"
+    },
     "filter": {
       "placeholder": "Filtrér efter navn, label eller status — f.eks. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filtrér arbejdsområder",

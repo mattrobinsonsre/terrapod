@@ -102,6 +102,27 @@
       "clearLockedFilter": "Fjern låst-filter",
       "filterLocked": "Filtrer til låste arbeidsområder"
     },
+    "bulk": {
+      "selectionCount": "Utvalg · {count}",
+      "menuLabel": "Handlinger for de valgte arbeidsområdene",
+      "selectAll": "Velg alle arbeidsområder",
+      "selectRow": "Velg {name}",
+      "eligible": "{eligible} av {total} kan brukes",
+      "action": {
+        "plan": "Plan",
+        "retry": "Prøv kjøring på nytt",
+        "cancel": "Avbryt kjøring",
+        "apply": "Anvend",
+        "discard": "Forkast"
+      },
+      "confirmApply": "Bruke de planlagte kjøringene på de valgte arbeidsområdene ({count})?\n\n{names}{more}\n\nDette endrer ekte infrastruktur og kan ikke angres.",
+      "confirmDiscard": "Forkaste de planlagte kjøringene på de valgte arbeidsområdene ({count})?\n\n{names}{more}\n\nPlanene forkastes og kan ikke gjenopprettes.",
+      "andMore": "\n…og {count} til",
+      "running": "Kjører {action} på de valgte arbeidsområdene ({count})…",
+      "resultSummary": "{action}: {ok} av {total} lyktes",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Lukk"
+    },
     "filter": {
       "placeholder": "Filtrer etter navn, etikett eller status – f.eks. «eu1», «env:prod», «status:errored»",
       "ariaLabel": "Filtrer arbeidsområder",

@@ -102,6 +102,27 @@
       "clearLockedFilter": "ロックフィルターをクリア",
       "filterLocked": "ロック済みのワークスペースで絞り込み"
     },
+    "bulk": {
+      "selectionCount": "選択 · {count}",
+      "menuLabel": "選択したワークスペースの操作",
+      "selectAll": "すべてのワークスペースを選択",
+      "selectRow": "{name} を選択",
+      "eligible": "{total} 件中 {eligible} 件が対象",
+      "action": {
+        "plan": "プラン",
+        "retry": "実行を再試行",
+        "cancel": "実行をキャンセル",
+        "apply": "適用",
+        "discard": "破棄"
+      },
+      "confirmApply": "選択したワークスペース（{count}）の計画済みの実行を適用しますか？\n\n{names}{more}\n\n実際のインフラが変更され、元に戻せません。",
+      "confirmDiscard": "選択したワークスペース（{count}）の計画済みの実行を破棄しますか？\n\n{names}{more}\n\n計画は破棄され、復元できません。",
+      "andMore": "\n…ほか {count} 件",
+      "running": "選択したワークスペース（{count}）で {action} を実行中…",
+      "resultSummary": "{action}: {total} 件中 {ok} 件が成功",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "閉じる"
+    },
     "filter": {
       "placeholder": "名前、ラベル、ステータスで絞り込み — 例: \"eu1\"、\"env:prod\"、\"status:errored\"",
       "ariaLabel": "ワークスペースを絞り込む",
