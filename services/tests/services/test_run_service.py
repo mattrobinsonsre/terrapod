@@ -507,6 +507,7 @@ def _mock_workspace(**kwargs):
     ws.terragrunt_version = kwargs.get("terragrunt_version", "1.0")
     ws.resource_cpu = kwargs.get("resource_cpu", "1")
     ws.parallelism = 10
+    ws.configure_parallelism = None
     ws.resource_memory = kwargs.get("resource_memory", "2Gi")
     ws.ee_resource_cpu = ""
     ws.ee_resource_memory = ""

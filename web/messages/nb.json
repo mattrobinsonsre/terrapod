@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Primær kjøringsknapp",
       "defaultRunKindAuto": "Automatisk (mest komplette kjøring)",
       "defaultRunKindLead": "Hvilken handling som får den fremhevede knappen i dette arbeidsområdet. Automatisk tilbyr den mest komplette kjøringen som er mulig.",
-      "defaultRunKindTitle": "Hvilken handling som får den fremhevede knappen i dette arbeidsområdet. Automatisk tilbyr den mest komplette kjøringen som er mulig — oftest riktig, og galt der den daglige handlingen ikke er den største: et arbeidsområde der Terraform-halvdelen bare vedlikeholder Ansible-inventaret, anvender uten tilsyn og aldri konfigurerer etter en anvendelse, vil ha Konfigurer her. Et valg som dette arbeidsområdet ikke kan tilby, avvises når du lagrer det, og et valg som rollen din ikke kan kjøre, faller tilbake til Automatisk for deg."
+      "defaultRunKindTitle": "Hvilken handling som får den fremhevede knappen i dette arbeidsområdet. Automatisk tilbyr den mest komplette kjøringen som er mulig — oftest riktig, og galt der den daglige handlingen ikke er den største: et arbeidsområde der Terraform-halvdelen bare vedlikeholder Ansible-inventaret, anvender uten tilsyn og aldri konfigurerer etter en anvendelse, vil ha Konfigurer her. Et valg som dette arbeidsområdet ikke kan tilby, avvises når du lagrer det, og et valg som rollen din ikke kan kjøre, faller tilbake til Automatisk for deg.",
+      "configureParallelism": "Konfigurasjonsparallellitet",
+      "configureParallelismTitle": "Hvor mange verter en konfigurasjon driver samtidig — ansibles forks (1-256). La feltet stå tomt for å arve Parallellitet. Det er atskilt fordi kjøremiljøet dimensjoneres uavhengig av orkestratoren.",
+      "configureParallelismLead": "Hvor mange verter en konfigurasjon driver samtidig — ansibles forks (1-256). La feltet stå tomt for å arve Parallellitet."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

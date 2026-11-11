@@ -736,7 +736,33 @@ class Workspace(Base):
     #: engine because Pulumi derives its default from the CPU count, and here CPU
     #: is itself a per-workspace setting — so resizing a runner would otherwise
     #: silently change concurrency, with nothing in the configuration saying so.
+    #:
+    #: Means the PLAN/APPLY phase specifically, and keeps the bare name because
+    #: it cannot be renamed: `parallelism` is a frozen attribute on
+    #: `tfe_v2._workspace_json` — which `go-tfe` parses — and a typed field on
+    #: three go-terrapod structs. The configure phase has its own, below.
     parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    #: The same question for the CONFIGURE phase: ansible's `forks` (#2499).
+    #:
+    #: Split from the pair above on the same axis the EE's resources already
+    #: are, and for the same reason. `parallelism` describes itself as the knob
+    #: converting "the workspace's CPU and memory allocation above into actual
+    #: load" — and since #2475 that is TWO allocations in two containers, so one
+    #: number cannot convert both. By default the EE is sized at HALF the
+    #: orchestrator (`500m`/`1Gi` against `1`/`2Gi`), and was then asked for the
+    #: same concurrency.
+    #:
+    #: The quantities are bounded by different things, which is why one value is
+    #: not right for both: plan/apply counts concurrent resource operations and
+    #: is capped in practice by the provider's rate limit, while a configure
+    #: counts concurrent HOSTS and is capped by the EE's own CPU and memory.
+    #:
+    #: `NULL` means inherit `parallelism`, so no existing workspace changed when
+    #: this arrived. **Not `0` as the inherit marker**: `validate_parallelism`
+    #: rejects `0` deliberately, because terraform reads `-parallelism=0` as "no
+    #: limit", and reusing it here would make one setting's inherit marker
+    #: another's unbounded.
+    configure_parallelism: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     # Per-workspace cloud identity (#1901). **The workspace's OVERRIDE**, merged
     # over the deployment catalogue in `api.config.auth.oidc_issuer.audiences` —
     # see `services/cloud_identity_resolver.py`. Keyed on the provider name as
@@ -2156,6 +2182,10 @@ class AutodiscoveryRule(Base):
     #: resources above — a monorepo's directories are rarely uniform in weight, so
     #: a rule that can size the runner should be able to say how hard to drive it.
     parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    #: The configure phase's own, templated alongside it (#2499). `NULL` means
+    #: the materialised workspace inherits its `parallelism`, which is what a
+    #: rule written before this existed keeps doing.
+    configure_parallelism: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     # Templated onto workspaces this rule materialises (#1901). Same override
     # shape as `Workspace.oidc_audiences` — provider name (optionally
     # `provider.alias`) to that target's audiences — and merged over the
@@ -3095,6 +3125,12 @@ class Run(Base):
     #: Snapshotted from the workspace at run creation, like the resources above,
     #: so editing the workspace mid-flight cannot change a run already under way.
     parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    #: The configure phase's own, RESOLVED at run creation (#2499) exactly as the
+    #: EE's resources are -- so the run carries the concrete number rather than
+    #: an inherit marker, and the figure survives the workspace being edited.
+    #: `NULL` only on a run created before this column existed; the options
+    #: builder falls back to `parallelism` for those, in one place.
+    configure_parallelism: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     # The **RESOLVED** map — the workspace's override already merged over the
     # deployment catalogue — snapshotted at creation like the resources above
     # (#1901).

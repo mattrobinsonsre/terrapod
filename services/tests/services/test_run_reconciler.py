@@ -878,6 +878,7 @@ class TestUnschedulable:
         )
         run.resource_cpu = "1"
         run.parallelism = 10
+        run.configure_parallelism = 10
         run.resource_memory = "2Gi"
 
         await _check_unschedulable(db, run)

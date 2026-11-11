@@ -67,6 +67,7 @@ SCENARIOS: dict[str, dict] = {
         "resource_cpu": "4",
         "resource_memory": "8Gi",
         "parallelism": 32,
+        "configure_parallelism": 64,
         "timeout_minutes": 180,
     },
     # A workspace declaring collections (#1931). Emitted only when non-empty, so
@@ -210,6 +211,12 @@ SCENARIOS: dict[str, dict] = {
         "ee_image": "ghcr.io/x/terrapod-ee:2.21",
         "config_directory": "",
         "playbook": "site.yml",
+        # Distinct from `parallelism` deliberately (#2499): a composite run is
+        # one Run driving two phases in two containers, so the golden has to
+        # record two different numbers or it says nothing about whether they
+        # are independent.
+        "parallelism": 8,
+        "configure_parallelism": 50,
     },
     # The CONFIGURE account, ON (#2190). What this pins that `configure-only`
     # cannot: a configure takes its OWN account when one is set, and the apply

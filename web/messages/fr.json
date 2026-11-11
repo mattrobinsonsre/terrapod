@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Bouton d''exécution principal",
       "defaultRunKindAuto": "Automatique (la plus complète)",
       "defaultRunKindLead": "Quelle action obtient le bouton bien visible sur cet espace de travail. Automatique propose l''exécution la plus complète possible.",
-      "defaultRunKindTitle": "Quelle action obtient le bouton bien visible sur cet espace de travail. Automatique propose l''exécution la plus complète possible — généralement le bon choix, et le mauvais lorsque l''action quotidienne n''est pas la plus large : un espace de travail dont la partie Terraform ne fait qu''entretenir l''inventaire Ansible, qui applique sans surveillance et ne configure jamais après une application, veut Configurer ici. Un choix que cet espace de travail ne peut pas proposer est refusé à l''enregistrement, et un choix que votre rôle ne peut pas exécuter revient à Automatique pour vous."
+      "defaultRunKindTitle": "Quelle action obtient le bouton bien visible sur cet espace de travail. Automatique propose l''exécution la plus complète possible — généralement le bon choix, et le mauvais lorsque l''action quotidienne n''est pas la plus large : un espace de travail dont la partie Terraform ne fait qu''entretenir l''inventaire Ansible, qui applique sans surveillance et ne configure jamais après une application, veut Configurer ici. Un choix que cet espace de travail ne peut pas proposer est refusé à l''enregistrement, et un choix que votre rôle ne peut pas exécuter revient à Automatique pour vous.",
+      "configureParallelism": "Parallélisme de la configuration",
+      "configureParallelismTitle": "Nombre d''hôtes qu''une configuration pilote simultanément — les forks d''ansible (1-256). Laissez vide pour hériter de Parallélisme. Séparé parce que l''environnement d''exécution est dimensionné indépendamment de l''orchestrateur.",
+      "configureParallelismLead": "Nombre d''hôtes qu''une configuration pilote simultanément — les forks d''ansible (1-256). Laissez vide pour hériter de Parallélisme."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

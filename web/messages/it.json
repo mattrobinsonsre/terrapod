@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Pulsante di esecuzione principale",
       "defaultRunKindAuto": "Automatico (la più completa)",
       "defaultRunKindLead": "Quale azione ottiene il pulsante in evidenza in questo workspace. Automatico propone l''esecuzione più completa possibile.",
-      "defaultRunKindTitle": "Quale azione ottiene il pulsante in evidenza in questo workspace. Automatico propone l''esecuzione più completa possibile — di solito la scelta giusta, e quella sbagliata quando l''azione quotidiana non è la più ampia: un workspace la cui parte Terraform si limita a mantenere l''inventario Ansible, che applica senza supervisione e non configura mai dopo un apply, qui vuole Configura. Una scelta che questo workspace non può offrire viene rifiutata al salvataggio, e una che il tuo ruolo non può eseguire ripiega su Automatico per te."
+      "defaultRunKindTitle": "Quale azione ottiene il pulsante in evidenza in questo workspace. Automatico propone l''esecuzione più completa possibile — di solito la scelta giusta, e quella sbagliata quando l''azione quotidiana non è la più ampia: un workspace la cui parte Terraform si limita a mantenere l''inventario Ansible, che applica senza supervisione e non configura mai dopo un apply, qui vuole Configura. Una scelta che questo workspace non può offrire viene rifiutata al salvataggio, e una che il tuo ruolo non può eseguire ripiega su Automatico per te.",
+      "configureParallelism": "Parallelismo della configurazione",
+      "configureParallelismTitle": "Quanti host una configurazione gestisce contemporaneamente — i forks di ansible (1-256). Lascia vuoto per ereditare Parallelismo. È separato perché l''ambiente di esecuzione viene dimensionato indipendentemente dall''orchestratore.",
+      "configureParallelismLead": "Quanti host una configurazione gestisce contemporaneamente — i forks di ansible (1-256). Lascia vuoto per ereditare Parallelismo."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",

@@ -97,6 +97,7 @@ interface AutodiscoveryRule {
   'hard-limit'?: string
     'resource-cpu': string
     parallelism: number
+    'configure-parallelism'?: number | null
     'resource-memory': string
     'ee-resource-cpu'?: string
     'ee-resource-memory'?: string
@@ -293,6 +294,9 @@ export default function AutodiscoveryPage() {
   const [engine, setEngine] = useState('terraform')
   const [bindPlan, setBindPlan] = useState(false)
   const [parallelism, setParallelism] = useState('10')
+  // Empty, not '10': empty is a real value here meaning the materialised
+  // workspace inherits its `parallelism` (#2499).
+  const [configureParallelism, setConfigureParallelism] = useState('')
   const [resourceMemory, setResourceMemory] = useState('2Gi')
   // Deliberately NOT pre-filled, unlike the pair above: empty is a real value
   // here and means "inherit the deployment default" (#2154), so pre-filling
@@ -444,6 +448,7 @@ export default function AutodiscoveryPage() {
     setEngine('terraform')
     setBindPlan(false)
     setParallelism('10')
+    setConfigureParallelism('')
     setTerraformVersion('1.13')
     setAnsibleVersion('')
     setAnsibleEE('')
@@ -546,6 +551,9 @@ export default function AutodiscoveryPage() {
     setHardLimit(a['hard-limit'] || '')
     setResourceCpu(a['resource-cpu'])
     setParallelism(String(a.parallelism ?? 10))
+    setConfigureParallelism(
+      a['configure-parallelism'] == null ? '' : String(a['configure-parallelism']),
+    )
     setEngine(a.engine || 'terraform')
     setBindPlan(Boolean(a['pulumi-bind-plan']))
     setResourceMemory(a['resource-memory'])
@@ -635,6 +643,8 @@ export default function AutodiscoveryPage() {
       'hard-limit': hardLimit.trim(),
       'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
+      'configure-parallelism':
+        configureParallelism.trim() === '' ? null : Number(configureParallelism),
       engine,
       ...(engine === 'pulumi' ? { 'pulumi-bind-plan': bindPlan } : {}),
       'resource-memory': resourceMemory,
@@ -792,6 +802,8 @@ export default function AutodiscoveryPage() {
             'engine-version': terraformVersion,
             'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
+      'configure-parallelism':
+        configureParallelism.trim() === '' ? null : Number(configureParallelism),
             'resource-memory': resourceMemory,
             'ee-resource-cpu': eeResourceCpu.trim(),
             'ee-resource-memory': eeResourceMemory.trim(),
@@ -912,6 +924,7 @@ export default function AutodiscoveryPage() {
     'terragrunt-version': terragruntVersion,
     'pulumi-bind-plan': bindPlan,
     parallelism,
+    'configure-parallelism': configureParallelism,
     'resource-cpu': resourceCpu,
     'resource-memory': resourceMemory,
     'plan-apply-enabled': planApplyEnabled,
@@ -984,6 +997,7 @@ export default function AutodiscoveryPage() {
       case 'terragrunt-version': setTerragruntVersion(s); break
       case 'pulumi-bind-plan': setBindPlan(b); break
       case 'parallelism': setParallelism(s); break
+      case 'configure-parallelism': setConfigureParallelism(s); break
       case 'resource-cpu': setResourceCpu(s); break
       case 'resource-memory': setResourceMemory(s); break
       case 'plan-apply-enabled': setPlanApplyEnabled(b); break
@@ -1323,6 +1337,14 @@ export default function AutodiscoveryPage() {
             table says they are -- they used to be separated by the Ansible
             pair and the engine picker (#2413 F3). */}
         <Field attr="parallelism" ctx={ruleCtx} kind="number" min={1} max={256} />
+        <Field
+          attr="configure-parallelism"
+          ctx={ruleCtx}
+          kind="number"
+          min={1}
+          max={256}
+          nullable
+        />
         <Field attr="resource-cpu" ctx={ruleCtx} kind="text" />
         <Field attr="resource-memory" ctx={ruleCtx} kind="text" />
       </>

@@ -1659,6 +1659,14 @@ async def create_run(
         terragrunt_version=workspace.terragrunt_version,
         resource_cpu=workspace.resource_cpu,
         parallelism=workspace.parallelism,
+        # The configure phase's own concurrency (#2499), snapshotted ALREADY
+        # RESOLVED for the same reason the EE's resources below are: `None` on
+        # the workspace means "inherit `parallelism`", and a run that stored the
+        # marker rather than the number could not tell you afterwards what the
+        # Job was actually given.
+        configure_parallelism=workspace_settings.effective_configure_parallelism(
+            workspace.configure_parallelism, workspace.parallelism
+        ),
         # #2033's pair, snapshotted for the reason the neighbours are: the
         # runner composes its `ANSIBLE_INVENTORY_ENABLED` from what the run was
         # DISPATCHED with, so flipping the workspace setting mid-run cannot

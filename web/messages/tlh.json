@@ -2794,7 +2794,10 @@
       "defaultRunKind": "ta SeHlaw wa'DIch",
       "defaultRunKindAuto": "tlhoS (naQqu')",
       "defaultRunKindLead": "nuq Qu' SeHlaw potlh Suq Qumwo'vamDaq. ta naQqu' noblaHbogh nob tlhoS.",
-      "defaultRunKindTitle": "nuq Qu' SeHlaw potlh Suq Qumwo'vamDaq. ta naQqu' noblaHbogh nob tlhoS — motlh QaQ, 'ach Qu' motlh 'oH Qu' tIn'e' 'oHbe'chugh qab: Qumwo' Terraform 'ay' Ansible ghom tetlh neH vu'bogh, nudwI' Hutlhbogh lo' 'ej lo' tlha' not Qumbogh, naDev Qum poQ. wIv noblaHbe'bogh Qumwo'vam, DapolDI' lajbe'lu'; 'ej ta vangmeH patlhlIj chaw'be'chugh, SoHvaD tlhoS wIvlu'."
+      "defaultRunKindTitle": "nuq Qu' SeHlaw potlh Suq Qumwo'vamDaq. ta naQqu' noblaHbogh nob tlhoS — motlh QaQ, 'ach Qu' motlh 'oH Qu' tIn'e' 'oHbe'chugh qab: Qumwo' Terraform 'ay' Ansible ghom tetlh neH vu'bogh, nudwI' Hutlhbogh lo' 'ej lo' tlha' not Qumbogh, naDev Qum poQ. wIv noblaHbe'bogh Qumwo'vam, DapolDI' lajbe'lu'; 'ej ta vangmeH patlhlIj chaw'be'chugh, SoHvaD tlhoS wIvlu'.",
+      "configureParallelism": "Qum tay'' Qu''mey",
+      "configureParallelismTitle": "wa'' poH Qum hostmey mI'' — ansible forks (1-256). chIm chugh, tay'' Qu''mey tlha''. pIm, vumwI'' Daq ''ej nISwI'' pIm ''ar lughaj.",
+      "configureParallelismLead": "wa'' poH Qum hostmey mI'' — ansible forks (1-256). chIm chugh, tay'' Qu''mey tlha''."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

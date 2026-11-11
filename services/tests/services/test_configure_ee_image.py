@@ -49,6 +49,7 @@ def _ws(**kw):
     ws.ee_resource_cpu = ""
     ws.ee_resource_memory = ""
     ws.parallelism = 10
+    ws.configure_parallelism = None
     ws.agent_pool_links = []
     ws.plan_apply_enabled = kw.get("plan_apply_enabled", True)
     ws.configure_enabled = kw.get("configure_enabled", True)

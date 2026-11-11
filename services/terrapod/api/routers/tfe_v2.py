@@ -96,7 +96,11 @@ from terrapod.services import (
     run_service,
     workspace_settings,
 )
-from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
+from terrapod.services.parallelism import (
+    DEFAULT_PARALLELISM,
+    validate_configure_parallelism,
+    validate_parallelism,
+)
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.remote_state_access import consumer_grant_id
 from terrapod.services.workspace_name import validate_workspace_name
@@ -356,6 +360,14 @@ def _validate_parallelism(raw: object) -> int:
     """HTTP wrapper over the canonical rule in `services.parallelism`."""
     try:
         return validate_parallelism(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _validate_configure_parallelism(raw: object) -> int | None:
+    """HTTP wrapper over the configure phase's rule (#2499)."""
+    try:
+        return validate_configure_parallelism(raw)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -1021,6 +1033,7 @@ def _workspace_json(
                 "locked-by": ws.locked_by if ws.locked else None,
                 "resource-cpu": ws.resource_cpu,
                 "parallelism": ws.parallelism,
+                "configure-parallelism": ws.configure_parallelism,
                 "resource-memory": ws.resource_memory,
                 # The EE sidecar's own pair (#2154). Returned UNRESOLVED -- `""`
                 # means "the deployment default" and must not be substituted
@@ -1937,6 +1950,11 @@ async def _create_workspace_impl(
             "resource-cpu",
         ),
         parallelism=_validate_parallelism(attrs.get("parallelism", DEFAULT_PARALLELISM)),
+        # No DEFAULT here, deliberately: absent means `None`, which means
+        # "inherit `parallelism`" (#2499). Defaulting it to a number would make
+        # every new workspace pin a configure concurrency nobody chose, and
+        # would make the inherit unreachable.
+        configure_parallelism=_validate_configure_parallelism(attrs.get("configure-parallelism")),
         pulumi_bind_plan=_validate_pulumi_bind_plan(attrs.get("pulumi-bind-plan", False), engine),
         resource_memory=_422(
             workspace_settings.validate_resource_quantity,
@@ -2778,6 +2796,11 @@ async def update_workspace(
         )
     if "parallelism" in attrs:
         ws.parallelism = _validate_parallelism(attrs["parallelism"])
+    # `in attrs`, not truthiness: an explicit `null` is how a caller RESETS this
+    # to inheriting, and `if attrs.get(...)` would silently ignore it -- the
+    # #2010 shape, where an empty value is a value rather than an absence.
+    if "configure-parallelism" in attrs:
+        ws.configure_parallelism = _validate_configure_parallelism(attrs["configure-parallelism"])
     if "pulumi-bind-plan" in attrs:
         ws.pulumi_bind_plan = _validate_pulumi_bind_plan(attrs["pulumi-bind-plan"], ws.engine)
     for key, column in (

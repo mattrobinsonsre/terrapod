@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Primree run buttun",
       "defaultRunKindAuto": "Automatik (teh mostest complete)",
       "defaultRunKindLead": "Wich akshun getz teh loud buttun on dis workspace. Automatik offerz teh mostest complete run it can. srsly",
-      "defaultRunKindTitle": "Wich akshun getz teh loud buttun on dis workspace. Automatik offerz teh mostest complete run it can — usually rite, an rong wen teh evryday akshun aint teh biggest wun: a workspace wot haz a Terraform half wot only lookz after teh Ansibul inventoree, doin applyz all by itself an nevr konfigurin after a do-it, wantz Konfigur heer. A choyce dis workspace cant offur, we sez NO to it wen u savez it; an wun ur role cant run fallz bak 2 Automatik fer u. srsly"
+      "defaultRunKindTitle": "Wich akshun getz teh loud buttun on dis workspace. Automatik offerz teh mostest complete run it can — usually rite, an rong wen teh evryday akshun aint teh biggest wun: a workspace wot haz a Terraform half wot only lookz after teh Ansibul inventoree, doin applyz all by itself an nevr konfigurin after a do-it, wantz Konfigur heer. A choyce dis workspace cant offur, we sez NO to it wen u savez it; an wun ur role cant run fallz bak 2 Automatik fer u. srsly",
+      "configureParallelism": "Konfigur Parallelizm",
+      "configureParallelismTitle": "How many hostz wun konfigur drivez at teh same tiem — ansibul forkz (1-256). Leev it empty an it takez Parallelizm. Separate coz teh execushun enviroment getz sized apart frum teh orkestraytor. srsly",
+      "configureParallelismLead": "How many hostz wun konfigur drivez at teh same tiem — ansibul forkz (1-256). Leev it empty an it takez Parallelizm."
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

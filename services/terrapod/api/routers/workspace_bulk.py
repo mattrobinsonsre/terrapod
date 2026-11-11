@@ -46,7 +46,7 @@ from terrapod.logging_config import get_logger
 from terrapod.services import pool_set, run_service, workspace_settings
 from terrapod.services.capability_resolver import resolve_capabilities
 from terrapod.services.notification_service import VALID_TRIGGERS
-from terrapod.services.parallelism import validate_parallelism
+from terrapod.services.parallelism import validate_configure_parallelism, validate_parallelism
 from terrapod.services.run_task_service import VALID_ENFORCEMENT_LEVELS, VALID_STAGES
 from terrapod.services.workspace_search_service import (
     WorkspaceFilterError,
@@ -71,6 +71,7 @@ _FIELD_MAP: dict[str, str] = {
     # each writes two columns from one input key, so they are validated
     # separately (_validate_pool_set / _validate_auto_apply below).
     "parallelism": "parallelism",
+    "configure-parallelism": "configure_parallelism",
     "ansible-version": "ansible_version",
     "ansible-execution-environment": "ansible_execution_environment",
     "ansible-collections": "ansible_collections",
@@ -398,6 +399,11 @@ _SETTING_RULES: dict[str, Any] = {
     "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
     "oidc-audiences": workspace_settings.validate_oidc_audiences,
     "ansible-version": workspace_settings.validate_ansible_version,
+    # Through the shared dict rather than a bespoke `if key == ...` branch like
+    # the sibling `parallelism` above: a branch both restates the rule and skips
+    # this dict's 422 wrapper, and a key in `_FIELD_MAP` absent from here is
+    # written UNVALIDATED (#2499).
+    "configure-parallelism": validate_configure_parallelism,
     # Shape only. Whether the label is CONFIGURED needs the deployment map and
     # a session, so it is refused in `_reject_unrunnable_ee_selection` below --
     # a rule here is still required, because a key in `_FIELD_MAP` and absent

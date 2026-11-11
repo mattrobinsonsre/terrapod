@@ -906,15 +906,28 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"parallelism": schema.Int64Attribute{
-				Description: "How many operations the engine performs at once " +
-					"(-parallelism for terraform/tofu). Defaults to 10, terraform's own " +
-					"default. Raise it for a large state on a well-resourced runner; lower " +
-					"it to stay inside a provider's rate limit.",
+				Description: "How many operations the engine performs at once in the " +
+					"PLAN/APPLY phase (-parallelism for terraform/tofu, --parallel for " +
+					"Pulumi). Defaults to 10, terraform's own default. Raise it for a large " +
+					"state on a well-resourced runner; lower " +
+					"it to stay inside a provider's rate limit. The configure phase has " +
+					"`configure_parallelism`.",
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
+			},
+			"configure_parallelism": schema.Int64Attribute{
+				Description: "How many HOSTS a configure drives at once (ansible's forks). " +
+					"Separate from `parallelism`, which sizes the plan/apply phase, because " +
+					"the two run in different containers: `ee_resource_cpu`/`_memory` size the " +
+					"execution environment independently of the orchestrator, so one number " +
+					"cannot convert both allocations into load. Unset inherits `parallelism`, " +
+					"which is what every workspace did before this existed. Raise it for a large " +
+					"inventory on a well-resourced EE; lowering `parallelism` for a rate-limited " +
+					"provider no longer throttles the configure with it.",
+				Optional: true,
 			},
 			"resource_cpu": schema.StringAttribute{
 				Description: "CPU request for runner Jobs (K8s format, e.g. '1').",
@@ -1627,6 +1640,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		req.Parallelism = m.Parallelism.ValueInt64()
 	}
+	if !m.ConfigureParallelism.IsNull() && !m.ConfigureParallelism.IsUnknown() {
+		req.ConfigureParallelism = m.ConfigureParallelism.ValueInt64()
+	}
 	if !m.EEResourceCPU.IsNull() && !m.EEResourceCPU.IsUnknown() {
 		req.EEResourceCPU = m.EEResourceCPU.ValueString()
 	}
@@ -1908,6 +1924,9 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		req.Parallelism = m.Parallelism.ValueInt64()
 	}
+	if !m.ConfigureParallelism.IsNull() && !m.ConfigureParallelism.IsUnknown() {
+		req.ConfigureParallelism = m.ConfigureParallelism.ValueInt64()
+	}
 	if !m.EEResourceCPU.IsNull() && !m.EEResourceCPU.IsUnknown() {
 		req.EEResourceCPU = m.EEResourceCPU.ValueString()
 	}
@@ -2047,6 +2066,15 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.EEResourceCPU = types.StringValue(ws.EEResourceCPU)
 	m.EEResourceMemory = types.StringValue(ws.EEResourceMemory)
 	m.Parallelism = types.Int64Value(ws.Parallelism)
+	// Null rather than 0 when the server reports nothing: 0 is not a legal
+	// value (the server rejects it, because terraform reads -parallelism=0 as
+	// "no limit"), so writing Int64Value(0) into state for an unset attribute
+	// is the "provider produced inconsistent result after apply" shape.
+	if ws.ConfigureParallelism != 0 {
+		m.ConfigureParallelism = types.Int64Value(ws.ConfigureParallelism)
+	} else {
+		m.ConfigureParallelism = types.Int64Null()
+	}
 	m.ResourceMemory = types.StringValue(ws.ResourceMemory)
 	m.VCSWorkflow = types.StringValue(ws.VCSWorkflow)
 	m.AutoMerge = types.BoolValue(ws.AutoMerge)

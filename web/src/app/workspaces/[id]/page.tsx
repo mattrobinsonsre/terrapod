@@ -146,6 +146,7 @@ interface WorkspaceAttrs {
   'locked-by'?: string | null
   'resource-cpu': string
   parallelism: number
+  'configure-parallelism'?: number | null
   'resource-memory': string
   'debug-mode': boolean
   'allow-fork-pr-plans': boolean
@@ -483,6 +484,9 @@ function WorkspaceDetailContent() {
   const [editCpu, setEditCpu] = useState('')
   const [editMemory, setEditMemory] = useState('')
   const [editParallelism, setEditParallelism] = useState('10')
+  // Empty is a real value: it means this workspace inherits `parallelism`
+  // for its configure phase (#2499), so the box starts empty rather than at 10.
+  const [editConfigureParallelism, setEditConfigureParallelism] = useState('')
   // #1274: the four-value mode supersedes the old boolean. Rendered as its
   // raw enum value, matching `execution-mode` immediately above it — these
   // are API identifiers, not prose, so they are not translated.
@@ -1381,6 +1385,11 @@ function WorkspaceDetailContent() {
     setNameChanged(false)
     setEditCpu(workspace.attributes['resource-cpu'])
     setEditParallelism(String(workspace.attributes.parallelism ?? 10))
+    setEditConfigureParallelism(
+      workspace.attributes['configure-parallelism'] == null
+        ? ''
+        : String(workspace.attributes['configure-parallelism']),
+    )
     setEditMemory(workspace.attributes['resource-memory'])
     setEditAutoApplyMode(workspace.attributes['auto-apply-mode'] || (workspace.attributes['auto-apply'] ? 'always' : 'never'))
     setEditExecMode(workspace.attributes['execution-mode'])
@@ -1471,6 +1480,12 @@ function WorkspaceDetailContent() {
               name: editName,
               'resource-cpu': editCpu,
               parallelism: Number(editParallelism),
+              // An empty box is null, not 0 -- null resets it to inheriting, and
+              // the server refuses 0 (terraform reads it as "no limit").
+              'configure-parallelism':
+                editConfigureParallelism.trim() === ''
+                  ? null
+                  : Number(editConfigureParallelism),
               'resource-memory': editMemory,
               'auto-apply-mode': editAutoApplyMode,
               'execution-mode': editExecMode,
@@ -2731,6 +2746,7 @@ function WorkspaceDetailContent() {
         'auto-apply-mode': editAutoApplyMode,
         'pulumi-bind-plan': editBindPlan,
         parallelism: editParallelism,
+        'configure-parallelism': editConfigureParallelism,
         'resource-cpu': editCpu,
         'resource-memory': editMemory,
         'terragrunt-enabled': editTerragruntEnabled,
@@ -2767,6 +2783,7 @@ function WorkspaceDetailContent() {
 
   /** The hint under a settings field, where the old markup carried one. */
   const SETTINGS_HINTS: Record<string, string> = {
+    'configure-parallelism': 'fields.configureParallelismTitle',
     'plan-apply-enabled': 'fields.planApplyEnabledHint',
     'configure-enabled': 'fields.configureEnabledHint',
     'configure-after-apply': 'fields.configureAfterApplyHint',
@@ -2835,6 +2852,10 @@ function WorkspaceDetailContent() {
     // half-typed value into `NaN` under the operator's cursor, and the save
     // path already coerces it.
     parallelism: (v) => setEditParallelism(String(v)),
+    // `null` arrives when the box is cleared, and must become '' rather than
+    // the string "null".
+    'configure-parallelism': (v) =>
+      setEditConfigureParallelism(v == null ? '' : String(v)),
     'resource-cpu': (v) => setEditCpu(String(v)),
     'resource-memory': (v) => setEditMemory(String(v)),
     'terragrunt-enabled': (v) => setEditTerragruntEnabled(Boolean(v)),
@@ -3441,6 +3462,29 @@ function WorkspaceDetailContent() {
                         value={editParallelism}
                         onChange={(e) => setEditParallelism(e.target.value)}
                         title={t('fields.parallelismTitle')}
+                        className={EDIT_INPUT}
+                      />
+                    }
+                  />
+                  {/* View mode shows a dash and the inherited figure when nothing
+                      is pinned, so "unset" is distinguishable from "set to the
+                      same number" without a second string to translate. */}
+                  <Field
+                    attr="configure-parallelism"
+                    ctx={settingsCtx}
+                    kind="number"
+                    display={
+                      attrs['configure-parallelism'] ?? `— (${attrs.parallelism ?? 10})`
+                    }
+                    control={
+                      <input
+                        id="ws-configure-parallelism"
+                        data-testid="ws-configure-parallelism"
+                        type="number"
+                        min={1}
+                        max={256}
+                        value={editConfigureParallelism}
+                        onChange={(e) => setEditConfigureParallelism(e.target.value)}
                         className={EDIT_INPUT}
                       />
                     }

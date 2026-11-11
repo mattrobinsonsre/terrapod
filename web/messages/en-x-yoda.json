@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Run button, primary",
       "defaultRunKindAuto": "Automatic (most complete it is)",
       "defaultRunKindLead": "The loud button on this workspace, which action gets it. The most complete run it can, Automatic offers.",
-      "defaultRunKindTitle": "The loud button on this workspace, which action gets it. The most complete run it can, Automatic offers — usually right, and wrong where the biggest one the everyday action is not: a workspace whose Terraform half only the Ansible inventory maintains, applying unattended and after an apply never configuring, Configure here it wants. A choice this workspace cannot offer, refused it is when you save it; and one your role cannot run, back to Automatic for you it falls."
+      "defaultRunKindTitle": "The loud button on this workspace, which action gets it. The most complete run it can, Automatic offers — usually right, and wrong where the biggest one the everyday action is not: a workspace whose Terraform half only the Ansible inventory maintains, applying unattended and after an apply never configuring, Configure here it wants. A choice this workspace cannot offer, refused it is when you save it; and one your role cannot run, back to Automatic for you it falls.",
+      "configureParallelism": "parallelism, Configure",
+      "configureParallelismTitle": "Drive at once, how many hosts a configure does — ansible''s forks (1-256). Empty leave it, and Parallelism inherit it will. Separate it is, because sized separately from the orchestrator, the execution environment is.",
+      "configureParallelismLead": "Drive at once, how many hosts a configure does — ansible''s forks (1-256). Empty leave it, and Parallelism inherit it will."
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

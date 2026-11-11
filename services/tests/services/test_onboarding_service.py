@@ -170,6 +170,7 @@ def _agent_ws():
         terragrunt_version="",
         resource_cpu="1",
         parallelism=10,
+        configure_parallelism=None,
         resource_memory="2Gi",
         name="ws",
     )

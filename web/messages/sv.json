@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Primär körningsknapp",
       "defaultRunKindAuto": "Automatiskt (mest fullständig körning)",
       "defaultRunKindLead": "Vilken åtgärd som får den framhävda knappen på denna arbetsyta. Automatiskt erbjuder den mest fullständiga körning som är möjlig.",
-      "defaultRunKindTitle": "Vilken åtgärd som får den framhävda knappen på denna arbetsyta. Automatiskt erbjuder den mest fullständiga körning som är möjlig — oftast rätt, och fel där den vardagliga åtgärden inte är den största: en arbetsyta vars Terraform-hälft bara underhåller Ansible-inventariet, tillämpar obevakat och aldrig konfigurerar efter en tillämpning, vill ha Konfigurera här. Ett val som denna arbetsyta inte kan erbjuda avvisas när du sparar det, och ett val som din roll inte får köra faller tillbaka till Automatiskt för dig."
+      "defaultRunKindTitle": "Vilken åtgärd som får den framhävda knappen på denna arbetsyta. Automatiskt erbjuder den mest fullständiga körning som är möjlig — oftast rätt, och fel där den vardagliga åtgärden inte är den största: en arbetsyta vars Terraform-hälft bara underhåller Ansible-inventariet, tillämpar obevakat och aldrig konfigurerar efter en tillämpning, vill ha Konfigurera här. Ett val som denna arbetsyta inte kan erbjuda avvisas när du sparar det, och ett val som din roll inte får köra faller tillbaka till Automatiskt för dig.",
+      "configureParallelism": "Konfigurationsparallellitet",
+      "configureParallelismTitle": "Hur många värdar en konfiguration driver samtidigt — ansibles forks (1-256). Lämna tomt för att ärva Parallellitet. Separat eftersom exekveringsmiljön dimensioneras oberoende av orkestreraren.",
+      "configureParallelismLead": "Hur många värdar en konfiguration driver samtidigt — ansibles forks (1-256). Lämna tomt för att ärva Parallellitet."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

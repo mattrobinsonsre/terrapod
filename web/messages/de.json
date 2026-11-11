@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Hauptschaltfläche für Läufe",
       "defaultRunKindAuto": "Automatisch (vollständigster Lauf)",
       "defaultRunKindLead": "Welche Aktion in diesem Arbeitsbereich die auffällige Schaltfläche erhält. Automatisch bietet den vollständigsten Lauf an, der möglich ist.",
-      "defaultRunKindTitle": "Welche Aktion in diesem Arbeitsbereich die auffällige Schaltfläche erhält. Automatisch bietet den vollständigsten Lauf an, der möglich ist — meist richtig, und falsch dort, wo die alltägliche Aktion nicht die umfassendste ist: Ein Arbeitsbereich, dessen Terraform-Hälfte nur das Ansible-Inventar pflegt, unbeaufsichtigt anwendet und nach einem Anwenden nie konfiguriert, möchte hier Konfigurieren. Eine Auswahl, die dieser Arbeitsbereich nicht anbieten kann, wird beim Speichern abgelehnt, und eine, die Ihre Rolle nicht ausführen darf, fällt für Sie auf Automatisch zurück."
+      "defaultRunKindTitle": "Welche Aktion in diesem Arbeitsbereich die auffällige Schaltfläche erhält. Automatisch bietet den vollständigsten Lauf an, der möglich ist — meist richtig, und falsch dort, wo die alltägliche Aktion nicht die umfassendste ist: Ein Arbeitsbereich, dessen Terraform-Hälfte nur das Ansible-Inventar pflegt, unbeaufsichtigt anwendet und nach einem Anwenden nie konfiguriert, möchte hier Konfigurieren. Eine Auswahl, die dieser Arbeitsbereich nicht anbieten kann, wird beim Speichern abgelehnt, und eine, die Ihre Rolle nicht ausführen darf, fällt für Sie auf Automatisch zurück.",
+      "configureParallelism": "Konfigurations-Parallelität",
+      "configureParallelismTitle": "Wie viele Hosts eine Konfiguration gleichzeitig ansteuert — ansibles forks (1-256). Leer lassen, um Parallelität zu übernehmen. Getrennt, weil die Ausführungsumgebung unabhängig vom Orchestrator dimensioniert wird.",
+      "configureParallelismLead": "Wie viele Hosts eine Konfiguration gleichzeitig ansteuert — ansibles forks (1-256). Leer lassen, um Parallelität zu übernehmen."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

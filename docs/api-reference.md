@@ -1586,7 +1586,8 @@ Run objects include peak resource usage + an abnormal-exit signal so the UI (and
 | Attribute | Type | Source | Description |
 |---|---|---|---|
 | `resource-cpu` | string | Workspace setting (snapshot) | CPU request applied to the Job (K8s quantity, e.g. `"1"`, `"500m"`). Limit is `2×` this |
-| `parallelism` | integer | Workspace setting (snapshot) | Concurrent operations the engine performs — `-parallelism` for terraform/tofu. Default `10`, minimum `1`, maximum `256` |
+| `parallelism` | integer | Workspace setting (snapshot) | Concurrent operations the engine performs in the plan/apply phase — `-parallelism` for terraform/tofu. Default `10`, minimum `1`, maximum `256` |
+| `configure-parallelism` | integer or null | Workspace setting (snapshot) | Concurrent hosts a configure drives — ansible's `forks`. `null` on a workspace means it inherits `parallelism`; on a run it is already RESOLVED to the number the Job was given. Minimum `1`, maximum `256`; `0` is refused |
 | `pulumi-bind-plan` | boolean | Workspace setting | Pulumi workspaces only (#1553): save the preview's plan and bind the update to it (`preview --save-plan` / `up --plan`). Default `false` — the preview saves nothing and the update is a plain `pulumi up`. Off by default because Pulumi's update plans are still experimental upstream. Refused (422) with `true` on any other engine |
 | `resource-memory` | string | Workspace setting (snapshot) | Memory request applied to the Job (K8s quantity, e.g. `"2Gi"`). Limit is `2×` this |
 | `ee-resource-cpu` | string | Workspace setting (snapshot, **resolved**) | CPU request for the Ansible execution-environment sidecar. Snapshotted already resolved — the workspace's value if it set one, otherwise the deployment default — so a finished run records the size it actually asked for. Empty on every plan and apply |

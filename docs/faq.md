@@ -270,7 +270,9 @@ the exact value to raise before retrying.
 Each workspace also carries a `parallelism` setting (default `10`, terraform's own
 default), which is what turns that allocation into load — lower it to stay inside a
 provider's rate limit, or raise it for a large state on a well-resourced runner. It
-is one setting whichever engine the workspace runs. See
+is one setting whichever engine the workspace runs — but the **configure** phase has its own,
+`configure_parallelism`, because the execution environment is sized separately from the
+orchestrator and counts hosts rather than resource operations. See
 [Per-workspace resources](architecture.md#per-workspace-resources).
 
 ## Does Terrapod estimate infrastructure costs?

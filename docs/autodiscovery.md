@@ -59,7 +59,8 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `execution-backend` | enum | no | `tofu` or `terraform`. Default `tofu`. |
 | `engine-version` | string | no | Default `1.13`. Also accepted as `terraform-version`. |
 | `resource-cpu` / `resource-memory` | string | no | Defaults `1` / `2Gi`. |
-| `parallelism` | integer | no | Concurrent engine operations on workspaces this rule creates. Default `10`. |
+| `parallelism` | integer | no | Concurrent engine operations on workspaces this rule creates, in the plan/apply phase. Default `10`. |
+| `configure-parallelism` | integer | no | Concurrent hosts a configure drives on workspaces this rule creates (ansible's `forks`). Omit and they inherit their `parallelism`. |
 | `ansible-version` | string | no | ansible-core **line** for workspaces this rule creates -- a line rather than a full version because the execution-environment image tag is the line, and the line is what decides which target Pythons their playbooks can reach. Default `2.21`. There is no format rule beyond the deployment's pre-release policy, so a full patch version is accepted too. Send an explicit empty string to have the created workspaces inherit the deployment default instead, as with `engine-version`. |
 | `auto-apply` | bool | no | Default `false`. Superseded by `auto-apply-mode` when that is set. |
 | `auto-apply-mode` | string | no | Conditional auto-apply templated onto created workspaces: `never`, `always`, `create`, `create_update`. `create`/`create_update` never auto-apply a plan that destroys or replaces a resource. Set this **or** `auto-apply`, not both (422). |

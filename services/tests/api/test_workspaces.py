@@ -55,6 +55,7 @@ def _mock_workspace(
     ansible_execution_environment="",
     resource_cpu="1",
     parallelism=10,
+    configure_parallelism=None,
     resource_memory="2Gi",
 ):
     ws = MagicMock()
@@ -118,6 +119,7 @@ def _mock_workspace(
     ws.locked_by = locked_by
     ws.resource_cpu = resource_cpu
     ws.parallelism = 10
+    ws.configure_parallelism = None
     ws.execution_backend = "tofu"
     ws.resource_memory = resource_memory
     ws.ee_resource_cpu = ""

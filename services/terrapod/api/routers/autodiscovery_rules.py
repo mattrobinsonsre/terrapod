@@ -49,7 +49,11 @@ from terrapod.db.session import get_db
 from terrapod.engines import known_engines
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service, workspace_settings
-from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
+from terrapod.services.parallelism import (
+    DEFAULT_PARALLELISM,
+    validate_configure_parallelism,
+    validate_parallelism,
+)
 from terrapod.services.workspace_settings import (
     validate_ansible_collections,
     validate_ansible_version,
@@ -94,6 +98,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "terraform-version": rule.engine_version,
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
+            "configure-parallelism": rule.configure_parallelism,
             "ansible-version": rule.ansible_version,
             "ansible-execution-environment": rule.ansible_execution_environment,
             "ansible-collections": list(rule.ansible_collections or []),
@@ -441,6 +446,13 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     if "parallelism" in attrs:
         try:
             out["parallelism"] = validate_parallelism(attrs["parallelism"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    if "configure-parallelism" in attrs:
+        try:
+            out["configure_parallelism"] = validate_configure_parallelism(
+                attrs["configure-parallelism"]
+            )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
     # One rule for all four (#2154), shared with the workspace routes rather
@@ -891,6 +903,8 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         ee_resource_cpu=fields.get("ee_resource_cpu", ""),
         ee_resource_memory=fields.get("ee_resource_memory", ""),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
+        # No default: absent means the materialised workspace inherits (#2499).
+        configure_parallelism=fields.get("configure_parallelism"),
         ansible_version=fields.get("ansible_version", DEFAULT_ANSIBLE_LINE),
         ansible_execution_environment=fields.get("ansible_execution_environment", ""),
         ansible_collections=fields.get("ansible_collections", []),

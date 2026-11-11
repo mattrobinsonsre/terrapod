@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Primary voyage button",
       "defaultRunKindAuto": "Automatic (th'' fullest)",
       "defaultRunKindLead": "Which order gets th'' loud button on this here workspace. Automatic offers th'' most complete voyage it can, arr.",
-      "defaultRunKindTitle": "Which order gets th'' loud button on this here workspace. Automatic offers th'' most complete voyage it can — usually right, an'' wrong where th'' everyday order be not th'' biggest one: a workspace whose Terraform half only keeps th'' Ansible manifest, committin'' unattended an'' never riggin'' after a commit, wants Rig here. A choice this workspace cannot offer be turned away when ye save it, an'' one yer role cannot run falls back t'' Automatic fer ye, arr."
+      "defaultRunKindTitle": "Which order gets th'' loud button on this here workspace. Automatic offers th'' most complete voyage it can — usually right, an'' wrong where th'' everyday order be not th'' biggest one: a workspace whose Terraform half only keeps th'' Ansible manifest, committin'' unattended an'' never riggin'' after a commit, wants Rig here. A choice this workspace cannot offer be turned away when ye save it, an'' one yer role cannot run falls back t'' Automatic fer ye, arr.",
+      "configureParallelism": "Riggin'' Hands at Once",
+      "configureParallelismTitle": "How many hands a riggin'' drives at once — ansible''s forks (1-256). Leave it bare t'' inherit Hands at Once. Kept apart, for th'' execution environment be sized separate from th'' orchestrator, arr.",
+      "configureParallelismLead": "How many hands a riggin'' drives at once — ansible''s forks (1-256). Leave it bare t'' inherit Hands at Once."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

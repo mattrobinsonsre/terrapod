@@ -111,6 +111,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "ee_resource_cpu": ws.ee_resource_cpu,
         "ee_resource_memory": ws.ee_resource_memory,
         "parallelism": ws.parallelism,
+        "configure_parallelism": ws.configure_parallelism,
         "ansible_version": ws.ansible_version,
         "ansible_execution_environment": ws.ansible_execution_environment,
         "ansible_collections": list(ws.ansible_collections or []),
@@ -711,6 +712,10 @@ async def restore_workspace(
         ee_resource_cpu=settings.get("ee_resource_cpu") or "",
         ee_resource_memory=settings.get("ee_resource_memory") or "",
         parallelism=settings.get("parallelism") or DEFAULT_PARALLELISM,
+        # No `or` fallback: `None` is the correct restored value, meaning the
+        # workspace inherited. A snapshot predating this column has no key, and
+        # `.get` gives the same `None` -- which is right for both (#2499).
+        configure_parallelism=settings.get("configure_parallelism"),
         # "" is the correct fallback, not the deployment default: a snapshot
         # predating this column means the workspace never pinned one.
         ansible_version=settings.get("ansible_version") or "",

@@ -132,6 +132,7 @@ type autodiscoveryRuleModel struct {
 	EEResourceCPU        types.String `tfsdk:"ee_resource_cpu"`
 	EEResourceMemory     types.String `tfsdk:"ee_resource_memory"`
 	Parallelism          types.Int64  `tfsdk:"parallelism"`
+	ConfigureParallelism types.Int64  `tfsdk:"configure_parallelism"`
 	ResourceMemory       types.String `tfsdk:"resource_memory"`
 	AutoApply            types.Bool   `tfsdk:"auto_apply"`
 	AutoApplyMode        types.String `tfsdk:"auto_apply_mode"`
@@ -534,12 +535,18 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 			},
 			"parallelism": schema.Int64Attribute{
 				Description: "How many operations the engine performs at once on " +
-					"workspaces this rule creates. Defaults to 10.",
+					"workspaces this rule creates, in the plan/apply phase. Defaults to 10.",
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
+			},
+			"configure_parallelism": schema.Int64Attribute{
+				Description: "How many hosts a configure drives at once (ansible's forks) on " +
+					"workspaces this rule creates. Unset means they inherit `parallelism`, " +
+					"which is what a rule written before this existed keeps doing.",
+				Optional: true,
 			},
 			"ee_resource_cpu": schema.StringAttribute{
 				Description: "CPU request for the Ansible execution-environment sidecar (K8s format, " +
@@ -1123,6 +1130,9 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		attrs["parallelism"] = m.Parallelism.ValueInt64()
 	}
+	if !m.ConfigureParallelism.IsNull() && !m.ConfigureParallelism.IsUnknown() {
+		attrs["configure-parallelism"] = m.ConfigureParallelism.ValueInt64()
+	}
 	if !m.EEResourceCPU.IsNull() && !m.EEResourceCPU.IsUnknown() {
 		attrs["ee-resource-cpu"] = m.EEResourceCPU.ValueString()
 	}
@@ -1451,6 +1461,11 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.AnsibleCollections = types.ListNull(acObjType)
 	}
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
+	if v := terrapod.GetIntAttr(res, "configure-parallelism"); v != 0 {
+		m.ConfigureParallelism = types.Int64Value(v)
+	} else {
+		m.ConfigureParallelism = types.Int64Null()
+	}
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.EEResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "ee-resource-cpu"))
 	m.EEResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "ee-resource-memory"))

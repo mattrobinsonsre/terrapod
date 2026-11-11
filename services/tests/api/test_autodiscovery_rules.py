@@ -86,6 +86,7 @@ def _mock_rule(
     r.hard_limit = ""
     r.resource_cpu = "1"
     r.parallelism = 10
+    r.configure_parallelism = None
     r.resource_memory = "2Gi"
     r.ee_resource_cpu = ""
     r.ee_resource_memory = ""

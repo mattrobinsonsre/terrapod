@@ -107,6 +107,7 @@ class TestAutodiscoveryRule:
             ansible_host_key_checking=True,
             resource_cpu="1",
             parallelism=10,
+            configure_parallelism=None,
             resource_memory="2Gi",
             ee_resource_cpu="",
             ee_resource_memory="",

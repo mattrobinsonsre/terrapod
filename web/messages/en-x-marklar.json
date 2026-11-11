@@ -2794,7 +2794,10 @@
       "defaultRunKind": "Primary marklar marklar",
       "defaultRunKindAuto": "Marklar (most complete)",
       "defaultRunKindLead": "Which marklar gets the loud marklar on this marklar. Marklar offers the most complete marklar it can.",
-      "defaultRunKindTitle": "Which marklar gets the loud marklar on this marklar. Marklar offers the most complete marklar it can — usually right, and wrong where the everyday marklar is not the biggest one: a marklar whose Terraform marklar only maintains the Ansible marklar, applying unattended and never configuring after a marklar, wants Configure here. A marklar this marklar cannot offer is refused when you save it, and one your marklar cannot run falls back to Marklar for you."
+      "defaultRunKindTitle": "Which marklar gets the loud marklar on this marklar. Marklar offers the most complete marklar it can — usually right, and wrong where the everyday marklar is not the biggest one: a marklar whose Terraform marklar only maintains the Ansible marklar, applying unattended and never configuring after a marklar, wants Configure here. A marklar this marklar cannot offer is refused when you save it, and one your marklar cannot run falls back to Marklar for you.",
+      "configureParallelism": "Marklar marklar",
+      "configureParallelismTitle": "How many marklars a marklar drives at once — marklar''s marklars (1-256). Leave empty to inherit Marklar. Separate because the marklar is sized separately from the marklar.",
+      "configureParallelismLead": "How many marklars a marklar drives at once — marklar''s marklars (1-256). Leave empty to inherit Marklar."
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

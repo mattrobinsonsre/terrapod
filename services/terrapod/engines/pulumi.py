@@ -66,6 +66,9 @@ class PulumiRunOptions:
     resource_cpu: str = ""
     resource_memory: str = ""
     parallelism: int = 0
+    #: The configure phase's own `forks` (#2499). `0` means "say nothing", the
+    #: same convention `parallelism` uses here.
+    configure_parallelism: int = 0
     env_vars: list[dict[str, Any]] = field(default_factory=list)
     #: Save the preview's plan and bind the update to it (#1553). Off by default.
     bind_plan: bool = False
@@ -224,6 +227,13 @@ class PulumiStrategy:
             env.append({"name": "TP_REPLACE_URNS", "value": json.dumps(options.replace_urns)})
         if options.parallelism:
             env.append({"name": "TP_PARALLELISM", "value": str(options.parallelism)})
+        if options.configure_parallelism:
+            env.append(
+                {
+                    "name": "TP_CONFIGURE_PARALLELISM",
+                    "value": str(options.configure_parallelism),
+                }
+            )
         if options.bind_plan:
             env.append({"name": "TP_PULUMI_BIND_PLAN", "value": "true"})
         # Cost estimation (#1569), emitted exactly as Terraform emits it: the
@@ -269,6 +279,10 @@ class PulumiStrategy:
             resource_cpu=attrs.get("resource-cpu", ""),
             resource_memory=attrs.get("resource-memory", ""),
             parallelism=attrs.get("parallelism", 0),
+            # The configure phase's own, inherit stated once (#2499).
+            configure_parallelism=(
+                attrs.get("configure-parallelism") or attrs.get("parallelism", 0)
+            ),
             bind_plan=bool(attrs.get("pulumi-bind-plan", False)),
             cost_estimation=attrs.get("cost-estimation", True),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),

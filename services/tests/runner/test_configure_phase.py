@@ -49,6 +49,7 @@ def cfg():
         playbook="site.yml",
         ansible_limit="",
         parallelism=10,
+        configure_parallelism=10,
     )
 
 
