@@ -195,6 +195,7 @@ def download_configuration(
     *,
     work_dir: Path,
     client: httpx.Client | None = None,
+    write_backend_override: bool = True,
 ) -> ConfigurationResult:
     """Acquire and unpack the run's configuration tarball.
 
@@ -304,9 +305,17 @@ def download_configuration(
 
     _warn_on_user_override(override_dir)
 
-    override_file = override_dir / "zzzz_terrapod_backend_override.tf"
-    override_file.write_text(_LOCAL_BACKEND_OVERRIDE)
-    logger.info("wrote local-backend override", path=str(override_file))
+    # A configure passes False (#2508). It never invokes an engine, so there is
+    # no backend to neutralise, and writing the file would leave a `.tf` in a
+    # directory of playbooks -- which is not harmless: it is what made the
+    # configure's log read as though Terraform were being run. `override_file`
+    # is already Optional and no caller reads it, so None is the honest value
+    # rather than a path to something that was not written.
+    override_file: Path | None = None
+    if write_backend_override:
+        override_file = override_dir / "zzzz_terrapod_backend_override.tf"
+        override_file.write_text(_LOCAL_BACKEND_OVERRIDE)
+        logger.info("wrote local-backend override", path=str(override_file))
 
     return ConfigurationResult(
         downloaded=True,
