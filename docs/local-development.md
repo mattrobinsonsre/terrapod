@@ -16,7 +16,7 @@ running pods.
 | Docker | Container runtime | [docker.com](https://www.docker.com/) |
 | A local Kubernetes cluster | Run the stack | Rancher Desktop, Docker Desktop (K8s enabled), minikube, kind, OrbStack, or colima |
 | Tilt | Local dev orchestration | `brew install tilt` |
-| Go, GPG, ZIP tools, and local Git tags | Build and sign the local Terrapod provider | Go version in `provider/go.mod`; `gpg`, `zip`, `unzip`, `sha256sum`; fetch tags after cloning |
+| Go, GPG, ZIP tools, and local Git tags | Build and sign the local Terrapod provider | At least the Go version in `provider/go.mod` — the directive is a minimum, and the toolchain in use is part of the dev provider version; `gpg`, `zip`, `unzip`, `sha256sum`; fetch tags after cloning |
 | mkcert | Local TLS certificate | `brew install mkcert` |
 | tofu (recommended) or terraform | Exercise the CLI flows | [opentofu.org](https://opentofu.org/) |
 
@@ -49,8 +49,14 @@ listener. Watch progress in the Tilt UI at <http://localhost:10352>.
 
 Tilt also runs `provider/GNUmakefile` against the current Go source and signs
 a Linux provider ZIP. The `-dev.<number>` version is based on the latest fetched
-Git version tag and source content (override the tag with
-`TERRAPOD_DEV_PROVIDER_TAG=v1.9.0 make dev`). The persistent dev-only GPG home
+Git version tag, the provider and SDK source content, and the **Go toolchain**
+(`go env GOVERSION`) — override the tag with
+`TERRAPOD_DEV_PROVIDER_TAG=v1.9.0 make dev`. The toolchain is in there because it
+changes the compiled bytes while leaving every source file identical: `provider/go.mod`
+is digested, but its `go` directive is a minimum rather than a pin, so a host Go
+upgrade inside the declared range used to leave the version unmoved — and the build
+then stopped with `Binary differs from existing <version>`, which names neither the
+toolchain nor the cause. Upgrading Go now simply yields a new `-dev.<number>`. The persistent dev-only GPG home
 lives at `~/.local/share/terrapod/certs/provider-gnupg/`, separate from the
 local TLS cert and key in the same parent directory. An existing signing key
 in `provider/.dev-build/gnupg/` is moved there after its public key is checked;

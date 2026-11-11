@@ -28,14 +28,40 @@ BASE_VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
 DEV_VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+-([0-9A-Za-z.-]+\.)?dev\.[0-9]+$'
 
 artifact_version() {
-  local base=$1 digest suffix
+  local base=$1 digest suffix goversion
   [[ "$base" =~ $BASE_VERSION_RE ]] || die "Expected a semver base version, got: $base"
+  # The Go toolchain is an INPUT to the compiled bytes, and the one input the file
+  # hashes cannot see. `provider/go.mod` IS in the digest below, but its `go`
+  # directive is a MINIMUM rather than a pin -- so a host upgrade inside the
+  # declared range changes the binary and nothing else. The version then does not
+  # move, `bundle()` rightly refuses to overwrite a stored artifact whose bytes
+  # differ, and the local dev stack stops building with a refusal that names
+  # neither the toolchain nor the cause (#2461).
+  #
+  # Resolved BEFORE the digest subshell deliberately: inside it a `die` would end
+  # only the subshell, leaving `digest` empty or truncated and yielding a silently
+  # WRONG version -- worse than the refusal this fixes. It is also a non-file
+  # input, so it is folded into the pipeline alongside the per-file hashes rather
+  # than added to the path list.
+  #
+  # `go` is required by this script's own `build` path in any case (`bundle` reads
+  # `go env GOARCH`, and `make build` compiles), so this moves the failure earlier
+  # and makes it name its cause; it adds no new prerequisite. The Tiltfile calls
+  # `version` while EVALUATING, and a Tiltfile that cannot evaluate builds nothing
+  # while an already-running API goes on answering 200 -- which reads as a wedged
+  # stack -- hence the explicit message rather than a bare `go: not found`.
+  command -v go >/dev/null || die 'go is not on PATH, and the Go toolchain is part of the dev provider version. Install Go; the dev stack needs it to build the provider regardless.'
+  goversion=$(go env GOVERSION) || die 'Could not read `go env GOVERSION`; cannot derive the dev provider version'
+  [ -n "$goversion" ] || die '`go env GOVERSION` was empty; cannot derive the dev provider version'
   digest=$(
     cd "$REPO_DIR"
-    git ls-files --cached --others --exclude-standard -z -- \
-      provider/GNUmakefile provider/dev-package.sh provider/go.mod provider/go.sum \
-      provider/main.go provider/internal go-terrapod \
-      | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum
+    {
+      printf 'GOVERSION=%s\n' "$goversion"
+      git ls-files --cached --others --exclude-standard -z -- \
+        provider/GNUmakefile provider/dev-package.sh provider/go.mod provider/go.sum \
+        provider/main.go provider/internal go-terrapod \
+        | LC_ALL=C sort -z | xargs -0 sha256sum
+    } | sha256sum
   )
   suffix=$((16#${digest:0:10}))
   # Extend the existing pre-release rather than starting a second one.
@@ -92,6 +118,11 @@ bundle() {
       || die "Incomplete artifact set for $version; refuse to overwrite"
     (cd "$output" && sha256sum -c "$sums")
     gpg --homedir "$KEY_HOME" --verify "$output/$sig" "$output/$sums" >&2
+    # Deliberately a hard stop rather than an overwrite: one version, one binary.
+    # Letting this overwrite would trade a loud refusal for a cache that quietly
+    # serves a binary other than the one its version names. When it fires, the
+    # answer is to find the input that moved and is not in the digest -- the Go
+    # toolchain was exactly that until #2461 put it there.
     cmp -s "$binary" <(unzip -p "$output/$archive" "$inner") \
       || die "Binary differs from existing $version; choose a new dev version"
     printf '%s\n' "$version" > "$STORE/current-version"
