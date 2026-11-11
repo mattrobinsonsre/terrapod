@@ -56,7 +56,43 @@ class TestReady:
         assert resp.status_code == 503
         body = resp.json()
         assert body["status"] == "not ready"
-        assert body["checks"]["migrations"].startswith("behind:")
+        assert body["checks"]["migrations"].startswith("skew:")
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.health.schema_is_current", new_callable=AsyncMock)
+    @patch("terrapod.api.health.get_storage_or_none")
+    @patch("terrapod.api.health.get_redis_health", new_callable=AsyncMock)
+    @patch("terrapod.api.health.get_db_health", new_callable=AsyncMock)
+    async def test_ready_when_the_schema_is_ahead_of_this_code(
+        self, mock_db, mock_redis, mock_storage, mock_schema, *app_mocks
+    ):
+        """A pod whose schema is AHEAD stays ready (#2500).
+
+        This is the state of every old pod during a rolling upgrade: the
+        migration Job has run and the pods are being replaced one at a time.
+        Reporting them not ready empties the load balancer for the length of the
+        rollout, which turned a zero-downtime mechanism into an outage. The
+        endpoint is tested as well as the predicate because it is `/ready` the
+        kubelet probes, and it is the wiring between them that decides whether a
+        pod is kept in service.
+        """
+        mock_db.return_value = True
+        mock_redis.return_value = True
+        mock_storage.return_value = object()
+        mock_schema.return_value = (
+            True,
+            "schema at future1, ahead of this code's head mine01 "
+            "(expected during a rolling upgrade)",
+        )
+
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.get("/ready")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ready"
+        assert body["checks"]["migrations"] == "healthy"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

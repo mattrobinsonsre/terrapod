@@ -93,6 +93,125 @@ def _upgrade_contractions(tree: ast.Module) -> set[str]:
     return out
 
 
+# The migration that creates `schema_contractions` (#2500). A migration at or
+# before it cannot record anything, because the table does not exist yet; one
+# after it can, and must.
+_MARKER_REVISION = "f9bb1c338a1c"
+
+# Of the four contraction ops, these are the two that remove something the old
+# code may still be READING, which is what makes an ahead-of-code pod unsafe.
+# `drop_constraint` and `alter_column` leave every column in place and readable,
+# so they are ledgered (above) without needing the runtime marker.
+_BREAKING_OPS = frozenset({"drop_column", "drop_table"})
+
+
+def _revision_ids(tree: ast.Module) -> tuple[str | None, str | None]:
+    """A migration's own revision and its parent, read exactly rather than
+    matched. (A regex over these lines manufactures false roots and heads when a
+    value is not on one line in the shape the pattern assumed.)"""
+    found: dict[str, str | None] = {}
+    for node in tree.body:
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else getattr(node, "targets", [])
+        names = [t.id for t in targets if isinstance(t, ast.Name)]
+        value = getattr(node, "value", None)
+        for name in names:
+            if name in ("revision", "down_revision"):
+                found[name] = (
+                    value.value
+                    if isinstance(value, ast.Constant) and isinstance(value.value, str)
+                    else None
+                )
+    return found.get("revision"), found.get("down_revision")
+
+
+def _descendants_of(marker: str, parents: dict[str, str | None]) -> set[str]:
+    """Every revision whose ancestry passes through `marker`, exclusive."""
+    children: dict[str, list[str]] = {}
+    for rev, parent in parents.items():
+        if parent:
+            children.setdefault(parent, []).append(rev)
+    out: set[str] = set()
+    queue = list(children.get(marker, []))
+    while queue:
+        rev = queue.pop()
+        if rev in out:
+            continue
+        out.add(rev)
+        queue.extend(children.get(rev, []))
+    return out
+
+
+def test_a_breaking_contraction_records_itself_in_the_marker_table() -> None:
+    """A contraction that drops a column or table must tell old pods (#2500).
+
+    An API pod stays READY when the schema is ahead of its code, because an
+    additive migration leaves it working. A dropped column does not, and the pod
+    cannot know that by inspecting a revision it has never heard of -- so the
+    migration writes its own revision into `schema_contractions` and the pod
+    refuses readiness on finding one outside its own revision graph.
+
+    Derived from the revision graph rather than from a second ledger: the
+    requirement applies to exactly those migrations that descend from the one
+    creating the table, which is self-maintaining and needs no grandfather list
+    for the contractions that shipped before it.
+    """
+    trees = {path: ast.parse(path.read_text(), filename=str(path)) for path in _migration_files()}
+    parents: dict[str, str | None] = {}
+    by_revision: dict[str, Path] = {}
+    for path, tree in trees.items():
+        rev, parent = _revision_ids(tree)
+        if rev:
+            parents[rev] = parent
+            by_revision[rev] = path
+
+    assert _MARKER_REVISION in by_revision, (
+        f"the marker migration {_MARKER_REVISION} is missing; this gate has nothing to "
+        "anchor on and would pass on every tree"
+    )
+    subject = _descendants_of(_MARKER_REVISION, parents)
+
+    offenders: list[str] = []
+    for rev in sorted(subject):
+        path = by_revision[rev]
+        up = _func(trees[path], "upgrade")
+        if up is None:
+            continue
+        breaking = {
+            sig
+            for sig in _upgrade_contractions(trees[path])
+            if sig.split("(", 1)[0] in _BREAKING_OPS
+        }
+        if not breaking:
+            continue
+        records = any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "execute"
+            and any(
+                isinstance(a, ast.Constant)
+                and isinstance(a.value, str)
+                and "schema_contractions" in a.value
+                for a in node.args
+            )
+            for node in ast.walk(up)
+        )
+        if not records:
+            offenders.append(f"{path.name} ({rev}): {', '.join(sorted(breaking))}")
+
+    assert not offenders, (
+        "A migration drops a column or table without recording itself in "
+        "`schema_contractions`. An API pod from the previous release stays READY "
+        "against an ahead-of-code schema (#2500) and would read a column that is "
+        "now gone. Add to its `upgrade()`:\n\n"
+        "    op.execute(\n"
+        '        "INSERT INTO schema_contractions (revision, note) "\n'
+        "        \"VALUES ('<this revision>', '<what it drops and why it is safe>') \"\n"
+        '        "ON CONFLICT (revision) DO NOTHING"\n'
+        "    )\n\n"
+        "Offenders:\n  " + "\n  ".join(offenders)
+    )
+
+
 def test_every_migration_is_reversible() -> None:
     offenders: list[str] = []
     for path in _migration_files():
