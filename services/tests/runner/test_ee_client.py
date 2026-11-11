@@ -11,6 +11,9 @@ the trailer contract came to be verified only in the language that can read it.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -24,6 +27,7 @@ from terrapod.runner.ee_client import (
     EEResult,
     ExecutionEnvironmentUnavailable,
     cancel,
+    child_env,
     configured,
     run,
 )
@@ -267,8 +271,10 @@ class TestTheHappyPath:
         assert sent["bin"] == "ansible-playbook"
         assert sent["args"] == ["site.yml", "--limit", "web"]
         assert sent["dir"] == "/workspace/ansible"
-        # The wire form is KEY=VALUE, matching os.Environ().
-        assert sent["env"] == ["ANSIBLE_FORCE_COLOR=0"]
+        # The wire form is KEY=VALUE, matching os.Environ(). `PYTHONUNBUFFERED`
+        # is forced onto every child (#2511) and so is part of this contract;
+        # asserting the set rather than the order, which nothing depends on.
+        assert set(sent["env"]) == {"ANSIBLE_FORCE_COLOR=0", "PYTHONUNBUFFERED=1"}
 
     def test_the_log_is_appended_not_truncated(self, agent, tmp_path):
         """A configure is concatenated onto the apply's log (#1988).
@@ -473,3 +479,98 @@ class TestTerminationReachesTheExecutionEnvironment:
             handler(signalmod.SIGTERM, None)
 
         assert len(sent) == 1, f"cancelled {len(sent)} times"
+
+
+class TestTheChildIsForcedUnbuffered:
+    """#2511: a configure's log arrived in large irregular chunks.
+
+    Everything else in this module already streams -- the agent flushes per
+    write, httpx hands each chunk straight on, and the redactor holds nothing
+    back for ordinary output; all three measured. None of it helps while the
+    CHILD is sitting on its own bytes, which is what ansible does on a pipe: it
+    never flushes, and CPython block-buffers a non-tty at 8 KiB.
+
+    Measured against real ansible-core 2.21.5, three hosts sleeping 2/6/10s
+    inside ONE task: without the variable all three `ok:` lines reached the
+    reader at +10.87s, with it at +2.83s / +6.83s / +10.81s.
+    """
+
+    def test_it_is_forced_when_the_caller_passes_nothing(self):
+        assert child_env(None) == {"PYTHONUNBUFFERED": "1"}
+        assert child_env({}) == {"PYTHONUNBUFFERED": "1"}
+
+    def test_the_callers_own_variables_are_kept(self):
+        """Forcing one key must not become replacing the environment."""
+        assert child_env({"ANSIBLE_FORKS": "20"}) == {
+            "ANSIBLE_FORKS": "20",
+            "PYTHONUNBUFFERED": "1",
+        }
+
+    def test_a_caller_cannot_turn_it_off(self):
+        """Ours wins, and that direction is a judgement rather than an accident.
+
+        A phase builds its environment for ansible's benefit and has no reason
+        to think about the log's shape; `galaxy_env` is a strict allow-list and
+        `pip_env` is assembled somewhere else again. A forced value that lost to
+        any of them would restore #2511 for one binary and leave the rest
+        streaming, which is the shape of defect nobody goes looking for.
+        """
+        assert child_env({"PYTHONUNBUFFERED": ""})["PYTHONUNBUFFERED"] == "1"
+        assert child_env({"PYTHONUNBUFFERED": "0"})["PYTHONUNBUFFERED"] == "1"
+
+    def test_the_call_site_puts_it_on_the_wire(self, agent):
+        """The decision is inert unless `run` actually sends it.
+
+        Separate from the cases above, which would all still pass with `run`
+        building its payload from the caller's env directly -- which is exactly
+        the line this fix changes.
+        """
+        a = agent()
+        run("ansible-galaxy", ["collection", "install"], cwd="/w", tee_to_stdout=False)
+        assert "PYTHONUNBUFFERED=1" in a.seen[0]["env"]
+
+    def test_every_binary_gets_it_not_just_the_playbook(self, agent):
+        """One door, because the agent's allowlist is all Python entry points.
+
+        The report named the setup steps as well as the play, and
+        `ansible-galaxy` is the worse case of the two: it forks nothing, so
+        nothing incidentally flushes it and its whole progress stream waits for
+        the process to exit.
+        """
+        a = agent()
+        for binary in ("ansible-playbook", "ansible-galaxy", "pip", "ansible-inventory"):
+            run(binary, [], cwd="/w", tee_to_stdout=False)
+        assert [b["bin"] for b in a.seen if "PYTHONUNBUFFERED=1" not in b["env"]] == []
+
+    def test_a_captured_call_is_forced_too(self, agent):
+        """`capture=True` suppresses the log file and the tee, not the variable."""
+        a = agent()
+        run("ansible-config", ["dump"], cwd="/w", capture=True)
+        assert "PYTHONUNBUFFERED=1" in a.seen[0]["env"]
+
+    def test_what_run_sends_really_releases_an_unflushed_write(self):
+        """The mechanism, driven rather than described -- and with no timing.
+
+        The child writes a line and leaves through `os._exit`, which skips the
+        interpreter's flush at shutdown. That stands in for the real case, where
+        ansible has simply not reached a flush point yet because the task is
+        still running, and it turns the question into "did the write reach the
+        reader on its own" -- nothing to go flaky.
+
+        The environment is `child_env` 's own output rather than a literal, so
+        this cannot drift into proving a variable the product does not set; and
+        it drives a real interpreter on a real pipe rather than asserting the
+        string's shape, because the value configures CPython and a test that
+        only checked our spelling would pass on a name that does nothing.
+        """
+        source = "import os, sys\nsys.stdout.write('STREAMED-WITHOUT-FLUSHING\\n')\nos._exit(0)\n"
+        argv = [sys.executable, "-c", source]
+        path = {"PATH": os.environ.get("PATH", "")}
+
+        held = subprocess.run(argv, capture_output=True, env=path, check=False)
+        assert held.stdout == b"", "the premise is gone: an unflushed write was already visible"
+
+        forced = subprocess.run(
+            argv, capture_output=True, env={**path, **child_env(None)}, check=False
+        )
+        assert b"STREAMED-WITHOUT-FLUSHING" in forced.stdout

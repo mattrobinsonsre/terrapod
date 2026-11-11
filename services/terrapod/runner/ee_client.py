@@ -29,6 +29,11 @@ Three things here are not obvious and each is load-bearing:
 * **Unreachable fails CLOSED.** A configure that could not be started must never
   look like a configure that changed nothing: `rc=0` with an empty log reads as
   success to every caller above. So this raises, naming the endpoint.
+
+* **The child is forced unbuffered.** Everything above streams, and none of it
+  helps while ansible is holding its own output: it never flushes, and the agent
+  hands it a pipe, where CPython block-buffers. `_FORCED_CHILD_ENV` carries the
+  measurement (#2511).
 """
 
 from __future__ import annotations
@@ -54,6 +59,77 @@ TOKEN_ENV = "TP_EE_TOKEN"
 #: Short on purpose: an agent in the same pod answers immediately or is not there.
 #: `read=None` is the deliberate half -- see the module docstring.
 _TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
+
+#: Forced on every child the agent runs, and the whole of #2511's fix.
+#:
+#: **The child decides whether a configure streams, and by default it does not.**
+#: ansible renders through `Display.display`, which writes to `sys.stdout` and
+#: does NOT flush -- the flush is commented out in `ansible/utils/display.py`
+#: ("let the system flush"), and `TaskQueueManager.cleanup` is the only
+#: `sys.stdout.flush()` in the tree. On a terminal that costs nothing, because
+#: CPython line-buffers a tty. The agent gives the child a PIPE, where CPython
+#: block-buffers at 8 KiB, so every line ansible renders sits in the child.
+#:
+#: Measured against real ansible-core 2.21.5 -- three hosts sleeping 2/6/10s
+#: inside ONE task, reading the child's pipe exactly as the agent does:
+#:
+#:     host     finished   without   with
+#:     slow02      ~2s     +10.87s   +2.83s
+#:     slow06      ~6s     +10.87s   +6.83s
+#:     slow10     ~10s     +10.87s  +10.81s
+#:
+#: Every host that finished early was invisible until the whole task ended. What
+#: releases the buffer today is incidental rather than designed: `multiprocessing`
+#: flushes stdout before each fork, so a task's output surfaces when the NEXT
+#: task forks its workers and the last task's only at exit -- which is why the
+#: delay grows with the duration of the task that follows, and is exactly the
+#: "large, irregular chunks" in the report. `ansible-galaxy` forks nothing at
+#: all, and every progress message it prints goes through the same unflushed
+#: `display()`, so its whole stream waits for the process to exit.
+#:
+#: **Here rather than in `docker/Dockerfile.ee`**, which is the tempting place
+#: and the wrong one: an EE "contributes its FILESYSTEM, not its entrypoint", an
+#: operator may supply their own image, and the contract that image must meet is
+#: deliberately four binaries and a uid. The shape of the run log is the
+#: platform's responsibility, the same reason the stdout callback is ours; and a
+#: `ENV` line would reach nobody until all ten published images were rebuilt.
+#:
+#: **One variable covers every binary** because the agent's allowlist is entirely
+#: Python entry points, which is also why this belongs at the one door the
+#: orchestrator runs them through rather than in each phase's own env builder --
+#: `galaxy_env` is a strict allow-list and `pip_env` is built elsewhere again.
+#:
+#: It fixes the class rather than one ansible line: `PYTHONUNBUFFERED` changes
+#: CPython's buffering, so it holds whatever a given ansible-core does about
+#: flushing, across all ten EE lines.
+#:
+#: It is also the house position rather than a novelty. Every image Terrapod
+#: builds sets this -- api, listener, migrations, runner, test -- and
+#: `job_entrypoint._configure_stdio` goes further still, line-buffering by hand
+#: in case a future image change drops it. The EE is the one Python container in
+#: a configure pod that Terrapod does not build, and so the one that was missed.
+_FORCED_CHILD_ENV = {"PYTHONUNBUFFERED": "1"}
+
+
+def child_env(env: dict[str, str] | None) -> dict[str, str]:
+    """The environment a child is run with: the caller's, plus what we force.
+
+    A named function because the property it carries is about WHEN output
+    arrives, which no test driving the whole pipeline can see -- the body of a
+    fast fake agent is complete before buffering could ever show. So the
+    decision is pinned here, and the call site is pinned separately.
+
+    **Ours wins over the caller's**, which is the one judgement in it. There is
+    no caller that legitimately wants a buffered configure log, and a phase
+    assembling its own environment has no reason to think about this at all --
+    so a value that silently lost to `galaxy_env`'s allow-list or to a future
+    `_FORCED_ENV` entry would reintroduce #2511 for one binary and leave the
+    others working, which is the shape of defect nobody finds.
+    """
+    merged = dict(env or {})
+    merged.update(_FORCED_CHILD_ENV)
+    return merged
+
 
 #: How much a `capture=True` call will hold. `ansible-config dump` is a few KB;
 #: this is two orders of magnitude of headroom and still a bound.
@@ -182,6 +258,8 @@ def run(
             against it and nowhere else (#1929).
         env: variables ADDED to the EE's own environment. The agent scrubs its
             own token before handing it over, so a playbook cannot replay it.
+            `_FORCED_CHILD_ENV` is merged over whatever is passed here, so a
+            caller cannot turn the streaming of its own log off.
         log_file: appended with the combined output, for upload as the run log.
         tee_to_stdout: also write to our stdout, so the kubelet stream sees it.
         capture: return the output on the result instead of streaming it, for a
@@ -200,7 +278,7 @@ def run(
         "bin": binary,
         "args": list(args),
         # The agent's wire form is `KEY=VALUE`, matching `os.Environ()`.
-        "env": [f"{k}={v}" for k, v in (env or {}).items()],
+        "env": [f"{k}={v}" for k, v in child_env(env).items()],
         "dir": cwd,
     }
 
