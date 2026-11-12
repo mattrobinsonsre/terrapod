@@ -383,11 +383,16 @@ export function CacheWarmPanel({
                 </div>
               )}
 
+              {/* `min-h-11` is the 44px tap-target floor; `sm:min-h-0` drops it
+                  again above phone width so this matches its siblings on
+                  desktop, which is the shape `run-kind-split-button` and the
+                  autodiscovery page already use. Without it the button was
+                  36px, which the phone-width guard caught. */}
               <button
                 data-testid="cache-warm-submit"
                 onClick={handleWarm}
                 disabled={submitting || sealed || blocked || tooMany || items.length === 0}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-900/40 hover:bg-violet-900/60 disabled:opacity-50 text-violet-300 transition-colors"
+                className="px-4 py-2 min-h-11 sm:min-h-0 rounded-lg text-sm font-medium bg-violet-900/40 hover:bg-violet-900/60 disabled:opacity-50 text-violet-300 transition-colors"
               >
                 {submitting ? t('warmAhead.warming') : t('warmAhead.warm')}
               </button>
