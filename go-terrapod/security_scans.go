@@ -54,7 +54,7 @@ func (c *Client) GetRunSecurityScan(ctx context.Context, runID string) (*Securit
 	if err != nil {
 		return nil, err
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+id+"/security-scan")
+	data, err := c.Get(ctx, "/api/v1/runs/"+id+"/security-scan")
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (c *Client) GetRunSecurityScanStatus(
 	if err != nil {
 		return nil, err
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+id+"/security-scan")
+	data, err := c.Get(ctx, "/api/v1/runs/"+id+"/security-scan")
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (c *Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*Se
 	if err != nil {
 		return nil, err
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+id+"/actions/override-security-scan", nil)
+	data, err := c.Post(ctx, "/api/v1/runs/"+id+"/actions/override-security-scan", nil)
 	if err != nil {
 		return nil, err
 	}

@@ -94,7 +94,7 @@ func (c *Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEst
 	if len(id) > 4 && id[:4] != "run-" {
 		id = "run-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-estimate")
+	data, err := c.Get(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/cost-estimate")
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (c *Client) GetWorkspaceCostEstimate(ctx context.Context, workspaceID strin
 	if len(id) < 3 || id[:3] != "ws-" {
 		id = "ws-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/workspaces/"+url.PathEscape(id)+"/cost-estimate")
+	data, err := c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(id)+"/cost-estimate")
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +280,7 @@ func (c *Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSumm
 	if len(id) > 4 && id[:4] != "run-" {
 		id = "run-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary")
+	data, err := c.Get(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/cost-summary")
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (c *Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*C
 	if len(id) > 4 && id[:4] != "run-" {
 		id = "run-" + id
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary/regenerate", nil)
+	data, err := c.Post(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/cost-summary/regenerate", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func (c *Client) ListRunCostSummaryMessages(ctx context.Context, runID string) (
 	if len(id) > 4 && id[:4] != "run-" {
 		id = "run-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary/messages")
+	data, err := c.Get(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/cost-summary/messages")
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (c *Client) PostRunCostSummaryMessage(ctx context.Context, runID, content s
 	if err != nil {
 		return nil, fmt.Errorf("marshal cost message: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary/messages", body)
+	data, err := c.Post(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/cost-summary/messages", body)
 	if err != nil {
 		return nil, err
 	}

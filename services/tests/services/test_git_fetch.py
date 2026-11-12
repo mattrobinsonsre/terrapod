@@ -774,6 +774,22 @@ class TestWhichKindOfFailureGitReported:
             ("error: 403 Forbidden", git_fetch.GitAccessDenied),
             ("fatal: server does not support --filter", git_fetch.GitUnsupported),
             ("fatal: filtering not recognized by server, ignoring", git_fetch.GitUnsupported),
+            (
+                "fetch-pack: unexpected disconnect while reading sideband packet",
+                git_fetch.GitTransient,
+            ),
+            (
+                "error: Server does not allow request for unadvertised object "
+                "0f3b2c9d8a7e6f5c4b3a29180716253443526170",
+                git_fetch.GitRefNotFound,
+            ),
+            ("fatal: couldn't find remote ref refs/heads/nope", git_fetch.GitRefNotFound),
+            (
+                "fatal: remote error: upload-pack: not our ref "
+                "0f3b2c9d8a7e6f5c4b3a29180716253443526170",
+                git_fetch.GitRefNotFound,
+            ),
+            ("fatal: multi-pack-index checksum mismatch", git_fetch.GitError),
             ("fatal: unable to access: Could not resolve host: github.com", git_fetch.GitTransient),
             ("fatal: unable to access: Connection reset by peer", git_fetch.GitTransient),
             ("error: RPC failed; HTTP 502", git_fetch.GitTransient),
@@ -785,16 +801,103 @@ class TestWhichKindOfFailureGitReported:
     def test_gits_own_words_decide_the_class(self, stderr, want) -> None:
         assert git_fetch._classify(stderr, reachability_proven=False) is want
 
-    def test_something_unrecognised_is_TRANSIENT_not_permanent(self) -> None:
-        """Fail toward "try again" rather than toward "your configuration is
-        wrong". An unknown message told to an operator as a permanent fault
-        sends them to check a connection that is fine; told as transient, the
-        worst case is one wasted retry and an honest 502.
+    def test_something_unrecognised_is_PERMANENT_not_transient(self) -> None:
+        """Supersedes `test_something_unrecognised_is_TRANSIENT_not_permanent`,
+        and half of that test's reason still holds (#2493).
+
+        Still true: telling an operator a transport blip is a permanent fault
+        sends them to check a connection that is fine. What was wrong was the
+        other half -- "the worst case is one wasted retry and an honest 502".
+        The 502 is not honest. It carries `X-Terrapod-Upstream-Failure: vcs`,
+        which is a positive assertion that the PROVIDER failed, made about a
+        third party on the strength of a message nobody had listed; and it ends
+        "try again", which is advice we have no basis for. So the costs are not
+        symmetric, and the old reasoning compared the wrong pair.
+
+        It is also empirically the wrong way round: the commonest unrecognised
+        message on this path is a `vcs-ref` that does not exist, i.e. a user
+        error, not an outage.
+
+        And the misleading-message objection does not apply to the class
+        actually chosen. `GitError` raised bare asserts nothing -- not
+        access-denied, not an unsupported server -- beyond git's own words,
+        which is exactly the right amount to say about a failure we cannot
+        classify.
         """
         assert (
             git_fetch._classify("fatal: something nobody has seen", reachability_proven=False)
-            is git_fetch.GitTransient
+            is git_fetch.GitError
         )
+
+    def test_the_unknown_default_is_the_BASE_class_so_transience_is_an_allow_list(
+        self,
+    ) -> None:
+        """The structural half, and the reason the base class rather than a new
+        named one: `_run_git`'s retry clause is the allow-list, so any class the
+        classifier gains later is permanent until somebody puts it there on
+        purpose. A default of `GitTransient` made the opposite true -- opt-out
+        rather than opt-in -- which is how an unlisted message came to be
+        retried.
+        """
+        import inspect
+
+        retry_clause = "except (GitTransient, GitTimeout) as e:"
+        assert retry_clause in inspect.getsource(git_fetch), (
+            "the retry allow-list moved; the unknown default is only safe while retrying is opt-in"
+        )
+        assert git_fetch._classify("fatal: nobody has seen this", reachability_proven=False) is (
+            git_fetch.GitError
+        )
+
+    def test_the_sideband_disconnect_is_a_TRANSPORT_event_not_a_capability_one(self) -> None:
+        """The first half of #2493, pinned on the string rather than the class.
+
+        `unexpected disconnect while reading sideband` sat in `_UNSUPPORTED`,
+        which is matched BEFORE `_TRANSIENT`, so a large repository over a flaky
+        proxy was told its provider lacked a capability and nothing retried --
+        on precisely the blip the retry exists to absorb. Both tables are
+        asserted, because moving the string and reordering the tables are
+        different fixes and only one of them is right: reordering would make a
+        genuine capability failure retryable whenever a transport symptom
+        happened to appear beside it.
+        """
+        frag = "unexpected disconnect while reading sideband"
+        assert frag not in git_fetch._UNSUPPORTED
+        assert frag in git_fetch._TRANSIENT
+        # The shape git really prints: the sideband line, then the two symptoms
+        # that were already classified transient and lost to the earlier branch.
+        real = (
+            "remote: Enumerating objects: 148215, done.\n"
+            "error: 3419 bytes of body are still expected\n"
+            "fetch-pack: unexpected disconnect while reading sideband packet\n"
+            "fatal: early EOF\n"
+            "fatal: fetch-pack: invalid index-pack output"
+        )
+        assert git_fetch._classify(real, reachability_proven=False) is git_fetch.GitTransient
+
+    def test_a_bad_ref_beats_the_transport_symptom_git_prints_after_it(self) -> None:
+        """Why `_BAD_REF` is matched before `_TRANSIENT`, and it needs BOTH
+        strings in one message to mean anything.
+
+        A rejected `want` is routinely followed by `fatal: the remote end hung
+        up unexpectedly`, which is in `_TRANSIENT`. Matched in the other order,
+        a `vcs-ref` naming a SHA the remote does not have is retried and then
+        reported as the provider's outage -- the defect, arriving through the
+        fix for the other half. The single-string cases in the table above
+        cannot see this: each one hits exactly one table.
+        """
+        both = (
+            "error: Server does not allow request for unadvertised object "
+            "0f3b2c9d8a7e6f5c4b3a29180716253443526170\n"
+            "fatal: the remote end hung up unexpectedly"
+        )
+        assert git_fetch._classify(both, reachability_proven=False) is git_fetch.GitRefNotFound
+        # ...and the transport symptom on its own is still transient, so this is
+        # an ordering property rather than `_TRANSIENT` having been weakened.
+        symptom_alone = git_fetch._classify(
+            "fatal: the remote end hung up unexpectedly", reachability_proven=False
+        )
+        assert symptom_alone is git_fetch.GitTransient
 
     def test_a_refusal_AFTER_a_successful_fetch_is_transient(self) -> None:
         """The reported case, and the whole reason `reachability_proven` exists.
@@ -832,6 +935,7 @@ class TestWhichKindOfFailureGitReported:
             git_fetch.GitTimeout,
             git_fetch.GitAccessDenied,
             git_fetch.GitUnsupported,
+            git_fetch.GitRefNotFound,
             git_fetch.GitTransient,
         ):
             assert issubclass(kind, RuntimeError)
@@ -976,3 +1080,145 @@ class TestTheBoundedRetry:
         )
         # And nothing else asks for one, so the bound stays where it was argued.
         assert src.count("retries=1") == 1, "another step gained a retry without a reason"
+
+
+class TestWhatIsRetriedAndWhatIsRefused:
+    """Both directions of the retry decision, driven through `_run_git` with
+    git's own output (#2493).
+
+    `TestWhichKindOfFailureGitReported` asserts the CLASS; this asserts the
+    CONSEQUENCE, which is the thing the issue is about: a retryable failure not
+    retried, and a permanent one retried pointlessly. The two halves fail in
+    opposite directions, so a table that only proved "transient is retried"
+    would be satisfied by the over-broad fix where everything becomes
+    retryable -- which is the defect the second half of #2493 describes. Every
+    row therefore pins the invocation COUNT, and the table carries rows of both
+    kinds.
+
+    The count is the only observable: a class is retried because `_run_git`'s
+    `except (GitTransient, GitTimeout)` names it, and nothing about the typed
+    exception says whether that clause caught it.
+    """
+
+    #: `(label, git's stderr, the class, how many times git should be invoked)`
+    #: with `retries=1` requested -- so 2 means retried, 1 means refused.
+    CASES = [
+        (
+            "sideband disconnect, as git prints it mid-transfer",
+            b"remote: Enumerating objects: 148215, done.\n"
+            b"error: 3419 bytes of body are still expected\n"
+            b"fetch-pack: unexpected disconnect while reading sideband packet\n"
+            b"fatal: early EOF\n"
+            b"fatal: fetch-pack: invalid index-pack output",
+            git_fetch.GitTransient,
+            2,
+        ),
+        (
+            "sideband disconnect alone, with no symptom beside it",
+            b"fetch-pack: unexpected disconnect while reading sideband packet",
+            git_fetch.GitTransient,
+            2,
+        ),
+        (
+            "a proxy reset",
+            b"fatal: unable to access 'https://host/o/r.git/': Connection reset by peer",
+            git_fetch.GitTransient,
+            2,
+        ),
+        (
+            "a gateway error from the provider",
+            b"error: RPC failed; HTTP 502 curl 22 The requested URL returned error: 502",
+            git_fetch.GitTransient,
+            2,
+        ),
+        (
+            "a SHA the remote will not serve, with the symptom git prints after it",
+            b"error: Server does not allow request for unadvertised object "
+            b"0f3b2c9d8a7e6f5c4b3a29180716253443526170\n"
+            b"fatal: the remote end hung up unexpectedly",
+            git_fetch.GitRefNotFound,
+            1,
+        ),
+        (
+            "a branch that does not exist on the remote",
+            b"fatal: couldn't find remote ref refs/heads/does-not-exist",
+            git_fetch.GitRefNotFound,
+            1,
+        ),
+        (
+            "upload-pack refusing an object it does not have",
+            b"fatal: remote error: upload-pack: not our ref "
+            b"0f3b2c9d8a7e6f5c4b3a29180716253443526170\n"
+            b"fatal: the remote end hung up unexpectedly",
+            git_fetch.GitRefNotFound,
+            1,
+        ),
+        (
+            "a server without partial clone",
+            b"fatal: server does not support --filter",
+            git_fetch.GitUnsupported,
+            1,
+        ),
+        (
+            "a credential that cannot see the repository",
+            b"remote: Repository not found.\nfatal: repository 'https://host/o/r.git/' not found",
+            git_fetch.GitAccessDenied,
+            1,
+        ),
+        (
+            "a message nobody has listed",
+            b"fatal: multi-pack-index checksum mismatch",
+            git_fetch.GitError,
+            1,
+        ),
+    ]
+
+    @pytest.mark.parametrize(
+        ("label", "stderr", "want_class", "want_attempts"),
+        [pytest.param(*c, id=c[0]) for c in CASES],
+    )
+    async def test_gits_own_output_decides_both_the_class_and_the_retry(
+        self, label, stderr, want_class, want_attempts, monkeypatch
+    ) -> None:
+        calls: list[list[str]] = []
+        monkeypatch.setattr(
+            git_fetch.asyncio,
+            "create_subprocess_exec",
+            TestTheBoundedRetry._fake_exec([(128, stderr)] * 2, calls),
+        )
+        monkeypatch.setattr(git_fetch, "_RETRY_BACKOFF_SECONDS", 0)
+        with pytest.raises(git_fetch.GitError) as caught:
+            await git_fetch._run_git(["fetch", "origin", "deadbeef"], retries=1)
+        assert type(caught.value) is want_class, label
+        assert len(calls) == want_attempts, (
+            f"{label}: git was invoked {len(calls)} time(s), expected {want_attempts} "
+            f"({'retried' if want_attempts > 1 else 'refused'})"
+        )
+
+    def test_the_table_covers_every_class_the_classifier_can_RETURN(self) -> None:
+        """The closure, derived from `_classify` rather than from a list here.
+
+        Without it a class added to the classifier later is unexercised in both
+        directions, which is how the unknown default came to be retried in the
+        first place -- nothing said what the retry loop would do with it. A
+        coverage floor would not do: the point is not how many rows there are
+        but that no reachable class is missing one.
+        """
+        import ast
+        import inspect
+
+        fn = ast.parse(inspect.getsource(git_fetch._classify).lstrip()).body[0]
+        returned: set[str] = set()
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Return):
+                for sub in ast.walk(node.value):
+                    if isinstance(sub, ast.Name) and sub.id.startswith("Git"):
+                        returned.add(sub.id)
+        assert returned, "read nothing out of _classify -- teach this walker its new shape"
+        covered = {k.__name__ for _l, _s, k, _n in self.CASES}
+        assert returned <= covered, (
+            f"_classify can return {sorted(returned - covered)}, which no row exercises, "
+            "so nothing says whether the retry loop accepts or refuses it"
+        )
+        # Both directions are present, or the table proves only one of them.
+        assert {n for _l, _s, _k, n in self.CASES} == {1, 2}

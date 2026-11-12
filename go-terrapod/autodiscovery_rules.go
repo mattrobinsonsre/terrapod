@@ -33,7 +33,7 @@ func (c *Client) CreateAutodiscoveryRule(ctx context.Context, attrs map[string]a
 	if err != nil {
 		return nil, fmt.Errorf("marshal create autodiscovery-rule: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/autodiscovery-rules", body)
+	data, err := c.Post(ctx, "/api/v1/autodiscovery-rules", body)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *Client) CreateAutodiscoveryRule(ctx context.Context, attrs map[string]a
 
 // GetAutodiscoveryRule reads a rule by id.
 func (c *Client) GetAutodiscoveryRule(ctx context.Context, id string) (*AutodiscoveryRule, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/autodiscovery-rules/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/autodiscovery-rules/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *Client) UpdateAutodiscoveryRule(ctx context.Context, id string, attrs m
 	if err != nil {
 		return nil, fmt.Errorf("marshal update autodiscovery-rule: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/autodiscovery-rules/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/autodiscovery-rules/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (c *Client) UpdateAutodiscoveryRule(ctx context.Context, id string, attrs m
 // autodiscovered from this rule continue to exist; they only lose
 // the link back to the source rule.
 func (c *Client) DeleteAutodiscoveryRule(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/autodiscovery-rules/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/autodiscovery-rules/"+url.PathEscape(id))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

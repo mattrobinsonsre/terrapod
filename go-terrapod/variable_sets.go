@@ -272,7 +272,7 @@ func variableSetFromResource(res *Resource) *VariableSet {
 // workspaces that appear in no assignment table at all.
 func (c *Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]VarsetWorkspace, error) {
 	data, err := c.Get(ctx, fmt.Sprintf(
-		"/api/terrapod/v1/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)))
+		"/api/v1/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)))
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func (c *Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]V
 // did this variable come from" from the workspace's own side.
 func (c *Client) ListWorkspaceVarsets(ctx context.Context, workspaceID string) ([]WorkspaceVarset, error) {
 	data, err := c.Get(ctx, fmt.Sprintf(
-		"/api/terrapod/v1/workspaces/%s/varsets", url.PathEscape(workspaceID)))
+		"/api/v1/workspaces/%s/varsets", url.PathEscape(workspaceID)))
 	if err != nil {
 		return nil, err
 	}

@@ -121,7 +121,7 @@ func (c *Client) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role, 
 	if err != nil {
 		return nil, fmt.Errorf("marshal create role: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/roles", body)
+	data, err := c.Post(ctx, "/api/v1/roles", body)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (c *Client) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role, 
 
 // GetRole reads a role by name.
 func (c *Client) GetRole(ctx context.Context, name string) (*Role, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/roles/"+url.PathEscape(name))
+	data, err := c.Get(ctx, "/api/v1/roles/"+url.PathEscape(name))
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (c *Client) GetRole(ctx context.Context, name string) (*Role, error) {
 // ListRoles returns every role (admin/audit see all). Built-in roles
 // are included; check Role.BuiltIn before attempting to modify.
 func (c *Client) ListRoles(ctx context.Context) ([]Role, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/roles")
+	data, err := c.Get(ctx, "/api/v1/roles")
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (c *Client) UpdateRole(ctx context.Context, name string, req UpdateRoleRequ
 	if err != nil {
 		return nil, fmt.Errorf("marshal update role: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/roles/"+url.PathEscape(name), body)
+	data, err := c.Patch(ctx, "/api/v1/roles/"+url.PathEscape(name), body)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (c *Client) UpdateRole(ctx context.Context, name string, req UpdateRoleRequ
 // DeleteRole removes a custom role. Built-in roles cannot be deleted.
 // Existing role_assignments for the role are also removed.
 func (c *Client) DeleteRole(ctx context.Context, name string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/roles/"+url.PathEscape(name))
+	return c.Delete(ctx, "/api/v1/roles/"+url.PathEscape(name))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────
@@ -505,7 +505,7 @@ func parseRoleReach(body []byte) (*RoleReach, error) {
 // through the platform path on every workspace, so a label-reach figure for
 // them would be true and deeply misleading.
 func (c *Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/roles/"+url.PathEscape(name)+"/preview"+opts.query())
+	data, err := c.Get(ctx, "/api/v1/roles/"+url.PathEscape(name)+"/preview"+opts.query())
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +528,7 @@ func (c *Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequ
 	if err != nil {
 		return nil, err
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/roles/preview"+opts.query(), body)
+	data, err := c.Post(ctx, "/api/v1/roles/preview"+opts.query(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +582,7 @@ type resourceAccessEnvelope struct {
 // "registry-modules", "registry-providers" or "catalog-items". Roles are few,
 // so this is unpaged by design.
 func (c *Client) GetResourceAccess(ctx context.Context, kind, id string) (*ResourceAccess, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/"+url.PathEscape(kind)+"/"+url.PathEscape(id)+"/access")
+	data, err := c.Get(ctx, "/api/v1/"+url.PathEscape(kind)+"/"+url.PathEscape(id)+"/access")
 	if err != nil {
 		return nil, err
 	}

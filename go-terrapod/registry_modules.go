@@ -76,7 +76,7 @@ func (c *Client) CreateRegistryModule(ctx context.Context, req CreateRegistryMod
 	if err != nil {
 		return nil, fmt.Errorf("marshal create registry-module: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/registry-modules", body)
+	data, err := c.Post(ctx, "/api/v1/registry-modules", body)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (c *Client) GetRegistryModule(ctx context.Context, name, providerName strin
 // server's JSON:API list through the same per-resource projector the
 // single-resource Get uses.
 func (c *Client) ListRegistryModules(ctx context.Context) ([]RegistryModule, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/registry-modules")
+	data, err := c.Get(ctx, "/api/v1/registry-modules")
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (c *Client) ListRegistryModules(ctx context.Context) ([]RegistryModule, err
 // interface extraction is disabled for the module or the version is
 // unknown.
 func (c *Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error) {
-	path := fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s/%s/interface",
+	path := fmt.Sprintf("/api/v1/registry-modules/private/default/%s/%s/%s/interface",
 		url.PathEscape(name), url.PathEscape(provider), url.PathEscape(version))
 	data, err := c.Get(ctx, path)
 	if err != nil {
@@ -167,7 +167,7 @@ func (c *Client) DeleteRegistryModule(ctx context.Context, name, providerName st
 // ── Internal helpers ─────────────────────────────────────────────────
 
 func registryModulePath(name, provider string) string {
-	return fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s",
+	return fmt.Sprintf("/api/v1/registry-modules/private/default/%s/%s",
 		url.PathEscape(name), url.PathEscape(provider))
 }
 

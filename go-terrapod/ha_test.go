@@ -12,9 +12,9 @@ func newHAFixture(t *testing.T, statusBody string) *Client {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch r.URL.Path {
-		case "/api/terrapod/v1/ha/status":
+		case "/api/v1/ha/status":
 			_, _ = w.Write([]byte(statusBody))
-		case "/api/terrapod/v1/ha/whoami":
+		case "/api/v1/ha/whoami":
 			_, _ = w.Write([]byte(`{"data":{"id":"node-a","type":"ha-nodes",
 			  "attributes":{"node-id":"node-a","role":"leader"}}}`))
 		default:

@@ -33,14 +33,6 @@ import (
 // root", so an emptiness check would read a configure-capable workspace as
 // having none.
 //
-// # Paths use the canonical /api/v1 prefix with no legacy fallback
-//
-// Other resources here address /api/terrapod/v1 because they predate the
-// canonical native prefix and a lagging server may serve only the alias. These
-// endpoints do not exist on any release, so a server old enough to want the
-// alias would answer 404 under either spelling -- a fallback would be code that
-// can never succeed.
-//
 // # A variable's value is a string, and a richer shape says so
 //
 // `Value` is a string and `Structured` says whether to read it as a literal

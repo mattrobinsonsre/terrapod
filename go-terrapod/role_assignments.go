@@ -25,7 +25,7 @@ type RoleAssignment struct {
 // ListRoleAssignments returns every assignment visible to the
 // caller. Admin/audit see everything.
 func (c *Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/role-assignments")
+	data, err := c.Get(ctx, "/api/v1/role-assignments")
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (c *Client) SetRolesForIdentityPinned(ctx context.Context, providerName, em
 	if err != nil {
 		return fmt.Errorf("marshal role assignment PUT: %w", err)
 	}
-	_, err = c.Put(ctx, "/api/terrapod/v1/role-assignments", body)
+	_, err = c.Put(ctx, "/api/v1/role-assignments", body)
 	return err
 }
 
@@ -142,7 +142,7 @@ func (c *Client) AddRoleToIdentity(ctx context.Context, providerName, email, rol
 // binding. Uses the direct DELETE endpoint — cheaper than the
 // read-modify-write SetRoles path.
 func (c *Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error {
-	path := fmt.Sprintf("/api/terrapod/v1/role-assignments/%s/%s/%s",
+	path := fmt.Sprintf("/api/v1/role-assignments/%s/%s/%s",
 		url.PathEscape(providerName), url.PathEscape(email), url.PathEscape(roleName))
 	return c.Delete(ctx, path)
 }

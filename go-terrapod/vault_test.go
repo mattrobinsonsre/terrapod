@@ -39,7 +39,7 @@ func vaultFixture(t *testing.T, handler http.HandlerFunc) *Client {
 
 func TestGetVaultStatus(t *testing.T) {
 	c := vaultFixture(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/terrapod/v1/admin/vault" || r.Method != http.MethodGet {
+		if r.URL.Path != "/api/v1/admin/vault" || r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -141,7 +141,7 @@ func TestCheckWorkspaceVaultReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	if gotPath != "/api/terrapod/v1/workspaces/ws-abc/vault-reference-checks" {
+	if gotPath != "/api/v1/workspaces/ws-abc/vault-reference-checks" {
 		t.Fatalf("path = %s", gotPath)
 	}
 	attrs := gotBody["data"].(map[string]any)["attributes"].(map[string]any)
@@ -174,7 +174,7 @@ func TestCheckVariableSetVaultReferenceByVariable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotPath != "/api/terrapod/v1/varsets/varset-9/vault-reference-checks" {
+	if gotPath != "/api/v1/varsets/varset-9/vault-reference-checks" {
 		t.Fatalf("path = %s", gotPath)
 	}
 	if !strings.Contains(gotRaw, `"variable-id":"var-123"`) || strings.Contains(gotRaw, `"reference":`) {

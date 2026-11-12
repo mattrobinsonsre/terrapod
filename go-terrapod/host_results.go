@@ -18,10 +18,6 @@ import (
 // by the inventory and is what a list view shows, while the events are the
 // failures somebody drills into.
 //
-// # Paths use the canonical /api/v1 prefix with no legacy fallback
-//
-// These endpoints exist on no release, so a fallback to /api/terrapod/v1 is
-// code that can never succeed.
 //
 // # Two things these types record that a reader must not re-derive
 //

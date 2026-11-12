@@ -20,18 +20,18 @@ func newHookFixture(t *testing.T) (*Client, *[]byte) {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/execution-hooks":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/execution-hooks":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"hook-aaa","type":"execution-hooks","attributes":{
 			  "name":"hosts","description":"add hosts entry","hook-point":"pre_init","script":"echo hi",
 			  "enabled":true,"priority":5,"workspace-count":0
 			}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/execution-hooks":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/execution-hooks":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"id":"hook-aaa","type":"execution-hooks","attributes":{"name":"hosts","hook-point":"pre_init"}},
 			  {"id":"hook-bbb","type":"execution-hooks","attributes":{"name":"notify","hook-point":"post_apply"}}
 			]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/execution-hooks/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/execution-hooks/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"hook-aaa","type":"execution-hooks","attributes":{"name":"hosts","hook-point":"pre_init"},
 			  "relationships":{"workspaces":{"data":[{"id":"ws-app","type":"workspaces"},{"id":"ws-api","type":"workspaces"}]}}
 			}}`))

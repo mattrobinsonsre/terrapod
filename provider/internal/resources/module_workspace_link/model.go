@@ -3,9 +3,9 @@
 // API Contract (Terrapod API <-> Terraform Provider):
 //
 //	JSON:API type: "workspace-links"
-//	Create: POST   /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/workspace-links
-//	List:   GET    /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/workspace-links
-//	Delete: DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/workspace-links/{id}
+//	Create: POST   /api/v1/registry-modules/private/default/{name}/{provider}/workspace-links
+//	List:   GET    /api/v1/registry-modules/private/default/{name}/{provider}/workspace-links
+//	Delete: DELETE /api/v1/registry-modules/private/default/{name}/{provider}/workspace-links/{id}
 //	No update -- immutable resource (delete + recreate).
 //
 // Attribute mapping:

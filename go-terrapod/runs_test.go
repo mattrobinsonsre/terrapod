@@ -94,15 +94,15 @@ func newRunsFixture(t *testing.T) *Client {
 		case r.Method == http.MethodGet && strings.Contains(p, "/api/v2/runs/"):
 			_, _ = w.Write([]byte(runPayload("run-aaaa")))
 
-		// Retry is a Terrapod extension: /api/terrapod/v1, not /api/v2, and it
+		// Retry is a Terrapod extension: /api/v1, not /api/v2, and it
 		// answers with the NEW run.
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-nohosts/actions/retry":
+		case r.Method == http.MethodPost && p == "/api/v1/runs/run-nohosts/actions/retry":
 			http.Error(w, `{"errors":[{"status":"422","title":"Unprocessable Entity","detail":"run-nohosts has no outstanding hosts, so there is nothing to retry."}]}`, http.StatusUnprocessableEntity)
 			return
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-busy/actions/retry":
+		case r.Method == http.MethodPost && p == "/api/v1/runs/run-busy/actions/retry":
 			http.Error(w, `{"errors":[{"status":"409","title":"Conflict","detail":"Cannot retry run in non-terminal state 'planning'"}]}`, http.StatusConflict)
 			return
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-aaaa/actions/retry":
+		case r.Method == http.MethodPost && p == "/api/v1/runs/run-aaaa/actions/retry":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(runPayload("run-bbbb")))
 		case r.Method == http.MethodPost && strings.HasSuffix(p, "/actions/apply"):
@@ -436,7 +436,7 @@ func TestRetryRunOutstandingHostsSendsTheFlagAndReturnsTheNewRun(t *testing.T) {
 	if run.ID != "run-bbbb" {
 		t.Errorf("got %q, want the new run run-bbbb", run.ID)
 	}
-	if gotPath != "/api/terrapod/v1/runs/run-aaaa/actions/retry" {
+	if gotPath != "/api/v1/runs/run-aaaa/actions/retry" {
 		t.Errorf("posted to %q", gotPath)
 	}
 	var sent map[string]any

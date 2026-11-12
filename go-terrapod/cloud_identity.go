@@ -86,7 +86,7 @@ type OIDCAudienceDefaults struct {
 // Audiences is empty when the deployment configures no catalogue, which is the
 // default and is not an error.
 func (c *Client) GetOIDCAudienceDefaults(ctx context.Context) (*OIDCAudienceDefaults, error) {
-	body, err := c.Get(ctx, "/api/terrapod/v1/oidc/audience-defaults")
+	body, err := c.Get(ctx, "/api/v1/oidc/audience-defaults")
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (c *Client) GetOIDCAudienceDefaults(ctx context.Context) (*OIDCAudienceDefa
 //
 // Requires platform admin.
 func (c *Client) ListOIDCSigningKeys(ctx context.Context) (*OIDCSigningKeySet, error) {
-	body, err := c.Get(ctx, "/api/terrapod/v1/oidc/signing-keys")
+	body, err := c.Get(ctx, "/api/v1/oidc/signing-keys")
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (c *Client) ListOIDCSigningKeys(ctx context.Context) (*OIDCSigningKeySet, e
 // with an operator-supplied key — there is nothing for Terrapod to rotate, and
 // replacing it is the operator's own key management.
 func (c *Client) RotateOIDCSigningKey(ctx context.Context) (*OIDCSigningKeyRotation, error) {
-	body, err := c.Post(ctx, "/api/terrapod/v1/oidc/signing-keys/actions/rotate", nil)
+	body, err := c.Post(ctx, "/api/v1/oidc/signing-keys/actions/rotate", nil)
 	if err != nil {
 		return nil, err
 	}

@@ -20,17 +20,17 @@ func newUserFixture(t *testing.T) (*Client, *[]byte) {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/users":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/users":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"alice@example.com","type":"users","attributes":{
 			  "email":"alice@example.com","display-name":"Alice","is-active":true,"has-password":true
 			}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/users":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/users":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"id":"alice@example.com","type":"users","attributes":{"email":"alice@example.com"}},
 			  {"id":"bob@example.com","type":"users","attributes":{"email":"bob@example.com","is-active":false}}
 			]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/users/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/users/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"alice@example.com","type":"users","attributes":{"email":"alice@example.com","display-name":"Alice"}}}`))
 		case r.Method == http.MethodPatch:
 			_, _ = w.Write([]byte(`{"data":{"id":"alice@example.com","type":"users","attributes":{"email":"alice@example.com","display-name":"Alice Cooper","is-active":false}}}`))

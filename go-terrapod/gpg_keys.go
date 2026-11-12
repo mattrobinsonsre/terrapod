@@ -50,7 +50,7 @@ func (c *Client) CreateGPGKey(ctx context.Context, req CreateGPGKeyRequest) (*GP
 	if err != nil {
 		return nil, fmt.Errorf("marshal create gpg-key: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/gpg-keys", body)
+	data, err := c.Post(ctx, "/api/v1/gpg-keys", body)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (c *Client) CreateGPGKey(ctx context.Context, req CreateGPGKeyRequest) (*GP
 
 // GetGPGKey reads a GPG key by id.
 func (c *Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/gpg-keys/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/gpg-keys/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (c *Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error) {
 
 // ListGPGKeys returns every registered key.
 func (c *Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/gpg-keys")
+	data, err := c.Get(ctx, "/api/v1/gpg-keys")
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error) {
 // DeleteGPGKey removes a key. Providers signed by the key can still
 // be served from cache; new uploads can no longer reference the key.
 func (c *Client) DeleteGPGKey(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/gpg-keys/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/gpg-keys/"+url.PathEscape(id))
 }
 
 // RevokeGPGKey applies an owner-issued revocation certificate to a
@@ -100,7 +100,7 @@ func (c *Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate str
 	if err != nil {
 		return nil, fmt.Errorf("marshal revoke gpg-key: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/gpg-keys/"+url.PathEscape(id)+"/revoke", body)
+	data, err := c.Post(ctx, "/api/v1/gpg-keys/"+url.PathEscape(id)+"/revoke", body)
 	if err != nil {
 		return nil, err
 	}

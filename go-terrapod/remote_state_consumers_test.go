@@ -25,7 +25,7 @@ func newRSCFixture(t *testing.T) *Client {
 			  "producer":{"data":{"id":"ws-prod","type":"workspaces"}},
 			  "consumer":{"data":{"id":"ws-app","type":"workspaces"}}
 			}}}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/remote-state-consumers/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/remote-state-consumers/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"rsc-aaa","type":"remote-state-consumers","relationships":{
 			  "producer":{"data":{"id":"ws-prod","type":"workspaces"}},
 			  "consumer":{"data":{"id":"ws-app","type":"workspaces"}}

@@ -827,7 +827,7 @@ func (c *Client) UpdateWorkspace(ctx context.Context, id string, req UpdateWorks
 // Returns nil on success, *NotFoundError if the workspace doesn't
 // exist (treated as success by most callers — idempotent delete).
 func (c *Client) DeleteWorkspace(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/workspaces/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/workspaces/"+url.PathEscape(id))
 }
 
 // ListWorkspaces returns one page of workspaces. The caller drives

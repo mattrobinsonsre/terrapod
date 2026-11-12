@@ -4,9 +4,9 @@
 //
 //	JSON:API type: "vcs-connections"
 //	ID prefix: "vcs-"
-//	Create:  POST   /api/terrapod/v1/vcs-connections
-//	Read:    GET    /api/terrapod/v1/vcs-connections/{id}
-//	Delete:  DELETE /api/terrapod/v1/vcs-connections/{id}
+//	Create:  POST   /api/v1/vcs-connections
+//	Read:    GET    /api/v1/vcs-connections/{id}
+//	Delete:  DELETE /api/v1/vcs-connections/{id}
 //
 // Everything that identifies the connection or authenticates it is immutable
 // from the Terraform side — changing it forces replacement. The Terrapod API
@@ -15,7 +15,7 @@
 // Terraform plans is messy. The go-terrapod SDK exposes the PATCH path for
 // direct callers (CLI tooling, migration tool).
 //
-// Update:  PATCH  /api/terrapod/v1/vcs-connections/{id}
+// Update:  PATCH  /api/v1/vcs-connections/{id}
 //
 // The exception, and it is deliberate: owner_email, labels and
 // allowed_repositories update in place (GHSA-v8g7-pqrj-8mcm). Replacement is

@@ -54,7 +54,7 @@ func (c *Client) CreateNotificationConfiguration(ctx context.Context, workspaceI
 		return nil, fmt.Errorf("marshal create notification-config: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/notification-configurations", url.PathEscape(workspaceID)),
+		fmt.Sprintf("/api/v1/workspaces/%s/notification-configurations", url.PathEscape(workspaceID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func (c *Client) CreateNotificationConfiguration(ctx context.Context, workspaceI
 
 // GetNotificationConfiguration reads a config by id.
 func (c *Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/notification-configurations/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/notification-configurations/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (c *Client) GetNotificationConfiguration(ctx context.Context, id string) (*
 // ListNotificationConfigurations returns all configs for a workspace.
 func (c *Client) ListNotificationConfigurations(ctx context.Context, workspaceID string) ([]NotificationConfiguration, error) {
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/notification-configurations", url.PathEscape(workspaceID)))
+		fmt.Sprintf("/api/v1/workspaces/%s/notification-configurations", url.PathEscape(workspaceID)))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (c *Client) UpdateNotificationConfiguration(ctx context.Context, id string,
 	if err != nil {
 		return nil, fmt.Errorf("marshal update notification-config: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/notification-configurations/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/notification-configurations/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (c *Client) UpdateNotificationConfiguration(ctx context.Context, id string,
 
 // DeleteNotificationConfiguration removes a config.
 func (c *Client) DeleteNotificationConfiguration(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/notification-configurations/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/notification-configurations/"+url.PathEscape(id))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

@@ -29,7 +29,7 @@ const stateGraphBody = `{"data":{"id":"state-graph","type":"state-graphs","attri
 
 func TestGetStateGraph(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/terrapod/v1/workspaces/ws-abc/state-graph" {
+		if r.URL.Path != "/api/v1/workspaces/ws-abc/state-graph" {
 			http.Error(w, "unexpected path", http.StatusNotFound)
 			return
 		}

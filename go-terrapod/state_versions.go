@@ -116,7 +116,7 @@ func (c *Client) CreateAndUploadState(ctx context.Context, workspaceID string, r
 // is the Terrapod-native management endpoint, not the TFE V2 surface.
 func (c *Client) DeleteStateVersion(ctx context.Context, stateVersionID string) error {
 	return c.Delete(ctx,
-		fmt.Sprintf("/api/terrapod/v1/state-versions/%s/manage", url.PathEscape(stateVersionID)))
+		fmt.Sprintf("/api/v1/state-versions/%s/manage", url.PathEscape(stateVersionID)))
 }
 
 // GetCurrentStateVersion reads the current state version for a

@@ -11,17 +11,17 @@ func newLabelsFixture(t *testing.T) *Client {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/api/terrapod/v1/labels":
+		case r.URL.Path == "/api/v1/labels":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"key":"env","value-count":2,"entity-counts":{"workspaces":5,"agent-pools":1}},
 			  {"key":"team","value-count":3,"entity-counts":{"workspaces":4}}
 			]}`))
-		case r.URL.Path == "/api/terrapod/v1/labels/env":
+		case r.URL.Path == "/api/v1/labels/env":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"value":"prod","entity-counts":{"workspaces":3}},
 			  {"value":"dev","entity-counts":{"workspaces":2}}
 			]}`))
-		case strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/labels/env/"):
+		case strings.HasPrefix(r.URL.Path, "/api/v1/labels/env/"):
 			_, _ = w.Write([]byte(`{"data":{
 			  "workspaces":[{"type":"workspaces","id":"ws-1","name":"prod-net","labels":{"env":"prod"}}],
 			  "agent-pools":[]

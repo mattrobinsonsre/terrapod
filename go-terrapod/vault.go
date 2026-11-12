@@ -73,7 +73,7 @@ type VaultResolutionError struct {
 //
 // Requires platform admin or audit.
 func (c *Client) GetVaultStatus(ctx context.Context) (*VaultStatus, error) {
-	body, err := c.Get(ctx, "/api/terrapod/v1/admin/vault")
+	body, err := c.Get(ctx, "/api/v1/admin/vault")
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (c *Client) CheckWorkspaceVaultReference(
 	ctx context.Context, workspaceID string, opts VaultReferenceCheckOptions,
 ) (*VaultReferenceCheck, error) {
 	return c.checkVaultReference(ctx,
-		"/api/terrapod/v1/workspaces/"+url.PathEscape(AddPrefix(workspaceID, "ws-"))+"/vault-reference-checks", opts)
+		"/api/v1/workspaces/"+url.PathEscape(AddPrefix(workspaceID, "ws-"))+"/vault-reference-checks", opts)
 }
 
 // CheckVariableSetVaultReference checks a Vault reference for a variable set.
@@ -170,7 +170,7 @@ func (c *Client) CheckVariableSetVaultReference(
 	ctx context.Context, varsetID string, opts VaultReferenceCheckOptions,
 ) (*VaultReferenceCheck, error) {
 	return c.checkVaultReference(ctx,
-		"/api/terrapod/v1/varsets/"+url.PathEscape(AddPrefix(varsetID, "varset-"))+"/vault-reference-checks", opts)
+		"/api/v1/varsets/"+url.PathEscape(AddPrefix(varsetID, "varset-"))+"/vault-reference-checks", opts)
 }
 
 func (c *Client) checkVaultReference(

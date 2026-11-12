@@ -50,7 +50,7 @@ func (c *Client) CreateRunTask(ctx context.Context, workspaceID string, req Crea
 		return nil, fmt.Errorf("marshal create run-task: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-tasks", url.PathEscape(workspaceID)),
+		fmt.Sprintf("/api/v1/workspaces/%s/run-tasks", url.PathEscape(workspaceID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (c *Client) CreateRunTask(ctx context.Context, workspaceID string, req Crea
 
 // GetRunTask reads a run task by id.
 func (c *Client) GetRunTask(ctx context.Context, id string) (*RunTask, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/run-tasks/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/run-tasks/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (c *Client) GetRunTask(ctx context.Context, id string) (*RunTask, error) {
 // ListRunTasks returns every run task on a workspace.
 func (c *Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error) {
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-tasks", url.PathEscape(workspaceID)))
+		fmt.Sprintf("/api/v1/workspaces/%s/run-tasks", url.PathEscape(workspaceID)))
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (c *Client) UpdateRunTask(ctx context.Context, id string, req UpdateRunTask
 	if err != nil {
 		return nil, fmt.Errorf("marshal update run-task: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/run-tasks/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/run-tasks/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (c *Client) UpdateRunTask(ctx context.Context, id string, req UpdateRunTask
 
 // DeleteRunTask removes a run task.
 func (c *Client) DeleteRunTask(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/run-tasks/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/run-tasks/"+url.PathEscape(id))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

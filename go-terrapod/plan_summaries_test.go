@@ -40,8 +40,8 @@ func newPlanSummaryFixture(t *testing.T) *Client {
 			    "run":{"data":{"id":"run-22222222-2222-2222-2222-222222222222","type":"runs"}}
 			  }}}`))
 
-		// POST /api/terrapod/v1/runs/{id}/plan-summary/regenerate
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-conflict/plan-summary/regenerate":
+		// POST /api/v1/runs/{id}/plan-summary/regenerate
+		case r.Method == http.MethodPost && p == "/api/v1/runs/run-conflict/plan-summary/regenerate":
 			http.Error(w, `{"errors":[{"status":"409","title":"Conflict","detail":"Run has no summarisable output yet"}]}`, http.StatusConflict)
 		case r.Method == http.MethodPost && strings.HasSuffix(p, "/plan-summary/regenerate"):
 			w.WriteHeader(http.StatusCreated)
@@ -49,8 +49,8 @@ func newPlanSummaryFixture(t *testing.T) *Client {
 			  "type":"plan-summaries","attributes":{"kind":"plan_summary","status":"pending"},
 			  "relationships":{"run":{"data":{"id":"run-22222222-2222-2222-2222-222222222222","type":"runs"}}}}}`))
 
-		// POST /api/terrapod/v1/runs/{id}/plan-summary/messages
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-msgconflict/plan-summary/messages":
+		// POST /api/v1/runs/{id}/plan-summary/messages
+		case r.Method == http.MethodPost && p == "/api/v1/runs/run-msgconflict/plan-summary/messages":
 			http.Error(w, `{"errors":[{"status":"409","title":"Conflict","detail":"Initial summary not ready"}]}`, http.StatusConflict)
 		case r.Method == http.MethodPost && strings.HasSuffix(p, "/plan-summary/messages"):
 			// Assert the client forwarded the content attribute.
@@ -69,8 +69,8 @@ func newPlanSummaryFixture(t *testing.T) *Client {
 			  "role":"assistant","content":"Because its attached VPC changed.","model":"claude",
 			  "input-tokens":80,"output-tokens":25,"created-at":"2026-07-17T10:05:00Z"}}}`))
 
-		// GET /api/terrapod/v1/runs/{id}/plan-summary/messages
-		case r.Method == http.MethodGet && p == "/api/terrapod/v1/runs/run-empty/plan-summary/messages":
+		// GET /api/v1/runs/{id}/plan-summary/messages
+		case r.Method == http.MethodGet && p == "/api/v1/runs/run-empty/plan-summary/messages":
 			_, _ = w.Write([]byte(`{"data":[]}`))
 		case r.Method == http.MethodGet && strings.HasSuffix(p, "/plan-summary/messages"):
 			_, _ = w.Write([]byte(`{"data":[

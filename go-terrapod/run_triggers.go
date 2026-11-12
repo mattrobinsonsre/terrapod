@@ -48,7 +48,7 @@ func (c *Client) CreateRunTrigger(ctx context.Context, req CreateRunTriggerReque
 		return nil, fmt.Errorf("marshal create run-trigger: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-triggers", url.PathEscape(req.DestinationWorkspaceID)),
+		fmt.Sprintf("/api/v1/workspaces/%s/run-triggers", url.PathEscape(req.DestinationWorkspaceID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (c *Client) CreateRunTrigger(ctx context.Context, req CreateRunTriggerReque
 
 // GetRunTrigger reads a trigger by id.
 func (c *Client) GetRunTrigger(ctx context.Context, id string) (*RunTrigger, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/run-triggers/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/run-triggers/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (c *Client) GetRunTrigger(ctx context.Context, id string) (*RunTrigger, err
 // given workspace (i.e. "this workspace will run when X applies").
 func (c *Client) ListInboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error) {
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-triggers?filter[run-trigger][type]=inbound",
+		fmt.Sprintf("/api/v1/workspaces/%s/run-triggers?filter[run-trigger][type]=inbound",
 			url.PathEscape(workspaceID)))
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (c *Client) ListInboundRunTriggers(ctx context.Context, workspaceID string)
 // workspace (i.e. "applying this workspace will queue runs on X").
 func (c *Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error) {
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-triggers?filter[run-trigger][type]=outbound",
+		fmt.Sprintf("/api/v1/workspaces/%s/run-triggers?filter[run-trigger][type]=outbound",
 			url.PathEscape(workspaceID)))
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (c *Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string
 
 // DeleteRunTrigger removes a trigger by id. Idempotent on the server.
 func (c *Client) DeleteRunTrigger(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/run-triggers/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/run-triggers/"+url.PathEscape(id))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

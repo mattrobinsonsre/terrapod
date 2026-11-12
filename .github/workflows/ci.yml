@@ -466,6 +466,15 @@ jobs:
       - name: (docs-audit) every remote download retries
         run: python3 scripts/docs-audit/check_download_retries.py
 
+      # `/api/terrapod/v1` is sunset in v2.1.0, and `docs/deprecations.md` tells
+      # an operator the prefix is internal to the SDK, the provider and the MCP
+      # server -- a promise only we can keep. The SDK and provider moved to the
+      # canonical `/api/v1` in #2497; this is what stops the next method written
+      # by copying the one above it putting the alias back, which no contract
+      # snapshot can see.
+      - name: (docs-audit) no Go consumer addresses the deprecated native alias
+        run: python3 scripts/docs-audit/check_native_prefix.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:

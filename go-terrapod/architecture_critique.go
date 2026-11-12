@@ -90,7 +90,7 @@ func (c *Client) GetArchitectureCritique(
 	if len(id) < 3 || id[:3] != "ws-" {
 		id = "ws-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique")
+	data, err := c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique")
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (c *Client) RegenerateArchitectureCritique(
 	}
 	data, err := c.Post(
 		ctx,
-		"/api/terrapod/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique/regenerate",
+		"/api/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique/regenerate",
 		nil,
 	)
 	if err != nil {
@@ -189,7 +189,7 @@ func (c *Client) ListArchitectureCritiqueMessages(
 	if len(id) < 3 || id[:3] != "ws-" {
 		id = "ws-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique/messages")
+	data, err := c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique/messages")
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (c *Client) PostArchitectureCritiqueMessage(
 	if err != nil {
 		return nil, fmt.Errorf("marshal message: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique/messages", body)
+	data, err := c.Post(ctx, "/api/v1/workspaces/"+url.PathEscape(id)+"/architecture-critique/messages", body)
 	if err != nil {
 		return nil, err
 	}

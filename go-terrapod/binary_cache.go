@@ -60,7 +60,7 @@ func (c *Client) WarmCacheBulk(ctx context.Context, req BulkWarmRequest) (*BulkW
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.Post(ctx, "/api/terrapod/v1/admin/binary-cache/warm-bulk", payload)
+	body, err := c.Post(ctx, "/api/v1/admin/binary-cache/warm-bulk", payload)
 	if err != nil {
 		return nil, err
 	}

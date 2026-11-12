@@ -753,6 +753,13 @@ async def _fetch_vcs_config(
     cannot fetch for is a 422; a provider outage is somebody else's 5xx, not
     ours, and gets 502/504 with the marker header (#1358).
 
+    **An UNCLASSIFIED git failure is a 422, not a 502.** `_classify`'s default is
+    the base `GitError`, so a message nobody has listed lands on the last handler
+    here and claims nothing about whose fault it is. It used to default to
+    transient, which meant every unrecognised message -- a `vcs-ref` that does
+    not exist being the commonest -- was reported as the provider's outage,
+    carried the upstream marker, and was retried (#2493).
+
     That contract was stated here and INCOMPLETE, which is #2471. The two
     handlers below covered the provider's HTTP API; the git CLI raised a bare
     `RuntimeError`, which is neither, so a failed clone sailed past both into
@@ -777,6 +784,20 @@ async def _fetch_vcs_config(
         return await vcs_config_service.fetch_config_version(db, ws, ref_override=ref_override)
     except vcs_config_service.VCSConfigError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except git_fetch.GitRefNotFound as e:
+        # A property of the REQUEST, so it gets its own guidance rather than the
+        # generic refusal below: before #2493 a `vcs-ref` naming a SHA the remote
+        # does not have was reported as a provider outage, retried, and carried
+        # nothing telling the practitioner to fix the ref. Both readings of git's
+        # ambiguous wording are named, because we cannot tell them apart here.
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Could not fetch {repo}@{ref}: {e}. Check that the ref exists on "
+                "the remote, and -- if it is a commit SHA -- that the server allows "
+                "fetching unadvertised objects. Nothing was created."
+            ),
+        ) from e
     except (git_fetch.GitAccessDenied, git_fetch.GitUnsupported) as e:
         # A property of the connection, the repository or the server -- the
         # operator has something to change, and a retry would not help. The
@@ -796,6 +817,17 @@ async def _fetch_vcs_config(
             status_code=502,
             detail=f"Could not fetch {repo}@{ref}: {e}. Nothing was created — try again.",
             headers={UPSTREAM_FAILURE_HEADER: "vcs"},
+        ) from e
+    except git_fetch.GitError as e:
+        # LAST of the git handlers, because every class above subclasses this one.
+        # It is what `_classify` returns for a message it does not recognise, and
+        # the only honest thing to say about one is git's own words: 422 with no
+        # upstream marker, because asserting the provider failed is a claim about
+        # a third party we have not established, and 502 + "try again" is how a
+        # permanent failure came to be retried and misattributed (#2493).
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not fetch {repo}@{ref}: {e}. Nothing was created.",
         ) from e
     except httpx.HTTPError as e:
         raise vcs_unavailable(conn, repo, ref, e) from e

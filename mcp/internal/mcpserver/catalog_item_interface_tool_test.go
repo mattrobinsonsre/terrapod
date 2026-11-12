@@ -43,7 +43,7 @@ func TestCatalogItemInterfaceToolReturnsTheInterface(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("tool error: %s", resultText(t, res))
 	}
-	if path != "/api/terrapod/v1/catalog-items/ci-1/interface" {
+	if path != "/api/v1/catalog-items/ci-1/interface" {
 		t.Errorf("requested %s", path)
 	}
 	var out struct {

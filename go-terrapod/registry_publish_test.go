@@ -51,7 +51,7 @@ func TestUploadProviderSHASUMS(t *testing.T) {
 	if cap.method != http.MethodPut {
 		t.Errorf("method = %s", cap.method)
 	}
-	if cap.path != "/api/terrapod/v1/registry-providers/private/default/example/versions/1.0.0/shasums" {
+	if cap.path != "/api/v1/registry-providers/private/default/example/versions/1.0.0/shasums" {
 		t.Errorf("path = %s", cap.path)
 	}
 	if string(cap.body) != "sums" {
@@ -64,7 +64,7 @@ func TestUploadProviderSignaturePath(t *testing.T) {
 	if err := c.UploadProviderSignature(t.Context(), "example", "1.0.0", []byte("sig")); err != nil {
 		t.Fatal(err)
 	}
-	if cap.path != "/api/terrapod/v1/registry-providers/private/default/example/versions/1.0.0/shasums.sig" {
+	if cap.path != "/api/v1/registry-providers/private/default/example/versions/1.0.0/shasums.sig" {
 		t.Errorf("path = %s", cap.path)
 	}
 }
@@ -83,7 +83,7 @@ func TestUploadProviderPlatform(t *testing.T) {
 	if err := c.UploadProviderPlatform(t.Context(), "example", "1.0.0", "linux", "arm64", zip); err != nil {
 		t.Fatal(err)
 	}
-	if cap.path != "/api/terrapod/v1/registry-providers/private/default/example/versions/1.0.0/platforms/linux/arm64" {
+	if cap.path != "/api/v1/registry-providers/private/default/example/versions/1.0.0/platforms/linux/arm64" {
 		t.Errorf("path = %s", cap.path)
 	}
 	if string(cap.body) != string(zip) {
@@ -104,7 +104,7 @@ func TestUploadModuleVersion(t *testing.T) {
 	if err := c.UploadModuleVersion(t.Context(), "vpc", "aws", "1.2.3", []byte("targz")); err != nil {
 		t.Fatal(err)
 	}
-	if cap.path != "/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions/1.2.3/upload" {
+	if cap.path != "/api/v1/registry-modules/private/default/vpc/aws/versions/1.2.3/upload" {
 		t.Errorf("path = %s", cap.path)
 	}
 	if string(cap.body) != "targz" {

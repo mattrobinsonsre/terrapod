@@ -7,7 +7,7 @@
 //
 // API Contract (Terrapod API <-> Terraform Provider), via go-terrapod:
 //
-//	GET /api/terrapod/v1/module-autodiscovery-rules/{id}/repositories[?filter[status]=…]
+//	GET /api/v1/module-autodiscovery-rules/{id}/repositories[?filter[status]=…]
 //	JSON:API type: "module-autodiscovery-rule-repositories", ID "modrepo-<uuid>"
 package module_autodiscovery_rule_repositories
 

@@ -32,7 +32,13 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 	fs := &rollbackFakeServer{currentSerial: currentSerial}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// A 2.0 server serves both surfaces; this fixture answers the legacy
-		// spellings, so recognise a native request rather than 404 it.
+		// spellings, so recognise a native request rather than 404 it. EVERY arm
+		// below is therefore written in the post-fold spelling -- `/api/v2/...`
+		// even for a route that only exists natively, because the fold has
+		// already rewritten it. The native arms used to be spelled
+		// `/api/terrapod/v1/...`, which the fold does not match, so they were
+		// reached unfolded; that stopped being true when the SDK moved to the
+		// canonical prefix (#2497).
 		r.URL.Path = legacySpellingOf(r.URL.Path)
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
@@ -49,8 +55,8 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 			}
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprintf(w, `{"data":{"id":"sv-x","type":"state-versions","attributes":{"serial":%d,"lineage":"lin","state-size":10}}}`, serial)
-		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/workspaces/"):
-			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/workspaces/")
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/v2/workspaces/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/v2/workspaces/")
 			fs.mu.Lock()
 			fs.deleted = append(fs.deleted, id)
 			fs.mu.Unlock()
@@ -61,26 +67,26 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 			fs.deletedVarsets = append(fs.deletedVarsets, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
-		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/run-triggers/"):
-			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/run-triggers/")
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/v2/run-triggers/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/v2/run-triggers/")
 			fs.mu.Lock()
 			fs.deletedRunTriggers = append(fs.deletedRunTriggers, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
-		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/notification-configurations/"):
-			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/notification-configurations/")
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/v2/notification-configurations/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/v2/notification-configurations/")
 			fs.mu.Lock()
 			fs.deletedNotifications = append(fs.deletedNotifications, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
-		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/agent-pools/"):
-			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/agent-pools/")
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/v2/agent-pools/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/v2/agent-pools/")
 			fs.mu.Lock()
 			fs.deletedAgentPools = append(fs.deletedAgentPools, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
-		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/gpg-keys/"):
-			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/gpg-keys/")
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/v2/gpg-keys/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/v2/gpg-keys/")
 			fs.mu.Lock()
 			fs.deletedGPGKeys = append(fs.deletedGPGKeys, id)
 			fs.mu.Unlock()

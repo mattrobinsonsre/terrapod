@@ -30,7 +30,7 @@ func newNotifFixture(t *testing.T) (*Client, *[]byte) {
 			_, _ = w.Write([]byte(`{"data":[
 			  {"id":"nc-aaa","type":"notification-configurations","attributes":{"name":"slack-prod","destination-type":"slack","enabled":true}}
 			]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/notification-configurations/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/notification-configurations/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"nc-aaa","type":"notification-configurations","attributes":{"name":"slack-prod","destination-type":"slack","enabled":true,"has-token":true}}}`))
 		case r.Method == http.MethodPatch:
 			_, _ = w.Write([]byte(`{"data":{"id":"nc-aaa","type":"notification-configurations","attributes":{"name":"slack-prod","destination-type":"slack","enabled":false}}}`))

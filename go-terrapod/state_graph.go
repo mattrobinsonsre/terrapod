@@ -63,7 +63,7 @@ type StateGraphMeta struct {
 // stateVersionID for the current (highest-serial) version, or "sv-<uuid>" to
 // render an older one. Requires state:read on the workspace.
 func (c *Client) GetStateGraph(ctx context.Context, workspaceID, stateVersionID string) (*StateGraph, error) {
-	path := fmt.Sprintf("/api/terrapod/v1/workspaces/%s/state-graph", url.PathEscape(workspaceID))
+	path := fmt.Sprintf("/api/v1/workspaces/%s/state-graph", url.PathEscape(workspaceID))
 	if stateVersionID != "" {
 		path += "?state_version=" + url.QueryEscape(stateVersionID)
 	}

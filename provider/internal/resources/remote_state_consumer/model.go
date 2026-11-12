@@ -8,9 +8,9 @@
 //
 //	JSON:API type: "remote-state-consumers"
 //	ID prefix: "rsc-"
-//	Create:  POST   /api/terrapod/v1/workspaces/{producer_id}/remote-state-consumers
-//	Read:    GET    /api/terrapod/v1/remote-state-consumers/{id}
-//	Delete:  DELETE /api/terrapod/v1/remote-state-consumers/{id}
+//	Create:  POST   /api/v1/workspaces/{producer_id}/remote-state-consumers
+//	Read:    GET    /api/v1/remote-state-consumers/{id}
+//	Delete:  DELETE /api/v1/remote-state-consumers/{id}
 //	No update — immutable resource (delete + recreate).
 //
 // Use this standalone resource when the producer workspace and the

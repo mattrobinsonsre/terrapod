@@ -86,7 +86,7 @@ func TestDeletedWorkspaceListToolReturnsTheMarkers(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("tool reported an error: %s", resultText(t, res))
 	}
-	if !strings.Contains(gotPath, "/api/terrapod/v1/deleted-workspaces") {
+	if !strings.Contains(gotPath, "/api/v1/deleted-workspaces") {
 		t.Errorf("tool hit the wrong endpoint: %q", gotPath)
 	}
 

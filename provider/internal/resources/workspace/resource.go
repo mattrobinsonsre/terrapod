@@ -1471,7 +1471,7 @@ func (r *workspaceResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	// go-terrapod handles the Terrapod-native path (/api/terrapod/v1/
+	// go-terrapod handles the Terrapod-native path (/api/v1/
 	// rather than /api/v2/, which returns 405 — see #353). The 404-on-
 	// idempotent-delete is unwrapped to match the original behaviour.
 	err := r.tc.DeleteWorkspace(ctx, state.ID.ValueString())
@@ -2413,7 +2413,7 @@ func putRemoteStateConsumers(ctx context.Context, c *terrapod.Client, workspaceI
 	if err != nil {
 		return err
 	}
-	_, err = c.Put(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers", workspaceID), body)
+	_, err = c.Put(ctx, fmt.Sprintf("/api/v1/workspaces/%s/remote-state-consumers", workspaceID), body)
 	return err
 }
 
@@ -2422,7 +2422,7 @@ func putRemoteStateConsumers(ctx context.Context, c *terrapod.Client, workspaceI
 // Set is returned on error (caller decides whether to surface it).
 func readRemoteStateConsumers(ctx context.Context, c *terrapod.Client, workspaceID string) (types.Set, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	url := fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers?filter[remote-state-consumer][type]=outbound", workspaceID)
+	url := fmt.Sprintf("/api/v1/workspaces/%s/remote-state-consumers?filter[remote-state-consumer][type]=outbound", workspaceID)
 	data, err := c.Get(ctx, url)
 	if err != nil {
 		diags.AddError("Failed to read remote_state_consumers", err.Error())

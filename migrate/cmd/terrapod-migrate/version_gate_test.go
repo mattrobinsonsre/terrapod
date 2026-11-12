@@ -58,16 +58,31 @@ func TestCheckAPIVersion(t *testing.T) {
 		allow      bool
 		wantRefuse bool
 	}{
+		// Every version at or above terrapod.MinimumAPIVersion, except where a
+		// row is about the floor itself. They used to be v1.2.0-v1.4.0, which
+		// the SDK can no longer address at all, so each "compatible" row would
+		// have been refused by the floor and each refusal row would have passed
+		// for a reason other than its name (#2497).
+
 		// The happy path, and the reason a source build still runs.
-		{"compatible api runs", "v1.3.0", "v1.3.0", false, false},
-		{"newer api is compatible", "v1.3.0", "v1.4.0", false, false},
-		{"dev build skips the gate", "dev", "v1.3.0", false, false},
+		{"compatible api runs", "v2.0.0", "v2.0.0", false, false},
+		{"newer api is compatible", "v2.0.0", "v2.1.0", false, false},
+		{"dev build skips the gate", "dev", "v2.0.0", false, false},
 
 		// A real mismatch is refused by default and allowed by the flag.
-		{"older api refused", "v1.3.0", "v1.2.0", false, true},
-		{"older api allowed by flag", "v1.3.0", "v1.2.0", true, false},
-		{"major mismatch refused", "v1.3.0", "v2.0.0", false, true},
-		{"major mismatch allowed by flag", "v1.3.0", "v2.0.0", true, false},
+		{"older api refused", "v1.11.0", "v1.9.0", false, true},
+		{"older api allowed by flag", "v1.11.0", "v1.9.0", true, false},
+		{"major mismatch refused", "v1.11.0", "v2.0.0", false, true},
+		{"major mismatch allowed by flag", "v1.11.0", "v2.0.0", true, false},
+
+		// The floor, which matters most HERE of anywhere: this gate refuses
+		// rather than warning, so an operator pointing terrapod-migrate at a
+		// pre-1.7.0 Terrapod is stopped before it writes anything, instead of
+		// discovering it as a 404 part-way through a migration. The pair is
+		// internally consistent -- same major, API not older than the SDK -- so
+		// only the floor can refuse it.
+		{"api below the SDK's floor refused", "v1.6.0", "v1.6.0", false, true},
+		{"api below the floor allowed by flag", "v1.6.0", "v1.6.0", true, false},
 
 		// A target too old to report its version can't be verified, so it
 		// gets the same treatment rather than a silent pass.

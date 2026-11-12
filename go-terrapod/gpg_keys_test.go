@@ -29,16 +29,16 @@ func newGPGFixture(t *testing.T) (*Client, *[]byte) {
 				return
 			}
 			_, _ = w.Write([]byte(`{"data":{"id":"gpg-aaa","type":"gpg-keys","attributes":{"key-id":"ABC123","namespace":"default"}}}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/gpg-keys":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/gpg-keys":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"gpg-aaa","type":"gpg-keys","attributes":{
 			  "key-id":"ABC123","namespace":"default","source":"terrapod"
 			}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/gpg-keys":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/gpg-keys":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"id":"gpg-aaa","type":"gpg-keys","attributes":{"key-id":"ABC123"}}
 			]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/gpg-keys/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/gpg-keys/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"gpg-aaa","type":"gpg-keys","attributes":{"key-id":"ABC123","namespace":"default"}}}`))
 		case r.Method == http.MethodDelete:
 			w.WriteHeader(http.StatusNoContent)

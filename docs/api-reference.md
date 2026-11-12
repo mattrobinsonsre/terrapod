@@ -1490,6 +1490,8 @@ created`, and carries git's own message with the credential stripped:
 | Status | Cause |
 |---|---|
 | `422` | The credential cannot reach the repository, the repository does not exist, or the server lacks a capability the fetch needs. A retry cannot help. Note that providers answer `Repository not found` for a private repository a token cannot see, so this status does not distinguish the two. |
+| `422` | The ref does not exist on the remote — the commonest cause being a `vcs-ref` naming a branch or SHA the remote cannot serve. The detail says so and names the second possible cause, a server that refuses to serve unadvertised objects, because git's wording does not distinguish them. |
+| `422` | Any other git failure. An unrecognised message is **not** reported as a provider outage: it carries no `X-Terrapod-Upstream-Failure` header and does not say "try again", because neither is a claim an unlisted message supports (#2493). The detail is git's own text. |
 | `502` | A transient provider failure. The step where this is most common is retried once automatically, so a 502 means it failed twice. Carries `X-Terrapod-Upstream-Failure: vcs`. |
 | `504` | The fetch exceeded its timeout. Also carries the header above. |
 

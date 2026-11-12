@@ -17,13 +17,13 @@ func newAutodiscFixture(t *testing.T) *Client {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/autodiscovery-rules":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/autodiscovery-rules":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"ad-aaa","type":"autodiscovery-rules","attributes":{
 			  "name":"monorepo","pattern":"services/*","branch":"main","enabled":true,
 			  "created-at":"2025-01-01T00:00:00Z"
 			}}}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/autodiscovery-rules/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/autodiscovery-rules/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"ad-aaa","type":"autodiscovery-rules","attributes":{"name":"monorepo","pattern":"services/*","enabled":true}}}`))
 		case r.Method == http.MethodPatch:
 			_, _ = w.Write([]byte(`{"data":{"id":"ad-aaa","type":"autodiscovery-rules","attributes":{"name":"monorepo","pattern":"services/*","enabled":false}}}`))

@@ -1,6 +1,6 @@
 // Package workspace_cost implements the terrapod_workspace_cost data source (#871).
 //
-// API Contract: GET /api/terrapod/v1/workspaces/{id}/cost-estimate
+// API Contract: GET /api/v1/workspaces/{id}/cost-estimate
 // Reports the current monthly cost of a workspace's managed infrastructure,
 // computed server-side from its latest state version by the native
 // native cost engine. Data only — no AI. Useful in config for budget

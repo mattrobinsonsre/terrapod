@@ -11,7 +11,7 @@ import (
 func TestSearchWorkspaces(t *testing.T) {
 	var gotBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/terrapod/v1/workspaces/actions/search" || r.Method != http.MethodPost {
+		if r.URL.Path != "/api/v1/workspaces/actions/search" || r.Method != http.MethodPost {
 			http.Error(w, "unhandled", http.StatusNotFound)
 			return
 		}
@@ -48,7 +48,7 @@ func TestSearchWorkspaces(t *testing.T) {
 func TestBulkUpdateWorkspaces_DryRun(t *testing.T) {
 	var gotBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/terrapod/v1/workspaces/actions/bulk-update" {
+		if r.URL.Path != "/api/v1/workspaces/actions/bulk-update" {
 			http.Error(w, "unhandled", http.StatusNotFound)
 			return
 		}

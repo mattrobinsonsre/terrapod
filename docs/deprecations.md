@@ -171,7 +171,7 @@ and run-task callback URLs are now generated on `/api/v1`.
 | Consumer | Action |
 |---|---|
 | Runner + listener images | Nothing **yet**. The shipped images still call the alias by design — they are expected to lag the API — so they move to `/api/v1` in a later 1.x minor, before the sunset. |
-| `go-terrapod`, `terraform-provider-terrapod`, `terrapod-mcp` | Take a newer version; the prefix is internal to them |
+| `go-terrapod`, `terraform-provider-terrapod`, `terrapod-mcp`, `terrapod-migrate` | **Done** — these address `/api/v1` and no longer carry an alias literal (#2497), so nothing is waiting on you. The one consequence to know about: because they address the canonical prefix with no fallback, **their minimum Terrapod is 1.7.0** — see [Component version skew](versioning-and-support.md#component-version-skew). `go-terrapod`'s version probe reports a target below it by name rather than letting every call 404. |
 | Your own scripts / `curl` / dashboards | Change `/api/terrapod/v1` to `/api/v1` |
 | `values.yaml` | Nothing |
 

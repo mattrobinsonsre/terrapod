@@ -109,7 +109,7 @@ type HANode struct {
 //
 // Requires admin or audit.
 func (c *Client) GetHAStatus(ctx context.Context) (*HAStatus, error) {
-	body, err := c.Get(ctx, "/api/terrapod/v1/ha/status")
+	body, err := c.Get(ctx, "/api/v1/ha/status")
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func parseComponents(res *Resource) []ComponentReplicas {
 // is unauthenticated on the server, because the probe runs before any trust
 // exists between the two nodes.
 func (c *Client) WhoAmI(ctx context.Context) (*HANode, error) {
-	body, err := c.Get(ctx, "/api/terrapod/v1/ha/whoami")
+	body, err := c.Get(ctx, "/api/v1/ha/whoami")
 	if err != nil {
 		return nil, err
 	}

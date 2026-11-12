@@ -123,7 +123,7 @@ func (c *Client) GetRunAIPolicyStatus(ctx context.Context, runID string) (*AIPol
 	if err != nil {
 		return nil, err
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+id+"/ai-policy")
+	data, err := c.Get(ctx, "/api/v1/runs/"+id+"/ai-policy")
 	if err != nil {
 		return nil, err
 	}

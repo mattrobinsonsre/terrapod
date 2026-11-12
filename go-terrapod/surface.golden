@@ -12,6 +12,7 @@ const KindOperator
 const ListingComplete
 const ListingUnknown
 const MaskedValue
+const MinimumAPIVersion
 const ModuleAutodiscoveryTargetNamespace
 const ModuleAutodiscoveryTargetPattern
 const ModuleAutodiscoveryTargetRepository
