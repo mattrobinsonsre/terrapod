@@ -48,7 +48,7 @@ def _mock_workspace(
     lock_id=None,
     lock_reason=None,
     locked_by=None,
-    auto_apply=False,
+    auto_apply_mode="never",
     execution_mode="local",
     engine_version="1.11",
     ansible_version="2.21.5",
@@ -65,7 +65,9 @@ def _mock_workspace(
     ws.pulumi_bind_plan = False
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
-    ws.auto_apply = auto_apply
+    # One setting (#2503). Set explicitly: an unset attribute on a MagicMock is
+    # a truthy mock, so a fixture that omitted it would resolve by accident.
+    ws.auto_apply_mode = auto_apply_mode
     ws.execution_mode = execution_mode
     ws.engine_version = engine_version
     ws.ansible_version = ansible_version
@@ -1383,7 +1385,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     async def test_apply_then_merge_incompatible_with_auto_apply(self, mock_resolve, *_mocks):
         mock_resolve.return_value = caps_for_level("admin")
-        ws = _mock_workspace(auto_apply=True)
+        ws = _mock_workspace(auto_apply_mode="always")
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
         mock_result = MagicMock()
@@ -1408,16 +1410,16 @@ class TestVcsWorkflowAttributes:
     ):
         """The same invariant, reached via the newer attribute (#1294).
 
-        `auto-apply-mode` writes `ws.auto_apply` exactly as the boolean does,
-        but the guard's trigger set originally named only `vcs-workflow` and
-        `auto-apply`. A mode-only PATCH therefore set auto_apply=True on an
+        `auto-apply` and `auto-apply-mode` write the same column (#2503), but
+        the guard's trigger set originally named only `vcs-workflow` and
+        `auto-apply`. A mode-only PATCH therefore enabled auto-apply on an
         apply_then_merge workspace and skipped the check entirely — reaching
         by curl the precise state the test above proves is refused. The UI
         now sends only the new attribute, so the invariant was unenforceable
         through the primary consumer.
         """
         mock_resolve.return_value = caps_for_level("admin")
-        ws = _mock_workspace(auto_apply=False)
+        ws = _mock_workspace(auto_apply_mode="never")
         ws.vcs_workflow = "apply_then_merge"
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
@@ -1441,11 +1443,11 @@ class TestVcsWorkflowAttributes:
     async def test_a_conditional_mode_is_refused_on_apply_then_merge_too(
         self, mock_resolve, *_mocks
     ):
-        """`create` is still auto-apply — the server derives auto_apply=True
+        """`create` is still auto-apply — it resolves to a mode other than `never`
         from any non-`never` mode, so the incompatibility is not limited to
         the unconditional case."""
         mock_resolve.return_value = caps_for_level("admin")
-        ws = _mock_workspace(auto_apply=False)
+        ws = _mock_workspace(auto_apply_mode="never")
         ws.vcs_workflow = "apply_then_merge"
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
@@ -1469,7 +1471,7 @@ class TestVcsWorkflowAttributes:
         """The negative case — the guard must not have become a blanket ban.
         `never` means no auto-apply, which is the whole point of the mode."""
         mock_resolve.return_value = caps_for_level("admin")
-        ws = _mock_workspace(auto_apply=True)
+        ws = _mock_workspace(auto_apply_mode="always")
         ws.vcs_workflow = "apply_then_merge"
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
@@ -1495,7 +1497,7 @@ class TestVcsWorkflowAttributes:
         """User may set vcs-workflow=apply_then_merge AND auto-apply=false in
         one request — the validation evaluates the post-update state."""
         mock_resolve.return_value = caps_for_level("admin")
-        ws = _mock_workspace(auto_apply=True)
+        ws = _mock_workspace(auto_apply_mode="always")
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
         mock_result = MagicMock()
@@ -1520,7 +1522,7 @@ class TestVcsWorkflowAttributes:
             )
         assert resp.status_code == 200, resp.text
         assert ws.vcs_workflow == "apply_then_merge"
-        assert ws.auto_apply is False
+        assert ws.auto_apply_mode == "never"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -1840,10 +1842,12 @@ class TestAutoApplyModeOnTheWorkspaceEndpoints:
     and the single-workspace ones did not exist. That absence concealed a live
     guard bypass, fixed under #1294 (#1297).
 
-    The pair of columns is the thing under test: `auto_apply_mode` carries the
-    intent and `auto_apply` is its boolean projection, and every path that
-    writes one must write the other, or a replica reading the projection
-    across a rolling upgrade sees a different answer from the one configured.
+    One column is the thing under test (#2503). `auto_apply_mode` carries the
+    whole setting; the boolean projection beside it is gone, because two
+    columns for one setting let a caller state a contradiction and left the
+    server to resolve it. The boolean is still an accepted INPUT, mapping onto
+    a mode, so a client written against the compatibility surface keeps
+    working — and sending both spellings is still a 422.
     """
 
     @staticmethod
@@ -1887,35 +1891,38 @@ class TestAutoApplyModeOnTheWorkspaceEndpoints:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
-    async def test_create_with_a_mode_writes_both_columns(self, *mocks):
+    async def test_create_with_a_mode_stores_it_verbatim(self, *mocks):
         resp, mock_db = await self._create({"auto-apply-mode": "create"})
         assert resp.status_code == 201, resp.text
         ws = self._created(mock_db)
         assert ws.auto_apply_mode == "create"
-        assert ws.auto_apply is True
+        # And writes no second column: the ORM would accept a stray attribute
+        # silently, so the absence is asserted rather than assumed (#2503).
+        assert not hasattr(ws, "auto_apply")
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
-    async def test_create_with_never_clears_the_boolean(self, *mocks):
+    async def test_create_with_never_stores_never(self, *mocks):
         resp, mock_db = await self._create({"auto-apply-mode": "never"})
         assert resp.status_code == 201, resp.text
         ws = self._created(mock_db)
         assert ws.auto_apply_mode == "never"
-        assert ws.auto_apply is False
+        assert not hasattr(ws, "auto_apply")
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
-    async def test_create_with_only_the_legacy_boolean_still_works(self, *mocks):
-        """An un-upgraded client sends the boolean alone and must be unaffected."""
+    async def test_create_with_only_the_superseded_boolean_still_works(self, *mocks):
+        """A client written against the compatibility surface sends the boolean
+        alone and must be unaffected: it maps onto a mode (#2503)."""
         resp, mock_db = await self._create({"auto-apply": True})
         assert resp.status_code == 201, resp.text
         ws = self._created(mock_db)
         assert ws.auto_apply_mode == "always"
-        assert ws.auto_apply is True
+        assert not hasattr(ws, "auto_apply")
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -1942,27 +1949,28 @@ class TestAutoApplyModeOnTheWorkspaceEndpoints:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
-    async def test_patching_a_mode_writes_both_columns(self, mock_resolve, *mocks):
+    async def test_patching_a_mode_stores_it_verbatim(self, mock_resolve, *mocks):
         mock_resolve.return_value = caps_for_level("admin")
         resp, ws = await self._patch({"auto-apply-mode": "create_update"})
         assert resp.status_code == 200, resp.text
         assert ws.auto_apply_mode == "create_update"
-        assert ws.auto_apply is True
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
-    async def test_patching_the_boolean_off_clears_the_mode(self, mock_resolve, *mocks):
-        """The consistency has to hold in BOTH directions. An old client turning
-        auto-apply off must not leave a conditional mode behind that a newer
-        replica would still act on."""
+    async def test_patching_the_boolean_off_clears_a_conditional_mode(self, mock_resolve, *mocks):
+        """The superseded boolean must still be able to turn it OFF.
+
+        `false` means "do not auto-apply", so it has to land on `never` rather
+        than on anything that still applies. A workspace on `create` patched
+        with `auto-apply: false` by an old client is the case that matters: it
+        is the only way such a client can disable a mode it cannot name.
+        """
         mock_resolve.return_value = caps_for_level("admin")
-        ws = _mock_workspace()
-        ws.auto_apply, ws.auto_apply_mode = True, "create"
+        ws = _mock_workspace(auto_apply_mode="create")
         resp, ws = await self._patch({"auto-apply": False}, ws=ws)
         assert resp.status_code == 200, resp.text
-        assert ws.auto_apply is False
         assert ws.auto_apply_mode == "never"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -1974,6 +1982,37 @@ class TestAutoApplyModeOnTheWorkspaceEndpoints:
         resp, _ = await self._patch({"auto-apply": True, "auto-apply-mode": "never"})
         assert resp.status_code == 422
         assert "not both" in resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_rejects_a_stringified_boolean(self, *mocks):
+        """`bool("false")` is True, so a string meant `always` (#1301).
+
+        This path never type-checked the boolean, and before #2503 the PATCH
+        path's write of the raw value into a Boolean column made the same
+        input fail loudly instead. With the column gone the coercion would be
+        silent and in the dangerous direction, so both paths refuse it.
+        """
+        for bad in ("false", "true", 0, 1, "", []):
+            resp, _ = await self._create({"auto-apply": bad})
+            assert resp.status_code == 422, f"{bad!r} was accepted: {resp.text}"
+            assert "true or false" in resp.text, bad
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patch_rejects_a_stringified_boolean(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        for bad in ("false", "true", 0, 1, "", []):
+            ws = _mock_workspace(auto_apply_mode="create")
+            resp, ws = await self._patch({"auto-apply": bad}, ws=ws)
+            assert resp.status_code == 422, f"{bad!r} was accepted: {resp.text}"
+            assert "true or false" in resp.text, bad
+            # ...and leaves the workspace exactly as it was, which is the half
+            # that matters: a refused write must not have half-landed.
+            assert ws.auto_apply_mode == "create", bad
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -2852,6 +2891,74 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
             "default-run-kind",
         ):
             assert key not in a, f"{key} reached the TFE-compatible wire"
+
+
+class TestAutoApplyIsCompatibilityOnlyOnTheWire:
+    """`auto-apply` goes the OPPOSITE way to every other surface split (#2503).
+
+    It is the only attribute kept on `/api/tfe/v2` and popped from the NATIVE
+    wire, because it is not a setting: it is a boolean projection of
+    `auto-apply-mode`, and `go-tfe` plus the `terraform`/`tofu` cloud backend
+    read it by name. Offering both spellings natively is what let a caller
+    contradict itself in the first place.
+
+    Nothing else can see this. The attribute-contract gate AST-reads the
+    serialiser's dict literal, which still carries the key -- deliberately, so
+    the compatibility surface stays frozen -- so the pop is invisible to it.
+    Both directions are asserted, because the careless fix for either is to
+    pop it on neither door or on both.
+    """
+
+    @staticmethod
+    def _app_for(ws):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
+        return app
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_the_tfe_surface_derives_it_from_the_mode(self, mock_resolve, *mocks):
+        """All four modes in one test rather than parametrized: the patch stack
+        above takes the positional slots, so a parametrized argument cannot be
+        named without enumerating every mock."""
+        mock_resolve.return_value = caps_for_level("read")
+        for mode, expected in (
+            ("never", False),
+            ("always", True),
+            # A conditional mode still auto-applies, so the projection is true
+            # for it -- which is what the boolean has always meant.
+            ("create", True),
+            ("create_update", True),
+        ):
+            ws = _mock_workspace(name="aa-ws", auto_apply_mode=mode)
+            async with AsyncClient(
+                transport=ASGITransport(app=self._app_for(ws)), base_url=_BASE
+            ) as c:
+                resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+            assert resp.status_code == 200, resp.text
+            a = resp.json()["data"]["attributes"]
+            assert a["auto-apply"] is expected, mode
+            assert a["auto-apply-mode"] == mode
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_the_native_surface_carries_the_mode_alone(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="aa-native", auto_apply_mode="create")
+        async with AsyncClient(transport=ASGITransport(app=self._app_for(ws)), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v1/workspaces/ws-{ws.id}", headers=_AUTH)
+        assert resp.status_code == 200, resp.text
+        a = resp.json()["data"]["attributes"]
+        assert a["auto-apply-mode"] == "create"
+        assert "auto-apply" not in a, "the superseded projection reached the native wire"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

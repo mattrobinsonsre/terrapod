@@ -19,9 +19,10 @@ both sides looked internally consistent.
 
 Nothing else catches that. `provider/internal/provider/schema.golden` records
 each attribute's required/optional/computed/sensitive/type and **not** its
-default -- `internal/provider/auto_apply_default_test.go` says so in its own
-comment -- and a golden would only catch a *change* anyway, where the property
-that matters is *agreement*.
+default -- every line of it is
+`<kind> <resource>.<attr> required= optional= computed= sensitive= type=`, with
+no field for a default -- and a golden would only catch a *change* anyway, where
+the property that matters is *agreement*.
 
 The subjects are **derived from the tree**, not listed here, so a new resource
 with an engine-version attribute is covered the day it lands rather than the

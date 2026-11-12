@@ -442,10 +442,23 @@ once the plan JSON has been uploaded — a moment later than `always`, which is
 decided as soon as the plan finishes. If the plan JSON never arrives, the run
 is left for a human rather than applied.
 
-`auto-apply` is retained as the boolean projection: it reads `true` for any
-mode that auto-applies at all, and writing it still works (`true` → `always`,
-`false` → `never`). Setting **both** `auto-apply` and `auto-apply-mode` in one
-request is rejected with `422` rather than guessing which was meant.
+`auto-apply-mode` is the whole of the setting. A separate `auto-apply`
+boolean used to be stored beside it as a projection; it is gone, because two
+attributes for one setting let a caller state a contradiction — `auto-apply:
+false` with `auto-apply-mode: "always"` — which resolved towards **more**
+automation than was asked for.
+
+Two things survive the removal:
+
+* **`/api/tfe/v2` still returns `auto-apply`**, derived as
+  `auto-apply-mode != "never"`. That surface is frozen for `go-tfe` and the
+  `terraform`/`tofu` cloud backend, which read the key by name. `/api/v1`
+  returns `auto-apply-mode` alone.
+* **Every write path still accepts `auto-apply` as an input**, mapping it onto
+  a mode (`true` → `always`, `false` → `never`), so a client written against
+  the compatibility surface is not refused. Setting **both** `auto-apply` and
+  `auto-apply-mode` in one request is still rejected with `422` rather than
+  guessing which was meant — so send one of them, not both.
 
 Runs carry the decision too: `auto-apply-mode` is the mode snapshotted when the
 run was created (editing the workspace mid-run cannot retroactively change how an
@@ -464,7 +477,6 @@ either/or rule.
     "type": "workspaces",
     "attributes": {
       "name": "my-workspace",
-      "auto-apply": false,
       "auto-apply-mode": "create_update",
       "execution-mode": "agent",
       "engine": "terraform",
@@ -3926,7 +3938,7 @@ POST /api/v1/autodiscovery-rules
       "engine-version": "1.13",
       "resource-cpu": "1",
       "resource-memory": "2Gi",
-      "auto-apply": false,
+      "auto-apply-mode": "never",
       "on-directory-delete": "flag",
       "labels": {"managed-by": "monorepo-autodiscover"},
       "owner-email": "platform@example.com"
@@ -4238,7 +4250,7 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
   "update": {
     "engine-version": "1.13",
     "execution-backend": "tofu",
-    "auto-apply": false,
+    "auto-apply-mode": "never",
     "agent-pool-id": "apool-...",
     "resource-cpu": "1", "resource-memory": "2Gi",
     "var-files": ["envs/prod.tfvars"],

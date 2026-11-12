@@ -31,37 +31,54 @@ def _run(additions=0, changes=0, destructions=0, replacements=0):
 
 
 class TestResolveMode:
-    """`auto_apply` and `auto_apply_mode` can disagree across a rolling
-    upgrade. The composition must always err towards less automation."""
+    """`auto_apply_mode` is the whole of the setting (#2503).
+
+    What survives the removal of the boolean beside it is the DIRECTION the
+    old composition resolved in: anything this release cannot read means
+    `never`, so the worst a skewed write can do is auto-apply less than the
+    operator asked for.
+    """
 
     @pytest.mark.parametrize(
-        ("auto_apply", "mode", "expected"),
+        ("mode", "expected"),
         [
-            # The historical boolean on its own.
-            (False, "never", "never"),
-            (True, "never", "always"),
-            # Conditional modes.
-            (True, "create", "create"),
-            (True, "create_update", "create_update"),
-            # An old replica clearing the boolean must win: less, never more.
-            (False, "create", "never"),
-            (False, "create_update", "never"),
-            (False, "always", "never"),
-            # A value written by a newer replica this code doesn't know:
-            # fall back to the boolean's own meaning rather than guessing.
-            (True, "some_future_mode", "always"),
-            (True, None, "always"),
+            ("never", "never"),
+            ("always", "always"),
+            ("create", "create"),
+            ("create_update", "create_update"),
+            # Unreadable in any of the three ways it can be unreadable -- a
+            # mode a newer replica wrote, an empty string, or no attribute at
+            # all -- resolves to `never` rather than being guessed at.
+            ("some_future_mode", "never"),
+            ("", "never"),
+            (None, "never"),
         ],
     )
-    def test_composition(self, auto_apply, mode, expected):
-        obj = SimpleNamespace(auto_apply=auto_apply, auto_apply_mode=mode)
-        assert resolve_auto_apply_mode(obj) == expected
+    def test_the_mode_decides(self, mode, expected):
+        assert resolve_auto_apply_mode(SimpleNamespace(auto_apply_mode=mode)) == expected
 
     def test_object_without_the_column_at_all(self):
         # Defensive: a stale/partial object must not raise, and must not
         # invent an auto-apply.
-        assert resolve_auto_apply_mode(SimpleNamespace(auto_apply=False)) == "never"
         assert resolve_auto_apply_mode(SimpleNamespace()) == "never"
+
+    def test_a_boolean_beside_the_mode_is_ignored(self):
+        """A `Run` still carries an `auto_apply` boolean -- what one run
+        decided, not a setting -- and this resolver must not read it.
+
+        Reading it would resurrect the contradiction the removal exists to
+        make unwritable: a row whose boolean and mode disagree would resolve
+        to whichever the composition happened to prefer. The run's boolean is
+        WRITTEN from this answer, never an input to it.
+        """
+        assert (
+            resolve_auto_apply_mode(SimpleNamespace(auto_apply=False, auto_apply_mode="always"))
+            == "always"
+        )
+        assert (
+            resolve_auto_apply_mode(SimpleNamespace(auto_apply=True, auto_apply_mode="never"))
+            == "never"
+        )
 
 
 class TestPlanShape:
@@ -373,16 +390,17 @@ class TestAutoApplyGuardsAreSharedByBothEntryPoints:
         transition.assert_not_awaited(), "a stale plan must never be applied"
 
 
-class TestCatalogWritesBothColumns:
-    """The model comment asserts the pair cannot disagree, and every other
-    write path honours it — `catalog_service` set only the boolean, on both
-    provision and reconfigure (#1301). Harmless today because
-    `resolve_auto_apply_mode` composes asymmetrically and errs towards less
-    automation either way, but it left catalog rows persistently inconsistent
-    and is a trap for anyone who later reads the column directly.
+class TestCatalogSetsTheSetting:
+    """`catalog_service` provisions workspaces, so it must set the setting.
+
+    It once set only the boolean beside it, on both provision and reconfigure
+    (#1301), leaving catalog rows persistently inconsistent. #2503 removed the
+    boolean, so there is one column to set and no pair to keep in step -- but
+    the two SITES remain, and a site that sets nothing leaves the workspace on
+    the column default rather than on what the caller asked for.
     """
 
-    def test_the_service_never_writes_one_column_alone(self):
+    def test_both_sites_set_the_mode(self):
         """Source-level, because the two sites are a constructor kwarg and a
         plain attribute assignment — no single function to call. This is the
         introspection tier the contract calls for when the invariant is 'X must
@@ -393,15 +411,58 @@ class TestCatalogWritesBothColumns:
 
         src = inspect.getsource(catalog_service)
         assert src.count("auto_apply_mode") >= 2, (
-            "catalog_service must set auto_apply_mode wherever it sets auto_apply — "
-            "both the Workspace construction and the reconfigure assignment"
+            "catalog_service must set auto_apply_mode at both sites — the Workspace "
+            "construction on provision and the reconfigure assignment"
         )
 
+    def test_it_writes_no_boolean_workspace_column(self):
+        """The removed column must not come back by way of this service.
+
+        `auto_apply` is still a legitimate ARGUMENT here -- the catalog
+        operation's own "apply the run this queues", passed to `create_run` at
+        six sites -- so a text search for the name finds every one of them and
+        says nothing. The AST distinguishes the two: a keyword on a
+        `Workspace(...)` construction, or an assignment to `<something>
+        .auto_apply`, is the dropped column coming back. The first would be a
+        TypeError; the second would pass silently, which is the one worth a
+        gate.
+        """
+        import ast
+        import inspect
+
+        from terrapod.services import catalog_service
+
+        tree = ast.parse(inspect.getsource(catalog_service))
+        offenders: list[str] = []
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "Workspace"
+                and any(kw.arg == "auto_apply" for kw in node.keywords)
+            ):
+                offenders.append(f"Workspace(auto_apply=...) at line {node.lineno}")
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Attribute) and target.attr == "auto_apply":
+                        offenders.append(f".auto_apply assignment at line {node.lineno}")
+        assert not offenders, (
+            "the workspace `auto_apply` column was dropped (#2503) and this service "
+            f"writes it again: {offenders}. Set `auto_apply_mode` instead."
+        )
+        # A floor: the walker must still be finding this module's Workspace
+        # construction, or the assertion above passes on nothing.
+        constructions = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "Workspace"
+        ]
+        assert constructions, "no Workspace(...) found; the walker has stopped matching"
+
     @pytest.mark.parametrize(("auto_apply", "expected"), [(True, "always"), (False, "never")])
-    def test_the_pair_the_catalog_writes_round_trips(self, auto_apply, expected):
+    def test_what_the_catalog_writes_round_trips(self, auto_apply, expected):
         """Whatever the catalog writes must resolve back to the same intent —
-        the catalog offers no conditional modes, so the pair is always one of
-        the two flat ones."""
+        the catalog offers no conditional modes, so it is always one of the two
+        flat ones."""
         mode = "always" if auto_apply else "never"
-        obj = SimpleNamespace(auto_apply=auto_apply, auto_apply_mode=mode)
-        assert resolve_auto_apply_mode(obj) == expected
+        assert resolve_auto_apply_mode(SimpleNamespace(auto_apply_mode=mode)) == expected

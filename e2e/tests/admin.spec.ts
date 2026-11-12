@@ -142,10 +142,10 @@ test.describe('Package and image cache warming (#2486)', () => {
 test.describe('Bulk update — auto-apply mode (#1276)', () => {
   // This page had no functional spec at all, only a redirect check in
   // rbac-negatives. The mode select is worth covering specifically because it
-  // is one of the two paths that writes TWO columns from a single input:
-  // auto_apply_mode AND the legacy auto_apply boolean. If they ever drift
-  // apart, a workspace claims one thing in the projection and does another.
-  test('a conditional mode previews as a change to BOTH auto-apply columns', async ({ adminPage }) => {
+  // is one of the two write paths taking TWO input spellings for one setting
+  // -- `auto-apply-mode` and the superseded `auto-apply` boolean -- and the
+  // form must offer the mode rather than the boolean.
+  test('a conditional mode previews as a change to the auto-apply mode', async ({ adminPage }) => {
     const token = getStoredToken();
     const prefix = uniqueName('e2e-bulkmode');
     await createWorkspace(token, `${prefix}-a`);
@@ -174,12 +174,16 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
       adminPage.getByRole('heading', { name: /Would change \(2\)/ }),
     ).toBeVisible();
 
-    // Both columns move together. Asserting only the mode would pass even if
-    // the boolean were left stale, which is the bug this guards.
+    // ONE column moves, and its value is the mode verbatim (#2503). A
+    // `toContainText('auto_apply')` here would match the substring of
+    // `auto_apply_mode` and so assert nothing either way -- the row LIST is
+    // what can tell the two apart, so the diff is read as rows.
     const table = adminPage.locator('table').last();
     await expect(table).toContainText('auto_apply_mode');
     await expect(table).toContainText('create_update');
-    await expect(table).toContainText('auto_apply');
+    const rowTexts = await table.locator('tr', { hasText: /auto_apply/ }).allInnerTexts();
+    expect(rowTexts.length, `auto-apply rows: ${JSON.stringify(rowTexts)}`).toBe(1);
+    expect(rowTexts[0]).toContain('auto_apply_mode');
   });
 });
 

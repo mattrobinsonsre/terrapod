@@ -50,11 +50,14 @@ type Workspace struct {
 	// PulumiBindPlan: Pulumi workspaces only (#1553) — the update is bound to
 	// the approved preview's saved plan. False by default.
 	PulumiBindPlan bool `json:"pulumi-bind-plan"`
-	AutoApply      bool `json:"auto-apply"`
-	// AutoApplyMode is the conditional auto-apply setting (#1274):
-	// "never", "always", "create" or "create_update". AutoApply stays the
-	// boolean projection — true whenever the workspace applies unattended
-	// at all — so code that only reads it keeps working unchanged.
+	// AutoApplyMode is the auto-apply setting (#1274), and the whole of it
+	// (#2503): "never", "always", "create" or "create_update".
+	//
+	// An AutoApply bool used to sit beside it as a projection. It is gone
+	// because two fields for one setting let a caller state a contradiction,
+	// and because the native API no longer serialises the boolean -- it
+	// survives only on /api/tfe/v2, which go-tfe reads and this SDK does not.
+	// Test against "never" rather than against false.
 	AutoApplyMode string `json:"auto-apply-mode"`
 	// EngineVersion pins the version of whichever engine this workspace runs.
 	// TerraformVersion is the same version under its original name — the API
@@ -107,8 +110,8 @@ type Workspace struct {
 	// PlanApplyEnabled and ConfigureEnabled are which operations this
 	// workspace HAS (#1966). Independent, and the server refuses both false.
 	//
-	// No `omitempty` on either, as on AutoApply above: a false must survive a
-	// round trip, and `omitempty` drops it.
+	// No `omitempty` on either: a false must survive a round trip, and
+	// `omitempty` drops it.
 	//
 	// Not served on /api/tfe/v2 — that surface is engine-filtered to Terraform
 	// and go-tfe switches on a fixed attribute set — so both read as false
@@ -371,9 +374,11 @@ type CreateWorkspaceRequest struct {
 	PulumiBindPlan   *bool  `json:"pulumi-bind-plan,omitempty"`
 	ExecutionMode    string `json:"execution-mode,omitempty"`
 	ExecutionBackend string `json:"execution-backend,omitempty"`
-	AutoApply        *bool  `json:"auto-apply,omitempty"`
-	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
-	// pair with 422 rather than guessing which the caller meant.
+	// AutoApplyMode is the whole of the setting (#2503). The AutoApply bool
+	// that used to sit beside it is gone: the API still ACCEPTS the boolean
+	// for clients written against the compatibility surface, but sending
+	// either spelling from one SDK is how a caller ends up sending both, and
+	// the server refuses that pair with a 422.
 	AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 	// Set either; EngineVersion is preferred. TerraformVersion is the same
 	// version under the name go-tfe uses, so the API accepts it indefinitely
@@ -420,7 +425,7 @@ type CreateWorkspaceRequest struct {
 	AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 	ResourceMemory     string              `json:"resource-memory,omitempty"`
 	// PlanApplyEnabled and ConfigureEnabled declare which operations the new
-	// workspace has (#1966). POINTERS, like AutoApply above and for the same
+	// workspace has (#1966). POINTERS, like AutoApplyMode above and for the same
 	// reason: a plain bool's false is indistinguishable from unset, and on
 	// PlanApplyEnabled -- whose server-side default is TRUE -- that failure
 	// would be silent and in the dangerous direction, every caller that left
@@ -560,19 +565,16 @@ type CreateWorkspaceRequest struct {
 // workspace PATCH endpoint accepts a rename, so the SDK exposes it
 // here. Pass an empty string to leave the name alone.
 //
-// Pointer-typed bool fields let callers distinguish "leave alone"
-// (nil) from "set to false" (&false). Without that distinction we'd
-// flip a workspace's auto-apply to false on every PATCH that didn't
-// explicitly set it.
+// Pointer-typed fields let callers distinguish "leave alone" (nil) from
+// "set to this value". Without that distinction a plain bool would flip
+// a setting to false on every PATCH that didn't explicitly set it.
 type UpdateWorkspaceRequest struct {
 	// PulumiBindPlan (#1553); the API refuses true for non-Pulumi engines.
 	PulumiBindPlan   *bool  `json:"pulumi-bind-plan,omitempty"`
 	Name             string `json:"name,omitempty"`
 	ExecutionMode    string `json:"execution-mode,omitempty"`
 	ExecutionBackend string `json:"execution-backend,omitempty"`
-	AutoApply        *bool  `json:"auto-apply,omitempty"`
-	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
-	// pair with 422 rather than guessing which the caller meant.
+	// The whole of the setting (#2503) — see CreateWorkspaceRequest above.
 	AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 	// Set either; EngineVersion is preferred. TerraformVersion is the same
 	// version under the name go-tfe uses, so the API accepts it indefinitely
@@ -621,7 +623,7 @@ type UpdateWorkspaceRequest struct {
 	// PlanApplyEnabled and ConfigureEnabled turn an operation on or off
 	// (#1966). POINTERS so that nil leaves the stored value alone -- a plain
 	// bool would flip the field to false on every PATCH that did not mention
-	// it, which is the trap AutoApply's own comment above records.
+	// it, which is the trap the type comment above records.
 	//
 	// The server checks the both-false invariant against the MERGE of what is
 	// sent with what is stored, so turning plan/apply off on a workspace that
@@ -956,9 +958,6 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ExecutionBackend != "" {
 		attrs["execution-backend"] = req.ExecutionBackend
 	}
-	if req.AutoApply != nil {
-		attrs["auto-apply"] = *req.AutoApply
-	}
 	if req.PulumiBindPlan != nil {
 		attrs["pulumi-bind-plan"] = *req.PulumiBindPlan
 	}
@@ -1167,9 +1166,6 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.ExecutionBackend != "" {
 		attrs["execution-backend"] = req.ExecutionBackend
-	}
-	if req.AutoApply != nil {
-		attrs["auto-apply"] = *req.AutoApply
 	}
 	if req.PulumiBindPlan != nil {
 		attrs["pulumi-bind-plan"] = *req.PulumiBindPlan
@@ -1433,7 +1429,6 @@ func workspaceFromResource(res *Resource) *Workspace {
 		Engine:           GetStringAttr(res, "engine"),
 		PulumiBindPlan:   GetBoolAttr(res, "pulumi-bind-plan"),
 		ExecutionBackend: GetStringAttr(res, "execution-backend"),
-		AutoApply:        GetBoolAttr(res, "auto-apply"),
 		AutoApplyMode:    GetStringAttr(res, "auto-apply-mode"),
 		// Both fields carry the resolved value, so a caller reading either one
 		// gets the right answer whichever name the server used (#1559).

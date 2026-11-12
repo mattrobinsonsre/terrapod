@@ -62,7 +62,7 @@ def _mock_ws(
     engine_version="1.12",
     agent_pool_id=None,
     labels=None,
-    auto_apply=False,
+    auto_apply_mode="never",
     var_files=None,
     engine="terraform",
 ):
@@ -80,8 +80,9 @@ def _mock_ws(
         for i, p in enumerate([agent_pool_id] if agent_pool_id else [])
     ]
     w.labels = labels if labels is not None else {}
-    w.auto_apply = auto_apply
-    w.auto_apply_mode = "always" if auto_apply else "never"
+    # One setting (#2503), set explicitly: an unset attribute on a MagicMock
+    # is a truthy mock, so a fixture that omitted it would resolve by accident.
+    w.auto_apply_mode = auto_apply_mode
     w.var_files = var_files if var_files is not None else []
     # Settings bulk update may write (#1763), at the column defaults a real
     # workspace always carries. Left as MagicMocks they reach the response's
@@ -985,9 +986,8 @@ class TestBulkUpdateRemainingSettings1763:
         self, _db, _redis, _storage
     ):
         """The governance point: applying from an unapproved branch."""
-        ws = _mock_ws(name="auto-ws")
+        ws = _mock_ws(name="auto-ws", auto_apply_mode="always")
         ws.vcs_connection_id = uuid.uuid4()
-        ws.auto_apply = True
         app, db = self._app([ws])
         resp = await self._post(app, {"vcs-workflow": "apply_then_merge"})
         assert resp.status_code == 422, resp.text
@@ -1000,14 +1000,13 @@ class TestBulkUpdateRemainingSettings1763:
         self, _db, _redis, _storage
     ):
         """Mirrors the PATCH path, which lets both flip in one request."""
-        ws = _mock_ws(name="ok-ws")
+        ws = _mock_ws(name="ok-ws", auto_apply_mode="always")
         ws.vcs_connection_id = uuid.uuid4()
-        ws.auto_apply = True
         app, db = self._app([ws])
         resp = await self._post(app, {"vcs-workflow": "apply_then_merge", "auto-apply": False})
         assert resp.status_code == 200, resp.text
         assert ws.vcs_workflow == "apply_then_merge"
-        assert ws.auto_apply is False
+        assert ws.auto_apply_mode == "never"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

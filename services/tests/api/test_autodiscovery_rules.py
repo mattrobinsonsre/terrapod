@@ -94,7 +94,9 @@ def _mock_rule(
     r.resource_memory = "2Gi"
     r.ee_resource_cpu = ""
     r.ee_resource_memory = ""
-    r.auto_apply = False
+    # One setting (#2503), set explicitly: an unset attribute on a MagicMock is
+    # a truthy mock, so a fixture that omitted it would resolve by accident.
+    r.auto_apply_mode = "never"
     r.on_directory_delete = "flag"
     r.labels = {"env": "monorepo"}
     r.owner_email = "admin@example.com"
@@ -1328,12 +1330,12 @@ class TestApplyThenMergeCannotBeTemplatedWithAutoApply:
 
         from fastapi import HTTPException
 
-        stored = SimpleNamespace(vcs_workflow="apply_then_merge", auto_apply=False)
+        stored = SimpleNamespace(vcs_workflow="apply_then_merge", auto_apply_mode="never")
         with pytest.raises(HTTPException) as exc:
             self._coerce({"auto-apply": True}, existing=stored, on_create=False)
         assert exc.value.status_code == 422
 
-        stored_other = SimpleNamespace(vcs_workflow="merge_then_apply", auto_apply=True)
+        stored_other = SimpleNamespace(vcs_workflow="merge_then_apply", auto_apply_mode="always")
         with pytest.raises(HTTPException):
             self._coerce(
                 {"vcs-workflow": "apply_then_merge"}, existing=stored_other, on_create=False
@@ -1342,7 +1344,7 @@ class TestApplyThenMergeCannotBeTemplatedWithAutoApply:
     def test_an_unrelated_patch_on_a_clean_rule_is_untouched(self):
         from types import SimpleNamespace
 
-        stored = SimpleNamespace(vcs_workflow="merge_then_apply", auto_apply=False)
+        stored = SimpleNamespace(vcs_workflow="merge_then_apply", auto_apply_mode="never")
         assert self._coerce({"name": "x"}, existing=stored, on_create=False) is not None
 
 

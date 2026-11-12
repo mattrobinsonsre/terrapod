@@ -66,10 +66,10 @@ _FIELD_MAP: dict[str, str] = {
     "engine-version": "engine_version",
     "execution-backend": "execution_backend",
     "execution-mode": "execution_mode",
-    "auto-apply": "auto_apply",
-    # NOTE: neither the agent-pool attributes nor `auto-apply-mode` are here —
-    # each writes two columns from one input key, so they are validated
-    # separately (_validate_pool_set / _validate_auto_apply below).
+    # NOTE: neither the agent-pool attributes nor the auto-apply pair are here.
+    # The pool attributes write two columns from one input key, and `auto-apply`
+    # and `auto-apply-mode` are two spellings of ONE column (#2503) — each is
+    # validated separately (_validate_pool_set / _validate_auto_apply below).
     "parallelism": "parallelism",
     "configure-parallelism": "configure_parallelism",
     "ansible-version": "ansible_version",
@@ -160,6 +160,10 @@ _FIELDS_HANDLED_SEPARATELY: dict[str, str] = {
     "agent-pool-id": "agent_pool_id",
     "agent-pool-ids": "agent_pool_ids",
     "auto-apply-mode": "auto_apply_mode",
+    # The superseded spelling of the line above, kept as an INPUT so a caller
+    # written against the compatibility surface is not refused here while being
+    # accepted on the single-workspace PATCH (#2503). It writes the same column.
+    "auto-apply": "auto_apply_mode",
     # Each of these three needs something the homogeneous payload does not
     # carry -- the workspace's engine, its VCS connection, or its auto-apply
     # state -- so each is judged against the matched set instead.
@@ -356,13 +360,20 @@ async def _validate_pool_set(
     return {_POOL_SET_FIELD: requested}
 
 
-def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:
-    """Resolve the auto-apply pair for a bulk update (#1274).
+def _validate_auto_apply(update: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the auto-apply pair for a bulk update (#1274, #2503).
 
-    `auto-apply-mode` writes BOTH columns, so it can't go through _FIELD_MAP.
+    Two input spellings, one column: `auto-apply-mode` is the setting and
+    `auto-apply` is the boolean the compatibility surface still sends. Neither
+    can go through `_FIELD_MAP`, which maps one key to one column verbatim.
+
     Mirrors the single-workspace API exactly: either key alone is fine, both
-    together is a 422 rather than a guess, and the two columns are always
-    written together so they cannot end up disagreeing.
+    together is a 422 rather than a guess.
+
+    Reads `update` alone, like `_validate_scan_enforcement` and
+    `_validate_context_dependent` beside it. It used to take the validated
+    field map too, to read back the boolean `_FIELD_MAP` had written -- there
+    is no such column now (#2503), and the value is read here from the request.
     """
     has_bool = "auto-apply" in update
     has_mode = "auto-apply-mode" in update
@@ -381,10 +392,23 @@ def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict
                 status_code=422,
                 detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
             )
-        return {"auto_apply_mode": mode, "auto_apply": mode != "never"}
+        return {"auto_apply_mode": mode}
     if has_bool:
-        # The boolean maps onto the flat modes, same as everywhere else.
-        return {"auto_apply_mode": "always" if fields.get("auto_apply") else "never"}
+        raw = update["auto-apply"]
+        # Type-check rather than coerce (#1301). `bool("false")` is True, so a
+        # JSON string sailed through as an ENABLE -- the caller got the opposite
+        # of what they asked for, silently. This check used to sit in the
+        # `_FIELD_MAP` loop, which stopped seeing the key when the column went
+        # (#2503); it belongs with the code that now reads the value.
+        if not isinstance(raw, bool):
+            raise HTTPException(
+                status_code=422,
+                detail="auto-apply must be true or false, not a string or number",
+            )
+        # The boolean maps onto the flat modes, same as everywhere else. Read
+        # from `update` rather than from the validated fields: the key is not in
+        # `_FIELD_MAP`, so nothing has put it there (#2503).
+        return {"auto_apply_mode": "always" if raw else "never"}
     return {}
 
 
@@ -503,18 +527,6 @@ def _validate_scalar_fields(update: dict) -> dict[str, Any]:
             raise HTTPException(status_code=422, detail="engine-version cannot be empty")
         if key == "labels":
             val = validate_labels(val)  # reserved-key chokepoint (#316) -> 422
-        if key == "auto-apply":
-            # Type-check rather than coerce (#1301). `bool("false")` is True,
-            # so a JSON string sailed through as an enable AND -- since the
-            # pairing landed -- wrote the string itself into a Boolean column
-            # while `auto_apply_mode` was set to "always". A caller who typed
-            # the value wrong gets told, instead of getting the opposite of
-            # what they asked for.
-            if not isinstance(val, bool):
-                raise HTTPException(
-                    status_code=422,
-                    detail="auto-apply must be true or false, not a string or number",
-                )
         if key == "var-files":
             if not isinstance(val, list):
                 raise HTTPException(status_code=422, detail="var-files must be a list")
@@ -529,7 +541,7 @@ def _validate_scalar_fields(update: dict) -> dict[str, Any]:
             except ValueError as e:
                 raise HTTPException(status_code=422, detail=str(e)) from e
         fields[attr] = val
-    fields.update(_validate_auto_apply(update, fields))
+    fields.update(_validate_auto_apply(update))
     fields.update(_validate_scan_enforcement(update))
     fields.update(_validate_context_dependent(update))
     return fields
@@ -594,15 +606,15 @@ def _reject_apply_then_merge_where_it_cannot_hold(fields: dict[str, Any], worksp
     workflow = fields.get("vcs_workflow")
     if workflow != "apply_then_merge":
         return
-    pending_auto_apply = fields.get("auto_apply")
+    pending_mode = fields.get("auto_apply_mode")
     offenders: list[str] = []
     for w in workspaces:
-        auto_apply = w.auto_apply if pending_auto_apply is None else pending_auto_apply
+        mode = run_service.resolve_auto_apply_mode(w) if pending_mode is None else pending_mode
         try:
             workspace_settings.check_apply_then_merge_allowed(
                 workflow,
                 has_vcs_connection=getattr(w, "vcs_connection_id", None) is not None,
-                auto_apply=bool(auto_apply),
+                auto_apply=mode != "never",
             )
         except ValueError:
             offenders.append(w.name)
@@ -873,7 +885,7 @@ def _reject_auto_apply_on_apply_then_merge(fields: dict[str, Any], workspaces: l
     matching the endpoint's own contract: a partial application here would be
     worse than a refusal.
     """
-    if not fields.get("auto_apply"):
+    if fields.get("auto_apply_mode", "never") == "never":
         return
     offenders = [w.name for w in workspaces if getattr(w, "vcs_workflow", "") == "apply_then_merge"]
     if not offenders:

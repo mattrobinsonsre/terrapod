@@ -346,13 +346,20 @@ class Workspace(Base):
     execution_mode: Mapped[str] = mapped_column(
         String(20), nullable=False, default="local"
     )  # local, agent
-    auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # Conditional auto-apply (#1274): never | always | create | create_update.
-    # `auto_apply` stays the boolean projection ("does this auto-apply at
-    # all") so an un-upgraded client keeps working; this column carries the
-    # refinement. Resolve with `run_service.resolve_auto_apply_mode` rather
-    # than reading either column directly — the two can disagree during a
-    # rolling upgrade, and the helper is where that is settled safely.
+    #: Auto-apply (#1274, #2503): never | always | create | create_update.
+    #:
+    #: The ONE setting. A separate `auto_apply` boolean used to sit beside it as
+    #: a projection, which let a caller state a contradiction (`auto_apply =
+    #: false` with `auto_apply_mode = "always"`) that resolved towards MORE
+    #: automation than was asked for. One column cannot hold a contradiction.
+    #:
+    #: Read it through `run_service.resolve_auto_apply_mode`, which normalises a
+    #: value this release does not recognise to `never` -- the only safe
+    #: direction for a setting that applies infrastructure unattended.
+    #:
+    #: `/api/tfe/v2` still emits an `auto-apply` boolean, derived as
+    #: `mode != "never"`: that surface is frozen for `go-tfe` and the cloud
+    #: backend. `/api/v1` carries the mode alone.
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
     execution_backend: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tofu"
@@ -448,7 +455,7 @@ class Workspace(Base):
     #: `""` is the default and means "today's ordering", which offers the most
     #: complete kind the workspace declares. That is right almost always, and
     #: wrong for a workspace whose Terraform half only maintains the Ansible
-    #: inventory: with `auto_apply` on and `configure_after_apply` off, the
+    #: inventory: with auto-apply on and `configure_after_apply` off, the
     #: everyday action is Configure, and the composite sits behind the caret.
     #:
     #: An OVERRIDE rather than a replacement. It reorders what the workspace
@@ -499,9 +506,9 @@ class Workspace(Base):
     #: it just removed.
     #:
     #: `Run.configure_after_apply` carries the same name deliberately. It is
-    #: the run's snapshot of this setting, which is `auto_apply`'s own shape --
-    #: the workspace holds the operator's intent and the run records what it
-    #: was created under, so the answer survives the setting being changed.
+    #: the run's snapshot of this setting, which is `auto_apply_mode`'s own
+    #: shape -- the workspace holds the operator's intent and the run records
+    #: what it was created under, so the answer survives the setting changing.
     #:
     #: There is deliberately **no scheduled configure** (user, 2026-10-22).
     #: An operator who wants one drives the run API from their own scheduler;
@@ -2219,8 +2226,8 @@ class AutodiscoveryRule(Base):
     oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
-    auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # Templated onto workspaces this rule materialises (#1274).
+    # Templated onto workspaces this rule materialises (#1274). One setting,
+    # as on `Workspace` -- the boolean beside it went with #2503.
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -3103,10 +3110,15 @@ class Run(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
     message: Mapped[str] = mapped_column(Text, nullable=False, default="")
     is_destroy: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: What THIS run decided, not a workspace setting -- which is why it
+    #: survived #2503's removal of the workspace boolean of the same name. It
+    #: records the outcome of resolving the mode below, so a consumer asking
+    #: "did this run apply itself" needs no vocabulary for the modes, and the
+    #: run API can answer `auto-apply` without re-deriving it per request.
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # Snapshotted from the workspace at run creation, exactly like
-    # `auto_apply`, so editing the workspace mid-run cannot retroactively
-    # change how an in-flight run decides (#1274).
+    # Snapshotted from the workspace at run creation, together with the boolean
+    # above, so editing the workspace mid-run cannot retroactively change how an
+    # in-flight run decides (#1274).
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
     # Why a conditional auto-apply declined ("2 destroys, 1 replace"), so the
     # UI can say why a run is sitting in `planned` instead of leaving the
@@ -3326,8 +3338,8 @@ class Run(Base):
     #: composite -- rather than being the whole of what the run does.
     #:
     #: Written from the workspace's setting of the same name at creation --
-    #: `auto_apply`'s shape, where the workspace holds the intent and the run
-    #: records what it was created under. There is deliberately no per-run
+    #: `auto_apply_mode`'s shape, where the workspace holds the intent and the
+    #: run records what it was created under. There is deliberately no per-run
     #: override: a standalone configure is already reachable per invocation
     #: (`is-configure`), so an override here would be a second way to say the
     #: same thing with no caller asking for it.

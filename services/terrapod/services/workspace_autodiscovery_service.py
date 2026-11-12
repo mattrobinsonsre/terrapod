@@ -430,10 +430,10 @@ async def find_or_autocreate_workspace(
         # wants unless the operator sized it deliberately.
         ee_resource_cpu=rule.ee_resource_cpu,
         ee_resource_memory=rule.ee_resource_memory,
-        auto_apply=rule.auto_apply,
-        # Inherit the rule's conditional mode too (#1274) — carrying only
-        # the boolean would turn a `create_update` rule into `always` on
-        # every workspace it materialises.
+        # The whole of the setting (#1274, #2503). It used to carry a boolean
+        # beside this, and carrying only the boolean would have turned a
+        # `create_update` rule into `always` on every workspace it
+        # materialises — which is one column fewer to get wrong now.
         auto_apply_mode=getattr(rule, "auto_apply_mode", "never"),
         working_directory=root_directory,
         labels=safe_labels,

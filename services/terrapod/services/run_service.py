@@ -69,29 +69,27 @@ CONDITIONAL_AUTO_APPLY_MODES = ("create", "create_update")
 
 
 def resolve_auto_apply_mode(obj: Any) -> str:
-    """Resolve the effective auto-apply mode of a workspace or a run.
+    """Resolve the effective auto-apply mode of a workspace, rule or run.
 
-    Two columns describe one setting: the historical `auto_apply` boolean
-    (still written by an un-upgraded API replica, and by any client that
-    only knows the old attribute) and the newer `auto_apply_mode`. A rolling
-    upgrade can therefore observe them disagreeing, and this is where that
-    is settled — never by reading either column directly.
+    `auto_apply_mode` is the whole of the setting (#2503). It used to sit
+    beside an `auto_apply` boolean that was its projection, and this function
+    composed the two — which is the composition that is gone, along with the
+    column, because two columns for one setting let a caller state a
+    contradiction and left this helper to resolve it.
 
-    The composition is deliberately asymmetric: `auto_apply == False` always
-    wins and means `never`. So the worst a skewed write can do is auto-apply
-    LESS than the operator asked for, never more. Failing towards "a human
-    looks at it" is the only safe direction for a setting that applies
-    infrastructure changes unattended.
+    What survives is the direction it resolved in. A value this release does
+    not recognise — an empty string, or a mode written by a newer replica
+    mid-rolling-upgrade — reads as `never`, so the worst a skewed write can do
+    is auto-apply LESS than the operator asked for, never more. Failing
+    towards "a human looks at it" is the only safe direction for a setting
+    that applies infrastructure changes unattended.
+
+    `Run.auto_apply` is NOT this setting and is still a column: it records
+    what one run decided, beside `auto_apply_declined_reason`. It is written
+    from this function's answer at run creation and read directly.
     """
-    if not getattr(obj, "auto_apply", False):
-        return "never"
     mode = getattr(obj, "auto_apply_mode", None)
-    if mode in CONDITIONAL_AUTO_APPLY_MODES:
-        return mode
-    # `auto_apply` is true and the mode column says nothing conditional
-    # (unset, "never" from an old row, or an unrecognised value written by a
-    # newer replica): fall back to the boolean's own meaning.
-    return "always"
+    return mode if mode in AUTO_APPLY_MODES else "never"
 
 
 def plan_shape_permits_auto_apply(run: Run, mode: str) -> bool | None:
@@ -1617,8 +1615,10 @@ async def create_run(
     # onto the flat modes. Only an unset argument inherits the workspace's
     # conditional mode (#1274).
     if auto_apply is None:
-        auto_apply = workspace.auto_apply
         auto_apply_mode = resolve_auto_apply_mode(workspace)
+        # The run's own record of what it decided, derived here and nowhere
+        # else — the workspace has no such boolean any more (#2503).
+        auto_apply = auto_apply_mode != "never"
     else:
         auto_apply_mode = "always" if auto_apply else "never"
 
@@ -2918,7 +2918,13 @@ async def fire_run_triggers(
                 db,
                 workspace=dest_ws,
                 message=f"Triggered by successful apply in workspace '{source_name}'",
-                auto_apply=dest_ws.auto_apply,
+                # No `auto_apply=` (#2503). An explicit argument means "this one
+                # run behaves this way" and flattens onto `always`/`never`, so
+                # passing the destination's own setting through it turned a
+                # `create` or `create_update` workspace into an unconditional
+                # auto-apply for every triggered run — past the guardrail its
+                # operator set. Omitting it inherits the destination's mode
+                # whole, which is what the line was reaching for.
                 plan_only=False,
                 # Its own source (#1307). `tfe-api` is the CLI-upload source, and
                 # labelling a triggered run with it made it indistinguishable from

@@ -56,8 +56,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		AnsibleVersion              string                   `json:"ansible_version,omitempty" jsonschema:"ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default"`
 		AnsibleExecutionEnvironment string                   `json:"ansible_execution_environment,omitempty" jsonschema:"label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored; omit or empty to use the built-in image for the line"`
 		AnsibleCollections          []ansibleCollectionInput `json:"ansible_collections,omitempty" jsonschema:"the ansible collections installed before a configure runs, declared on the platform. Each entry is {\"name\": \"namespace.name\"} with an optional \"version\" (a pin or a range, as in ansible's own requirements.yml; omit for whatever resolves). These are installed AFTER the configuration's own requirements.yml and with --force, so an entry here OVERRIDES the repository's build of that collection and leaves every other one standing. Collections come from this deployment's own Galaxy surface -- its published ones and a pull-through proxy of upstream -- so source and type are deliberately not settable. ROLES are a different mechanism and are not declared here: they come from git, using the workspace's git credentials, declared in the configuration's own requirements.yml"`
-		AutoApply                   *bool                    `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans (default false)"`
-		AutoApplyMode               *string                  `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Set this OR auto_apply, not both."`
+		AutoApplyMode               *string                  `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never (the default -- a plan waits for a human), always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace."`
 		AgentPoolID                 string                   `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...) for agent execution mode; assigns exactly one pool. Mutually exclusive with agent_pool_ids"`
 		AgentPoolIDs                []string                 `json:"agent_pool_ids,omitempty" jsonschema:"agent pools this workspace may run on (apool-...). Flat set: a run is offered to every pool at once and whichever has a live runner claims it first, so losing one does not stop the workspace. Mutually exclusive with agent_pool_id"`
 		WorkingDirectory            string                   `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
@@ -148,7 +147,6 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AnsibleVersion:              in.AnsibleVersion,
 			AnsibleExecutionEnvironment: in.AnsibleExecutionEnvironment,
 			AnsibleCollections:          toSDKCollections(in.AnsibleCollections),
-			AutoApply:                   in.AutoApply,
 			AutoApplyMode:               in.AutoApplyMode,
 			AgentPoolID:                 in.AgentPoolID,
 			AgentPoolIDs:                in.AgentPoolIDs,
@@ -223,8 +221,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		AnsibleVersion              string                   `json:"ansible_version,omitempty" jsonschema:"ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default"`
 		AnsibleExecutionEnvironment *string                  `json:"ansible_execution_environment,omitempty" jsonschema:"label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored. OMIT to leave the stored value alone; pass an empty string to CLEAR it, after which the built-in image for the line is used again"`
 		AnsibleCollections          []ansibleCollectionInput `json:"ansible_collections,omitempty" jsonschema:"the ansible collections installed before a configure runs, declared on the platform. Each entry is {\"name\": \"namespace.name\"} with an optional \"version\" (a pin or a range, as in ansible's own requirements.yml; omit for whatever resolves). These are installed AFTER the configuration's own requirements.yml and with --force, so an entry here OVERRIDES the repository's build of that collection and leaves every other one standing. Collections come from this deployment's own Galaxy surface -- its published ones and a pull-through proxy of upstream -- so source and type are deliberately not settable. ROLES are a different mechanism and are not declared here: they come from git, using the workspace's git credentials, declared in the configuration's own requirements.yml. Omitting the field leaves the stored list alone; pass an empty list to clear it"`
-		AutoApply                   *bool                    `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans"`
-		AutoApplyMode               *string                  `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create, create_update. Set this OR auto_apply, not both."`
+		AutoApplyMode               *string                  `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Setting always on a workspace an operator deliberately put on create or create_update removes that guardrail -- say so before doing it."`
 		AgentPoolID                 string                   `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...); assigns exactly one pool, REPLACING any existing set. Mutually exclusive with agent_pool_ids"`
 		AgentPoolIDs                []string                 `json:"agent_pool_ids,omitempty" jsonschema:"replace the workspace''s agent-pool set (apool-...). Flat set — every pool is equally eligible to claim a run. Mutually exclusive with agent_pool_id"`
 		WorkingDirectory            string                   `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
@@ -384,7 +381,6 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AnsibleVersion:              in.AnsibleVersion,
 			AnsibleExecutionEnvironment: in.AnsibleExecutionEnvironment,
 			AnsibleCollections:          toSDKCollections(in.AnsibleCollections),
-			AutoApply:                   in.AutoApply,
 			AutoApplyMode:               in.AutoApplyMode,
 			AgentPoolID:                 in.AgentPoolID,
 			AgentPoolIDs:                in.AgentPoolIDs,

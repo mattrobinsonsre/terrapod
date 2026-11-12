@@ -377,6 +377,25 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
         "agent-pool-ids": "the rule template carries a single agent-pool id",
         "trigger-prefixes": "the rule's own path patterns already scope what it matches",
     },
+    "MCP workspace tools": {
+        # NOT a missing control. `auto-apply` is a superseded INPUT spelling of
+        # `auto-apply-mode` (#2503), which MCP does offer -- the boolean is no
+        # longer a column, a serialised attribute or an SDK field, so there is
+        # nothing for a tool to carry. It stays accepted on the write paths
+        # only so an operator script that still sends it is not SILENTLY
+        # ignored, which is why it is in `_FIELDS_HANDLED_SEPARATELY` and so in
+        # this gate's subject at all.
+        #
+        # `_web_tsx`'s alias widening is what covers the same case on the two
+        # GUIs. It is deliberately not applied to the Go surface -- see its
+        # docstring: widening there would retire the independent pool-key
+        # checks that currently hold -- so this is an entry rather than a
+        # matcher change.
+        "auto-apply": (
+            "a superseded input spelling of auto-apply-mode, which MCP offers; "
+            "the boolean is no longer a column or an SDK field (#2503)"
+        ),
+    },
 }
 
 

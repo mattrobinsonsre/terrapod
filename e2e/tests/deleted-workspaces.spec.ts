@@ -24,7 +24,7 @@ async function createAndDelete(
   name: string,
 ): Promise<string> {
   // auto-apply ON so the 'comes back inert' assertion has something to prove.
-  const wsId = await createWorkspace(token, name, { 'auto-apply': true });
+  const wsId = await createWorkspace(token, name, { 'auto-apply-mode': 'always' });
   await seedStateVersionWithContent(token, wsId, [
     { mode: 'managed', type: 'null_resource', name: 'a', instances: [{ attributes: {} }] },
   ]);
@@ -96,8 +96,9 @@ test.describe('Deleted workspaces (undelete)', () => {
     const restored = (await res.json()).data;
     expect(restored.id.replace(/^ws-/, ''), 'restore must mint a new id').not.toBe(rawId);
     expect(restored.attributes['state-versions-restored']).toBe(1);
-    // Auto-apply was ON before the delete and must come back OFF.
-    expect(restored.attributes.suppressed).toContain('auto_apply');
+    // Auto-apply was ON before the delete and must come back OFF. The
+    // reported field is the MODE, which is the whole of the setting (#2503).
+    expect(restored.attributes.suppressed).toContain('auto_apply_mode');
 
     // The source is a copy, not a move: the original stays recoverable until
     // its retention window closes.

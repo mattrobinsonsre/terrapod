@@ -287,18 +287,21 @@ class TestMarkerContents:
         )
 
     def test_a_conditional_auto_apply_mode_reaches_the_marker(self):
-        """The `auto_apply` boolean is only a projection — true for `always`,
-        `create` and `create_update` alike. Recording it alone tells a restoring
-        operator that auto-apply was on but not that it was deliberately held
-        back from changes and destroys, and the obvious way to turn it back on
-        is `always`, which applies destroys (#1313)."""
+        """WHICH mode, not just "auto-apply was on" (#1313).
+
+        A restoring operator told only that auto-apply was on reaches for
+        `always`, which applies destroys -- where the workspace may have been
+        deliberately held back to `create_update`. The mode is the whole of
+        the setting since #2503, so it is the one key that has to be here.
+        """
         ws = MagicMock()
         ws.labels = {}
-        ws.auto_apply = True
         ws.auto_apply_mode = "create_update"
         snap = dws._settings_snapshot(ws)
-        assert snap["auto_apply"] is True
         assert snap["auto_apply_mode"] == "create_update"
+        # And the removed boolean is not reintroduced through the snapshot,
+        # which is keyed by column name and restored by column name.
+        assert "auto_apply" not in snap
 
 
 @contextlib.asynccontextmanager

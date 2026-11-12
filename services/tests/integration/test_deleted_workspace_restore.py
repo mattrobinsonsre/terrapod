@@ -192,7 +192,9 @@ class TestRestore:
         )
         assert resp.status_code == 201
         suppressed = resp.json()["data"]["attributes"]["suppressed"]
-        assert "auto_apply" in suppressed
+        # The MODE is the field name reported, because it is the whole of the
+        # setting (#2503).
+        assert "auto_apply_mode" in suppressed
         assert "drift_detection_enabled" in suppressed
 
         new_id = resp.json()["data"]["id"]
@@ -205,12 +207,11 @@ class TestRestore:
     async def test_a_conditional_guardrail_is_recorded_and_not_downgraded(self, app, client):
         """A `create_update` workspace must not come back as `always` (#1313).
 
-        The `auto_apply` boolean is true for every non-`never` mode, so a marker
-        recording only the boolean tells an operator auto-apply was on but not
-        that it was deliberately held back from changes and destroys — and the
-        obvious way to switch it back on is `always`, which applies destroys.
-        The restore stays inert in *both* columns, and the marker keeps the
-        original mode so the guardrail can be put back as it was.
+        A report saying only that auto-apply was on tells an operator nothing
+        about the guardrail, and the obvious way to switch it back on is
+        `always`, which applies destroys. So the restore comes back `never`
+        and the marker keeps the original mode, which is what lets the
+        guardrail be put back as it was.
         """
         set_auth(app, admin_user())
         old_id = await _delete_with_state(
@@ -234,13 +235,15 @@ class TestRestore:
             f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
         )
         assert resp.status_code == 201, resp.text
-        assert "auto_apply" in resp.json()["data"]["attributes"]["suppressed"]
+        assert "auto_apply_mode" in resp.json()["data"]["attributes"]["suppressed"]
 
         attrs = (
             await client.get(f"/api/v2/workspaces/{resp.json()['data']['id']}", headers=AUTH)
         ).json()["data"]["attributes"]
-        # Inert in both columns — never `always`, and never a boolean that
-        # disagrees with the mode.
+        # Inert, and `never` rather than `always` -- the guardrail is not
+        # downgraded on the way back. `auto-apply` is read here off
+        # `/api/tfe/v2`, where it is still served as the mode's projection
+        # (#2503), so the two must agree.
         assert attrs["auto-apply"] is False
         assert attrs["auto-apply-mode"] == "never"
         # Evaluation settings cannot start a run, so they come back as they
