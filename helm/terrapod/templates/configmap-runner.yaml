@@ -25,24 +25,24 @@ data:
     configure_service_account_name: {{ . | quote }}
     {{- end }}
     azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
-    ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}
-    debug_linger_seconds: {{ .Values.runners.debugLingerSeconds }}
-    termination_grace_period_seconds: {{ .Values.runners.terminationGracePeriodSeconds }}
-    token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds }}
-    max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds }}
-    stale_timeout_seconds: {{ .Values.runners.staleTimeoutSeconds }}
-    drift_max_duration_seconds: {{ .Values.runners.driftMaxDurationSeconds | default 1800 }}
-    lifecycle_destroy_retries: {{ .Values.runners.lifecycleDestroyRetries | default 2 }}
-    lifecycle_destroy_retry_backoff_seconds: {{ .Values.runners.lifecycleDestroyRetryBackoffSeconds | default 45 }}
-    configure_retries: {{ .Values.runners.configureRetries | default 0 }}
-    configure_retry_backoff_seconds: {{ .Values.runners.configureRetryBackoffSeconds | default 45 }}
+    ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished | int64 }}
+    debug_linger_seconds: {{ .Values.runners.debugLingerSeconds | int64 }}
+    termination_grace_period_seconds: {{ .Values.runners.terminationGracePeriodSeconds | int64 }}
+    token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds | int64 }}
+    max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds | int64 }}
+    stale_timeout_seconds: {{ .Values.runners.staleTimeoutSeconds | int64 }}
+    drift_max_duration_seconds: {{ dig "driftMaxDurationSeconds" 1800 .Values.runners | int64 }}
+    lifecycle_destroy_retries: {{ dig "lifecycleDestroyRetries" 2 .Values.runners | int64 }}
+    lifecycle_destroy_retry_backoff_seconds: {{ dig "lifecycleDestroyRetryBackoffSeconds" 45 .Values.runners | int64 }}
+    configure_retries: {{ dig "configureRetries" 0 .Values.runners | int64 }}
+    configure_retry_backoff_seconds: {{ dig "configureRetryBackoffSeconds" 45 .Values.runners | int64 }}
     default_terraform_version: {{ .Values.runners.defaultTerraformVersion | default "1.13" | quote }}
     default_pulumi_version: {{ .Values.runners.defaultPulumiVersion | default "3.208" | quote }}
     default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "tofu" | quote }}
-    launch_timeout_seconds: {{ .Values.runners.launchTimeoutSeconds | default 300 }}
-    ee_startup_timeout_seconds: {{ .Values.runners.eeStartupTimeoutSeconds | default 600 }}
-    configure_timeout_minutes: {{ .Values.runners.configureTimeoutMinutes | default 180 }}
-    configure_no_progress_seconds: {{ .Values.runners.configureNoProgressSeconds | default 1800 }}
+    launch_timeout_seconds: {{ dig "launchTimeoutSeconds" 300 .Values.runners | int64 }}
+    ee_startup_timeout_seconds: {{ dig "eeStartupTimeoutSeconds" 600 .Values.runners | int64 }}
+    configure_timeout_minutes: {{ dig "configureTimeoutMinutes" 180 .Values.runners | int64 }}
+    configure_no_progress_seconds: {{ dig "configureNoProgressSeconds" 1800 .Values.runners | int64 }}
     {{- /* Execution-hooks kill-switch (#619). `dig` gives a correct default-true
        bool: an explicit `hooksEnabled: false` is preserved (a `| default true`
        would wrongly coerce it back to true). */}}
@@ -57,15 +57,15 @@ data:
     runner_namespace: {{ include "terrapod.runnerNamespace" . | quote }}
     listener_namespace: {{ .Release.Namespace | quote }}
     credentials_secret_name: {{ include "terrapod.listenerCredentialsSecretName" . | quote }}
-    health_port: {{ .Values.listener.healthPort | default 8081 }}
+    health_port: {{ .Values.listener.healthPort | default 8081 | int64 }}
     public_api_url: {{ .Values.listener.publicApiUrl | default .Values.api.config.external_url | default "" | quote }}
     listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | int64 }}
-    heartbeat_interval: {{ .Values.listener.heartbeatInterval | default 60 }}
-    max_concurrent: {{ .Values.listener.maxConcurrent | default 3 }}
-    poll_interval: {{ .Values.listener.pollInterval | default 30 }}
-    sse_read_timeout: {{ .Values.listener.sseReadTimeout | default 30 }}
-    sse_max_age: {{ .Values.listener.sseMaxAge | default 600 }}
-    sse_retry_interval: {{ .Values.listener.sseRetryInterval | default 5 }}
+    heartbeat_interval: {{ .Values.listener.heartbeatInterval | default 60 | int64 }}
+    max_concurrent: {{ .Values.listener.maxConcurrent | default 3 | int64 }}
+    poll_interval: {{ .Values.listener.pollInterval | default 30 | int64 }}
+    sse_read_timeout: {{ .Values.listener.sseReadTimeout | default 30 | int64 }}
+    sse_max_age: {{ .Values.listener.sseMaxAge | default 600 | int64 }}
+    sse_retry_interval: {{ .Values.listener.sseRetryInterval | default 5 | int64 }}
     {{- with .Values.runners.imagePullSecrets }}
     image_pull_secrets:
       {{- toYaml . | nindent 6 }}
@@ -81,6 +81,28 @@ data:
     {{- with .Values.runners.affinity }}
     affinity:
       {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- /* Per-phase scheduling for configure Jobs (#2524), MERGED over the
+       three settings above by the listener rather than replacing them -- see
+       RunnerPhaseScheduling for why each of the three merges the way it does.
+       Rendered only when something is set, so a deployment that wants none of
+       it keeps a byte-identical runners.yaml. */}}
+    {{- with .Values.runners.configure }}
+    {{- if or .nodeSelector .tolerations .affinity }}
+    configure:
+      {{- with .nodeSelector }}
+      node_selector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
     {{- end }}
     {{- with .Values.runners.podAnnotations }}
     pod_annotations:

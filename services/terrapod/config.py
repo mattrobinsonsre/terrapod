@@ -69,6 +69,48 @@ class RunnerProxyConfig(BaseModel):
     no_proxy: str = Field(default="")
 
 
+class RunnerPhaseScheduling(BaseModel):
+    """Where ONE phase's runner Jobs may be scheduled, over the general settings.
+
+    The phases have very different interruption profiles and the general
+    `node_selector` / `tolerations` / `affinity` cannot express that, because
+    they apply to every Job a listener launches (#2524). A plan or an apply is
+    minutes long and a retried plan is cheap, so interruptible capacity suits
+    them. A configure can run for an hour and is **not safely restartable** --
+    an interruption leaves hosts half-configured, mid-release, with maintenance
+    windows open -- so it may need to be pinned somewhere it will not be
+    reclaimed.
+
+    **Merged over the general settings, never replacing them, and the merge is
+    per-key wherever Kubernetes treats the keys as independent:**
+
+    * `node_selector` is a flat map Kubernetes ANDs, so the keys merge and this
+      block wins a collision. Adding one key NARROWS placement, which is what
+      the setting is for -- and an operator who later edits the general
+      selector does not have to remember to edit a copy of it here.
+    * `tolerations` is an additive list, so this block's entries are APPENDED.
+      A toleration only permits a node, it never attracts one, so appending
+      cannot undo a narrowing the selector just made.
+    * `affinity` merges at its own top level -- `nodeAffinity`, `podAffinity`,
+      `podAntiAffinity` are three independent Kubernetes fields, so overriding
+      node placement keeps an operator's pod anti-affinity. It does NOT merge
+      any deeper, deliberately: `nodeSelectorTerms` are ORed while the
+      `matchExpressions` inside one are ANDed, so a deeper merge would have to
+      guess, and the way it would guess wrong is by WIDENING where a configure
+      may land -- the exact opposite of why this exists.
+
+    So an empty block behaves exactly as before it existed: an empty map merges
+    to the general map and an empty list appends nothing. There is no "unset"
+    state to forget, which is why this is a plain model with a default factory
+    rather than an optional one -- a `None` here would be a branch every reader
+    has to remember.
+    """
+
+    node_selector: dict[str, str] = Field(default_factory=dict)
+    tolerations: list[dict] = Field(default_factory=list)
+    affinity: dict = Field(default_factory=dict)
+
+
 class RunnerConfig(BaseSettings):
     """Runner + listener configuration, layered defaults → runners.yaml → env.
 
@@ -174,6 +216,12 @@ class RunnerConfig(BaseSettings):
     #: extra apply identity. Base plus an optional extra for the apply, both ways.
     apply_service_account_name: str = Field(default="")
     configure_service_account_name: str = Field(default="")
+    #: Scheduling for configure Jobs only, merged over the general
+    #: `node_selector` / `tolerations` / `affinity` above (#2524). Not folded in
+    #: with the `configure_*` scalars around it: those are flat wire keys a
+    #: listener up to N-2 minors behind already reads, and renaming one would
+    #: break it. Always present, so a reader never has a None to guard.
+    configure: RunnerPhaseScheduling = Field(default_factory=RunnerPhaseScheduling)
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
     #: How long a failed runner pod is held open for inspection when its

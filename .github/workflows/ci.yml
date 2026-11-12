@@ -2135,8 +2135,14 @@ jobs:
           # boot. `--set` produces an int64 and cannot reproduce it, so this must
           # go through a file.
           #
-          # Asserted as a CLASS rather than per key: any numeric setting added
-          # later is covered without anyone remembering to extend this.
+          # The ASSERTION is a class check over the whole render, so a new
+          # numeric setting needs no new grep. The INPUT is not: the check can
+          # only see a key this file sets, and that is where it was blind. It set
+          # nothing under `runners` or `listener`, so 14 numeric renders in the
+          # runner ConfigMap sat outside it -- every one missing `| int64`, and a
+          # large value for any of them is a listener that does not start
+          # (PyYAML parses `1e+06` as a STRING, so pydantic refuses it outright).
+          # Add a key here whenever a numeric setting reaches a new values path.
           cat > /tmp/big-values.yaml <<'YAML'
           api:
             config:
@@ -2150,6 +2156,34 @@ jobs:
               registry:
                 oci:
                   upload_session_timeout_hours: 1000000
+          # debugLingerSeconds and listener.healthPort are deliberately absent:
+          # their values.schema.json maximum (14400 and 65535) is below the 1e6
+          # at which Go switches a float64 to exponent form, so the schema
+          # already refuses any value that could render this way. They carry
+          # | int64 anyway, but setting them here would fail lint for an
+          # unrelated reason and say nothing about notation.
+          runners:
+            ttlSecondsAfterFinished: 1000000
+            terminationGracePeriodSeconds: 1000000
+            tokenTTLSeconds: 1000000
+            maxTokenTTLSeconds: 1000000
+            staleTimeoutSeconds: 1000000
+            launchTimeoutSeconds: 1000000
+            eeStartupTimeoutSeconds: 1000000
+            driftMaxDurationSeconds: 1000000
+            configureTimeoutMinutes: 1000000
+            configureNoProgressSeconds: 1000000
+            configureRetries: 1000000
+            configureRetryBackoffSeconds: 1000000
+            lifecycleDestroyRetries: 1000000
+            lifecycleDestroyRetryBackoffSeconds: 1000000
+          listener:
+            heartbeatInterval: 1000000
+            maxConcurrent: 1000000
+            pollInterval: 1000000
+            sseReadTimeout: 1000000
+            sseMaxAge: 1000000
+            sseRetryInterval: 1000000
           YAML
           out=$(docker run --rm -v "$PWD:/chart" -v /tmp/big-values.yaml:/tmp/big-values.yaml -w /chart \
             "${HELM_IMAGE:-alpine/helm:3.17.2}" template terrapod helm/terrapod \
@@ -2318,6 +2352,124 @@ jobs:
               --set api.config.registry.oci.mirror_tag_ttl_hours=0)
           echo "$zero" | grep -q "mirror_tag_ttl_hours: 0" || { echo "FAIL: mirror_tag_ttl_hours=0 did not render — 'never re-check' would silently become the code default (#1425)"; exit 1; }
           echo "Cached-image staleness threshold renders OK, including 0"
+
+      - name: (helm-smoke) A runner setting the API reads reaches the API pod
+        run: |
+          # Leg 3 of the config-channel contract, for the settings the API reads
+          # off RunnerConfig (#2520). `configmap-runner.yaml` is gated on
+          # `listener.enabled` and the API never mounted it, so in the documented
+          # multi-cluster layout -- API with `listener.enabled: false`, agents in
+          # their own release -- every one of these silently fell back to its code
+          # default. Nothing reported that the operator's value went nowhere.
+          #
+          # Greps the RENDERED output, and asserts the VALUE rather than the
+          # presence of the key: a render line that dropped the value would still
+          # satisfy a key-only grep while the default won.
+          render() {
+            docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+              template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 "$@"
+          }
+
+          # The decisive case: the listener is OFF, so the runner ConfigMap does
+          # not exist at all and this is the only channel there is.
+          out=$(render --set listener.enabled=false --set runners.configureNoProgressSeconds=4200)
+          case "$out" in
+            *terrapod-runner-config*)
+              echo "FAIL: the runner ConfigMap rendered with listener.enabled=false"; exit 1 ;;
+          esac
+          echo "$out" | grep -q '^    configure_no_progress_seconds: 4200$' || {
+            echo "FAIL: runners.configureNoProgressSeconds does not reach the API pod"
+            echo "      with listener.enabled=false (#2520). The API mounts the"
+            echo "      api-config ConfigMap at /etc/terrapod, which is where"
+            echo "      load_runner_config() looks for runners.yaml."
+            echo "$out" | grep -n 'configure_no_progress_seconds' || echo "      (not rendered at all)"
+            exit 1
+          }
+          # ...and it has to be in the ConfigMap the API actually mounts.
+          api_cm=$(echo "$out" | awk '/name: terrapod-api-config/,/^---/')
+          case "$api_cm" in
+            *"runners.yaml: |"*) ;;
+            *) echo "FAIL: runners.yaml is not a key of terrapod-api-config"; exit 1 ;;
+          esac
+
+          # An explicit 0 is how three of these are DISABLED, and `| default N`
+          # rendered the default instead because Go templates treat 0 as empty --
+          # the integer twin of the `| default true` trap. Both ConfigMaps.
+          zero=$(render --set runners.configureNoProgressSeconds=0 \
+                        --set runners.driftMaxDurationSeconds=0 \
+                        --set runners.lifecycleDestroyRetries=0)
+          for pair in configure_no_progress_seconds drift_max_duration_seconds lifecycle_destroy_retries; do
+            n=$(echo "$zero" | grep -c "^    ${pair}: 0$")
+            [ "$n" = 2 ] || {
+              echo "FAIL: ${pair}: 0 renders in $n of 2 ConfigMaps — an operator"
+              echo "      cannot disable it. Use dig, not | default."
+              echo "$zero" | grep -n "${pair}:"
+              exit 1
+            }
+          done
+
+          # In a combined release both ConfigMaps carry these keys, and they must
+          # agree: the reconciler and the listener acting on different numbers for
+          # one setting is invisible, because both pods start.
+          both=$(render --set runners.configureTimeoutMinutes=240 --set runners.staleTimeoutSeconds=99)
+          [ "$(echo "$both" | grep -c '^    configure_timeout_minutes: 240$')" = 2 ] || {
+            echo "FAIL: the two ConfigMaps disagree about configure_timeout_minutes"; exit 1; }
+          [ "$(echo "$both" | grep -c '^    stale_timeout_seconds: 99$')" = 2 ] || {
+            echo "FAIL: the two ConfigMaps disagree about stale_timeout_seconds"; exit 1; }
+          echo "every runner setting the API reads reaches the API pod"
+
+      - name: (helm-smoke) Configure Jobs can be scheduled apart from plan and apply
+        run: |
+          # #2524. Asserted as a PAIR: the configure block reaches runners.yaml
+          # and the general settings are left intact beside it. An override that
+          # REPLACED them would satisfy a one-sided check while silently dropping
+          # the operator's general selector for configure Jobs.
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+            --set redis.url=redis://redis:6379 \
+            --set runners.nodeSelector.pool=general \
+            --set 'runners.configure.nodeSelector.karpenter\.sh/capacity-type=on-demand')
+          echo "$out" | grep -q '^    configure:$' || {
+            echo "FAIL: runners.configure never reaches runners.yaml (#2524)"; exit 1; }
+          # Captured rather than piped into `grep -q`: that exits on its first
+          # match, the upstream awk takes SIGPIPE, and under pipefail the
+          # assertion would fire on output that is perfectly correct.
+          # The three lines CONTIGUOUSLY, key included. Matching only the value
+          # somewhere after `configure:` passes when the key is misspelled -- and
+          # a key RunnerPhaseScheduling does not have is dropped in silence, so
+          # the operator's selector is accepted, rendered, shipped and ignored.
+          want=$'    configure:\n      node_selector:\n        karpenter.sh/capacity-type: on-demand'
+          case "$out" in
+            *"$want"*) ;;
+            *) echo "FAIL: the configure nodeSelector does not render as"
+               echo "      configure.node_selector — a key RunnerPhaseScheduling"
+               echo "      does not model is dropped in silence."
+               echo "$out" | awk '/^    configure:$/,0 {if (++n<=5) print}'
+               exit 1 ;;
+          esac
+          echo "$out" | grep -q '^      pool: general$' || {
+            echo "FAIL: the general nodeSelector is gone — the block must MERGE OVER it"; exit 1; }
+          # And it must not leak into the API's copy: this is a Job-building
+          # setting the listener reads, not something the reconciler acts on.
+          api_cm=$(echo "$out" | awk '/name: terrapod-api-config/,/^---/')
+          case "$api_cm" in
+            *$'\n    configure:\n'*)
+              echo "FAIL: the configure scheduling block rendered into the API ConfigMap"; exit 1 ;;
+          esac
+          # Absent (the default) must render nothing at all, so an existing
+          # deployment's runners.yaml is byte-identical.
+          plain=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+            --set redis.url=redis://redis:6379)
+          case "$plain" in
+            *$'\n    configure:\n'*)
+              echo "FAIL: an unset runners.configure still renders a block"; exit 1 ;;
+          esac
+          echo "configure scheduling renders, merges, and is absent by default"
 
       - name: (helm-smoke) Local dev values render
         run: |

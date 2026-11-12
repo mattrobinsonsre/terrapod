@@ -620,6 +620,41 @@ def _add_execution_environment(
     sec.setdefault("fsGroup", _EE_FS_GROUP)
 
 
+def _phase_scheduling(
+    runner_config: RunnerConfig, phase: str
+) -> tuple[dict[str, str], list[dict], dict]:
+    """`(nodeSelector, tolerations, affinity)` for this phase's Job (#2524).
+
+    The general `runner_config` settings apply to every Job a listener launches,
+    which cannot express that the phases have different interruption profiles: a
+    plan is minutes long and cheap to retry, while a configure can run for an
+    hour and is not safely restartable, so an interrupted one leaves hosts
+    half-configured. A configure may therefore need to be pinned to capacity
+    that will not be reclaimed, without moving every plan and apply with it.
+
+    The per-phase block is MERGED OVER the general settings rather than
+    replacing them, per key wherever Kubernetes treats the keys as independent
+    -- `RunnerPhaseScheduling` carries the reasoning for each of the three. The
+    merge direction matters more than it looks: replacement would make an
+    operator restate their general selector here, and the failure mode of that
+    is silent -- they later edit the general one, forget the copy, and configure
+    Jobs quietly keep landing where the old value said.
+
+    A phase with no block of its own, and an empty block, both return the
+    general settings unchanged, so this is byte-identical to the behaviour
+    before it existed.
+    """
+    general = (runner_config.node_selector, runner_config.tolerations, runner_config.affinity)
+    if phase != "configure":
+        return general
+    override = runner_config.configure
+    return (
+        {**runner_config.node_selector, **override.node_selector},
+        [*runner_config.tolerations, *override.tolerations],
+        {**runner_config.affinity, **override.affinity},
+    )
+
+
 def build_job_spec(
     run_id: str,
     phase: str,  # "plan", "apply" or "configure"
@@ -1143,12 +1178,17 @@ def build_job_spec(
     # Image pull secrets — for pulling custom runner images from private registries
     if runner_config.image_pull_secrets:
         pod_spec["imagePullSecrets"] = [{"name": s} for s in runner_config.image_pull_secrets]
-    if runner_config.node_selector:
-        pod_spec["nodeSelector"] = runner_config.node_selector
-    if runner_config.tolerations:
-        pod_spec["tolerations"] = runner_config.tolerations
-    if runner_config.affinity:
-        pod_spec["affinity"] = runner_config.affinity
+    # Per-phase scheduling (#2524). ONE resolution site, as with
+    # `effective_service_account` above: the three fields have to agree about
+    # which phase they are placing, and reading the phase separately in three
+    # places is how they come to disagree.
+    node_selector, tolerations, affinity = _phase_scheduling(runner_config, phase)
+    if node_selector:
+        pod_spec["nodeSelector"] = node_selector
+    if tolerations:
+        pod_spec["tolerations"] = tolerations
+    if affinity:
+        pod_spec["affinity"] = affinity
     if runner_config.priority_class_name:
         pod_spec["priorityClassName"] = runner_config.priority_class_name
     if runner_config.topology_spread_constraints:

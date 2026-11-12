@@ -376,6 +376,24 @@
         "affinity": {
           "type": "object"
         },
+        "configure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodeSelector": {
+              "type": "object"
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "affinity": {
+              "type": "object"
+            }
+          }
+        },
         "podAnnotations": {
           "type": "object"
         },

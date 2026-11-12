@@ -939,4 +939,52 @@ data:
       distinct_credentials_per_minute: {{ .Values.api.config.rate_limit.distinct_credentials_per_minute | int64 }}
       trusted_proxy_cidrs: {{ .Values.api.config.rate_limit.trusted_proxy_cidrs | default list | toJson }}
     {{- end }}
+  {{- /*
+  The runner settings the API ITSELF reads (#2520).
+
+  `RunnerConfig` is the listener's config object, but the API reads a handful of
+  its fields too -- the run reconciler's timeouts, the lifecycle- and
+  configure-retry cycles, the runner-token TTLs, the execution-hooks
+  kill-switch. It reads them the same way the listener does, through
+  `load_runner_config()`, whose file source is /etc/terrapod/runners.yaml.
+
+  That file reached the API only by accident of co-location, and in the
+  documented multi-cluster layout it never did: `configmap-runner.yaml` is
+  wrapped in `{{- if .Values.listener.enabled }}`, the API Deployment does not
+  mount it, and in an API-only release it is not even rendered. So an operator
+  who set `runners.configureNoProgressSeconds` in the API's own release changed
+  nothing, one who set it in an agent release changed a file the API never
+  reads, and the API silently kept the code default -- with nothing anywhere
+  reporting that the value had gone nowhere.
+
+  The API mounts THIS ConfigMap at /etc/terrapod, so a `runners.yaml` key here
+  lands at exactly that path whatever `listener.enabled` is. Only the fields the
+  API actually reads are rendered: this is the API's copy, not a second home for
+  listener-only material such as the service accounts, the Job scheduling, the
+  proxy or the CA paths.
+
+  Every key is spelled exactly as `configmap-runner.yaml` spells it, so a
+  combined release gives both components the same value. `dig` rather than
+  `| default` for the integers, because Go templates treat 0 as empty and three
+  of these document 0 as the way to switch them off.
+  */}}
+  runners.yaml: |
+    token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds | int64 }}
+    max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds | int64 }}
+    stale_timeout_seconds: {{ .Values.runners.staleTimeoutSeconds | int64 }}
+    launch_timeout_seconds: {{ dig "launchTimeoutSeconds" 300 .Values.runners | int64 }}
+    ee_startup_timeout_seconds: {{ dig "eeStartupTimeoutSeconds" 600 .Values.runners | int64 }}
+    drift_max_duration_seconds: {{ dig "driftMaxDurationSeconds" 1800 .Values.runners | int64 }}
+    configure_timeout_minutes: {{ dig "configureTimeoutMinutes" 180 .Values.runners | int64 }}
+    configure_no_progress_seconds: {{ dig "configureNoProgressSeconds" 1800 .Values.runners | int64 }}
+    configure_retries: {{ dig "configureRetries" 0 .Values.runners | int64 }}
+    configure_retry_backoff_seconds: {{ dig "configureRetryBackoffSeconds" 45 .Values.runners | int64 }}
+    lifecycle_destroy_retries: {{ dig "lifecycleDestroyRetries" 2 .Values.runners | int64 }}
+    lifecycle_destroy_retry_backoff_seconds: {{ dig "lifecycleDestroyRetryBackoffSeconds" 45 .Values.runners | int64 }}
+    {{- /* `dig`, not `| default true`: an explicit `false` is the whole point of
+       a kill-switch and `default` would render it back as true. */}}
+    hooks_enabled: {{ dig "hooksEnabled" true .Values.runners }}
+    {{- /* The reconciler reads this to describe a pod stuck in its init
+       containers, so it has to name the namespace the Jobs are really in. */}}
+    runner_namespace: {{ include "terrapod.runnerNamespace" . | quote }}
 {{- end }}

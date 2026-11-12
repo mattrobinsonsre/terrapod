@@ -27,6 +27,7 @@ import pathlib
 
 import pytest
 
+from terrapod.config import RunnerPhaseScheduling
 from tests.runner.test_job_template import _runner_config
 
 GOLDEN = pathlib.Path(__file__).parent / "job_spec_golden.json"
@@ -262,6 +263,36 @@ SCENARIOS: dict[str, dict] = {
     #
     # The values are not credentials, deliberately -- the golden is committed.
     # The builder never parses them, so a placeholder pins the same spec.
+    # Per-phase scheduling (#2524), as a PAIR. The configure Job takes the
+    # override MERGED over the general settings -- `pool` survives from the
+    # general selector while `capacity-type` is won by the override -- and the
+    # plan below must show the general settings untouched. One of these alone
+    # would pass just as well if the override reached every phase, which would
+    # move every plan and apply off the capacity chosen for them.
+    "configure-scheduling-on-configure": {
+        "general_scheduling": {
+            "node_selector": {"pool": "general", "karpenter.sh/capacity-type": "spot"},
+            "tolerations": [{"key": "spot", "operator": "Exists", "effect": "NoSchedule"}],
+        },
+        "phase": "configure",
+        "ee_image": "ghcr.io/x/terrapod-ee:2.21",
+        "config_directory": "ansible",
+        "configure_scheduling": {
+            "node_selector": {"karpenter.sh/capacity-type": "on-demand"},
+            "tolerations": [{"key": "configure", "operator": "Exists", "effect": "NoSchedule"}],
+        },
+    },
+    "configure-scheduling-on-plan": {
+        "general_scheduling": {
+            "node_selector": {"pool": "general", "karpenter.sh/capacity-type": "spot"},
+            "tolerations": [{"key": "spot", "operator": "Exists", "effect": "NoSchedule"}],
+        },
+        "phase": "plan",
+        "configure_scheduling": {
+            "node_selector": {"karpenter.sh/capacity-type": "on-demand"},
+            "tolerations": [{"key": "configure", "operator": "Exists", "effect": "NoSchedule"}],
+        },
+    },
     "configure-with-credentials": {
         "phase": "configure",
         "ee_image": "ghcr.io/x/terrapod-ee:2.21",
@@ -307,6 +338,11 @@ def _cfg():
     # caught only because the repr embeds a memory address and the golden
     # therefore failed loudly. A value that did not would have been accepted.
     cfg.configure_service_account_name = ""
+    # Empty, same mechanism one slot over (#2524): unset it arrives as a truthy
+    # MagicMock, so `configure.node_selector` would render a mock repr into every
+    # configure scenario's nodeSelector. The `configure-scheduling-*` pair below
+    # pins the feature ON.
+    cfg.configure = RunnerPhaseScheduling()
     cfg.termination_grace_period_seconds = 120
     cfg.extra_env_from = []
     # The shared mock leaves this False, and the CA block is gated on
@@ -341,6 +377,16 @@ def _render(name: str) -> dict:
         cfg.apply_service_account_name = scenario.pop("apply_service_account_name")
     if "configure_service_account_name" in scenario:
         cfg.configure_service_account_name = scenario.pop("configure_service_account_name")
+    if "configure_scheduling" in scenario:
+        cfg.configure = RunnerPhaseScheduling(**scenario.pop("configure_scheduling"))
+    # Set alongside the override rather than on the shared mock: on the mock it
+    # would pin a nodeSelector into all 36 other entries and bury the two this
+    # pair is about. Both are needed together, because against an EMPTY general
+    # selector a merge and a replacement render the same spec.
+    if "general_scheduling" in scenario:
+        general = scenario.pop("general_scheduling")
+        cfg.node_selector = general.get("node_selector", {})
+        cfg.tolerations = general.get("tolerations", [])
     neutral = dict(BASE)
     neutral.update({k: v for k, v in scenario.items() if k not in option_fields})
     return TerraformStrategy().build_job_spec(options=options, runner_config=cfg, **neutral)
