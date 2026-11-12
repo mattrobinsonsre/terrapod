@@ -1,0 +1,43 @@
+# Does the CI path gating still skip only what it should?
+#
+# `scripts/ci-affected.py` skips job families a change cannot affect. Its input
+# sets are derived from the tree, so they cannot lag what they derive from --
+# but a derivation has a blind spot by construction, and the failure is SILENT:
+# a skipped job and a passing job look identical in the checks list, so a gating
+# mistake never announces itself.
+#
+# Pushes to `main` run everything, which makes main's history a record of what a
+# change really did break, graded with no gating applied. This replays that
+# record against the gate's decisions and fails if a job that FAILED on main is
+# one the gate would have skipped on the pull request.
+#
+# Weekly rather than per-run: the evidence only accumulates once changes land,
+# and a hit names a job and a merge, so it is actionable whenever it is noticed.
+name: CI Selection Audit
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    name: CI Selection Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # `git show <sha>` on main's recent merges needs real history.
+          fetch-depth: 0
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Replay main's history against the gate's decisions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/ci-selection-audit.py --repo "${GITHUB_REPOSITORY}" --runs 30
