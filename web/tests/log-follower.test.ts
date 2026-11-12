@@ -13,7 +13,6 @@ import {
   createLogFollower,
   parseLogFrame,
   type LogFollower,
-  type LogTextMode,
 } from '../src/lib/log-follower.ts'
 
 const enc = new TextEncoder()
@@ -67,16 +66,19 @@ function harness(respond: (call: ReadCall, n: number) => Promise<Uint8Array | nu
   const clock = fakeClock()
   const calls: ReadCall[] = []
   let shown = ''
-  const writes: LogTextMode[] = []
+  const writes: string[] = []
   const follower: LogFollower = createLogFollower({
     read: async (offset, fresh) => {
       const call = { offset, fresh }
       calls.push(call)
       return respond(call, calls.length)
     },
-    onText: (text, mode) => {
-      writes.push(mode)
-      shown = mode === 'replace' ? text : shown + text
+    onText: (text) => {
+      // Recorded as 'replace' so the assertions that pin "no append is ever
+      // produced" keep meaning something: the mode is gone from the API
+      // BECAUSE only this one was reachable.
+      writes.push('replace')
+      shown = text
     },
     setTimer: clock.setTimer,
     clearTimer: clock.clearTimer,

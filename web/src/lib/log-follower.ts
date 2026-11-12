@@ -15,8 +15,9 @@
  * post-plan policy output). The client has to keep asking until ETX arrives.
  * This module does that:
  *
- *  - **streaming**: an incremental poll every `pollIntervalMs`, appending the
- *    bytes past the current offset. This is the page's live view, unchanged.
+ *  - **streaming**: a poll every `pollIntervalMs` that re-reads the log from
+ *    the start and replaces the text. It used to append past an offset; see
+ *    below for why it cannot.
  *  - **finished**: keep fetching, with a backoff (`followDelaysMs`), until a
  *    response carries ETX, then stop. The budget is bounded so a log that
  *    never finalises (a Job killed before its upload) cannot poll forever.
@@ -56,8 +57,10 @@
 
 export type LogPhaseState = 'idle' | 'streaming' | 'finished'
 
-/** How a fetch's text should be applied to what is displayed. */
-export type LogTextMode = 'replace' | 'append'
+/* `LogTextMode` is gone with the incremental read. Every fetch now starts at
+ * offset 0, so the only possible application is a whole replace -- a union with
+ * one reachable member, and three `else` branches in the run page that could
+ * never run, is the shape somebody later reinstates a use for. */
 
 export interface LogFrame {
   /** Decoded log text, with the STX/ETX markers removed. */
@@ -98,8 +101,8 @@ export interface LogFollowerOptions {
    * `fresh` is true for a reset, so the caller can drop a cached log URL.
    */
   read: (offset: number, fresh: boolean) => Promise<Uint8Array | null>
-  /** Display `text`, replacing or appending to what is shown. */
-  onText: (text: string, mode: LogTextMode) => void
+  /** Display `text`, REPLACING what is shown. Every read starts at offset 0. */
+  onText: (text: string) => void
   /** Delays between follow fetches once the phase has finished. */
   followDelaysMs?: readonly number[]
   pollIntervalMs?: number
@@ -204,7 +207,7 @@ export function createLogFollower(opts: LogFollowerOptions): LogFollower {
     const frame = parseLogFrame(bytes, from)
     if (frame.ended) complete = true
     if (frame.dataBytes <= 0) return
-    opts.onText(frame.text, from === 0 ? 'replace' : 'append')
+    opts.onText(frame.text)
   }
 
   /** Run `first`, then every request queued while it ran, one at a time. */
