@@ -103,6 +103,89 @@ describe('long hints are two-tier', () => {
   })
 })
 
+describe('the lead rules hold in EVERY locale, not just English', () => {
+  // The two length rules above read `en.json` alone, so a 400-character lead in
+  // a translation satisfied nothing -- and the languages that expand 20-30%
+  // against English are exactly where it would happen. The rules are about what
+  // a reader sees, and a reader sees their own language.
+  //
+  // Each locale is judged on the values it ACTUALLY carries. An absent key is
+  // not a failure here: the catalogues deep-merge over `en`, so an absent lead
+  // renders the English one, which the rules above already cover. That is also
+  // what keeps `en-GB` -- a spelling-delta override that is deliberately a
+  // subset -- from failing a rule it is not in scope for.
+  const localeFiles = readdirSync(path.join(here, '..', 'messages'))
+    .filter((f) => f.endsWith('.json') && f !== 'en.json')
+  const locales = localeFiles.map((f) => [
+    f.replace(/\.json$/, ''),
+    flat(JSON.parse(readFileSync(path.join(here, '..', 'messages', f), 'utf8'))),
+  ] as const)
+
+  /** The (lead, hint) key pairs, resolved once against the English catalogue. */
+  const pairs = Object.entries(HINT_LEADS).map(([hint, lead]) => {
+    const hk = Object.keys(ALL).find((f) => f === hint || f.endsWith(`.${hint}`))!
+    return [hk.replace(hint, lead), hk] as const
+  })
+
+  it('examines a real set of locales and pairs, so it cannot pass on nothing', () => {
+    // Both floors, because every assertion below is inside a loop: an empty
+    // locale list or an empty pair list would report success having checked
+    // nothing at all.
+    assert.ok(locales.length >= 25, `only ${locales.length} locales found`)
+    assert.ok(pairs.length >= 1, 'no hint/lead pairs to check')
+  })
+
+  it('a translated lead is shorter than its own translated hint', () => {
+    for (const [loc, msgs] of locales) {
+      for (const [lk, hk] of pairs) {
+        if (!(lk in msgs) || !(hk in msgs)) continue
+        assert.ok(
+          msgs[lk].length < msgs[hk].length,
+          `${loc}: ${lk} (${msgs[lk].length}) is not shorter than ${hk} (${msgs[hk].length})`,
+        )
+      }
+    }
+  })
+
+  // Expressed as a multiple of LONG so it tracks if the threshold moves, and
+  // generous on purpose. A translation is NOT held to the English bound: the
+  // longest English lead is 220 of a 250 budget, so a faithful rendering in a
+  // language that expands 20-30% lands near 290 -- measured, pt-BR 291, fr 288,
+  // de 272 on `allowForkPrPlans.lead`, which is the only key that exceeds 250 in
+  // any locale. Holding those to 250 would make a translator DROP CONTENT rather
+  // than shorten, which is worse than a slightly long lead.
+  //
+  // What the rule is actually about is "a 400-character lead is the wall of text
+  // with an icon added", and 375 still catches that. Measured headroom today: the
+  // worst value is 291, and nothing anywhere exceeds 300.
+  const LOCALE_LONG = Math.round(LONG * 1.5)
+
+  it('a translated lead is still short enough to read at a glance', () => {
+    for (const [loc, msgs] of locales) {
+      for (const [lk] of pairs) {
+        if (!(lk in msgs)) continue
+        assert.ok(
+          msgs[lk].length < LOCALE_LONG,
+          `${loc}: ${lk} is ${msgs[lk].length} chars (limit ${LOCALE_LONG}), itself a long hint`,
+        )
+      }
+    }
+  })
+
+  it('that allowance is not so wide it has stopped meaning anything', () => {
+    // A bound nothing approaches is a bound nobody would notice drifting. If the
+    // real worst case ever climbs past two thirds of the allowance, the English
+    // lead it comes from has itself grown too long for translation.
+    const longest = Math.max(
+      ...locales.flatMap(([, msgs]) => pairs.filter(([lk]) => lk in msgs).map(([lk]) => msgs[lk].length)),
+    )
+    assert.ok(
+      longest < LOCALE_LONG * 0.8,
+      `the longest translated lead is ${longest} of ${LOCALE_LONG}; shorten the English lead it renders`,
+    )
+  })
+})
+
 describe('every long hint is RENDERED two-tier, not merely registered', () => {
   // The registry half alone is satisfiable while the finding persists: a hint
   // can have a lead and still be rendered as a wall of text. So this walks the

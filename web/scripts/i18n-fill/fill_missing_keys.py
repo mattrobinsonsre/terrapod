@@ -50,7 +50,56 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2] / "messages"
 
-_PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)")
+_IDENTIFIER = re.compile(r"[a-zA-Z0-9_]+")
+
+
+def placeholders(message: str) -> set[str]:
+    """The ICU ARGUMENT names in a message.
+
+    **ICU alternates by brace depth, and a regex cannot read it.** A placeholder
+    opens at ODD depth and its first identifier is the argument name; a plural's
+    sub-message opens at EVEN depth and its first word is prose. This used to be
+    a bare `\\{([a-zA-Z0-9_]+)` over the whole string, which cannot tell the two
+    apart -- so for
+
+        {files, plural, one {already cached (# file)} other {…}}
+
+    it reported the argument set as `{"files", "already"}` and then demanded the
+    translation open its sub-messages with the English word "already". That is
+    not a thing any translation can do, which made such a key UNFILLABLE: the
+    refusal named a placeholder that does not exist, and the only way past it
+    was to reword the English so every sub-message began with `#`.
+
+    Counting the depth is both the fix and strictly stronger than what it
+    replaces: it still catches an argument dropped or renamed in translation --
+    the invisible defect this check exists for, since the key is present and the
+    sentence reads fine while the placeholder renders as literal text -- and it
+    no longer invents one out of prose. `_self_check` drives the shapes below as
+    literal fixtures before any file is read, so narrowing it again fails by
+    name rather than quietly shrinking what is checked. The fixtures live in
+    this file because nothing in CI runs this script -- it is a tool, not a gate
+    -- so a test beside it would be a test nothing executes.
+    """
+    found: set[str] = set()
+    depth = 0
+    i = 0
+    while i < len(message):
+        char = message[i]
+        if char == "'" and i + 1 < len(message) and message[i + 1] in "{}#|":
+            # An ICU quote: the next special character is literal text. Skipped
+            # so `'{'` is not read as opening a placeholder.
+            i += 2
+            continue
+        if char == "{":
+            depth += 1
+            if depth % 2 == 1:
+                match = _IDENTIFIER.match(message, i + 1)
+                if match:
+                    found.add(match.group())
+        elif char == "}":
+            depth = max(0, depth - 1)
+        i += 1
+    return found
 
 
 def missing_keys(locale: str, namespace: str) -> tuple[str, ...]:
@@ -113,7 +162,39 @@ def _load(locale: str) -> collections.OrderedDict:
     return json.loads(path.read_text(), object_pairs_hook=collections.OrderedDict)
 
 
+#: `(message, the argument names it carries)`. The last three are the ones a
+#: depth-blind matcher gets wrong, and the first four are what stop a fix for
+#: them from being a matcher that finds nothing.
+_PLACEHOLDER_FIXTURES: tuple[tuple[str, set[str]], ...] = (
+    ("no placeholders here", set()),
+    ("one {limit} of them", {"limit"}),
+    ("{a} and {b}", {"a", "b"}),
+    ("{count, plural, one {# thing} other {# things}}", {"count"}),
+    # A sub-message opening with PROSE. Depth-blind, "already" reads as a second
+    # argument and the key becomes unfillable.
+    ("{files, plural, one {already cached (# file)} other {already cached}}", {"files"}),
+    # A nested argument inside a sub-message is still an argument.
+    ('{count, plural, one {# of "{name}"} other {# of "{name}"}}', {"count", "name"}),
+    # A quoted brace is literal text, not an argument.
+    ("a literal '{' brace and a real {arg}", {"arg"}),
+)
+
+
+def _self_check() -> None:
+    """Prove the matcher still matches, before it is trusted about anything.
+
+    A matcher that has quietly stopped recognising a form reports no problems,
+    which reads exactly like a clean fill -- so this asserts the forms rather
+    than counting hits, and runs before any catalogue is read.
+    """
+    for message, want in _PLACEHOLDER_FIXTURES:
+        got = placeholders(message)
+        if got != want:
+            sys.exit(f"placeholder matcher is broken: {message!r} gave {sorted(got)}")
+
+
 def main() -> int:
+    _self_check()
     ap = argparse.ArgumentParser()
     ap.add_argument("locale")
     ap.add_argument(
@@ -194,8 +275,8 @@ def main() -> int:
         if not isinstance(src, str):
             problems.append(f"{key}: names a GROUP in `en`, not a value — fill its leaves")
             continue
-        want = sorted(set(_PLACEHOLDER.findall(src)))
-        got = sorted(set(_PLACEHOLDER.findall(value)))
+        want = sorted(placeholders(src))
+        got = sorted(placeholders(value))
         if want != got:
             problems.append(f"{key}: placeholders {got} should be {want}")
         if value == src and key not in allow_identical:

@@ -1863,7 +1863,36 @@
       "continuePurge": "Continue the purge, you must",
       "continuing": "Continuing, we are…"
     },
-    "sealedWarning": "Sealed, this node is, so nothing purged here fetched again can be. For that reason, these caches the scheduled cleanup skips — a permanent deletion, this is."
+    "sealedWarning": "Sealed, this node is, so nothing purged here fetched again can be. For that reason, these caches the scheduled cleanup skips — a permanent deletion, this is.",
+    "warmAhead": {
+      "heading": "Package and image caches, warm them",
+      "help": "A version wherever you know it, give: against a lockfile, a warm named at a version afterwards checked can be, and “whatever is newest” cannot. As <code>name version</code>, each line write; for Pulumi plugins, trailing <code>os/arch</code> tokens add, specific platforms to warm.",
+      "ecosystemLabel": "Kind, artifact",
+      "ecosystemOff": "{ecosystem} (off, switched)",
+      "sourceLabel": "From, fetch",
+      "sourceDefault": "Upstream, configured",
+      "upstreamIs": "From <code>{url}</code>, fetch it will.",
+      "upstreamPerReference": "Its own host, each image reference names — and one of the upstreams this deployment has configured, that host must be.",
+      "itemsLabel": "Artifacts, the",
+      "imagesLabel": "References, image",
+      "willWarm": "{count, plural, one {Warmed # artifact will be.} other {Warmed # artifacts will be.}}",
+      "unversioned": "{count, plural, one {No version, # line names — so fetched the newest available will be. Reproducible, that is not.} other {No version, # lines name — so fetched the newest available will be. Reproducible, that is not.}}",
+      "versionRequired": "{count, plural, one {No version, # line names.} other {No version, # lines name.}} No index to resolve a newest against, {ecosystem} publishes — so one, every line needs.",
+      "tooMany": "In one submission, at most {max} artifacts warmed can be.",
+      "confirm": "{count, plural, one {# artifact} other {# artifacts}} now, warm?",
+      "warm": "Warm",
+      "warming": "Warming, we are…",
+      "progress": "{completed} of {total}, done it is",
+      "fetched": "{fetched, plural, one {# file fetched} other {# files fetched}}",
+      "alreadyCached": "{files, plural, one {cached already (# file)} other {cached already (# files)}}",
+      "finished": "{succeeded}/{total} warmed ({failed} failed)",
+      "sealed": "Sealed, this node is, so from upstream fetch anything it cannot. Before sealing it, the caches warm — or to warm them now, unseal it.",
+      "errorEmpty": "At least one line to warm, add you must.",
+      "errorSources": "Where warming would fetch from, read we could not",
+      "errorSubmit": "Start warming, we could not",
+      "errorStatus": "Read the warming job, we could not",
+      "helpLead": "Into the cache, fetch artifacts before anything asks for them — one per line, as a name and a version."
+    }
   },
   "catalog": {
     "title": "Catalog, Service",

@@ -86,6 +86,59 @@ test.describe('Cache bulk-warm (#606)', () => {
   });
 });
 
+test.describe('Package and image cache warming (#2486)', () => {
+  test('the panel says where it would fetch from, and what it would do, before doing it', async ({
+    adminPage,
+  }) => {
+    // The two halves of the feature that are easy to ship without: an operator
+    // could not see which upstream a submission would reach, and a submission
+    // reported nothing until it had already run. Both are read from the server
+    // (`/admin/package-cache/sources`) rather than hardcoded, so this also
+    // proves the panel and that endpoint agree.
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.getByTestId('cache-warm-section')).toBeVisible({ timeout: 15_000 });
+    await adminPage.getByTestId('cache-warm-toggle').click();
+
+    // Where it will pull from, as a URL rather than implied. The default
+    // ecosystem is galaxy, whose configured upstream the stack ships.
+    await expect(adminPage.getByTestId('cache-warm-upstream')).toContainText('galaxy.ansible.com');
+
+    // Nothing to warm yet, so there is nothing to submit.
+    await expect(adminPage.getByTestId('cache-warm-submit')).toBeDisabled();
+
+    // Say what will happen BEFORE it happens: two lines, counted back.
+    await adminPage
+      .getByTestId('cache-warm-items')
+      .fill('community.general 9.2.0\nansible.posix 1.5.4');
+    await expect(adminPage.getByTestId('cache-warm-preview')).toContainText('2');
+    await expect(adminPage.getByTestId('cache-warm-submit')).toBeEnabled();
+  });
+
+  test('pulumi without a version is refused in the form, not after submitting', async ({
+    adminPage,
+  }) => {
+    // The server refuses the WHOLE submission for one unversioned pulumi item,
+    // so an operator who pasted fifty lines would otherwise learn that from a
+    // 422 with nothing warmed. `resolves-latest` comes from the server, so this
+    // is the client reading that flag rather than carrying its own copy of the
+    // rule.
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.getByTestId('cache-warm-section')).toBeVisible({ timeout: 15_000 });
+    await adminPage.getByTestId('cache-warm-toggle').click();
+
+    await adminPage.selectOption('#warm-ecosystem', 'pulumi');
+    await adminPage.getByTestId('cache-warm-items').fill('aws');
+
+    await expect(adminPage.getByTestId('cache-warm-preview')).toContainText(/no version/i);
+    await expect(adminPage.getByTestId('cache-warm-submit')).toBeDisabled();
+
+    // With a version it is submittable again — the refusal is about the
+    // missing version, not about pulumi being unwarmable.
+    await adminPage.getByTestId('cache-warm-items').fill('aws 6.0.0');
+    await expect(adminPage.getByTestId('cache-warm-submit')).toBeEnabled();
+  });
+});
+
 test.describe('Bulk update — auto-apply mode (#1276)', () => {
   // This page had no functional spec at all, only a redirect check in
   // rbac-negatives. The mode select is worth covering specifically because it

@@ -23,7 +23,7 @@ name: Release Re-scan
 # support, and a rule we have since added is the entire point of re-scanning.
 #
 # This is a reporter, not a gate. It does not fail on findings — the release-time
-# `scan-images` job is the gate, and a permanently red scheduled job is the same
+# `scan-images-<arch>` jobs are the gate, and a permanently red scheduled job is the same
 # failure mode as a noisy one: muted, then ignored when it matters.
 
 on:

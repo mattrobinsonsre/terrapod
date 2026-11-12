@@ -126,6 +126,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     async with get_db_session() as db:
         await init_token_signing_key(db)
 
+    # A configure Job allowed to outlive the token it is handed loses every
+    # upload it makes at exit (#2526). A warning and not a refusal -- see the
+    # helper's docstring -- and here rather than in `config.py`, which runs
+    # before logging is configured.
+    from terrapod.auth.runner_tokens import warn_about_phase_token_budget
+
+    warn_about_phase_token_budget()
+
     # Resolve the OIDC issuer signing key (#1901), only when an issuer is
     # published. Tolerant like the CA above rather than fatal: a deployment that
     # has not opted in must not be prevented from starting, and one that has can
@@ -608,9 +616,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # leaves a session row and its chunks behind, and only push access is needed
     # to do that repeatedly — so this is a storage-exhaustion control, not just
     # tidying. Hourly is ample against a timeout measured in hours.
-    # Warm-ahead (#1420). Registered when anything is warmable, since one handler
-    # serves all three ecosystems and each item re-checks its own gate.
-    if any(capability_enabled(c) for c in ("oci", "pypi", "npm")):
+    # Warm-ahead (#1420, widened in #2486). Registered when ANYTHING is
+    # warmable. The set is derived from `warm_ahead.ECOSYSTEMS` rather than
+    # listed, because it used to name three: on a deployment serving only the
+    # others, a submission was accepted, returned a job id, and nothing was
+    # ever registered to run it -- a job stuck at "queued" for ever, which
+    # reads as a stalled scheduler rather than a missing handler.
+    from terrapod.services.warm_ahead import ECOSYSTEMS as WARMABLE
+
+    if any(capability_enabled(c) for c in WARMABLE):
 
         async def _cache_warm(payload: dict) -> None:
             from terrapod.services.warm_ahead import WarmItem, run_job
@@ -1415,9 +1429,11 @@ def create_application() -> FastAPI:
 
     include_terrapod(binary_cache_router)
 
-    # Warm-ahead submission + status (#1420). One router for all three caches so
-    # a job's status stays reachable regardless of which of them is enabled.
-    if any(capability_enabled(c) for c in ("oci", "pypi", "npm")):
+    # Warm-ahead submission + status (#1420). One router for every cache so a
+    # job's status stays reachable regardless of which of them is enabled.
+    from terrapod.services.warm_ahead import ECOSYSTEMS as WARMABLE
+
+    if any(capability_enabled(c) for c in WARMABLE):
         from terrapod.api.routers.cache_warm import router as cache_warm_router
 
         include_terrapod(cache_warm_router)

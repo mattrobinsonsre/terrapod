@@ -452,6 +452,16 @@ class TestAuthenticationIsRequired:
             "/api/v1/admin/package-cache/warm",
             {"packages": [{"ecosystem": "pypi", "name": "requests"}]},
         ),
+        # Where a warm would fetch from (#2486). A READ, and the one route in
+        # this namespace that reports the deployment's configured upstreams --
+        # so an anonymous caller reaching it would disclose every mirror an
+        # operator has declared, which is why it is in the walk below rather
+        # than exempted as "just a listing".
+        "/api/v1/admin/package-cache/sources": (
+            "GET",
+            "/api/v1/admin/package-cache/sources",
+            None,
+        ),
         # List, totals, per-file delete and bulk eviction (#2474). Admin routes,
         # so they refuse without the proxy's Basic challenge -- see the walk below.
         "/api/v1/admin/package-cache": (

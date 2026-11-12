@@ -1863,7 +1863,36 @@
       "continuePurge": "Parhau i waredu",
       "continuing": "Yn parhau…"
     },
-    "sealedWarning": "Mae'r nod hwn wedi'i selio, felly ni ellir ail-nôl dim a waredir yma. Mae'r glanhau amserlennus yn hepgor y storfeydd hyn am y rheswm hwnnw — dileu parhaol yw hyn."
+    "sealedWarning": "Mae'r nod hwn wedi'i selio, felly ni ellir ail-nôl dim a waredir yma. Mae'r glanhau amserlennus yn hepgor y storfeydd hyn am y rheswm hwnnw — dileu parhaol yw hyn.",
+    "warmAhead": {
+      "heading": "Cynhesu storfeydd pecynnau a delweddau",
+      "help": "Rhowch fersiwn lle bynnag y gwyddoch hi: gellir gwirio cynhesiad a enwyd wrth fersiwn wedyn yn erbyn ffeil glo, ond nid “beth bynnag sydd fwyaf newydd”. Ysgrifennwch bob llinell ar ffurf <code>enw fersiwn</code>; ar gyfer ategion Pulumi, ychwanegwch docynnau <code>os/arch</code> ar y diwedd i gynhesu platfformau penodol.",
+      "ecosystemLabel": "Math o arteffact",
+      "ecosystemOff": "{ecosystem} (wedi'i ddiffodd)",
+      "sourceLabel": "Nôl o",
+      "sourceDefault": "Y ffynhonnell a ffurfweddwyd",
+      "upstreamIs": "Caiff ei nôl o <code>{url}</code>.",
+      "upstreamPerReference": "Mae pob cyfeiriad delwedd yn enwi ei westeiwr ei hun, ac mae'n rhaid i hwnnw fod yn un o'r ffynonellau a ffurfweddwyd gan y gosodiad hwn.",
+      "itemsLabel": "Arteffactau",
+      "imagesLabel": "Cyfeiriadau delwedd",
+      "willWarm": "{count, plural, zero {Caiff # arteffact eu cynhesu.} one {Caiff # arteffact ei gynhesu.} two {Caiff # arteffact eu cynhesu.} few {Caiff # arteffact eu cynhesu.} many {Caiff # arteffact eu cynhesu.} other {Caiff # arteffact eu cynhesu.}}",
+      "unversioned": "{count, plural, zero {Nid yw # llinell yn enwi fersiwn, felly caiff y fersiwn ddiweddaraf sydd ar gael ei nôl. Nid yw hynny'n atgynyrchadwy.} one {Nid yw # llinell yn enwi fersiwn, felly caiff y fersiwn ddiweddaraf sydd ar gael ei nôl. Nid yw hynny'n atgynyrchadwy.} two {Nid yw # linell yn enwi fersiwn, felly caiff y fersiwn ddiweddaraf sydd ar gael ei nôl. Nid yw hynny'n atgynyrchadwy.} few {Nid yw # llinell yn enwi fersiwn, felly caiff y fersiwn ddiweddaraf sydd ar gael ei nôl. Nid yw hynny'n atgynyrchadwy.} many {Nid yw # llinell yn enwi fersiwn, felly caiff y fersiwn ddiweddaraf sydd ar gael ei nôl. Nid yw hynny'n atgynyrchadwy.} other {Nid yw # llinell yn enwi fersiwn, felly caiff y fersiwn ddiweddaraf sydd ar gael ei nôl. Nid yw hynny'n atgynyrchadwy.}}",
+      "versionRequired": "{count, plural, zero {Nid yw # llinell yn enwi fersiwn.} one {Nid yw # llinell yn enwi fersiwn.} two {Nid yw # linell yn enwi fersiwn.} few {Nid yw # llinell yn enwi fersiwn.} many {Nid yw # llinell yn enwi fersiwn.} other {Nid yw # llinell yn enwi fersiwn.}} Nid yw {ecosystem} yn cyhoeddi mynegai y gellid datrys y diweddaraf yn ei erbyn, felly mae angen un ar bob llinell.",
+      "tooMany": "Gellir cynhesu {max} arteffact ar y mwyaf mewn un cyflwyniad.",
+      "confirm": "Cynhesu {count, plural, zero {# arteffact} one {# arteffact} two {# arteffact} few {# arteffact} many {# arteffact} other {# arteffact}} nawr?",
+      "warm": "Cynhesu",
+      "warming": "Wrthi'n cynhesu…",
+      "progress": "{completed} o {total} wedi'u gwneud",
+      "fetched": "{fetched, plural, zero {nôlwyd # ffeil} one {nôlwyd # ffeil} two {nôlwyd # ffeil} few {nôlwyd # ffeil} many {nôlwyd # ffeil} other {nôlwyd # ffeil}}",
+      "alreadyCached": "{files, plural, zero {eisoes yn y storfa (# ffeil)} one {eisoes yn y storfa (# ffeil)} two {eisoes yn y storfa (# ffeil)} few {eisoes yn y storfa (# ffeil)} many {eisoes yn y storfa (# ffeil)} other {eisoes yn y storfa (# ffeil)}}",
+      "finished": "Cynheswyd {succeeded}/{total} ({failed} wedi methu)",
+      "sealed": "Mae'r nod hwn wedi'i selio, felly ni all nôl dim o'r ffynhonnell. Cynheswch y storfeydd cyn ei selio, neu ei ddadselio er mwyn eu cynhesu nawr.",
+      "errorEmpty": "Ychwanegwch o leiaf un llinell i'w chynhesu.",
+      "errorSources": "Methwyd darllen o ble y byddai'r cynhesu'n nôl",
+      "errorSubmit": "Methwyd cychwyn y cynhesu",
+      "errorStatus": "Methwyd darllen y dasg gynhesu",
+      "helpLead": "Nôl arteffactau i'r storfa cyn i unrhyw beth ofyn amdanynt — un fesul llinell, ar ffurf enw a fersiwn."
+    }
   },
   "catalog": {
     "title": "Catalog Gwasanaethau",

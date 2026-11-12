@@ -78,7 +78,8 @@ ALWAYS_RUN: dict[str, str] = {
     # per-image and consumes the build matrix, so gating it means shrinking
     # that, which starves the five jobs loading the image artifacts. Second, a
     # scan reads the live advisory database rather than the image alone.
-    "scan-images": "scans the built images; its matrix consumes the build matrix",
+    "scan-images-amd64": "scans the built amd64 images; consumes that build",
+    "scan-images-arm64": "scans the built arm64 images; consumes that build",
     "e2e-test": "boots the whole stack from the PR's image artifacts",
     "e2e-report": "merges the e2e shards' reports",
     "helm-eval-boot": "boots the whole stack",

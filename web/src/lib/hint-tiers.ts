@@ -106,6 +106,11 @@ export const HINT_LEADS: Record<string, string> = {
   // ansibleCredentials
   knownHostsHint: 'knownHostsLead',
   machineHint: 'machineLead',
+  // adminBinaryCache — the cache-warm panel (#2486). 349 characters of
+  // always-visible prose above the form until now. The lead says what the
+  // control does; the detail carries why naming a version is worth it, and the
+  // one ecosystem whose artifacts are published per platform.
+  'warmAhead.help': 'warmAhead.helpLead',
 }
 
 /**

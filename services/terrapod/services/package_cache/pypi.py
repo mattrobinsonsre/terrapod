@@ -52,14 +52,22 @@ def upstream_base() -> str:
     return settings.registry.package_cache.pypi.upstream.rstrip("/")
 
 
-async def fetch_index(project: str, *, client: httpx.AsyncClient | None = None) -> dict:
+async def fetch_index(
+    project: str, *, client: httpx.AsyncClient | None = None, base: str | None = None
+) -> dict:
     """The upstream PEP 691 index for a project.
 
     Returns the parsed document. Raises :class:`NotFoundUpstream` for a project
     that does not exist, which the caller turns into a 404 — distinct from an
     upstream that is unreachable, which is a 502 and worth retrying.
+
+    `base` overrides the configured upstream for ONE call. Warming uses it to
+    pull from a named mirror (`registry.package_cache.<eco>.mirrors`); serving
+    never passes it, so the proxy's own request-forgery surface is unchanged.
+    Every file URL in the returned document is the index's own, so fetching from
+    a mirror yields artifact URLs on that mirror with nothing to rewrite.
     """
-    url = f"{upstream_base()}/simple/{normalise(project)}/"
+    url = f"{(base or upstream_base()).rstrip('/')}/simple/{normalise(project)}/"
     owns = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
     try:

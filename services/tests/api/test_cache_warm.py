@@ -16,7 +16,14 @@ from httpx import ASGITransport, AsyncClient
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.config import settings
-from terrapod.services.warm_ahead import ItemOutcome, WarmItem, WarmJob
+from terrapod.services.warm_ahead import (
+    ECOSYSTEMS,
+    MAX_ITEMS,
+    PACKAGE_ECOSYSTEMS,
+    ItemOutcome,
+    WarmItem,
+    WarmJob,
+)
 
 _BASE = "http://test"
 
@@ -199,3 +206,227 @@ class TestOneFailureDoesNotStopTheRest:
         assert job.succeeded == 2 and job.failed == 1
         assert "upstream exploded" in job.outcomes[1].detail
         assert job.status == "finished"
+
+
+class TestEveryEcosystem:
+    """The surface accepts every ecosystem the cache holds (#2486).
+
+    It accepted `pypi` and `npm` and 422'd the other four, while all six had
+    working pull-through proxies — so the caches an operator was least able to
+    fill by hand were the ones with no way to fill them.
+    """
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.services.warm_ahead.create_job", new_callable=AsyncMock)
+    @pytest.mark.parametrize("ecosystem", PACKAGE_ECOSYSTEMS)
+    async def test_each_one_is_accepted(self, create_job, enqueue, ecosystem: str) -> None:
+        create_job.return_value = WarmJob(
+            job_id="warm-x", status="queued", total=1, submitted_at="2026-01-01T00:00:00Z"
+        )
+        body = {"packages": [{"ecosystem": ecosystem, "name": "thing", "version": "1.0.0"}]}
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.post("/api/terrapod/v1/admin/package-cache/warm", json=body)
+
+        assert r.status_code == 202, r.text
+        assert enqueue.await_args[0][1]["items"][0]["ecosystem"] == ecosystem
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    async def test_pulumi_without_a_version_is_refused_at_the_door(self, enqueue) -> None:
+        # Refused here rather than per item: the submission would otherwise be
+        # accepted whole and the operator would learn it warmed nothing only by
+        # reading the outcomes.
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.post(
+                "/api/terrapod/v1/admin/package-cache/warm",
+                json={"packages": [{"ecosystem": "pulumi", "name": "aws"}]},
+            )
+
+        assert r.status_code == 422
+        assert "explicit version" in r.json()["detail"]
+        enqueue.assert_not_awaited()
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.services.warm_ahead.create_job", new_callable=AsyncMock)
+    async def test_an_unversioned_item_stays_a_convenience_elsewhere(
+        self, create_job, enqueue
+    ) -> None:
+        create_job.return_value = WarmJob(
+            job_id="warm-x", status="queued", total=1, submitted_at="2026-01-01T00:00:00Z"
+        )
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.post(
+                "/api/terrapod/v1/admin/package-cache/warm",
+                json={"packages": [{"ecosystem": "galaxy", "name": "community.general"}]},
+            )
+
+        assert r.status_code == 202
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    async def test_a_nameless_item_is_refused(self, enqueue) -> None:
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.post(
+                "/api/terrapod/v1/admin/package-cache/warm",
+                json={"packages": [{"ecosystem": "pypi", "name": ""}]},
+            )
+        assert r.status_code == 422
+        enqueue.assert_not_awaited()
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.services.warm_ahead.create_job", new_callable=AsyncMock)
+    async def test_platforms_reach_the_job(self, create_job, enqueue) -> None:
+        create_job.return_value = WarmJob(
+            job_id="warm-x", status="queued", total=1, submitted_at="2026-01-01T00:00:00Z"
+        )
+        body = {
+            "packages": [
+                {
+                    "ecosystem": "pulumi",
+                    "name": "aws",
+                    "version": "6.0.0",
+                    "platforms": ["darwin/arm64"],
+                }
+            ]
+        }
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.post("/api/terrapod/v1/admin/package-cache/warm", json=body)
+
+        assert r.status_code == 202
+        assert enqueue.await_args[0][1]["items"][0]["platforms"] == ["darwin/arm64"]
+
+
+class TestTheSource:
+    """Per-request choice of where a warm pulls from, by LABEL."""
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    async def test_an_undeclared_label_is_refused_naming_what_is_declared(self, enqueue) -> None:
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.post(
+                "/api/terrapod/v1/admin/package-cache/warm",
+                json={"packages": [{"ecosystem": "pypi", "name": "x", "source": "hub"}]},
+            )
+
+        assert r.status_code == 422
+        assert "mirrors" in r.json()["detail"]
+        enqueue.assert_not_awaited()
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.services.warm_ahead.create_job", new_callable=AsyncMock)
+    async def test_a_declared_label_reaches_the_job(self, create_job, enqueue) -> None:
+        create_job.return_value = WarmJob(
+            job_id="warm-x", status="queued", total=1, submitted_at="2026-01-01T00:00:00Z"
+        )
+        settings.registry.package_cache.pypi.mirrors["hub"] = "https://hub.example/pypi"
+        try:
+            async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+                r = await c.post(
+                    "/api/terrapod/v1/admin/package-cache/warm",
+                    json={"packages": [{"ecosystem": "pypi", "name": "x", "source": "hub"}]},
+                )
+        finally:
+            settings.registry.package_cache.pypi.mirrors.pop("hub")
+
+        assert r.status_code == 202
+        assert enqueue.await_args[0][1]["items"][0]["source"] == "hub"
+
+    @patch("terrapod.api.routers.cache_warm.enqueue_trigger", new_callable=AsyncMock)
+    async def test_a_url_in_source_is_refused_like_any_other_undeclared_label(
+        self, enqueue
+    ) -> None:
+        # The point of a label: `upstream` is the whole of this proxy's
+        # request-forgery surface precisely because it is operator-set, so a
+        # body carrying a URL must not become a fetch.
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.post(
+                "/api/terrapod/v1/admin/package-cache/warm",
+                json={
+                    "packages": [
+                        {"ecosystem": "pypi", "name": "x", "source": "http://attacker.example"}
+                    ]
+                },
+            )
+
+        assert r.status_code == 422
+        enqueue.assert_not_awaited()
+
+
+class TestSources:
+    """What a submission would pull from, before it is submitted."""
+
+    async def test_it_describes_every_warmable_thing(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.get("/api/terrapod/v1/admin/package-cache/sources")
+
+        assert r.status_code == 200
+        body = r.json()
+        by_id = {e["id"]: e["attributes"] for e in body["data"]}
+        assert set(by_id) == set(ECOSYSTEMS)
+        assert by_id["pypi"]["upstream"]
+        # Whether a version may be omitted is a property of the ecosystem's own
+        # protocol, so the UI reads it from here rather than hardcoding it.
+        assert by_id["pulumi"]["resolves-latest"] is False
+        assert body["meta"]["max-items"] == MAX_ITEMS
+
+    async def test_a_declared_mirror_is_visible(self) -> None:
+        settings.registry.package_cache.galaxy.mirrors["hub"] = "https://hub.example/galaxy"
+        try:
+            async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+                r = await c.get("/api/terrapod/v1/admin/package-cache/sources")
+        finally:
+            settings.registry.package_cache.galaxy.mirrors.pop("hub")
+
+        by_id = {e["id"]: e["attributes"] for e in r.json()["data"]}
+        assert by_id["galaxy"]["mirrors"] == {"hub": "https://hub.example/galaxy"}
+
+    async def test_it_says_when_the_node_is_sealed(self) -> None:
+        # So a UI can say warming is unavailable rather than offering a form
+        # whose submission can only 409.
+        settings.registry.cache_only = True
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.get("/api/terrapod/v1/admin/package-cache/sources")
+
+        assert r.json()["meta"]["sealed"] is True
+
+
+class TestAlreadyCachedIsReported:
+    """`fetched` 0 against a non-zero `files` is a different answer (#2486)."""
+
+    @patch("terrapod.services.warm_ahead.get_job", new_callable=AsyncMock)
+    async def test_the_outcome_carries_fetched_and_source(self, get_job) -> None:
+        # BOTH arms in one job, because either alone is vacuous: a fixture
+        # where every item is already cached passes against a serialiser that
+        # hardcodes `fetched: 0`, and one where every item was fetched passes
+        # against a serialiser that echoes `files`. Mutation-checked — the
+        # already-cached-only version of this test survived exactly that.
+        get_job.return_value = WarmJob(
+            job_id="warm-abc",
+            status="finished",
+            total=2,
+            submitted_at="2026-01-01T00:00:00Z",
+            completed=2,
+            outcomes=[
+                ItemOutcome(
+                    ecosystem="pypi",
+                    ref="requests@2.32.3",
+                    ok=True,
+                    files=4,
+                    fetched=0,
+                    source="https://hub.example/pypi",
+                ),
+                ItemOutcome(
+                    ecosystem="galaxy",
+                    ref="community.general@9.2.0",
+                    ok=True,
+                    files=4,
+                    fetched=4,
+                ),
+            ],
+        )
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            r = await c.get("/api/terrapod/v1/admin/warm-jobs/warm-abc")
+
+        already, fresh = r.json()["data"]["attributes"]["outcomes"]
+        assert (already["files"], already["fetched"]) == (4, 0)
+        assert already["source"] == "https://hub.example/pypi"
+        # The distinction is the whole point: these two must not serialise alike.
+        assert (fresh["files"], fresh["fetched"]) == (4, 4)
+        assert already["fetched"] != fresh["fetched"]

@@ -189,3 +189,56 @@ def verify_runner_token(token: str) -> str | None:
     """
     claims = verify_runner_token_claims(token)
     return claims.run_id if claims is not None else None
+
+
+def warn_about_phase_token_budget() -> None:
+    """Warn when a Job may outlive the token it is given (#2526).
+
+    A configure Job is allowed `configure_timeout_minutes`; its token is capped
+    by `max_token_ttl_seconds`. Where the cap is the smaller of the two, a
+    configure that runs past it finishes with a dead token and every upload it
+    makes at exit answers 401 -- the log, the per-host event stream, the
+    oversized-payload sidecar, and the resource profile that also carries why
+    the run failed. The run is still marked errored correctly, by the listener,
+    so nothing about the failure is loud.
+
+    **A warning rather than a refusal**, and that is deliberate: the
+    combination WORKS. Short configures are unaffected and long ones still run
+    and still change their hosts -- what they lose is their evidence. A refusal
+    here would be a refusal at import of `terrapod.config`, i.e. every API
+    replica in CrashLoopBackOff, which is a far worse answer to a
+    configuration that is merely lossy.
+
+    Called from the lifespan rather than from `config.py`, which imports
+    nothing from Terrapod and runs before logging is configured.
+    """
+    from terrapod.config import load_runner_config, runner_token_ttl_for_job
+
+    try:
+        config = load_runner_config()
+        needed = runner_token_ttl_for_job(
+            config.configure_timeout_minutes, config.termination_grace_period_seconds
+        )
+        cap = _effective_max_ttl(config.max_token_ttl_seconds)
+    except Exception as exc:  # noqa: BLE001 — see below
+        # The only new way this could refuse a startup, so it does not. A
+        # `runners.yaml` the model cannot build is a real problem and every
+        # other reader of it reports that on its own path; a warning about a
+        # budget is not the place to turn it into a CrashLoopBackOff.
+        logger.warning(
+            "could not check whether a configure may outlive its runner token",
+            error=str(exc),
+        )
+        return
+    if needed <= cap:
+        return
+    logger.warning(
+        "runners.maxTokenTTLSeconds is below the longest configure this "
+        "deployment permits, so a configure that runs past the cap will lose "
+        "its log, its per-host events and its resource profile when its token "
+        "expires mid-run. Raise maxTokenTTLSeconds to at least the needed "
+        "value, or lower configureTimeoutMinutes.",
+        max_token_ttl_seconds=cap,
+        configure_timeout_minutes=config.configure_timeout_minutes,
+        needed_seconds=needed,
+    )
