@@ -32,8 +32,11 @@ uncertainty resolves to RUN:
     is instead safe by the families being derived -- `go_modules()` globs at run
     time, and a new directory matches no family and so skips nothing that reads
     it;
-  * `.github/**` forces every family on, because a workflow, a composite action
-    or a pinned digest changes how the jobs themselves behave;
+  * a change to `.github/workflows/ci.yml` or to a composite action it calls
+    forces every family on, because that changes how the jobs themselves
+    behave.  Not `.github/**`: the other seven workflows here are scheduled or
+    unrelated to the pull-request jobs, and running everything for them buys
+    nothing;
   * `scripts/**` forces every family on, because jobs shell out to it
     (`lib.sh` computes the test base tag, `docs-audit/` is a gate, `eval.sh`
     boots the eval stack);
@@ -71,9 +74,29 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-# A changed path under either of these means we cannot reason about the run at
-# all, so every family runs.  See WHAT MAKES IT FAIL SAFE above.
-FORCE_ALL_PREFIXES = (".github/", "scripts/")
+
+def _force_all_prefixes() -> tuple[str, ...]:
+    """Changed paths that mean we cannot reason about the run, so everything runs.
+
+    `.github/` as a whole is too wide: seven of the eight workflows here have
+    nothing to do with the pull-request jobs (the scheduled re-scan, the EE
+    build, the image mirror, the price sheet, cleanup, checkov, this gating's
+    own audit), and a change to one of them would needlessly run the lot.
+
+    What does belong is the workflow that DEFINES these jobs, plus the composite
+    actions it calls -- derived from its own `uses: ./.github/...` lines rather
+    than listed, so a new composite action is covered on the day it is added.
+
+    `scripts/` stays whole: jobs shell out to it all over (`lib.sh` computes the
+    test base tag, `test.sh` runs the Python tier, `docs-audit/` is a gate,
+    `eval.sh` boots the eval stack), and it is small and rarely touched.
+    """
+    ci = ROOT / ".github" / "workflows" / "ci.yml"
+    local = sorted(set(re.findall(r"uses:\s*\./(\.github/[A-Za-z0-9/_.-]+)", ci.read_text())))
+    return (".github/workflows/ci.yml", "scripts/", *(f"{d}/" for d in local))
+
+
+FORCE_ALL_PREFIXES = _force_all_prefixes()
 
 
 def _copy_sources(dockerfile: str) -> list[str]:
@@ -209,7 +232,23 @@ _FIXTURES: list[tuple[list[str], dict[str, bool], str]] = [
     (
         [".github/workflows/ci.yml"],
         {"python": True, "node": True, "go": True, "pulumi": True},
-        "a workflow change forces everything",
+        "the workflow that defines these jobs forces everything",
+    ),
+    (
+        [".github/actions/ghcr-login/action.yml"],
+        {"python": True, "node": True, "go": True, "pulumi": True},
+        "a composite action ci.yml calls forces everything",
+    ),
+    # The narrowing itself: an unrelated workflow must NOT run the lot.
+    (
+        [".github/workflows/release-rescan.yml"],
+        {"python": False, "node": False, "go": False, "pulumi": False},
+        "a scheduled workflow unrelated to the PR jobs affects nothing",
+    ),
+    (
+        [".github/dependabot.yml"],
+        {"python": False, "node": False, "go": False, "pulumi": False},
+        "and nor does dependabot's config",
     ),
     (
         ["scripts/lib.sh"],
