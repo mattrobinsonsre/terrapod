@@ -96,6 +96,14 @@ WORKSPACE_API_ONLY: frozenset[str] = frozenset(
         # the SDK exposes runs as a separate concept rather than
         # embedding them on Workspace.
         "latest-run",
+        # TFE-surface only, and DERIVED: `resolve_auto_apply_mode(ws) !=
+        # "never"`. The stored column is gone (#2503) -- `auto_apply_mode` is
+        # the setting, and that IS mirrored in the SDK and both provider
+        # surfaces. This stays on `/api/tfe/v2` because `go-tfe` and the cloud
+        # backend read it, and it is popped on the native door; mirroring it
+        # would hand a practitioner a second way to express one setting, which
+        # is the whole thing #2503 removed.
+        "auto-apply",
     }
 )
 
