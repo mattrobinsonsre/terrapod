@@ -102,6 +102,27 @@
       "clearLockedFilter": "Wyczyść filtr zablokowanych",
       "filterLocked": "Filtruj zablokowane obszary robocze"
     },
+    "bulk": {
+      "selectionCount": "Zaznaczenie · {count}",
+      "menuLabel": "Akcje dla wybranych przestrzeni roboczych",
+      "selectAll": "Zaznacz wszystkie przestrzenie robocze",
+      "selectRow": "Zaznacz {name}",
+      "eligible": "{eligible} z {total} kwalifikuje się",
+      "action": {
+        "plan": "Plan",
+        "retry": "Ponów przebieg",
+        "cancel": "Anuluj przebieg",
+        "apply": "Zastosuj",
+        "discard": "Odrzuć"
+      },
+      "confirmApply": "Zastosować zaplanowane uruchomienia w wybranych przestrzeniach roboczych ({count})?\n\n{names}{more}\n\nZmienia to prawdziwą infrastrukturę i nie można tego cofnąć.",
+      "confirmDiscard": "Odrzucić zaplanowane uruchomienia w wybranych przestrzeniach roboczych ({count})?\n\n{names}{more}\n\nPlany zostaną odrzucone i nie będzie można ich odzyskać.",
+      "andMore": "\n…i {count} więcej",
+      "running": "Wykonywanie {action} w wybranych przestrzeniach roboczych ({count})…",
+      "resultSummary": "{action}: powiodło się {ok} z {total}",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Zamknij"
+    },
     "filter": {
       "placeholder": "Filtruj po nazwie, etykiecie lub statusie — np. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filtruj obszary robocze",

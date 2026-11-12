@@ -1,5 +1,22 @@
-import { test, expect } from "@playwright/test";
-import { getStoredToken, createWorkspace, uniqueName } from "../helpers/api";
+import { test, expect, type Page } from "@playwright/test";
+import { getStoredToken, createWorkspace, seedRun, uniqueName } from "../helpers/api";
+
+// Scope the list to one test's own rows. On a busy list the table can keep rows the
+// filter excludes (it does on upstream main too: "Showing 2 of N" above more than
+// two rows), which would make select-all act on someone else's workspaces. A reload
+// clears it, so retry from a fresh page rather than assert on a table that is wrong.
+async function listOnly(page: Page, prefix: string, count: number) {
+  for (let attempt = 1; ; attempt++) {
+    await page.goto("/workspaces");
+    await page.locator('input[aria-label="Filter workspaces"]').fill(`${prefix} `);
+    try {
+      await expect(page.getByTestId("ws-row-select")).toHaveCount(count, { timeout: 4_000 });
+      return;
+    } catch (err) {
+      if (attempt >= 4) throw err;
+    }
+  }
+}
 
 test.describe("Workspaces", () => {
   test("workspace list page loads", async ({ page }) => {
@@ -546,6 +563,172 @@ test.describe("Workspaces", () => {
     await page.getByRole("menuitemcheckbox", { name: /VCS error/ }).click();
     await expect(filter).toHaveValue(/flag:drifted/);
     await expect(filter).toHaveValue(/flag:vcs-error/);
+  });
+
+  test("selecting workspaces offers bulk actions, and Plan runs on each one", async ({ page }) => {
+    // Two workspaces under one prefix scope the list to this test's own rows.
+    // `seedRun` uploads a configuration, which a workspace needs before it can
+    // take a plan: the server refuses one without, and the result says so.
+    const prefix = uniqueName("e2e-sel-plan");
+    const token = getStoredToken();
+    const a = await createWorkspace(token, `${prefix}-a`);
+    const b = await createWorkspace(token, `${prefix}-b`);
+    await seedRun(token, a, true);
+    await seedRun(token, b, true);
+
+    await listOnly(page, prefix, 2);
+
+    // The standard view does not change until a box is ticked.
+    await expect(page.getByTestId("ws-selection")).toHaveCount(0);
+
+    // The header checkbox selects every visible row, and the Selection control
+    // appears with the count.
+    await page.getByTestId("ws-select-all").check();
+    await expect(page.getByTestId("ws-selection")).toContainText("2");
+
+    // Pressing it only opens a menu: it has no default action.
+    await page.getByTestId("ws-selection").click();
+    const menu = page.getByTestId("ws-selection-menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("menuitem")).toHaveCount(5);
+
+    // Why an action is unavailable is in the row, not in a tooltip. Each
+    // workspace has only a queued plan-only run, so Apply qualifies for neither.
+    const apply = page.getByTestId("ws-selection-apply");
+    await expect(apply).toContainText("0 of 2");
+    await expect(apply).toHaveAttribute("aria-disabled", "true");
+
+    // Plan qualifies for both, and runs on each.
+    await expect(page.getByTestId("ws-selection-plan")).toContainText("2 of 2");
+    await page.getByTestId("ws-selection-plan").click();
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Plan: 2 of 2", { timeout: 15_000 });
+  });
+  test("a refusal from the server is reported per workspace, not hidden", async ({ page }) => {
+    // A workspace with no uploaded configuration refuses a plan. The batch must
+    // say so for THAT workspace, with the server's own words, and not fail whole.
+    const prefix = uniqueName("e2e-sel-refuse");
+    const token = getStoredToken();
+    await createWorkspace(token, `${prefix}-bare`);
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-plan").click();
+
+    const result = page.getByTestId("ws-bulk-result");
+    await expect(result).toContainText("Plan: 0 of 1", { timeout: 15_000 });
+    await expect(result).toContainText(`${prefix}-bare`);
+    await expect(result).toContainText("no uploaded configuration");
+    // The refused workspace stays selected, so the reason beside it can be acted on.
+    await expect(page.getByTestId("ws-row-select")).toBeChecked();
+  });
+  test("the header checkbox is also the clear, from a partial selection", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-clear");
+    const token = getStoredToken();
+    await createWorkspace(token, `${prefix}-a`);
+    await createWorkspace(token, `${prefix}-b`);
+
+    await listOnly(page, prefix, 2);
+
+    await page.getByTestId("ws-row-select").first().check();
+    await expect(page.getByTestId("ws-select-all")).toHaveJSProperty("indeterminate", true);
+
+    // Clicking it from a partial selection clears, it does not complete it.
+    await page.getByTestId("ws-select-all").click();
+    await expect(page.getByTestId("ws-row-select").first()).not.toBeChecked();
+    await expect(page.getByTestId("ws-selection")).toHaveCount(0);
+  });
+  test("an unavailable action is inert and says why, and never opens a confirm", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-inert");
+    const token = getStoredToken();
+    await createWorkspace(token, `${prefix}-a`);
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+
+    // No planned run, so Discard is off. It stays focusable (aria-disabled, not
+    // `disabled`) so a screen reader reaches it and hears the reason beside it.
+    const discard = page.getByTestId("ws-selection-discard");
+    await expect(discard).toHaveAttribute("aria-disabled", "true");
+    await expect(discard).toContainText("0 of 1");
+    let dialogs = 0;
+    page.on("dialog", (d) => {
+      dialogs += 1;
+      void d.dismiss();
+    });
+    // `force` skips Playwright's own "is it enabled" wait, which is the point:
+    // a real user can still press it, and nothing must happen.
+    await discard.click({ force: true });
+    expect(dialogs, "an unavailable action must not open a confirm").toBe(0);
+    await expect(page.getByTestId("ws-bulk-result")).toHaveCount(0);
+  });
+  test("Apply and Discard confirm in the irreversible tier, with the count and the names, and send nothing if declined", async ({ page }) => {
+    // A planned, apply-capable run is the state both need, and reaching it for
+    // real takes a runner. So the LIST response is stubbed to carry one, and the
+    // calls it would make are recorded; the confirm and the eligibility are real.
+    const prefix = uniqueName("e2e-sel-confirm");
+    const token = getStoredToken();
+    const ids = [
+      await createWorkspace(token, `${prefix}-a`),
+      await createWorkspace(token, `${prefix}-b`),
+    ];
+
+    const posts: string[] = [];
+    await page.route("**/api/v1/workspaces?**", async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      for (const w of body.data ?? []) {
+        const i = ids.indexOf(w.id);
+        if (i >= 0) {
+          w.attributes["latest-run"] = {
+            id: `run-planned-${i}`,
+            status: "planned",
+            "plan-only": false,
+            "created-at": "2026-11-10T10:00:00Z",
+          };
+        }
+      }
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.route("**/api/v1/runs/*/actions/*", async (route) => {
+      posts.push(route.request().url());
+      await route.fulfill({ status: 200, contentType: "application/vnd.api+json", body: "{}" });
+    });
+
+    await listOnly(page, prefix, 2);
+    await page.getByTestId("ws-select-all").check();
+    await page.getByTestId("ws-selection").click();
+
+    // Both qualify, so Apply and Discard are on and say so in the row.
+    await expect(page.getByTestId("ws-selection-apply")).toContainText("2 of 2");
+    await expect(page.getByTestId("ws-selection-discard")).toContainText("2 of 2");
+
+    // Declining sends nothing.
+    const seen: string[] = [];
+    page.once("dialog", (d) => {
+      seen.push(d.message());
+      void d.dismiss();
+    });
+    await page.getByTestId("ws-selection-apply").click();
+    await expect.poll(() => seen.length).toBe(1);
+    expect(seen[0]).toContain(`${prefix}-a`);
+    expect(seen[0]).toContain(`${prefix}-b`);
+    expect(seen[0]).toContain("(2)");
+    expect(posts, "declining the confirm must send nothing").toEqual([]);
+
+    // Accepting sends one call per workspace, to the existing endpoint.
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-discard").click();
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Discard: 2 of 2", { timeout: 15_000 });
+    expect(posts.filter((u) => u.endsWith("/actions/discard"))).toHaveLength(2);
+
+    // The page reloads the list after an action (and on SSE), and each reload runs
+    // the stubbed `route.fetch()` above. One still in flight when the test ends
+    // fails with "browser has been closed", so end by removing the stubs and
+    // letting any running callback finish.
+    await page.unrouteAll({ behavior: "wait" });
   });
 });
 

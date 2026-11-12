@@ -102,6 +102,27 @@
       "clearLockedFilter": "Cribrum occlusorum vacuare",
       "filterLocked": "Cribrare ad loca operis occlusa"
     },
+    "bulk": {
+      "selectionCount": "Selectio · {count}",
+      "menuLabel": "Actiones pro spatiis operis selectis",
+      "selectAll": "Omnia spatia operis selige",
+      "selectRow": "Selige {name}",
+      "eligible": "{eligible} ex {total} apta",
+      "action": {
+        "plan": "Consilium",
+        "retry": "Exsecutionem Retentare",
+        "cancel": "Exsecutionem Abrogare",
+        "apply": "Applicare",
+        "discard": "Reicere"
+      },
+      "confirmApply": "Cursus destinatos in spatiis operis selectis ({count}) applicare?\n\n{names}{more}\n\nHoc infrastructuram veram mutat nec revocari potest.",
+      "confirmDiscard": "Cursus destinatos in spatiis operis selectis ({count}) abicere?\n\n{names}{more}\n\nConsilia abiciuntur nec recuperari possunt.",
+      "andMore": "\n…et {count} alia",
+      "running": "{action} in spatiis operis selectis ({count}) agitur…",
+      "resultSummary": "{action}: {ok} ex {total} successerunt",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Claude"
+    },
     "filter": {
       "placeholder": "Cribra per nomen, titulum aut statum — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Loca operis cribrare",

@@ -102,6 +102,27 @@
       "clearLockedFilter": "ngaQ DarSeH teq",
       "filterLocked": "ngaQbogh Qumwo'meyDaq DarSeH"
     },
+    "bulk": {
+      "selectionCount": "wIv · {count}",
+      "menuLabel": "Qun vaD Daq wIvlu'pu'",
+      "selectAll": "Hoch Daq wIv",
+      "selectRow": "{name} wIv",
+      "eligible": "{total} qoch {eligible} lagh",
+      "action": {
+        "plan": "nab",
+        "retry": "Sar nID",
+        "cancel": "Sar qIl",
+        "apply": "lo'",
+        "discard": "woD"
+      },
+      "confirmApply": "Daq wIvlu'pu' ({count}) Sar pIq chenmoH vIneHbej?\n\n{names}{more}\n\nghaH Dochmey Dubbe'; DoH Hegh ta'.",
+      "confirmDiscard": "Daq wIvlu'pu' ({count}) Sar pIq tlhoy?\n\n{names}{more}\n\npIq poSlaHbe'.",
+      "andMore": "\n…je {count} latlh",
+      "running": "{action} Daq wIvlu'pu' ({count}) yIn…",
+      "resultSummary": "{action}: {ok} {total} qoch",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "SoQmoH"
+    },
     "filter": {
       "placeholder": "pong, per, joq Dotlh DarSeH — Da \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Qumwo'mey DarSeH",

@@ -102,6 +102,27 @@
       "clearLockedFilter": "Tyhjennä lukituksen suodatin",
       "filterLocked": "Suodata lukitut työtilat"
     },
+    "bulk": {
+      "selectionCount": "Valinta · {count}",
+      "menuLabel": "Toiminnot valituille työtiloille",
+      "selectAll": "Valitse kaikki työtilat",
+      "selectRow": "Valitse {name}",
+      "eligible": "{eligible}/{total} kelpaa",
+      "action": {
+        "plan": "Plan",
+        "retry": "Yritä ajoa uudelleen",
+        "cancel": "Peruuta ajo",
+        "apply": "Ota käyttöön",
+        "discard": "Hylkää"
+      },
+      "confirmApply": "Otetaanko suunnitellut ajot käyttöön valituissa työtiloissa ({count})?\n\n{names}{more}\n\nTämä muuttaa oikeaa infrastruktuuria eikä sitä voi perua.",
+      "confirmDiscard": "Hylätäänkö suunnitellut ajot valituissa työtiloissa ({count})?\n\n{names}{more}\n\nSuunnitelmat hylätään, eikä niitä voi palauttaa.",
+      "andMore": "\n…ja {count} muuta",
+      "running": "Suoritetaan {action} valituissa työtiloissa ({count})…",
+      "resultSummary": "{action}: {ok}/{total} onnistui",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Sulje"
+    },
     "filter": {
       "placeholder": "Suodata nimen, tunnisteen tai tilan mukaan — esim. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Suodata työtiloja",

@@ -102,6 +102,27 @@
       "clearLockedFilter": "נקה את מסנן הנעילה",
       "filterLocked": "סנן לסביבות עבודה נעולות"
     },
+    "bulk": {
+      "selectionCount": "בחירה · {count}",
+      "menuLabel": "פעולות עבור סביבות העבודה שנבחרו",
+      "selectAll": "בחירת כל סביבות העבודה",
+      "selectRow": "בחירת {name}",
+      "eligible": "{eligible} מתוך {total} זכאיות",
+      "action": {
+        "plan": "תכנון",
+        "retry": "הרץ שוב",
+        "cancel": "בטל הרצה",
+        "apply": "החל",
+        "discard": "דחה"
+      },
+      "confirmApply": "להחיל את ההרצות המתוכננות בסביבות העבודה שנבחרו ({count})?\n\n{names}{more}\n\nפעולה זו משנה תשתית אמיתית ואינה ניתנת לביטול.",
+      "confirmDiscard": "לבטל את ההרצות המתוכננות בסביבות העבודה שנבחרו ({count})?\n\n{names}{more}\n\nהתוכניות נמחקות ואינן ניתנות לשחזור.",
+      "andMore": "\n…ועוד {count}",
+      "running": "מריץ {action} בסביבות העבודה שנבחרו ({count})…",
+      "resultSummary": "{action}: {ok} מתוך {total} הצליחו",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "סגירה"
+    },
     "filter": {
       "placeholder": "סנן לפי שם, תווית או סטטוס — למשל \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "סנן סביבות עבודה",

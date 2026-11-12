@@ -102,6 +102,27 @@
       "clearLockedFilter": "Clear th'' locked filter",
       "filterLocked": "Filter t'' locked work-decks"
     },
+    "bulk": {
+      "selectionCount": "Chosen Crew · {count}",
+      "menuLabel": "Orders fer th' chosen workspaces",
+      "selectAll": "Pick all th' workspaces",
+      "selectRow": "Pick {name}",
+      "eligible": "{eligible} o' {total} fit fer duty",
+      "action": {
+        "plan": "Chart",
+        "retry": "Try Run Again",
+        "cancel": "Cancel Run",
+        "apply": "Apply",
+        "discard": "Discard"
+      },
+      "confirmApply": "Apply th' charted runs on th' chosen workspaces ({count})?\n\n{names}{more}\n\nThis changes real infrastructure an' cannot be undone, matey.",
+      "confirmDiscard": "Discard th' charted runs on th' chosen workspaces ({count})?\n\n{names}{more}\n\nTh' charts be thrown overboard an' cannot be recovered.",
+      "andMore": "\n…an' {count} more",
+      "running": "Runnin' {action} on th' chosen workspaces ({count})…",
+      "resultSummary": "{action}: {ok} o' {total} made it",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Belay"
+    },
     "filter": {
       "placeholder": "Filter by name, label, or status — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Filter th'' work-decks",

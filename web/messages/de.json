@@ -102,6 +102,27 @@
       "clearLockedFilter": "Sperrfilter zurücksetzen",
       "filterLocked": "Auf gesperrte Arbeitsbereiche filtern"
     },
+    "bulk": {
+      "selectionCount": "Auswahl · {count}",
+      "menuLabel": "Aktionen für die ausgewählten Workspaces",
+      "selectAll": "Alle Workspaces auswählen",
+      "selectRow": "{name} auswählen",
+      "eligible": "{eligible} von {total} geeignet",
+      "action": {
+        "plan": "Plan",
+        "retry": "Ausführung wiederholen",
+        "cancel": "Ausführung abbrechen",
+        "apply": "Anwenden",
+        "discard": "Verwerfen"
+      },
+      "confirmApply": "Die geplanten Läufe auf den ausgewählten Workspaces anwenden ({count})?\n\n{names}{more}\n\nDies ändert echte Infrastruktur und kann nicht rückgängig gemacht werden.",
+      "confirmDiscard": "Die geplanten Läufe auf den ausgewählten Workspaces verwerfen ({count})?\n\n{names}{more}\n\nDie Pläne werden verworfen und können nicht wiederhergestellt werden.",
+      "andMore": "\n…und {count} weitere",
+      "running": "{action} wird auf den ausgewählten Workspaces ausgeführt ({count})…",
+      "resultSummary": "{action}: {ok} von {total} erfolgreich",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Schließen"
+    },
     "filter": {
       "placeholder": "Nach Name, Label oder Status filtern – z. B. „eu1“, „env:prod“, „status:errored“",
       "ariaLabel": "Arbeitsbereiche filtern",

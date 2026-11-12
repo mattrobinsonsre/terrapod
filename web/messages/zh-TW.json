@@ -102,6 +102,27 @@
       "clearLockedFilter": "清除已鎖定篩選",
       "filterLocked": "篩選已鎖定的工作區"
     },
+    "bulk": {
+      "selectionCount": "已選取 · {count}",
+      "menuLabel": "所選工作區的操作",
+      "selectAll": "選取所有工作區",
+      "selectRow": "選取 {name}",
+      "eligible": "{total} 個中有 {eligible} 個符合條件",
+      "action": {
+        "plan": "計畫",
+        "retry": "重試執行",
+        "cancel": "取消執行",
+        "apply": "應用",
+        "discard": "丟棄"
+      },
+      "confirmApply": "要在所選工作區（{count}）上套用已規劃的執行嗎？\n\n{names}{more}\n\n這會變更真實的基礎設施，且無法復原。",
+      "confirmDiscard": "要捨棄所選工作區（{count}）上已規劃的執行嗎？\n\n{names}{more}\n\n計畫將被捨棄且無法復原。",
+      "andMore": "\n…以及另外 {count} 個",
+      "running": "正在所選工作區（{count}）上執行{action}…",
+      "resultSummary": "{action}：{total} 個中 {ok} 個成功",
+      "resultFailed": "{name}：{reason}",
+      "resultDismiss": "關閉"
+    },
     "filter": {
       "placeholder": "按名稱、標籤或狀態篩選 — 例如 \"eu1\"、\"env:prod\"、\"status:errored\"",
       "ariaLabel": "篩選工作區",

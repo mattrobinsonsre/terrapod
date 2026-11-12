@@ -102,6 +102,27 @@
       "clearLockedFilter": "Cl34r l0ck3d f1l73r",
       "filterLocked": "F1l73r 70 l0ck3d w0rk5p4c35"
     },
+    "bulk": {
+      "selectionCount": "53l3c710n · {count}",
+      "menuLabel": "4c710n5 f0r 7h3 53l3c73d w0rk5p4c35",
+      "selectAll": "53l3c7 4ll w0rk5p4c35",
+      "selectRow": "53l3c7 {name}",
+      "eligible": "{eligible} 0f {total} 3l1g1bl3",
+      "action": {
+        "plan": "Pl4n",
+        "retry": "R37ry Run",
+        "cancel": "C4nc3l Run",
+        "apply": "4pply",
+        "discard": "D15c4rd"
+      },
+      "confirmApply": "4ppl¥ 7h3 pl4nn3d runs 0n 7h3 53l3c73d w0rk5p4c35 ({count})?\n\n{names}{more}\n\n7h15 ch4ng35 r34l 1nfr45truc7ur3 4nd c4nn07 b3 und0n3.",
+      "confirmDiscard": "D15c4rd 7h3 pl4nn3d runs 0n 7h3 53l3c73d w0rk5p4c35 ({count})?\n\n{names}{more}\n\n7h3 pl4n5 4r3 7hr0wn 4w4¥ 4nd c4nn07 b3 r3c0v3r3d.",
+      "andMore": "\n…4nd {count} m0r3",
+      "running": "Runn1ng {action} 0n 7h3 53l3c73d w0rk5p4c35 ({count})…",
+      "resultSummary": "{action}: {ok} 0f {total} 5ucc33d3d",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "D15m155"
+    },
     "filter": {
       "placeholder": "F1l73r by n4m3, l4b3l, 0r 5747u5 — 3.g. \"3u1\", \"3nv:pr0d\", \"5747u5:3rr0r3d\"",
       "ariaLabel": "F1l73r w0rk5p4c35",
