@@ -290,6 +290,7 @@ export default function UsersPage() {
   }, [])
   const { sortedItems, sortState, toggleSort } = useSortable<UserRecord, SortKey>(
     users, 'email', 'asc', accessor,
+    'users',
   )
 
   useEffect(() => {

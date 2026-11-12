@@ -59,6 +59,7 @@ export default function VariableSetsPage() {
 
   const { sortedItems, sortState, toggleSort } = useSortable<VariableSet, VarsetSortKey>(
     varsets, 'name', 'asc', varsetAccessor,
+    'variable-sets',
   )
 
   useEffect(() => {

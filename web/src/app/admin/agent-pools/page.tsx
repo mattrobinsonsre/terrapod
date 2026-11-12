@@ -63,6 +63,7 @@ export default function AgentPoolsPage() {
 
   const { sortedItems, sortState, toggleSort } = useSortable<AgentPool, PoolSortKey>(
     pools, 'name', 'asc', poolAccessor,
+    'agent-pools',
   )
 
   useEffect(() => {

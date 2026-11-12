@@ -73,6 +73,14 @@ import {
   parseGroupParam,
   serializeGroupParam,
 } from '@/lib/workspace-grouping'
+import {
+  ENGINE_KEY,
+  FILTER_KEY,
+  readPref,
+  resolveInitial,
+  usableEngine,
+  writePref,
+} from '@/lib/view-prefs'
 
 interface LatestRun {
   id: string
@@ -381,11 +389,23 @@ function WorkspacesPageInner() {
   // name (case-insensitive substring), `key:value` / `key=value` match a
   // label exactly, and `key:` / `key=` matches any workspace that has the
   // label key set. Mirrored to the URL via ?q=… so refresh + share work.
-  const [filterInput, setFilterInput] = useState(searchParams.get('q') || '')
+  const [filterInput, setFilterInput] = useState(() =>
+    resolveInitial(
+      searchParams.get('q'),
+      typeof window !== 'undefined' ? readPref(window.sessionStorage, FILTER_KEY) : null,
+    ),
+  )
   const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
   // Engine filter (#1555): a dropdown rather than an `engine:` term, which would
   // collide with a label of that name. Offered only when more than one engine is on.
-  const [engineFilter, setEngineFilter] = useState(searchParams.get('engine') || '')
+  const [engineFilter, setEngineFilter] = useState(() =>
+    resolveInitial(
+      searchParams.get('engine'),
+      typeof window !== 'undefined' ? readPref(window.sessionStorage, ENGINE_KEY) : null,
+    ),
+  )
+  // Only an engine restored from storage is judged against the offered list; one in the URL is left alone.
+  const engineFromStorage = useRef(engineFilter !== '' && !searchParams.get('engine'))
 
   // Grouping mode — URL param takes priority, localStorage as fallback.
   const [groupMode, setGroupModeState] = useState<GroupMode>(() => {
@@ -575,6 +595,14 @@ function WorkspacesPageInner() {
   // Initialised to the URL's current `q` so that mounting on a page
   // already loaded with `?q=...` (refresh, shared link) doesn't fire a
   // redundant `router.replace` over the unchanged URL on first render.
+  // Kept for the life of the tab, or until cleared: an empty value removes the stored key.
+  useEffect(() => {
+    writePref(window.sessionStorage, FILTER_KEY, serializeFilter(parsedFilter))
+  }, [parsedFilter])
+  useEffect(() => {
+    writePref(window.sessionStorage, ENGINE_KEY, engineFilter)
+  }, [engineFilter])
+
   const lastSyncedQueryRef = useRef<string | null>(`${searchParams.get('q') || ''}|${searchParams.get('engine') || ''}`)
   useEffect(() => {
     const serialized = serializeFilter(parsedFilter)
@@ -664,8 +692,12 @@ function WorkspacesPageInner() {
       .then((d: { data?: { id: string }[] }) => {
         const ids = (d.data || []).map(e => e.id)
         if (ids.length > 0) setEngines(ids)
+        // Only now is the offered list known, so only now can a stored engine be judged; see `usableEngine`.
+        if (engineFromStorage.current) setEngineFilter((cur) => usableEngine(cur, ids))
       })
-      .catch(() => {})
+      .catch(() => {
+        if (engineFromStorage.current) setEngineFilter('')
+      })
   }, [])
   const engineName = (e: string) =>
     e === 'pulumi' ? t('form.enginePulumi') : e === 'terraform' ? t('form.engineTerraform') : e
@@ -871,6 +903,7 @@ function WorkspacesPageInner() {
         case 'created': return item.attributes['created-at']
       }
     }, []),
+    'workspaces',
   )
 
   const workspaceTree = useMemo(

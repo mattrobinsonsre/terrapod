@@ -910,6 +910,7 @@ function WorkspaceDetailContent() {
         case 'created-at': return item.attributes['created-at']
       }
     }, []),
+    'workspace-detail-runs',
   )
 
   // Sorting for state tab
@@ -925,6 +926,7 @@ function WorkspaceDetailContent() {
         case 'created-by': return item.attributes['created-by'] || ''
       }
     }, []),
+    'workspace-detail-state-versions',
   )
 
   // Sorting for variables tab
@@ -938,6 +940,7 @@ function WorkspaceDetailContent() {
         case 'category': return item.attributes.category
       }
     }, []),
+    'workspace-detail-variables',
   )
 
   const loadWorkspace = useCallback(async () => {
