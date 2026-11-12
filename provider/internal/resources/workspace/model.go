@@ -32,7 +32,7 @@
 //
 //	"name"                              → name                (string, required, supports rename)
 //	"execution-mode"                    → execution_mode      (string, optional, default "local")
-//	"auto-apply"                        → auto_apply          (bool,   optional, default false)
+//	"auto-apply-mode"                   → auto_apply_mode     (string, optional+computed)
 //	"execution-backend"                 → execution_backend   (string, optional; defaults to "terraform" on the Terraform engine, server-assigned on Pulumi)
 //	"engine"                            → engine              (string, read-only)
 //	"pulumi-bind-plan"                  → pulumi_bind_plan    (bool,   optional+computed)
@@ -100,7 +100,6 @@ type workspaceModel struct {
 	// Writable attributes
 	Name                        types.String `tfsdk:"name"`
 	ExecutionMode               types.String `tfsdk:"execution_mode"`
-	AutoApply                   types.Bool   `tfsdk:"auto_apply"`
 	AutoApplyMode               types.String `tfsdk:"auto_apply_mode"`
 	ExecutionBackend            types.String `tfsdk:"execution_backend"`
 	Engine                      types.String `tfsdk:"engine"`

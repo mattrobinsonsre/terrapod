@@ -31,7 +31,7 @@ resource "terrapod_workspace" "probe" {
   name              = var.managed_workspace_name
   execution_mode    = "local"
   execution_backend = "tofu"
-  auto_apply        = false
+  auto_apply_mode   = "never"
 }
 
 output "managed_workspace_id" {

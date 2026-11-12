@@ -29,7 +29,6 @@ type workspaceDataSourceModel struct {
 	ID                            types.String `tfsdk:"id"`
 	Name                          types.String `tfsdk:"name"`
 	ExecutionMode                 types.String `tfsdk:"execution_mode"`
-	AutoApply                     types.Bool   `tfsdk:"auto_apply"`
 	AutoApplyMode                 types.String `tfsdk:"auto_apply_mode"`
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	Engine                        types.String `tfsdk:"engine"`
@@ -123,7 +122,6 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"id":                computedString("Workspace ID."),
 			"name":              requiredString("Workspace name to look up."),
 			"execution_mode":    computedString("Execution mode."),
-			"auto_apply":        computedBool("Auto-apply setting."),
 			"auto_apply_mode":   computedString("Conditional auto-apply mode: never, always, create or create_update."),
 			"execution_backend": computedString("Execution backend."),
 			"engine": computedString(
@@ -276,7 +274,11 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(terrapod.GetStringAttr(res, "name"))
 	m.ExecutionMode = types.StringValue(terrapod.GetStringAttr(res, "execution-mode"))
-	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
+	// The mode is the setting (#2503). The boolean this used to read is gone
+	// from the schema -- and the mode that replaces it was DECLARED here and
+	// never assigned, so every read reported a blank one. Both halves were a
+	// wrong answer rather than an error.
+	m.AutoApplyMode = types.StringValue(terrapod.GetStringAttr(res, "auto-apply-mode"))
 	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
 	m.Engine = types.StringValue(terrapod.GetStringAttr(res, "engine"))
 	m.PulumiBindPlan = types.BoolValue(terrapod.GetBoolAttr(res, "pulumi-bind-plan"))

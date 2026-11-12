@@ -556,6 +556,58 @@ clears a held run, which previously had no SDK route at all.
 
 See [policies.md](policies.md).
 
+### The `auto_apply` boolean is removed from the Terraform and Pulumi providers
+
+**Affects:** HCL or Pulumi programs that set `auto_apply` on `terrapod_workspace`
+or `terrapod_autodiscovery_rule`, or that read `auto_apply` off the
+`terrapod_workspace` data source. Not the API, not the `tofu`/`terraform` CLI,
+and not `terrapod_catalog_instance`, whose own `auto_apply` is a different
+setting (see below).
+
+One setting was described by two attributes: `auto_apply_mode`
+(`never` / `always` / `create` / `create_update`) and an `auto_apply` boolean
+that was its projection. Two attributes for one setting let a configuration
+state a contradiction:
+
+```hcl
+resource "terrapod_workspace" "app" {
+  name            = "app-prod"
+  auto_apply      = false
+  auto_apply_mode = "always"   # accepted, then resolved to "always"
+}
+```
+
+which was accepted without complaint, resolved towards **more** automation than
+the configuration asked for, and then failed the apply with "Provider produced
+inconsistent result after apply" — by which point the workspace had already been
+changed to auto-apply. With one attribute the contradiction cannot be written
+down.
+
+**What you must do before upgrading the provider:**
+
+1. Delete `auto_apply` from every `terrapod_workspace` and
+   `terrapod_autodiscovery_rule` block and state the mode instead —
+   `auto_apply = true` becomes `auto_apply_mode = "always"`, and
+   `auto_apply = false` becomes `auto_apply_mode = "never"`.
+2. Repoint anything reading `data.terrapod_workspace.<name>.auto_apply` at
+   `.auto_apply_mode`, comparing against `"never"` rather than against `false`.
+   Note that attribute previously reported a **blank** string — it was declared
+   and never populated — so a program that read it and found nothing was reading
+   the defect, not an unset workspace.
+
+A configuration that still names the boolean fails at **plan** time, before any
+request is made, with Terraform's own *An argument named "auto_apply" is not
+expected here*. Existing state needs no migration: the plugin framework ignores
+a prior-state field the current schema no longer defines, so the stale value is
+dropped on the next read rather than erroring.
+
+**`terrapod_catalog_instance.auto_apply` is unchanged.** It is not this setting:
+it says whether the provision or reconfigure run that resource queues applies
+without waiting for a human, which is a property of that operation rather than a
+standing workspace setting.
+
+See [terraform-provider.md](terraform-provider.md#auto_apply_mode).
+
 ### Two columns are renamed, so the API rollout has a brief window of errors
 
 **Affects:** every deployment, but only for the length of one rolling upgrade, and

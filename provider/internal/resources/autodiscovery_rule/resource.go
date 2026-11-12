@@ -38,7 +38,6 @@
 //	"parallelism"        -> parallelism
 //	"resource-cpu"       -> resource_cpu        (string, optional, default "1")
 //	"resource-memory"    -> resource_memory     (string, optional, default "2Gi")
-//	"auto-apply"         -> auto_apply          (bool, optional, default false)
 //	"auto-apply-mode"    -> auto_apply_mode     (string, optional+computed)
 //	"labels"             -> labels              (map[string]string, optional)
 //	"owner-email"        -> owner_email         (string, optional)
@@ -136,7 +135,6 @@ type autodiscoveryRuleModel struct {
 	Parallelism          types.Int64  `tfsdk:"parallelism"`
 	ConfigureParallelism types.Int64  `tfsdk:"configure_parallelism"`
 	ResourceMemory       types.String `tfsdk:"resource_memory"`
-	AutoApply            types.Bool   `tfsdk:"auto_apply"`
 	AutoApplyMode        types.String `tfsdk:"auto_apply_mode"`
 	Labels               types.Map    `tfsdk:"labels"`
 	OwnerEmail           types.String `tfsdk:"owner_email"`
@@ -598,20 +596,12 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Computed:    true,
 				Default:     stringdefault.StaticString("2Gi"),
 			},
-			// No schema default — see the matching note on
-			// terrapod_workspace.auto_apply. The server derives this from
-			// auto_apply_mode, so a known planned `false` against an applied
-			// `true` fails the run with "inconsistent result after apply".
-			"auto_apply": schema.BoolAttribute{
-				Description: "Default auto-apply setting for created workspaces. Superseded by `auto_apply_mode` when that is set.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
+			// One setting, not two (#2503) -- see the matching note on
+			// terrapod_workspace. A rule is the worse place for a contradictory
+			// pair, because it materialises FUTURE workspaces with a setting its
+			// author cannot see in the rule they wrote.
 			"auto_apply_mode": schema.StringAttribute{
-				Description: "Conditional auto-apply mode templated onto created workspaces: `never`, `always`, `create` (apply only plans that add resources) or `create_update` (also allow in-place updates). Supersedes `auto_apply` when set. Optional + Computed with no default so a rule that does not set it never drifts.",
+				Description: "Conditional auto-apply mode templated onto created workspaces: `never`, `always`, `create` (apply only plans that add resources) or `create_update` (also allow in-place updates). Optional + Computed with no default so a rule that does not set it never drifts.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -1165,17 +1155,11 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.ResourceMemory.IsNull() && !m.ResourceMemory.IsUnknown() {
 		attrs["resource-memory"] = m.ResourceMemory.ValueString()
 	}
-	// Mode first, and deliberately NOT nested inside the auto_apply guard.
-	// The two are alternatives (the API 422s if both are sent), so the mode
-	// has to be reachable whether or not the boolean happens to be known.
-	// Nesting it worked only while `auto_apply` carried a schema default
-	// that made it always known; the moment that default goes, the outer
-	// guard fails on an unconfigured boolean and the mode silently stops
-	// being sent at all.
+	// The mode is the whole setting (#2503); there is no boolean alternative
+	// left for it to be gated behind, which is what used to stop it being
+	// sent at all whenever the boolean happened to be unknown.
 	if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
 		attrs["auto-apply-mode"] = m.AutoApplyMode.ValueString()
-	} else if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
-		attrs["auto-apply"] = m.AutoApply.ValueBool()
 	}
 
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
@@ -1491,7 +1475,6 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.EEResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "ee-resource-cpu"))
 	m.EEResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "ee-resource-memory"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
-	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
 	m.AutoApplyMode = types.StringValue(terrapod.GetStringAttr(res, "auto-apply-mode"))
 
 	labels := terrapod.GetMapAttr(res, "labels")

@@ -94,7 +94,6 @@ data terrapod_workspace.ansible_collections required=false optional=false comput
 data terrapod_workspace.ansible_execution_environment required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ansible_host_key_checking required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.ansible_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
-data terrapod_workspace.auto_apply required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.auto_apply_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_configure_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.config_directory required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -202,7 +201,6 @@ resource terrapod_autodiscovery_rule.allow_fork_pr_plans required=false optional
 resource terrapod_autodiscovery_rule.ansible_collections required=false optional=true computed=false sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
 resource terrapod_autodiscovery_rule.ansible_execution_environment required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
-resource terrapod_autodiscovery_rule.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_configure_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.auto_merge required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -580,7 +578,6 @@ resource terrapod_workspace.ansible_collections required=false optional=true com
 resource terrapod_workspace.ansible_execution_environment required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ansible_host_key_checking required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
-resource terrapod_workspace.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_configure_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.auto_merge required=false optional=true computed=true sensitive=false type=basetypes.BoolType
