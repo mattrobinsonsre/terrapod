@@ -352,7 +352,9 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
         from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
         from terrapod.services.workspace_search_service import WorkspaceFilter
 
-        assert set(RULE_DIMENSIONS_REFUSED) == {"drift_status", "locked"}
+        # `exclude` is refused until a later PR recurses into its entries through
+        # the same predicate.
+        assert set(RULE_DIMENSIONS_REFUSED) == {"drift_status", "locked", "exclude"}
         for dim in RULE_DIMENSIONS_REFUSED:
             assert dim in WorkspaceFilter.model_fields, (
                 f"{dim} is refused but is no longer a filter dimension — the refusal "
@@ -380,6 +382,27 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
         assert resp.status_code == 422, resp.text
         assert "drift_status" in resp.text
 
+        # `exclude` can carry a refused dimension in an entry; refused until recursion.
+        resp = await client.post(
+            VARSETS,
+            json={
+                "data": {
+                    "type": "varsets",
+                    "attributes": {
+                        "name": f"excl-{tag}",
+                        "global": False,
+                        "assignment-rule": {
+                            "labels": {"team": tag},
+                            "exclude": [{"locked": False}],
+                        },
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+        assert "exclude" in resp.text
+
     async def test_a_stored_rule_naming_one_matches_nothing(self, db_session=None):
         """A deployment that already has such a rule must stop honouring it, not keep
         the hole open for exactly the installs that have one."""
@@ -387,6 +410,9 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
 
         assert not await _rule_matches(None, {"locked": True}, uuid.uuid4())
         assert not await _rule_matches(None, {"drift_status": ""}, uuid.uuid4())
+        assert not await _rule_matches(
+            None, {"labels": {"team": "x"}, "exclude": [{"locked": False}]}, uuid.uuid4()
+        )
 
 
 class TestEveryWayAWorkspaceComesIntoExistence:

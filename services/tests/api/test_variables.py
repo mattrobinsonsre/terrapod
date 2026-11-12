@@ -1228,6 +1228,21 @@ class TestVarsetAssignmentRuleValidation:
         assert resp.status_code == 422
         assert "explicitly" in resp.json()["detail"]
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_exclude_in_a_rule_is_rejected(self, *mocks):
+        """An exclude entry could carry a refused dimension (`locked`,
+        `drift_status`) past the self-join guard, so `exclude` is refused."""
+        resp = await self._post(
+            {
+                "name": "x",
+                "assignment-rule": {"labels": {"team": "x"}, "exclude": [{"locked": False}]},
+            }
+        )
+        assert resp.status_code == 422
+        assert "cannot select on exclude" in resp.json()["detail"]
+
 
 class TestVaultValueSource:
     """Write-time validation for the Vault value source (#1439).
