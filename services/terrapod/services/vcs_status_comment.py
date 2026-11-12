@@ -711,21 +711,22 @@ def _fit_details(rows: list[_Row], blocks: list[str], fixed: int) -> list[str]:
       too, so the comment as a whole stays under `COMMENT_MAX_CHARS` rather than
       merely each list under its share.
     """
+    listed = {id(r) for r in rows if _render_resource_list(r)}
     degraded = {
-        id(r): _render_workspace_details(r, degrade_list=True) for r in rows if r.resource_list
+        id(r): _render_workspace_details(r, degrade_list=True) for r in rows if id(r) in listed
     }
     withblock = [r for r in rows if _render_workspace_details(r)]
     out: list[str] = []
     spent = fixed
     for i, (r, block) in enumerate(zip(withblock, blocks, strict=True)):
-        if r.resource_list:
+        if id(r) in listed:
             # What every LATER workspace needs even if it degrades, so a list
             # admitted here cannot push the pointers past the ceiling.
             reserve = sum(
-                len(degraded[id(later)]) for later in withblock[i + 1 :] if later.resource_list
+                len(degraded[id(later)]) for later in withblock[i + 1 :] if id(later) in listed
             )
             remaining = max(COMMENT_MAX_CHARS - spent - reserve, 0)
-            waiting = sum(1 for later in withblock[i:] if later.resource_list)
+            waiting = sum(1 for later in withblock[i:] if id(later) in listed)
             share = remaining // max(waiting, 1)
             if len(block) > share:
                 block = degraded[id(r)]
