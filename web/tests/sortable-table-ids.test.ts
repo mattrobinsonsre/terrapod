@@ -20,10 +20,10 @@ function sourceFiles(dir: string): string[] {
   })
 }
 
-// The text of each `useSortable<...>( ... )` call, found by matching parentheses.
+// The text of each `useSortable( ... )` or `useSortable<...>( ... )` call, found by matching parentheses.
 function callsIn(text: string): string[] {
   const calls: string[] = []
-  const re = /useSortable<[^(]*\(/g
+  const re = /\buseSortable(?:<[^(]*)?\s*\(/g
   let m: RegExpExecArray | null
   while ((m = re.exec(text))) {
     let depth = 1
@@ -45,6 +45,11 @@ const sites = sourceFiles(SRC)
 describe('useSortable call sites', () => {
   it('finds the call sites, so the checks below are not vacuous', () => {
     assert.ok(sites.length >= 19, `only ${sites.length} call sites found`)
+  })
+
+  it('also finds a call written without type arguments, and ignores an import', () => {
+    assert.equal(callsIn("useSortable(items, 'name', 'asc', fn)").length, 1)
+    assert.equal(callsIn("import { useSortable } from '@/lib/use-sortable'\nfoo(1)").length, 0)
   })
 
   it('every call passes a kebab-case table id as its last argument', () => {

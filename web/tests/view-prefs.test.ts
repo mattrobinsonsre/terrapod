@@ -85,11 +85,15 @@ describe('sort preference', () => {
     })
   })
 
-  it('keeps a column key that itself contains a colon or a dash', () => {
+  it('keeps a column key that itself contains a dash', () => {
     assert.deepEqual(parseSort(serializeSort({ key: 'created-at', direction: 'asc' })), {
       key: 'created-at',
       direction: 'asc',
     })
+  })
+
+  it('splits on the last colon, so a key that contains one survives', () => {
+    assert.deepEqual(parseSort('label:env:desc'), { key: 'label:env', direction: 'desc' })
   })
 
   it('ignores a malformed value', () => {

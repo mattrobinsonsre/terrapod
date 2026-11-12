@@ -41,8 +41,8 @@ export function resolveInitial(fromUrl: string | null, stored: string | null): s
 }
 
 // A stored engine filter is only usable while the selector that clears it is shown
-// (two or more engines) and still offers that engine; otherwise it would hide
-// every workspace with no way to undo it.
+// (two or more engines offered) and still offers that engine. If the list could not be
+// loaded, or no longer includes it, the filter would hide every workspace with no way to undo it.
 export function usableEngine(engine: string, offered: readonly string[]): string {
   return offered.length > 1 && offered.includes(engine) ? engine : ''
 }

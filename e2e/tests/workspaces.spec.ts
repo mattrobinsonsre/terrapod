@@ -161,15 +161,17 @@ test.describe("Workspaces", () => {
     await filter.fill("status:errored ");
     await expect(filter).toHaveValue("status:errored ");
 
+    // The stored form is the parsed terms, the same text the URL carries, so the
+    // trailing space typed after a completed term is not restored.
     // Leave through the nav bar's bare /workspaces link, which carries no query.
     await page.goto("/settings/tokens");
     await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
     await page.waitForURL(/\/workspaces/);
-    await expect(filter).toHaveValue("status:errored ");
+    await expect(filter).toHaveValue("status:errored");
 
     // A reload keeps it too.
     await page.reload();
-    await expect(filter).toHaveValue("status:errored ");
+    await expect(filter).toHaveValue("status:errored");
 
     // It stays until it is explicitly cleared, and then it stays cleared.
     await filter.fill("");
@@ -178,6 +180,46 @@ test.describe("Workspaces", () => {
     await page.waitForURL(/\/workspaces/);
     await expect(filter).toHaveValue("");
   });
+
+  test("the stored filter is the normalised form, not the raw text", async ({ page }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await filter.fill("env=prod ");
+
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await expect(filter).toHaveValue("env:prod");
+  });
+
+  test("a filter in the URL wins over the stored one", async ({ page }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await filter.fill("status:errored ");
+    await expect(filter).toHaveValue("status:errored ");
+
+    // The same tab still holds "status:errored", so the two disagree here.
+    await page.goto("/workspaces?q=status:applied");
+    await expect(filter).toHaveValue("status:applied");
+  });
+
+  // A refusal takes the not-ok branch; a body that is not JSON takes the catch. Neither may drop
+  // an engine the URL asked for (a transport failure would too, but apiFetch retries those for seconds).
+  for (const [name, reply] of [
+    ["is refused", { status: 403, body: "{}" }],
+    ["returns something that is not JSON", { status: 200, body: "not json" }],
+  ] as const) {
+    test(`an engine in the URL survives the engines request that ${name}`, async ({ page }) => {
+      await page.route("**/api/v1/engines", (route) => route.fulfill(reply));
+      const answered = page.waitForResponse((r) => r.url().includes("/api/v1/engines"));
+      await page.goto("/workspaces?engine=terraform");
+      await answered;
+      // Give the page the chance to (wrongly) drop it, then check both places it lives.
+      await page.waitForTimeout(600);
+      expect(new URL(page.url()).searchParams.get("engine")).toBe("terraform");
+      expect(await page.evaluate(() => sessionStorage.getItem("terrapod:workspace-engine"))).toBe("terraform");
+    });
+  }
 
   test("a second tab does not inherit or overwrite the first tab's filter", async ({ page, context }) => {
     const filter = page.locator('input[aria-label="Filter workspaces"]');
@@ -193,7 +235,7 @@ test.describe("Workspaces", () => {
 
     await otherFilter.fill("status:applied ");
     await page.reload();
-    await expect(filter).toHaveValue("status:errored ");
+    await expect(filter).toHaveValue("status:errored");
     await other.close();
   });
 

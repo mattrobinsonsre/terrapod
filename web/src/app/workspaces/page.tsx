@@ -398,6 +398,8 @@ function WorkspacesPageInner() {
       typeof window !== 'undefined' ? readPref(window.sessionStorage, ENGINE_KEY) : null,
     ),
   )
+  // Only an engine restored from storage is judged against the offered list; one in the URL is left alone.
+  const engineFromStorage = useRef(engineFilter !== '' && !searchParams.get('engine'))
 
   // Grouping mode — URL param takes priority, localStorage as fallback.
   const [groupMode, setGroupModeState] = useState<GroupMode>(() => {
@@ -663,9 +665,11 @@ function WorkspacesPageInner() {
         const ids = (d.data || []).map(e => e.id)
         if (ids.length > 0) setEngines(ids)
         // Only now is the offered list known, so only now can a stored engine be judged; see `usableEngine`.
-        setEngineFilter((cur) => usableEngine(cur, ids))
+        if (engineFromStorage.current) setEngineFilter((cur) => usableEngine(cur, ids))
       })
-      .catch(() => setEngineFilter(''))
+      .catch(() => {
+        if (engineFromStorage.current) setEngineFilter('')
+      })
   }, [])
   const engineName = (e: string) =>
     e === 'pulumi' ? t('form.enginePulumi') : e === 'terraform' ? t('form.engineTerraform') : e

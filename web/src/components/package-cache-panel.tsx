@@ -130,7 +130,7 @@ export function PackageCachePanel({
     }
   }, [])
   const { sortedItems, sortState, toggleSort } = useSortable<CachedPackageFile, SortKey>(
-    entries, 'last-accessed-at', 'desc', accessor,
+    entries, 'last-accessed-at', 'desc', accessor, 'package-cache',
   )
 
   /** One page. `append` false restarts the list at page 1. */
