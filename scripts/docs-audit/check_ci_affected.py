@@ -62,6 +62,13 @@ ALWAYS_RUN: dict[str, str] = {
     "dependency-review": "reads the dependency graph, not our paths",
     "host-checks": "the docs-audit gates read the whole tree",
     "sast": "semgrep scans every language at once",
+    # Named for the chart and is a grab-bag: besides 38 chart renders it holds
+    # `(go-audit)`, the repository's ONLY Go vulnerability scan, and
+    # `check_doc_helm_values.py`, the one docs-audit gate not in python-checks.
+    # Gating it on a `helm` family meant a docs-only pull request skipped the
+    # docs gate and a Go dependency bump skipped the CVE scan -- the same defect
+    # as python-checks, one level down: the job is not what its name says.
+    "helm-smoke": "holds the Go CVE scan and a docs gate, not just chart renders",
     "codeql": "one matrix over three languages; gating needs a dynamic matrix",
     "build-query": "publishes a binary the image builds download",
     "build-ee-agent": "publishes a binary the image builds download",
@@ -83,7 +90,7 @@ ALWAYS_RUN: dict[str, str] = {
     "cleanup-tag": "must fire precisely when a release failed",
 }
 
-MIN_GATED = 6  # below this the wiring has plainly come undone
+MIN_GATED = 5  # below this the wiring has plainly come undone
 
 
 def _families_from_script() -> set[str]:
@@ -170,7 +177,12 @@ def main() -> int:
 
     # 1. every job accounted for
     for name in jobs:
-        if name in gated or name in ALWAYS_RUN or name.startswith("release-"):
+        if name in gated or name in ALWAYS_RUN:
+            continue
+        if name.startswith("release-") or name == "cleanup-tag":
+            # Tag-only jobs: every family is `true` on a non-pull-request event,
+            # so they are outside this system by construction rather than by
+            # omission. Stated here rather than left as a bare prefix test.
             continue
         problems.append(
             f"{name}: neither gated on a run_<family> nor listed in ALWAYS_RUN. "

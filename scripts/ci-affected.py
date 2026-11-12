@@ -25,7 +25,13 @@ Skipping wrongly is silent -- a green run that proved nothing -- so every
 uncertainty resolves to RUN:
 
   * a changed path whose top-level component is not one this repository has
-    (a brand-new top-level directory) forces every family on;
+    forces every family on.  Note what this does and does not cover: the set is
+    read from the CHECKED-OUT tree, which on a pull request is the merge ref and
+    therefore already contains any directory the pull request ADDS.  So this
+    catches a path that has gone away, not a new one.  A new top-level directory
+    is instead safe by the families being derived -- `go_modules()` globs at run
+    time, and a new directory matches no family and so skips nothing that reads
+    it;
   * `.github/**` forces every family on, because a workflow, a composite action
     or a pinned digest changes how the jobs themselves behave;
   * `scripts/**` forces every family on, because jobs shell out to it
@@ -110,6 +116,29 @@ def go_modules() -> list[str]:
     return sorted(p.parent.name for p in ROOT.glob("*/go.mod"))
 
 
+def _compose_files_for_tests() -> list[str]:
+    """The compose files `scripts/test.sh` names -- the Python tier's runtime.
+
+    `python-test` is a single step, `scripts/test.sh python -- <args>`, and that
+    script brings the tier up with a compose file carrying the database URL, the
+    storage backend and the postgres/redis/localstack image tags. None of that is
+    baked into an image, so reading the Dockerfiles' COPY lines cannot see it --
+    and a change to it with no other change would otherwise skip every Python
+    slice while altering what they run against.
+
+    Derived from the script rather than written down, for the same reason as
+    everything else here.
+    """
+    src = (ROOT / "scripts" / "test.sh").read_text()
+    # The name alone: the script writes `"$REPO_ROOT/docker-compose.test.yml"`,
+    # and a pattern that also eats the prefix yields `REPO_ROOT/...`, which
+    # matches no changed path -- silently, and in the direction that skips.
+    found = sorted(set(re.findall(r"docker-compose[\w.-]*\.ya?ml", src)))
+    if not found:
+        raise ValueError("scripts/test.sh names no compose file")
+    return found
+
+
 def families() -> dict[str, list[str]]:
     """family -> the input paths it reads, all derived from the tree."""
     python_inputs = sorted(
@@ -120,11 +149,13 @@ def families() -> dict[str, list[str]]:
     )
     all_go = sorted(set().union(*(_go_closure(m) for m in go_modules())))
     return {
-        "python": python_inputs,
-        "node": ["web"],
-        "go": all_go,
+        # `pentest/` holds the accepted-risk register each audit reads. Removing
+        # a suppression IS the change, and the job that would prove the finding
+        # has really gone is the one that would otherwise be skipped.
+        "python": sorted(set(python_inputs) | set(_compose_files_for_tests()) | {"pentest"}),
+        "node": ["web", "pentest"],
+        "go": sorted(set(all_go) | {"pentest"}),
         "pulumi": sorted(_go_closure("pulumi-provider")),
-        "helm": ["helm"],
     }
 
 
@@ -172,82 +203,87 @@ def decide(
 _FIXTURES: list[tuple[list[str], dict[str, bool], str]] = [
     (
         ["README.md"],
-        {"python": False, "node": False, "go": False, "pulumi": False, "helm": False},
+        {"python": False, "node": False, "go": False, "pulumi": False},
         "a root doc affects nothing",
     ),
     (
         [".github/workflows/ci.yml"],
-        {"python": True, "node": True, "go": True, "pulumi": True, "helm": True},
+        {"python": True, "node": True, "go": True, "pulumi": True},
         "a workflow change forces everything",
     ),
     (
         ["scripts/lib.sh"],
-        {"python": True, "node": True, "go": True, "pulumi": True, "helm": True},
+        {"python": True, "node": True, "go": True, "pulumi": True},
         "scripts/ forces everything",
     ),
+    # A path whose top-level component has GONE AWAY. Deliberately not a
+    # brand-new directory: `actions/checkout` gives a pull request the merge
+    # ref, so a directory the pull request adds is already on disk and is
+    # therefore "known" -- the check cannot fire for that case, and a fixture
+    # asserting it would pass only by the name happening not to exist.
     (
-        ["brand-new-dir/x.py"],
-        {"python": True, "node": True, "go": True, "pulumi": True, "helm": True},
-        "an unrecognised top-level path forces everything",
+        ["a-directory-that-was-deleted/x.py"],
+        {"python": True, "node": True, "go": True, "pulumi": True},
+        "a top-level path that is no longer in the tree forces everything",
     ),
     (
         ["services/terrapod/api/app.py"],
-        {"python": True, "node": False, "go": False, "pulumi": False, "helm": False},
+        {"python": True, "node": False, "go": False, "pulumi": False},
         "API source is the Python tier only",
     ),
     (
         ["web/src/app/workspaces/page.tsx"],
-        {"python": True, "node": True, "go": False, "pulumi": False, "helm": False},
+        {"python": True, "node": True, "go": False, "pulumi": False},
         "this web path is COPYed into the test image, so it is Python too",
     ),
     (
         ["web/src/components/nav.tsx"],
-        {"python": False, "node": True, "go": False, "pulumi": False, "helm": False},
+        {"python": False, "node": True, "go": False, "pulumi": False},
         "a web path outside the COPY set is node only",
     ),
     (
         ["web/messages/de.json"],
-        {"python": True, "node": True, "go": False, "pulumi": False, "helm": False},
+        {"python": True, "node": True, "go": False, "pulumi": False},
         "the locale catalogues are read by the Python i18n gates",
     ),
     (
         ["go-terrapod/runs.go"],
-        {"python": True, "node": False, "go": True, "pulumi": True, "helm": False},
+        {"python": True, "node": False, "go": True, "pulumi": True},
         "the SDK is COPYed into the test image and replaced by pulumi-provider",
     ),
     (
         ["mcp/internal/mcpserver/crud.go"],
-        {"python": True, "node": False, "go": True, "pulumi": False, "helm": False},
+        {"python": True, "node": False, "go": True, "pulumi": False},
         "crud.go is COPYed into the test image",
     ),
     (
         ["mcp/internal/mcpserver/act.go"],
-        {"python": False, "node": False, "go": True, "pulumi": False, "helm": False},
+        {"python": False, "node": False, "go": True, "pulumi": False},
         "another mcp file is not",
     ),
     (
         ["helm/terrapod/values.yaml"],
-        {"python": True, "node": False, "go": False, "pulumi": False, "helm": True},
+        {"python": True, "node": False, "go": False, "pulumi": False},
         "the chart is COPYed into the test image for the helm tests",
     ),
     (
         ["docs/index.md"],
-        {"python": False, "node": False, "go": False, "pulumi": False, "helm": False},
+        {"python": False, "node": False, "go": False, "pulumi": False},
         "an ordinary doc affects nothing",
     ),
     (
         ["docs/deprecations.md"],
-        {"python": True, "node": False, "go": False, "pulumi": False, "helm": False},
+        {"python": True, "node": False, "go": False, "pulumi": False},
         "this one doc IS COPYed into the test image",
     ),
     (
         ["ee-agent/main.go"],
-        {"python": False, "node": False, "go": True, "pulumi": False, "helm": False},
+        {"python": False, "node": False, "go": True, "pulumi": False},
         "ee-agent source is Go only -- only its go.mod is COPYed",
     ),
     (
         ["ee-agent/go.mod"],
-        {"python": True, "node": False, "go": True, "pulumi": False, "helm": False},
+        {"python": True, "node": False, "go": True, "pulumi": False},
         "...and its go.mod is",
     ),
     # The base image installs the Python dependency closure, so a lockfile bump
@@ -257,12 +293,12 @@ _FIXTURES: list[tuple[list[str], dict[str, bool], str]] = [
     # entire Python tier.
     (
         ["services/poetry.lock"],
-        {"python": True, "node": False, "go": False, "pulumi": False, "helm": False},
+        {"python": True, "node": False, "go": False, "pulumi": False},
         "the lockfile is COPYed into the test BASE image",
     ),
     (
         ["services/pyproject.toml"],
-        {"python": True, "node": False, "go": False, "pulumi": False, "helm": False},
+        {"python": True, "node": False, "go": False, "pulumi": False},
         "and so is pyproject.toml",
     ),
     # An empty list means the diff could not be computed, not that nothing
@@ -270,8 +306,25 @@ _FIXTURES: list[tuple[list[str], dict[str, bool], str]] = [
     # them is safe to act on.
     (
         [],
-        {"python": True, "node": True, "go": True, "pulumi": True, "helm": True},
+        {"python": True, "node": True, "go": True, "pulumi": True},
         "an empty changed-file list forces everything",
+    ),
+    # `python-test` is one step: `scripts/test.sh python -- ...`, and that script
+    # brings the tier up with this file. Nothing bakes it into an image, so the
+    # Dockerfile-derived set cannot see it; without this case a bump of the
+    # postgres tag, or an edit to the storage backend, skips every Python slice
+    # while changing what they run against.
+    (
+        ["docker-compose.test.yml"],
+        {"python": True, "node": False, "go": False, "pulumi": False},
+        "the compose file IS the Python tier's runtime",
+    ),
+    # Removing a suppression is the change, and the audit that would prove the
+    # finding has gone is the job that would otherwise be skipped.
+    (
+        ["pentest/pip-audit-ignore.txt"],
+        {"python": True, "node": True, "go": True, "pulumi": False},
+        "the accepted-risk register is read by three audits",
     ),
 ]
 
@@ -291,19 +344,34 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--changed-file", help="file holding one changed path per line")
     ap.add_argument("--show", action="store_true", help="print the derived input sets and exit")
+    ap.add_argument(
+        "--self-test",
+        action="store_true",
+        help="assert the fixtures and exit; run by the docs-audit gate, NOT on "
+        "the CI hot path -- `prepare` is the root of the job graph, so a failure "
+        "there reds the whole run with the reason buried in one job's log",
+    )
     args = ap.parse_args()
 
     try:
         fams = families()
     except Exception as exc:  # a dependency set we cannot vouch for
         print(f"could not derive the input sets ({exc}) -- running everything", file=sys.stderr)
-        for name in ("python", "node", "go", "pulumi", "helm"):
+        # The names come from the fixtures rather than a second hand-written
+        # list: a list here that fell behind `families()` would emit nothing for
+        # the missing family, and an absent output is the empty string, so that
+        # job would be skipped on every run where the derivation failed.
+        for name in sorted({k for _, expected, _ in _FIXTURES for k in expected}):
             print(f"run_{name}=true")
         return 0
 
-    self_test(fams)
+    if args.self_test:
+        self_test(fams)
+        print(f"PASS — {len(_FIXTURES)} fixture(s) over {len(fams)} derived families.")
+        return 0
 
     if args.show:
+        self_test(fams)
         for name, patterns in fams.items():
             print(f"{name}:")
             for pattern in patterns:

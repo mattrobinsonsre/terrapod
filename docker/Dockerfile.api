@@ -67,7 +67,9 @@ COPY services/pyproject.toml services/poetry.lock ./
 # both `==` pinned and hashed, and refuses to install a transitive the file does
 # not list. A malicious upstream release cannot reach this image without the
 # committed lock changing first.
-RUN "$POETRY_HOME"/bin/poetry check --lock --no-interaction --no-ansi \
+RUN --mount=type=cache,target=/root/.cache/pypoetry \
+    --mount=type=cache,target=/root/.cache/pip \
+    "$POETRY_HOME"/bin/poetry check --lock --no-interaction --no-ansi \
     && "$POETRY_HOME"/bin/poetry export \
         --only main -f requirements.txt -o /tmp/requirements.txt \
     && pip install --no-cache-dir --require-hashes -r /tmp/requirements.txt

@@ -105,6 +105,12 @@ jobs:
     permissions:
       contents: read
       packages: read
+      # The affected-families step reads the pull request's own file list. A
+      # job-level permissions block sets every unlisted scope to `none`, so
+      # without this the call 403s, the step falls back to running everything,
+      # and the run is green -- the gate would simply never work, visibly
+      # nowhere but this job's stderr.
+      pull-requests: read
     outputs:
       sha_short: ${{ steps.meta.outputs.sha_short }}
       images_exist: ${{ steps.check.outputs.images_exist }}
@@ -116,7 +122,6 @@ jobs:
       run_node: ${{ steps.affected.outputs.run_node }}
       run_go: ${{ steps.affected.outputs.run_go }}
       run_pulumi: ${{ steps.affected.outputs.run_pulumi }}
-      run_helm: ${{ steps.affected.outputs.run_helm }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -195,7 +200,7 @@ jobs:
         run: |
           set -euo pipefail
           emit_all() {
-            for f in python node go pulumi helm; do
+            for f in python node go pulumi; do
               echo "run_$f=true" >> "$GITHUB_OUTPUT"
             done
           }
@@ -218,10 +223,16 @@ jobs:
           # compare what we listed against the pull request's own count and fall
           # back to running everything whenever they disagree, or whenever
           # either call fails.
+          # One TSV row per file, so the count still matches `changed_files`
+          # while both paths of a rename reach the deriver. Emitting two bare
+          # lines per rename instead would make `actual > expected` on any pull
+          # request containing one -- which falls back to running everything,
+          # silently, i.e. it would disable the gate for a whole class of change.
           if expected=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${n}" --jq '.changed_files') \
              && gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${n}/files" \
-                  --jq '.[].filename' > "$raw"; then
-            actual=$(grep -c . "$raw" || true)
+                  --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$raw.tsv"; then
+            actual=$(grep -c . "$raw.tsv" || true)
+            tr '\t' '\n' < "$raw.tsv" | grep -v '^$' > "$raw" 
             if [[ "$actual" == "$expected" ]]; then
               mv "$raw" "$changed"
             else
@@ -1557,7 +1568,7 @@ jobs:
   helm-smoke:
     name: Helm Smoke
     needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true' && needs.prepare.outputs.run_helm == 'true'
+    if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
 
     # The `(migration-check)` steps below apply the real migration files to a
@@ -4195,8 +4206,26 @@ jobs:
           build-args: |
             PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
             BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
-          cache-from: type=gha,scope=${{ matrix.image }}-amd64
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
+          # A REGISTRY cache, not `type=gha`, because the Actions cache
+          # service scopes every entry to the ref that wrote it: an entry
+          # written by `refs/pull/N/merge` is readable by that one pull
+          # request and by nothing else. Measured before this change, the
+          # repository held 627 buildkit entries totalling 7.47 GB across
+          # three open pull requests and 5 entries totalling 0.06 GB on
+          # `refs/heads/main` -- so nothing was shared, and the pull
+          # requests were evicting each other against the 10 GB cap.
+          #
+          # A registry cache is an ordinary OCI artifact in GHCR. It has
+          # no ref scoping and no cap, so every run reads and writes the
+          # same ref: main's layers are there for a pull request, and a
+          # pull request's are there for the next one. `packages: write`
+          # and the GHCR login this job already has are all it needs.
+          #
+          # `ignore-error` because a pull request from a FORK gets a
+          # read-only token, so its export would fail; it should still
+          # build, and it can still read.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-amd64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-amd64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
 
       - name: Export image artifact
         if: needs.prepare.outputs.is_pr == 'true'
@@ -4291,8 +4320,26 @@ jobs:
           build-args: |
             PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
             BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
-          cache-from: type=gha,scope=${{ matrix.image }}-arm64
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
+          # A REGISTRY cache, not `type=gha`, because the Actions cache
+          # service scopes every entry to the ref that wrote it: an entry
+          # written by `refs/pull/N/merge` is readable by that one pull
+          # request and by nothing else. Measured before this change, the
+          # repository held 627 buildkit entries totalling 7.47 GB across
+          # three open pull requests and 5 entries totalling 0.06 GB on
+          # `refs/heads/main` -- so nothing was shared, and the pull
+          # requests were evicting each other against the 10 GB cap.
+          #
+          # A registry cache is an ordinary OCI artifact in GHCR. It has
+          # no ref scoping and no cap, so every run reads and writes the
+          # same ref: main's layers are there for a pull request, and a
+          # pull request's are there for the next one. `packages: write`
+          # and the GHCR login this job already has are all it needs.
+          #
+          # `ignore-error` because a pull request from a FORK gets a
+          # read-only token, so its export would fail; it should still
+          # build, and it can still read.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-arm64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-arm64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
 
       # arm64 is now artifacted on PRs too — scan-images scans it as well.
       - name: Export image artifact
