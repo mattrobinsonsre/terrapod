@@ -236,6 +236,17 @@
     "status",
     "total"
   ],
+  "cache_warm.package_cache_sources": [
+    "ecosystem",
+    "enabled",
+    "mirrors",
+    "resolves-latest",
+    "upstream"
+  ],
+  "cache_warm.package_cache_sources:meta": [
+    "max-items",
+    "sealed"
+  ],
   "cache_warm.warm_job_status": [
     "completed",
     "failed",

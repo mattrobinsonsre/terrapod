@@ -91,7 +91,9 @@ def service_index(base: str) -> dict:
     }
 
 
-async def fetch_versions(package_id: str, *, client: httpx.AsyncClient | None = None) -> bytes:
+async def fetch_versions(
+    package_id: str, *, client: httpx.AsyncClient | None = None, base: str | None = None
+) -> bytes:
     """The upstream versions document for a package, as raw bytes.
 
     Not parsed: it is `{"versions": [...]}` and nothing here inspects it, so
@@ -99,7 +101,7 @@ async def fetch_versions(package_id: str, *, client: httpx.AsyncClient | None = 
     re-serialisation.
     """
     lower = normalise(package_id)
-    url = f"{upstream_base()}/{lower}/index.json"
+    url = f"{(base or upstream_base()).rstrip('/')}/{lower}/index.json"
     owns = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
     try:
@@ -130,16 +132,22 @@ def versions_artifact(package_id: str) -> Artifact:
     )
 
 
-def package_artifact(package_id: str, version: str) -> Artifact:
-    """One `.nupkg`, addressed exactly as the client asks for it."""
+def package_artifact(package_id: str, version: str, *, base: str | None = None) -> Artifact:
+    """One `.nupkg`, addressed exactly as the client asks for it.
+
+    `base` overrides the configured upstream for ONE call. Warming uses it to
+    pull from a named mirror (`registry.package_cache.<eco>.mirrors`); serving
+    never passes it, so the proxy's own request-forgery surface is unchanged.
+    """
     lower = normalise(package_id)
     filename = f"{lower}.{version}.nupkg"
+    root = (base or upstream_base()).rstrip("/")
     return Artifact(
         ecosystem=ECOSYSTEM,
         name=lower,
         version=version,
         filename=filename,
-        upstream_url=f"{upstream_base()}/{lower}/{version}/{filename}",
+        upstream_url=f"{root}/{lower}/{version}/{filename}",
         # The flat container publishes no digest beside the package; the client
         # verifies against the versions document and its own signature checks.
         digest="",

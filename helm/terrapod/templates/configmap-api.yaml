@@ -318,16 +318,28 @@ data:
         pypi:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .npm }}
         npm:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .pulumi }}
         pulumi:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- /* Guarded, unlike `upstream`: this key HAS a code default, so
                  rendering it unconditionally would write "" for an operator
                  whose values omit it, overriding that default with an empty
@@ -341,16 +353,28 @@ data:
         go:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .nuget }}
         nuget:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .galaxy }}
         galaxy:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}

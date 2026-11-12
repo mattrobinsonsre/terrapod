@@ -1863,7 +1863,36 @@
       "continuePurge": "tlhIlwI' yItaH",
       "continuing": "taHtaH…"
     },
-    "sealedWarning": "De'wI'vam ngaQlu'. vaj naDev tlhIllu'bogh Doch Hevqa'lu'laHbe'. vaj nge'wI'meyvam buSHa' Doch teqmeH pIj qaSbogh Qu'. reH Qaw'lu'."
+    "sealedWarning": "De'wI'vam ngaQlu'. vaj naDev tlhIllu'bogh Doch Hevqa'lu'laHbe'. vaj nge'wI'meyvam buSHa' Doch teqmeH pIj qaSbogh Qu'. reH Qaw'lu'.",
+    "warmAhead": {
+      "heading": "De' mIllogh je nge'wI'mey tujmoH",
+      "help": "mI' DaSovDI' yIper: mI' ghajbogh tujmoHwI' ngaQmoHwI' teywI' nuDlaHlu', 'ach «chu'qu'bogh Doch» nuDlaHbe'lu'. Hoch tlhegh <code>pong mI''</code> rurnIS; Pulumi chenmoHwI'meyvaD Qav <code>os/arch</code> mu'mey yIchel, wIvlu'bogh qachmey tujmoHmeH.",
+      "ecosystemLabel": "jan Segh",
+      "ecosystemOff": "{ecosystem} (chu'Ha'lu'pu')",
+      "sourceLabel": "ghelmeH mung",
+      "sourceDefault": "ghunlu'pu'bogh mung",
+      "upstreamIs": "ghelmeH mung: <code>{url}</code>.",
+      "upstreamPerReference": "Hoch mIllogh per Daj host pong; De'wI'vam ghunlu'pu'bogh mungmey wa' 'oHnIS host'e'.",
+      "itemsLabel": "janmey",
+      "imagesLabel": "mIllogh permey",
+      "willWarm": "{count, plural, other {# jan tujmoHlu'.}}",
+      "unversioned": "{count, plural, other {# tlhegh mI' pongbe', vaj chu'qu'bogh Doch ghellu'. rapqa'laHbe'lu'.}}",
+      "versionRequired": "{count, plural, other {# tlhegh mI' pongbe'.}} chu'qu'bogh wIvmeH tetlh ngeHbe' {ecosystem}, vaj Hoch tlhegh mI' poQ.",
+      "tooMany": "wa' ngeHDI' {max} janmey tujmoHlaHlu' neH.",
+      "confirm": "DaH {count, plural, other {# jan}} tujmoH'a'?",
+      "warm": "tujmoH",
+      "warming": "tujmoHtaH…",
+      "progress": "{total} ghUved {completed} rInpu'",
+      "fetched": "{fetched, plural, other {# De' ghellu'pu''}}",
+      "alreadyCached": "{files, plural, other {nge'lu'pu'qu' (# De')}}",
+      "finished": "{total} ghUved {succeeded} tujmoHlu'pu' ({failed} lujpu')",
+      "sealed": "ngaQlu' De'wI'vam, vaj mungvo' pagh ghellaH. ngaQmoHlu'pa' nge'wI'mey yItujmoH, pagh DaH tujmoHmeH yIpoSmoH.",
+      "errorEmpty": "tujmoHmeH wa' tlhegh chel.",
+      "errorSources": "ghelmeH mung laDmeH lujpu'",
+      "errorSubmit": "tujmoH taghmeH lujpu'",
+      "errorStatus": "tujmoH Qu' laDmeH lujpu'",
+      "helpLead": "vay' poQlu'pa' nge'wI'Daq janmey yIghel — wa' tlheghvaD wa' jan: pong mI' je."
+    }
   },
   "catalog": {
     "title": "vum tetlh",

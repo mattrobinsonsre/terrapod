@@ -1863,7 +1863,36 @@
       "continuePurge": "Purgationem pergere",
       "continuing": "Pergitur…"
     },
-    "sealedWarning": "Hic nodus obsignatus est, itaque nihil hic purgatum iterum peti potest. Purgatio statuta haec promptuaria ea de causa praeterit — haec deletio perpetua est."
+    "sealedWarning": "Hic nodus obsignatus est, itaque nihil hic purgatum iterum peti potest. Purgatio statuta haec promptuaria ea de causa praeterit — haec deletio perpetua est.",
+    "warmAhead": {
+      "heading": "Promptuaria fasciculorum et imaginum calefacere",
+      "help": "Versionem da quotiens eam nosti: calefactio cum versione nominata postea ad lockfile comparari potest, «quidquid novissimum est» non potest. Scribe quamque lineam ut <code>nomen versio</code>; pro interpolamentis Pulumi, signa <code>os/arch</code> in fine adde ut certos suggestus calefacias.",
+      "ecosystemLabel": "Genus artificii",
+      "ecosystemOff": "{ecosystem} (exstinctum)",
+      "sourceLabel": "Petere ex",
+      "sourceDefault": "Superior configuratus",
+      "upstreamIs": "Ex <code>{url}</code> petetur.",
+      "upstreamPerReference": "Quaeque imaginis relatio proprium hospitem nominat, qui unus ex superioribus in hac instructione configuratis esse debet.",
+      "itemsLabel": "Artificia",
+      "imagesLabel": "Relationes imaginum",
+      "willWarm": "{count, plural, one {# artificium calefiet.} other {# artificia calefient.}}",
+      "unversioned": "{count, plural, one {# linea nullam versionem nominat, itaque novissima quae praesto est petetur. Id iterari non potest.} other {# lineae nullam versionem nominant, itaque novissima quae praesto est petetur. Id iterari non potest.}}",
+      "versionRequired": "{count, plural, one {# linea nullam versionem nominat.} other {# lineae nullam versionem nominant.}} {ecosystem} nullum indicem edit ad quem novissima resolvatur, itaque omnis linea una eget.",
+      "tooMany": "Ad summum {max} artificia una submissione calefieri possunt.",
+      "confirm": "{count, plural, one {# artificium} other {# artificia}} nunc calefacere?",
+      "warm": "Calefacere",
+      "warming": "Calefit…",
+      "progress": "{completed} ex {total} perfecta",
+      "fetched": "{fetched, plural, one {# tabula petita} other {# tabulae petitae}}",
+      "alreadyCached": "{files, plural, one {iam conditum (# tabula)} other {iam conditum (# tabulae)}}",
+      "finished": "Calefacta {succeeded}/{total} ({failed} defecerunt)",
+      "sealed": "Hic nodus obsignatus est, itaque nihil a superiore petere potest. Promptuaria ante obsignationem calefac, vel obsignationem tolle ut nunc calefiant.",
+      "errorEmpty": "Adde saltem unam lineam ad calefaciendum.",
+      "errorSources": "Unde calefactio peteret cognosci non potuit",
+      "errorSubmit": "Calefactio incipi non potuit",
+      "errorStatus": "Opus calefactionis legi non potuit",
+      "helpLead": "Artificia in promptuarium pete priusquam quidquam ea postulet — unum per lineam, nomine et versione."
+    }
   },
   "catalog": {
     "title": "Catalogus Servitiorum",

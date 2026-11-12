@@ -1863,7 +1863,36 @@
       "continuePurge": "Kontynuuj czyszczenie",
       "continuing": "Kontynuowanie…"
     },
-    "sealedWarning": "Ten węzeł jest zapieczętowany, więc nic wyczyszczonego tutaj nie da się ponownie pobrać. Właśnie dlatego zaplanowane czyszczenie pomija te pamięci podręczne — jest to trwałe usunięcie."
+    "sealedWarning": "Ten węzeł jest zapieczętowany, więc nic wyczyszczonego tutaj nie da się ponownie pobrać. Właśnie dlatego zaplanowane czyszczenie pomija te pamięci podręczne — jest to trwałe usunięcie.",
+    "warmAhead": {
+      "heading": "Rozgrzej pamięci podręczne pakietów i obrazów",
+      "help": "Podawaj wersję wszędzie tam, gdzie ją znasz: rozgrzewanie wskazane z wersją można potem sprawdzić względem pliku blokady, a „cokolwiek jest najnowsze” — nie. Każdy wiersz zapisuj jako <code>nazwa wersja</code>; w przypadku wtyczek Pulumi dodaj na końcu tokeny <code>os/arch</code>, aby rozgrzać konkretne platformy.",
+      "ecosystemLabel": "Rodzaj artefaktu",
+      "ecosystemOff": "{ecosystem} (wyłączone)",
+      "sourceLabel": "Pobieraj z",
+      "sourceDefault": "Skonfigurowane źródło nadrzędne",
+      "upstreamIs": "Zostanie pobrane z <code>{url}</code>.",
+      "upstreamPerReference": "Każde odwołanie do obrazu wskazuje własny host, który musi być jednym ze źródeł nadrzędnych skonfigurowanych w tej instalacji.",
+      "itemsLabel": "Artefakty",
+      "imagesLabel": "Odwołania do obrazów",
+      "willWarm": "{count, plural, one {Zostanie rozgrzany # artefakt.} few {Zostaną rozgrzane # artefakty.} many {Zostanie rozgrzanych # artefaktów.} other {Zostanie rozgrzane # artefaktu.}}",
+      "unversioned": "{count, plural, one {# wiersz nie podaje wersji, więc pobrana zostanie najnowsza dostępna. To nie jest odtwarzalne.} few {# wiersze nie podają wersji, więc pobrane zostaną najnowsze dostępne. To nie jest odtwarzalne.} many {# wierszy nie podaje wersji, więc pobrane zostaną najnowsze dostępne. To nie jest odtwarzalne.} other {# wiersza nie podaje wersji, więc pobrana zostanie najnowsza dostępna. To nie jest odtwarzalne.}}",
+      "versionRequired": "{count, plural, one {# wiersz nie podaje wersji.} few {# wiersze nie podają wersji.} many {# wierszy nie podaje wersji.} other {# wiersza nie podaje wersji.}} {ecosystem} nie publikuje indeksu, względem którego dałoby się rozstrzygnąć, co jest najnowsze, więc każdy wiersz musi ją podać.",
+      "tooMany": "W jednym zgłoszeniu można rozgrzać najwyżej {max} artefaktów.",
+      "confirm": "Rozgrzać teraz {count, plural, one {# artefakt} few {# artefakty} many {# artefaktów} other {# artefaktu}}?",
+      "warm": "Rozgrzej",
+      "warming": "Rozgrzewanie…",
+      "progress": "Gotowe {completed} z {total}",
+      "fetched": "{fetched, plural, one {pobrano # plik} few {pobrano # pliki} many {pobrano # plików} other {pobrano # pliku}}",
+      "alreadyCached": "{files, plural, one {już w pamięci podręcznej (# plik)} few {już w pamięci podręcznej (# pliki)} many {już w pamięci podręcznej (# plików)} other {już w pamięci podręcznej (# pliku)}}",
+      "finished": "Rozgrzano {succeeded}/{total} ({failed} nieudanych)",
+      "sealed": "Ten węzeł jest zapieczętowany, więc nie może niczego pobrać ze źródła nadrzędnego. Rozgrzej pamięci podręczne przed zapieczętowaniem albo zdejmij pieczęć, aby rozgrzać je teraz.",
+      "errorEmpty": "Dodaj co najmniej jeden wiersz do rozgrzania.",
+      "errorSources": "Nie udało się odczytać, skąd rozgrzewanie miałoby pobierać",
+      "errorSubmit": "Nie udało się rozpocząć rozgrzewania",
+      "errorStatus": "Nie udało się odczytać zadania rozgrzewania",
+      "helpLead": "Pobierz artefakty do pamięci podręcznej, zanim cokolwiek się o nie upomni — po jednym w wierszu, jako nazwa i wersja."
+    }
   },
   "catalog": {
     "title": "Katalog usług",

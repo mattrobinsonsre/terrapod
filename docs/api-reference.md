@@ -4867,6 +4867,10 @@ above; this section covers the other two — the **package cache** (one table fo
 all six language ecosystems) and the **VCS archive cache** (object storage only,
 no table). Every route here requires platform `admin`.
 
+It also covers **warming** — filling a cache deliberately before anything asks
+— for the package cache and the container mirror. The CLI-binary and provider
+warm routes are above, and are synchronous; these return a job id.
+
 For what fills each cache, how the scheduled sweep evicts it, and the operator
 walkthrough, see [Caches](caches.md).
 
@@ -5140,6 +5144,148 @@ as you go.
 > caches there because nothing can be refilled; these manual routes do not. VCS
 > archives are unaffected — sealing forbids reaching a package registry, not your
 > own VCS. See [Sealed deployments](caches.md#sealed-deployments).
+
+### Where a Warm Would Fetch From (Admin)
+
+```
+GET /api/v1/admin/package-cache/sources
+```
+
+What a warm submission would reach, **before** one is made. One entry per
+warmable artifact kind (`data[].type` = `package-cache-sources`, `id` = the
+ecosystem), plus `oci`.
+
+```json
+{
+  "data": [
+    {
+      "type": "package-cache-sources",
+      "id": "galaxy",
+      "attributes": {
+        "ecosystem": "galaxy",
+        "enabled": true,
+        "upstream": "https://galaxy.ansible.com",
+        "mirrors": {"hub": "https://terrapod.hub.example/api/v1/package-cache/galaxy"},
+        "resolves-latest": true
+      }
+    }
+  ],
+  "meta": {"max-items": 500, "sealed": false}
+}
+```
+
+- **`upstream`** is the registry this ecosystem pulls through by default. It is
+  **empty for `oci`**, which has no single answer — an image reference's own
+  first path component names its host.
+- **`mirrors`** are the labels a warm submission's `source` may name, declared
+  in `api.config.registry.package_cache.<ecosystem>.mirrors`. They affect
+  **warming only**; serving always uses `upstream`.
+- **`resolves-latest`** is whether a `version` may be omitted. It is `false` for
+  `pulumi`, whose download protocol publishes no index to resolve a bare name
+  against — a property of that protocol rather than of the deployment.
+- **`meta.sealed`** reports `api.config.registry.cache_only` here as well as on
+  the 409 below, so a client can say warming is unavailable rather than offering
+  a submission that can only fail.
+
+### Warm the Package Cache (Admin)
+
+```
+POST /api/v1/admin/package-cache/warm
+```
+
+Caches artifacts ahead of a run, or ahead of sealing the node. Returns **202**
+with a job id — a real dependency closure outlives a request.
+
+```json
+{
+  "packages": [
+    {"ecosystem": "galaxy", "name": "community.general", "version": "9.2.0"},
+    {"ecosystem": "go", "name": "github.com/spf13/cobra", "version": "v1.8.1"},
+    {"ecosystem": "pulumi", "name": "aws", "version": "6.0.0",
+     "platforms": ["linux/amd64", "linux/arm64"]},
+    {"ecosystem": "pypi", "name": "requests", "version": "2.32.3", "source": "hub"}
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `ecosystem` | `galaxy`, `pypi`, `npm`, `go`, `nuget` or `pulumi` |
+| `name` | the artifact as its ecosystem names it — `namespace.collection`, a module path, a package id, `[kind:]plugin` |
+| `version` | **explicit wherever you know it.** Omitted, the newest upstream offers; refused for `pulumi` with a 422 |
+| `source` | a **label** from `mirrors` above, to warm from instead of `upstream`. Never a URL — an undeclared label is a 422 naming the declared ones |
+| `platforms` | `os/arch` pairs, `pulumi` only. Omitted, the runner's own `linux/amd64` and `linux/arm64` |
+
+At most 500 items per submission (422 beyond it). An unknown ecosystem is a 422;
+an ecosystem whose proxy is switched off is a 404.
+
+```json
+{
+  "data": {
+    "type": "warm-jobs",
+    "id": "warm-9f2c4a1b8e03",
+    "attributes": {"status": "queued", "total": 4},
+    "links": {"self": "/api/v1/admin/warm-jobs/warm-9f2c4a1b8e03"}
+  }
+}
+```
+
+### Warm the Container Mirror (Admin)
+
+```
+POST /api/v1/admin/oci/warm
+```
+
+`{"images": ["quay.io/ansible/awx-ee:24.6.1"]}` — each reference exactly as a
+client would pull it; an absent tag means `latest`. Pulls the manifest **and
+every blob it references**, because a manifest-only warm would look cached and
+fail on the first layer a sealed node tried to serve. Same 202 shape as above.
+
+### Warm Job Status (Admin)
+
+```
+GET /api/v1/admin/warm-jobs/{job_id}
+```
+
+```json
+{
+  "data": {
+    "type": "warm-jobs",
+    "id": "warm-9f2c4a1b8e03",
+    "attributes": {
+      "status": "finished",
+      "total": 2, "completed": 2, "succeeded": 1, "failed": 1,
+      "submitted-at": "2026-01-01T00:00:00Z",
+      "outcomes": [
+        {"ecosystem": "pypi", "ref": "requests@2.32.3", "ok": true, "detail": "",
+         "files": 6, "fetched": 0, "source": "https://pypi.org"},
+        {"ecosystem": "npm", "ref": "nope", "ok": false,
+         "detail": "404 from upstream", "files": 0, "fetched": 0, "source": ""}
+      ]
+    }
+  }
+}
+```
+
+`status` is `queued`, `running` or `finished`. **Read `outcomes`, not the
+counts** — "one failed" across twenty packages is not actionable, and finding
+the specific gaps before sealing is the purpose. One item failing never stops
+the rest.
+
+- **`files`** is how many files the item covers; **`fetched`** how many this run
+  pulled. `fetched` 0 with `files` above 0 means **already cached**, which is how
+  a converged re-run is told apart from a first one — warming is idempotent, so
+  re-running is the normal way to close the last gaps.
+- **`detail` on a successful item** names a part that did not land, such as one
+  architecture of a Pulumi plugin.
+- **`source`** is the base those bytes came from.
+
+Jobs are kept in Redis for a day and then report 404.
+
+> **Warming a sealed node is a 409**, naming `api.config.registry.cache_only`,
+> rather than a job reporting zero successes — which would read as a set of
+> missing packages and send an operator looking upstream for a problem that is
+> on this side.
 
 ---
 
