@@ -133,7 +133,6 @@ export function createLogFollower(opts: LogFollowerOptions): LogFollower {
     opts.clearTimer ?? ((h: unknown) => clearTimeout(h as ReturnType<typeof setTimeout>))
 
   let phase: LogPhaseState = 'idle'
-  let offset = 0
   let complete = false
   let disposed = false
 
@@ -180,7 +179,6 @@ export function createLogFollower(opts: LogFollowerOptions): LogFollower {
 
   async function runOnce(reset: boolean): Promise<void> {
     if (reset) {
-      offset = 0
       complete = false
       // A reset restarts the follow budget; the loop re-arms it afterwards.
       stopFollow()
@@ -188,9 +186,13 @@ export function createLogFollower(opts: LogFollowerOptions): LogFollower {
     } else if (complete) {
       return // the log is final; nothing more will ever arrive
     }
-    // ALWAYS from 0, in every state. An old offset cannot be trusted against
-    // either source (see the module comment), so `offset` is kept only to
-    // notice an empty response, never to resume from.
+    // ALWAYS from 0, in every state -- an old offset cannot be trusted
+    // against either source (see the module comment). The local that used to
+    // track it is gone rather than kept: it would have been written and never
+    // read, which is the shape of a thing a future reader reinstates a use for.
+    // `from` stays a named constant because `parseLogFrame` and `opts.read`
+    // both take the offset, and naming it keeps the two call sites honest about
+    // what is being asked for.
     const from = 0
     let bytes: Uint8Array | null
     try {
@@ -202,7 +204,6 @@ export function createLogFollower(opts: LogFollowerOptions): LogFollower {
     const frame = parseLogFrame(bytes, from)
     if (frame.ended) complete = true
     if (frame.dataBytes <= 0) return
-    offset = from + frame.dataBytes
     opts.onText(frame.text, from === 0 ? 'replace' : 'append')
   }
 
