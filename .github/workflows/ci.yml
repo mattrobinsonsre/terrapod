@@ -56,10 +56,23 @@ on:
     # marked ready. Without this, draft-first PRs need a close+reopen to
     # get any CI run at all — caught while bringing up #371.
     types: [opened, synchronize, reopened, ready_for_review]
+  # The merge queue builds each entry against the PROJECTED result of
+  # everything ahead of it, so entry 3 is tested as though 1 and 2 had already
+  # landed. Without this trigger the required `CI` check never registers on a
+  # merge-queue entry and every merge blocks for ever -- it does not fail, it
+  # simply never reports, which is the absent-signal shape rather than a loud
+  # one. Same branches as the PR trigger, for the same reason.
+  merge_group:
+    branches: [main, 'release/**']
 
 concurrency:
+  # NOT cancel-in-progress for a merge-queue entry. A queue entry's run IS the
+  # merge decision, and cancelling it ejects the PR from the queue -- whereas a
+  # superseded PR run is genuinely waste. `github.ref` is unique per entry
+  # (`gh-readonly-queue/<base>/pr-N-<sha>`), so entries never cancel each other;
+  # this only governs re-pushes to the same ref.
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 env:
   REGISTRY: ghcr.io/mattrobinsonsre
@@ -153,7 +166,15 @@ jobs:
             version="${GITHUB_REF#refs/tags/}"
           fi
 
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+          # `merge_group` counts, and the name is the only thing about this
+          # that is now slightly off. What `is_pr` actually selects is a
+          # PRE-MERGE VALIDATION context: a ref that is not going to be
+          # published from, where images are built as artifacts and loaded
+          # rather than pulled, and where nothing writes a `sha-` manifest. A
+          # merge-queue entry is exactly that -- its ref is ephemeral
+          # (`gh-readonly-queue/...`), so publishing from it would tag images
+          # against a sha no branch will keep.
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" || "$GITHUB_EVENT_NAME" == "merge_group" ]]; then
             is_pr=true
           fi
 
@@ -287,6 +308,12 @@ jobs:
 
       - name: (docs-audit) Downloaded artifacts come from a declared dependency
         run: python3 scripts/docs-audit/check_artifact_deps.py
+
+      # Also PyYAML. Placed beside the artifact gate rather than anywhere else
+      # for that reason -- both read `ci.yml` itself, and both would fail on a
+      # job that has not installed it.
+      - name: (docs-audit) The merge-queue trigger covers every PR-trigger branch
+        run: python3 scripts/docs-audit/check_merge_queue_trigger.py
 
       # Needs PyYAML, installed above, like the artifact-dependency gate. A job
       # that boots the eval stack delivers images by one route on a pull request
