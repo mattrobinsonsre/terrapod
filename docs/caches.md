@@ -34,11 +34,19 @@ the registry they serve — see
 are covered below.
 
 Each surface reaches the same routes: the API directly, `go-terrapod`, the
-`/admin/binary-cache` page, and two **read-only** MCP tools —
-`terrapod_package_cache_list` and `terrapod_vcs_archive_cache_list` ([MCP](mcp.md)).
-The evictions are deliberately **not** offered as MCP tools: an eviction's only
-result is a slower run later for somebody who did not ask, which is an operator's
-call rather than an agent's.
+`/admin/binary-cache` page, and six MCP tools ([MCP](mcp.md)) — the two listings,
+annotated read-only, and the four evictions, annotated **destructive** so an MCP
+host asks before running one.
+
+> This page used to say the evictions were deliberately *not* offered as tools,
+> because an eviction's only result is a slower run later for somebody who did
+> not ask. The cost is real and the four tool descriptions say so; what was wrong
+> was treating it as a reason to withhold the tool. It is a property of the
+> operation rather than of the caller, so it applies just as much to the admin
+> page and to `curl`, and MCP is not an authorization boundary — the server
+> carries the operator's own token and the API applies the same RBAC whichever
+> door the call comes through. All the omission achieved was an agent that could
+> see a cache holding 40 GiB and could not act on it.
 
 ### What is not in this list, and why
 
@@ -115,6 +123,16 @@ The response is an ordinary paged Terrapod collection
 ([pagination](api-reference.md#pagination)): pass `page[size]` and `page[number]`
 to page it, or omit both for the whole filtered set.
 
+**A page costs a page.** The slice and the count are both done in the database,
+so asking for fifty artifacts out of sixty thousand reads fifty rows — it used to
+fetch every matching row and slice the list in memory, which made each page of a
+large cache as expensive as the whole table. `meta.pagination.total-count` is the
+whole filtered set rather than the page, so a client knows how much is left.
+
+Omitting both page parameters still returns everything, which is the documented
+non-paged contract and what an SDK sending no paging parameters relies on. On a
+cache of any size, page it.
+
 Each entry (`data[].type` is `cached-package-files`) carries:
 
 | Attribute | Meaning |
@@ -173,8 +191,19 @@ curl -X POST -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H 'Content-Type: application/json' \
   https://terrapod.example.com/api/v1/admin/package-cache/evict \
   -d '{"ecosystem": "npm", "older_than_days": 14}'
-# → {"status": "evicted", "files": 318, "bytes": 2104725504}
+# → {"status": "evicted", "files": 318, "bytes": 2104725504, "truncated": false}
 ```
+
+**One call removes at most 1000 artifacts, and `truncated` says when it stopped
+early.** The bound is on the work rather than on what matched: the eviction
+deletes one object per artifact, so an unbounded sweep of a large cache runs for
+minutes inside one request, and past the gateway's timeout the transaction rolls
+back while the objects already deleted stay deleted.
+
+`"truncated": true` means more matched than this call took. **Repeat the same
+request to continue** — there is no cursor to carry, because the artifacts that
+matched are the ones that went, so the next call starts on what is left. Keep
+going until it comes back `false`.
 
 **`older_than_days` is measured from the last access, never from the write.** An
 artifact every run pulls would otherwise be evicted merely for being old and
@@ -367,7 +396,8 @@ curl -X POST -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H 'Content-Type: application/json' \
   https://terrapod.example.com/api/v1/admin/vcs-archive-cache/evict \
   -d '{"connection_id": "vcs-1b3f", "older_than_days": 7}'
-# → {"status": "evicted", "archives": 406, "bytes": 1178927104}
+# → {"status": "evicted", "archives": 406, "bytes": 1178927104,
+#    "truncated": true, "next-cursor": "vcs_archives/vcs-1b3f/acme/web/9f2c-full.tar.gz"}
 ```
 
 **`older_than_days` is measured from the object's write time**, which for an
@@ -379,9 +409,42 @@ evicted if its commit is old enough, and the next run re-fetches it.
 As with the package cache, both fields are optional, neither means everything,
 and `older_than_days: 0` means *everything* rather than "disabled".
 
-**One call considers at most `scan-limit` archives**, the same ceiling the totals
-report. The response says how many it removed but not whether it stopped early,
-so on a large estate **run it again until `archives` comes back `0`**.
+### Continuing a bounded sweep
+
+**One call considers at most 1000 keys**, and `truncated` says whether more lie
+past them. This is a bound on the walk, not on the matches: an age filter may
+match a handful of keys in a window of a thousand.
+
+**That is why there is a cursor, and why "just run it again" is not enough.** The
+walk starts where you tell it to, so a repeat with no `after` re-examines the
+same window — on a cache larger than one window it purges nothing new however
+many times you run it, and if nothing in that first window is old enough it never
+advances at all. Pass `next-cursor` back as `after`, with **every other field
+unchanged**, and the sweep continues:
+
+```sh
+# Window 2, resuming exactly where window 1 stopped. Same filters.
+curl -X POST -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H 'Content-Type: application/json' \
+  https://terrapod.example.com/api/v1/admin/vcs-archive-cache/evict \
+  -d '{"connection_id": "vcs-1b3f", "older_than_days": 7,
+       "after": "vcs_archives/vcs-1b3f/acme/web/9f2c-full.tar.gz"}'
+```
+
+Loop while `truncated` is `true`; an empty `next-cursor` and `"truncated": false`
+mean the sweep reached the end. Changing a filter mid-sweep makes the next window
+a different question from the last one, so start again rather than adjusting as
+you go.
+
+`go-terrapod` reports both on `EvictionResult` (`Truncated`, `NextCursor`) and
+the MCP tool reports them as `truncated` and `next_cursor`. There is deliberately
+no "evict everything" helper on any of them: the bound is the point, and a helper
+that hid it behind one call would put the unbounded work straight back.
+
+> An earlier version of this page said the response did not report truncation
+> and told you to run the eviction again until `archives` came back `0`. It did
+> not, and that advice did not work — the walk restarted at the same place every
+> time. Both are fixed; the cursor is how.
 
 ---
 
@@ -397,6 +460,7 @@ to be tidied, and expecting either to behave like the other will mislead you.
 | **Paging** | `page[size]` / `page[number]`, with `meta.pagination` | a **key cursor** — `after` and `meta.next-cursor`, and **no** `meta.pagination` |
 | **Age filter** | **last access** (`last-accessed-at`) | **write time** (`last-modified`) |
 | **Totals** | exact, aggregated in the database | a bounded walk, with **`meta.truncated`** when it hit the ceiling |
+| **Resuming a bulk eviction** | repeat the same request — the artifacts that matched are the ones that went | pass `next-cursor` back as `after`, or the window restarts in the same place |
 | **When the capability is off** | the routes are **not there** | the routes stay |
 
 1. **The archive listing uses a key cursor.** There are no rows to offset into; a
@@ -413,6 +477,11 @@ to be tidied, and expecting either to behave like the other will mislead you.
    the age of its commit however recently a run used it.
 3. **`meta.truncated` exists because the archive totals cannot be exact.** The
    package totals are a `GROUP BY` over the whole table and need no such flag.
+4. **Only the archive eviction has a resume cursor.** Both are bounded per call
+   and both report `truncated`, but the package eviction deletes the rows it
+   selected, so repeating the request resumes by itself; the archive eviction
+   walks keys that are mostly *not* deleted, so without a cursor the same window
+   comes back every time.
 
 Two smaller consequences of the same fact, so they do not surprise you: the
 archive delete is idempotent where the package delete 404s, and an archive key

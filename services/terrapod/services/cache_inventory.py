@@ -50,6 +50,37 @@ VCS_ARCHIVE_PREFIX = "vcs_archives/"
 #: unbounded request from pulling a six-figure estate into one response.
 MAX_ARCHIVE_SCAN = 5000
 
+#: The most objects ONE bulk eviction call will remove, for either cache.
+#:
+#: A bound on the WORK rather than on what matches, and the result says when it
+#: stopped early and where to resume -- so a large cache is purged by repeating
+#: the call rather than by one request that outlives its gateway. Before this,
+#: `evict_package_files` deleted every matching object sequentially inside one
+#: handler: 50,000 artifacts at ~30 ms each is about 25 minutes, so the gateway
+#: timed out, the transaction rolled back, and the objects already deleted left
+#: rows pointing at keys that no longer existed (#2492).
+#:
+#: Separate from `MAX_ARCHIVE_SCAN`, which bounds a READ -- how much of the
+#: estate a listing shows or a total aggregates. Merging them is the obvious
+#: tidy and would be wrong in both directions: a read can afford a wide window
+#: because it only costs one list call, and a destructive loop cannot because
+#: every entry in the window is a round trip.
+#:
+#: Deliberately NOT a Helm value. The right bound is a property of the gateway
+#: in front of the API, not of the estate behind it, and the unattended path is
+#: already configurable: the scheduled retention sweep evicts both these caches
+#: with `artifact_retention.batch_size`. This constant bounds the ATTENDED path,
+#: where an operator who has just published a bad artifact wants it gone now and
+#: can see from the response that more remain.
+#:
+#: Deliberately NOT implemented as a batch delete either, which is the other
+#: obvious answer: `ObjectStore` has no such method, adding one means four
+#: backends with four different hard limits -- and S3's `DeleteObjects` fails
+#: the WHOLE call over 1000 keys, which looks like it worked. A batch delete
+#: would make this loop faster and leave it just as unbounded, and the defect is
+#: the unboundedness.
+MAX_EVICT_BATCH = 1000
+
 
 # ── the package cache ──────────────────────────────────────────────────────
 
@@ -59,23 +90,50 @@ async def list_package_files(
     *,
     ecosystem: str | None = None,
     name: str | None = None,
-) -> list[CachedPackageFile]:
-    """Cached package artifacts, newest-accessed first.
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[CachedPackageFile], int]:
+    """One page of cached package artifacts, newest-accessed first, and the
+    total matching the filters.
 
     Ordered by `last_accessed_at` rather than `cached_at` because that is the
     column retention reads: an operator deciding what to evict wants to see what
     nothing has touched, and sorting by when it arrived buries exactly that.
+
+    **The page is sliced in SQL, and the total is counted in SQL.** It used to
+    return every matching row and let the router slice the list in Python, so
+    every page of a 60,000-artifact cache materialised all 60,000 ORM rows --
+    and the admin panel walked every page, which made one filter keystroke
+    hundreds of requests each paying for the whole table (#2492). `limit` of
+    `None` still returns everything, because that is the documented non-paged
+    contract (`page[size]` absent means the full list) and an SDK that sends no
+    paging params relies on it; what changed is that asking for a page now costs
+    a page.
+
+    A secondary `id` sort breaks ties, which `last_accessed_at` alone does not:
+    artifacts cached by one request share a timestamp to the microsecond, and
+    without a tiebreak Postgres may order them differently per query -- so a row
+    could appear on two consecutive pages, or on neither.
     """
-    stmt = select(CachedPackageFile).order_by(CachedPackageFile.last_accessed_at.desc())
+    stmt = select(CachedPackageFile)
+    count_stmt = select(func.count()).select_from(CachedPackageFile)
     if ecosystem:
         stmt = stmt.where(CachedPackageFile.ecosystem == ecosystem)
+        count_stmt = count_stmt.where(CachedPackageFile.ecosystem == ecosystem)
     if name:
         # A prefix match, not equality: a practitioner looking for "community."
         # wants the collection family, and the exact name is the degenerate
         # case of the same query.
         stmt = stmt.where(CachedPackageFile.name.startswith(name))
+        count_stmt = count_stmt.where(CachedPackageFile.name.startswith(name))
+
+    total = int((await db.execute(count_stmt)).scalar() or 0)
+
+    stmt = stmt.order_by(CachedPackageFile.last_accessed_at.desc(), CachedPackageFile.id.desc())
+    if limit is not None:
+        stmt = stmt.offset(max(offset, 0)).limit(limit)
     result = await db.execute(stmt)
-    return list(result.scalars().all())
+    return list(result.scalars().all()), total
 
 
 @dataclass(frozen=True)
@@ -135,10 +193,42 @@ async def delete_package_file(db: AsyncSession, storage: ObjectStore, file_id: s
 
 @dataclass(frozen=True)
 class EvictionResult:
-    """What a bulk eviction removed."""
+    """What a bulk eviction removed, **and whether that was all of it**.
+
+    `truncated` is the honest half, and the reason this dataclass exists rather
+    than a bare pair of counts. Both evictions are bounded (`MAX_EVICT_BATCH`),
+    so the answer can be partial -- and a partial answer reported as a complete
+    one is worse than a partial result. The observed sequence was: an operator
+    posts `{"older_than_days": 30}` against 20,000 archives, gets back
+    `{"status": "evicted", "archives": 400}`, reloads the totals, sees the same
+    size, and reads it as "the purge did nothing" rather than "the purge is
+    bounded" (#2491).
+
+    `cursor` is where a repeat call should resume, and it is **empty for the
+    package cache** rather than missing. That asymmetry is the two caches being
+    different things rather than an inconsistency to tidy:
+
+    * the package eviction selects the rows it then deletes, so the rows that
+      matched are gone and the next call's own `LIMIT` picks up where this one
+      stopped. A cursor would be an offset into a shrinking set, which skips
+      rows;
+    * the archive eviction walks keys that are mostly NOT deleted -- an age
+      filter may match a handful in a window of a thousand -- so without a
+      cursor the walk restarts at the same place every time. That is what made
+      a large archive cache unpurgeable no matter how often the route was run,
+      and in the degenerate case where nothing in the first window matches, the
+      window never advanced at all.
+    """
 
     files: int
     bytes: int
+    #: True when more matched than this call removed. Read it: the alternative
+    #: is presenting a bounded sweep as a complete one.
+    truncated: bool = False
+    #: The key to resume an archive sweep from, or `""` when there is nothing
+    #: to resume -- either because the sweep finished or because this is the
+    #: package cache, which resumes by itself. See the class docstring.
+    cursor: str = ""
 
 
 async def evict_package_files(
@@ -167,9 +257,23 @@ async def evict_package_files(
         cutoff = now_utc() - timedelta(days=older_than_days)
         stmt = stmt.where(CachedPackageFile.last_accessed_at < cutoff)
 
-    entries = list((await db.execute(stmt)).scalars().all())
+    # STALEST FIRST, which matters only because the call is bounded: if a sweep
+    # can take a thousand of fifty thousand, the thousand worth taking are the
+    # ones nothing has touched for longest. The scheduled sweep orders its own
+    # batch the same way and says so.
+    #
+    # ...and ONE ROW PAST THE BOUND, which is what makes `truncated` exact.
+    # Asking for exactly `MAX_EVICT_BATCH` cannot tell "this many matched" from
+    # "more matched and we stopped": both come back as a full page, so `>=`
+    # would report a cache of precisely that many as truncated and tell an
+    # operator more remained when nothing did. `archive_totals` asks for one
+    # past its own ceiling for the same reason.
+    stmt = stmt.order_by(CachedPackageFile.last_accessed_at.asc()).limit(MAX_EVICT_BATCH + 1)
+    matched = list((await db.execute(stmt)).scalars().all())
+    truncated = len(matched) > MAX_EVICT_BATCH
+    entries = matched[:MAX_EVICT_BATCH]
     if not entries:
-        return EvictionResult(files=0, bytes=0)
+        return EvictionResult(files=0, bytes=0, truncated=False)
 
     total = 0
     for entry in entries:
@@ -186,8 +290,9 @@ async def evict_package_files(
         older_than_days=older_than_days,
         files=len(entries),
         bytes=total,
+        truncated=truncated,
     )
-    return EvictionResult(files=len(entries), bytes=total)
+    return EvictionResult(files=len(entries), bytes=total, truncated=truncated)
 
 
 # ── the VCS archive cache ──────────────────────────────────────────────────
@@ -388,8 +493,9 @@ async def evict_archives(
     *,
     connection_id: str | None = None,
     older_than_days: int | None = None,
+    after: str = "",
 ) -> EvictionResult:
-    """Evict archives by connection and/or age.
+    """Evict archives by connection and/or age, **one bounded window at a time**.
 
     Age comes from the object's own `last_modified`, because there is nothing
     else: an archive is immutable once written, so its write time IS its age,
@@ -397,9 +503,32 @@ async def evict_archives(
     makes this eviction cheaper to reason about and slightly blunter -- an
     archive a run pulled this morning is evicted if its commit is old enough,
     and the next run re-fetches it.
+
+    **The window is `MAX_EVICT_BATCH` keys and the result says where it stopped.**
+    This used to walk `MAX_ARCHIVE_SCAN` keys from the START of the prefix every
+    time and report only a count, which made a cache larger than the ceiling
+    unpurgeable: the walk always began at the same place, so repeating the call
+    re-examined the same window. With an age filter matching a small fraction of
+    it, the window crept forward by only as many keys as the call deleted; with
+    one matching none of it, the window never moved at all and the rest of the
+    estate was unreachable for ever (#2491).
+
+    **The cursor is the last key EXAMINED, not the last key deleted**, and that
+    is the whole mechanism. Resuming past a key we looked at and kept is what
+    makes the next call reach keys this one never saw; resuming past the last
+    DELETION would re-walk every non-matching key in between, which is the
+    stuck-window behaviour in a smaller costume.
+
+    A caller resuming MUST pass the same filters back, or the second window is
+    a different question from the first.
     """
     prefix = f"{VCS_ARCHIVE_PREFIX}{connection_id}/" if connection_id else VCS_ARCHIVE_PREFIX
-    objects = await storage.list_prefix(prefix, limit=MAX_ARCHIVE_SCAN)
+    # One key past the window, so `truncated` is exact rather than "the window
+    # happened to be full" -- the same reason `archive_totals` asks for one more
+    # than it uses.
+    objects = await storage.list_prefix(prefix, after=after, limit=MAX_EVICT_BATCH + 1)
+    truncated = len(objects) > MAX_EVICT_BATCH
+    objects = objects[:MAX_EVICT_BATCH]
 
     cutoff = None
     if older_than_days is not None:
@@ -407,7 +536,16 @@ async def evict_archives(
 
     files = 0
     total = 0
+    last_examined = ""
     for obj in objects:
+        # Recorded FIRST, before either guard, so the cursor means exactly what
+        # its name says: the last key this call LOOKED AT. A key we examined and
+        # kept still has to advance it -- recording it only on a delete is the
+        # stuck-window defect in a smaller costume, and skipping it on the
+        # prefix guard would leave a window of nothing but off-prefix keys
+        # reporting `truncated` with no cursor, which a caller looping on the
+        # cursor reads as the end.
+        last_examined = obj.key
         if not obj.key.startswith(VCS_ARCHIVE_PREFIX):
             continue
         if cutoff is not None:
@@ -418,14 +556,16 @@ async def evict_archives(
         files += 1
         total += obj.size_bytes
 
+    cursor = last_examined if truncated else ""
     logger.info(
         "vcs archive cache evicted",
         connection_id=connection_id or "all",
         older_than_days=older_than_days,
         archives=files,
         bytes=total,
+        truncated=truncated,
     )
-    return EvictionResult(files=files, bytes=total)
+    return EvictionResult(files=files, bytes=total, truncated=truncated, cursor=cursor)
 
 
 def _iso(obj: object) -> str:
@@ -442,6 +582,7 @@ def _iso(obj: object) -> str:
 
 __all__ = [
     "MAX_ARCHIVE_SCAN",
+    "MAX_EVICT_BATCH",
     "VCS_ARCHIVE_PREFIX",
     "ArchiveEntry",
     "EcosystemTotal",

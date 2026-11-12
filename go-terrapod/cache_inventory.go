@@ -37,6 +37,20 @@ import (
 //     so the answer can be partial, and a caller that cannot see the flag
 //     cannot tell a complete total from a partial one -- in the direction that
 //     understates exactly what an operator came to find.
+//   - EvictionResult.Truncated, for the same reason on the write side. BOTH
+//     bulk evictions are bounded per call, so ALWAYS read it: an eviction that
+//     removed a bounded slice and reported only a count reads as "the purge did
+//     nothing" when the operator reloads the totals and sees the same size
+//     (#2491). The archive one also hands back a NextCursor to resume from; the
+//     package one does not need one, and the field comment says why.
+//
+// # Neither eviction has an EvictAll* loop helper, deliberately
+//
+// The ListAll* helpers exist because walking a whole collection to READ it is
+// bounded by the collection. A destructive loop is not: the bound is the point,
+// and a helper that hid it behind one call would put back the unbounded work
+// the bound was added to remove (#2492). Loop on Truncated yourself, as many
+// times as you have decided to, and stop when it is false.
 //
 // Every route here requires platform admin.
 //
@@ -147,6 +161,25 @@ type EvictionResult struct {
 	// Carried verbatim rather than reconstructed, so one wording serves every
 	// consumer and none of them has to know what `cache_only` implies.
 	Warning string `json:"warning"`
+	// Truncated is true when MORE MATCHED THAN THIS CALL REMOVED. Both bulk
+	// evictions are bounded per call -- unbounded sequential object deletes in
+	// one request outlived the gateway, rolled the transaction back, and left
+	// rows pointing at keys already deleted (#2492) -- so a caller that cannot
+	// see this flag cannot tell a finished purge from a bounded one. Repeat the
+	// call while it is true.
+	Truncated bool `json:"truncated"`
+	// NextCursor is where to resume an ARCHIVE sweep: pass it back as
+	// ArchiveEvictRequest.After with the same filters. Empty means there is
+	// nothing to resume.
+	//
+	// ALWAYS EMPTY FOR THE PACKAGE CACHE, and that is not a gap. The package
+	// eviction deletes the rows it selected, so the next call's own LIMIT
+	// resumes by itself; a cursor would be an offset into a shrinking set,
+	// which skips rows. The archive eviction walks keys that are mostly NOT
+	// deleted, so without a cursor its window restarts at the same place every
+	// time -- which is what made a large archive cache unpurgeable however
+	// often the route was run (#2491).
+	NextCursor string `json:"next-cursor"`
 }
 
 // ListPackageCache returns one page of cached package artifacts,
@@ -271,8 +304,13 @@ func (c *Client) DeletePackageCacheFile(ctx context.Context, id string) error {
 	return c.Delete(ctx, "/api/v1/admin/package-cache/"+url.PathEscape(id))
 }
 
-// EvictPackageCache evicts artifacts in bulk by ecosystem and/or age, and
-// reports how much went. Requires platform admin.
+// EvictPackageCache evicts artifacts in bulk by ecosystem and/or age, up to a
+// BOUNDED NUMBER PER CALL, and reports how much went and whether that was all
+// of it. Requires platform admin.
+//
+// Check Truncated and call again while it is true. There is no cursor to carry:
+// the rows that matched are the rows that went, so the next call's own bound
+// picks up where this one stopped.
 func (c *Client) EvictPackageCache(ctx context.Context, req PackageEvictRequest) (*EvictionResult, error) {
 	payload, err := json.Marshal(req)
 	if err != nil {
@@ -283,16 +321,19 @@ func (c *Client) EvictPackageCache(ctx context.Context, req PackageEvictRequest)
 		return nil, err
 	}
 	var out struct {
-		Files   int64  `json:"files"`
-		Bytes   int64  `json:"bytes"`
-		Sealed  bool   `json:"sealed"`
-		Warning string `json:"warning"`
+		Files     int64  `json:"files"`
+		Bytes     int64  `json:"bytes"`
+		Sealed    bool   `json:"sealed"`
+		Warning   string `json:"warning"`
+		Truncated bool   `json:"truncated"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		return nil, fmt.Errorf("parse package eviction result: %w", err)
 	}
+	// NextCursor is left empty on purpose -- see the field comment.
 	return &EvictionResult{
 		Files: out.Files, Bytes: out.Bytes, Sealed: out.Sealed, Warning: out.Warning,
+		Truncated: out.Truncated,
 	}, nil
 }
 
@@ -396,6 +437,11 @@ type ArchiveEvictRequest struct {
 	// means no age filter. Write-based, not access-based -- see the file
 	// comment.
 	OlderThanDays *int `json:"older_than_days,omitempty"`
+	// After resumes a bounded sweep from this key -- the NextCursor the
+	// previous call returned. Empty starts at the beginning. Pass the SAME
+	// filters back with it, or the second window answers a different question
+	// from the first.
+	After string `json:"after,omitempty"`
 }
 
 // ListVCSArchiveCache returns one page of cached archives plus the cursor to
@@ -528,9 +574,16 @@ func (c *Client) DeleteVCSArchive(ctx context.Context, key string) error {
 	return c.Delete(ctx, "/api/v1/admin/vcs-archive-cache?key="+url.QueryEscape(key))
 }
 
-// EvictVCSArchiveCache evicts archives in bulk by connection and/or age, and
-// reports how much went. The server reports the count as `archives`; it lands
-// in EvictionResult.Files. Requires platform admin.
+// EvictVCSArchiveCache evicts archives in bulk by connection and/or age, ONE
+// BOUNDED WINDOW PER CALL, and reports how much went, whether more remains and
+// where to resume. The server reports the count as `archives`; it lands in
+// EvictionResult.Files. Requires platform admin.
+//
+// To purge an estate larger than one window, loop: while Truncated, call again
+// with After set to the previous NextCursor and every other field unchanged.
+// Not optional on a large cache -- without the cursor the window restarts at
+// the same place, so repeating the call re-examines the same keys and the rest
+// of the estate is unreachable (#2491).
 func (c *Client) EvictVCSArchiveCache(ctx context.Context, req ArchiveEvictRequest) (*EvictionResult, error) {
 	payload, err := json.Marshal(req)
 	if err != nil {
@@ -541,15 +594,18 @@ func (c *Client) EvictVCSArchiveCache(ctx context.Context, req ArchiveEvictReque
 		return nil, err
 	}
 	var out struct {
-		Archives int64  `json:"archives"`
-		Bytes    int64  `json:"bytes"`
-		Sealed   bool   `json:"sealed"`
-		Warning  string `json:"warning"`
+		Archives   int64  `json:"archives"`
+		Bytes      int64  `json:"bytes"`
+		Sealed     bool   `json:"sealed"`
+		Warning    string `json:"warning"`
+		Truncated  bool   `json:"truncated"`
+		NextCursor string `json:"next-cursor"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		return nil, fmt.Errorf("parse archive eviction result: %w", err)
 	}
 	return &EvictionResult{
 		Files: out.Archives, Bytes: out.Bytes, Sealed: out.Sealed, Warning: out.Warning,
+		Truncated: out.Truncated, NextCursor: out.NextCursor,
 	}, nil
 }

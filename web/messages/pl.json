@@ -1829,7 +1829,12 @@
       "successBulk": "Wyczyszczono {files} artefaktów, zwalniając {size}",
       "errorRow": "Nie udało się wyczyścić artefaktu",
       "errorBulk": "Nie udało się wyczyścić artefaktów pakietów",
-      "capabilityOff": "Pamięć podręczna pakietów jest wyłączona, więc nie ma tu czego wyświetlać. Wszystko, co już zostało zapisane w pamięci podręcznej, jest zachowane i wróci po jej ponownym włączeniu."
+      "capabilityOff": "Pamięć podręczna pakietów jest wyłączona, więc nie ma tu czego wyświetlać. Wszystko, co już zostało zapisane w pamięci podręcznej, jest zachowane i wróci po jej ponownym włączeniu.",
+      "loadMore": "Wczytaj więcej",
+      "loadingMore": "Wczytywanie…",
+      "showing": "Wyświetlono {shown} z {total} — tabela sortuje to, co wczytano, więc wczytaj resztę, zanim odczytasz porządek jako całą pamięć podręczną.",
+      "listedAll": "Wyświetlono {count, plural, one {# artefakt} few {# artefakty} other {# artefaktów}} — to wszystko, co odpowiada tym filtrom.",
+      "successBulkTruncated": "Wyczyszczono {files} artefaktów, zwalniając {size}. Pasuje więcej, niż usuwa jedno czyszczenie — uruchom je ponownie, aby kontynuować."
     },
     "archives": {
       "connectionLabel": "Połączenie",
@@ -1853,7 +1858,10 @@
       "successRow": "Wyczyszczono archiwum dla {repo} na commicie {sha}",
       "successBulk": "Wyczyszczono {archives} archiwów, zwalniając {size}",
       "errorRow": "Nie udało się wyczyścić archiwum",
-      "errorBulk": "Nie udało się wyczyścić archiwów VCS"
+      "errorBulk": "Nie udało się wyczyścić archiwów VCS",
+      "successBulkTruncated": "Wyczyszczono {archives} archiwów, zwalniając {size}. Zostało więcej — użyj „Kontynuuj czyszczenie”, które wznowi je tam, gdzie się zatrzymało.",
+      "continuePurge": "Kontynuuj czyszczenie",
+      "continuing": "Kontynuowanie…"
     },
     "sealedWarning": "Ten węzeł jest zapieczętowany, więc nic wyczyszczonego tutaj nie da się ponownie pobrać. Właśnie dlatego zaplanowane czyszczenie pomija te pamięci podręczne — jest to trwałe usunięcie."
   },

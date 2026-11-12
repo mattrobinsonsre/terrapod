@@ -1829,7 +1829,12 @@
       "successBulk": "{files} janmey tlhIllu'pu', {size} tlhaplu'pu'",
       "errorRow": "jan tlhIlmeH lujpu'",
       "errorBulk": "De' janmey tlhIlmeH lujpu'",
-      "capabilityOff": "lo'laHbe'law' ngaSwI' pat. vaj pagh tetlh vIDel. ngaSta'bogh Hoch polta' 'ej chu'qa'DI' chegh."
+      "capabilityOff": "lo'laHbe'law' ngaSwI' pat. vaj pagh tetlh vIDel. ngaSta'bogh Hoch polta' 'ej chu'qa'DI' chegh.",
+      "loadMore": "latlh yIghel",
+      "loadingMore": "gheltaH…",
+      "showing": "{total} 'ay' {shown} 'oH cha'lu'; tetlh ghelta'bogh neH tlhegh, vaj tlhegh naQ DaleghDI' latlh yIghel.",
+      "listedAll": "{count, plural, other {# jan}} tetlhlu'pu' — naDev chenmoHlu'bogh Hoch 'oH.",
+      "successBulkTruncated": "{files} janmey tlhIllu'pu', {size} tlhaplu'pu'. wa' tlhIlwI' tlhIlbogh law' law' qaS — Daq DataghmeH latlh yItlhIl."
     },
     "archives": {
       "connectionLabel": "rar",
@@ -1853,7 +1858,10 @@
       "successRow": "{repo} ngaSwI' {sha} Daq tlhIllu'pu'",
       "successBulk": "{archives} ngaSwI'mey tlhIllu'pu', {size} tlhaplu'pu'",
       "errorRow": "ngaSwI' tlhIlmeH lujpu'",
-      "errorBulk": "VCS ngaSwI'mey tlhIlmeH lujpu'"
+      "errorBulk": "VCS ngaSwI'mey tlhIlmeH lujpu'",
+      "successBulkTruncated": "{archives} ngaSwI'mey tlhIllu'pu', {size} tlhaplu'pu'. latlh ratlh — «tlhIlwI' yItaH» yIlo', mevpu'bogh Daqvo' taghqa'.",
+      "continuePurge": "tlhIlwI' yItaH",
+      "continuing": "taHtaH…"
     },
     "sealedWarning": "De'wI'vam ngaQlu'. vaj naDev tlhIllu'bogh Doch Hevqa'lu'laHbe'. vaj nge'wI'meyvam buSHa' Doch teqmeH pIj qaSbogh Qu'. reH Qaw'lu'."
   },

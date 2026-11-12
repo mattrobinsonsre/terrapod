@@ -1829,7 +1829,12 @@
       "successBulk": "Ryddede {files} artefakter og frigjorde {size}",
       "errorRow": "Kunne ikke rydde artefaktet",
       "errorBulk": "Kunne ikke rydde pakkeartefakterne",
-      "capabilityOff": "Pakkecachen er slået fra, så der er intet at vise her. Alt, der allerede er cachet, bevares og kommer tilbage, når den slås til igen."
+      "capabilityOff": "Pakkecachen er slået fra, så der er intet at vise her. Alt, der allerede er cachet, bevares og kommer tilbage, når den slås til igen.",
+      "loadMore": "Indlæs mere",
+      "loadingMore": "Indlæser…",
+      "showing": "Viser {shown} af {total} — tabellen sorterer det, der er indlæst, så indlæs resten, før du læser en sortering som hele cachen.",
+      "listedAll": "{count, plural, one {# artefakt} other {# artefakter}} vist — det er alt, der matcher disse filtre.",
+      "successBulkTruncated": "Ryddede {files} artefakter og frigjorde {size}. Flere matcher, end én rydning fjerner — ryd igen for at fortsætte."
     },
     "archives": {
       "connectionLabel": "Forbindelse",
@@ -1853,7 +1858,10 @@
       "successRow": "Arkivet for {repo} ved {sha} blev ryddet",
       "successBulk": "Ryddede {archives} arkiver og frigjorde {size}",
       "errorRow": "Kunne ikke rydde arkivet",
-      "errorBulk": "Kunne ikke rydde VCS-arkiverne"
+      "errorBulk": "Kunne ikke rydde VCS-arkiverne",
+      "successBulkTruncated": "Ryddede {archives} arkiver og frigjorde {size}. Flere er tilbage — brug Fortsæt rydningen, som tager fat, hvor denne slap.",
+      "continuePurge": "Fortsæt rydningen",
+      "continuing": "Fortsætter…"
     },
     "sealedWarning": "Denne node er forseglet, så intet, der ryddes her, kan hentes igen. Den planlagte oprydning springer disse caches over af samme grund — det er en permanent sletning."
   },

@@ -1829,7 +1829,12 @@
       "successBulk": "{files} artefacts purgés, {size} libérés",
       "errorRow": "Échec de la purge de l'artefact",
       "errorBulk": "Échec de la purge des artefacts de paquets",
-      "capabilityOff": "Le cache de paquets est désactivé, il n'y a donc rien à lister ici. Tout ce qui est déjà en cache est conservé et réapparaît dès qu'il est réactivé."
+      "capabilityOff": "Le cache de paquets est désactivé, il n'y a donc rien à lister ici. Tout ce qui est déjà en cache est conservé et réapparaît dès qu'il est réactivé.",
+      "loadMore": "Charger plus",
+      "loadingMore": "Chargement…",
+      "showing": "{shown} sur {total} affichés — le tableau trie ce qui est chargé, chargez donc le reste avant de lire un tri comme l'ensemble du cache.",
+      "listedAll": "{count, plural, one {# artefact listé} other {# artefacts listés}} — c'est tout ce qui correspond à ces filtres.",
+      "successBulkTruncated": "{files} artefacts purgés, {size} libérés. Il y a plus de correspondances qu'une purge n'en retire — purgez à nouveau pour continuer."
     },
     "archives": {
       "connectionLabel": "Connexion",
@@ -1853,7 +1858,10 @@
       "successRow": "Archive de {repo} au commit {sha} purgée",
       "successBulk": "{archives} archives purgées, {size} libérés",
       "errorRow": "Échec de la purge de l'archive",
-      "errorBulk": "Échec de la purge des archives VCS"
+      "errorBulk": "Échec de la purge des archives VCS",
+      "successBulkTruncated": "{archives} archives purgées, {size} libérés. Il en reste — utilisez Poursuivre la purge, qui reprend là où celle-ci s'est arrêtée.",
+      "continuePurge": "Poursuivre la purge",
+      "continuing": "Poursuite…"
     },
     "sealedWarning": "Ce nœud est scellé : rien de ce qui est purgé ici ne pourra être récupéré de nouveau. Le nettoyage planifié ignore ces caches pour cette raison — il s'agit d'une suppression définitive."
   },

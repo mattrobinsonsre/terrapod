@@ -2709,4 +2709,47 @@ test.describe('Workspace form sections (#2253)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('the caches page says how much of each list it is showing, at phone width (#2492)', async ({ page }) => {
+    // The package panel takes ONE PAGE at a time now rather than walking every
+    // page, so it gained a Load more control and a count line — two more rows
+    // of content below a table that already reflows to cards, on the page whose
+    // shape overflows most readily.
+    await page.goto('/admin/binary-cache')
+    await expect(page.getByTestId('package-cache-section')).toBeVisible({ timeout: 15_000 })
+
+    // The affordance is present IFF there is a list. Nothing in this stack
+    // seeds the package cache, so the usual answer here is the empty state and
+    // NEITHER control — asserting one of them unconditionally would be a test
+    // that fails on the state the stack actually produces. What is invariant is
+    // the pairing: a list shows exactly one of Load more and the end-of-list
+    // line, an empty one shows neither, and the two are never both present.
+    const section = page.locator('[data-testid="package-cache-section"]')
+    const more = page.getByTestId('package-load-more')
+    const end = page.getByTestId('package-end-of-list')
+    await expect
+      .poll(async () => {
+        const listed = (await section.getByTestId('empty-state').count()) === 0
+        return `${listed} ${await more.count()} ${await end.count()}`
+      }, { timeout: 10_000 })
+      .toMatch(/^(true (1 0|0 1)|false 0 0)$/)
+
+    if (await more.count()) {
+      // A real button with a thumb-sized target, like every other action here.
+      const box = await more.boundingBox()
+      expect(box, 'package-load-more has no box').not.toBeNull()
+      expect(box!.height, `package-load-more is ${box!.height}px tall`).toBeGreaterThanOrEqual(44)
+      // And the count line that keeps the sortable headers honest: they order
+      // what is LOADED, so the scope has to be on screen beside the control.
+      await expect(page.getByTestId('package-showing')).toBeVisible()
+    }
+
+    // The archive panel's Continue control is gated on an unfinished sweep, so
+    // before any purge it must be ABSENT rather than present-and-disabled —
+    // offering to continue a sweep that never started is worse than not
+    // offering it (#2491).
+    await expect(page.getByTestId('archive-continue-purge')).toHaveCount(0)
+
+    await expectNoHorizontalPageScroll(page)
+  })
+
 })

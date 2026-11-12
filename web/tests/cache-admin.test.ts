@@ -53,12 +53,59 @@ test('the archive list is driven by the key cursor, never by fetchAllPages', () 
   assert.ok(/params\.set\('after', after\)/.test(ARCHIVES), 'the cursor is never sent back as `after`')
 })
 
-test('the PACKAGE list does use fetchAllPages — the two endpoints differ on purpose', () => {
-  // Asserted so the test above cannot be satisfied by banning the helper
-  // everywhere: one of these lists is an ordinary paged table and the other is
-  // a bucket walk, and a gate that could not tell them apart would read as
-  // "cursors everywhere", which is wrong about the package cache.
-  assert.ok(/fetchAllPages<CachedPackageFile>/.test(PACKAGES), 'the package list stopped paging')
+test('the PACKAGE list takes one page at a time, and never walks every page', () => {
+  // This used to assert the OPPOSITE -- that the package panel calls
+  // `fetchAllPages` -- which was right until the listing's pagination moved
+  // into SQL. `fetchAllPages` walks `page[number]=1..n` until the pagination
+  // meta says it is done, so at 60,000 cached artifacts that was ~600 requests,
+  // restarted by every keystroke in the debounced name filter (#2492).
+  //
+  // Both halves matter. Banning the helper alone would be satisfied by a panel
+  // that fetched nothing; requiring the page params alone would be satisfied by
+  // one that sent them and then looped anyway.
+  const body = code(PACKAGES)
+  assert.ok(
+    !/fetchAllPages/.test(body),
+    'the package panel walks every page again, which is #2492',
+  )
+  assert.ok(
+    /'page\[size\]': String\(PAGE_SIZE\)/.test(body),
+    'the panel does not ask for a page, so the server returns the whole table',
+  )
+  assert.ok(
+    /'page\[number\]'/.test(body),
+    'the panel never asks for a page NUMBER, so Load more cannot advance',
+  )
+  // The archive panel's ban stays a ban, so the two are still told apart: one
+  // of these lists is a paged table and the other is a bucket walk.
+  assert.ok(!/fetchAllPages/.test(code(ARCHIVES)), 'the archive panel reaches for fetchAllPages')
+})
+
+test('the package count line reads the SERVER total, not the rows it rendered', () => {
+  // `total-count` is computed over the whole match, so "showing 100 of 60,000"
+  // is honest where a count of the rendered rows would read as the whole cache
+  // -- and the sortable headers above the table only order what is loaded, so
+  // the scope of the sort has to be visible rather than inferred.
+  const body = code(PACKAGES)
+  // EVERY site that sets the total, not just one of them. The panel sets it in
+  // two places -- the first page and each Load more -- and a presence check is
+  // satisfied by whichever of the two still reads the meta, leaving the other
+  // counting its own rendered rows. A mutation of exactly that shape survived
+  // the first version of this assertion.
+  const setters = body.match(/setTotal\([^\n]*/g) ?? []
+  assert.ok(setters.length >= 2, `expected both total writers, found ${setters.length}`)
+  for (const call of setters) {
+    assert.ok(
+      call.includes("pagination?.['total-count']"),
+      `a total is set from something other than the server count: ${call}`,
+    )
+  }
+  assert.ok(
+    /entries\.length < total/.test(body),
+    'the Load more control is not gated on there being more to load',
+  )
+  assert.ok(EN.packages.showing.includes('{shown}'), 'the count line does not say how many are shown')
+  assert.ok(EN.packages.showing.includes('{total}'), 'the count line does not say of how many')
 })
 
 test('an empty cursor is what ends the walk, and only after a page has arrived', () => {
@@ -118,7 +165,16 @@ test('a 404 from the package totals is read as "switched off", before any throw'
   // the property: both throws must come after the 404 branch, or an operator
   // with the cache off gets a red error banner on a page where everything else
   // works.
-  const body = code(PACKAGES)
+  // SCOPED TO `load`, which is the function this ordering is about. `fetchPage`
+  // beside it checks 404 too -- correctly, so a Load more with the capability
+  // switched off mid-session is silent rather than a banner -- and a file-wide
+  // indexOf would find THAT one and compare the throws against a 404 in another
+  // function entirely.
+  const whole = code(PACKAGES)
+  const from = whole.indexOf('const load = useCallback')
+  const to = whole.indexOf('useEffect(')
+  assert.ok(from > 0 && to > from, 'the load callback could not be located')
+  const body = whole.slice(from, to)
   const at404 = body.indexOf('404')
   assert.ok(at404 > 0, 'the panel does not look at the status, so it cannot tell off from broken')
   // The two rejections sit on OPPOSITE sides of the 404 check, and each side is
@@ -233,4 +289,94 @@ test('the archive key travels as a query parameter, encoded', () => {
 test('a whole-repo archive renders as a word, not as a hash', () => {
   assert.ok(/hash === 'full'/.test(ARCHIVES))
   assert.ok(/[a-z]/i.test(EN.archives.pathsFull), 'the whole-repo label is not words')
+})
+
+// ── the bounded evictions (#2491, #2492) ───────────────────────────────────
+
+test('both panels distinguish a BOUNDED purge from a finished one', () => {
+  // The defect (#2491): an eviction removed a bounded slice, reported only a
+  // count, and the operator reloaded the totals, saw the same size, and read it
+  // as the purge having done nothing. The message is the only place a panel can
+  // say otherwise.
+  for (const [name, body, key] of [
+    ['packages', code(PACKAGES), 'packages'],
+    ['archives', code(ARCHIVES), 'archives'],
+  ] as const) {
+    assert.ok(
+      /body\?\.truncated === true/.test(body),
+      `the ${name} panel never reads \`truncated\`, so a bounded purge reads as a complete one`,
+    )
+    assert.ok(
+      new RegExp(`${key}\\.successBulkTruncated`).test(body),
+      `the ${name} panel has no separate message for a bounded purge`,
+    )
+    assert.ok(
+      EN[key].successBulkTruncated !== EN[key].successBulk,
+      `the ${key} truncated message is the same sentence as the complete one`,
+    )
+  }
+})
+
+test('the ARCHIVE purge carries a cursor, because "run it again" is not true for it', () => {
+  // The asymmetry, pinned rather than tidied. The package eviction deletes the
+  // rows it selected, so repeating the call resumes by itself and the same
+  // button does it. The archive eviction walks keys that are mostly NOT
+  // deleted, so without the cursor the window restarts at the same place and
+  // the rest of the estate is unreachable however many times Purge is pressed.
+  const body = code(ARCHIVES)
+  assert.ok(
+    /\.\.\.\(after \? \{ after \} : \{\}\)/.test(body),
+    'the resume cursor never reaches the eviction request',
+  )
+  assert.ok(
+    /body\?\.\['next-cursor'\]/.test(body),
+    'the eviction response cursor is never read, so nothing can resume the sweep',
+  )
+  assert.ok(
+    /data-testid="archive-continue-purge"/.test(body),
+    'there is no Continue control, so the operator is told more remains and cannot reach it',
+  )
+  assert.ok(
+    /\{purgeCursor && \(/.test(body),
+    'the Continue control is not gated on the cursor, so it offers to continue a finished sweep',
+  )
+  // And the PACKAGE panel must NOT grow one: there is no cursor on that
+  // response, so a control driving one would send `after: ""` for ever.
+  assert.ok(
+    !/next-cursor/.test(code(PACKAGES)),
+    'the package panel reads a cursor the package eviction never returns',
+  )
+})
+
+test('a continued archive sweep re-sends EVERY filter it STARTED with', () => {
+  // Continuing with whatever the inputs hold now would make the second window a
+  // different question from the first -- an operator who edits a field between
+  // windows would purge two different sets and be told it was one.
+  //
+  // BOTH filters, which is the half easy to get half-right: an earlier version
+  // of this panel snapshotted the age and read the connection live, so the
+  // comment promising "the filters it started with" was false for one of them.
+  // Hence the assertion is that the request body reads the SNAPSHOT for every
+  // field rather than that some named piece of state exists.
+  const body = code(ARCHIVES)
+  const from = body.indexOf('async function purgeWindow')
+  const to = body.indexOf('async function purgeMatching')
+  assert.ok(from > 0 && to > from, 'purgeWindow could not be located')
+  const win = body.slice(from, to)
+  assert.ok(
+    /connection_id: scope\.connectionId/.test(win),
+    'the continued window reads the LIVE connection input, not the one it started with',
+  )
+  assert.ok(
+    /scope\.days === null/.test(win),
+    'the continued window reads the LIVE age input, not the one it started with',
+  )
+  assert.ok(
+    !/purgeConnectionId|purgeDays/.test(win),
+    'purgeWindow still reaches for a live filter input',
+  )
+  assert.ok(
+    /continuePurge\(\) \{\s*await purgeWindow\(purgeCursor, purgedScope\)/.test(body),
+    'Continue does not re-send the stored scope',
+  )
 })

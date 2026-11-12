@@ -168,3 +168,58 @@ class TestTotalsAndEvictionAgainstRealStorage:
         await _seed(store, [("state_versions/ws-1/4.tfstate", 50)])
         assert await ci.delete_archive(store, "state_versions/ws-1/4.tfstate") is False
         assert await store.exists("state_versions/ws-1/4.tfstate") is True
+
+    async def test_a_BOUNDED_sweep_resumes_against_REAL_storage_until_the_cache_is_empty(
+        self, store, monkeypatch
+    ):
+        """#2491 against a real backend, which is the only place the claim can
+        be made.
+
+        The service tests drive a double that implements `list_prefix`'s cursor
+        as documented, so they prove the eviction asks the right question. They
+        say nothing about whether a backend's cursor actually resumes where the
+        previous page stopped -- and the whole fix rests on that, because there
+        are no rows behind an archive and the walk IS the index. The filesystem
+        backend's `after` handling is hand-written rather than delegated to a
+        cloud SDK's pagination, so this is where it is a claim rather than
+        somebody else's guarantee.
+
+        The loop is the operator's own procedure: call, and while `truncated`,
+        call again with the cursor. It is bounded by an assertion rather than by
+        hope -- a sweep that fails to advance would otherwise hang the suite,
+        which is exactly what the pre-fix code did.
+        """
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 2)
+        await _seed(store, [(f"vcs_archives/c/o/r/k{i:02d}-full.tar.gz", 10) for i in range(7)])
+
+        after, calls, removed, seen = "", 0, 0, []
+        while True:
+            calls += 1
+            assert calls < 20, "the sweep did not terminate"
+            result = await ci.evict_archives(store, after=after)
+            removed += result.files
+            if not result.truncated:
+                break
+            assert result.cursor, "truncated with no cursor: nothing can resume it"
+            assert result.cursor > after, (
+                f"the cursor did not advance ({result.cursor!r} after {after!r}), "
+                "so the window restarts and the rest of the estate is unreachable"
+            )
+            seen.append(result.cursor)
+            after = result.cursor
+
+        assert removed == 7, f"the sweep removed {removed} of 7 in {calls} calls"
+        remaining, _ = await ci.list_archives(store, limit=100)
+        assert remaining == [], "the sweep reported a complete purge and left objects"
+        # Four calls for seven keys at two per window: three full windows plus
+        # the short one that ends it. Pinned so a bound that silently stopped
+        # being applied shows up as a count rather than as a slow test.
+        assert calls == 4, f"{calls} calls for 7 keys at 2 per window"
+
+    async def test_a_sweep_that_FITS_in_one_window_reports_nothing_left(self, store):
+        """The control. Every assertion above about truncation being reported is
+        worth nothing unless the same code reports FALSE when the sweep really
+        did finish -- a `truncated = True` constant would satisfy all of them."""
+        await _seed(store, [(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 10) for i in range(3)])
+        result = await ci.evict_archives(store)
+        assert (result.files, result.truncated, result.cursor) == (3, False, "")

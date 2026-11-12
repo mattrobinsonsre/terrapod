@@ -1829,7 +1829,12 @@
       "successBulk": "Purged {files} pieces o'' booty, freein'' {size}",
       "errorRow": "Failed t'' purge th'' booty",
       "errorBulk": "Failed t'' purge th'' package booty",
-      "capabilityOff": "The package hold be shut, so there be naught to muster here. Whatever ye stowed away stays stowed, an' sails back when ye open her up again."
+      "capabilityOff": "The package hold be shut, so there be naught to muster here. Whatever ye stowed away stays stowed, an' sails back when ye open her up again.",
+      "loadMore": "Haul more",
+      "loadingMore": "Haulin''…",
+      "showing": "Showin'' {shown} o'' {total} — th'' table sorts what be hauled aboard, so haul th'' rest afore ye read an order as th'' whole cache.",
+      "listedAll": "{count, plural, one {# piece o'' booty} other {# pieces o'' booty}} listed — that be all that matches these filters.",
+      "successBulkTruncated": "Purged {files} pieces o'' booty, freein'' {size}. More match than one purge carries off — purge again to press on."
     },
     "archives": {
       "connectionLabel": "Linkin''",
@@ -1853,7 +1858,10 @@
       "successRow": "Purged th'' archive fer {repo} at {sha}",
       "successBulk": "Purged {archives} archives, freein'' {size}",
       "errorRow": "Failed t'' purge th'' archive",
-      "errorBulk": "Failed t'' purge th'' VCS archives"
+      "errorBulk": "Failed t'' purge th'' VCS archives",
+      "successBulkTruncated": "Purged {archives} archives, freein'' {size}. More be left — use Press on with th'' purge, which picks up where this one left off.",
+      "continuePurge": "Press on with th'' purge",
+      "continuing": "Pressin'' on…"
     },
     "sealedWarning": "This vessel be battened down, so nothin'' purged here can be fetched again. Th'' scheduled swabbin'' skips these holds fer that reason — this be a permanent deletion."
   },

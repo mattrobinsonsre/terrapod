@@ -1829,7 +1829,12 @@
       "successBulk": "{files} artefacten gewist, {size} vrijgemaakt",
       "errorRow": "Kon het artefact niet wissen",
       "errorBulk": "Kon de pakketartefacten niet wissen",
-      "capabilityOff": "De pakketcache staat uit, dus er is hier niets om weer te geven. Alles wat al in de cache staat blijft bewaard en komt terug zodra de cache weer aan wordt gezet."
+      "capabilityOff": "De pakketcache staat uit, dus er is hier niets om weer te geven. Alles wat al in de cache staat blijft bewaard en komt terug zodra de cache weer aan wordt gezet.",
+      "loadMore": "Meer laden",
+      "loadingMore": "Laden…",
+      "showing": "{shown} van {total} weergegeven — de tabel sorteert wat is geladen, laad dus de rest voordat je een sortering als de hele cache leest.",
+      "listedAll": "{count, plural, one {# artefact} other {# artefacten}} weergegeven — dat is alles wat aan deze filters voldoet.",
+      "successBulkTruncated": "{files} artefacten gewist, {size} vrijgemaakt. Er voldoen er meer dan één wisbeurt verwijdert — wis opnieuw om door te gaan."
     },
     "archives": {
       "connectionLabel": "Verbinding",
@@ -1853,7 +1858,10 @@
       "successRow": "Archief voor {repo} bij {sha} gewist",
       "successBulk": "{archives} archieven gewist, {size} vrijgemaakt",
       "errorRow": "Kon het archief niet wissen",
-      "errorBulk": "Kon de VCS-archieven niet wissen"
+      "errorBulk": "Kon de VCS-archieven niet wissen",
+      "successBulkTruncated": "{archives} archieven gewist, {size} vrijgemaakt. Er blijven er over — gebruik Wissen voortzetten, dat verdergaat waar dit stopte.",
+      "continuePurge": "Wissen voortzetten",
+      "continuing": "Wordt voortgezet…"
     },
     "sealedWarning": "Deze node is verzegeld, dus niets wat hier gewist wordt kan opnieuw worden opgehaald. De geplande opruiming slaat deze caches juist daarom over — dit is een permanente verwijdering."
   },

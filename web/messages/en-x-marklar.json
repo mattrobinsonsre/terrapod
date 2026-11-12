@@ -1829,7 +1829,12 @@
       "successBulk": "Purged {files} marklars, freeing {size}",
       "errorRow": "Failed to purge the marklar",
       "errorBulk": "Failed to purge marklar marklars",
-      "capabilityOff": "The marklar marklar is switched off, so there is no marklar to list here. Any marklar already cached is kept and comes back when it is turned on again."
+      "capabilityOff": "The marklar marklar is switched off, so there is no marklar to list here. Any marklar already cached is kept and comes back when it is turned on again.",
+      "loadMore": "Load more marklars",
+      "loadingMore": "Loading marklars…",
+      "showing": "Showing {shown} of {total} marklars — the marklar sorts what is loaded, so load the rest before reading a marklar as the whole marklar.",
+      "listedAll": "{count, plural, one {# marklar} other {# marklars}} listed — that is everything matching these marklars.",
+      "successBulkTruncated": "Purged {files} marklars, freeing {size}. More marklars match than one marklar removes — marklar again to carry on."
     },
     "archives": {
       "connectionLabel": "Marklar",
@@ -1853,7 +1858,10 @@
       "successRow": "Purged the marklar for {repo} at {sha}",
       "successBulk": "Purged {archives} marklars, freeing {size}",
       "errorRow": "Failed to purge the marklar marklar",
-      "errorBulk": "Failed to purge marklar marklar marklars"
+      "errorBulk": "Failed to purge marklar marklar marklars",
+      "successBulkTruncated": "Purged {archives} marklars, freeing {size}. More marklars remain — use Continue marklar to carry on, which resumes where this marklar stopped.",
+      "continuePurge": "Continue marklar",
+      "continuing": "Continuing marklar…"
     },
     "sealedWarning": "This marklar is sealed, so nothing purged here can be fetched again. The scheduled marklar skips these marklars for that marklar — this is a permanent marklar."
   },

@@ -97,6 +97,28 @@ export function VcsArchiveCachePanel({
   const [purgeConnectionId, setPurgeConnectionId] = useState('')
   const [purgeDays, setPurgeDays] = useState('')
   const [purging, setPurging] = useState(false)
+  /** Where an unfinished purge stopped, and how much it has taken so far.
+   *
+   *  A bulk eviction walks a BOUNDED window of keys, so one call can leave more
+   *  behind -- and unlike the package cache, repeating the call without this
+   *  cursor re-examines the same window, which is what made a large archive
+   *  cache unpurgeable however many times the button was pressed (#2491). So
+   *  "press it again" is not a true instruction here, and the Continue control
+   *  below is what makes it one. */
+  const [purgeCursor, setPurgeCursor] = useState('')
+  const [purgedSoFar, setPurgedSoFar] = useState({ archives: 0, bytes: 0 })
+  /** EVERY filter the sweep in progress was STARTED with, which is not
+   *  necessarily what the inputs hold now. Continuing with a different one
+   *  would make the second window a different question from the first, so an
+   *  operator who edits a field between windows would purge two different sets
+   *  and be told it was one.
+   *
+   *  Both of them, not just the age: holding one and reading the other live is
+   *  the asymmetry that makes a comment promising "the filters it started with"
+   *  false for half of them. */
+  const [purgedScope, setPurgedScope] = useState<{ connectionId: string; days: number | null }>(
+    { connectionId: '', days: null },
+  )
 
   /** One page of the walk. `after` empty restarts it; anything else resumes. */
   const fetchPage = useCallback(
@@ -215,6 +237,47 @@ export function VcsArchiveCachePanel({
     )
   }
 
+  /** One bounded window of the sweep. `after` empty starts it; anything else
+   *  continues the one in progress, with the SAME filters -- changing one
+   *  mid-sweep would make the second window a different question from the
+   *  first, which is why Continue re-sends the stored values rather than
+   *  whatever is in the inputs now. */
+  async function purgeWindow(after: string, scope: { connectionId: string; days: number | null }) {
+    setPurging(true)
+    try {
+      const res = await apiFetch('/api/v1/admin/vcs-archive-cache/evict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connection_id: scope.connectionId,
+          ...(scope.days === null ? {} : { older_than_days: scope.days }),
+          ...(after ? { after } : {}),
+        }),
+      })
+      if (!res.ok) throw new Error(await parseApiError(res, t('archives.errorBulk')))
+      const body = await res.json()
+      const archives = (after ? purgedSoFar.archives : 0) + Number(body?.archives ?? 0)
+      const bytes = (after ? purgedSoFar.bytes : 0) + Number(body?.bytes ?? 0)
+      setPurgedSoFar({ archives, bytes })
+      const truncated = body?.truncated === true
+      // The cursor IS the Continue affordance, exactly as it is for the
+      // listing. Cleared on a finished sweep so the control goes away rather
+      // than offering to continue something that has ended.
+      setPurgeCursor(truncated ? String(body?.['next-cursor'] ?? '') : '')
+      const args = { archives, size: formatBytes(bytes, locale) }
+      onSuccess(
+        truncated
+          ? t('archives.successBulkTruncated', args)
+          : t('archives.successBulk', args),
+      )
+      await reload()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : t('archives.errorBulk'))
+    } finally {
+      setPurging(false)
+    }
+  }
+
   async function purgeMatching() {
     const days = purgeDays.trim() === '' ? null : Number(purgeDays)
     if (days !== null && (!Number.isInteger(days) || days < 0)) {
@@ -222,28 +285,19 @@ export function VcsArchiveCachePanel({
       return
     }
     if (!confirmIrreversible(purgeScopeMessage(days))) return
-    setPurging(true)
-    try {
-      const res = await apiFetch('/api/v1/admin/vcs-archive-cache/evict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          connection_id: purgeConnectionId,
-          ...(days === null ? {} : { older_than_days: days }),
-        }),
-      })
-      if (!res.ok) throw new Error(await parseApiError(res, t('archives.errorBulk')))
-      const body = await res.json()
-      onSuccess(t('archives.successBulk', {
-        archives: Number(body?.archives ?? 0),
-        size: formatBytes(Number(body?.bytes ?? 0), locale),
-      }))
-      await reload()
-    } catch (err) {
-      onError(err instanceof Error ? err.message : t('archives.errorBulk'))
-    } finally {
-      setPurging(false)
-    }
+    // A fresh sweep: snapshot the scope it is being started with, and restart
+    // the running tally from this call.
+    const scope = { connectionId: purgeConnectionId, days }
+    setPurgedScope(scope)
+    await purgeWindow('', scope)
+  }
+
+  /** Continue an unfinished sweep. No second confirm(): the operator confirmed
+   *  this scope when they started it, and re-prompting per window on a purge
+   *  that may need many of them trains people to click through the prompt --
+   *  which is the one thing a confirmation must not become. */
+  async function continuePurge() {
+    await purgeWindow(purgeCursor, purgedScope)
   }
 
   /** `full` is a whole-repo archive, not a hash — rendered as the word, because
@@ -324,14 +378,29 @@ export function VcsArchiveCachePanel({
           </div>
         </div>
         <p className="mt-2 text-xs text-slate-400">{t('archives.bulkDaysHint')}</p>
-        <button
-          onClick={purgeMatching}
-          disabled={purging}
-          data-testid="archive-bulk-purge"
-          className="mt-3 min-h-11 px-4 py-2 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 disabled:opacity-50 text-red-300 transition-colors"
-        >
-          {purging ? t('batchPurge.purging') : t('bulk.button')}
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            onClick={purgeMatching}
+            disabled={purging}
+            data-testid="archive-bulk-purge"
+            className="min-h-11 px-4 py-2 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 disabled:opacity-50 text-red-300 transition-colors"
+          >
+            {purging ? t('batchPurge.purging') : t('bulk.button')}
+          </button>
+          {/* Present only while a sweep is unfinished. Without it the operator
+              is told more remains and has no way to reach it -- pressing Purge
+              again restarts the walk at the same place (#2491). */}
+          {purgeCursor && (
+            <button
+              onClick={continuePurge}
+              disabled={purging}
+              data-testid="archive-continue-purge"
+              className="min-h-11 px-4 py-2 rounded-lg text-sm font-medium bg-amber-900/40 hover:bg-amber-900/60 disabled:opacity-50 text-amber-200 transition-colors"
+            >
+              {purging ? t('archives.continuing') : t('archives.continuePurge')}
+            </button>
+          )}
+        </div>
       </div>
 
       {loaded && archives.length === 0 ? (

@@ -1829,7 +1829,12 @@
       "successBulk": "Purjd {files} artifaktz, freein {size}",
       "errorRow": "Could not purj teh artifakt",
       "errorBulk": "Could not purj teh packige artifaktz",
-      "capabilityOff": "package cache iz off, so no has anyfing to show heer. evryfing u alreddy cached stayz, an comez bak when u turn it on agen. kthx"
+      "capabilityOff": "package cache iz off, so no has anyfing to show heer. evryfing u alreddy cached stayz, an comez bak when u turn it on agen. kthx",
+      "loadMore": "Moar plz",
+      "loadingMore": "Loadin…",
+      "showing": "Showin {shown} ov {total} — teh tabel sortz wat iz loadd, so load teh rest b4 u reedz a sort liek it iz teh hole cache.",
+      "listedAll": "{count, plural, one {# artifaktz} other {# artifaktz}} listd — dat iz evrythin wot matchez deez filterz.",
+      "successBulkTruncated": "Purjd {files} artifaktz, freein {size}. Moar matchez den 1 purj takez — purj agen 2 keep goin."
     },
     "archives": {
       "connectionLabel": "Konnekshun",
@@ -1853,7 +1858,10 @@
       "successRow": "Purjd teh arkive for {repo} at {sha}",
       "successBulk": "Purjd {archives} arkivez, freein {size}",
       "errorRow": "Could not purj teh arkive",
-      "errorBulk": "Could not purj teh VCS arkivez"
+      "errorBulk": "Could not purj teh VCS arkivez",
+      "successBulkTruncated": "Purjd {archives} arkivez, freein {size}. Moar still deer — uze Keep Purjin, wich startz agen whar dis 1 stoppd.",
+      "continuePurge": "Keep purjin",
+      "continuing": "Keep goin…"
     },
     "sealedWarning": "Dis node iz seeld up, so nuffin purjd heer can be fetchd agin. Teh scheduld cleenup skipz deez cachez for dat reezon — dis iz a permanunt deleshun."
   },
