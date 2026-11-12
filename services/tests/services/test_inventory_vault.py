@@ -340,7 +340,11 @@ class TestTheLevelsViewSurvivesAVaultedVariable:
         root = _vaulted_tree(tmp_path)
         document = _resolve_with_levels(root, monkeypatch)
 
-        assert "web1.example.com" in document["hosts"]
+        # The whole key set, not a membership test: it is strictly stronger
+        # (a resolution that invented or dropped a host fails here) and it
+        # cannot be read as a URL substring check, which is what
+        # py/incomplete-url-substring-sanitization flagged the `in` form as.
+        assert set(document["hosts"]) == {"web1.example.com"}
         levels = document["var-levels"]
         host = levels["web1.example.com"]
         assert host["db_password"] == VAULTED_PLACEHOLDER, levels
