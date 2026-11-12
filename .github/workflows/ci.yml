@@ -942,75 +942,112 @@ jobs:
   # volume and the EE can run it with no interpreter and no libraries of ours.
 
   build-ee-agent:
-    name: Build terrapod-ee-agent (${{ matrix.goarch }})
+    # BOTH architectures in ONE job, not a matrix of two.
+    #
+    # The quota is per JOB -- 20 concurrent -- so two jobs spend two slots to
+    # cross-compile a binary that takes a few seconds either way. Measured on
+    # run 43261217946, `build-query` waited 48s for a slot and the image builds
+    # cannot even be CREATED until it finishes, so that queue time sits on the
+    # critical chain ahead of wave 2 and is paid twice.
+    #
+    # Cross-compiling needs no native runner, which is why both were on
+    # `ubuntu-latest` already; GOARCH is the only difference between them.
+    name: Build terrapod-ee-agent
     needs: prepare
+    # CGO off is not an optimisation: the binary runs inside an arbitrary EE
+    # whose libc we do not choose, so it must not link one -- asserted below for
+    # both architectures.
     if: needs.prepare.outputs.images_exist != 'true' || needs.prepare.outputs.is_tag == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ee-agent/go.mod
           cache: false
-      - name: Build linux/${{ matrix.goarch }}
+
+      - name: Build linux/amd64 and linux/arm64
         working-directory: ee-agent
         env:
           GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
-          # CGO off is not an optimisation here: the binary runs inside an
-          # arbitrary EE whose libc we do not choose, so it must not link one.
           CGO_ENABLED: "0"
-        run: go build -trimpath -ldflags "-s -w" -o "terrapod-ee-agent-linux-${{ matrix.goarch }}" .
-      - name: Confirm it is actually static
-        working-directory: ee-agent
         run: |
           set -euo pipefail
-          file "terrapod-ee-agent-linux-${{ matrix.goarch }}"
-          file "terrapod-ee-agent-linux-${{ matrix.goarch }}" | grep -q 'statically linked'
-      - name: Upload binary artifact
+          for arch in amd64 arm64; do
+            GOARCH="$arch" go build -trimpath -ldflags "-s -w" \
+              -o "terrapod-ee-agent-linux-$arch" .
+          done
+          for arch in amd64 arm64; do
+            file "terrapod-ee-agent-linux-$arch"
+            file "terrapod-ee-agent-linux-$arch" | grep -q 'statically linked'
+          done
+
+      - name: Upload terrapod-ee-agent-linux-amd64 artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: terrapod-ee-agent-linux-${{ matrix.goarch }}
-          path: ee-agent/terrapod-ee-agent-linux-${{ matrix.goarch }}
+          name: terrapod-ee-agent-linux-amd64
+          path: ee-agent/terrapod-ee-agent-linux-amd64
           retention-days: 1
 
-  # ── Build terrapod-query binary (baked into api + runner images) ──────
+      - name: Upload terrapod-ee-agent-linux-arm64 artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: terrapod-ee-agent-linux-arm64
+          path: ee-agent/terrapod-ee-agent-linux-arm64
+          retention-days: 1
+
   build-query:
-    name: Build terrapod-query (${{ matrix.goarch }})
+    # BOTH architectures in ONE job, not a matrix of two.
+    #
+    # The quota is per JOB -- 20 concurrent -- so two jobs spend two slots to
+    # cross-compile a binary that takes a few seconds either way. Measured on
+    # run 43261217946, `build-query` waited 48s for a slot and the image builds
+    # cannot even be CREATED until it finishes, so that queue time sits on the
+    # critical chain ahead of wave 2 and is paid twice.
+    #
+    # Cross-compiling needs no native runner, which is why both were on
+    # `ubuntu-latest` already; GOARCH is the only difference between them.
+    name: Build terrapod-query
     needs: prepare
     # Runs whenever images will be built (to bake the binary in) OR on a tag
-    # (so release-query can attach the SAME linux binaries to the Release —
+    # (so release-query can attach the SAME linux binaries to the Release --
     # built once here, reused by both the image bake and the release, never
     # compiled twice).
     if: needs.prepare.outputs.images_exist != 'true' || needs.prepare.outputs.is_tag == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: query/go.mod
           cache: false
-      - name: Build linux/${{ matrix.goarch }}
+
+      - name: Build linux/amd64 and linux/arm64
         working-directory: query
         env:
           GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
-        run: go build -trimpath -ldflags "-s -w" -o "terrapod-query-linux-${{ matrix.goarch }}" ./cmd/terrapod-query
-      - name: Upload binary artifact
+        run: |
+          set -euo pipefail
+          for arch in amd64 arm64; do
+            GOARCH="$arch" go build -trimpath -ldflags "-s -w" \
+              -o "terrapod-query-linux-$arch" ./cmd/terrapod-query
+          done
+
+      - name: Upload terrapod-query-linux-amd64 artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: terrapod-query-linux-${{ matrix.goarch }}
-          path: query/terrapod-query-linux-${{ matrix.goarch }}
+          name: terrapod-query-linux-amd64
+          path: query/terrapod-query-linux-amd64
           retention-days: 1
 
-  # ── Python Test ────────────────────────────────────────
+      - name: Upload terrapod-query-linux-arm64 artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: terrapod-query-linux-arm64
+          path: query/terrapod-query-linux-arm64
+          retention-days: 1
+
   python-test:
     # Sharded by directory so each shard gets its own Postgres /
     # Redis / LocalStack stack via docker-compose.test.yml. Integration
@@ -4125,35 +4162,35 @@ jobs:
   # still runs (build-validation + release manifests) and is now also
   # artifacted on PRs so scan-images can scan it.
   build-images-amd64:
-    name: Build ${{ matrix.image }} (amd64)
+    # ONE buildx invocation for all five images, not a matrix of five jobs.
+    #
+    # Wave 2 -- E2E, eval-boot, the CLI contract, the air-gap gate and OCI
+    # conformance, ten jobs -- is gated on this job as a WHOLE, so it opens when
+    # the LAST image finishes. As five matrix jobs they queued against each
+    # other for slots the Python tier was holding: measured on run 43261217946,
+    # all five were created at +1.4 and started at +1.8, +1.8, +2.2, +2.6 and
+    # +2.8, so up to 82s of the gate time was stagger rather than work. One job
+    # cannot stagger against itself.
+    #
+    # It also pulls the shared base once instead of five times, imports the
+    # registry cache manifest once instead of five times, and stages the
+    # terrapod-query and terrapod-ee-agent binaries once instead of five times.
+    #
+    # The two ARCHITECTURES stay separate: this arm64 twin runs on a NATIVE
+    # arm64 runner, and merging them would push one through emulation, which
+    # costs far more than the slot it saves. See docker/docker-bake.hcl.
+    name: Build images (amd64)
     needs: [prepare, build-query, build-ee-agent]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: true
-      matrix:
-        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
-        include:
-          - image: terrapod-api
-            dockerfile: docker/Dockerfile.api
-          - image: terrapod-web
-            dockerfile: docker/Dockerfile.web
-          - image: terrapod-runner
-            dockerfile: docker/Dockerfile.runner
-          - image: terrapod-listener
-            dockerfile: docker/Dockerfile.listener
-          - image: terrapod-migrations
-            dockerfile: docker/Dockerfile.migrations
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-        with:
-          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
 
       - name: Log in to GHCR
         uses: ./.github/actions/ghcr-login
@@ -4161,116 +4198,133 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      # terrapod-query is baked into api + runner (#823) from the binary the
-      # build-query job compiled once — staged into the build context here.
-      - name: Stage terrapod-query binary (api/runner only)
-        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
+      # Staged ONCE for all five targets. Only the api and runner images COPY
+      # the query binary and only the runner COPYs the agent, but they are a
+      # few MB and staging them unconditionally is cheaper than branching.
+      - name: Stage terrapod-query binary
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: terrapod-query-linux-amd64
           path: docker/query-bin
+
       - name: Normalise terrapod-query binary
-        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
         run: |
           mv docker/query-bin/terrapod-query-linux-amd64 docker/query-bin/terrapod-query
           chmod 0755 docker/query-bin/terrapod-query
 
-      # terrapod-ee-agent is baked into the RUNNER only (#2154), from the
-      # binary build-ee-agent compiled once. The runner's initContainer
-      # copies it onto a shared volume so the EE can run it — which is how
-      # an EE stays free of Terrapod code and insensitive to our releases.
-      - name: Stage terrapod-ee-agent binary (runner only)
-        if: matrix.image == 'terrapod-runner'
+      - name: Stage terrapod-ee-agent binary
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: terrapod-ee-agent-linux-amd64
           path: docker/ee-agent-bin
+
       - name: Normalise terrapod-ee-agent binary
-        if: matrix.image == 'terrapod-runner'
         run: |
           mv docker/ee-agent-bin/terrapod-ee-agent-linux-amd64 docker/ee-agent-bin/terrapod-ee-agent
           chmod 0755 docker/ee-agent-bin/terrapod-ee-agent
 
-      - name: Build and push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64
-          # On PRs we do NOT push to GHCR (fork PRs lack package:write; even
-          # same-repo PRs gain nothing from a round-trip). The image is loaded
-          # into the local daemon and handed to scan/e2e as an artifact.
-          push: ${{ needs.prepare.outputs.is_pr != 'true' }}
-          load: ${{ needs.prepare.outputs.is_pr == 'true' }}
-          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
-          build-args: |
-            PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
-            BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
-          # A REGISTRY cache, not `type=gha`, because the Actions cache
-          # service scopes every entry to the ref that wrote it: an entry
-          # written by `refs/pull/N/merge` is readable by that one pull
-          # request and by nothing else. Measured before this change, the
-          # repository held 627 buildkit entries totalling 7.47 GB across
-          # three open pull requests and 5 entries totalling 0.06 GB on
-          # `refs/heads/main` -- so nothing was shared, and the pull
-          # requests were evicting each other against the 10 GB cap.
-          #
-          # A registry cache is an ordinary OCI artifact in GHCR. It has
-          # no ref scoping and no cap, so every run reads and writes the
-          # same ref: main's layers are there for a pull request, and a
-          # pull request's are there for the next one. `packages: write`
-          # and the GHCR login this job already has are all it needs.
-          #
-          # `ignore-error` because a pull request from a FORK gets a
-          # read-only token, so its export would fail; it should still
-          # build, and it can still read.
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-amd64
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-amd64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
+      - name: Build all five images
+        env:
+          TAG: sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          ARCH: amd64
+          REGISTRY: ${{ env.REGISTRY }}
+          CACHE_REF: ghcr.io/${{ github.repository_owner }}/terrapod-buildcache
+          PKG_REFRESH: ${{ needs.prepare.outputs.pkg_refresh }}
+          PYTHON_BASE_IMAGE: ${{ env.PYTHON_BASE_IMAGE }}
+          NODE_BASE_IMAGE: ${{ env.NODE_BASE_IMAGE }}
+        run: |
+          set -euo pipefail
+          # A pull request LOADS into the local daemon so the images can be
+          # exported as artifacts for wave 2; a branch or tag PUSHES, which is
+          # what `create-manifests` later retags.
+          if [ "${{ needs.prepare.outputs.is_pr }}" = "true" ]; then
+            out=--load
+          else
+            out=--push
+          fi
+          docker buildx bake -f docker/docker-bake.hcl "$out"
 
-      - name: Export image artifact
+      - name: Export image artifacts
         if: needs.prepare.outputs.is_pr == 'true'
         run: |
-          docker save "$REGISTRY/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64" \
-            | gzip > "/tmp/${{ matrix.image }}-amd64.tar.gz"
+          set -euo pipefail
+          for img in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
+            docker save "${REGISTRY}/${img}:sha-${{ needs.prepare.outputs.sha_short }}-amd64" \
+              | gzip > "/tmp/${img}-amd64.tar.gz"
+          done
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
 
-      - name: Upload image artifact
+      - name: Upload terrapod-api image artifact
         if: needs.prepare.outputs.is_pr == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: image-${{ matrix.image }}-amd64
-          path: /tmp/${{ matrix.image }}-amd64.tar.gz
+          name: image-terrapod-api-amd64
+          path: /tmp/terrapod-api-amd64.tar.gz
+          retention-days: 1
+
+      - name: Upload terrapod-web image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-web-amd64
+          path: /tmp/terrapod-web-amd64.tar.gz
+          retention-days: 1
+
+      - name: Upload terrapod-runner image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-runner-amd64
+          path: /tmp/terrapod-runner-amd64.tar.gz
+          retention-days: 1
+
+      - name: Upload terrapod-listener image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-listener-amd64
+          path: /tmp/terrapod-listener-amd64.tar.gz
+          retention-days: 1
+
+      - name: Upload terrapod-migrations image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-migrations-amd64
+          path: /tmp/terrapod-migrations-amd64.tar.gz
           retention-days: 1
 
   build-images-arm64:
-    name: Build ${{ matrix.image }} (arm64)
+    # ONE buildx invocation for all five images, not a matrix of five jobs.
+    #
+    # Wave 2 -- E2E, eval-boot, the CLI contract, the air-gap gate and OCI
+    # conformance, ten jobs -- is gated on this job as a WHOLE, so it opens when
+    # the LAST image finishes. As five matrix jobs they queued against each
+    # other for slots the Python tier was holding: measured on run 43261217946,
+    # all five were created at +1.4 and started at +1.8, +1.8, +2.2, +2.6 and
+    # +2.8, so up to 82s of the gate time was stagger rather than work. One job
+    # cannot stagger against itself.
+    #
+    # It also pulls the shared base once instead of five times, imports the
+    # registry cache manifest once instead of five times, and stages the
+    # terrapod-query and terrapod-ee-agent binaries once instead of five times.
+    #
+    # The two ARCHITECTURES stay separate: this arm64 twin runs on a NATIVE
+    # arm64 runner, and merging them would push one through emulation, which
+    # costs far more than the slot it saves. See docker/docker-bake.hcl.
+    name: Build images (arm64)
     needs: [prepare, build-query, build-ee-agent]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: true
-      matrix:
-        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
-        include:
-          - image: terrapod-api
-            dockerfile: docker/Dockerfile.api
-          - image: terrapod-web
-            dockerfile: docker/Dockerfile.web
-          - image: terrapod-runner
-            dockerfile: docker/Dockerfile.runner
-          - image: terrapod-listener
-            dockerfile: docker/Dockerfile.listener
-          - image: terrapod-migrations
-            dockerfile: docker/Dockerfile.migrations
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-        with:
-          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
 
       - name: Log in to GHCR
         uses: ./.github/actions/ghcr-login
@@ -4278,85 +4332,103 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      # terrapod-query is baked into api + runner (#823) from the binary the
-      # build-query job compiled once — staged into the build context here.
-      - name: Stage terrapod-query binary (api/runner only)
-        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
+      # Staged ONCE for all five targets. Only the api and runner images COPY
+      # the query binary and only the runner COPYs the agent, but they are a
+      # few MB and staging them unconditionally is cheaper than branching.
+      - name: Stage terrapod-query binary
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: terrapod-query-linux-arm64
           path: docker/query-bin
+
       - name: Normalise terrapod-query binary
-        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
         run: |
           mv docker/query-bin/terrapod-query-linux-arm64 docker/query-bin/terrapod-query
           chmod 0755 docker/query-bin/terrapod-query
 
-      # terrapod-ee-agent is baked into the RUNNER only (#2154), from the
-      # binary build-ee-agent compiled once. The runner's initContainer
-      # copies it onto a shared volume so the EE can run it — which is how
-      # an EE stays free of Terrapod code and insensitive to our releases.
-      - name: Stage terrapod-ee-agent binary (runner only)
-        if: matrix.image == 'terrapod-runner'
+      - name: Stage terrapod-ee-agent binary
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: terrapod-ee-agent-linux-arm64
           path: docker/ee-agent-bin
+
       - name: Normalise terrapod-ee-agent binary
-        if: matrix.image == 'terrapod-runner'
         run: |
           mv docker/ee-agent-bin/terrapod-ee-agent-linux-arm64 docker/ee-agent-bin/terrapod-ee-agent
           chmod 0755 docker/ee-agent-bin/terrapod-ee-agent
 
-      - name: Build and push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: linux/arm64
-          push: ${{ needs.prepare.outputs.is_pr != 'true' }}
-          load: ${{ needs.prepare.outputs.is_pr == 'true' }}
-          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
-          build-args: |
-            PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
-            BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
-          # A REGISTRY cache, not `type=gha`, because the Actions cache
-          # service scopes every entry to the ref that wrote it: an entry
-          # written by `refs/pull/N/merge` is readable by that one pull
-          # request and by nothing else. Measured before this change, the
-          # repository held 627 buildkit entries totalling 7.47 GB across
-          # three open pull requests and 5 entries totalling 0.06 GB on
-          # `refs/heads/main` -- so nothing was shared, and the pull
-          # requests were evicting each other against the 10 GB cap.
-          #
-          # A registry cache is an ordinary OCI artifact in GHCR. It has
-          # no ref scoping and no cap, so every run reads and writes the
-          # same ref: main's layers are there for a pull request, and a
-          # pull request's are there for the next one. `packages: write`
-          # and the GHCR login this job already has are all it needs.
-          #
-          # `ignore-error` because a pull request from a FORK gets a
-          # read-only token, so its export would fail; it should still
-          # build, and it can still read.
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-arm64
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-arm64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
+      - name: Build all five images
+        env:
+          TAG: sha-${{ needs.prepare.outputs.sha_short }}-arm64
+          ARCH: arm64
+          REGISTRY: ${{ env.REGISTRY }}
+          CACHE_REF: ghcr.io/${{ github.repository_owner }}/terrapod-buildcache
+          PKG_REFRESH: ${{ needs.prepare.outputs.pkg_refresh }}
+          PYTHON_BASE_IMAGE: ${{ env.PYTHON_BASE_IMAGE }}
+          NODE_BASE_IMAGE: ${{ env.NODE_BASE_IMAGE }}
+        run: |
+          set -euo pipefail
+          # A pull request LOADS into the local daemon so the images can be
+          # exported as artifacts for wave 2; a branch or tag PUSHES, which is
+          # what `create-manifests` later retags.
+          if [ "${{ needs.prepare.outputs.is_pr }}" = "true" ]; then
+            out=--load
+          else
+            out=--push
+          fi
+          docker buildx bake -f docker/docker-bake.hcl "$out"
 
-      # arm64 is now artifacted on PRs too — scan-images scans it as well.
-      - name: Export image artifact
+      - name: Export image artifacts
         if: needs.prepare.outputs.is_pr == 'true'
         run: |
-          docker save "$REGISTRY/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64" \
-            | gzip > "/tmp/${{ matrix.image }}-arm64.tar.gz"
+          set -euo pipefail
+          for img in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
+            docker save "${REGISTRY}/${img}:sha-${{ needs.prepare.outputs.sha_short }}-arm64" \
+              | gzip > "/tmp/${img}-arm64.tar.gz"
+          done
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
 
-      - name: Upload image artifact
+      - name: Upload terrapod-api image artifact
         if: needs.prepare.outputs.is_pr == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: image-${{ matrix.image }}-arm64
-          path: /tmp/${{ matrix.image }}-arm64.tar.gz
+          name: image-terrapod-api-arm64
+          path: /tmp/terrapod-api-arm64.tar.gz
           retention-days: 1
 
-  # ── E2E Tests (Playwright) ─────────────────────────────
+      - name: Upload terrapod-web image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-web-arm64
+          path: /tmp/terrapod-web-arm64.tar.gz
+          retention-days: 1
+
+      - name: Upload terrapod-runner image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-runner-arm64
+          path: /tmp/terrapod-runner-arm64.tar.gz
+          retention-days: 1
+
+      - name: Upload terrapod-listener image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-listener-arm64
+          path: /tmp/terrapod-listener-arm64.tar.gz
+          retention-days: 1
+
+      - name: Upload terrapod-migrations image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-terrapod-migrations-arm64
+          path: /tmp/terrapod-migrations-arm64.tar.gz
+          retention-days: 1
+
   e2e-test:
     # Sharded across N GitHub runners using Playwright's built-in --shard=k/N.
     # Each shard boots its own docker-compose stack in PARALLEL, so stack-boot

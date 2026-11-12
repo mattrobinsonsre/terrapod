@@ -9,10 +9,19 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // 2 workers per shard in CI: with the suite sharded across many runners,
-  // each shard runs few tests, so keeping workers low avoids oversubscribing
-  // the 2-vCPU runner while a shard boots its own stack. Tune with shard count.
-  workers: process.env.CI ? 2 : 2,
+  // 3 workers per shard in CI. This said 2, reasoning about "the 2-vCPU
+  // runner" -- a premise that expired when GitHub's standard hosted runners
+  // became 4 vCPU / 16 GiB, so the suite was using half the cores it is given
+  // on a job that sits on the critical-path TAIL (the shards finish at +9.4 to
+  // +10.0 of a run that ends at +10.7, so shortening one shortens the run).
+  //
+  // 3 rather than 4 because each shard also boots its own compose stack --
+  // postgres, redis, api, web -- in the same job, so the four cores are shared
+  // between the stack and the browsers. Memory is not the constraint: 16 GiB
+  // against a stack plus a few Chromium instances at a few hundred MB each.
+  //
+  // Raise to 4 only on measured shard durations, not on the arithmetic.
+  workers: process.env.CI ? 3 : 2,
   // CI: each shard emits a `blob` report (auto-named per shard under
   // e2e/blob-report/); the `e2e-report` CI job merges them into one HTML
   // report. `github` gives inline annotations per shard. Local: HTML on failure.
