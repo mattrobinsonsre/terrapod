@@ -1829,7 +1829,12 @@
       "successBulk": "Purg3d {files} 4r71f4c75, fr331ng {size}",
       "errorRow": "F41l3d 70 purg3 7h3 4r71f4c7",
       "errorBulk": "F41l3d 70 purg3 p4ck4g3 4r71f4c75",
-      "capabilityOff": "7h3 p4ck4g3 c4ch3 15 5w17ch3d 0ff, 50 7h3r3 15 n07h1ng 70 l157 h3r3. 4ny7h1ng 4lr34dy c4ch3d 15 k3p7 4nd c0m35 b4ck wh3n 17 15 7urn3d 0n 4g41n."
+      "capabilityOff": "7h3 p4ck4g3 c4ch3 15 5w17ch3d 0ff, 50 7h3r3 15 n07h1ng 70 l157 h3r3. 4ny7h1ng 4lr34dy c4ch3d 15 k3p7 4nd c0m35 b4ck wh3n 17 15 7urn3d 0n 4g41n.",
+      "loadMore": "L04d m0r3",
+      "loadingMore": "L04d1ng…",
+      "showing": "5h0w1ng {shown} 0f {total} — 7h3 74bl3 50r75 wh47 15 l04d3d, 50 l04d 7h3 r357 b3f0r3 r34d1ng 4n 0rd3r 45 7h3 wh0l3 c4ch3.",
+      "listedAll": "{count, plural, one {# 4r71f4c7} other {# 4r71f4c75}} l1573d — 7h47 15 3v3ry7h1ng m47ch1ng 7h353 f1l73r5.",
+      "successBulkTruncated": "Purg3d {files} 4r71f4c75, fr331ng {size}. M0r3 m47ch 7h4n 0n3 purg3 r3m0v35 — purg3 4g41n 70 c4rry 0n."
     },
     "archives": {
       "connectionLabel": "C0nn3c710n",
@@ -1853,7 +1858,10 @@
       "successRow": "Purg3d 7h3 4rch1v3 f0r {repo} 47 {sha}",
       "successBulk": "Purg3d {archives} 4rch1v35, fr331ng {size}",
       "errorRow": "F41l3d 70 purg3 7h3 4rch1v3",
-      "errorBulk": "F41l3d 70 purg3 VC5 4rch1v35"
+      "errorBulk": "F41l3d 70 purg3 VC5 4rch1v35",
+      "successBulkTruncated": "Purg3d {archives} 4rch1v35, fr331ng {size}. M0r3 r3m41n — u53 C0n71nu3 purg3, wh1ch r35um35 wh3r3 7h15 0n3 570pp3d.",
+      "continuePurge": "C0n71nu3 purg3",
+      "continuing": "C0n71nu1ng…"
     },
     "sealedWarning": "7h15 n0d3 15 534l3d, 50 n07h1ng purg3d h3r3 c4n b3 f37ch3d 4g41n. 7h3 5ch3dul3d cl34nup 5k1p5 7h353 c4ch35 f0r 7h47 r3450n — 7h15 15 4 p3rm4n3n7 d3l3710n."
   },

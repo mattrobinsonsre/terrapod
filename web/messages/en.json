@@ -1829,7 +1829,12 @@
       "successBulk": "Purged {files} artifacts, freeing {size}",
       "errorRow": "Failed to purge the artifact",
       "errorBulk": "Failed to purge package artifacts",
-      "capabilityOff": "The package cache is switched off, so there is nothing to list here. Anything already cached is kept and comes back when it is turned on again."
+      "capabilityOff": "The package cache is switched off, so there is nothing to list here. Anything already cached is kept and comes back when it is turned on again.",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "showing": "Showing {shown} of {total} — the table sorts what is loaded, so load the rest before reading an order as the whole cache.",
+      "listedAll": "{count, plural, one {# artifact} other {# artifacts}} listed — that is everything matching these filters.",
+      "successBulkTruncated": "Purged {files} artifacts, freeing {size}. More match than one purge removes — purge again to carry on."
     },
     "archives": {
       "connectionLabel": "Connection",
@@ -1853,7 +1858,10 @@
       "successRow": "Purged the archive for {repo} at {sha}",
       "successBulk": "Purged {archives} archives, freeing {size}",
       "errorRow": "Failed to purge the archive",
-      "errorBulk": "Failed to purge VCS archives"
+      "errorBulk": "Failed to purge VCS archives",
+      "successBulkTruncated": "Purged {archives} archives, freeing {size}. More remain — use Continue purge to carry on, which resumes where this stopped.",
+      "continuePurge": "Continue purge",
+      "continuing": "Continuing…"
     },
     "sealedWarning": "This node is sealed, so nothing purged here can be fetched again. The scheduled cleanup skips these caches for that reason — this is a permanent deletion."
   },

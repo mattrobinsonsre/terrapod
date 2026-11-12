@@ -124,8 +124,8 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_ha_status` | This deployment's HA posture: the leader/follower pair (in sync, seconds since the last sync, classes still backfilling — read these before a failover) and the in-cluster component health. |
 | `terrapod_oidc_audience_defaults` | The deployment-wide [cloud identity](cloud-identity.md) audience **catalogue** that every workspace's `oidc-audiences` override merges over, plus `issuer-enabled`. Read it before writing a workspace's audiences and subtract it: a workspace reports its audiences as the **merged** map, so writing that value back would promote every inherited entry into a permanent override. An empty catalogue and a disabled issuer produce the same symptom and only one is fixed by adding audiences — hence the separate flag. Any authenticated user. |
 | `terrapod_oidc_signing_keys` | The OIDC issuer's published signing keys for [per-workspace cloud identity](cloud-identity.md) — each key's `kid`, when it was created, when it starts signing and when it was retired, plus which one signs now. Public key metadata only; no private material. Admin. |
-| `terrapod_package_cache_list` | What Terrapod has cached from the six package ecosystems its runs pull through, with per-ecosystem and whole-cache totals. The tool for "why is the configure slow" and "what is filling the object store" — an artifact's **absence** is the finding, because a miss means the run goes to the upstream registry instead. Judge dead weight by `last_accessed_at`, not `cached_at`: that is the field age-based eviction uses, because an artifact every run pulls would otherwise be evicted merely for being old and re-fetched immediately. Totals are aggregated over the whole cache, so they stay correct when the page is short. Reads only — see [Caches](caches.md#the-package-cache) for the eviction routes. Platform admin. |
-| `terrapod_vcs_archive_cache_list` | The repository tarballs cached from VCS, with per-repository totals largest-first. `sha` plus `paths_hash` identify one commit's archive for one path-narrowing set (`full` for a whole repository). **Two things behave unlike every other listing.** Paging is a **key cursor**, not a page number — there are no rows behind it, so a page is a walk of object storage and you resume by passing the previous `next_cursor` back as `after`; an empty `next_cursor` means the end. And `totals.truncated` true means the walk hit `totals.scan_limit`, so the counts are a **lower bound** rather than the size of the cache — say so rather than reporting the number. An archive's age is its `last_modified`: it is immutable once written, so there is no last-access time to prefer. Reads only — see [Caches](caches.md#the-vcs-archive-cache). Platform admin. |
+| `terrapod_package_cache_list` | What Terrapod has cached from the six package ecosystems its runs pull through, with per-ecosystem and whole-cache totals. The tool for "why is the configure slow" and "what is filling the object store" — an artifact's **absence** is the finding, because a miss means the run goes to the upstream registry instead. Judge dead weight by `last_accessed_at`, not `cached_at`: that is the field age-based eviction uses, because an artifact every run pulls would otherwise be evicted merely for being old and re-fetched immediately. Totals are aggregated over the whole cache, so they stay correct when the page is short. Reads only; `terrapod_package_cache_delete` and `terrapod_package_cache_evict` below are how an agent acts on what it finds. Read `totals.sealed` first — on a sealed node an eviction is a permanent deletion. Platform admin. |
+| `terrapod_vcs_archive_cache_list` | The repository tarballs cached from VCS, with per-repository totals largest-first. `sha` plus `paths_hash` identify one commit's archive for one path-narrowing set (`full` for a whole repository). **Two things behave unlike every other listing.** Paging is a **key cursor**, not a page number — there are no rows behind it, so a page is a walk of object storage and you resume by passing the previous `next_cursor` back as `after`; an empty `next_cursor` means the end. And `totals.truncated` true means the walk hit `totals.scan_limit`, so the counts are a **lower bound** rather than the size of the cache — say so rather than reporting the number. An archive's age is its `last_modified`: it is immutable once written, so there is no last-access time to prefer. Reads only; `terrapod_vcs_archive_delete` and `terrapod_vcs_archive_cache_evict` below are how an agent acts on what it finds. Platform admin. |
 
 ### Act (gated) — the normal run lifecycle
 
@@ -332,6 +332,33 @@ blocks + config for the human to adopt; **they never apply an import themselves*
 Nothing bypasses the platform: applies obey the workspace's VCS/auto-apply/lock
 rules and OPA policy, config changes apply on the next run, and every action is
 bounded by your Terrapod RBAC — a read-only token cannot mutate.
+
+### Caches (gated) — reclaim what the listings found
+
+The eviction half of the two cache listings in **Observe** above. Nothing here
+loses data: every artifact and archive is fetched again on the next run that
+wants it, which is what makes these caches evictable at all. What an eviction
+costs is a slower run **later**, for somebody who did not ask — so report what
+you found and propose, rather than purging on your own initiative, and read
+`totals.sealed` from the listing first: on a sealed node (`registry.cache_only`)
+nothing can be re-fetched and an eviction is a permanent deletion.
+
+| Tool | Safety | What it does |
+|---|---|---|
+| `terrapod_package_cache_delete` | destructive | Evict **one** cached package artifact by the `id` the listing reports. For a single bad artifact — a tampered or truncated download, a version withdrawn upstream — rather than for space. A row already gone is a `404`. |
+| `terrapod_package_cache_evict` | destructive | Evict package artifacts **in bulk** by ecosystem and/or last access. Omitting both filters evicts the whole cache, deliberately; `older_than_days: 0` means everything, not "disabled". **Bounded per call** — `truncated` true means more matched than it took, and repeating the same request continues, because the artifacts that matched are the ones that went. |
+| `terrapod_vcs_archive_delete` | destructive | Evict **one** cached repository tarball by its storage key, which is also its identity. Idempotent: a well-formed key already gone reports the same success, since there is no row for a `404` to be about. A key outside `vcs_archives/` is refused `422`. |
+| `terrapod_vcs_archive_cache_evict` | destructive | Evict archives **in bulk** by connection and/or write time. **Bounded per call, and the one that needs its cursor**: `truncated` true means the window was full, and you resume by passing `next_cursor` back as `after` with every other field unchanged. Repeating it *without* the cursor re-examines the same window and purges nothing new. |
+
+> These four were deliberately absent at first, on the grounds that an
+> eviction's only result is a slower run later for somebody who did not ask.
+> That cost is real and the descriptions carry it; treating it as a reason to
+> withhold the tools was the mistake. It is a property of the **operation**, not
+> of the caller, so it applies equally to the admin page and to `curl` — and
+> this server is not an authorization boundary, since it carries your own token
+> and the API applies the same RBAC whichever door a call arrives through. The
+> omission protected nobody and left an agent able to read that a cache had
+> grown and unable to act on it. Risk is signalled by the annotation.
 
 ## Safety model, in short
 

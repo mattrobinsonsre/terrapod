@@ -4891,7 +4891,10 @@ GET /api/v1/admin/package-cache
 
 Ordered by **last access, newest first** — the column retention reads, so the
 order answers "what has nothing touched". Ordinary optional
-[pagination](#pagination).
+[pagination](#pagination), **sliced and counted in the database**: a page costs
+a page rather than the whole table, and `meta.pagination.total-count` is the
+whole filtered set. Omitting both page parameters still returns everything,
+which is the documented non-paged contract; on a cache of any size, page it.
 
 | Query param | Matching |
 |---|---|
@@ -4967,8 +4970,20 @@ An unknown `ecosystem` **value** is not validated and simply matches nothing, so
 check the returned count:
 
 ```json
-{ "status": "evicted", "files": 318, "bytes": 2104725504 }
+{ "status": "evicted", "files": 318, "bytes": 2104725504, "truncated": false }
 ```
+
+**One call removes at most 1000 artifacts.** The bound is on the work rather
+than on what matched: the eviction deletes one object per artifact, so an
+unbounded sweep of a large cache runs for minutes inside one request, and past
+the gateway's timeout the transaction rolls back while the objects already
+deleted stay deleted.
+
+| Response field | Meaning |
+|---|---|
+| `files` | How many artifacts this call removed |
+| `bytes` | How much they held |
+| `truncated` | `true` when **more matched than this call took**. Repeat the same request to continue; there is no cursor, because the artifacts that matched are the ones that went, so the next call starts on what is left. Keep going until it is `false` |
 
 ### List Cached VCS Archives (Admin)
 
@@ -5085,16 +5100,40 @@ POST /api/v1/admin/vcs-archive-cache/evict
 |---|---|
 | `connection_id` | Optional. Omitted or empty, every connection |
 | `older_than_days` | Optional, `>= 0`. Archives **written** more than this many days ago. Write-based here, because an archive is immutable once written and there is no access column to prefer |
+| `after` | Optional. Resume a bounded sweep from this key — the `next-cursor` the previous call returned. Pass the **same** other fields back with it |
 
 Neither field means every archive. `older_than_days: 0` means everything, as
 above.
 
 ```json
-{ "status": "evicted", "archives": 406, "bytes": 1178927104 }
+{
+  "status": "evicted", "archives": 406, "bytes": 1178927104,
+  "truncated": true,
+  "next-cursor": "vcs_archives/vcs-1b3f/acme/web/9f2c-full.tar.gz"
+}
 ```
 
-One call considers at most `scan-limit` archives and the response does not say
-whether it stopped early, so on a large estate **repeat until `archives` is `0`**.
+**One call considers at most 1000 keys**, and the walk starts wherever `after`
+says — which is why the cursor is not optional on a large estate. A repeat with
+no `after` re-examines the same window, so it purges nothing new however many
+times it is run, and a window in which nothing is old enough never advances at
+all.
+
+| Response field | Meaning |
+|---|---|
+| `archives` | How many this call removed |
+| `bytes` | How much they held |
+| `truncated` | `true` when more keys lie past this window |
+| `next-cursor` | Where to resume: pass it as `after`, with every other field unchanged. Empty when the sweep reached the end |
+
+Loop while `truncated` is `true`. Changing a filter mid-sweep makes the next
+window a different question from the last, so start again rather than adjusting
+as you go.
+
+> An earlier version of this page said the response did not report whether it
+> stopped early and told you to repeat the call until `archives` came back `0`.
+> It did not, and that did not work — the walk restarted at the same place every
+> time. `truncated` and `next-cursor` are the fix.
 
 > **On a sealed node (`api.config.registry.cache_only`) a package-cache eviction
 > is a deletion.** The scheduled sweep skips the binary, provider and package

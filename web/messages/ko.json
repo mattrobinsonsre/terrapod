@@ -1829,7 +1829,12 @@
       "successBulk": "아티팩트 {files}개를 삭제하여 {size}을(를) 확보했습니다",
       "errorRow": "아티팩트를 삭제하지 못했습니다",
       "errorBulk": "패키지 아티팩트를 삭제하지 못했습니다",
-      "capabilityOff": "패키지 캐시가 꺼져 있어 여기에 표시할 항목이 없습니다. 이미 캐시된 항목은 그대로 유지되며 다시 켜면 돌아옵니다."
+      "capabilityOff": "패키지 캐시가 꺼져 있어 여기에 표시할 항목이 없습니다. 이미 캐시된 항목은 그대로 유지되며 다시 켜면 돌아옵니다.",
+      "loadMore": "더 불러오기",
+      "loadingMore": "불러오는 중…",
+      "showing": "{total}개 중 {shown}개를 표시했습니다. 이 표는 불러온 항목만 정렬하므로, 정렬 결과를 캐시 전체로 읽기 전에 나머지를 불러오세요.",
+      "listedAll": "{count, plural, other {#개 아티팩트}}를 표시했습니다. 이 필터에 해당하는 전부입니다.",
+      "successBulkTruncated": "아티팩트 {files}개를 삭제하여 {size}을(를) 확보했습니다. 한 번의 삭제로 지우는 수보다 더 많이 해당하므로, 계속하려면 다시 삭제하세요."
     },
     "archives": {
       "connectionLabel": "연결",
@@ -1853,7 +1858,10 @@
       "successRow": "{repo}의 커밋 {sha} 아카이브를 삭제했습니다",
       "successBulk": "아카이브 {archives}개를 삭제하여 {size}을(를) 확보했습니다",
       "errorRow": "아카이브를 삭제하지 못했습니다",
-      "errorBulk": "VCS 아카이브를 삭제하지 못했습니다"
+      "errorBulk": "VCS 아카이브를 삭제하지 못했습니다",
+      "successBulkTruncated": "아카이브 {archives}개를 삭제하여 {size}을(를) 확보했습니다. 아직 남아 있습니다. ‘삭제 계속’을 사용하면 중단된 지점부터 다시 시작합니다.",
+      "continuePurge": "삭제 계속",
+      "continuing": "계속 중…"
     },
     "sealedWarning": "이 노드는 봉인되어 있어 여기서 삭제한 것은 다시 가져올 수 없습니다. 예정된 정리 작업이 이 캐시들을 건너뛰는 것도 그 때문입니다 — 이것은 영구적인 삭제입니다."
   },

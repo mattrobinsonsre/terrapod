@@ -1829,7 +1829,12 @@
       "successBulk": "{files} yapıt temizlendi, {size} boşaltıldı",
       "errorRow": "Yapıt temizlenemedi",
       "errorBulk": "Paket yapıtları temizlenemedi",
-      "capabilityOff": "Paket önbelleği kapalı olduğundan burada listelenecek bir şey yok. Önbelleğe alınmış olanlar korunur ve önbellek yeniden açıldığında geri gelir."
+      "capabilityOff": "Paket önbelleği kapalı olduğundan burada listelenecek bir şey yok. Önbelleğe alınmış olanlar korunur ve önbellek yeniden açıldığında geri gelir.",
+      "loadMore": "Daha fazla yükle",
+      "loadingMore": "Yükleniyor…",
+      "showing": "{total} ögeden {shown} tanesi gösteriliyor — tablo yalnızca yüklenmiş olanı sıralar, bu nedenle bir sıralamayı önbelleğin tamamı olarak okumadan önce gerisini yükleyin.",
+      "listedAll": "{count, plural, one {# yapıt} other {# yapıt}} listelendi — bu filtrelere uyanların tamamı bu.",
+      "successBulkTruncated": "{files} yapıt temizlendi, {size} boşaltıldı. Bir temizliğin kaldırdığından fazlası uyuyor — sürdürmek için yeniden temizleyin."
     },
     "archives": {
       "connectionLabel": "Bağlantı",
@@ -1853,7 +1858,10 @@
       "successRow": "{repo} deposunun {sha} commit'indeki arşivi temizlendi",
       "successBulk": "{archives} arşiv temizlendi, {size} boşaltıldı",
       "errorRow": "Arşiv temizlenemedi",
-      "errorBulk": "VCS arşivleri temizlenemedi"
+      "errorBulk": "VCS arşivleri temizlenemedi",
+      "successBulkTruncated": "{archives} arşiv temizlendi, {size} boşaltıldı. Daha fazlası kaldı — bu işlemin durduğu yerden devam eden „Temizliği sürdür“ü kullanın.",
+      "continuePurge": "Temizliği sürdür",
+      "continuing": "Sürdürülüyor…"
     },
     "sealedWarning": "Bu düğüm mühürlü olduğundan burada temizlenen hiçbir şey yeniden getirilemez. Zamanlanmış temizlik tam bu nedenle bu önbellekleri atlar — bu kalıcı bir silme işlemidir."
   },

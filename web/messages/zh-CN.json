@@ -1829,7 +1829,12 @@
       "successBulk": "已清除 {files} 个构件，释放 {size}",
       "errorRow": "清除构件失败",
       "errorBulk": "清除软件包构件失败",
-      "capabilityOff": "软件包缓存已关闭，因此这里没有可列出的内容。已缓存的内容会保留下来，重新开启后即会恢复。"
+      "capabilityOff": "软件包缓存已关闭，因此这里没有可列出的内容。已缓存的内容会保留下来，重新开启后即会恢复。",
+      "loadMore": "加载更多",
+      "loadingMore": "加载中…",
+      "showing": "正在显示 {total} 项中的 {shown} 项 —— 表格只排序已加载的内容，因此在把某个排序当作整个缓存来读之前，请先加载其余部分。",
+      "listedAll": "已列出 {count, plural, other {# 个构件}}，这就是符合这些筛选条件的全部内容。",
+      "successBulkTruncated": "已清除 {files} 个构件，释放 {size}。符合条件的比一次清除所能移除的更多 —— 再清除一次以继续。"
     },
     "archives": {
       "connectionLabel": "连接",
@@ -1853,7 +1858,10 @@
       "successRow": "已清除 {repo} 在提交 {sha} 的归档",
       "successBulk": "已清除 {archives} 个归档，释放 {size}",
       "errorRow": "清除归档失败",
-      "errorBulk": "清除 VCS 归档失败"
+      "errorBulk": "清除 VCS 归档失败",
+      "successBulkTruncated": "已清除 {archives} 个归档，释放 {size}。仍有剩余 —— 使用“继续清除”，它会从本次停止的位置继续。",
+      "continuePurge": "继续清除",
+      "continuing": "正在继续…"
     },
     "sealedWarning": "本节点已密封，因此在此清除的内容无法重新获取。定期清理也正因如此会跳过这些缓存 — 这是永久删除。"
   },

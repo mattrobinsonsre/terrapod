@@ -1829,7 +1829,12 @@
       "successBulk": "{files} artefactos expurgados, libertando {size}",
       "errorRow": "Falha ao expurgar o artefacto",
       "errorBulk": "Falha ao expurgar os artefactos de pacotes",
-      "capabilityOff": "A cache de pacotes está desativada, pelo que não há nada para listar aqui. Tudo o que já se encontra em cache é mantido e regressa quando for novamente ativada."
+      "capabilityOff": "A cache de pacotes está desativada, pelo que não há nada para listar aqui. Tudo o que já se encontra em cache é mantido e regressa quando for novamente ativada.",
+      "loadMore": "Carregar mais",
+      "loadingMore": "A carregar…",
+      "showing": "A mostrar {shown} de {total} — a tabela ordena o que está carregado, por isso carregue o resto antes de ler uma ordenação como toda a cache.",
+      "listedAll": "{count, plural, one {# artefacto listado} other {# artefactos listados}} — é tudo o que corresponde a estes filtros.",
+      "successBulkTruncated": "{files} artefactos expurgados, libertando {size}. Correspondem mais do que um expurgo remove — expurgue de novo para continuar."
     },
     "archives": {
       "connectionLabel": "Ligação",
@@ -1853,7 +1858,10 @@
       "successRow": "Arquivo de {repo} no commit {sha} expurgado",
       "successBulk": "{archives} arquivos expurgados, libertando {size}",
       "errorRow": "Falha ao expurgar o arquivo",
-      "errorBulk": "Falha ao expurgar os arquivos de VCS"
+      "errorBulk": "Falha ao expurgar os arquivos de VCS",
+      "successBulkTruncated": "{archives} arquivos expurgados, libertando {size}. Ainda restam — use Continuar o expurgo, que retoma onde este parou.",
+      "continuePurge": "Continuar o expurgo",
+      "continuing": "A continuar…"
     },
     "sealedWarning": "Este nó está selado, pelo que nada do que for expurgado aqui pode ser descarregado novamente. Por isso a limpeza agendada ignora estas caches — esta é uma eliminação permanente."
   },

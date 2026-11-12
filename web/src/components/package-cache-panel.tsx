@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/empty-state'
 import { MobileCard, MobileCardList } from '@/components/mobile-card-list'
 import { SortableHeader } from '@/components/sortable-header'
 import { StatChip } from '@/components/stat-chip'
-import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
+import { apiFetch, parseApiError } from '@/lib/api'
 import { formatBytes } from '@/lib/format-bytes'
 import { withSealedWarning } from '@/lib/cache-sealed'
 import { useConfirm } from '@/lib/use-confirm'
@@ -21,12 +21,29 @@ import { useSortable } from '@/lib/use-sortable'
  * without going to object storage by hand.
  *
  * This list is an ORDINARY paged collection: one row per artifact in
- * `cached_package_files`, so the response carries `meta.pagination` and
- * `fetchAllPages` is the right helper. The sibling archive panel is the
- * opposite case and says so; the two are not inconsistent, they are a table
- * and a storage walk.
+ * `cached_package_files`, so the response carries `meta.pagination` where the
+ * sibling archive panel carries a key cursor. The two are not inconsistent;
+ * they are a table and a storage walk.
+ *
+ * **It takes ONE PAGE AT A TIME and must stay that way.** It used to call
+ * `fetchAllPages`, which walks `page[number]=1..n` until the pagination meta
+ * says it is done -- so at 60,000 cached artifacts that was about 600 requests,
+ * and every keystroke in the debounced name filter started them again (#2492).
+ * The server now slices in SQL, so a page costs a page; walking every page
+ * would hand back that cost in round trips instead.
+ *
+ * The consequence to keep honest rather than hide: the sortable headers sort
+ * what has been LOADED, not the whole match, until Load more has reached the
+ * end. That is why the count line below the table reads "showing N of M"
+ * rather than just a count -- the scope of the sort has to be visible, and the
+ * archive panel solved the same problem by having no sortable headers at all,
+ * which costs a feature this table has always had.
  */
 export const PACKAGE_ECOSYSTEMS = ['galaxy', 'pypi', 'npm', 'go', 'nuget', 'pulumi'] as const
+
+/** Artifacts per request. The same page the archive panel takes, and the cap
+ *  the server applies to `page[size]` anyway. */
+const PAGE_SIZE = 100
 
 interface CachedPackageFile {
   id: string
@@ -63,6 +80,13 @@ export function PackageCachePanel({
   const { confirmIrreversible } = useConfirm()
 
   const [entries, setEntries] = useState<CachedPackageFile[]>([])
+  /** How many artifacts match the FILTERS, which is not how many are loaded.
+   *  Straight from `meta.pagination.total-count`, computed server-side over the
+   *  whole match -- so "showing 100 of 60,000" is honest where a count of the
+   *  rendered rows would read as the whole cache. */
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loadingPage, setLoadingPage] = useState(false)
   const [totals, setTotals] = useState<PackageTotal[]>([])
   const [overall, setOverall] = useState({ files: 0, bytes: 0 })
   // Whether this node can re-fetch what is purged. Read from the TOTALS
@@ -109,17 +133,46 @@ export function PackageCachePanel({
     entries, 'last-accessed-at', 'desc', accessor,
   )
 
+  /** One page. `append` false restarts the list at page 1. */
+  const fetchPage = useCallback(
+    async (pageNumber: number, append: boolean) => {
+      setLoadingPage(true)
+      const params = new URLSearchParams({
+        'page[size]': String(PAGE_SIZE),
+        'page[number]': String(pageNumber),
+      })
+      if (ecosystem) params.set('ecosystem', ecosystem)
+      if (appliedName) params.set('name', appliedName)
+      try {
+        const res = await apiFetch(`/api/v1/admin/package-cache?${params.toString()}`)
+        // A 404 here is the capability being off, which `load` reports in place
+        // of the section; it is not an error banner's business.
+        if (res.status === 404) return
+        if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadPackages')))
+        const body = await res.json()
+        const items: CachedPackageFile[] = Array.isArray(body?.data) ? body.data : []
+        setEntries((prev) => (append ? [...prev, ...items] : items))
+        setTotal(Number(body?.meta?.pagination?.['total-count'] ?? items.length))
+        setPage(pageNumber)
+      } catch (err) {
+        onError(err instanceof Error ? err.message : t('errors.loadPackages'))
+      } finally {
+        setLoadingPage(false)
+      }
+    },
+    [ecosystem, appliedName, onError, t],
+  )
+
   const load = useCallback(async () => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ 'page[size]': String(PAGE_SIZE), 'page[number]': '1' })
     if (ecosystem) params.set('ecosystem', ecosystem)
     if (appliedName) params.set('name', appliedName)
-    const query = params.toString() ? `?${params.toString()}` : ''
     try {
-      // `allSettled`, not `all`: with the capability off `fetchAllPages` throws
-      // on the 404 before the totals response can be inspected, and the 404 is
-      // what distinguishes "switched off" from "broken".
+      // `allSettled`, not `all`: with the capability off the listing 404s
+      // before the totals response can be inspected, and the 404 is what
+      // distinguishes "switched off" from "broken".
       const [listResult, totalsResult] = await Promise.allSettled([
-        fetchAllPages<CachedPackageFile>(`/api/v1/admin/package-cache${query}`),
+        apiFetch(`/api/v1/admin/package-cache?${params.toString()}`),
         apiFetch('/api/v1/admin/package-cache/totals'),
       ])
       // A rejection is a transport failure and belongs in the banner; a 404 is
@@ -133,8 +186,13 @@ export function PackageCachePanel({
       }
       setAbsent(false)
       if (listResult.status === 'rejected') throw listResult.reason
-      const list = listResult.value
-      setEntries(list)
+      const listRes = listResult.value
+      if (!listRes.ok) throw new Error(await parseApiError(listRes, t('errors.loadPackages')))
+      const listBody = await listRes.json()
+      const items: CachedPackageFile[] = Array.isArray(listBody?.data) ? listBody.data : []
+      setEntries(items)
+      setTotal(Number(listBody?.meta?.pagination?.['total-count'] ?? items.length))
+      setPage(1)
       if (totalsRes.ok) {
         const body = await totalsRes.json()
         setTotals(Array.isArray(body?.data) ? body.data : [])
@@ -229,10 +287,24 @@ export function PackageCachePanel({
       })
       if (!res.ok) throw new Error(await parseApiError(res, t('packages.errorBulk')))
       const body = await res.json()
-      onSuccess(t('packages.successBulk', {
+      // One eviction removes a BOUNDED number of artifacts, so the message has
+      // to distinguish a finished purge from a bounded one (#2491). Reporting
+      // only the count was the defect: the operator reloads the totals, sees
+      // barely any change, and reads it as the purge having done nothing.
+      //
+      // Here "run it again" is literally true and the same button does it,
+      // because the artifacts that matched are the ones that went. The archive
+      // panel beside this one needs a cursor for the same sentence to be true,
+      // and has a separate control for exactly that reason.
+      const args = {
         files: Number(body?.files ?? 0),
         size: formatBytes(Number(body?.bytes ?? 0), locale),
-      }))
+      }
+      onSuccess(
+        body?.truncated === true
+          ? t('packages.successBulkTruncated', args)
+          : t('packages.successBulk', args),
+      )
       await load()
     } catch (err) {
       onError(err instanceof Error ? err.message : t('packages.errorBulk'))
@@ -418,6 +490,31 @@ export function PackageCachePanel({
               />
             ))}
           </MobileCardList>
+
+          {/* The page affordance, and the line that keeps the sort honest: the
+              sortable headers above order what is LOADED, so the scope of what
+              is shown has to be legible rather than inferred from a count. */}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {entries.length < total ? (
+              <>
+                <button
+                  onClick={() => fetchPage(page + 1, true)}
+                  disabled={loadingPage}
+                  data-testid="package-load-more"
+                  className="min-h-11 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 transition-colors"
+                >
+                  {loadingPage ? t('packages.loadingMore') : t('packages.loadMore')}
+                </button>
+                <p data-testid="package-showing" className="text-xs text-slate-400">
+                  {t('packages.showing', { shown: entries.length, total })}
+                </p>
+              </>
+            ) : (
+              <p data-testid="package-end-of-list" className="text-xs text-slate-500">
+                {t('packages.listedAll', { count: entries.length })}
+              </p>
+            )}
+          </div>
         </>
       )}
         </>

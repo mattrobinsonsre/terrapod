@@ -1829,7 +1829,12 @@
       "successBulk": "Svuotati {files} artefatti, liberando {size}",
       "errorRow": "Impossibile svuotare l''artefatto",
       "errorBulk": "Impossibile svuotare gli artefatti di pacchetti",
-      "capabilityOff": "La cache dei pacchetti è disattivata, quindi qui non c'è nulla da elencare. Tutto ciò che è già in cache viene conservato e torna disponibile quando viene riattivata."
+      "capabilityOff": "La cache dei pacchetti è disattivata, quindi qui non c'è nulla da elencare. Tutto ciò che è già in cache viene conservato e torna disponibile quando viene riattivata.",
+      "loadMore": "Carica altri",
+      "loadingMore": "Caricamento…",
+      "showing": "Visualizzati {shown} di {total}: la tabella ordina ciò che è caricato, quindi carica il resto prima di leggere un ordine come l'intera cache.",
+      "listedAll": "{count, plural, one {# artefatto elencato} other {# artefatti elencati}}: è tutto ciò che corrisponde a questi filtri.",
+      "successBulkTruncated": "Svuotati {files} artefatti, liberando {size}. Le corrispondenze sono più di quante ne rimuova uno svuotamento: ripeti per continuare."
     },
     "archives": {
       "connectionLabel": "Connessione",
@@ -1853,7 +1858,10 @@
       "successRow": "Archivio di {repo} al commit {sha} svuotato",
       "successBulk": "Svuotati {archives} archivi, liberando {size}",
       "errorRow": "Impossibile svuotare l''archivio",
-      "errorBulk": "Impossibile svuotare gli archivi VCS"
+      "errorBulk": "Impossibile svuotare gli archivi VCS",
+      "successBulkTruncated": "Svuotati {archives} archivi, liberando {size}. Ne restano altri: usa Continua lo svuotamento, che riprende da dove si è fermato.",
+      "continuePurge": "Continua lo svuotamento",
+      "continuing": "Continuazione…"
     },
     "sealedWarning": "Questo nodo è sigillato, quindi nulla di ciò che viene svuotato qui può essere recuperato di nuovo. La pulizia pianificata salta queste cache proprio per questo — è un''eliminazione definitiva."
   },

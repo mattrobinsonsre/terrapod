@@ -1829,7 +1829,12 @@
       "successBulk": "Purgata sunt {files} artificia, liberatis {size}",
       "errorRow": "Artificium purgari non potuit",
       "errorBulk": "Artificia fasciculorum purgari non potuerunt",
-      "capabilityOff": "Promptuarium fasciculorum exstinctum est, itaque nihil hic est quod enumeretur. Quidquid iam conditum est servatur et redit cum rursus accenditur."
+      "capabilityOff": "Promptuarium fasciculorum exstinctum est, itaque nihil hic est quod enumeretur. Quidquid iam conditum est servatur et redit cum rursus accenditur.",
+      "loadMore": "Plura legere",
+      "loadingMore": "Legitur…",
+      "showing": "{shown} ex {total} monstrantur — tabula ea sola ordinat quae lecta sunt, ergo cetera lege priusquam ordinem pro toto promptuario habeas.",
+      "listedAll": "{count, plural, one {# artificium enumeratum} other {# artificia enumerata}} — id est omne quod his cribris congruit.",
+      "successBulkTruncated": "Purgata sunt {files} artificia, liberatis {size}. Plura congruunt quam una purgatio tollit — iterum purga ut pergas."
     },
     "archives": {
       "connectionLabel": "Nexus",
@@ -1853,7 +1858,10 @@
       "successRow": "Archivum pro {repo} ad {sha} purgatum",
       "successBulk": "Purgata sunt {archives} archiva, liberatis {size}",
       "errorRow": "Archivum purgari non potuit",
-      "errorBulk": "Archiva VCS purgari non potuerunt"
+      "errorBulk": "Archiva VCS purgari non potuerunt",
+      "successBulkTruncated": "Purgata sunt {archives} archiva, liberatis {size}. Plura manent — utere „Purgationem pergere“, quae ibi resumit ubi haec desiit.",
+      "continuePurge": "Purgationem pergere",
+      "continuing": "Pergitur…"
     },
     "sealedWarning": "Hic nodus obsignatus est, itaque nihil hic purgatum iterum peti potest. Purgatio statuta haec promptuaria ea de causa praeterit — haec deletio perpetua est."
   },

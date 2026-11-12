@@ -39,7 +39,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
-from terrapod.api.pagination import paginate
+from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, parse_page_params
 from terrapod.api.serialization import rfc3339
 from terrapod.config import settings
 from terrapod.db.session import get_db
@@ -91,6 +91,15 @@ class ArchiveEvictRequest(BaseModel):
             "Evict archives written more than this many days ago. Write-based here, "
             "because an archive is immutable once written and there is no access "
             "column to prefer."
+        ),
+    )
+    after: str = Field(
+        default="",
+        description=(
+            "Resume a bounded sweep from this key -- the `next-cursor` the "
+            "previous call returned. Omit to start at the beginning. Pass the "
+            "SAME filters back, or the second window answers a different "
+            "question from the first."
         ),
     )
 
@@ -149,7 +158,17 @@ async def list_package_cache(
     `name` is a prefix match: a practitioner looking for `community.` wants the
     collection family, and an exact name is the degenerate case of that query.
     """
-    entries = await cache_inventory.list_package_files(db, ecosystem=ecosystem, name=name)
+    page_number, page_size = parse_page_params(request)
+    # `page_size` None is the documented non-paged request (no `page[*]` params
+    # at all), which returns the whole result set -- an SDK that sends none
+    # relies on that. Anything else is sliced in the DATABASE: this used to
+    # fetch every matching row and slice the list in Python, so a page of a
+    # 60,000-artifact cache materialised all 60,000 ORM rows (#2492).
+    limit = min(page_size, MAX_PAGE_SIZE) if page_size else None
+    offset = (page_number - 1) * limit if limit else 0
+    entries, total = await cache_inventory.list_package_files(
+        db, ecosystem=ecosystem, name=name, limit=limit, offset=offset
+    )
     items = [
         {
             "id": str(e.id),
@@ -170,8 +189,7 @@ async def list_package_cache(
         }
         for e in entries
     ]
-    page_items, meta = paginate(items, request)
-    return JSONResponse(content={"data": page_items, "meta": meta})
+    return JSONResponse(content={"data": items, "meta": build_meta(total, page_number, page_size)})
 
 
 @package_router.get("/admin/package-cache/totals")
@@ -235,12 +253,20 @@ async def evict_package_cache(
     db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
-    """Evict in bulk by ecosystem and/or age.
+    """Evict in bulk by ecosystem and/or age, up to a bounded number per call.
 
     Neither filter means the whole cache, which is a thing an operator
     legitimately wants after a bad publish. Nothing is lost: every artifact here
     is re-fetchable from the registry it came from, which is what makes this
     cache evictable rather than a store.
+
+    **`truncated` is true when more matched than this call removed**, and is the
+    reason the bound is safe to have. It used to delete every match inside one
+    handler -- 50,000 artifacts at ~30 ms each is about 25 minutes, so the
+    gateway timed out, the transaction rolled back, and the objects already
+    deleted left rows pointing at keys that no longer existed (#2492). Repeating
+    the call continues from where this one stopped, with no cursor to carry: the
+    rows that matched are the rows that went.
     """
     result = await cache_inventory.evict_package_files(
         db,
@@ -254,6 +280,10 @@ async def evict_package_cache(
             "status": "evicted",
             "files": result.files,
             "bytes": result.bytes,
+            # The honest half. A bounded sweep reported as a complete one is
+            # worse than a partial result: the operator reloads the totals, sees
+            # the same size, and reads it as "the purge did nothing" (#2491).
+            "truncated": result.truncated,
             **_sealed_note(),
         }
     )
@@ -383,17 +413,33 @@ async def evict_vcs_archive_cache(
     user: AuthenticatedUser = Depends(require_admin),
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
-    """Evict archives in bulk by connection and/or age."""
+    """Evict archives in bulk by connection and/or age, one bounded window per call.
+
+    **`truncated` and `next-cursor` are what make a large cache purgeable at
+    all.** This used to walk a fixed ceiling of keys from the START of the prefix
+    on every call and report only a count, so repeating it re-examined the same
+    window: with an age filter matching a small fraction of it the window crept
+    forward by only as many keys as the call deleted, and with one matching none
+    of it the window never moved and the rest of the estate was unreachable for
+    ever (#2491). Pass `next-cursor` back as `after`, with the same filters, and
+    the sweep continues; an empty one means it finished.
+    """
     result = await cache_inventory.evict_archives(
         storage,
         connection_id=body.connection_id or None,
         older_than_days=body.older_than_days,
+        after=body.after,
     )
     return JSONResponse(
         content={
             "status": "evicted",
             "archives": result.files,
             "bytes": result.bytes,
+            "truncated": result.truncated,
+            # Spelled as the LISTING spells it (`meta.next-cursor`), because it
+            # is the same kind of thing and a second spelling is how two halves
+            # of one surface come to disagree about what they are addressing.
+            "next-cursor": result.cursor,
             **_sealed_note(),
         }
     )

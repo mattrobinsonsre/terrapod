@@ -1829,7 +1829,12 @@
       "successBulk": "Gwaredwyd {files} arteffact, gan ryddhau {size}",
       "errorRow": "Methwyd gwaredu'r arteffact",
       "errorBulk": "Methwyd gwaredu arteffactau'r pecynnau",
-      "capabilityOff": "Mae storfa'r pecynnau wedi'i diffodd, felly nid oes dim i'w restru yma. Cedwir popeth sydd eisoes yn y storfa, a daw'n ôl pan gaiff ei throi ymlaen eto."
+      "capabilityOff": "Mae storfa'r pecynnau wedi'i diffodd, felly nid oes dim i'w restru yma. Cedwir popeth sydd eisoes yn y storfa, a daw'n ôl pan gaiff ei throi ymlaen eto.",
+      "loadMore": "Llwytho mwy",
+      "loadingMore": "Wrthi'n llwytho…",
+      "showing": "Yn dangos {shown} o {total} — mae'r tabl yn trefnu'r hyn sydd wedi'i lwytho, felly llwythwch y gweddill cyn darllen trefn fel y storfa gyfan.",
+      "listedAll": "{count, plural, one {# arteffact} other {# arteffact}} wedi'u rhestru — dyna bopeth sy'n cyfateb i'r hidlyddion hyn.",
+      "successBulkTruncated": "Gwaredwyd {files} arteffact, gan ryddhau {size}. Mae mwy yn cyfateb nag y mae un gwarediad yn ei dynnu — gwaredwch eto i barhau."
     },
     "archives": {
       "connectionLabel": "Cysylltiad",
@@ -1853,7 +1858,10 @@
       "successRow": "Gwaredwyd yr archif ar gyfer {repo} ar {sha}",
       "successBulk": "Gwaredwyd {archives} archif, gan ryddhau {size}",
       "errorRow": "Methwyd gwaredu'r archif",
-      "errorBulk": "Methwyd gwaredu archifau VCS"
+      "errorBulk": "Methwyd gwaredu archifau VCS",
+      "successBulkTruncated": "Gwaredwyd {archives} archif, gan ryddhau {size}. Mae mwy ar ôl — defnyddiwch Parhau i waredu, sy'n ailddechrau lle gorffennodd hwn.",
+      "continuePurge": "Parhau i waredu",
+      "continuing": "Yn parhau…"
     },
     "sealedWarning": "Mae'r nod hwn wedi'i selio, felly ni ellir ail-nôl dim a waredir yma. Mae'r glanhau amserlennus yn hepgor y storfeydd hyn am y rheswm hwnnw — dileu parhaol yw hyn."
   },

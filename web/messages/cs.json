@@ -1829,7 +1829,12 @@
       "successBulk": "Vymazáno {files} artefaktů, uvolněno {size}",
       "errorRow": "Artefakt se nepodařilo vymazat",
       "errorBulk": "Artefakty balíčků se nepodařilo vymazat",
-      "capabilityOff": "Mezipaměť balíčků je vypnutá, takže zde není co vypsat. Vše, co je již v mezipaměti, zůstává zachováno a vrátí se, až ji znovu zapnete."
+      "capabilityOff": "Mezipaměť balíčků je vypnutá, takže zde není co vypsat. Vše, co je již v mezipaměti, zůstává zachováno a vrátí se, až ji znovu zapnete.",
+      "loadMore": "Načíst další",
+      "loadingMore": "Načítání…",
+      "showing": "Zobrazeno {shown} z {total} — tabulka řadí jen to, co je načteno, takže než budete řazení čtete jako celou cache, načtěte zbytek.",
+      "listedAll": "{count, plural, one {# vypsaný artefakt} few {# vypsané artefakty} other {# vypsaných artefaktů}} — to je vše, co odpovídá těmto filtrům.",
+      "successBulkTruncated": "Vymazáno {files} artefaktů, uvolněno {size}. Odpovídá jich víc, než jedno mazání odstraní — spusťte je znovu a pokračujte."
     },
     "archives": {
       "connectionLabel": "Připojení",
@@ -1853,7 +1858,10 @@
       "successRow": "Archiv pro {repo} na commitu {sha} vymazán",
       "successBulk": "Vymazáno {archives} archivů, uvolněno {size}",
       "errorRow": "Archiv se nepodařilo vymazat",
-      "errorBulk": "Archivy VCS se nepodařilo vymazat"
+      "errorBulk": "Archivy VCS se nepodařilo vymazat",
+      "successBulkTruncated": "Vymazáno {archives} archivů, uvolněno {size}. Další zůstávají — použijte „Pokračovat v mazání“, které naváže tam, kde toto skončilo.",
+      "continuePurge": "Pokračovat v mazání",
+      "continuing": "Pokračuje…"
     },
     "sealedWarning": "Tento uzel je zapečetěný, takže nic, co zde vymažete, už nelze znovu stáhnout. Plánované čištění proto tyto cache vynechává — jde o trvalé smazání."
   },

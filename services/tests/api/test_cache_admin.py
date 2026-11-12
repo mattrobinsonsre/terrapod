@@ -25,6 +25,7 @@ from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.config import settings
 from terrapod.db.session import get_db
+from terrapod.services import cache_inventory as ci
 from terrapod.storage import get_storage
 
 _BASE = "http://test"
@@ -94,7 +95,7 @@ def _file(**kw):
     return row
 
 
-def _make_app(user=None, rows=(), storage=None, get_row=None):
+def _make_app(user=None, rows=(), storage=None, get_row=None, total=None):
     app = create_app()
     if user is not None:
         app.dependency_overrides[get_current_user] = lambda: user
@@ -104,6 +105,10 @@ def _make_app(user=None, rows=(), storage=None, get_row=None):
     result.scalars.return_value.all.return_value = list(rows)
     # package_totals reads the result as an iterable of rows with named columns.
     result.__iter__ = lambda self: iter([])
+    # The listing counts the whole match in SQL before fetching the page
+    # (#2492), so one result object has to answer `scalar()` too. Defaults to
+    # the row count so a test with no opinion about pagination reads as before.
+    result.scalar.return_value = len(rows) if total is None else total
     db.execute.return_value = result
     db.get = AsyncMock(return_value=get_row)
     db.delete = AsyncMock()
@@ -337,9 +342,57 @@ class TestThePackageCacheRoutes:
             "status": "evicted",
             "files": 2,
             "bytes": 105,
+            # The honest half (#2491). A bounded sweep reported as a complete
+            # one is worse than a partial result: the operator reloads the
+            # totals, sees the same size, and reads it as the purge having done
+            # nothing. Asserted by EQUALITY rather than by presence, so a key
+            # dropped from this response fails here.
+            "truncated": False,
             "sealed": False,
         }
         db.commit.assert_awaited()
+
+    async def test_a_BOUNDED_eviction_says_so_on_the_wire(self, *_m):
+        """The mutation this exists to catch is the truncation report going
+        away: the eviction still works, still reports a count, and an operator
+        purging a cache larger than the bound can no longer tell."""
+        rows = [_file(id=f"f{i}", size=1) for i in range(4)]
+        app, _, _ = _make_app(_user(), rows=rows)
+        with patch.object(ci, "MAX_EVICT_BATCH", 2):
+            resp = await _call(app, "POST", "/api/v1/admin/package-cache/evict", json={})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["files"] == 2, "the route did not bound the eviction"
+        assert body["truncated"] is True, (
+            "a bounded eviction reported itself complete, which is #2491"
+        )
+
+    async def test_the_listing_pages_in_SQL_and_counts_the_WHOLE_match(self, *_m):
+        """`total-count` is the whole match and the page is the page. It used to
+        fetch every matching row and slice in Python, so a page of a
+        60,000-artifact cache materialised all 60,000 ORM rows (#2492)."""
+        app, db, _ = _make_app(_user(), rows=[_file(id="a")], total=60000)
+        resp = await _call(app, "GET", "/api/v1/admin/package-cache?page[size]=1")
+        assert resp.status_code == 200, resp.text
+        meta = resp.json()["meta"]["pagination"]
+        assert meta["total-count"] == 60000
+        assert meta["page-size"] == 1
+        assert meta["total-pages"] == 60000
+        # The bound reached the DATABASE. Asserted on the statement, because the
+        # double returns its fixed row list whether or not the query was bounded.
+        rendered = " ".join(str(c.args[0]).lower() for c in db.execute.await_args_list)
+        assert "limit" in rendered, f"the page was not bounded in SQL: {rendered}"
+
+    async def test_an_unpaged_listing_still_returns_the_WHOLE_set(self, *_m):
+        """The documented non-paged contract -- `page[size]` absent means the
+        full result set -- which an SDK sending no paging params relies on. The
+        fix had to make a PAGE cost a page without changing that."""
+        app, db, _ = _make_app(_user(), rows=[_file(id="a")], total=1)
+        resp = await _call(app, "GET", "/api/v1/admin/package-cache")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["meta"]["pagination"]["total-pages"] == 1
+        rendered = " ".join(str(c.args[0]).lower() for c in db.execute.await_args_list)
+        assert "limit" not in rendered, f"an unpaged request was bounded: {rendered}"
 
 
 @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -411,8 +464,6 @@ class TestTheArchiveCacheRoutes:
         what is filling a bucket, is the one outcome worth preventing — so the
         flag and the ceiling both reach the wire.
         """
-        from terrapod.services import cache_inventory as ci
-
         objs = [_Obj(f"vcs_archives/c/o/r/s{i}-full.tar.gz", 100) for i in range(4)]
         app, _, _ = _make_app(_user(), storage=_Storage(objs))
 
@@ -489,8 +540,51 @@ class TestTheArchiveCacheRoutes:
             "status": "evicted",
             "archives": 3,
             "bytes": 150,
+            "truncated": False,
+            # Spelled as the LISTING spells it, because it is the same kind of
+            # thing -- a second spelling is how two halves of one surface come
+            # to disagree about what they are addressing.
+            "next-cursor": "",
             "sealed": False,
         }
+
+    async def test_a_BOUNDED_archive_eviction_reports_it_AND_where_to_resume(self, *_m):
+        """#2491 at the route. Before this the walk started at the same place on
+        every call and reported only a count, so a cache larger than the bound
+        could never be purged and nothing said so."""
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 50) for i in range(5)]
+        app, _, store = _make_app(_user(), storage=_Storage(objs))
+        with patch.object(ci, "MAX_EVICT_BATCH", 2):
+            resp = await _call(app, "POST", "/api/v1/admin/vcs-archive-cache/evict", json={})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["archives"] == 2, "the route did not bound the eviction"
+        assert body["truncated"] is True, (
+            "a bounded eviction reported itself complete, which is #2491"
+        )
+        assert body["next-cursor"] == "vcs_archives/c/o/r/k1-full.tar.gz", (
+            "truncated with no cursor: nothing can resume the sweep"
+        )
+
+    async def test_the_resume_cursor_round_trips_through_the_request_body(self, *_m):
+        """The cursor has to travel OUTBOUND too, or the window restarts at the
+        same place however many times the route is called."""
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 50) for i in range(5)]
+        app, _, store = _make_app(_user(), storage=_Storage(objs))
+        with patch.object(ci, "MAX_EVICT_BATCH", 2):
+            resp = await _call(
+                app,
+                "POST",
+                "/api/v1/admin/vcs-archive-cache/evict",
+                json={"after": "vcs_archives/c/o/r/k2-full.tar.gz"},
+            )
+        assert resp.status_code == 200, resp.text
+        # Resumed PAST k2, so k0..k2 are untouched and k3/k4 go.
+        assert store.deleted == [
+            "vcs_archives/c/o/r/k3-full.tar.gz",
+            "vcs_archives/c/o/r/k4-full.tar.gz",
+        ], store.deleted
+        assert resp.json()["truncated"] is False
 
     async def test_an_unknown_evict_field_is_422(self, *_m):
         app, _, _ = _make_app(_user())

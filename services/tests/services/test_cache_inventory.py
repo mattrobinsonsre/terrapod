@@ -355,6 +355,130 @@ class TestEvictingArchivesInBulk:
         assert storage.deleted == []
 
 
+class TestABoundedArchiveSweepSaysSo:
+    """#2491: a bulk eviction stopped at a ceiling and reported no truncation,
+    so a cache larger than it could never be purged and nothing said so.
+
+    The observable sequence was worse than a partial result: an operator posts
+    `{"older_than_days": 30}` against 20,000 archives, gets back
+    `{"status": "evicted", "archives": 400}`, reloads the totals, sees the same
+    size, and reads it as "the purge did nothing" rather than "the purge is
+    bounded".
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_sweep_that_stopped_EARLY_reports_truncated(self, monkeypatch):
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 3)
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i:02d}-full.tar.gz", 100) for i in range(10)]
+        storage = _Storage(objs)
+        result = await ci.evict_archives(storage)
+        assert result.files == 3, "the sweep was not bounded"
+        assert result.truncated is True, (
+            "a bounded sweep reported itself complete -- the operator reloads the "
+            "totals, sees the same size, and reads it as the purge having done nothing"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_sweep_that_FINISHED_reports_truncated_FALSE(self, monkeypatch):
+        """The control for the test above. An assertion that nothing was
+        truncated is worth nothing unless the same code reports truncation when
+        there is some -- and `truncated = True` unconditionally would satisfy
+        every other test in this class."""
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 10)
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i:02d}-full.tar.gz", 100) for i in range(3)]
+        storage = _Storage(objs)
+        result = await ci.evict_archives(storage)
+        assert (result.files, result.truncated, result.cursor) == (3, False, "")
+
+    @pytest.mark.asyncio
+    async def test_a_cache_EXACTLY_at_the_bound_is_complete_rather_than_truncated(
+        self, monkeypatch
+    ):
+        """The walk asks for one key PAST the window, which is what makes the
+        flag exact. Asking for exactly the window cannot tell "this many exist"
+        from "more exist and we stopped": both come back full, so `>=` would
+        tell an operator more remained when nothing did."""
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 3)
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 100) for i in range(3)]
+        storage = _Storage(objs)
+        result = await ci.evict_archives(storage)
+        assert (result.files, result.truncated, result.cursor) == (3, False, "")
+
+    @pytest.mark.asyncio
+    async def test_the_cursor_is_the_last_key_EXAMINED_not_the_last_DELETED(self, monkeypatch):
+        """The whole mechanism. An age filter may match a handful of keys in a
+        window of a thousand, so resuming past the last DELETION would re-walk
+        every non-matching key in between -- which is the stuck-window defect in
+        a smaller costume. Resuming past the last key LOOKED AT is what reaches
+        keys the call never saw."""
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 3)
+        old = _Obj("vcs_archives/c/o/r/k0-full.tar.gz", 10, _now() - timedelta(days=30))
+        objs = [old] + [_Obj(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 10, _now()) for i in (1, 2, 3)]
+        storage = _Storage(objs)
+        result = await ci.evict_archives(storage, older_than_days=7)
+        assert storage.deleted == ["vcs_archives/c/o/r/k0-full.tar.gz"]
+        assert result.truncated is True
+        assert result.cursor == "vcs_archives/c/o/r/k2-full.tar.gz", (
+            "the cursor is the last DELETION, so the next call re-walks k1 and k2"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_window_where_NOTHING_matches_still_advances(self, monkeypatch):
+        """The degenerate case, and the one that was unreachable for ever: with
+        no key in the first window old enough, the old code deleted nothing, so
+        the window never moved and the rest of the estate could not be touched
+        however many times the route was run."""
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 2)
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 10, _now()) for i in range(5)]
+        storage = _Storage(objs)
+        result = await ci.evict_archives(storage, older_than_days=7)
+        assert (result.files, storage.deleted) == (0, [])
+        assert result.truncated is True
+        assert result.cursor == "vcs_archives/c/o/r/k1-full.tar.gz", (
+            "a window that matched nothing did not advance, so the sweep is stuck"
+        )
+
+    @pytest.mark.asyncio
+    async def test_repeating_with_the_cursor_reaches_the_WHOLE_estate(self, monkeypatch):
+        """End to end, which is the claim #2491 actually makes: a cache larger
+        than one window is purgeable by repeating the call. Only the LAST key is
+        old enough, so the sweep has to walk past four windows of keys it keeps
+        to reach it -- the exact shape that never terminated before."""
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 2)
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 10, _now()) for i in range(8)]
+        objs.append(_Obj("vcs_archives/c/o/r/zz-full.tar.gz", 70, _now() - timedelta(days=30)))
+        storage = _Storage(objs)
+
+        after, calls, removed = "", 0, 0
+        while True:
+            calls += 1
+            assert calls < 20, "the sweep did not terminate"
+            result = await ci.evict_archives(storage, older_than_days=7, after=after)
+            removed += result.files
+            if not result.truncated:
+                break
+            assert result.cursor, "truncated with no cursor: nothing can resume it"
+            assert result.cursor > after, "the cursor went backwards or stalled"
+            after = result.cursor
+
+        assert removed == 1
+        assert storage.deleted == ["vcs_archives/c/o/r/zz-full.tar.gz"]
+
+    @pytest.mark.asyncio
+    async def test_the_window_is_the_EVICT_bound_not_the_SCAN_ceiling(self, monkeypatch):
+        """Two constants, deliberately. `MAX_ARCHIVE_SCAN` bounds a READ -- how
+        much of the estate a listing shows or a total aggregates, which costs one
+        list call -- and `MAX_EVICT_BATCH` bounds a destructive LOOP, where every
+        entry in the window is a round trip. Merging them is the obvious tidy and
+        would be wrong in both directions."""
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 2)
+        monkeypatch.setattr(ci, "MAX_ARCHIVE_SCAN", 100)
+        objs = [_Obj(f"vcs_archives/c/o/r/k{i}-full.tar.gz", 10) for i in range(50)]
+        storage = _Storage(objs)
+        result = await ci.evict_archives(storage)
+        assert result.files == 2, "the eviction used the read ceiling as its bound"
+
+
 # ── the package cache ──────────────────────────────────────────────────────
 
 
@@ -374,10 +498,23 @@ def _file(**kw):
     return row
 
 
-def _db(rows):
+def _db(rows, total=None):
+    """A session double that answers BOTH shapes `list_package_files` issues.
+
+    It runs two statements now -- a `COUNT` and then the page -- so one result
+    object has to serve `scalar()` as well as `scalars().all()`. Returning the
+    same object for every execute rather than scripting an ordered list is
+    deliberate: a scripted list desynchronises every result after it the moment
+    a function gains a query, which is a `StopIteration` naming nothing about
+    the cause.
+
+    `total` defaults to the number of rows, so a test that does not care about
+    pagination reads as it did before.
+    """
     db = AsyncMock()
     result = MagicMock()
     result.scalars.return_value.all.return_value = rows
+    result.scalar.return_value = len(rows) if total is None else total
     db.execute.return_value = result
     db.delete = AsyncMock()
     db.flush = AsyncMock()
@@ -434,6 +571,71 @@ class TestEvictingPackageFilesInBulk:
         storage.delete.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_it_stops_at_the_bound_and_REPORTS_that_it_did(self, monkeypatch):
+        """#2492: this used to delete every matching object sequentially inside
+        one handler. 50,000 artifacts at ~30 ms each is about 25 minutes, so the
+        gateway timed out, the transaction rolled back, and the objects already
+        deleted left rows pointing at keys that no longer existed.
+
+        The bound is what makes the request finish, and `truncated` is what makes
+        the bound safe to have: without it the operator cannot tell a finished
+        purge from a bounded one.
+        """
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 3)
+        rows = [_file(id=f"f{i}", size=10) for i in range(10)]
+        db = _db(rows)
+        storage = MagicMock()
+        storage.delete = AsyncMock()
+        result = await ci.evict_package_files(db, storage)
+        assert result.files == 3, "the eviction was not bounded"
+        assert storage.delete.await_count == 3
+        assert result.truncated is True
+
+    @pytest.mark.asyncio
+    async def test_a_sweep_INSIDE_the_bound_reports_truncated_FALSE(self, monkeypatch):
+        """The control. The query asks for one row PAST the bound, so a match of
+        exactly the bound is reported as complete rather than as "the page was
+        full" -- otherwise an operator is told more remains when nothing does."""
+        monkeypatch.setattr(ci, "MAX_EVICT_BATCH", 3)
+        rows = [_file(id=f"f{i}", size=10) for i in range(3)]
+        db = _db(rows)
+        storage = MagicMock()
+        storage.delete = AsyncMock()
+        result = await ci.evict_package_files(db, storage)
+        assert (result.files, result.truncated) == (3, False)
+
+    @pytest.mark.asyncio
+    async def test_it_carries_NO_cursor_because_it_resumes_by_itself(self):
+        """The asymmetry with the archive sweep, pinned rather than tidied: this
+        one deletes the rows it selected, so the next call's own bound picks up
+        where this stopped. A cursor here would be an offset into a shrinking
+        set, which skips rows."""
+        rows = [_file(id="a", size=1)]
+        db = _db(rows)
+        storage = MagicMock()
+        storage.delete = AsyncMock()
+        result = await ci.evict_package_files(db, storage)
+        assert result.cursor == ""
+
+    @pytest.mark.asyncio
+    async def test_the_bound_takes_the_STALEST_first(self):
+        """Which matters only because the call is bounded: if a sweep can take a
+        thousand of fifty thousand, the thousand worth taking are the ones
+        nothing has touched for longest. The scheduled sweep orders its own batch
+        the same way and says so.
+
+        Asserted on the SQL, because the double returns whatever rows it was
+        given regardless of the ordering the query asked for.
+        """
+        db = _db([])
+        storage = MagicMock()
+        storage.delete = AsyncMock()
+        await ci.evict_package_files(db, storage)
+        order = str(db.execute.await_args_list[0].args[0]).split("ORDER BY")[-1]
+        assert "last_accessed_at" in order
+        assert "DESC" not in order.upper(), f"the sweep takes the freshest first: {order}"
+
+    @pytest.mark.asyncio
     async def test_the_age_filter_reads_LAST_ACCESS_not_cached_at(self):
         """Access-based, never write-based, for the reason the model records: an
         artifact every run pulls would be evicted merely for being old and
@@ -468,11 +670,71 @@ class TestTheListingQuery:
     async def test_it_orders_by_LAST_ACCESS(self):
         """The column retention reads. An operator deciding what to evict wants
         to see what nothing has touched, and ordering by arrival buries exactly
-        that."""
+        that.
+
+        Read off the SECOND statement, because the first is now the `COUNT`
+        that `meta.pagination.total-count` comes from and a count has no
+        ordering to assert about.
+        """
         db = _db([])
         await ci.list_package_files(db)
-        rendered = str(db.execute.await_args_list[0].args[0])
+        rendered = str(db.execute.await_args_list[1].args[0])
         assert "last_accessed_at" in rendered.split("ORDER BY")[-1]
+
+    @pytest.mark.asyncio
+    async def test_the_order_breaks_TIES_so_a_row_cannot_land_on_two_pages(self):
+        """`last_accessed_at` alone is not a total order: artifacts cached by one
+        request share a timestamp to the microsecond, so without a tiebreak
+        Postgres may order them differently per query -- and under `LIMIT` /
+        `OFFSET` that means a row appearing on two consecutive pages, or on
+        neither. Invisible at the fixture sizes the rest of this file uses,
+        which is why it is asserted on the SQL."""
+        db = _db([])
+        await ci.list_package_files(db, limit=10)
+        order = str(db.execute.await_args_list[1].args[0]).split("ORDER BY")[-1]
+        assert "last_accessed_at" in order
+        assert "id" in order, f"no tiebreak after last_accessed_at: {order}"
+
+    @pytest.mark.asyncio
+    async def test_the_page_is_sliced_in_SQL_rather_than_in_python(self):
+        """The defect this closes (#2492): every page of the listing used to
+        fetch EVERY matching row and slice the list in Python, so a page of a
+        60,000-artifact cache materialised all 60,000 ORM rows -- and the admin
+        panel walked every page, which made one filter keystroke hundreds of
+        requests each paying for the whole table.
+
+        Asserted on the statement rather than on the returned length, because a
+        double that returns a fixed list regardless would satisfy a
+        length-based assertion whether or not the bound reached the database.
+        """
+        db = _db([])
+        await ci.list_package_files(db, limit=50, offset=100)
+        rendered = str(db.execute.await_args_list[1].args[0]).lower()
+        assert "limit" in rendered, f"the page is not bounded in SQL: {rendered}"
+        assert "offset" in rendered, f"the page is not offset in SQL: {rendered}"
+
+    @pytest.mark.asyncio
+    async def test_no_limit_still_returns_EVERYTHING(self):
+        """The documented non-paged contract: `page[size]` absent means the full
+        result set, and an SDK that sends no paging params relies on it. So the
+        fix had to make a PAGE cost a page without changing what a caller
+        asking for no page gets."""
+        db = _db([])
+        await ci.list_package_files(db)
+        rendered = str(db.execute.await_args_list[1].args[0]).lower()
+        assert "limit" not in rendered, f"an unpaged request was bounded: {rendered}"
+
+    @pytest.mark.asyncio
+    async def test_the_total_is_COUNTED_rather_than_measured_from_the_page(self):
+        """`meta.pagination.total-count` has to be the whole match, not the page
+        -- a page of 50 out of 60,000 reported as a total of 50 tells a client
+        there is nothing more to fetch."""
+        db = _db([_file()], total=60000)
+        entries, total = await ci.list_package_files(db, limit=50)
+        assert len(entries) == 1
+        assert total == 60000
+        first = str(db.execute.await_args_list[0].args[0]).lower()
+        assert "count" in first, f"the first statement is not a count: {first}"
 
     @pytest.mark.asyncio
     async def test_no_filter_means_no_predicate(self):

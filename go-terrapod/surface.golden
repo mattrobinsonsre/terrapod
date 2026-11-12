@@ -126,6 +126,7 @@ field ArchitectureCritiqueMessage.InputTokens int `json:"input-tokens"`
 field ArchitectureCritiqueMessage.Model string `json:"model,omitempty"`
 field ArchitectureCritiqueMessage.OutputTokens int `json:"output-tokens"`
 field ArchitectureCritiqueMessage.Role string `json:"role"`
+field ArchiveEvictRequest.After string `json:"after,omitempty"`
 field ArchiveEvictRequest.ConnectionID string `json:"connection_id,omitempty"`
 field ArchiveEvictRequest.OlderThanDays *int `json:"older_than_days,omitempty"`
 field ArchiveTotalsMeta.Archives int64 `json:"archives"`
@@ -513,7 +514,9 @@ field EstateNode.Name string `json:"name"`
 field EstateNode.Pool string `json:"pool"`
 field EvictionResult.Bytes int64
 field EvictionResult.Files int64
+field EvictionResult.NextCursor string `json:"next-cursor"`
 field EvictionResult.Sealed bool `json:"sealed"`
+field EvictionResult.Truncated bool `json:"truncated"`
 field EvictionResult.Warning string `json:"warning"`
 field ExecutionHook.CreatedAt string `json:"created-at,omitempty"`
 field ExecutionHook.Description string `json:"description,omitempty"`

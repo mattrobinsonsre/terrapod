@@ -533,3 +533,96 @@ func TestEvictVCSArchiveCache_Error(t *testing.T) {
 		t.Fatal("expected an error on 422")
 	}
 }
+
+// ── the bounded evictions (#2491, #2492) ───────────────────────────────────
+
+// TestEvictVCSArchiveCache_CarriesTheCursorBothWays is the whole mechanism of
+// #2491 in one test. Before it, a bulk archive eviction walked a fixed ceiling
+// of keys from the START of the prefix on every call and reported only a count,
+// so repeating it re-examined the same window: with an age filter matching a
+// small fraction of it the window crept forward by only as many keys as the
+// call deleted, and with one matching none of it the window never moved and the
+// rest of the estate was unreachable for ever.
+func TestEvictVCSArchiveCache_CarriesTheCursorBothWays(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"evicted","archives":1000,"bytes":4096,
+		  "truncated":true,"next-cursor":"vcs_archives/c1/o/r/zz-full.tar.gz"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	res, err := newCacheClient(t, srv).EvictVCSArchiveCache(context.Background(), ArchiveEvictRequest{
+		ConnectionID: "c1", After: "vcs_archives/c1/o/r/aa-full.tar.gz",
+	})
+	if err != nil {
+		t.Fatalf("EvictVCSArchiveCache: %v", err)
+	}
+	// OUTBOUND: without this the sweep cannot be resumed at all.
+	if body["after"] != "vcs_archives/c1/o/r/aa-full.tar.gz" {
+		t.Errorf("the resume cursor did not reach the wire: %+v", body)
+	}
+	// INBOUND: `truncated` is read off `truncated` and the cursor off the
+	// hyphenated `next-cursor`, which is how the LISTING spells it -- a
+	// mismatch here reads as a finished sweep on every call.
+	if !res.Truncated {
+		t.Error("truncated was dropped; a bounded sweep then reads as a finished one")
+	}
+	if res.NextCursor != "vcs_archives/c1/o/r/zz-full.tar.gz" {
+		t.Errorf("NextCursor = %q", res.NextCursor)
+	}
+}
+
+// TestEvictVCSArchiveCache_OmitsAnUnsetCursor: `after` is `omitempty`, and the
+// server treats an absent one as "start at the beginning" -- so a caller that
+// sent `"after": ""` would be saying the same thing in a way the request model
+// has to tolerate. Keeping it off the wire is the honest shape.
+func TestEvictVCSArchiveCache_OmitsAnUnsetCursor(t *testing.T) {
+	var raw []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"evicted","archives":0,"bytes":0,"truncated":false}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	res, err := newCacheClient(t, srv).EvictVCSArchiveCache(context.Background(), ArchiveEvictRequest{})
+	if err != nil {
+		t.Fatalf("EvictVCSArchiveCache: %v", err)
+	}
+	if strings.Contains(string(raw), "after") {
+		t.Errorf("an unset cursor reached the wire: %s", raw)
+	}
+	// A finished sweep must report an EMPTY cursor, not a stale one: a caller
+	// looping on Truncated would otherwise never be told to stop.
+	if res.Truncated || res.NextCursor != "" {
+		t.Errorf("a complete sweep reported more to do: %+v", res)
+	}
+}
+
+// TestEvictPackageCache_ReportsTruncationAndNoCursor pins the asymmetry rather
+// than tidying it. The package eviction deletes the rows it selected, so the
+// next call's own bound resumes by itself and there is no cursor; the archive
+// one walks keys that are mostly NOT deleted, so it needs one. A caller that
+// looped on the package cursor would stop after one call believing it had
+// finished.
+func TestEvictPackageCache_ReportsTruncationAndNoCursor(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"evicted","files":1000,"bytes":999,"truncated":true}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	res, err := newCacheClient(t, srv).EvictPackageCache(context.Background(), PackageEvictRequest{})
+	if err != nil {
+		t.Fatalf("EvictPackageCache: %v", err)
+	}
+	if !res.Truncated {
+		t.Error("truncated was dropped; a bounded sweep then reads as a finished one")
+	}
+	if res.NextCursor != "" {
+		t.Errorf("the package eviction reported a cursor: %q", res.NextCursor)
+	}
+}

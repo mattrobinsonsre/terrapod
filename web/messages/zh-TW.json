@@ -1829,7 +1829,12 @@
       "successBulk": "已清除 {files} 個構件，釋出 {size}",
       "errorRow": "清除構件失敗",
       "errorBulk": "清除套件構件失敗",
-      "capabilityOff": "套件快取已關閉，因此這裡沒有可列出的內容。已快取的內容會保留下來，重新開啟後即會恢復。"
+      "capabilityOff": "套件快取已關閉，因此這裡沒有可列出的內容。已快取的內容會保留下來，重新開啟後即會恢復。",
+      "loadMore": "載入更多",
+      "loadingMore": "載入中…",
+      "showing": "正在顯示 {total} 項中的 {shown} 項 —— 表格只排序已載入的內容，因此在把某個排序當作整個快取來讀之前，請先載入其餘部分。",
+      "listedAll": "已列出 {count, plural, other {# 個構件}}，這就是符合這些篩選條件的全部內容。",
+      "successBulkTruncated": "已清除 {files} 個構件，釋出 {size}。符合條件的比一次清除所能移除的更多 —— 再清除一次以繼續。"
     },
     "archives": {
       "connectionLabel": "連線",
@@ -1853,7 +1858,10 @@
       "successRow": "已清除 {repo} 在提交 {sha} 的封存",
       "successBulk": "已清除 {archives} 個封存，釋出 {size}",
       "errorRow": "清除封存失敗",
-      "errorBulk": "清除 VCS 封存失敗"
+      "errorBulk": "清除 VCS 封存失敗",
+      "successBulkTruncated": "已清除 {archives} 個封存，釋出 {size}。仍有剩餘 —— 使用「繼續清除」，它會從本次停止的位置繼續。",
+      "continuePurge": "繼續清除",
+      "continuing": "正在繼續…"
     },
     "sealedWarning": "本節點已密封，因此在此清除的內容無法重新取得。定期清理也正因如此會跳過這些快取 — 這是永久刪除。"
   },

@@ -1082,6 +1082,44 @@
     }
   },
   {
+    "name": "terrapod_package_cache_delete",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "file_id": {
+          "description": "the artifact's row id, as terrapod_package_cache_list reports it as its id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_package_cache_evict",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ecosystem": {
+          "description": "evict only this ecosystem: galaxy, pypi, npm, go, nuget or pulumi. Omit for EVERY ecosystem -- neither filter means the whole cache, which is deliberate and is a thing an operator legitimately wants after a bad publish",
+          "type": "string"
+        },
+        "older_than_days": {
+          "description": "evict artifacts not ACCESSED in this many days. Omit for no age filter. Access-based rather than write-based, because an artifact every run pulls would otherwise be evicted merely for being old and re-fetched immediately. ZERO MEANS EVERYTHING, not disabled -- unlike the retention config keys, where 0 switches a category off",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_package_cache_list",
     "read_only": true,
     "input_schema": {
@@ -2048,6 +2086,31 @@
     }
   },
   {
+    "name": "terrapod_vcs_archive_cache_evict",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "description": "resume a bounded sweep from this key: pass back the next_cursor of the previous call, with every other field UNCHANGED. Omit to start at the beginning. Changing a filter while resuming makes the second window a different question from the first",
+          "type": "string"
+        },
+        "connection_id": {
+          "description": "evict only this VCS connection's archives. Omit for EVERY connection -- neither filter means the whole cache, which is deliberate. It narrows the storage walk itself rather than filtering a window, so prefer it when you know which connection is the problem",
+          "type": "string"
+        },
+        "older_than_days": {
+          "description": "evict archives WRITTEN more than this many days ago. Omit for no age filter. Write-based, not access-based: an archive is immutable once written so its write time IS its age, and there is no access column to prefer. That makes this blunter than the package eviction -- an archive a run pulled this morning goes if its commit is old enough. ZERO MEANS EVERYTHING, not disabled",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_vcs_archive_cache_list",
     "read_only": true,
     "input_schema": {
@@ -2066,6 +2129,23 @@
           "type": "integer"
         }
       },
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_vcs_archive_delete",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "description": "the archive's storage key, as terrapod_vcs_archive_cache_list reports it as its key. It IS the archive's identity -- there is no row and no other id. Refused with a 422 unless it sits under vcs_archives/, because this takes a storage key from a request and without that check a typo could delete a state version or a plan artifact",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
       "type": "object"
     }
   },

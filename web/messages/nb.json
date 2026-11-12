@@ -1829,7 +1829,12 @@
       "successBulk": "Tømte {files} artefakter og frigjorde {size}",
       "errorRow": "Kunne ikke tømme artefaktet",
       "errorBulk": "Kunne ikke tømme pakkeartefaktene",
-      "capabilityOff": "Pakkebufferen er slått av, så det er ingenting å vise her. Alt som allerede er bufret, beholdes og kommer tilbake når den slås på igjen."
+      "capabilityOff": "Pakkebufferen er slått av, så det er ingenting å vise her. Alt som allerede er bufret, beholdes og kommer tilbake når den slås på igjen.",
+      "loadMore": "Last mer",
+      "loadingMore": "Laster …",
+      "showing": "Viser {shown} av {total} – tabellen sorterer det som er lastet, så last inn resten før du leser en sortering som hele bufferen.",
+      "listedAll": "{count, plural, one {# artefakt} other {# artefakter}} vist – det er alt som passer disse filtrene.",
+      "successBulkTruncated": "Tømte {files} artefakter og frigjorde {size}. Flere passer enn én tømming fjerner – tøm på nytt for å fortsette."
     },
     "archives": {
       "connectionLabel": "Tilkobling",
@@ -1853,7 +1858,10 @@
       "successRow": "Arkivet for {repo} ved {sha} ble tømt",
       "successBulk": "Tømte {archives} arkiver og frigjorde {size}",
       "errorRow": "Kunne ikke tømme arkivet",
-      "errorBulk": "Kunne ikke tømme VCS-arkivene"
+      "errorBulk": "Kunne ikke tømme VCS-arkivene",
+      "successBulkTruncated": "Tømte {archives} arkiver og frigjorde {size}. Flere står igjen – bruk «Fortsett tømmingen», som tar opp der denne sluttet.",
+      "continuePurge": "Fortsett tømmingen",
+      "continuing": "Fortsetter …"
     },
     "sealedWarning": "Denne noden er forseglet, så ingenting som tømmes her kan hentes på nytt. Den planlagte oppryddingen hopper over disse bufferne av samme grunn – dette er en permanent sletting."
   },

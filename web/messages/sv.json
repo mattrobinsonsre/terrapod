@@ -1829,7 +1829,12 @@
       "successBulk": "Rensade {files} artefakter och frigjorde {size}",
       "errorRow": "Kunde inte rensa artefakten",
       "errorBulk": "Kunde inte rensa paketartefakterna",
-      "capabilityOff": "Paketcachen är avstängd, så det finns inget att visa här. Allt som redan är cachat behålls och kommer tillbaka när den slås på igen."
+      "capabilityOff": "Paketcachen är avstängd, så det finns inget att visa här. Allt som redan är cachat behålls och kommer tillbaka när den slås på igen.",
+      "loadMore": "Läs in mer",
+      "loadingMore": "Läser in…",
+      "showing": "Visar {shown} av {total} — tabellen sorterar det som är inläst, så läs in resten innan du läser en sortering som hela cachen.",
+      "listedAll": "{count, plural, one {# artefakt} other {# artefakter}} visas — det är allt som matchar dessa filter.",
+      "successBulkTruncated": "Rensade {files} artefakter och frigjorde {size}. Fler matchar än en rensning tar bort — rensa igen för att fortsätta."
     },
     "archives": {
       "connectionLabel": "Anslutning",
@@ -1853,7 +1858,10 @@
       "successRow": "Arkivet för {repo} vid {sha} rensades",
       "successBulk": "Rensade {archives} arkiv och frigjorde {size}",
       "errorRow": "Kunde inte rensa arkivet",
-      "errorBulk": "Kunde inte rensa VCS-arkiven"
+      "errorBulk": "Kunde inte rensa VCS-arkiven",
+      "successBulkTruncated": "Rensade {archives} arkiv och frigjorde {size}. Fler återstår — använd Fortsätt rensningen, som tar vid där den här slutade.",
+      "continuePurge": "Fortsätt rensningen",
+      "continuing": "Fortsätter…"
     },
     "sealedWarning": "Den här noden är förseglad, så inget som rensas här kan hämtas på nytt. Den schemalagda rensningen hoppar över dessa cachar av just det skälet — detta är en permanent borttagning."
   },

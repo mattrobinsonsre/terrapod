@@ -1829,7 +1829,12 @@
       "successBulk": "{files} artefactos purgados, {size} liberados",
       "errorRow": "No se pudo purgar el artefacto",
       "errorBulk": "No se pudieron purgar los artefactos de paquetes",
-      "capabilityOff": "La caché de paquetes está desactivada, así que no hay nada que mostrar aquí. Todo lo ya almacenado en caché se conserva y vuelve a aparecer cuando se active de nuevo."
+      "capabilityOff": "La caché de paquetes está desactivada, así que no hay nada que mostrar aquí. Todo lo ya almacenado en caché se conserva y vuelve a aparecer cuando se active de nuevo.",
+      "loadMore": "Cargar más",
+      "loadingMore": "Cargando…",
+      "showing": "Mostrando {shown} de {total}: la tabla ordena lo que está cargado, así que cargue el resto antes de leer un orden como si fuera toda la caché.",
+      "listedAll": "{count, plural, one {# artefacto listado} other {# artefactos listados}}: eso es todo lo que coincide con estos filtros.",
+      "successBulkTruncated": "{files} artefactos purgados, {size} liberados. Coinciden más de los que quita una purga: purgue otra vez para continuar."
     },
     "archives": {
       "connectionLabel": "Conexión",
@@ -1853,7 +1858,10 @@
       "successRow": "Archivo de {repo} en {sha} purgado",
       "successBulk": "{archives} archivos purgados, {size} liberados",
       "errorRow": "No se pudo purgar el archivo",
-      "errorBulk": "No se pudieron purgar los archivos VCS"
+      "errorBulk": "No se pudieron purgar los archivos VCS",
+      "successBulkTruncated": "{archives} archivos purgados, {size} liberados. Quedan más: use Continuar la purga, que retoma donde se detuvo esta.",
+      "continuePurge": "Continuar la purga",
+      "continuing": "Continuando…"
     },
     "sealedWarning": "Este nodo está sellado, así que nada de lo que se purgue aquí se podrá volver a obtener. Por eso la limpieza programada omite estas cachés — se trata de una eliminación permanente."
   },

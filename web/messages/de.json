@@ -1829,7 +1829,12 @@
       "successBulk": "{files} Artefakte gelöscht, {size} freigegeben",
       "errorRow": "Artefakt konnte nicht gelöscht werden",
       "errorBulk": "Paket-Artefakte konnten nicht gelöscht werden",
-      "capabilityOff": "Der Paket-Cache ist abgeschaltet, daher gibt es hier nichts aufzulisten. Alles bereits Zwischengespeicherte bleibt erhalten und ist wieder da, sobald er erneut eingeschaltet wird."
+      "capabilityOff": "Der Paket-Cache ist abgeschaltet, daher gibt es hier nichts aufzulisten. Alles bereits Zwischengespeicherte bleibt erhalten und ist wieder da, sobald er erneut eingeschaltet wird.",
+      "loadMore": "Mehr laden",
+      "loadingMore": "Wird geladen …",
+      "showing": "{shown} von {total} werden angezeigt – die Tabelle sortiert nur das Geladene, laden Sie also den Rest, bevor Sie eine Reihenfolge als den gesamten Zwischenspeicher lesen.",
+      "listedAll": "{count, plural, one {# Artefakt} other {# Artefakte}} aufgeführt – das ist alles, was auf diese Filter passt.",
+      "successBulkTruncated": "{files} Artefakte gelöscht, {size} freigegeben. Es passen mehr darauf, als ein Löschvorgang entfernt – noch einmal löschen, um fortzufahren."
     },
     "archives": {
       "connectionLabel": "Verbindung",
@@ -1853,7 +1858,10 @@
       "successRow": "Archiv für {repo} bei {sha} gelöscht",
       "successBulk": "{archives} Archive gelöscht, {size} freigegeben",
       "errorRow": "Archiv konnte nicht gelöscht werden",
-      "errorBulk": "VCS-Archive konnten nicht gelöscht werden"
+      "errorBulk": "VCS-Archive konnten nicht gelöscht werden",
+      "successBulkTruncated": "{archives} Archive gelöscht, {size} freigegeben. Es ist noch mehr übrig – mit „Löschen fortsetzen“ geht es dort weiter, wo dieser Vorgang endete.",
+      "continuePurge": "Löschen fortsetzen",
+      "continuing": "Wird fortgesetzt …"
     },
     "sealedWarning": "Dieser Knoten ist versiegelt, nichts hier Gelöschtes kann also erneut abgerufen werden. Die geplante Bereinigung überspringt diese Zwischenspeicher genau deshalb – dies ist eine dauerhafte Löschung."
   },
