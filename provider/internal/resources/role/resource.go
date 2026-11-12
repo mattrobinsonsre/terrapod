@@ -25,12 +25,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/stateupgrade"
 )
 
@@ -191,15 +191,28 @@ func currentSchema() schema.Schema {
 			// above become a derived summary; when the user authors by LEVEL
 			// instead, the server still returns the effective (expanded)
 			// capability set for that level, and Computed lets that expanded
-			// set land in state without a diff. UseStateForUnknown keeps the
-			// value stable across plans when the config doesn't change.
+			// set land in state without a diff.
+			//
+			// It carried `UseStateForUnknown`, which is WRONG for the
+			// level-authored half and was #2502: that modifier made the set
+			// known in the plan, so an update sent the PRIOR DERIVED set, the
+			// server read it as authored and stored it verbatim, and the level
+			// edit was dropped. `UnknownSetWhenSourceChanges` keeps the value
+			// stable across plans the same way, EXCEPT when the configuration
+			// moves one of the four levels — then the prior set is stale by
+			// definition and the plan leaves it unknown to be re-derived.
 			"capabilities": schema.SetAttribute{
 				Description: "Explicit capability set as \"resource:verb\" tokens. When authored it is the source of truth and the *_permission levels become a server-derived summary (possibly \"custom\"). When omitted, reflects the effective capabilities the authored levels expand to.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
 				PlanModifiers: []planmodifier.Set{
-					setplanmodifier.UseStateForUnknown(),
+					planmods.UnknownSetWhenSourceChanges(
+						"workspace_permission",
+						"pool_permission",
+						"registry_permission",
+						"catalog_permission",
+					),
 				},
 			},
 
@@ -335,7 +348,16 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	role, err := r.tc.UpdateRole(ctx, state.ID.ValueString(), buildUpdateRoleRequest(&plan))
+	// The CONFIGURATION, not just the plan: the four level attributes are
+	// Optional+Computed, so the plan cannot distinguish a level the
+	// practitioner authored from one the server derived (#2502).
+	var cfg roleModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	role, err := r.tc.UpdateRole(ctx, state.ID.ValueString(), buildUpdateRoleRequest(&plan, &cfg))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update role", err.Error())
 		return
@@ -411,22 +433,39 @@ func buildCreateRoleRequest(m *roleModel) terrapod.CreateRoleRequest {
 // Update (plan diff is the framework's job), so every present field
 // becomes a pointer. Null/unknown attributes leave the underlying
 // pointer nil so the SDK omits them from the PATCH body.
-func buildUpdateRoleRequest(m *roleModel) terrapod.UpdateRoleRequest {
-	req := terrapod.UpdateRoleRequest{
-		WorkspacePermission: m.WorkspacePermission.ValueString(),
+func buildUpdateRoleRequest(m, cfg *roleModel) terrapod.UpdateRoleRequest {
+	req := terrapod.UpdateRoleRequest{}
+	// A level is sent only when the CONFIGURATION names it (#2502). An
+	// unauthored level holds the server's own derived summary of the stored
+	// capability set, and sending a summary back as an instruction is the same
+	// defect this issue is about, one field over. It is also not always
+	// expressible: a set matching no preset summarises to the literal
+	// "custom", which is not a level the server can expand, so sending it back
+	// is a 422 on an axis the practitioner never touched. Omitting it instead
+	// is what makes the server's own partial-level semantics reachable --
+	// `_apply_level_edits` replaces only the axes a request names and
+	// preserves granular capabilities on the rest.
+	for _, lvl := range []struct {
+		authored, planned types.String
+		into              *string
+	}{
+		{cfg.WorkspacePermission, m.WorkspacePermission, &req.WorkspacePermission},
+		{cfg.PoolPermission, m.PoolPermission, &req.PoolPermission},
+		{cfg.RegistryPermission, m.RegistryPermission, &req.RegistryPermission},
+		{cfg.CatalogPermission, m.CatalogPermission, &req.CatalogPermission},
+	} {
+		if lvl.authored.IsNull() {
+			continue
+		}
+		if lvl.planned.IsNull() || lvl.planned.IsUnknown() {
+			continue
+		}
+		*lvl.into = lvl.planned.ValueString()
 	}
-	if !m.PoolPermission.IsNull() && !m.PoolPermission.IsUnknown() {
-		req.PoolPermission = m.PoolPermission.ValueString()
-	}
-	if !m.RegistryPermission.IsNull() && !m.RegistryPermission.IsUnknown() {
-		req.RegistryPermission = m.RegistryPermission.ValueString()
-	}
-	if !m.CatalogPermission.IsNull() && !m.CatalogPermission.IsUnknown() {
-		req.CatalogPermission = m.CatalogPermission.ValueString()
-	}
-	// Send capabilities on update only when authored (non-null, known).
-	// An unauthored (Computed) capabilities field is Unknown in the plan;
-	// sending the previously-derived set would wrongly pin it as authored.
+	// Send capabilities on update only when authored (non-null, known). An
+	// unauthored capabilities field plans as Unknown -- which is what
+	// `UnknownSetWhenSourceChanges` on the schema now guarantees when a level
+	// moves -- so the previously-derived set is never pinned as authored.
 	if !m.Capabilities.IsNull() && !m.Capabilities.IsUnknown() {
 		req.Capabilities = sliceFromTFSet(m.Capabilities)
 	}

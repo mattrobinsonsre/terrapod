@@ -86,8 +86,13 @@ type CreateRoleRequest struct {
 
 	// Capabilities authors the role's grant directly as explicit
 	// "resource:verb" tokens (#585). When set it is the source of truth and
-	// the *Permission level fields are ignored (the server derives them as a
-	// summary). Leave empty to author by level instead.
+	// the *Permission level fields become a server-derived summary of it.
+	// Leave empty to author by level instead.
+	//
+	// A level set ALONGSIDE this must agree with what the set summarises to,
+	// or the server answers 422 (#2502). It used to drop the levels silently,
+	// which is how a caller's level edit could go nowhere with the only
+	// evidence being the next read coming back with the old grant.
 	Capabilities []string
 }
 
@@ -111,7 +116,11 @@ type UpdateRoleRequest struct {
 	CatalogPermission   string
 
 	// Capabilities replaces the role's grant with the given explicit
-	// capability set (#585); when non-empty it wins over the level fields.
+	// capability set (#585). A level sent alongside it must agree with what
+	// the set summarises to, or the server answers 422 rather than dropping
+	// the level (#2502) -- so send the levels alone to have the server expand
+	// a preset, or send this alone. Sending the DERIVED levels back unchanged
+	// is fine, and is what a caller that read the role first will do.
 	Capabilities []string
 }
 
