@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -274,7 +275,11 @@ class TestTheHappyPath:
         # The wire form is KEY=VALUE, matching os.Environ(). `PYTHONUNBUFFERED`
         # is forced onto every child (#2511) and so is part of this contract;
         # asserting the set rather than the order, which nothing depends on.
-        assert set(sent["env"]) == {"ANSIBLE_FORCE_COLOR=0", "PYTHONUNBUFFERED=1"}
+        assert set(sent["env"]) == {
+            "ANSIBLE_FORCE_COLOR=0",
+            "PYTHONUNBUFFERED=1",
+            "FORCE_COLOR=1",
+        }
 
     def test_the_log_is_appended_not_truncated(self, agent, tmp_path):
         """A configure is concatenated onto the apply's log (#1988).
@@ -384,6 +389,89 @@ class TestRedactionCrossesTheContainerBoundary:
         assert "before " in body and "after" in body
 
 
+class TestAHighlighterSeesWholeLines:
+    """#2510: a tool whose own output is plain gets marked by the runner.
+
+    `ansible-galaxy` prints its progress with no colour by design, and those
+    lines are the record of what a configure installed. Marking them is the
+    runner's, so the hook is here -- but a stream arrives in whatever pieces the
+    socket gives it, so the only thing that makes a per-line rule possible at
+    all is that this buffers.
+    """
+
+    def test_each_line_is_passed_whole_even_when_a_chunk_splits_it(self, agent, tmp_path):
+        """The chunk boundary falls mid-line on purpose. A highlighter handed a
+        fragment would match nothing, and the failure is silent -- the log is
+        simply never marked."""
+        seen: list[bytes] = []
+
+        def highlight(line: bytes) -> bytes:
+            seen.append(line)
+            return b"<" + line + b">"
+
+        agent(chunks=[b"one was installed su", b"ccessfully\ntwo\n"])
+        logf = tmp_path / "c.log"
+        run(
+            "ansible-galaxy",
+            [],
+            cwd="/w",
+            log_file=str(logf),
+            tee_to_stdout=False,
+            highlight=highlight,
+        )
+        assert seen == [b"one was installed successfully", b"two"]
+        assert logf.read_bytes() == b"<one was installed successfully>\n<two>\n"
+
+    def test_a_final_line_with_no_terminator_is_still_highlighted(self, agent, tmp_path):
+        """A tool that dies mid-line is exactly when its last line matters, and
+        holding it back for a newline that never comes would lose it."""
+        agent(chunks=[b"ERROR! the galaxy server refused"])
+        logf = tmp_path / "c.log"
+        run(
+            "ansible-galaxy",
+            [],
+            cwd="/w",
+            log_file=str(logf),
+            tee_to_stdout=False,
+            highlight=lambda line: b"!" + line,
+        )
+        assert logf.read_bytes() == b"!ERROR! the galaxy server refused"
+
+    def test_without_one_the_stream_is_passed_through_untouched(self, agent, tmp_path):
+        """The default path, which every other entry point takes. Byte equality
+        rather than a substring: line buffering that leaked into the unhooked
+        path would still contain each line, so a looser assertion would pass."""
+        agent(chunks=[b"PLAY [x] ", b"***\nok: [host1]"])
+        logf = tmp_path / "c.log"
+        run("ansible-playbook", [], cwd="/w", log_file=str(logf), tee_to_stdout=False)
+        assert logf.read_bytes() == b"PLAY [x] ***\nok: [host1]"
+
+    def test_the_redactor_runs_first_so_a_highlighter_never_sees_a_secret(self, agent, tmp_path):
+        """Order, not merely presence. A highlighter is per-tool code deciding
+        what a line LOOKS like; giving it the bytes before the redactor would
+        make it a second place a credential can escape -- and it would do so
+        silently, because the log that gets checked afterwards is the redacted
+        one either way.
+        """
+        secret = "straddling-secret-value-long-enough"
+        assert exec_subprocess.register_secret(secret)
+        seen: list[bytes] = []
+        head, tail = secret[:10], secret[10:]
+        agent(chunks=[f"password={head}".encode(), f"{tail}\n".encode()])
+        logf = tmp_path / "c.log"
+        run(
+            "ansible-galaxy",
+            [],
+            cwd="/w",
+            log_file=str(logf),
+            tee_to_stdout=False,
+            highlight=lambda line: seen.append(line) or line,
+        )
+        assert seen, "the highlighter was never called"
+        assert all(secret.encode() not in line for line in seen)
+        assert secret not in logf.read_text()
+
+
 class TestCancel:
     def test_it_reports_whether_anything_was_signalled(self, agent):
         a = agent()
@@ -481,6 +569,135 @@ class TestTerminationReachesTheExecutionEnvironment:
         assert len(sent) == 1, f"cancelled {len(sent)} times"
 
 
+class TestTheChildIsForcedToColour:
+    """#2510: pip was the largest monochrome block in a configure log.
+
+    125 of one run's 198 lines, against 0 carrying ANSI. The block that matters
+    is the resolver conflict report, which `_pip_check` turns into a failed
+    phase -- so it is read exactly when a hundred successful install lines are
+    in the way of it.
+
+    It sits beside `PYTHONUNBUFFERED` rather than in `pip_env` for the reason
+    that function's own note now gives: one door, because a value in a phase's
+    env builder colours that phase's binary and silently leaves every other one
+    plain.
+    """
+
+    def test_it_is_inert_for_ansible_itself(self, tmp_path):
+        """The measurement the one-door placement rests on, DRIVEN.
+
+        Forcing a variable on every child is only safe while the other children
+        ignore it, and `FORCE_COLOR` is a cross-tool convention rather than
+        pip's own. Measured against ansible-core: it reads
+        `ANSIBLE_FORCE_COLOR`, `ANSIBLE_NOCOLOR` and `NO_COLOR`, and nothing
+        bare -- so what the one door sends changes pip and leaves the playbook
+        exactly as `configure._FORCED_ENV` decides, which is the set an operator
+        reads about.
+
+        Driven rather than read off ansible's settings table for two reasons:
+        the table is a proxy for the behaviour, and `ansible-config` is not on
+        the test image's PATH while `ansible-playbook` is asserted at its build
+        -- so the table version would skip in the only place that gates a merge.
+
+        `ANSIBLE_FORCE_COLOR=1` is the positive control. Without it a run that
+        failed for an unrelated reason, or an output shape with no colour in it
+        either way, would report "FORCE_COLOR did nothing" and mean nothing.
+        """
+        binary = shutil.which("ansible-playbook")
+        if binary is None:
+            pytest.skip("needs a real ansible-playbook to drive; the point is the tool")
+
+        (tmp_path / "site.yml").write_text(
+            "- hosts: all\n"
+            "  gather_facts: false\n"
+            "  tasks:\n"
+            "    - name: say something\n"
+            "      ansible.builtin.debug:\n"
+            "        msg: hello\n"
+        )
+        (tmp_path / "hosts.yml").write_text(
+            "all:\n  hosts:\n    probe:\n      ansible_connection: local\n"
+        )
+
+        def play(extra: dict[str, str]) -> bytes:
+            # Every inherited ANSIBLE_* out of the way, so a developer's own
+            # settings cannot decide the answer either way.
+            env = {k: v for k, v in os.environ.items() if not k.startswith("ANSIBLE_")}
+            env.pop("FORCE_COLOR", None)
+            env.pop("NO_COLOR", None)
+            env["ANSIBLE_RETRY_FILES_ENABLED"] = "False"
+            env.update(extra)
+            done = subprocess.run(
+                [binary, "-i", "hosts.yml", "site.yml"],
+                cwd=tmp_path,
+                env=env,
+                capture_output=True,
+            )
+            assert done.returncode == 0, done.stdout + done.stderr
+            return done.stdout + done.stderr
+
+        assert b"\x1b[" not in play({}), "the premise is gone: ansible coloured a pipe"
+        forced = play({"FORCE_COLOR": child_env(None)["FORCE_COLOR"]})
+        assert b"\x1b[" not in forced, forced[:300]
+        assert b"\x1b[" in play({"ANSIBLE_FORCE_COLOR": "1"}), "the control failed"
+
+    def test_a_caller_cannot_turn_it_off(self):
+        """Same judgement as the buffering half, and the same reasoning.
+
+        `galaxy_env` is a strict allow-list, so a colour variable routed
+        through it would be dropped without a word; `pip_env` is assembled
+        somewhere else again. Either would leave one binary monochrome while
+        the rest gained colour -- which reads as "that tool just does not do
+        colour" rather than as a defect.
+        """
+        assert child_env({"FORCE_COLOR": "0"})["FORCE_COLOR"] == "1"
+        assert child_env({"NO_COLOR": "1"})["FORCE_COLOR"] == "1"
+
+    def test_every_binary_gets_it_on_the_wire(self, agent):
+        """Inert in ansible's case and still SENT, because the door is one door.
+
+        Asserted through `run` rather than off `child_env`, which is the line
+        that would break if the payload were ever built from the caller's env.
+        """
+        a = agent()
+        for binary in ("pip", "ansible-playbook", "ansible-galaxy"):
+            run(binary, [], cwd="/w", tee_to_stdout=False)
+        assert [b["bin"] for b in a.seen if "FORCE_COLOR=1" not in b["env"]] == []
+
+    def test_real_pip_colours_its_refusal_with_it_and_not_without(self):
+        """Drives pip itself, because the shape of an environment variable says
+        nothing about whether the tool honours it -- the recorded way a plugin
+        downloader shipped pointed at a cache it never authenticated to.
+
+        Offline by construction: `--no-index` contacts no index at all, so this
+        asserts on pip's own refusal rather than on the network. Both
+        directions, because colour that was already there would make the forced
+        half pass while meaning nothing -- and `FORCE_COLOR` is read by rich on
+        PRESENCE, so the unforced run has to have it removed rather than set to
+        zero.
+
+        The value comes from `child_env`, so this cannot drift into proving a
+        variable the product does not actually send.
+        """
+        pip = [sys.executable, "-m", "pip"]
+        if subprocess.run(pip + ["--version"], capture_output=True).returncode != 0:
+            pytest.skip("no usable pip in this interpreter")
+
+        def refuse(extra: dict[str, str]) -> bytes:
+            base = {k: v for k, v in os.environ.items() if k not in ("FORCE_COLOR", "NO_COLOR")}
+            done = subprocess.run(
+                pip + ["install", "--no-index", "--disable-pip-version-check", "nope-xyz==9.9.9"],
+                env={**base, **extra},
+                capture_output=True,
+            )
+            return done.stdout + done.stderr
+
+        plain = refuse({})
+        forced = refuse({"FORCE_COLOR": child_env(None)["FORCE_COLOR"]})
+        assert b"\x1b[" not in plain, plain[:200]
+        assert b"\x1b[" in forced, forced[:200]
+
+
 class TestTheChildIsForcedUnbuffered:
     """#2511: a configure's log arrived in large irregular chunks.
 
@@ -496,14 +713,20 @@ class TestTheChildIsForcedUnbuffered:
     """
 
     def test_it_is_forced_when_the_caller_passes_nothing(self):
-        assert child_env(None) == {"PYTHONUNBUFFERED": "1"}
-        assert child_env({}) == {"PYTHONUNBUFFERED": "1"}
+        """Spelled out rather than compared against `_FORCED_CHILD_ENV`, so
+        this is a MEMBERSHIP assertion: a third forced variable has to be
+        added here deliberately, where a derived comparison would accept one
+        nobody reviewed."""
+        expected = {"PYTHONUNBUFFERED": "1", "FORCE_COLOR": "1"}
+        assert child_env(None) == expected
+        assert child_env({}) == expected
 
     def test_the_callers_own_variables_are_kept(self):
         """Forcing one key must not become replacing the environment."""
         assert child_env({"ANSIBLE_FORKS": "20"}) == {
             "ANSIBLE_FORKS": "20",
             "PYTHONUNBUFFERED": "1",
+            "FORCE_COLOR": "1",
         }
 
     def test_a_caller_cannot_turn_it_off(self):
@@ -517,6 +740,8 @@ class TestTheChildIsForcedUnbuffered:
         """
         assert child_env({"PYTHONUNBUFFERED": ""})["PYTHONUNBUFFERED"] == "1"
         assert child_env({"PYTHONUNBUFFERED": "0"})["PYTHONUNBUFFERED"] == "1"
+        assert child_env({"FORCE_COLOR": ""})["FORCE_COLOR"] == "1"
+        assert child_env({"FORCE_COLOR": "0"})["FORCE_COLOR"] == "1"
 
     def test_the_call_site_puts_it_on_the_wire(self, agent):
         """The decision is inert unless `run` actually sends it.

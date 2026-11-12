@@ -170,7 +170,35 @@ def _flush_stdio() -> None:
 def _configure_logging() -> None:
     """Human-readable console renderer — runner output goes straight
     into `kubectl logs` and the combined-log artifact. JSON would force
-    operators to pipe everything through `jq` to read a plan."""
+    operators to pipe everything through `jq` to read a plan.
+
+    **Coloured, for the same reason the configure phase forces colour on
+    ansible (#2413 F18, #2510).** These lines are the phase boundaries -- "init
+    starting", "installing the configuration's collections", "configure
+    finished rc=..." -- and they sit in a scroll that is otherwise tool output,
+    so the one thing that says WHERE you are in the run was the one thing with
+    no emphasis. Measured on a configure log, the runner's own thirty lines
+    carried no ANSI at all while ansible's did. The renderer dims the
+    timestamp, colours the level, brightens the event and dims the `key=`
+    of each field, which is exactly the separation that was missing.
+
+    **Nothing downstream reads these lines as text**, which is what makes it
+    safe rather than merely nice: `remember_errors` sits ABOVE the renderer and
+    matches on the event dict, so a colour code can never reach it;
+    `failure_reason.tofu_errors` scrapes the engines' phase logs and strips ANSI
+    first, because those have carried colour all along; and the viewer's plan
+    index strips it before matching too. The log viewer renders ANSI and offers
+    a colour toggle, and the download keeps or strips the codes -- so the
+    stored artifact keeps them and stripping happens at the point of use, the
+    same way round as everywhere else.
+
+    `lock_extender`, `exec_subprocess` and `phases.uploads` each configure
+    structlog the same way without colour, and stay that way. They are the old
+    bash entrypoint's `python -m` CLIs, which no run invokes any more -- the
+    orchestrator imports those modules directly, so their lines come out of
+    THIS configuration -- and colouring a stream nothing in a run produces
+    would be a claim rather than a change.
+    """
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -178,7 +206,7 @@ def _configure_logging() -> None:
             # Remembers the last error so a failed run can say why (#1631).
             failure_reason.remember_errors,
             structlog.processors.TimeStamper(fmt="iso", utc=True),
-            structlog.dev.ConsoleRenderer(colors=False),
+            structlog.dev.ConsoleRenderer(colors=True),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(20),  # INFO
         cache_logger_on_first_use=True,

@@ -25,6 +25,7 @@ from unittest.mock import patch
 import pytest
 
 from terrapod.runner import job_entrypoint
+from terrapod.runner.phases import failure_reason
 from terrapod.runner.phases.binary import BinaryDownloadError
 
 
@@ -1025,6 +1026,101 @@ class TestThePulumiPhaseMintsCloudIdentity:
         _, calls, _ = self._drive(monkeypatch, mint={}, phase="update")
         assert len(calls) == 1
         assert calls[0]["discover_providers"] is False
+
+
+class TestTheRunnersOwnLinesAreColoured:
+    """#2510: the phase boundaries were the one thing in the log with no emphasis.
+
+    Measured on a configure log, the runner's own thirty lines carried no ANSI
+    at all while ansible's did -- so "init starting", "installing the
+    configuration's collections" and "configure finished rc=..." read exactly
+    like the tool output they punctuate, in a scroll that is mostly tool output.
+
+    The renderer dims the timestamp, colours the level, brightens the event and
+    dims each field's key, which is the separation that was missing. What these
+    pin is that it is on, that it changes only presentation, and that the one
+    thing downstream of this logger which is read as TEXT is unaffected.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore(self):
+        """`structlog.configure` is global, so put back whatever the suite had.
+
+        Without this the colour configuration leaks into every later test in the
+        worker, which is the kind of cross-test coupling that shows up as an
+        unrelated file failing under one shard ordering and not another.
+        """
+        import structlog
+
+        before = structlog.get_config()
+        failure_reason.reset()
+        yield
+        failure_reason.reset()
+        structlog.configure(**before)
+
+    def test_a_phase_boundary_carries_colour(self, capsys) -> None:
+        import structlog
+
+        job_entrypoint._configure_logging()
+        structlog.get_logger("runner.test").info("configure finished", rc=0)
+
+        out = capsys.readouterr().out
+        assert "\x1b[" in out, repr(out)
+
+    def test_only_presentation_changes_not_the_line(self, capsys) -> None:
+        """Strip the escapes and the event and its fields are still all there.
+
+        The failure this excludes is a renderer that colours by rewriting --
+        truncating a field, dropping one, reordering the pair -- which a bare
+        "does it contain an escape" assertion would pass straight over.
+        """
+        import re
+
+        import structlog
+
+        job_entrypoint._configure_logging()
+        structlog.get_logger("runner.test").info("configure finished", rc=0, playbook="site.yml")
+
+        raw = capsys.readouterr().out
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", raw)
+        # Something was stripped, or this asserts nothing: an uncoloured line
+        # survives the regex untouched and would satisfy every line below it.
+        assert plain != raw, repr(raw)
+        assert "configure finished" in plain
+        assert "rc=0" in plain
+        assert "playbook=site.yml" in plain
+
+    def test_the_failure_reason_still_sees_the_event(self, capsys) -> None:
+        """`remember_errors` sits ABOVE the renderer, so colour cannot reach it.
+
+        It matches on the event dict rather than on rendered text, which is what
+        makes colouring the output safe at all -- and `failure_reason` is the one
+        consumer of this logger whose result is read as a string rather than
+        looked at, because it becomes the run's `error_message`.
+        """
+        import structlog
+
+        job_entrypoint._configure_logging()
+        structlog.get_logger("runner.test").error("init failed", rc=2)
+
+        capsys.readouterr()
+        reason = failure_reason.last_logged_error()
+        assert reason == "init failed (rc=2)"
+
+    def test_the_failure_reason_carries_no_escape_codes(self, capsys) -> None:
+        """The run's `error_message` is shown as text by every surface that reads
+        it -- the API, the UI, a notification body -- none of which renders ANSI
+        the way the log viewer does. So an escape reaching it would be visible as
+        literal `ESC[31m` rubbish rather than as colour."""
+        import structlog
+
+        job_entrypoint._configure_logging()
+        structlog.get_logger("runner.test").error("binary download failed", err="404 from cache")
+
+        capsys.readouterr()
+        reason = failure_reason.last_logged_error()
+        assert reason is not None
+        assert "\x1b" not in reason, repr(reason)
 
 
 class TestTheCheckoutIsNotWorldWritable:

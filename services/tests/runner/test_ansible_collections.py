@@ -16,6 +16,7 @@ Pulumi plugin downloader pointed at a cache it never sent a credential to
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -766,3 +767,89 @@ class TestThePythonRequirementsOfInstalledCollections:
         installs = [a for a in argvs if a[:2] == ["pip", "install"]]
         assert len(installs) == 1, argvs
         assert str(tmp_path / ac.PYTHON_REQUIREMENTS) in installs[0]
+
+
+class TestTheGalaxyLinesWorthFinding:
+    """#2510: `ansible-galaxy` prints plain, so the runner marks it.
+
+    Nine lines of a 198-line configure log, carrying the whole record of what
+    the run installed and -- when it fails -- the first line of why. They are
+    the thing someone scrolls back for, and they looked exactly like everything
+    around them.
+    """
+
+    def test_a_successful_install_is_marked(self) -> None:
+        line = b"community.general:11.3.0 was installed successfully"
+        assert ac.highlight_galaxy_line(line) == b"\x1b[32m" + line + b"\x1b[0m"
+
+    def test_an_error_is_marked(self) -> None:
+        line = b"ERROR! Unknown error when attempting to call Galaxy"
+        assert ac.highlight_galaxy_line(line) == b"\x1b[1;31m" + line + b"\x1b[0m"
+
+    def test_the_detail_below_an_error_is_left_alone(self) -> None:
+        """`ERROR!` opens a block whose remaining lines are indented detail.
+        Colouring those too would defeat the point of marking the first one."""
+        assert ac.highlight_galaxy_line(b"    HTTP Code: 500") == b"    HTTP Code: 500"
+
+    def test_progress_lines_are_left_exactly_as_they_are(self) -> None:
+        for line in (
+            b"Starting galaxy collection install process",
+            b"Process install dependency map",
+            b"Downloading https://terrapod.test/... to /tp/collections",
+            b"",
+        ):
+            assert ac.highlight_galaxy_line(line) == line
+
+    def test_only_colour_is_added_never_text(self) -> None:
+        """The success line carries the collection and its version, so a
+        highlighter that reformatted rather than wrapped would lose the thing
+        worth finding."""
+        line = b"amazon.aws:9.0.0 was installed successfully"
+        assert re.sub(rb"\x1b\[[0-9;]*m", b"", ac.highlight_galaxy_line(line)) == line
+
+    def test_a_line_that_already_carries_ansi_is_declined(self) -> None:
+        """An EE whose ansible-galaxy does colour its own errors is where this
+        would show: wrapping puts our reset mid-line, so everything after it
+        loses the colour the tool chose."""
+        line = b"\x1b[31mERROR! already red\x1b[0m"
+        assert ac.highlight_galaxy_line(line) == line
+
+    def test_galaxy_runs_with_it_and_pip_does_not(self, tmp_path: Path) -> None:
+        """The wiring, in both directions. pip colours itself once `FORCE_COLOR`
+        is set, so handing it this too would mark its `ERROR:` lines twice -- and
+        a highlighter makes the stream line-buffered, which a tool that already
+        does the job should not pay for.
+        """
+        (tmp_path / "requirements.yml").write_text("collections:\n  - name: a.b\n")
+        (tmp_path / ac.PYTHON_REQUIREMENTS).write_text("boto3\n")
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="")
+            ac.install(_cfg(), tmp_path)
+            ac.install_python_requirements(_cfg(), tmp_path)
+        by_binary: dict[str, list[object]] = {}
+        for call in run.call_args_list:
+            by_binary.setdefault(call.args[0], []).append(call.kwargs.get("highlight"))
+        assert by_binary["ansible-galaxy"], "no galaxy call was made"
+        assert all(h is ac.highlight_galaxy_line for h in by_binary["ansible-galaxy"])
+        assert by_binary["pip"], "no pip call was made"
+        assert all(h is None for h in by_binary["pip"])
+
+
+class TestPipPrintsInColour:
+    """#2510: pip's own output was the largest monochrome block in the log.
+
+    125 of a configure's 198 lines, and the one block that matters is the
+    resolver conflict report -- which `_pip_check` turns into a failed phase, so
+    it is read exactly when a hundred successful install lines are in the way.
+
+    The variable itself lives in `ee_client._FORCED_CHILD_ENV` and is tested
+    there, against the real pip. What belongs here is the converse: that this
+    module does NOT set it a second time.
+    """
+
+    def test_pip_env_does_not_set_it_a_second_time(self) -> None:
+        """One producer. The first draft of #2510 put `FORCE_COLOR` here, which
+        colours pip and leaves anything the agent runs through another env
+        builder plain -- and two sites holding one value is the recorded way
+        they come to disagree."""
+        assert "FORCE_COLOR" not in ac.pip_env(API)
