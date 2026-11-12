@@ -174,16 +174,34 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
       adminPage.getByRole('heading', { name: /Would change \(2\)/ }),
     ).toBeVisible();
 
-    // ONE column moves, and its value is the mode verbatim (#2503). A
-    // `toContainText('auto_apply')` here would match the substring of
-    // `auto_apply_mode` and so assert nothing either way -- the row LIST is
-    // what can tell the two apart, so the diff is read as rows.
+    // ONE column moves, and its value is the mode verbatim (#2503).
+    //
+    // The property is per COLUMN, so it has to be read per column. A bare
+    // `toContainText('auto_apply')` matches the substring of `auto_apply_mode`
+    // and asserts nothing either way -- and counting the diff table's `tr`
+    // elements does not fix that, because a row is one WORKSPACE: both of this
+    // test's two workspaces change, so a row count is 2 whatever the columns
+    // say. (The first version of this assertion counted rows and expected 1,
+    // with a comment claiming the row list told the two columns apart. It did
+    // not: it measured the workspace dimension and would have passed for the
+    // wrong reason on a single-workspace fixture.)
+    //
+    // So: every changed row names `auto_apply_mode`, and names no OTHER
+    // auto-apply column -- which is checkable precisely because `auto_apply`
+    // is a prefix of `auto_apply_mode`. If the boolean came back as its own
+    // column, a row would carry one more `auto_apply` than it carries
+    // `auto_apply_mode`, and the counts would differ.
     const table = adminPage.locator('table').last();
     await expect(table).toContainText('auto_apply_mode');
     await expect(table).toContainText('create_update');
     const rowTexts = await table.locator('tr', { hasText: /auto_apply/ }).allInnerTexts();
-    expect(rowTexts.length, `auto-apply rows: ${JSON.stringify(rowTexts)}`).toBe(1);
-    expect(rowTexts[0]).toContain('auto_apply_mode');
+    expect(rowTexts.length, `auto-apply rows: ${JSON.stringify(rowTexts)}`).toBe(2);
+    for (const row of rowTexts) {
+      const named = (row.match(/auto_apply/g) ?? []).length;
+      const mode = (row.match(/auto_apply_mode/g) ?? []).length;
+      expect(mode, `no auto_apply_mode column in: ${row}`).toBeGreaterThan(0);
+      expect(named, `a bare auto_apply column survives in: ${row}`).toBe(mode);
+    }
   });
 });
 
