@@ -2582,7 +2582,16 @@ function WorkspacesPageInner() {
                     )
                   })}
                   <span className="text-xs text-slate-500 self-center">
-                    {t('filter.showing', { filtered: filteredWorkspaces.length, total: workspaces.length })}
+                    {/* Counted off the SAME array the rows map over, not off
+                        `filteredWorkspaces`. The two are equal by construction
+                        today -- `useSortable` returns `[...items].sort(...)` --
+                        so this is not a behaviour change; it removes the CLASS.
+                        #2551 reported `Showing 2 of 530` above five rows, and a
+                        label fed by a different derivation from the rows is the
+                        only way that can ever be true of one commit. Reading the
+                        rendered array makes the two unable to disagree rather
+                        than relying on a reader noticing they must. */}
+                    {t('filter.showing', { filtered: sortedWorkspaces.length, total: workspaces.length })}
                   </span>
                 </div>
               )}
