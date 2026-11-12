@@ -114,7 +114,16 @@ def api_read_fields() -> set[str]:
     and the runner Job -- they read the whole object from their own ConfigMap and
     are not what this gate is about. `config.py` itself only defines the loader.
     """
-    pkg = ROOT / "services" / "terrapod"
+    # The test image FLATTENS `services/` into /app (`COPY services/terrapod
+    # ./terrapod` with `WORKDIR /app`), so the repo-relative path exists only
+    # in a checkout. Getting this wrong does not skip -- the chart IS in the
+    # image, so `ROOT` resolves and the walker simply reads an empty directory
+    # and derives nothing. The MIN_FIELDS floor below is what caught it, which
+    # is the floor doing its job; this keeps it from having to.
+    pkg = pathlib.Path("/app/terrapod")
+    if not pkg.is_dir():
+        pkg = ROOT / "services" / "terrapod"
+    assert pkg.is_dir(), f"package not found at {pkg} -- the image layout moved"
     fields: set[str] = set()
     for path in sorted(pkg.rglob("*.py")):
         rel = path.relative_to(pkg)
