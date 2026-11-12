@@ -757,6 +757,39 @@ reason this is a feature rather than a gap:
 - **Decryption happens where it should** — during the play, in the execution
   environment, with the password materialised as a file for exactly that run.
 
+### …and reads `<vaulted>` in the variable-levels view
+
+The same read with `?provenance=true` shows the value as the literal string
+`<vaulted>` rather than as ciphertext, and that difference is deliberate.
+
+The levels come from a second `ansible-inventory` pass, `--graph --vars`, which
+prints every variable's **value** as text — so unlike `--list` it has to
+decrypt, and with no password it fails outright. Rather than lose the whole
+read, Terrapod replaces every `!vault` scalar with `<vaulted>` in the scratch
+copy that pass reads. The copy is a throwaway extraction that is deleted when
+the read returns; nothing you committed is touched, and nothing is decrypted.
+
+So the view says **where** a vaulted variable is set and not **what** it is:
+
+```json
+{"db_password": {"value": {"__ansible_vault": "$ANSIBLE_VAULT;1.1;AES256\n…"},
+                 "origin": "web",
+                 "chain": [{"level": "web", "value": "<vaulted>"}]}}
+```
+
+`value` is still the ciphertext, because that is what the resolution itself
+holds; `chain` carries the placeholder. One consequence worth knowing: a vaulted
+value that itself templates another variable cannot be followed, because
+Terrapod never sees its content. Measured — `--graph --vars` prints a template
+unexpanded even when it *can* decrypt, so this costs nothing the view could
+otherwise have shown.
+
+A **whole-file**-encrypted vars file (`ansible-vault encrypt group_vars/all.yml`)
+is a different case and is not resolvable here at all: ansible must decrypt the
+file to parse it, so `--list` fails too and the read refuses rather than
+returning a short host set. Encrypt the values, not the file, for anything the
+resolved view should see.
+
 ## See also
 
 - [Ansible on Terrapod](ansible.md#one-worked-example-from-nothing-to-a-configure-that-runs) — the worked example that declares a

@@ -25,7 +25,7 @@ import os
 import tempfile
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy import select
@@ -342,9 +342,15 @@ async def store_document(
 
     existing = await lookup(db, artifact.ecosystem, artifact.name, artifact.filename)
     if existing is not None:
+        now = datetime.now(UTC)
         existing.size = len(data)
         existing.version = artifact.version
-        existing.last_accessed_at = datetime.now(UTC)
+        # The row describes the bytes just written, so its age restarts here.
+        # Without this a `max_age` read against `cached_at` would expire a copy
+        # that was refreshed a moment ago -- on every request, forever, which is
+        # the same full upstream round trip the cache exists to remove.
+        existing.cached_at = now
+        existing.last_accessed_at = now
         await db.flush()
         return existing
 
@@ -369,20 +375,53 @@ async def store_document(
     return record
 
 
+def _age(record: CachedPackageFile) -> timedelta:
+    """How long ago this document was written.
+
+    The column is timezone-aware, but a row that reached us from somewhere that
+    dropped the offset must not raise out of an index route: a comparison error
+    there reads as the registry being down.
+    """
+    stamp = record.cached_at
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=UTC)
+    return datetime.now(UTC) - stamp
+
+
 async def load_document(
-    db: AsyncSession, storage: ObjectStore, ecosystem: str, name: str, filename: str
+    db: AsyncSession,
+    storage: ObjectStore,
+    ecosystem: str,
+    name: str,
+    filename: str,
+    *,
+    max_age: timedelta | None = None,
 ) -> bytes | None:
-    """A cached document's bytes, or None if we do not hold it."""
+    """A cached document's bytes, or None if we hold no usable copy.
+
+    `max_age` bounds a document whose content can change upstream -- a list of
+    which versions exist. Omit it for one that cannot: an immutable per-version
+    detail would only be re-fetched byte for byte. An expired copy returns None
+    exactly as an absent one does, so a caller has one cold path rather than two.
+
+    **A hit touches `last_accessed_at`.** Retention is access-based, so a
+    document served from here and never touched looks permanently unused and is
+    reaped however heavily it is read -- which then re-fetches it, in a loop.
+    """
     record = await lookup(db, ecosystem, name, filename)
     if record is None:
         return None
+    if max_age is not None and _age(record) > max_age:
+        return None
     try:
-        return await storage.get(record.storage_key)
+        data = await storage.get(record.storage_key)
     except Exception:
         # The row promised something the store does not have. Treated as a miss;
         # on a sealed node that becomes an honest "not cached" rather than a 500.
         logger.warning("Cached document missing from storage", key=record.storage_key)
         return None
+    await touch(db, record)
+    return data
 
 
 async def cached_filenames(db: AsyncSession, ecosystem: str, name: str) -> list[str]:

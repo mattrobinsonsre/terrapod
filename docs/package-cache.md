@@ -199,6 +199,28 @@ token = <a Terrapod API token>
 entirely through Terrapod, and installs again with no route to the internet once
 the collection is cached.
 
+### What is cached, and for how long
+
+The split is the same one the Go and NuGet proxies make, for the same reason:
+a document is bounded if its content can change upstream, and not otherwise.
+
+| Document | Mutable? | Served from cache for |
+|---|---|---|
+| `collections/{ns}/{name}/` and `.../versions/` | yes — a new version changes both | **one hour**, then re-read upstream |
+| `.../versions/{version}/` | no — a published version is immutable | indefinitely |
+| the collection tarball | no | indefinitely |
+
+So a version published upstream within the hour may not be offered yet by a
+deployment that has already resolved that collection — `ansible-galaxy` reads
+the listing even for an exact pin, so an install of a brand-new version can
+resolve on the hour rather than at once. A collection the deployment has never
+seen is unaffected: there is nothing cached to be stale.
+
+An unsealed node reads these back before it asks upstream. Earlier releases did
+not: they fetched every document on every request and stored a copy only a
+sealed node would ever read, so resolving five pinned collections through a warm
+proxy still paid every upstream round trip in series and took tens of seconds.
+
 ### Collections and roles are two mechanisms
 
 **Collections** are usually external, so they come through the pull-through proxy

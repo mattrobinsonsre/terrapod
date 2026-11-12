@@ -25,9 +25,14 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
+from collections.abc import Callable, Coroutine
+from datetime import timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.routing import APIRoute
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.credentials import extract_credential
@@ -64,15 +69,68 @@ from terrapod.services.package_cache.substrate import (
 from terrapod.storage import get_storage, keys
 from terrapod.storage.protocol import ObjectStore
 
+logger = get_logger(__name__)
+
+
+class TimedRoute(APIRoute):
+    """Every package-cache route records how long it took (#2512).
+
+    uvicorn's access log writes a line when a request *completes* and says
+    nothing about how long it took, so a two-second index lookup and an instant
+    one are indistinguishable in it, and a gap between two lines is equally a
+    slow request or an idle client. That ambiguity is most of a "why is this
+    install slow" report: one arrived with a 60-second hole in it that could
+    have been a client timeout or a single held request, and the logs could not
+    say which.
+
+    A route class rather than application-wide middleware because the question
+    is about *these* routes: a dependency resolver issues tens of requests per
+    install, and timing every route the API serves would bury the answer. It
+    wraps the route's whole handler, so a slow authentication or a slow
+    database lookup is inside the number rather than invisible before it.
+    """
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+        handler = super().get_route_handler()
+
+        async def timed(request: Request) -> Response:
+            started = time.perf_counter()
+            # An exception that is not an HTTPException reaches the application
+            # error handler, which answers 500; recording that is better than
+            # recording nothing for the requests most worth looking at.
+            status_code = 500
+            try:
+                response = await handler(request)
+                status_code = response.status_code
+                return response
+            except HTTPException as exc:
+                status_code = exc.status_code
+                raise
+            finally:
+                logger.info(
+                    "Package cache request",
+                    method=request.method,
+                    path=request.url.path,
+                    status=status_code,
+                    duration_ms=round((time.perf_counter() - started) * 1000, 1),
+                )
+
+        return timed
+
+
 #: Split by ecosystem so each can be left unmounted independently. See
 #: `build_router` — a disabled ecosystem is not registered at all.
-pypi_router = APIRouter()
-npm_router = APIRouter()
-galaxy_router = APIRouter()
-pulumi_router = APIRouter()
-go_router = APIRouter()
-nuget_router = APIRouter()
-logger = get_logger(__name__)
+#:
+#: `route_class` is set on each of them rather than only on the aggregate:
+#: `include_router` carries the *source* router's class across, so a class set
+#: on the aggregate alone would be silently dropped for every route included
+#: into it — which is all of them.
+pypi_router = APIRouter(route_class=TimedRoute)
+npm_router = APIRouter(route_class=TimedRoute)
+galaxy_router = APIRouter(route_class=TimedRoute)
+pulumi_router = APIRouter(route_class=TimedRoute)
+go_router = APIRouter(route_class=TimedRoute)
+nuget_router = APIRouter(route_class=TimedRoute)
 
 #: pip has no bearer option — credentials come from the index URL or `.netrc` —
 #: so the challenge has to name Basic or pip will not retry with them.
@@ -456,6 +514,51 @@ def _galaxy_names(namespace: str, name: str) -> None:
         raise HTTPException(status_code=404, detail="Not found")
 
 
+async def _cached_galaxy_document(
+    db: AsyncSession,
+    storage: ObjectStore,
+    key: str,
+    filename: str,
+    *,
+    max_age: timedelta | None = None,
+) -> dict | None:
+    """A collection index document we already hold, or None to go upstream.
+
+    **This read is the whole of #2512.** The write below it has always been
+    there, and until now nothing but a sealed node ever read it back: an
+    unsealed node fetched the document upstream on every single request and then
+    stored a copy it would never consult -- a write-only cache sitting on the
+    read path. `ansible-galaxy` resolves sequentially, so each of those round
+    trips (and `fetch_versions` pages through every version of the collection)
+    was paid in series, turning a five-collection install into tens of seconds.
+
+    A miss is not an error: returning None leaves the caller's existing upstream
+    path to answer, which is also what a stale listing or an unreachable store
+    falls back to.
+
+    **Reading the cache is best-effort, exactly as writing it already is.** The
+    store below says so in as many words -- failing to cache must not fail a
+    request about to succeed -- and the same holds in reverse: a database hiccup
+    or a storage blip here has an answer upstream can still give, so degrading
+    to a slow install beats failing one. The warning is what keeps that from
+    becoming silent, which is the defect this function exists to fix wearing a
+    different hat.
+    """
+    try:
+        raw = await load_document(db, storage, galaxy.ECOSYSTEM, key, filename, max_age=max_age)
+        if raw is None:
+            return None
+        return json.loads(raw)
+    except Exception:
+        logger.warning(
+            "Could not read cached collection document; falling back upstream",
+            collection=key,
+            filename=filename,
+            exc_info=True,
+        )
+        return None
+
+
 @galaxy_router.get("/galaxy/")
 async def galaxy_root(
     user: AuthenticatedUser = Depends(authenticate_package_request),
@@ -515,6 +618,10 @@ async def galaxy_collection(
             )
         document = json.loads(raw)
     else:
+        document = await _cached_galaxy_document(
+            db, storage, key, galaxy.COLLECTION_DOC, max_age=galaxy.LISTING_TTL
+        )
+    if document is None:
         try:
             document = await galaxy.fetch_collection(namespace, name)
         except (NotFoundUpstream, UpstreamError) as exc:
@@ -596,6 +703,10 @@ async def galaxy_versions(
         )
         document = galaxy.restrict_to_cached(json.loads(raw), held)
     else:
+        document = await _cached_galaxy_document(
+            db, storage, key, galaxy.VERSIONS_DOC, max_age=galaxy.LISTING_TTL
+        )
+    if document is None:
         try:
             document = await galaxy.fetch_versions(namespace, name)
         except (NotFoundUpstream, UpstreamError) as exc:
@@ -659,6 +770,10 @@ async def galaxy_version(
             )
         document = json.loads(raw)
     else:
+        # No `max_age`: a published version's detail is immutable, so an expiry
+        # here would only ever re-fetch identical bytes.
+        document = await _cached_galaxy_document(db, storage, key, galaxy.version_doc(version))
+    if document is None:
         try:
             document = await galaxy.fetch_version(namespace, name, version)
         except (NotFoundUpstream, UpstreamError) as exc:
@@ -1282,7 +1397,7 @@ def build_router() -> APIRouter | None:
     application twice in one process (which the tests do constantly) cannot
     accumulate duplicate routes.
     """
-    aggregate = APIRouter(prefix="/package-cache", tags=["package-cache"])
+    aggregate = APIRouter(prefix="/package-cache", tags=["package-cache"], route_class=TimedRoute)
     mounted = False
     if capability_enabled("pypi"):
         aggregate.include_router(pypi_router)
