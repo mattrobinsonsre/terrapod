@@ -102,6 +102,27 @@
       "clearLockedFilter": "Kilitli filtresini temizle",
       "filterLocked": "Kilitli çalışma alanlarına göre filtrele"
     },
+    "bulk": {
+      "selectionCount": "Seçim · {count}",
+      "menuLabel": "Seçili çalışma alanları için eylemler",
+      "selectAll": "Tüm çalışma alanlarını seç",
+      "selectRow": "{name} seç",
+      "eligible": "{total} içinden {eligible} uygun",
+      "action": {
+        "plan": "Plan",
+        "retry": "Çalıştırmayı Yeniden Dene",
+        "cancel": "Çalıştırmayı İptal Et",
+        "apply": "Uygula",
+        "discard": "İptal Et"
+      },
+      "confirmApply": "Seçili çalışma alanlarındaki ({count}) planlanmış çalıştırmalar uygulansın mı?\n\n{names}{more}\n\nBu, gerçek altyapıyı değiştirir ve geri alınamaz.",
+      "confirmDiscard": "Seçili çalışma alanlarındaki ({count}) planlanmış çalıştırmalar atılsın mı?\n\n{names}{more}\n\nPlanlar atılır ve geri getirilemez.",
+      "andMore": "\n…ve {count} tane daha",
+      "running": "Seçili çalışma alanlarında ({count}) {action} çalıştırılıyor…",
+      "resultSummary": "{action}: {total} içinden {ok} başarılı",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Kapat"
+    },
     "filter": {
       "placeholder": "Ada, etikete veya duruma göre filtrele — örn. \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Çalışma alanlarını filtrele",

@@ -102,6 +102,27 @@
       "clearLockedFilter": "Очистить фильтр блокировки",
       "filterLocked": "Показать заблокированные рабочие области"
     },
+    "bulk": {
+      "selectionCount": "Выбор · {count}",
+      "menuLabel": "Действия для выбранных рабочих пространств",
+      "selectAll": "Выбрать все рабочие пространства",
+      "selectRow": "Выбрать {name}",
+      "eligible": "{eligible} из {total} подходят",
+      "action": {
+        "plan": "Plan",
+        "retry": "Повторить запуск",
+        "cancel": "Отменить запуск",
+        "apply": "Применить",
+        "discard": "Отклонить"
+      },
+      "confirmApply": "Применить запланированные запуски в выбранных рабочих пространствах ({count})?\n\n{names}{more}\n\nЭто изменяет реальную инфраструктуру и не может быть отменено.",
+      "confirmDiscard": "Отменить запланированные запуски в выбранных рабочих пространствах ({count})?\n\n{names}{more}\n\nПланы будут отброшены и не подлежат восстановлению.",
+      "andMore": "\n…и ещё {count}",
+      "running": "Выполняется {action} в выбранных рабочих пространствах ({count})…",
+      "resultSummary": "{action}: успешно {ok} из {total}",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "Закрыть"
+    },
     "filter": {
       "placeholder": "Фильтр по имени, метке или статусу — например, \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "Фильтр рабочих областей",

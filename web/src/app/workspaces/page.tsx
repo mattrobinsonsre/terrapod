@@ -17,6 +17,18 @@ import { WorkspaceStatusBadges } from '@/components/workspace-status-badges'
 import { StatChip } from '@/components/stat-chip'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { useConfirm } from '@/lib/use-confirm'
+import { Checkbox } from '@/components/checkbox'
+import { SelectionMenu, type SelectionMenuItem } from '@/components/selection-menu'
+import {
+  BULK_ACTIONS,
+  summarise,
+  type BulkActionId,
+  type BulkWorkspace,
+} from '@/lib/workspace-bulk-actions'
+import { runBulkAction, type BulkResult } from '@/lib/workspace-bulk-run'
+import { confirmLines } from '@/lib/workspace-bulk-confirm'
+import { headerState, pruneSelection, toggleAll, toggleOne } from '@/lib/workspace-selection'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
 import {
@@ -126,6 +138,54 @@ interface Workspace {
   }
 }
 
+// The selection column is desktop-only (`max-sm:hidden`): the per-workspace flow
+// on a phone stays exactly what it is, and nothing is lost there. The standard
+// view does not change until a user ticks a box.
+function RowCheckbox({
+  id,
+  name,
+  checked,
+  onToggle,
+}: {
+  id: string
+  name: string
+  checked: boolean
+  onToggle: (id: string) => void
+}) {
+  const t = useTranslations('workspaces')
+  return (
+    <td className="px-4 py-3 w-10 max-sm:hidden">
+      <Checkbox
+        checked={checked}
+        onChange={() => onToggle(id)}
+        ariaLabel={t('bulk.selectRow', { name })}
+        testId="ws-row-select"
+      />
+    </td>
+  )
+}
+
+function HeaderCheckbox({
+  state,
+  onToggle,
+}: {
+  state: 'none' | 'some' | 'all'
+  onToggle: () => void
+}) {
+  const t = useTranslations('workspaces')
+  return (
+    <th className="px-4 py-3 w-10 max-sm:hidden">
+      <Checkbox
+        checked={state === 'all'}
+        indeterminate={state === 'some'}
+        onChange={onToggle}
+        ariaLabel={t('bulk.selectAll')}
+        testId="ws-select-all"
+      />
+    </th>
+  )
+}
+
 function WorkspaceGroupRows({
   groups,
   collapsedGroups,
@@ -133,6 +193,8 @@ function WorkspaceGroupRows({
   pathPrefix,
   parsedFilter: filter,
   setFilterInput,
+  selected,
+  onToggleRow,
   depth = 0,
 }: {
   groups: WorkspaceGroup[]
@@ -141,6 +203,8 @@ function WorkspaceGroupRows({
   pathPrefix: string
   parsedFilter: ParsedFilter
   setFilterInput: (v: string) => void
+  selected: ReadonlySet<string>
+  onToggleRow: (id: string) => void
   depth?: number
 }) {
   const t = useTranslations('workspaces')
@@ -154,7 +218,7 @@ function WorkspaceGroupRows({
         return (
           <Fragment key={fullPath}>
             <tr className="hover:bg-slate-700/20 transition-colors">
-              <td className="px-4 py-2" colSpan={6}>
+              <td className="px-4 py-2" colSpan={7}>
                 <button
                   type="button"
                   aria-expanded={!isCollapsed}
@@ -180,6 +244,7 @@ function WorkspaceGroupRows({
               const { def, runId, phaseStarts } = resolveStatus(ws)
               return (
                 <tr key={item.id} className="hover:bg-slate-700/20 transition-colors border-t border-slate-700/30">
+                  <RowCheckbox id={item.id} name={item.name} checked={selected.has(item.id)} onToggle={onToggleRow} />
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1.5" style={{ paddingLeft: `${(depth + 1) * 16}px` }}>
                       <Link
@@ -261,6 +326,8 @@ function WorkspaceGroupRows({
                 pathPrefix={fullPath}
                 parsedFilter={filter}
                 setFilterInput={setFilterInput}
+                selected={selected}
+                onToggleRow={onToggleRow}
                 depth={depth + 1}
               />
             )}
@@ -908,6 +975,92 @@ function WorkspacesPageInner() {
   const workspaceTree = useMemo(
     () => buildWorkspaceTree(sortedWorkspaces, groupMode),
     [sortedWorkspaces, groupMode]
+  )
+
+  // ── Bulk actions ───────────────────────────────────────────────────────────
+  // Selection is by workspace id and survives a filter or sort change, but a
+  // workspace that leaves the visible list is dropped, so an action can never
+  // run on something the user can no longer see.
+  const { confirmIrreversible } = useConfirm()
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkRunning, setBulkRunning] = useState<{ action: BulkActionId; count: number } | null>(null)
+  const [bulkResult, setBulkResult] = useState<{ action: BulkActionId; results: BulkResult[] } | null>(null)
+  const visibleIds = useMemo(() => sortedWorkspaces.map((w) => w.id), [sortedWorkspaces])
+  useEffect(() => {
+    setSelected((cur) => pruneSelection(cur, visibleIds))
+  }, [visibleIds])
+  const selectionHeader = headerState(selected, visibleIds)
+  const toggleAllRows = useCallback(() => setSelected((cur) => toggleAll(cur, visibleIds)), [visibleIds])
+  const toggleRow = useCallback((id: string) => setSelected((cur) => toggleOne(cur, id)), [])
+
+  // The selected workspaces in the shape the rules read.
+  const selectedBulk = useMemo<BulkWorkspace[]>(
+    () =>
+      sortedWorkspaces
+        .filter((w) => selected.has(w.id))
+        .map((w) => ({
+          id: w.id,
+          name: w.attributes.name,
+          locked: !!w.attributes.locked,
+          latestRun: w.attributes['latest-run']
+            ? {
+                id: w.attributes['latest-run'].id,
+                status: w.attributes['latest-run'].status,
+                planOnly: w.attributes['latest-run']['plan-only'],
+              }
+            : null,
+        })),
+    [sortedWorkspaces, selected],
+  )
+
+  const runBulk = useCallback(
+    async (action: BulkActionId) => {
+      const meta = BULK_ACTIONS.find((a) => a.id === action)
+      // Apply and Discard are the irreversible tier, so they prompt in BOTH
+      // pointer modes, with the count and the first few names.
+      if (meta?.confirm) {
+        const lines = confirmLines(selectedBulk.map((w) => w.name))
+        const text = t(action === 'apply' ? 'bulk.confirmApply' : 'bulk.confirmDiscard', {
+          count: lines.count,
+          names: lines.names.join('\n'),
+          more: lines.more > 0 ? t('bulk.andMore', { count: lines.more }) : '',
+        })
+        if (!confirmIrreversible(text)) return
+      }
+      setBulkBusy(true)
+      setBulkRunning({ action, count: selectedBulk.length })
+      setBulkResult(null)
+      try {
+        const results = await runBulkAction(action, selectedBulk, apiFetch)
+        setBulkResult({ action, results })
+        // Clear the ones that worked; leave the refused ones selected so the
+        // reason beside them can be acted on without picking them again.
+        const failed = new Set(results.filter((r) => !r.ok).map((r) => r.id))
+        setSelected((cur) => new Set([...cur].filter((id) => failed.has(id))))
+        await loadWorkspaces()
+      } finally {
+        setBulkBusy(false)
+        setBulkRunning(null)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadWorkspaces is a hoisted function
+    [selectedBulk, confirmIrreversible, t],
+  )
+
+  const selectionItems = useMemo<SelectionMenuItem[]>(
+    () =>
+      BULK_ACTIONS.map((a) => {
+        const sum = summarise(a.id, selectedBulk)
+        return {
+          id: a.id,
+          label: t(`bulk.action.${a.id}`),
+          detail: t('bulk.eligible', { eligible: sum.eligible, total: sum.total }),
+          enabled: sum.enabled && !bulkBusy,
+          run: () => void runBulk(a.id),
+        }
+      }),
+    [selectedBulk, bulkBusy, runBulk, t],
   )
 
   const allGroupPaths = useMemo(() => {
@@ -1906,6 +2059,16 @@ function WorkspacesPageInner() {
           actions={
             <div className="flex items-center gap-3">
               <ConnectionStatus connected={sseConnected} />
+              {selected.size > 0 && (
+                <div className="max-sm:hidden">
+                  <SelectionMenu
+                    items={selectionItems}
+                    label={t('bulk.selectionCount', { count: selected.size })}
+                    menuLabel={t('bulk.menuLabel')}
+                    className="bg-slate-700 hover:bg-slate-600 text-slate-100"
+                  />
+                </div>
+              )}
               <button
                 onClick={() => setShowCreate(!showCreate)}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 text-white transition-colors btn-smoke"
@@ -1917,6 +2080,47 @@ function WorkspacesPageInner() {
         />
 
         {error && <ErrorBanner message={error} />}
+
+        {bulkRunning && (
+          <div role="status" className="mb-4 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3 text-sm text-slate-300 max-sm:hidden">
+            {t('bulk.running', { action: t(`bulk.action.${bulkRunning.action}`), count: bulkRunning.count })}
+          </div>
+        )}
+        {bulkResult && (
+          <div
+            role="status"
+            data-testid="ws-bulk-result"
+            className="mb-4 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3 text-sm text-slate-200 max-sm:hidden"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <p className="font-medium">
+                {t('bulk.resultSummary', {
+                  action: t(`bulk.action.${bulkResult.action}`),
+                  ok: bulkResult.results.filter((r) => r.ok).length,
+                  total: bulkResult.results.length,
+                })}
+              </p>
+              <button
+                type="button"
+                onClick={() => setBulkResult(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-100"
+              >
+                {t('bulk.resultDismiss')}
+              </button>
+            </div>
+            {bulkResult.results.some((r) => !r.ok) && (
+              <ul className="mt-2 space-y-1 text-slate-300">
+                {bulkResult.results
+                  .filter((r): r is Extract<BulkResult, { ok: false }> => !r.ok)
+                  .map((r) => (
+                    <li key={r.id} className="font-mono text-xs">
+                      {t('bulk.resultFailed', { name: r.name, reason: r.reason })}
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {showCreate && (
           <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4 min-w-0">
@@ -2412,6 +2616,7 @@ function WorkspacesPageInner() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
+                  <HeaderCheckbox state={selectionHeader} onToggle={toggleAllRows} />
                   <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('table.mode')} sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
                   <SortableHeader label={t('table.pool')} sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
@@ -2428,6 +2633,8 @@ function WorkspacesPageInner() {
                   pathPrefix=""
                   parsedFilter={parsedFilter}
                   setFilterInput={setFilterInput}
+                  selected={selected}
+                  onToggleRow={toggleRow}
                 />
               </tbody>
             </table>
@@ -2437,6 +2644,7 @@ function WorkspacesPageInner() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
+                  <HeaderCheckbox state={selectionHeader} onToggle={toggleAllRows} />
                   <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('table.mode')} sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
                   <SortableHeader label={t('table.pool')} sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
@@ -2450,6 +2658,7 @@ function WorkspacesPageInner() {
                   const { def, runId, phaseStarts } = resolveStatus(ws)
                   return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
+                    <RowCheckbox id={ws.id} name={ws.attributes.name} checked={selected.has(ws.id)} onToggle={toggleRow} />
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1.5">
                         <Link

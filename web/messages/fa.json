@@ -102,6 +102,27 @@
       "clearLockedFilter": "پاک کردن فیلتر قفل‌شده",
       "filterLocked": "فیلتر به فضاهای کاری قفل‌شده"
     },
+    "bulk": {
+      "selectionCount": "انتخاب · {count}",
+      "menuLabel": "اقدامات برای فضاهای کاری انتخاب‌شده",
+      "selectAll": "انتخاب همه فضاهای کاری",
+      "selectRow": "انتخاب {name}",
+      "eligible": "{eligible} از {total} مجاز",
+      "action": {
+        "plan": "طرح",
+        "retry": "تلاش مجدد اجرا",
+        "cancel": "لغو اجرا",
+        "apply": "اعمال",
+        "discard": "کنار گذاشتن"
+      },
+      "confirmApply": "اجراهای برنامه‌ریزی‌شده روی فضاهای کاری انتخاب‌شده ({count}) اعمال شود؟\n\n{names}{more}\n\nاین کار زیرساخت واقعی را تغییر می‌دهد و قابل بازگشت نیست.",
+      "confirmDiscard": "اجراهای برنامه‌ریزی‌شده روی فضاهای کاری انتخاب‌شده ({count}) کنار گذاشته شود؟\n\n{names}{more}\n\nبرنامه‌ها دور ریخته می‌شوند و قابل بازیابی نیستند.",
+      "andMore": "\n…و {count} مورد دیگر",
+      "running": "در حال اجرای {action} روی فضاهای کاری انتخاب‌شده ({count})…",
+      "resultSummary": "{action}: {ok} از {total} موفق",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "بستن"
+    },
     "filter": {
       "placeholder": "فیلتر بر اساس نام، برچسب یا وضعیت — مثلاً «eu1»، «env:prod»، «status:errored»",
       "ariaLabel": "فیلتر فضاهای کاری",

@@ -102,6 +102,27 @@
       "clearLockedFilter": "مسح عامل تصفية المقفولة",
       "filterLocked": "التصفية لمساحات العمل المقفولة"
     },
+    "bulk": {
+      "selectionCount": "التحديد · {count}",
+      "menuLabel": "إجراءات لمساحات العمل المحددة",
+      "selectAll": "تحديد كل مساحات العمل",
+      "selectRow": "تحديد {name}",
+      "eligible": "{eligible} من {total} مؤهلة",
+      "action": {
+        "plan": "خطة",
+        "retry": "إعادة تشغيل",
+        "cancel": "إلغاء التشغيل",
+        "apply": "تطبيق",
+        "discard": "تجاهل"
+      },
+      "confirmApply": "هل تريد تطبيق التشغيلات المخططة على مساحات العمل المحددة ({count})؟\n\n{names}{more}\n\nهذا يغيّر البنية التحتية الفعلية ولا يمكن التراجع عنه.",
+      "confirmDiscard": "هل تريد تجاهل التشغيلات المخططة على مساحات العمل المحددة ({count})؟\n\n{names}{more}\n\nتُهمل الخطط ولا يمكن استرجاعها.",
+      "andMore": "\n…و{count} أخرى",
+      "running": "جارٍ تنفيذ {action} على مساحات العمل المحددة ({count})…",
+      "resultSummary": "{action}: نجح {ok} من {total}",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "إغلاق"
+    },
     "filter": {
       "placeholder": "التصفية حسب الاسم أو التسمية أو الحالة — مثل \"eu1\"، \"env:prod\"، \"status:errored\"",
       "ariaLabel": "تصفية مساحات العمل",

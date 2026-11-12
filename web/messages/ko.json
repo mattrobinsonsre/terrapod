@@ -102,6 +102,27 @@
       "clearLockedFilter": "잠김 필터 지우기",
       "filterLocked": "잠긴 워크스페이스로 필터링"
     },
+    "bulk": {
+      "selectionCount": "선택 · {count}",
+      "menuLabel": "선택한 워크스페이스에 대한 작업",
+      "selectAll": "모든 워크스페이스 선택",
+      "selectRow": "{name} 선택",
+      "eligible": "{total}개 중 {eligible}개 대상",
+      "action": {
+        "plan": "플랜",
+        "retry": "실행 재시도",
+        "cancel": "실행 취소",
+        "apply": "적용",
+        "discard": "폐기"
+      },
+      "confirmApply": "선택한 워크스페이스({count})의 계획된 실행을 적용하시겠습니까?\n\n{names}{more}\n\n실제 인프라가 변경되며 되돌릴 수 없습니다.",
+      "confirmDiscard": "선택한 워크스페이스({count})의 계획된 실행을 폐기하시겠습니까?\n\n{names}{more}\n\n계획이 폐기되며 복구할 수 없습니다.",
+      "andMore": "\n…외 {count}개",
+      "running": "선택한 워크스페이스({count})에서 {action} 실행 중…",
+      "resultSummary": "{action}: {total}개 중 {ok}개 성공",
+      "resultFailed": "{name}: {reason}",
+      "resultDismiss": "닫기"
+    },
     "filter": {
       "placeholder": "이름, 라벨 또는 상태로 필터 — 예: \"eu1\", \"env:prod\", \"status:errored\"",
       "ariaLabel": "워크스페이스 필터",
