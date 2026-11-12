@@ -21,9 +21,49 @@
  * does not tell two of them apart.
  */
 import { test, expect } from '@playwright/test'
+import { gzipSync } from 'zlib'
 import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api'
 
 const API_URL = process.env.API_URL || 'http://localhost:8000'
+
+/**
+ * A REAL single-file `.tar.gz`, because a configure resolves its inventory out
+ * of the archive at run-creation time. A placeholder body is not a tar, so the
+ * run was refused -- and before the fix in this branch it was refused as a 500
+ * rather than as something an operator could act on.
+ *
+ * The path is deliberately NOT under a wrapper directory: `_extract` strips a
+ * single top-level directory (a VCS provider wraps its archive in a
+ * commit-named one), so `ansible/hosts.yml` alone would be unwrapped to
+ * `hosts.yml` and land outside the workspace's `config-directory`.
+ *
+ * Same hand-built header as `catalog.spec.ts` uses, for the same reason: the
+ * suite has no tar dependency and one file does not earn one.
+ */
+function tarGz(entries: Array<[string, string]>): Buffer {
+  const blocks: Buffer[] = []
+  for (const [path, body] of entries) {
+    const content = Buffer.from(body)
+    const header = Buffer.alloc(512)
+    header.write(path)
+    header.write('0000644\0', 100)
+    header.write('0000000\0', 108)
+    header.write('0000000\0', 116)
+    header.write(content.length.toString(8).padStart(11, '0') + '\0', 124)
+    header.write('00000000000\0', 136)
+    header.fill(32, 148, 156)
+    header.write('0', 156)
+    header.write('ustar\0', 257)
+    const checksum = header.reduce((sum, byte) => sum + byte, 0)
+    header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148)
+    blocks.push(header, content, Buffer.alloc((512 - (content.length % 512)) % 512))
+  }
+  // The two 512-byte zero blocks that end an archive go ONCE, after every
+  // entry -- emitting them per file would terminate the tar at the first one
+  // and silently drop the rest.
+  blocks.push(Buffer.alloc(1024))
+  return gzipSync(Buffer.concat(blocks))
+}
 
 /** Queue a standalone configure through the API, returning its run id. */
 async function seedConfigure(
@@ -55,7 +95,13 @@ async function seedConfigure(
   // the signed capability replaced.
   const upRes = await fetch(cvJson.data.attributes['upload-url'] as string, {
     method: 'PUT',
-    body: 'terrapod-e2e-config-placeholder',
+    // TWO top-level entries on purpose. With only `ansible/`, `_extract`'s
+    // single-directory unwrap fires and strips it, leaving the inventory at
+    // the root and nothing at the workspace's `config-directory`.
+    body: tarGz([
+      ['ansible/hosts.yml', 'all:\n  hosts:\n    web1:\n'],
+      ['main.tf', '# e2e placeholder\n'],
+    ]),
   })
   if (!upRes.ok) throw new Error(`seedConfigure upload: ${upRes.status}`)
 

@@ -1720,8 +1720,28 @@ def _extract(tarball: str, dest: Path) -> None:
     import tarfile
 
     dest.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(tarball, mode="r:*") as tf:
-        tf.extractall(dest, filter="data")
+    try:
+        with tarfile.open(tarball, mode="r:*") as tf:
+            tf.extractall(dest, filter="data")
+    except (tarfile.TarError, EOFError, OSError) as exc:
+        # An unreadable archive answered 500 with no reason. `tarfile.ReadError`
+        # is neither `InventoryResolutionFailed` nor a `ValueError`, so it went
+        # straight past both of the create-run route's handlers -- the same
+        # untranslated-exception shape as the two fixed beside them, arriving
+        # through a third door.
+        #
+        # This IS the operator's problem to act on rather than ours: the archive
+        # they uploaded, or the one their VCS provider served, is not a readable
+        # tar. So it becomes the refusal that already carries that meaning and
+        # already has a translation (503, naming the file), instead of a status
+        # that says we broke.
+        #
+        # `filter="data"` can also raise here, which is deliberate: an archive
+        # that tries to escape `dest` is refused by the same path rather than
+        # being reported as a server fault.
+        raise InventoryResolutionFailed(
+            f"the configuration archive could not be read as a tar file: {exc}"
+        ) from exc
 
     # A VCS provider's archive is wrapped in a single commit-named directory
     # (`owner-repo-<sha>/`), so unwrap it -- otherwise every path an operator

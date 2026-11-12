@@ -653,3 +653,74 @@ class TestEveryMaterialisedSourceIsScanned:
             "fetched repository reaches ansible unscanned: a plugin config in it is "
             "no longer named and refused, and no exec bit is stripped"
         )
+
+
+class TestAnUnreadableArchiveIsARefusalNotAServerFault:
+    """A malformed configuration archive answered 500 with no reason.
+
+    `_extract` opened the tarball unguarded, so `tarfile.ReadError` -- which is
+    neither `InventoryResolutionFailed` nor a `ValueError` -- went past both of
+    the create-run route's handlers and surfaced as `Internal server error`.
+    The same untranslated-exception shape as the two fixed beside them, through
+    a third door, and found because this is the first end-to-end configure any
+    e2e spec creates: every earlier one intercepted the request instead.
+
+    The archive is the operator's to fix -- theirs, or the one their VCS
+    provider served -- so it becomes the refusal that already means that and
+    already has a translation (503, naming the file).
+    """
+
+    @staticmethod
+    def _extract(data: bytes, tmp_path):
+        from terrapod.services import inventory_resolve
+
+        tarball = tmp_path / "cv.tar.gz"
+        tarball.write_bytes(data)
+        return inventory_resolve._extract(str(tarball), tmp_path / "out")
+
+    def test_a_body_that_is_not_a_tar_at_all_is_refused_saying_so(self, tmp_path):
+        from terrapod.services import inventory_resolve
+
+        with pytest.raises(inventory_resolve.InventoryResolutionFailed) as e:
+            self._extract(b"terrapod-e2e-config-placeholder", tmp_path)
+        # The message has to name WHAT is wrong, or the operator is back to
+        # guessing -- which is the whole complaint about the 500.
+        assert "could not be read as a tar file" in str(e.value)
+
+    def test_valid_gzip_that_is_not_a_tar_is_refused_too(self, tmp_path):
+        """A different failure from the one above: this gets past the gzip
+        magic and dies on the tar structure, so it exercises the second half
+        of `mode="r:*"` rather than the first.
+
+        NOT a truncated gzip: that decompresses to an empty stream, which is a
+        legal empty tar and correctly raises nothing. Worth stating, because
+        "truncated upload" is the obvious thing to reach for here and it does
+        not test what it looks like it tests.
+        """
+        import gzip
+
+        from terrapod.services import inventory_resolve
+
+        with pytest.raises(inventory_resolve.InventoryResolutionFailed):
+            self._extract(gzip.compress(b"not a tar, just some bytes"), tmp_path)
+
+    def test_a_REAL_archive_still_extracts(self, tmp_path):
+        """The control. Without it, `raise` on every input would pass above."""
+        import io
+        import tarfile
+
+        from terrapod.services import inventory_resolve
+
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+            info = tarfile.TarInfo("ansible/hosts.yml")
+            body = b"all:\n  hosts:\n    web1:\n"
+            info.size = len(body)
+            tf.addfile(info, io.BytesIO(body))
+        self._extract(buf.getvalue(), tmp_path)
+        # UNWRAPPED, not `out/ansible/hosts.yml`: `_extract` strips a single
+        # top-level directory on purpose, because a VCS provider wraps its
+        # archive in a commit-named one. My first version of this assertion
+        # expected the wrapper to survive and the control is what caught it.
+        assert (tmp_path / "out" / "hosts.yml").is_file()
+        assert inventory_resolve  # the module under test, not a stray import
