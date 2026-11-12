@@ -281,6 +281,11 @@ test.describe('Run lifecycle UI', () => {
       const json = await res.json().catch(() => null);
       if (!Array.isArray(json?.data)) return route.fulfill({ response: res });
       for (const r of json.data) {
+        // `run-kind` is authoritative over `is-configure` (#2507), so setting
+        // only the latter leaves the run saying plan_apply and the configure
+        // badge correctly does not render. This test is about a COMPOSITE -- a
+        // plan+apply AND a configure -- which is what `full` means.
+        r.attributes['run-kind'] = 'full';
         r.attributes['is-configure'] = true;
         // The APPLY is the explaining phase here, deliberately: it proves the
         // configure badge is not merely inheriting the status badge's answer.

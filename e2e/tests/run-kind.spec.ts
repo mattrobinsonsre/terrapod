@@ -157,7 +157,7 @@ test.describe('The run document says what kind of run it is', () => {
     // visible, so neither the phone render nor any other surface can satisfy
     // or break it.
     await expect(
-      typeCell.getByText('Plan + apply', { exact: true }).filter({ visible: true }),
+      typeCell.getByText('plan + apply', { exact: true }).filter({ visible: true }),
     ).toHaveCount(0)
   })
 
@@ -180,7 +180,7 @@ test.describe('The run document says what kind of run it is', () => {
     await expect(
       page
         .locator('td')
-        .getByText('Plan + apply', { exact: true })
+        .getByText('plan + apply', { exact: true })
         .filter({ visible: true })
         .first(),
     ).toBeVisible()
