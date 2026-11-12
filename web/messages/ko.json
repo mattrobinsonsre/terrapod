@@ -138,12 +138,16 @@
       "termLabelAny": "{key}: (모든 값)",
       "termLabel": "{key}: {value}",
       "hintStatus": "상태",
-      "hintHealth": "상태",
       "hintLabel": "라벨",
       "hintLabelKey": "라벨 키",
       "hintName": "이름",
       "engineLabel": "엔진",
-      "engineAll": "모든 엔진"
+      "engineAll": "모든 엔진",
+      "flags": "플래그",
+      "termFlag": "플래그: {value}",
+      "termLocked": "잠김: {value}",
+      "hintFlag": "플래그",
+      "hintLocked": "잠김"
     },
     "row": {
       "removeLabelFilter": "클릭하여 필터에서 제거",
@@ -170,6 +174,14 @@
       "local": "로컬",
       "collapseAll": "모두 접기",
       "expandAll": "모두 펼치기"
+    },
+    "flagName": {
+      "state-diverged": "상태 불일치",
+      "no-agent-pool": "에이전트 풀 없음",
+      "no-live-agent-pool": "활성 에이전트 풀 없음",
+      "vcs-error": "VCS 오류",
+      "drifted": "드리프트됨",
+      "drift-errored": "드리프트 감지 실패"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "삭제 계속",
       "continuing": "계속 중…"
     },
-    "sealedWarning": "이 노드는 봉인되어 있어 여기서 삭제한 것은 다시 가져올 수 없습니다. 예정된 정리 작업이 이 캐시들을 건너뛰는 것도 그 때문입니다 — 이것은 영구적인 삭제입니다."
+    "sealedWarning": "이 노드는 봉인되어 있어 여기서 삭제한 것은 다시 가져올 수 없습니다. 예정된 정리 작업이 이 캐시들을 건너뛰는 것도 그 때문입니다 — 이것은 영구적인 삭제입니다.",
+    "warmAhead": {
+      "heading": "패키지 및 이미지 캐시 워밍",
+      "help": "버전을 아는 경우에는 반드시 적어 주세요. 버전을 지정한 워밍은 나중에 잠금 파일과 대조할 수 있지만 “무엇이든 최신인 것”은 대조할 수 없습니다. 각 줄은 <code>이름 버전</code> 형식으로 적습니다. Pulumi 플러그인은 뒤에 <code>os/arch</code> 토큰을 붙이면 특정 플랫폼을 워밍할 수 있습니다.",
+      "ecosystemLabel": "아티팩트 종류",
+      "ecosystemOff": "{ecosystem}(꺼짐)",
+      "sourceLabel": "가져올 위치",
+      "sourceDefault": "구성된 업스트림",
+      "upstreamIs": "<code>{url}</code>에서 가져옵니다.",
+      "upstreamPerReference": "각 이미지 참조는 자체 호스트를 지정하며, 그 호스트는 이 배포에 구성된 업스트림 중 하나여야 합니다.",
+      "itemsLabel": "아티팩트",
+      "imagesLabel": "이미지 참조",
+      "willWarm": "{count, plural, other {아티팩트 #개를 워밍합니다.}}",
+      "unversioned": "{count, plural, other {#개 줄에 버전이 없어 사용 가능한 최신 버전을 가져옵니다. 이는 재현 가능하지 않습니다.}}",
+      "versionRequired": "{count, plural, other {#개 줄에 버전이 없습니다.}} {ecosystem}은(는) 최신 버전을 확인할 색인을 제공하지 않으므로 모든 줄에 버전이 필요합니다.",
+      "tooMany": "한 번의 제출로 워밍할 수 있는 아티팩트는 최대 {max}개입니다.",
+      "confirm": "{count, plural, other {아티팩트 #개}}를 지금 워밍하시겠습니까?",
+      "warm": "워밍",
+      "warming": "워밍 중…",
+      "progress": "{total}개 중 {completed}개 완료",
+      "fetched": "{fetched, plural, other {파일 #개 가져옴}}",
+      "alreadyCached": "{files, plural, other {이미 캐시됨 (파일 #개)}}",
+      "finished": "{total}개 중 {succeeded}개 워밍됨 ({failed}개 실패)",
+      "sealed": "이 노드는 봉인되어 있어 업스트림에서 아무것도 가져올 수 없습니다. 봉인하기 전에 캐시를 워밍하거나, 봉인을 해제한 뒤 지금 워밍하세요.",
+      "errorEmpty": "워밍할 줄을 하나 이상 추가하세요.",
+      "errorSources": "워밍이 어디에서 가져올지 읽지 못했습니다",
+      "errorSubmit": "워밍을 시작하지 못했습니다",
+      "errorStatus": "워밍 작업을 읽지 못했습니다",
+      "helpLead": "무언가 요청하기 전에 아티팩트를 캐시로 가져옵니다 — 한 줄에 하나씩, 이름과 버전을 적습니다."
+    }
   },
   "catalog": {
     "title": "서비스 카탈로그",

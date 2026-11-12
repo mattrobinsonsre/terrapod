@@ -652,9 +652,26 @@ api:
         pypi:
           enabled: true
           upstream: https://pypi.org
+          # Extra registries this ecosystem may be WARMED from, by label.
+          # Serving always pulls through `upstream` above; these are reachable
+          # only from a warm submission that names one, which is what lets an
+          # operator fill this node from a nearer copy -- a sibling Terrapod, an
+          # internal mirror -- without changing the deployment default and
+          # restarting it. Labels rather than per-request URLs on purpose:
+          # `upstream` is the whole of this proxy's request-forgery surface
+          # precisely because it is set here, and a warm body carrying a URL
+          # would hand an admin-authenticated caller a server-side fetch to any
+          # host they name. Every ecosystem below has the same key.
+          #
+          # e.g.
+          #   mirrors:
+          #     hub: https://terrapod.hub.example/api/v1/packages/pypi
+          mirrors: {}
         npm:
           enabled: true
           upstream: https://registry.npmjs.org
+          # Warm-from mirrors by label; see `pypi.mirrors` above.
+          mirrors: {}
         # Pulumi resource and language plugins. Point the CLI at it with
         # PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES. Serves Pulumi runs only, but it
         # is on regardless: there is no engine on/off switch, and a proxy costs
@@ -662,6 +679,8 @@ api:
         pulumi:
           enabled: true
           upstream: https://get.pulumi.com/releases/plugins
+          # Warm-from mirrors by label; see `pypi.mirrors` above.
+          mirrors: {}
           # Where Terrapod's OWN bridged Pulumi provider plugin is published
           # (#1987). Separate from `upstream` on purpose: that is where PULUMI's
           # plugins come from, and pointing it here would send every other
@@ -674,11 +693,15 @@ api:
         go:
           enabled: true
           upstream: https://proxy.golang.org
+          # Warm-from mirrors by label; see `pypi.mirrors` above.
+          mirrors: {}
         # NuGet V3 flat container. Pulumi-only (C# SDK programs). Point a
         # nuget.config packageSource at this proxy's index.json.
         nuget:
           enabled: true
           upstream: https://api.nuget.org/v3-flatcontainer
+          # Warm-from mirrors by label; see `pypi.mirrors` above.
+          mirrors: {}
         # Ansible Galaxy v3 (collections). Point ansible-galaxy at it with a
         # galaxy_server entry whose url is this proxy's base. Also carries
         # private collection publishing and signature verification, so unlike
@@ -686,6 +709,8 @@ api:
         galaxy:
           enabled: true
           upstream: https://galaxy.ansible.com
+          # Warm-from mirrors by label; see `pypi.mirrors` above.
+          mirrors: {}
       provider_cache:
         enabled: true
         upstream_registries:
@@ -2122,8 +2147,20 @@ runners:
   # to disable debug mode across the deployment however workspaces are set.
   debugLingerSeconds: 1800
   terminationGracePeriodSeconds: 120  # Time budget for graceful shutdown + artifact uploads
+  # Runner token lifetime. tokenTTLSeconds is the fallback for a listener old
+  # enough not to say how long its Job needs; a current one asks for the Job's
+  # own deadline plus its launch and termination windows, and the API clamps
+  # that to maxTokenTTLSeconds.
+  #
+  # So the ceiling has to clear the LONGEST Job this deployment permits, which
+  # is configureTimeoutMinutes below. It did not: at 7200 a configure's token
+  # was capped two hours into a Job allowed three, and a configure that ran
+  # past it finished with a dead token — its log, its per-host events and its
+  # resource profile (which also carries why the run failed) every one a 401.
+  # The run was still errored correctly by the listener, so the loss was quiet.
+  # The API warns at startup if this pair is inconsistent.
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
-  maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
+  maxTokenTTLSeconds: 14400     # Runner token max TTL (4 hours; clears the 180-minute configure ceiling)
   staleTimeoutSeconds: 3600     # Seconds before a run with no Job status is marked errored
   # Seconds before a claimed run with no Job launched is errored (listener
   # claimed it but never created the Job — e.g. runner-token 401, K8s outage).

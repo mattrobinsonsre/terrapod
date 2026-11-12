@@ -128,6 +128,7 @@
       "ariaLabel": "Filter workspaces",
       "clear": "Clear",
       "status": "Status",
+      "flags": "Flags",
       "label": "Label",
       "back": "back",
       "valueCount": "{count, plural, one {# value} other {# values}}",
@@ -135,10 +136,13 @@
       "showing": "Showing {filtered} of {total}",
       "termName": "name: {value}",
       "termStatus": "status: {value}",
+      "termFlag": "flag: {value}",
+      "termLocked": "locked: {value}",
       "termLabelAny": "{key}: (any)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "health",
+      "hintFlag": "flag",
+      "hintLocked": "locked",
       "hintLabel": "label",
       "hintLabelKey": "label key",
       "hintName": "name",
@@ -170,6 +174,14 @@
     "empty": {
       "none": "No workspaces yet. Create one to get started.",
       "noMatch": "No workspaces match this filter."
+    },
+    "flagName": {
+      "state-diverged": "State diverged",
+      "no-agent-pool": "No agent pool",
+      "no-live-agent-pool": "No live agent pool",
+      "vcs-error": "VCS error",
+      "drifted": "Drifted",
+      "drift-errored": "Drift detection errored"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "Continue purge",
       "continuing": "Continuing…"
     },
-    "sealedWarning": "This node is sealed, so nothing purged here can be fetched again. The scheduled cleanup skips these caches for that reason — this is a permanent deletion."
+    "sealedWarning": "This node is sealed, so nothing purged here can be fetched again. The scheduled cleanup skips these caches for that reason — this is a permanent deletion.",
+    "warmAhead": {
+      "heading": "Warm package and image caches",
+      "helpLead": "Fetch artifacts into the cache before anything asks for them — one per line, as a name and a version.",
+      "help": "Give a version wherever you know it: a warm named at a version can afterwards be checked against a lockfile, and “whatever is newest” cannot. Write each line as <code>name version</code>; for Pulumi plugins, add trailing <code>os/arch</code> tokens to warm specific platforms.",
+      "ecosystemLabel": "Artifact kind",
+      "ecosystemOff": "{ecosystem} (switched off)",
+      "sourceLabel": "Fetch from",
+      "sourceDefault": "Configured upstream",
+      "upstreamIs": "Will fetch from <code>{url}</code>.",
+      "upstreamPerReference": "Each image reference names its own host, which has to be one of the upstreams this deployment has configured.",
+      "itemsLabel": "Artifacts",
+      "imagesLabel": "Image references",
+      "willWarm": "{count, plural, one {# artifact will be warmed.} other {# artifacts will be warmed.}}",
+      "unversioned": "{count, plural, one {# line names no version, so the newest available will be fetched. That is not reproducible.} other {# lines name no version, so the newest available will be fetched. That is not reproducible.}}",
+      "versionRequired": "{count, plural, one {# line names no version.} other {# lines name no version.}} {ecosystem} publishes no index to resolve a newest against, so every line needs one.",
+      "tooMany": "At most {max} artifacts can be warmed in one submission.",
+      "confirm": "Warm {count, plural, one {# artifact} other {# artifacts}} now?",
+      "warm": "Warm",
+      "warming": "Warming…",
+      "progress": "{completed} of {total} done",
+      "fetched": "{fetched, plural, one {fetched # file} other {fetched # files}}",
+      "alreadyCached": "{files, plural, one {already cached (# file)} other {already cached (# files)}}",
+      "finished": "Warmed {succeeded}/{total} ({failed} failed)",
+      "sealed": "This node is sealed, so it cannot fetch anything from upstream. Warm the caches before sealing it, or unseal it to warm them now.",
+      "errorEmpty": "Add at least one line to warm.",
+      "errorSources": "Could not read where warming would fetch from",
+      "errorSubmit": "Could not start warming",
+      "errorStatus": "Could not read the warming job"
+    }
   },
   "catalog": {
     "title": "Service Catalog",

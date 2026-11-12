@@ -138,12 +138,16 @@
       "termLabelAny": "{key}: （すべて）",
       "termLabel": "{key}: {value}",
       "hintStatus": "ステータス",
-      "hintHealth": "ヘルス",
       "hintLabel": "ラベル",
       "hintLabelKey": "ラベルキー",
       "hintName": "名前",
       "engineLabel": "エンジン",
-      "engineAll": "すべてのエンジン"
+      "engineAll": "すべてのエンジン",
+      "flags": "フラグ",
+      "termFlag": "フラグ: {value}",
+      "termLocked": "ロック済み: {value}",
+      "hintFlag": "フラグ",
+      "hintLocked": "ロック済み"
     },
     "row": {
       "removeLabelFilter": "クリックしてフィルターから削除",
@@ -170,6 +174,14 @@
       "local": "ローカル",
       "collapseAll": "すべて折りたたむ",
       "expandAll": "すべて展開"
+    },
+    "flagName": {
+      "state-diverged": "状態の乖離",
+      "no-agent-pool": "エージェントプールなし",
+      "no-live-agent-pool": "稼働中のエージェントプールなし",
+      "vcs-error": "VCSエラー",
+      "drifted": "ドリフト",
+      "drift-errored": "ドリフト検出に失敗"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "パージを続行",
       "continuing": "続行中…"
     },
-    "sealedWarning": "このノードはシール済みのため、ここでパージしたものは再取得できません。定期クリーンアップがこれらのキャッシュを対象外にしているのもそのためです — これは完全な削除です。"
+    "sealedWarning": "このノードはシール済みのため、ここでパージしたものは再取得できません。定期クリーンアップがこれらのキャッシュを対象外にしているのもそのためです — これは完全な削除です。",
+    "warmAhead": {
+      "heading": "パッケージとイメージのキャッシュをウォームアップ",
+      "help": "バージョンが分かるものには必ず指定してください。バージョンを指定したウォームアップは後からロックファイルと照合できますが、「いちばん新しいもの」では照合できません。各行は <code>名前 バージョン</code> の形式で記述します。Pulumi プラグインでは、末尾に <code>os/arch</code> トークンを付けると特定のプラットフォームをウォームアップできます。",
+      "ecosystemLabel": "成果物の種類",
+      "ecosystemOff": "{ecosystem}（無効）",
+      "sourceLabel": "取得元",
+      "sourceDefault": "設定済みの上流",
+      "upstreamIs": "<code>{url}</code> から取得します。",
+      "upstreamPerReference": "各イメージ参照はそれ自身のホストを指定します。そのホストは、このデプロイメントで設定済みの上流のいずれかである必要があります。",
+      "itemsLabel": "成果物",
+      "imagesLabel": "イメージ参照",
+      "willWarm": "{count, plural, other {#件の成果物をウォームアップします。}}",
+      "unversioned": "{count, plural, other {#行にバージョンの指定がないため、利用可能な最新版を取得します。これは再現性がありません。}}",
+      "versionRequired": "{count, plural, other {#行にバージョンの指定がありません。}} {ecosystem} は最新版を解決するためのインデックスを公開していないため、すべての行にバージョンが必要です。",
+      "tooMany": "1回の送信でウォームアップできる成果物は最大 {max} 件です。",
+      "confirm": "{count, plural, other {#件の成果物}}を今すぐウォームアップしますか？",
+      "warm": "ウォームアップ",
+      "warming": "ウォームアップ中…",
+      "progress": "{total} 件中 {completed} 件完了",
+      "fetched": "{fetched, plural, other {#件のファイルを取得}}",
+      "alreadyCached": "{files, plural, other {キャッシュ済み（#件のファイル）}}",
+      "finished": "{total} 件中 {succeeded} 件をウォームアップしました（{failed} 件失敗）",
+      "sealed": "このノードはシール済みのため、上流から何も取得できません。シールする前にキャッシュをウォームアップするか、シールを解除して今すぐウォームアップしてください。",
+      "errorEmpty": "ウォームアップする行を少なくとも1つ追加してください。",
+      "errorSources": "ウォームアップの取得元を読み取れませんでした",
+      "errorSubmit": "ウォームアップを開始できませんでした",
+      "errorStatus": "ウォームアップのジョブを読み取れませんでした",
+      "helpLead": "何かが要求する前に成果物をキャッシュへ取り込みます — 1行に1つ、名前とバージョンを記述します。"
+    }
   },
   "catalog": {
     "title": "サービスカタログ",

@@ -12,6 +12,10 @@ ceremony. The one exception is a **sealed** deployment, where nothing can be
 re-fetched; read [Sealed deployments](#sealed-deployments) before evicting
 anything there.
 
+**Filling one deliberately is [warming](#warming--filling-a-cache-before-anything-asks)**,
+which is how a restricted-network deployment is prepared: you fill the caches
+while upstream is still reachable, then seal the node.
+
 ---
 
 ## The four caches
@@ -96,6 +100,195 @@ On a sealed node the sweep **skips** the binary, provider and package caches
 entirely, because an evicted artifact there could never be refilled. It still
 sweeps VCS archives: a sealed node is forbidden from reaching a package registry,
 not from reaching your own VCS.
+
+---
+
+## Warming — filling a cache before anything asks
+
+Eviction is the other half of this page; warming is the half that matters before
+a node is disconnected. You fill the caches while upstream is still reachable,
+then seal the node — and the only way to know you got the set right is to name it
+explicitly and check afterwards what landed.
+
+Every artifact kind Terrapod caches can be warmed, from the API, from
+`go-terrapod`, from an MCP tool, and from the **Warm package and image caches**
+panel on the `/admin/binary-cache` page.
+
+| What | How |
+|---|---|
+| CLI binaries, provider binaries | `POST /api/v1/admin/binary-cache/warm-bulk` — synchronous, returns per-target results. See [Registry](registry.md#api-endpoints) |
+| Packages — `galaxy`, `pypi`, `npm`, `go`, `nuget`, `pulumi` | `POST /api/v1/admin/package-cache/warm` — asynchronous, returns a job id |
+| Container images | `POST /api/v1/admin/oci/warm` — asynchronous, returns a job id |
+| Either job's progress | `GET /api/v1/admin/warm-jobs/{job_id}` |
+| Where a warm would fetch from | `GET /api/v1/admin/package-cache/sources` |
+
+The VCS archive cache is not warmable and has no warm route: an archive is keyed
+by a commit SHA and a path set that only a workspace's own configuration
+produces, so there is nothing to name ahead of time. It fills itself on the first
+poll or run.
+
+### Name versions, not packages
+
+```sh
+curl -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+  https://terrapod.example.com/api/v1/admin/package-cache/warm \
+  -d '{"packages":[
+        {"ecosystem":"galaxy","name":"community.general","version":"9.2.0"},
+        {"ecosystem":"go","name":"github.com/spf13/cobra","version":"v1.8.1"},
+        {"ecosystem":"pulumi","name":"aws","version":"6.0.0"}
+      ]}'
+# → 202 {"data": {"id": "warm-9f2c…", "links": {"self": "…/admin/warm-jobs/warm-9f2c…"}}}
+```
+
+**A version is what makes a warm checkable.** Named at a version, the set you
+warmed can afterwards be compared against the lockfile or requirements file your
+runs actually pin; "whatever is newest" can be compared against nothing, and on a
+node about to be sealed an unverifiable warm is exactly the thing that gets
+discovered too late.
+
+Omitting `version` is a convenience and stays supported where the registry
+publishes a meaningful newest. **`pulumi` refuses it**: its download protocol has
+no index at all — the CLI already knows the version it wants and asks for one
+filename — so there is nothing to resolve a bare name against, and the
+submission is refused with a 422 saying so rather than accepted and warmed to
+something arbitrary.
+
+Each ecosystem names its artifacts its own way, and `name` is that name:
+
+| Ecosystem | `name` | Example |
+|---|---|---|
+| `galaxy` | `namespace.collection` | `community.general` |
+| `pypi` | the project | `requests` |
+| `npm` | the package, scope included | `@scope/left-pad` |
+| `go` | the module path | `github.com/spf13/cobra` |
+| `nuget` | the package id | `Newtonsoft.Json` |
+| `pulumi` | `plugin`, or `kind:plugin` | `aws`, `language:python` |
+| `oci` | `host/repository:tag` | `quay.io/ansible/awx-ee:24.6.1` |
+
+**Pulumi plugins are published per platform**, so a `pulumi` item takes an
+optional `platforms` list of `os/arch` pairs and defaults to the runner's own
+`linux/amd64` and `linux/arm64`. Warming one architecture leaves the other to be
+discovered after sealing, which is the failure this feature exists to prevent.
+
+### What a warm caches, beyond the artifact
+
+Four of the six ecosystems serve an index document that a sealed node has no
+other way to obtain, and warming the artifact alone leaves a cache that looks
+full and cannot answer:
+
+| Ecosystem | Also cached | Why it is not optional |
+|---|---|---|
+| `galaxy` | the collection detail, the version list, and that version's detail | `ansible-galaxy` resolves and reads `download_url` from these before it downloads anything |
+| `npm` | the packument | the dependency ranges live there and nowhere else |
+| `go` | `@v/list`, and all three of `.info`, `.mod` and `.zip` | the toolchain reads `.mod` to resolve the graph long before it fetches source |
+| `nuget` | the versions document | `restore` resolves against it first |
+| `pypi` | **every file for the version**, plus PEP 658 metadata sidecars | which wheel pip selects depends on the interpreter and platform doing the installing |
+| `pulumi` | nothing else — the client never asks for a list | |
+
+### Warming from somewhere nearer than the public registry
+
+A node being prepared for a restricted network often has a closer copy to pull
+from: a sibling Terrapod, or an internal mirror. Declare it once, by **label**:
+
+```yaml
+# values.yaml
+api:
+  config:
+    registry:
+      package_cache:
+        galaxy:
+          upstream: https://galaxy.ansible.com
+          mirrors:
+            hub: https://terrapod.hub.example/api/v1/package-cache/galaxy
+```
+
+…and then name that label per submission:
+
+```sh
+-d '{"packages":[{"ecosystem":"galaxy","name":"community.general",
+                  "version":"9.2.0","source":"hub"}]}'
+```
+
+`mirrors` affects **warming only**. Serving always pulls through `upstream`, so
+adding one changes nothing about how runs resolve — which is what makes it safe
+to add to a running deployment.
+
+**`source` takes a label and never a URL.** `upstream` is the whole of this
+proxy's request-forgery surface precisely because it is set in the deployment's
+own configuration; a request body carrying a URL would hand an
+admin-authenticated caller a server-side fetch to any host they named. An
+undeclared label is refused with a 422 that lists the ones that are declared.
+
+`oci` needs none of this and takes no `source`: an image reference's own first
+path component names its host, chosen against `registry.oci.upstreams`, so the
+per-reference choice was always there.
+
+To see what a submission would do before making one:
+
+```sh
+curl -H "$AUTH" https://terrapod.example.com/api/v1/admin/package-cache/sources
+# → {"data": [{"id": "galaxy", "attributes": {
+#       "ecosystem": "galaxy", "enabled": true,
+#       "upstream": "https://galaxy.ansible.com",
+#       "mirrors": {"hub": "https://terrapod.hub.example/api/v1/package-cache/galaxy"},
+#       "resolves-latest": true}}, …],
+#    "meta": {"max-items": 500, "sealed": false}}
+```
+
+### Watching the job
+
+A submission returns a job id rather than a result, because a real dependency
+closure outlives an HTTP request and a call that times out halfway leaves you
+unsure what landed.
+
+```sh
+curl -H "$AUTH" https://terrapod.example.com/api/v1/admin/warm-jobs/warm-9f2c…
+# → {"data": {"attributes": {
+#       "status": "finished", "total": 3, "completed": 3,
+#       "succeeded": 2, "failed": 1,
+#       "outcomes": [
+#         {"ecosystem": "galaxy", "ref": "community.general@9.2.0", "ok": true,
+#          "files": 4, "fetched": 4, "source": ""},
+#         {"ecosystem": "pypi", "ref": "requests@2.32.3", "ok": true,
+#          "files": 6, "fetched": 0, "source": "https://pypi.org"},
+#         {"ecosystem": "npm", "ref": "nope", "ok": false,
+#          "detail": "404 from upstream", "files": 0, "fetched": 0}]}}}
+```
+
+Read the **outcomes**, not the counts. "One failed" across twenty packages is not
+something you can act on, and finding the specific gaps before you seal is the
+entire purpose. One item failing never stops the rest.
+
+Three outcomes, not two:
+
+- **`fetched` equal to `files`** — this run pulled them.
+- **`fetched` 0 with `files` above 0** — it was already cached. Warming is
+  idempotent and resumable by design, so re-running is the normal way to close
+  the last gaps after a transient upstream failure; without this distinction a
+  converged re-run reports exactly what the first run did and you cannot tell
+  that it finished.
+- **`ok` false** — `detail` says why.
+
+`detail` on a *successful* item names a part that did not land — one architecture
+of a Pulumi plugin, say — rather than reporting a clean success for a half-warmed
+item.
+
+At most **500 items** per submission, which `meta.max-items` reports; it is a
+guard against a paste meant for a different box.
+
+### On a sealed node, warming is refused
+
+```sh
+# → 409 {"detail": "This node is sealed (registry.cache_only), so nothing can be
+#        fetched from upstream. Warm before sealing, or unseal to warm."}
+```
+
+A 409 rather than a job that reports zero successes, because "0 succeeded" on a
+sealed node looks exactly like a set of missing packages and would send you
+looking upstream for a problem that is on this side.
+`GET /admin/package-cache/sources` reports `meta.sealed` as well, so a client can
+say warming is unavailable instead of offering a form whose submission can only
+fail.
 
 ---
 
@@ -520,7 +713,9 @@ The scheduled sweep knows this and skips those three categories entirely. **The
 manual routes do not** — they do exactly what you ask. So on a sealed node, treat
 a package-cache eviction as a deletion: confirm you can re-warm it (with
 `cache_only` off, or from an internal mirror) before you remove it. See
-[Warming ahead of a seal](package-cache.md#warming-ahead-of-a-seal).
+[Warming](#warming--filling-a-cache-before-anything-asks), and note that warming
+is itself refused on a sealed node — so "I will re-warm it afterwards" is only a
+plan if you unseal first.
 
 The VCS archive cache is unaffected. Sealing forbids reaching a package registry,
 not reaching your own VCS, so an evicted archive is re-fetched by the next poll

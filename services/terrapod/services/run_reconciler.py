@@ -203,10 +203,37 @@ async def _check_configure_progress(db: AsyncSession, run: Run, phase: str) -> N
     await redis.setex(key, max(window * 2, 600), f"{digest}:{now.timestamp()}")
 
 
+#: What a promoted log says about itself (#2526).
+#:
+#: The Redis snapshot is a bounded TAIL -- the live stream holds the last ~500
+#: lines -- so promoting it stores something that reads exactly like a complete
+#: log and is not one. A measured case: 45 KB of a 109 KB configure log, with
+#: the PLAY RECAP in it and the failing task's output above the cut.
+#:
+#: A line in the object rather than a new attribute on the run, deliberately.
+#: It is self-describing, so it reaches every reader of the log -- the viewer,
+#: the download, an operator curling the artifact -- without an attribute to
+#: add to the API, the SDK, the provider, the MCP tools and the UI, each of
+#: which would need to learn to render it.
+LOG_TAIL_NOTICE = (
+    b"[terrapod] The runner did not store this phase's log, so what follows is "
+    b"the tail Terrapod streamed live -- the last few hundred lines, not the "
+    b"whole run. The usual cause is the Job being killed before it could "
+    b"upload; a runner token that expired mid-run is the other (see "
+    b"runners.maxTokenTTLSeconds).\n"
+)
+
+
 async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
     """Promote live-streamed log from Redis to object storage if the runner
     didn't upload its own final log.  This prevents log loss when a Job fails
     before the entrypoint's log upload step (or when the upload itself fails).
+
+    **The promoted copy says what it is.** The Redis key is written with a
+    300-second TTL, so without this the run has no log at all five minutes
+    after it ends -- but the snapshot is a tail, and storing it unannounced
+    makes a truncated log indistinguishable from a complete one. See
+    `LOG_TAIL_NOTICE`.
     """
     from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
     from terrapod.storage import get_storage
@@ -239,11 +266,14 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
         if live_data:
             if isinstance(live_data, str):
                 live_data = live_data.encode()
-            await storage.put(log_key, live_data)
+            await storage.put(log_key, LOG_TAIL_NOTICE + live_data)
             logger.info(
                 "Persisted live log from Redis to storage",
                 run_id=run_id,
                 phase=phase,
+                # So an operator who finds a short log can tell from the API's
+                # own logs that it is a promoted tail rather than all there was.
+                promoted_tail_bytes=len(live_data),
             )
     except Exception as e:
         logger.warning("Failed to persist live log", run_id=run_id, error=str(e))
@@ -585,10 +615,47 @@ async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
         # Typed OOM message when the listener captured the K8s
         # terminated reason (#430). runner_exit_status is set by
         # report_job_status; we just read it here.
-        await _handle_failed(db, run, _build_failure_message(run, status))
+        #
+        # For a configure, what the HOSTS said first (#2525). Keyed on the
+        # phase rather than on `run.is_configure`, which is true of a composite
+        # run whose apply Job is the one that failed -- a host summary on an
+        # apply failure would be last cycle's evidence attached to this one's
+        # cause.
+        await _handle_failed(
+            db,
+            run,
+            _build_failure_message(
+                run,
+                status,
+                host_summary=(
+                    await _configure_host_summary(db, run) if phase == "configure" else None
+                ),
+            ),
+        )
 
 
-def _build_failure_message(run: Run, status: str) -> str:
+async def _configure_host_summary(db: AsyncSession, run: Run) -> str | None:
+    """A failed configure's per-host summary, or None. Never raises (#2525).
+
+    Best-effort for the same reason `_persist_live_log_if_missing` is: this runs
+    on the path that records WHY a run failed, so a storage or query problem
+    here must degrade to the bare exit code rather than leave the run with no
+    terminal transition at all.
+    """
+    try:
+        from terrapod.services import host_results_service
+
+        return await host_results_service.failure_summary(db, run)
+    except Exception as exc:  # noqa: BLE001 — see the docstring
+        logger.warning(
+            "could not summarise a failed configure's hosts",
+            run_id=str(run.id),
+            error=str(exc),
+        )
+        return None
+
+
+def _build_failure_message(run: Run, status: str, *, host_summary: str | None = None) -> str:
     """Render a typed error message from runner_exit_status when set.
 
     When the listener captured a K8s container-terminated `reason`, the
@@ -600,6 +667,11 @@ def _build_failure_message(run: Run, status: str) -> str:
         "clean"  — exit 0 (shouldn't reach here since status==failed)
     Returns a human-readable message naming the cause and pointing at
     the actionable knob (resource_memory bump for OOM).
+
+    `host_summary` is a failed configure's per-host account (#2525), which
+    takes the place of the runner's own reason when there is one -- see the
+    comment where it is read. An OOM or an external SIGKILL still wins over
+    both: a killed runner's hosts failed because it was killed.
     """
     if run.runner_exit_status == "oom":
         peak_h = _human_bytes(run.peak_memory_bytes) if run.peak_memory_bytes else None
@@ -621,7 +693,19 @@ def _build_failure_message(run: Run, status: str) -> str:
         )
     # The runner's own account of the failure, when it sent one (#1631):
     # resource-profile stores it as error_message before the Job ends.
-    reason = run.error_message or ""
+    #
+    # A configure's host summary REPLACES it rather than joining it (#2525).
+    # The two answer the same question and the summary answers it specifically:
+    # the runner's reason for an ansible rc 2 is "the playbook failed on one or
+    # more hosts", which the summary says while also naming which hosts, which
+    # task and what the module reported. Keeping both would put the general form
+    # under the specific one in every notification body.
+    #
+    # And it is the one of the two that survives the failure #2526 describes: a
+    # configure longer than its token's lifetime loses the resource-profile POST
+    # that carries the runner's reason, while the rows were ingested earlier --
+    # so on exactly the long runs that most need a cause, this is all there is.
+    reason = host_summary or run.error_message or ""
     if run.runner_exit_status == "error" and run.runner_exit_code is not None:
         exited = f"Runner exited with code {run.runner_exit_code}"
         return f"{reason}\n\n{exited}" if reason else exited

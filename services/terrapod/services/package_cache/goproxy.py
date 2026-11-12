@@ -85,14 +85,23 @@ def cache_name(module: str) -> str:
     return module
 
 
-def artifact_for(module: str, version: str, suffix: str) -> Artifact:
-    """One immutable file of a module version — `.info`, `.mod` or `.zip`."""
+def artifact_for(module: str, version: str, suffix: str, *, base: str | None = None) -> Artifact:
+    """One immutable file of a module version — `.info`, `.mod` or `.zip`.
+
+    `base` overrides the configured upstream for ONE call. Warming uses it to
+    pull from a named mirror (`registry.package_cache.<eco>.mirrors`); serving
+    never passes it, so the proxy's own request-forgery surface is unchanged.
+    The URL is BUILT from the base here rather than read out of an index, because
+    the proxy protocol publishes no document carrying it — so unlike pypi, npm
+    and galaxy this one has to be told.
+    """
+    root = (base or upstream_base()).rstrip("/")
     return Artifact(
         ecosystem=ECOSYSTEM,
         name=cache_name(module),
         version=version,
         filename=f"{version}{suffix}",
-        upstream_url=f"{upstream_base()}/{module}/@v/{version}{suffix}",
+        upstream_url=f"{root}/{module}/@v/{version}{suffix}",
         # The proxy protocol publishes no digest alongside these; integrity
         # comes from the client's own checksum database, which it consults
         # independently of us. Claiming one here would imply a check we do not
@@ -115,7 +124,7 @@ SUFFIXES = tuple(_CONTENT_TYPES)
 
 
 async def fetch_document(
-    module: str, name: str, *, client: httpx.AsyncClient | None = None
+    module: str, name: str, *, client: httpx.AsyncClient | None = None, base: str | None = None
 ) -> bytes:
     """Fetch one of the mutable documents — `@v/list` or `@latest`.
 
@@ -125,7 +134,7 @@ async def fetch_document(
     a re-serialisation.
     """
     path = "@v/list" if name == LIST_DOC else "@latest"
-    url = f"{upstream_base()}/{module}/{path}"
+    url = f"{(base or upstream_base()).rstrip('/')}/{module}/{path}"
     owns = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
     try:

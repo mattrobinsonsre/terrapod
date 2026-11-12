@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { parseSort, readPref, serializeSort, sortStorageKey, writePref } from './view-prefs'
 
 export interface SortState<K extends string> {
   key: K
@@ -10,11 +11,25 @@ export function useSortable<T, K extends string>(
   defaultKey: K,
   defaultDirection: 'asc' | 'desc',
   accessor: (item: T, key: K) => string | number | null | undefined,
+  // A table id opts this call site in to keeping its sort for the life of the tab.
+  tableId?: string,
 ) {
-  const [sortState, setSortState] = useState<SortState<K>>({
-    key: defaultKey,
-    direction: defaultDirection,
+  const storageKey = tableId ? sortStorageKey(tableId) : null
+  // Read in the initializer, as the Workspaces page does for its filter, so there is no
+  // effect that sets state and no first render with the default sort.
+  const [sortState, setSortState] = useState<SortState<K>>(() => {
+    const stored =
+      storageKey && typeof window !== 'undefined'
+        ? parseSort<K>(readPref(window.sessionStorage, storageKey))
+        : null
+    return stored ?? { key: defaultKey, direction: defaultDirection }
   })
+
+  useEffect(() => {
+    if (!storageKey) return
+    const isDefault = sortState.key === defaultKey && sortState.direction === defaultDirection
+    writePref(window.sessionStorage, storageKey, isDefault ? '' : serializeSort(sortState))
+  }, [sortState, storageKey, defaultKey, defaultDirection])
 
   function toggleSort(key: K) {
     setSortState((prev) =>

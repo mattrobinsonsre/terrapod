@@ -138,12 +138,16 @@
       "termLabelAny": "{key}: (valfri)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "hälsa",
       "hintLabel": "etikett",
       "hintLabelKey": "etikettnyckel",
       "hintName": "namn",
       "engineLabel": "Motor",
-      "engineAll": "Alla motorer"
+      "engineAll": "Alla motorer",
+      "flags": "Flaggor",
+      "termFlag": "flagga: {value}",
+      "termLocked": "låst: {value}",
+      "hintFlag": "flagga",
+      "hintLocked": "låst"
     },
     "row": {
       "removeLabelFilter": "Klicka för att ta bort från filtret",
@@ -170,6 +174,14 @@
       "local": "Lokal",
       "collapseAll": "Fäll ihop alla",
       "expandAll": "Expandera alla"
+    },
+    "flagName": {
+      "state-diverged": "Tillstånd avvikande",
+      "no-agent-pool": "Ingen agentpool",
+      "no-live-agent-pool": "Ingen aktiv agentpool",
+      "vcs-error": "VCS-fel",
+      "drifted": "Drift",
+      "drift-errored": "Driftdetektering misslyckades"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "Fortsätt rensningen",
       "continuing": "Fortsätter…"
     },
-    "sealedWarning": "Den här noden är förseglad, så inget som rensas här kan hämtas på nytt. Den schemalagda rensningen hoppar över dessa cachar av just det skälet — detta är en permanent borttagning."
+    "sealedWarning": "Den här noden är förseglad, så inget som rensas här kan hämtas på nytt. Den schemalagda rensningen hoppar över dessa cachar av just det skälet — detta är en permanent borttagning.",
+    "warmAhead": {
+      "heading": "Förvärm paket- och image-cachar",
+      "help": "Ange en version där den är känd: en förvärmning som namnger en version går sedan att stämma av mot en låsfil, ”vad som nu är nyast” gör det inte. Skriv varje rad som <code>namn version</code>; för Pulumi-plugins lägger du till efterföljande <code>os/arch</code>-tokens för att förvärma vissa plattformar.",
+      "ecosystemLabel": "Artefakttyp",
+      "ecosystemOff": "{ecosystem} (avstängt)",
+      "sourceLabel": "Hämta från",
+      "sourceDefault": "Konfigurerad uppströmskälla",
+      "upstreamIs": "Hämtas från <code>{url}</code>.",
+      "upstreamPerReference": "Varje image-referens namnger sin egen värd, och den måste vara en av de uppströmskällor som den här installationen har konfigurerat.",
+      "itemsLabel": "Artefakter",
+      "imagesLabel": "Image-referenser",
+      "willWarm": "{count, plural, one {# artefakt kommer att förvärmas.} other {# artefakter kommer att förvärmas.}}",
+      "unversioned": "{count, plural, one {# rad namnger ingen version, så den senast tillgängliga hämtas. Det är inte reproducerbart.} other {# rader namnger ingen version, så den senast tillgängliga hämtas för var och en. Det är inte reproducerbart.}}",
+      "versionRequired": "{count, plural, one {# rad namnger ingen version.} other {# rader namnger ingen version.}} {ecosystem} publicerar inget index att lösa upp ett nyaste mot, så varje rad behöver en.",
+      "tooMany": "Högst {max} artefakter kan förvärmas i en inlämning.",
+      "confirm": "Förvärm {count, plural, one {# artefakt} other {# artefakter}} nu?",
+      "warm": "Förvärm",
+      "warming": "Förvärmer…",
+      "progress": "{completed} av {total} klara",
+      "fetched": "{fetched, plural, one {hämtade # fil} other {hämtade # filer}}",
+      "alreadyCached": "{files, plural, one {redan i cachen (# fil)} other {redan i cachen (# filer)}}",
+      "finished": "Förvärmde {succeeded}/{total} ({failed} misslyckades)",
+      "sealed": "Den här noden är förseglad och kan därför inte hämta något uppströms. Förvärm cacharna innan du förseglar den, eller häv förseglingen för att förvärma dem nu.",
+      "errorEmpty": "Lägg till minst en rad att förvärma.",
+      "errorSources": "Det gick inte att läsa varifrån förvärmningen skulle hämta",
+      "errorSubmit": "Det gick inte att starta förvärmningen",
+      "errorStatus": "Det gick inte att läsa förvärmningsjobbet",
+      "helpLead": "Hämta artefakter till cachen innan något begär dem — en per rad, som ett namn och en version."
+    }
   },
   "catalog": {
     "title": "Tjänstekatalog",

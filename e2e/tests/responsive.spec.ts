@@ -754,6 +754,11 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByText('Total', { exact: true })).toBeHidden();
     await expect(page.getByText('Locked', { exact: true })).toBeHidden();
     await expect(page.getByText('Health', { exact: true })).toBeVisible();
+    // The Flags dropdown is desktop-only too, so a phone keeps three controls
+    // (Health, Status, Label) and reaches one condition through the filter
+    // input. Asserting it ABSENT is what stops it being reintroduced.
+    await expect(page.getByRole('button', { name: 'Flags' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Status' })).toBeVisible();
     await expectNoHorizontalPageScroll(page);
   });
 
@@ -2726,6 +2731,40 @@ test.describe('Workspace form sections (#2253)', () => {
     page.once('dialog', async (d) => { msg = d.message(); await d.dismiss() })
     await page.getByTestId('package-bulk-purge').click()
     await expect.poll(() => msg, { timeout: 5_000 }).toMatch(/cannot be undone/i)
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the cache-warm panel fits and is operable at phone width (#2486)', async ({ page }) => {
+    // A fifth stacked section on the page whose shape overflows most readily,
+    // and the one with the widest unbreakable content: the effective upstream
+    // is a full URL on one line, which is exactly what pushes a 412px viewport
+    // sideways if it is not allowed to wrap.
+    await page.goto('/admin/binary-cache')
+    await expect(page.getByTestId('cache-warm-section')).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // Collapsed by default, so the page does not open on five expanded
+    // sections. Opening it is what puts the two selects, the textarea and the
+    // URL on screen together.
+    await page.getByTestId('cache-warm-toggle').click()
+    await expect(page.getByTestId('cache-warm-upstream')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // The submit is a real button with a thumb-sized target, not a coloured
+    // text link — and it is disabled until there is something to warm, which
+    // is the state an empty textarea leaves it in.
+    const submit = page.getByTestId('cache-warm-submit')
+    const box = await submit.boundingBox()
+    expect(box, 'the warm button has no box').not.toBeNull()
+    expect(box!.height, `the warm button is ${box!.height}px tall`).toBeGreaterThanOrEqual(44)
+    await expect(submit).toBeDisabled()
+
+    // Say what will happen before it happens: typing an item previews the
+    // count, and the panel still fits with the preview and its warning on
+    // screen. `aws` with no version is the refused case for pulumi, so the
+    // preview has its longest content.
+    await page.getByTestId('cache-warm-items').fill('community.general 9.2.0\naws')
+    await expect(page.getByTestId('cache-warm-preview')).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 

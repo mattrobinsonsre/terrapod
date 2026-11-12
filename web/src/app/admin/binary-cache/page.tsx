@@ -14,6 +14,7 @@ import { usePollingInterval } from '@/lib/use-polling-interval'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { CacheWarmPanel } from '@/components/cache-warm-panel'
 import { PackageCachePanel } from '@/components/package-cache-panel'
 import { VcsArchiveCachePanel } from '@/components/vcs-archive-cache-panel'
 
@@ -80,6 +81,7 @@ export default function CachePage() {
   }, [])
   const { sortedItems: sortedEntries, sortState: binarySortState, toggleSort: toggleBinarySort } = useSortable<CachedBinary, BinarySortKey>(
     entries, 'cached-at', 'desc', binaryAccessor,
+    'binary-cache-binaries',
   )
 
   type ProviderSortKey = 'provider' | 'version' | 'hostname' | 'os' | 'arch' | 'cached-at'
@@ -95,6 +97,7 @@ export default function CachePage() {
   }, [])
   const { sortedItems: sortedProviders, sortState: providerSortState, toggleSort: toggleProviderSort } = useSortable<CachedProvider, ProviderSortKey>(
     providerEntries, 'cached-at', 'desc', providerAccessor,
+    'binary-cache-providers',
   )
 
   useEffect(() => {
@@ -550,6 +553,16 @@ export default function CachePage() {
                 the archive list is cursor-paged, and a tick that restarted
                 the walk would throw away the pages just loaded. */}
             <PackageCachePanel onError={setError} onSuccess={setSuccess} formatDate={formatDate} />
+            {/* Warming for the caches whose only warm path was the API (#2486),
+                placed directly under the package-cache listing it fills: the
+                listing says what is missing and this is what closes the gap.
+                It covers the container mirror as well, which is warmable and is
+                not a package cache -- there is no section of its own on this
+                page for it, and a second page for one control would be worse
+                than one panel that names both. It carries its own async job
+                watch, because unlike the bulk warm at the top of this page the
+                submission returns a job id rather than a result. */}
+            <CacheWarmPanel onError={setError} onSuccess={setSuccess} />
             <VcsArchiveCachePanel onError={setError} onSuccess={setSuccess} formatDate={formatDate} />
           </>
         )}

@@ -138,12 +138,16 @@
       "termLabelAny": "{key} : (toutes)",
       "termLabel": "{key} : {value}",
       "hintStatus": "statut",
-      "hintHealth": "santé",
       "hintLabel": "label",
       "hintLabelKey": "clé de label",
       "hintName": "nom",
       "engineLabel": "Moteur",
-      "engineAll": "Tous les moteurs"
+      "engineAll": "Tous les moteurs",
+      "flags": "Indicateurs",
+      "termFlag": "indicateur: {value}",
+      "termLocked": "verrouillé: {value}",
+      "hintFlag": "indicateur",
+      "hintLocked": "verrouillé"
     },
     "row": {
       "removeLabelFilter": "Cliquez pour retirer du filtre",
@@ -170,6 +174,14 @@
       "local": "Local",
       "collapseAll": "Tout réduire",
       "expandAll": "Tout développer"
+    },
+    "flagName": {
+      "state-diverged": "État divergent",
+      "no-agent-pool": "Aucun pool d’agents",
+      "no-live-agent-pool": "Aucun pool d’agents actif",
+      "vcs-error": "Erreur VCS",
+      "drifted": "Dérive détectée",
+      "drift-errored": "Échec de la détection de dérive"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "Poursuivre la purge",
       "continuing": "Poursuite…"
     },
-    "sealedWarning": "Ce nœud est scellé : rien de ce qui est purgé ici ne pourra être récupéré de nouveau. Le nettoyage planifié ignore ces caches pour cette raison — il s'agit d'une suppression définitive."
+    "sealedWarning": "Ce nœud est scellé : rien de ce qui est purgé ici ne pourra être récupéré de nouveau. Le nettoyage planifié ignore ces caches pour cette raison — il s'agit d'une suppression définitive.",
+    "warmAhead": {
+      "heading": "Préchauffer les caches de paquets et d''images",
+      "help": "Indiquez une version chaque fois que vous la connaissez : un préchauffage nommé à une version peut ensuite être confronté à un fichier de verrouillage, alors que « le plus récent, quel qu''il soit » ne le peut pas. Écrivez chaque ligne sous la forme <code>nom version</code> ; pour les plugins Pulumi, ajoutez des jetons <code>os/arch</code> en suffixe afin de préchauffer des plateformes précises.",
+      "ecosystemLabel": "Type d''artefact",
+      "ecosystemOff": "{ecosystem} (désactivé)",
+      "sourceLabel": "Récupérer depuis",
+      "sourceDefault": "Amont configuré",
+      "upstreamIs": "Sera récupéré depuis <code>{url}</code>.",
+      "upstreamPerReference": "Chaque référence d''image nomme son propre hôte, qui doit être l''un des amonts configurés dans ce déploiement.",
+      "itemsLabel": "Artefacts",
+      "imagesLabel": "Références d''image",
+      "willWarm": "{count, plural, one {# artefact sera préchauffé.} other {# artefacts seront préchauffés.}}",
+      "unversioned": "{count, plural, one {# ligne n''indique aucune version : le plus récent disponible sera donc récupéré. Ce n''est pas reproductible.} other {# lignes n''indiquent aucune version : le plus récent disponible sera donc récupéré. Ce n''est pas reproductible.}}",
+      "versionRequired": "{count, plural, one {# ligne n''indique aucune version.} other {# lignes n''indiquent aucune version.}} {ecosystem} ne publie aucun index permettant de résoudre un plus récent, chaque ligne doit donc en indiquer une.",
+      "tooMany": "Au plus {max} artefacts peuvent être préchauffés en un seul envoi.",
+      "confirm": "Préchauffer {count, plural, one {# artefact} other {# artefacts}} maintenant ?",
+      "warm": "Préchauffer",
+      "warming": "Préchauffage…",
+      "progress": "{completed} sur {total} terminés",
+      "fetched": "{fetched, plural, one {# fichier récupéré} other {# fichiers récupérés}}",
+      "alreadyCached": "{files, plural, one {déjà en cache (# fichier)} other {déjà en cache (# fichiers)}}",
+      "finished": "{succeeded}/{total} préchauffés ({failed} en échec)",
+      "sealed": "Ce nœud est scellé : il ne peut donc rien récupérer depuis l''amont. Préchauffez les caches avant de le sceller, ou descellez-le pour les préchauffer maintenant.",
+      "errorEmpty": "Ajoutez au moins une ligne à préchauffer.",
+      "errorSources": "Impossible de déterminer depuis où le préchauffage récupérerait",
+      "errorSubmit": "Impossible de démarrer le préchauffage",
+      "errorStatus": "Impossible de lire la tâche de préchauffage",
+      "helpLead": "Récupérez les artefacts dans le cache avant que quoi que ce soit ne les demande — un par ligne, sous la forme d''un nom et d''une version."
+    }
   },
   "catalog": {
     "title": "Catalogue de services",

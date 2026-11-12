@@ -138,12 +138,16 @@
       "termLabelAny": "{key}: (elke)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "toestand",
       "hintLabel": "label",
       "hintLabelKey": "labelsleutel",
       "hintName": "naam",
       "engineLabel": "Engine",
-      "engineAll": "Alle engines"
+      "engineAll": "Alle engines",
+      "flags": "Vlaggen",
+      "termFlag": "vlag: {value}",
+      "termLocked": "vergrendeld: {value}",
+      "hintFlag": "vlag",
+      "hintLocked": "vergrendeld"
     },
     "row": {
       "removeLabelFilter": "Klik om uit het filter te verwijderen",
@@ -170,6 +174,14 @@
       "local": "Lokaal",
       "collapseAll": "Alles inklappen",
       "expandAll": "Alles uitklappen"
+    },
+    "flagName": {
+      "state-diverged": "State afgeweken",
+      "no-agent-pool": "Geen agentpool",
+      "no-live-agent-pool": "Geen actieve agentpool",
+      "vcs-error": "VCS-fout",
+      "drifted": "Afgedreven",
+      "drift-errored": "Driftdetectie mislukt"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "Wissen voortzetten",
       "continuing": "Wordt voortgezet…"
     },
-    "sealedWarning": "Deze node is verzegeld, dus niets wat hier gewist wordt kan opnieuw worden opgehaald. De geplande opruiming slaat deze caches juist daarom over — dit is een permanente verwijdering."
+    "sealedWarning": "Deze node is verzegeld, dus niets wat hier gewist wordt kan opnieuw worden opgehaald. De geplande opruiming slaat deze caches juist daarom over — dit is een permanente verwijdering.",
+    "warmAhead": {
+      "heading": "Pakket- en image-caches opwarmen",
+      "help": "Geef een versie op waar die bekend is: een opwarming die een versie noemt, is later tegen een lockbestand te controleren, “wat het nieuwste ook is” niet. Schrijf elke regel als <code>naam versie</code>; voeg voor Pulumi-plugins achterliggende <code>os/arch</code>-tokens toe om specifieke platformen op te warmen.",
+      "ecosystemLabel": "Artefactsoort",
+      "ecosystemOff": "{ecosystem} (uitgeschakeld)",
+      "sourceLabel": "Ophalen van",
+      "sourceDefault": "Geconfigureerde upstream",
+      "upstreamIs": "Wordt opgehaald van <code>{url}</code>.",
+      "upstreamPerReference": "Elke image-referentie noemt zijn eigen host, en die moet een van de in deze installatie geconfigureerde upstreams zijn.",
+      "itemsLabel": "Artefacten",
+      "imagesLabel": "Image-referenties",
+      "willWarm": "{count, plural, one {# artefact wordt opgewarmd.} other {# artefacten worden opgewarmd.}}",
+      "unversioned": "{count, plural, one {# regel noemt geen versie, dus wordt de nieuwste beschikbare opgehaald. Dat is niet reproduceerbaar.} other {# regels noemen geen versie, dus wordt telkens de nieuwste beschikbare opgehaald. Dat is niet reproduceerbaar.}}",
+      "versionRequired": "{count, plural, one {# regel noemt geen versie.} other {# regels noemen geen versie.}} {ecosystem} publiceert geen index om een nieuwste tegen te herleiden, dus elke regel heeft er een nodig.",
+      "tooMany": "Per inzending kunnen hoogstens {max} artefacten worden opgewarmd.",
+      "confirm": "{count, plural, one {# artefact} other {# artefacten}} nu opwarmen?",
+      "warm": "Opwarmen",
+      "warming": "Bezig met opwarmen…",
+      "progress": "{completed} van {total} klaar",
+      "fetched": "{fetched, plural, one {# bestand opgehaald} other {# bestanden opgehaald}}",
+      "alreadyCached": "{files, plural, one {al in de cache (# bestand)} other {al in de cache (# bestanden)}}",
+      "finished": "{succeeded}/{total} opgewarmd ({failed} mislukt)",
+      "sealed": "Deze node is verzegeld en kan dus niets van upstream ophalen. Warm de caches op vóór het verzegelen, of hef de verzegeling op om ze nu op te warmen.",
+      "errorEmpty": "Voeg minstens één regel toe om op te warmen.",
+      "errorSources": "Kon niet achterhalen waarvandaan het opwarmen zou ophalen",
+      "errorSubmit": "Kon het opwarmen niet starten",
+      "errorStatus": "Kon de opwarmtaak niet lezen",
+      "helpLead": "Haal artefacten de cache in voordat iets erom vraagt — één per regel, als een naam en een versie."
+    }
   },
   "catalog": {
     "title": "Servicecatalogus",

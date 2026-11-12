@@ -169,174 +169,114 @@ test.describe("Workspaces", () => {
     await expect(filter).toHaveValue(`${wsName} `);
   });
 
-  test("selecting workspaces offers bulk actions, and Plan runs on each one", async ({ page }) => {
-    // Two workspaces under one prefix scope the list to this test's own rows.
-    // `seedRun` uploads a configuration, which a workspace needs before it can
-    // take a plan: the server refuses one without, and the result says so.
-    const prefix = uniqueName("e2e-sel-plan");
-    const token = getStoredToken();
-    const a = await createWorkspace(token, `${prefix}-a`);
-    const b = await createWorkspace(token, `${prefix}-b`);
-    await seedRun(token, a, true);
-    await seedRun(token, b, true);
+  test("the filter survives leaving the list and stays until cleared", async ({ page }) => {
+    // sessionStorage is per tab, so this test owns its own state.
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await expect(filter).toBeVisible();
 
-    await listOnly(page, prefix, 2);
+    await filter.fill("status:errored ");
+    await expect(filter).toHaveValue("status:errored ");
 
-    // The standard view does not change until a box is ticked.
-    await expect(page.getByTestId("ws-selection")).toHaveCount(0);
+    // The stored form is the parsed terms, the same text the URL carries, so the
+    // trailing space typed after a completed term is not restored.
+    // Leave through the nav bar's bare /workspaces link, which carries no query.
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await expect(filter).toHaveValue("status:errored");
 
-    // The header checkbox selects every visible row, and the Selection control
-    // appears with the count.
-    await page.getByTestId("ws-select-all").check();
-    await expect(page.getByTestId("ws-selection")).toContainText("2");
+    // A reload keeps it too.
+    await page.reload();
+    await expect(filter).toHaveValue("status:errored");
 
-    // Pressing it only opens a menu: it has no default action.
-    await page.getByTestId("ws-selection").click();
-    const menu = page.getByTestId("ws-selection-menu");
-    await expect(menu).toBeVisible();
-    await expect(menu.getByRole("menuitem")).toHaveCount(5);
-
-    // Why an action is unavailable is in the row, not in a tooltip. Each
-    // workspace has only a queued plan-only run, so Apply qualifies for neither.
-    const apply = page.getByTestId("ws-selection-apply");
-    await expect(apply).toContainText("0 of 2");
-    await expect(apply).toHaveAttribute("aria-disabled", "true");
-
-    // Plan qualifies for both, and runs on each.
-    await expect(page.getByTestId("ws-selection-plan")).toContainText("2 of 2");
-    await page.getByTestId("ws-selection-plan").click();
-    await expect(page.getByTestId("ws-bulk-result")).toContainText("Plan: 2 of 2", { timeout: 15_000 });
+    // It stays until it is explicitly cleared, and then it stays cleared.
+    await filter.fill("");
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await expect(filter).toHaveValue("");
   });
 
-  test("a refusal from the server is reported per workspace, not hidden", async ({ page }) => {
-    // A workspace with no uploaded configuration refuses a plan. The batch must
-    // say so for THAT workspace, with the server's own words, and not fail whole.
-    const prefix = uniqueName("e2e-sel-refuse");
-    const token = getStoredToken();
-    await createWorkspace(token, `${prefix}-bare`);
+  test("the stored filter is the normalised form, not the raw text", async ({ page }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await filter.fill("env=prod ");
 
-    await listOnly(page, prefix, 1);
-    await page.getByTestId("ws-row-select").check();
-    await page.getByTestId("ws-selection").click();
-    await page.getByTestId("ws-selection-plan").click();
-
-    const result = page.getByTestId("ws-bulk-result");
-    await expect(result).toContainText("Plan: 0 of 1", { timeout: 15_000 });
-    await expect(result).toContainText(`${prefix}-bare`);
-    await expect(result).toContainText("no uploaded configuration");
-    // The refused workspace stays selected, so the reason beside it can be acted on.
-    await expect(page.getByTestId("ws-row-select")).toBeChecked();
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await expect(filter).toHaveValue("env:prod");
   });
 
-  test("the header checkbox is also the clear, from a partial selection", async ({ page }) => {
-    const prefix = uniqueName("e2e-sel-clear");
+  test("a filter in the URL wins over the stored one", async ({ page }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await filter.fill("status:errored ");
+    await expect(filter).toHaveValue("status:errored ");
+
+    // The same tab still holds "status:errored", so the two disagree here.
+    await page.goto("/workspaces?q=status:applied");
+    await expect(filter).toHaveValue("status:applied");
+  });
+
+  // A refusal takes the not-ok branch; a body that is not JSON takes the catch. Neither may drop
+  // an engine the URL asked for (a transport failure would too, but apiFetch retries those for seconds).
+  for (const [name, reply] of [
+    ["is refused", { status: 403, body: "{}" }],
+    ["returns something that is not JSON", { status: 200, body: "not json" }],
+  ] as const) {
+    test(`an engine in the URL survives the engines request that ${name}`, async ({ page }) => {
+      await page.route("**/api/v1/engines", (route) => route.fulfill(reply));
+      const answered = page.waitForResponse((r) => r.url().includes("/api/v1/engines"));
+      await page.goto("/workspaces?engine=terraform");
+      await answered;
+      // Give the page the chance to (wrongly) drop it, then check both places it lives.
+      await page.waitForTimeout(600);
+      expect(new URL(page.url()).searchParams.get("engine")).toBe("terraform");
+      expect(await page.evaluate(() => sessionStorage.getItem("terrapod:workspace-engine"))).toBe("terraform");
+    });
+  }
+
+  test("a second tab does not inherit or overwrite the first tab's filter", async ({ page, context }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/workspaces");
+    await filter.fill("status:errored ");
+    await expect(filter).toHaveValue("status:errored ");
+
+    const other = await context.newPage();
+    await other.goto("/workspaces");
+    const otherFilter = other.locator('input[aria-label="Filter workspaces"]');
+    await expect(otherFilter).toBeVisible();
+    await expect(otherFilter).toHaveValue("");
+
+    await otherFilter.fill("status:applied ");
+    await page.reload();
+    await expect(filter).toHaveValue("status:errored");
+    await other.close();
+  });
+
+  test("the sort survives leaving the list and returning", async ({ page }) => {
+    // Two workspaces under one prefix, so their order is the only thing that decides the assertion.
+    const prefix = uniqueName("e2e-sort");
     const token = getStoredToken();
     await createWorkspace(token, `${prefix}-a`);
     await createWorkspace(token, `${prefix}-b`);
 
-    await listOnly(page, prefix, 2);
+    const firstRow = () => page.locator("tbody tr", { hasText: prefix }).first();
+    await page.goto("/workspaces");
+    await page.locator('input[aria-label="Filter workspaces"]').fill(`${prefix} `);
+    // Name sorts ascending by default, so "-a" comes first.
+    await expect(firstRow()).toContainText(`${prefix}-a`);
 
-    await page.getByTestId("ws-row-select").first().check();
-    await expect(page.getByTestId("ws-select-all")).toHaveJSProperty("indeterminate", true);
+    await page.getByRole("columnheader", { name: /Name/ }).first().click();
+    await expect(firstRow()).toContainText(`${prefix}-b`);
 
-    // Clicking it from a partial selection clears, it does not complete it.
-    await page.getByTestId("ws-select-all").click();
-    await expect(page.getByTestId("ws-row-select").first()).not.toBeChecked();
-    await expect(page.getByTestId("ws-selection")).toHaveCount(0);
-  });
-
-  test("an unavailable action is inert and says why, and never opens a confirm", async ({ page }) => {
-    const prefix = uniqueName("e2e-sel-inert");
-    const token = getStoredToken();
-    await createWorkspace(token, `${prefix}-a`);
-
-    await listOnly(page, prefix, 1);
-    await page.getByTestId("ws-row-select").check();
-    await page.getByTestId("ws-selection").click();
-
-    // No planned run, so Discard is off. It stays focusable (aria-disabled, not
-    // `disabled`) so a screen reader reaches it and hears the reason beside it.
-    const discard = page.getByTestId("ws-selection-discard");
-    await expect(discard).toHaveAttribute("aria-disabled", "true");
-    await expect(discard).toContainText("0 of 1");
-    let dialogs = 0;
-    page.on("dialog", (d) => {
-      dialogs += 1;
-      void d.dismiss();
-    });
-    // `force` skips Playwright's own "is it enabled" wait, which is the point:
-    // a real user can still press it, and nothing must happen.
-    await discard.click({ force: true });
-    expect(dialogs, "an unavailable action must not open a confirm").toBe(0);
-    await expect(page.getByTestId("ws-bulk-result")).toHaveCount(0);
-  });
-
-  test("Apply and Discard confirm in the irreversible tier, with the count and the names, and send nothing if declined", async ({ page }) => {
-    // A planned, apply-capable run is the state both need, and reaching it for
-    // real takes a runner. So the LIST response is stubbed to carry one, and the
-    // calls it would make are recorded; the confirm and the eligibility are real.
-    const prefix = uniqueName("e2e-sel-confirm");
-    const token = getStoredToken();
-    const ids = [
-      await createWorkspace(token, `${prefix}-a`),
-      await createWorkspace(token, `${prefix}-b`),
-    ];
-
-    const posts: string[] = [];
-    await page.route("**/api/v1/workspaces?**", async (route) => {
-      const res = await route.fetch();
-      const body = await res.json();
-      for (const w of body.data ?? []) {
-        const i = ids.indexOf(w.id);
-        if (i >= 0) {
-          w.attributes["latest-run"] = {
-            id: `run-planned-${i}`,
-            status: "planned",
-            "plan-only": false,
-            "created-at": "2026-11-10T10:00:00Z",
-          };
-        }
-      }
-      await route.fulfill({ response: res, json: body });
-    });
-    await page.route("**/api/v1/runs/*/actions/*", async (route) => {
-      posts.push(route.request().url());
-      await route.fulfill({ status: 200, contentType: "application/vnd.api+json", body: "{}" });
-    });
-
-    await listOnly(page, prefix, 2);
-    await page.getByTestId("ws-select-all").check();
-    await page.getByTestId("ws-selection").click();
-
-    // Both qualify, so Apply and Discard are on and say so in the row.
-    await expect(page.getByTestId("ws-selection-apply")).toContainText("2 of 2");
-    await expect(page.getByTestId("ws-selection-discard")).toContainText("2 of 2");
-
-    // Declining sends nothing.
-    const seen: string[] = [];
-    page.once("dialog", (d) => {
-      seen.push(d.message());
-      void d.dismiss();
-    });
-    await page.getByTestId("ws-selection-apply").click();
-    await expect.poll(() => seen.length).toBe(1);
-    expect(seen[0]).toContain(`${prefix}-a`);
-    expect(seen[0]).toContain(`${prefix}-b`);
-    expect(seen[0]).toContain("(2)");
-    expect(posts, "declining the confirm must send nothing").toEqual([]);
-
-    // Accepting sends one call per workspace, to the existing endpoint.
-    page.once("dialog", (d) => void d.accept());
-    await page.getByTestId("ws-selection").click();
-    await page.getByTestId("ws-selection-discard").click();
-    await expect(page.getByTestId("ws-bulk-result")).toContainText("Discard: 2 of 2", { timeout: 15_000 });
-    expect(posts.filter((u) => u.endsWith("/actions/discard"))).toHaveLength(2);
-
-    // The page reloads the list after an action (and on SSE), and each reload runs
-    // the stubbed `route.fetch()` above. One still in flight when the test ends
-    // fails with "browser has been closed", so end by removing the stubs and
-    // letting any running callback finish.
-    await page.unrouteAll({ behavior: "wait" });
+    await page.goto("/settings/tokens");
+    await page.getByRole("link", { name: "Workspaces", exact: true }).first().click();
+    await page.waitForURL(/\/workspaces/);
+    await page.locator('input[aria-label="Filter workspaces"]').fill(`${prefix} `);
+    await expect(firstRow()).toContainText(`${prefix}-b`);
   });
 
   test("workspace settings can be updated", async ({ page }) => {
@@ -538,12 +478,10 @@ test.describe("Workspaces", () => {
   test("Health Issues indicator filters the list to unhealthy workspaces", async ({
     page,
   }) => {
-    // Create two workspaces via the API so the test is deterministic and
-    // self-isolated (uniquely-named, no reliance on other specs):
-    //   - healthy: default local mode → no health conditions
-    //   - unhealthy: agent mode with no pool → a `no_agent_pool` health
-    //     condition, which `_compute_health_conditions` flags. This is the
-    //     simplest condition to provoke without running anything.
+    // Two workspaces via the API so the test is deterministic and self-isolated:
+    //   - healthy: default local mode -> no health conditions
+    //   - unhealthy: agent mode with no pool -> a `no_agent_pool` condition,
+    //     the simplest one to provoke without running anything.
     const token = getStoredToken();
     const healthyName = uniqueName("e2e-health-ok");
     const unhealthyName = uniqueName("e2e-health-bad");
@@ -554,31 +492,243 @@ test.describe("Workspaces", () => {
     await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
 
     // Both of MY workspaces are present before filtering. (Never assert global
-    // counts/positions — other workers mutate the same org concurrently.)
+    // counts/positions -- other workers mutate the same org concurrently.)
     const healthyRow = page.getByRole("link", { name: healthyName });
     const unhealthyRow = page.getByRole("link", { name: unhealthyName });
     await expect(unhealthyRow).toBeVisible({ timeout: 10_000 });
     await expect(healthyRow).toBeVisible();
 
-    // The Health Issues card is a toggle button whenever the count is > 0
-    // (which my unhealthy workspace guarantees). Clicking it applies the
-    // aggregate `status:unhealthy` filter.
+    // The Health Issues chip inserts every condition as a `flag:` term, so the
+    // filter bar shows what "unhealthy" means. The terms union, so the result
+    // is any workspace with at least one condition.
     const healthBtn = page.getByRole("button", { name: /health issues/i });
     await expect(healthBtn).toBeVisible();
     await healthBtn.click();
 
-    // Filter now active: the term is in the box, my unhealthy ws stays, my
-    // healthy ws is filtered out. (Assert on MY named resources, not counts —
-    // the unhealthy view also contains other workers' unhealthy workspaces.)
-    await expect(
-      page.locator('input[aria-label="Filter workspaces"]'),
-    ).toHaveValue(/status:unhealthy/);
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await expect(filter).toHaveValue(/flag:no-agent-pool/);
+    await expect(filter).toHaveValue(/flag:drifted/);
+    await expect(filter).not.toHaveValue(/status:unhealthy/);
     await expect(unhealthyRow).toBeVisible();
     await expect(healthyRow).toBeHidden();
 
-    // Toggling the badge again clears the filter — my healthy ws returns.
+    // Toggling the chip again clears the whole set -- my healthy ws returns.
     await healthBtn.click();
     await expect(healthyRow).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("the dropdowns union their own selections and typed terms intersect", async ({
+    page,
+  }) => {
+    // Three workspaces in one name scope: two with a different condition each
+    // (no_agent_pool via agent mode with no pool), one with none.
+    const prefix = uniqueName("e2e-or");
+    const token = getStoredToken();
+    const noPool = `${prefix}-nopool`;
+    const plain = `${prefix}-plain`;
+    await createWorkspace(token, noPool, { "execution-mode": "agent" });
+    await createWorkspace(token, plain);
+
+    await page.goto("/workspaces");
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    const noPoolRow = page.getByRole("link", { name: noPool });
+    const plainRow = page.getByRole("link", { name: plain });
+
+    // Two flags: either. `drifted` matches neither workspace, `no-agent-pool`
+    // matches one, so the union shows that one and not the other.
+    await filter.fill(`${prefix} flag:drifted flag:no-agent-pool `);
+    await expect(noPoolRow).toBeVisible({ timeout: 10_000 });
+    await expect(plainRow).toBeHidden();
+
+    // locked is its own key and still ANDs with a flag: nothing here is locked.
+    await filter.fill(`${prefix} locked:true flag:no-agent-pool `);
+    await expect(noPoolRow).toBeHidden();
+    await expect(plainRow).toBeHidden();
+
+    // locked:false ANDs the other way round.
+    await filter.fill(`${prefix} locked:false flag:no-agent-pool `);
+    await expect(noPoolRow).toBeVisible();
+    await expect(plainRow).toBeHidden();
+  });
+
+  test("the Flags dropdown ticks several conditions and the Status badge counts only its own", async ({
+    page,
+  }) => {
+    await page.goto("/workspaces");
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await expect(filter).toBeVisible();
+
+    await page.getByRole("button", { name: "Flags" }).click();
+    await page.getByRole("menuitemcheckbox", { name: /Drifted/ }).click();
+    await page.getByRole("menuitemcheckbox", { name: /VCS error/ }).click();
+    await expect(filter).toHaveValue(/flag:drifted/);
+    await expect(filter).toHaveValue(/flag:vcs-error/);
+  });
+
+  test("selecting workspaces offers bulk actions, and Plan runs on each one", async ({ page }) => {
+    // Two workspaces under one prefix scope the list to this test's own rows.
+    // `seedRun` uploads a configuration, which a workspace needs before it can
+    // take a plan: the server refuses one without, and the result says so.
+    const prefix = uniqueName("e2e-sel-plan");
+    const token = getStoredToken();
+    const a = await createWorkspace(token, `${prefix}-a`);
+    const b = await createWorkspace(token, `${prefix}-b`);
+    await seedRun(token, a, true);
+    await seedRun(token, b, true);
+
+    await listOnly(page, prefix, 2);
+
+    // The standard view does not change until a box is ticked.
+    await expect(page.getByTestId("ws-selection")).toHaveCount(0);
+
+    // The header checkbox selects every visible row, and the Selection control
+    // appears with the count.
+    await page.getByTestId("ws-select-all").check();
+    await expect(page.getByTestId("ws-selection")).toContainText("2");
+
+    // Pressing it only opens a menu: it has no default action.
+    await page.getByTestId("ws-selection").click();
+    const menu = page.getByTestId("ws-selection-menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("menuitem")).toHaveCount(5);
+
+    // Why an action is unavailable is in the row, not in a tooltip. Each
+    // workspace has only a queued plan-only run, so Apply qualifies for neither.
+    const apply = page.getByTestId("ws-selection-apply");
+    await expect(apply).toContainText("0 of 2");
+    await expect(apply).toHaveAttribute("aria-disabled", "true");
+
+    // Plan qualifies for both, and runs on each.
+    await expect(page.getByTestId("ws-selection-plan")).toContainText("2 of 2");
+    await page.getByTestId("ws-selection-plan").click();
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Plan: 2 of 2", { timeout: 15_000 });
+  });
+  test("a refusal from the server is reported per workspace, not hidden", async ({ page }) => {
+    // A workspace with no uploaded configuration refuses a plan. The batch must
+    // say so for THAT workspace, with the server's own words, and not fail whole.
+    const prefix = uniqueName("e2e-sel-refuse");
+    const token = getStoredToken();
+    await createWorkspace(token, `${prefix}-bare`);
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-plan").click();
+
+    const result = page.getByTestId("ws-bulk-result");
+    await expect(result).toContainText("Plan: 0 of 1", { timeout: 15_000 });
+    await expect(result).toContainText(`${prefix}-bare`);
+    await expect(result).toContainText("no uploaded configuration");
+    // The refused workspace stays selected, so the reason beside it can be acted on.
+    await expect(page.getByTestId("ws-row-select")).toBeChecked();
+  });
+  test("the header checkbox is also the clear, from a partial selection", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-clear");
+    const token = getStoredToken();
+    await createWorkspace(token, `${prefix}-a`);
+    await createWorkspace(token, `${prefix}-b`);
+
+    await listOnly(page, prefix, 2);
+
+    await page.getByTestId("ws-row-select").first().check();
+    await expect(page.getByTestId("ws-select-all")).toHaveJSProperty("indeterminate", true);
+
+    // Clicking it from a partial selection clears, it does not complete it.
+    await page.getByTestId("ws-select-all").click();
+    await expect(page.getByTestId("ws-row-select").first()).not.toBeChecked();
+    await expect(page.getByTestId("ws-selection")).toHaveCount(0);
+  });
+  test("an unavailable action is inert and says why, and never opens a confirm", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-inert");
+    const token = getStoredToken();
+    await createWorkspace(token, `${prefix}-a`);
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+
+    // No planned run, so Discard is off. It stays focusable (aria-disabled, not
+    // `disabled`) so a screen reader reaches it and hears the reason beside it.
+    const discard = page.getByTestId("ws-selection-discard");
+    await expect(discard).toHaveAttribute("aria-disabled", "true");
+    await expect(discard).toContainText("0 of 1");
+    let dialogs = 0;
+    page.on("dialog", (d) => {
+      dialogs += 1;
+      void d.dismiss();
+    });
+    // `force` skips Playwright's own "is it enabled" wait, which is the point:
+    // a real user can still press it, and nothing must happen.
+    await discard.click({ force: true });
+    expect(dialogs, "an unavailable action must not open a confirm").toBe(0);
+    await expect(page.getByTestId("ws-bulk-result")).toHaveCount(0);
+  });
+  test("Apply and Discard confirm in the irreversible tier, with the count and the names, and send nothing if declined", async ({ page }) => {
+    // A planned, apply-capable run is the state both need, and reaching it for
+    // real takes a runner. So the LIST response is stubbed to carry one, and the
+    // calls it would make are recorded; the confirm and the eligibility are real.
+    const prefix = uniqueName("e2e-sel-confirm");
+    const token = getStoredToken();
+    const ids = [
+      await createWorkspace(token, `${prefix}-a`),
+      await createWorkspace(token, `${prefix}-b`),
+    ];
+
+    const posts: string[] = [];
+    await page.route("**/api/v1/workspaces?**", async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      for (const w of body.data ?? []) {
+        const i = ids.indexOf(w.id);
+        if (i >= 0) {
+          w.attributes["latest-run"] = {
+            id: `run-planned-${i}`,
+            status: "planned",
+            "plan-only": false,
+            "created-at": "2026-11-10T10:00:00Z",
+          };
+        }
+      }
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.route("**/api/v1/runs/*/actions/*", async (route) => {
+      posts.push(route.request().url());
+      await route.fulfill({ status: 200, contentType: "application/vnd.api+json", body: "{}" });
+    });
+
+    await listOnly(page, prefix, 2);
+    await page.getByTestId("ws-select-all").check();
+    await page.getByTestId("ws-selection").click();
+
+    // Both qualify, so Apply and Discard are on and say so in the row.
+    await expect(page.getByTestId("ws-selection-apply")).toContainText("2 of 2");
+    await expect(page.getByTestId("ws-selection-discard")).toContainText("2 of 2");
+
+    // Declining sends nothing.
+    const seen: string[] = [];
+    page.once("dialog", (d) => {
+      seen.push(d.message());
+      void d.dismiss();
+    });
+    await page.getByTestId("ws-selection-apply").click();
+    await expect.poll(() => seen.length).toBe(1);
+    expect(seen[0]).toContain(`${prefix}-a`);
+    expect(seen[0]).toContain(`${prefix}-b`);
+    expect(seen[0]).toContain("(2)");
+    expect(posts, "declining the confirm must send nothing").toEqual([]);
+
+    // Accepting sends one call per workspace, to the existing endpoint.
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-discard").click();
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Discard: 2 of 2", { timeout: 15_000 });
+    expect(posts.filter((u) => u.endsWith("/actions/discard"))).toHaveLength(2);
+
+    // The page reloads the list after an action (and on SSE), and each reload runs
+    // the stubbed `route.fetch()` above. One still in flight when the test ends
+    // fails with "browser has been closed", so end by removing the stubs and
+    // letting any running callback finish.
+    await page.unrouteAll({ behavior: "wait" });
   });
 });
 

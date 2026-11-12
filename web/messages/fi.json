@@ -138,12 +138,16 @@
       "termLabelAny": "{key}: (mikä tahansa)",
       "termLabel": "{key}: {value}",
       "hintStatus": "tila",
-      "hintHealth": "kunto",
       "hintLabel": "tunniste",
       "hintLabelKey": "tunnisteavain",
       "hintName": "nimi",
       "engineLabel": "Moottori",
-      "engineAll": "Kaikki moottorit"
+      "engineAll": "Kaikki moottorit",
+      "flags": "Liput",
+      "termFlag": "lippu: {value}",
+      "termLocked": "lukittu: {value}",
+      "hintFlag": "lippu",
+      "hintLocked": "lukittu"
     },
     "row": {
       "removeLabelFilter": "Napsauta poistaaksesi suodattimesta",
@@ -170,6 +174,14 @@
       "local": "Paikallinen",
       "collapseAll": "Tiivistä kaikki",
       "expandAll": "Laajenna kaikki"
+    },
+    "flagName": {
+      "state-diverged": "Tila eronnut",
+      "no-agent-pool": "Ei agenttipoolia",
+      "no-live-agent-pool": "Ei aktiivista agenttipoolia",
+      "vcs-error": "VCS-virhe",
+      "drifted": "Ajautunut",
+      "drift-errored": "Ajautumisen tunnistus epäonnistui"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "Jatka poistoa",
       "continuing": "Jatketaan…"
     },
-    "sealedWarning": "Tämä solmu on sinetöity, joten mitään täältä poistettua ei voi hakea uudelleen. Ajastettu siivous jättää nämä välimuistit juuri siksi väliin — tämä on pysyvä poisto."
+    "sealedWarning": "Tämä solmu on sinetöity, joten mitään täältä poistettua ei voi hakea uudelleen. Ajastettu siivous jättää nämä välimuistit juuri siksi väliin — tämä on pysyvä poisto.",
+    "warmAhead": {
+      "heading": "Lämmitä paketti- ja vedosvälimuistit",
+      "help": "Anna versio aina kun tiedät sen: versiolla nimetyn lämmityksen voi jälkikäteen tarkistaa lukkotiedostoa vasten, ”mikä sattuu olemaan uusin” ei käy siihen. Kirjoita jokainen rivi muodossa <code>nimi versio</code>; Pulumi-laajennuksille lisää loppuun <code>os/arch</code>-merkinnät, jotta tietyt alustat lämmitetään.",
+      "ecosystemLabel": "Artefaktin laji",
+      "ecosystemOff": "{ecosystem} (pois käytöstä)",
+      "sourceLabel": "Hae lähteestä",
+      "sourceDefault": "Määritetty ylävirta",
+      "upstreamIs": "Haetaan lähteestä <code>{url}</code>.",
+      "upstreamPerReference": "Jokainen vedosviittaus nimeää oman isäntänsä, ja sen on oltava yksi tämän asennuksen määritetyistä ylävirroista.",
+      "itemsLabel": "Artefaktit",
+      "imagesLabel": "Vedosviittaukset",
+      "willWarm": "{count, plural, one {# artefakti lämmitetään.} other {# artefaktia lämmitetään.}}",
+      "unversioned": "{count, plural, one {# rivi ei nimeä versiota, joten haetaan uusin saatavilla oleva. Se ei ole toistettavissa.} other {# riviä ei nimeä versiota, joten haetaan uusimmat saatavilla olevat. Se ei ole toistettavissa.}}",
+      "versionRequired": "{count, plural, one {# rivi ei nimeä versiota.} other {# riviä ei nimeä versiota.}} {ecosystem} ei julkaise hakemistoa, jota vasten uusimman voisi selvittää, joten jokainen rivi tarvitsee version.",
+      "tooMany": "Yhdellä lähetyksellä voi lämmittää enintään {max} artefaktia.",
+      "confirm": "Lämmitetäänkö {count, plural, one {# artefakti} other {# artefaktia}} nyt?",
+      "warm": "Lämmitä",
+      "warming": "Lämmitetään…",
+      "progress": "{completed}/{total} valmiina",
+      "fetched": "{fetched, plural, one {haettu # tiedosto} other {haettu # tiedostoa}}",
+      "alreadyCached": "{files, plural, one {jo välimuistissa (# tiedosto)} other {jo välimuistissa (# tiedostoa)}}",
+      "finished": "Lämmitetty {succeeded}/{total} ({failed} epäonnistui)",
+      "sealed": "Tämä solmu on sinetöity, joten se ei voi hakea mitään ylävirrasta. Lämmitä välimuistit ennen sinetöintiä tai pura sinetöinti lämmittääksesi ne nyt.",
+      "errorEmpty": "Lisää vähintään yksi rivi lämmitettäväksi.",
+      "errorSources": "Ei voitu lukea, mistä lämmitys hakisi",
+      "errorSubmit": "Lämmitystä ei voitu käynnistää",
+      "errorStatus": "Lämmitystyötä ei voitu lukea",
+      "helpLead": "Hae artefaktit välimuistiin ennen kuin mikään pyytää niitä — yksi riviä kohden, nimenä ja versiona."
+    }
   },
   "catalog": {
     "title": "Palveluluettelo",

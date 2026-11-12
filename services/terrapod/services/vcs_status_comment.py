@@ -68,6 +68,15 @@ _COMMENT_MARKER = "<!-- terrapod:status-comment -->"
 #: Worded without "pull request" so it reads the same on a GitLab MR.
 _HEADING = "### Terrapod — all affected workspaces"
 
+#: How long the rendered comment may be. GitHub caps a comment body at 65,536
+#: characters, and the one comment carries EVERY workspace the PR touches, so a
+#: per-workspace cap is not enough on its own: a monorepo PR with many workspaces
+#: passes the limit however small each list is. Deliberately well under the real
+#: cap, because the table, the gate and AI blocks and the footer are rendered
+#: outside this budget and are not capped. GitLab's limit is far larger, so
+#: this holds for the smaller of the two.
+COMMENT_MAX_CHARS = 48_000
+
 
 #: Redis key prefix caching this PR's one comment id, so the common refresh
 #: costs no comment listing. Moved here from `vcs_status_dispatcher` with the
@@ -136,6 +145,10 @@ class _Row:
     #: None when the summariser is off (its default), when no row has landed
     #: yet, or when the row it landed is not `ready`.
     ai_summary: PlanSummary | None = None
+    #: The bounded, redacted list of resources this run's plan changes
+    #: (`plan_resource_list`), as recorded on the run. None when nothing was
+    #: recorded (an older run, a Pulumi preview, an unreadable plan).
+    resource_list: dict | None = None
 
 
 def _plan_summary(run: Run | None) -> str:
@@ -465,7 +478,72 @@ def _render_ai_narrative(s: PlanSummary) -> list[str]:
     return lines
 
 
-def _render_workspace_details(row: _Row) -> str:
+_ACTION_SYMBOL = {"create": "+", "update": "~", "delete": "-", "replace": "-/+"}
+
+
+def _one_line(text: str) -> str:
+    """Plan content kept to a single line, so a newline cannot start a new
+    entry that reads as another resource."""
+    return " ".join(str(text).split())
+
+
+def _fence_for(content: str) -> str:
+    """A code fence longer than any run of backticks inside `content`.
+
+    A value is plan content, which can contain anything, including a run of
+    backticks that would close a short fence early and let what follows render
+    as markdown.
+    """
+    longest = run = 0
+    for ch in content:
+        run = run + 1 if ch == "`" else 0
+        longest = max(longest, run)
+    return "`" * max(3, longest + 1)
+
+
+def _render_resource_list(row: _Row, *, entries_only: bool = False) -> list[str]:
+    """The resources this workspace's plan changes, as lines for its details block.
+
+    Inside a fenced code block, on purpose. The text is plan content, and a
+    plan can contain anything: `@team` would notify someone, a markdown image
+    would make the reader's browser call out to a third party, and a closing
+    `</details>` would break the block. A code fence interprets none of it.
+
+    `entries_only` is the degraded form used when the comment's budget is spent:
+    a pointer to the run, which holds the whole thing, instead of the list.
+    """
+    data = row.resource_list
+    if not data or not data.get("entries"):
+        return []
+    entries = data["entries"]
+    omitted = int(data.get("omitted") or 0)
+    link = f"[see the run]({row.run_url})" if row.run_url else "see the run"
+
+    if entries_only:
+        count = len(entries) + omitted
+        return [f"{count} resource{'s' if count != 1 else ''} change, {link}."]
+
+    lines: list[str] = []
+    for e in entries:
+        symbol = _ACTION_SYMBOL.get(e.get("action"), "?")
+        suffix = " (import)" if e.get("imported") else ""
+        lines.append(f"{symbol} {_one_line(e.get('address', ''))}{suffix}")
+        for a in e.get("attributes") or []:
+            lines.append(
+                f"    {_one_line(a.get('path', ''))}: "
+                f"{_one_line(a.get('before', ''))} → {_one_line(a.get('after', ''))}"
+            )
+        more = int(e.get("attributes_omitted") or 0)
+        if more:
+            lines.append(f"    … {more} more attributes")
+    fence = _fence_for("\n".join(lines))
+    out = [fence, *lines, fence]
+    if omitted:
+        out.append(f"…and {omitted} more, {link}.")
+    return out
+
+
+def _render_workspace_details(row: _Row, *, degrade_list: bool = False) -> str:
     """One collapsed block per workspace: its AI narrative and its gates.
 
     This function is the whole of #1940. The narrative and the gate verdicts
@@ -487,7 +565,8 @@ def _render_workspace_details(row: _Row) -> str:
     """
     summary = row.ai_summary
     ready = summary is not None and summary.status == "ready"
-    if not row.gates and not ready:
+    resource_lines = _render_resource_list(row, entries_only=degrade_list)
+    if not row.gates and not ready and not resource_lines:
         return ""
 
     bits: list[str] = []
@@ -498,6 +577,10 @@ def _render_workspace_details(row: _Row) -> str:
     if row.gates:
         failed = [g for g in row.gates if not g.passed]
         bits.append(f"blocked by {failed[0].gate}" if failed else "all gates passed")
+    if resource_lines:
+        data = row.resource_list or {}
+        n = len(data.get("entries") or []) + int(data.get("omitted") or 0)
+        bits.append(f"{n} resource{'s' if n != 1 else ''} change")
 
     lines = [
         f"<details><summary><code>{_escape(row.workspace_name)}</code> "
@@ -516,6 +599,10 @@ def _render_workspace_details(row: _Row) -> str:
         for g in row.gates:
             mark = "🔴" if not g.passed else "🟢"
             lines.append(f"- {mark} `{_escape(g.name)}` &mdash; {g.gate}, {g.enforcement}")
+    if resource_lines:
+        if ready or row.gates:
+            lines.extend(["", "**Changes:**", ""])
+        lines.extend(resource_lines)
     lines.extend(["", "</details>"])
     return "\n".join(lines)
 
@@ -572,6 +659,16 @@ def render_comment(rows: list[_Row]) -> str:
         if block:
             detail_blocks.append(block)
 
+    # One comment carries every workspace, so the lists share ONE budget. Spent in
+    # row order: the earlier workspaces keep their full list, and once the budget
+    # runs out a workspace's list degrades to a pointer to the run. The table is
+    # built above and always stays, since that is what a reviewer triages from.
+    detail_blocks = _fit_details(
+        rows,
+        detail_blocks,
+        len(_COMMENT_MARKER) + len(_HEADING) + len(header) + sum(map(len, body_lines)),
+    )
+
     parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines]
     if detail_blocks:
         parts.append("")
@@ -594,6 +691,47 @@ def render_comment(rows: list[_Row]) -> str:
     parts.append("")
     parts.append(f"*Updated {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}*")
     return "\n".join(parts)
+
+
+def _fit_details(rows: list[_Row], blocks: list[str], fixed: int) -> list[str]:
+    """Fit the details blocks into the comment's one budget.
+
+    `blocks` is parallel to the rows that produced one. A block's resource list
+    is the only part that can grow with the plan, so it is the only part that
+    degrades: the gate verdicts and the AI narrative it also carries are never
+    dropped, since they are what blocks or explains a merge.
+
+    Two rules, applied in row order:
+
+    * **A fair share, not first come.** The budget left after the table is split
+      across the workspaces that still carry a list, so one huge plan cannot spend
+      it all and leave every later workspace with nothing. A list over its share
+      degrades to a pointer to the run.
+    * **A hard ceiling.** The pointers and the footer that follow are charged
+      too, so the comment as a whole stays under `COMMENT_MAX_CHARS` rather than
+      merely each list under its share.
+    """
+    degraded = {
+        id(r): _render_workspace_details(r, degrade_list=True) for r in rows if r.resource_list
+    }
+    withblock = [r for r in rows if _render_workspace_details(r)]
+    out: list[str] = []
+    spent = fixed
+    for i, (r, block) in enumerate(zip(withblock, blocks, strict=True)):
+        if r.resource_list:
+            # What every LATER workspace needs even if it degrades, so a list
+            # admitted here cannot push the pointers past the ceiling.
+            reserve = sum(
+                len(degraded[id(later)]) for later in withblock[i + 1 :] if later.resource_list
+            )
+            remaining = max(COMMENT_MAX_CHARS - spent - reserve, 0)
+            waiting = sum(1 for later in withblock[i:] if later.resource_list)
+            share = remaining // max(waiting, 1)
+            if len(block) > share:
+                block = degraded[id(r)]
+        spent += len(block)
+        out.append(block)
+    return out
 
 
 def _escape(text: str) -> str:
@@ -652,6 +790,7 @@ async def _row_for(db, ws: Workspace, run: Run, merged_run: Run | None = None) -
         gates=await _collect_gates(db, run),
         ai_summary=await _ready_ai_summary(db, run),
         run_url=run_links.run_url(ws.id, run.id),
+        resource_list=run.plan_resources,
         post_merge_summary=_post_merge_summary(merged_run),
         post_merge_url=(run_links.run_url(ws.id, merged_run.id) if merged_run else None),
     )

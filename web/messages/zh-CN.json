@@ -138,12 +138,16 @@
       "termLabelAny": "{key}: (任意)",
       "termLabel": "{key}: {value}",
       "hintStatus": "状态",
-      "hintHealth": "健康状况",
       "hintLabel": "标签",
       "hintLabelKey": "标签键",
       "hintName": "名称",
       "engineLabel": "引擎",
-      "engineAll": "所有引擎"
+      "engineAll": "所有引擎",
+      "flags": "标记",
+      "termFlag": "标记: {value}",
+      "termLocked": "已锁定: {value}",
+      "hintFlag": "标记",
+      "hintLocked": "已锁定"
     },
     "row": {
       "removeLabelFilter": "点击以从筛选中移除",
@@ -170,6 +174,14 @@
       "local": "本地",
       "collapseAll": "全部折叠",
       "expandAll": "全部展开"
+    },
+    "flagName": {
+      "state-diverged": "状态已偏离",
+      "no-agent-pool": "无代理池",
+      "no-live-agent-pool": "无活动代理池",
+      "vcs-error": "VCS 错误",
+      "drifted": "已漂移",
+      "drift-errored": "漂移检测失败"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "继续清除",
       "continuing": "正在继续…"
     },
-    "sealedWarning": "本节点已密封，因此在此清除的内容无法重新获取。定期清理也正因如此会跳过这些缓存 — 这是永久删除。"
+    "sealedWarning": "本节点已密封，因此在此清除的内容无法重新获取。定期清理也正因如此会跳过这些缓存 — 这是永久删除。",
+    "warmAhead": {
+      "heading": "预热软件包与镜像缓存",
+      "help": "只要知道版本就请写上：指定了版本的预热此后可以与锁文件比对，而“最新的那个”无法比对。每行按 <code>名称 版本</code> 的格式书写；对于 Pulumi 插件，在末尾加上 <code>os/arch</code> 令牌可预热特定平台。",
+      "ecosystemLabel": "构件类型",
+      "ecosystemOff": "{ecosystem}（已关闭）",
+      "sourceLabel": "获取来源",
+      "sourceDefault": "已配置的上游",
+      "upstreamIs": "将从 <code>{url}</code> 获取。",
+      "upstreamPerReference": "每个镜像引用都指明自己的主机，而该主机必须是本部署已配置的上游之一。",
+      "itemsLabel": "构件",
+      "imagesLabel": "镜像引用",
+      "willWarm": "{count, plural, other {将预热 # 个构件。}}",
+      "unversioned": "{count, plural, other {有 # 行未指明版本，因此将获取可用的最新版本。这是不可复现的。}}",
+      "versionRequired": "{count, plural, other {有 # 行未指明版本。}}{ecosystem} 不发布可用于解析最新版本的索引，因此每一行都需要指明版本。",
+      "tooMany": "一次提交最多可预热 {max} 个构件。",
+      "confirm": "立即预热 {count, plural, other {# 个构件}}？",
+      "warm": "预热",
+      "warming": "正在预热…",
+      "progress": "{total} 个中已完成 {completed} 个",
+      "fetched": "{fetched, plural, other {已获取 # 个文件}}",
+      "alreadyCached": "{files, plural, other {已在缓存中（# 个文件）}}",
+      "finished": "已预热 {succeeded}/{total}（{failed} 个失败）",
+      "sealed": "本节点已密封，因此无法从上游获取任何内容。请在密封之前预热这些缓存，或解除密封后立即预热。",
+      "errorEmpty": "请至少添加一行以进行预热。",
+      "errorSources": "无法读取预热将从何处获取",
+      "errorSubmit": "无法启动预热",
+      "errorStatus": "无法读取预热作业",
+      "helpLead": "在有东西请求之前就把构件拉入缓存 — 每行一个，写明名称与版本。"
+    }
   },
   "catalog": {
     "title": "服务目录",

@@ -8,6 +8,108 @@
     }
   },
   {
+    "name": "terrapod_cache_warm_images",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "images": {
+          "description": "image references to mirror, each host/repository:tag exactly as a client would pull it. An omitted tag means latest",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "images"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_cache_warm_packages",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "packages": {
+          "description": "the artifacts to cache. Name versions explicitly wherever you know them",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "ecosystem": {
+                "description": "which proxy to warm: galaxy, pypi, npm, go, nuget or pulumi",
+                "type": "string"
+              },
+              "name": {
+                "description": "the artifact as its own ecosystem names it: namespace.collection for galaxy (community.general), a module path for go (github.com/spf13/cobra), a package id for pypi and nuget, a package name for npm, and plugin or kind:plugin for pulumi (aws, or language:python)",
+                "type": "string"
+              },
+              "platforms": {
+                "description": "os/arch pairs for PULUMI ONLY, whose plugins are published per platform. Omit for the runner's own linux/amd64 and linux/arm64. Ignored by every other ecosystem",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "source": {
+                "description": "a mirror LABEL from terrapod_cache_warm_sources to pull from instead of the default upstream. Never a URL: an undeclared label is refused",
+                "type": "string"
+              },
+              "version": {
+                "description": "the EXACT version to warm, which is what makes the result checkable against a lockfile. Omitting it takes whatever the registry calls newest and is REFUSED for pulumi",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ecosystem",
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "packages"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_cache_warm_sources",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_cache_warm_status",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {
+          "description": "the id a warm submission returned",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_catalog_instance_confirm",
     "destructive": true,
     "input_schema": {

@@ -571,22 +571,37 @@ Keys and values must be strings.
 
 ### Reserved Label Keys
 
-A small set of label keys are reserved as **virtual filter fields** in the workspace-list filter UI. A filter term like `status:errored` resolves against a workspace's derived status, not against a literal label called `status`. To keep that filter language unambiguous, these keys cannot be used as literal labels — the API rejects them on create and update with 422.
+A small set of label keys are reserved as **virtual filter fields** in the workspace-list filter UI. A filter term like `status:errored` resolves against a workspace's derived state, not against a literal label called `status`. To keep the filter unambiguous, those keys cannot be used as labels. A create or update that includes one is rejected with a `422`.
 
 | Reserved key | Maps to | Why it is reserved |
 |---|---|---|
-| `status` | derived run status (`errored`, `needs-confirm`, `drifted`, `applied`, …) | **Parsing** — the only built-in filter term, so a literal `status` label would make `status:errored` ambiguous |
+| `status` | the run's status (`errored`, `needs-confirm`, `applied`, …), exactly one per workspace | **Parsing** — a built-in filter term, so a literal `status` label would make `status:errored` ambiguous |
+| `flag` | one health condition per value: `state-diverged`, `no-agent-pool`, `no-live-agent-pool`, `vcs-error`, `drifted`, `drift-errored` | **Parsing** — a built-in filter term |
+| `locked` | the manual state lock, `locked:true` or `locked:false` | **Parsing** — a built-in filter term |
 | `owner` | `owner_email`, which grants workspace **admin** | **Authorization** — a label `owner: alice` grants alice nothing, and believing otherwise is a security-shaped mistake |
 
-The `status` field also accepts one **aggregate** value beyond the per-status values above: `status:unhealthy` matches any workspace with at least one active **health condition** (state diverged, no agent pool assigned, VCS polling error, drift detected, or drift-detection errored). It is the roll-up behind the **Health Issues** summary card on the workspace list — clicking the card when the count is non-zero toggles this filter so you can jump straight to the affected workspaces (and click again to clear). Because it rides the already-reserved `status` field, no additional label key is reserved for it. It is deliberately broader than any single status value: a workspace awaiting confirmation shows as `needs-confirm` even when its state has diverged, and the `no_agent_pool`/`drift_errored` conditions have no standalone status value at all — `status:unhealthy` catches all of them.
+**How filter terms combine.** The two multi-select dropdowns, **Status** and **Flags**, union their own selections. Everything you type intersects.
 
-**This set was narrowed from ten keys to two in v1.6.0.** A key is now reserved only when using it as a label would **mislead about a decision Terrapod actually makes** — parsing (`status`) or authorization (`owner`). Descriptive overlap with a workspace field is not enough on its own.
+| Filter | Matches |
+|---|---|
+| `status:planned status:applied` | planned **or** applied |
+| `flag:drifted flag:no-agent-pool` | drifted **or** no agent pool |
+| `status:errored env:prod` | errored **and** `env:prod` |
+| `locked:true status:errored` | locked **and** errored |
+| `env:prod env:staging` | label terms still AND, so this matches nothing: a workspace has one value per key |
+| `eu1 data` | name terms still AND: the name contains both |
 
-The eight released keys — `pool`, `mode`, `backend`, `drift`, `version`, `vcs`, `locked`, `branch` — were reserved for that weaker reason. None was ever a built-in filter term, so each refused your label *and* gave the filter nothing in return, and they are common words: `version` legitimately means an application or module version, not only the workspace's `engine_version`. `drift` and `locked` are answerable as `status:drifted` and `status:locked` regardless.
+Ticking two rows of a dropdown means "either", and typing another term means "and also". A workspace can carry several health conditions at once, and `flag:a flag:b` is "either", so asking for two conditions *together* is not possible.
 
-**Those eight are now usable as ordinary labels.** The change is additive — no label that worked before stops working — and it lets label-based targeting, which is Terrapod's answer to grouping workspaces, use the vocabulary you actually reach for. Should a released key ever warrant a virtual filter term, it will take a distinct name (`pool-name:`) rather than break labels already in use; the house convention is that a new facet rides `status:` as a *value*, as `status:locked` and `status:unhealthy` both do.
+`status:` is only the run's status. It used to carry two further values, `status:locked` and `status:unhealthy`, which are now `locked:true` and the six `flag:` terms. The **Health Issues** indicator on the workspace list inserts all six `flag:` terms, so the filter bar shows what "unhealthy" means. They are matched against the server's `health-conditions` array, which is the same source the indicator counts, so the filter cannot drift from it. See [Upgrading to 2.0](upgrading-to-2.0.md#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status).
 
-If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `status: live` for `state: live`. (Earlier releases suggested renaming `version`; that key is no longer reserved, so it needs no change.)
+**This set was narrowed from ten keys to two in v1.6.0, and `flag` and `locked` joined it in 2.0.** A key is now reserved only when using it as a label would **mislead about a decision Terrapod actually makes** — parsing (`status`, `flag`, `locked`) or authorization (`owner`). Descriptive overlap with a workspace field is not enough on its own.
+
+The eight released keys — `pool`, `mode`, `backend`, `drift`, `version`, `vcs`, `locked`, `branch` — were reserved for that weaker reason. None was ever a built-in filter term, so each refused your label *and* gave the filter nothing in return, and they are common words: `version` legitimately means an application or module version, not only the workspace's `engine_version`.
+
+**Those eight were usable as ordinary labels from 1.6.0**, and seven still are. The exception is `locked`: it was released on the grounds that `status:locked` answered it, and in 2.0 that spelling became the filter term `locked:true`, so the key is reserved again. A new facet used to ride `status:` as a *value* to avoid reserving a key, as `status:locked` and `status:unhealthy` did, but that stopped `status:` being one set of mutually exclusive values, so a new facet now takes its own key and its own reservation.
+
+If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `status: live` for `state: live`. (Earlier releases suggested renaming `version`; that key is no longer reserved, so it needs no change. A label named `flag` or `locked` needs renaming from 2.0.)
 
 The list lives in `terrapod.services.label_validation.RESERVED_LABEL_KEYS`. Adding to it is a behaviour change for any deployment with existing labels using the new key — update both the constant and this table together.
 

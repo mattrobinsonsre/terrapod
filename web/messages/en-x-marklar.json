@@ -138,12 +138,16 @@
       "termLabelAny": "{key}: (any)",
       "termLabel": "{key}: {value}",
       "hintStatus": "marklar",
-      "hintHealth": "marklar",
       "hintLabel": "marklar",
       "hintLabelKey": "marklar marklar",
       "hintName": "marklar",
       "engineLabel": "Marklar",
-      "engineAll": "All marklars"
+      "engineAll": "All marklars",
+      "flags": "Marklar",
+      "termFlag": "marklar: {value}",
+      "termLocked": "marklar: {value}",
+      "hintFlag": "marklar",
+      "hintLocked": "marklar"
     },
     "row": {
       "removeLabelFilter": "Click to remove from marklar",
@@ -170,6 +174,14 @@
       "local": "Marklar",
       "collapseAll": "Marklar all",
       "expandAll": "Marklar all"
+    },
+    "flagName": {
+      "state-diverged": "Marklar Diverged",
+      "no-agent-pool": "No marklar marklar",
+      "no-live-agent-pool": "No live marklar marklar",
+      "vcs-error": "Marklar Marklar",
+      "drifted": "Drifted",
+      "drift-errored": "Marklar marklar failed"
     }
   },
   "status": {
@@ -1884,7 +1896,36 @@
       "continuePurge": "Continue marklar",
       "continuing": "Continuing marklar…"
     },
-    "sealedWarning": "This marklar is sealed, so nothing purged here can be fetched again. The scheduled marklar skips these marklars for that marklar — this is a permanent marklar."
+    "sealedWarning": "This marklar is sealed, so nothing purged here can be fetched again. The scheduled marklar skips these marklars for that marklar — this is a permanent marklar.",
+    "warmAhead": {
+      "heading": "Warm marklar and marklar marklars",
+      "help": "Give a marklar wherever you know it: a marklar named at a marklar can afterwards be checked against a marklar, and “whatever is newest” cannot. Write each marklar as <code>name version</code>; for marklar marklars, add trailing <code>os/arch</code> marklars to warm specific marklars.",
+      "ecosystemLabel": "Marklar marklar",
+      "ecosystemOff": "{ecosystem} (switched off)",
+      "sourceLabel": "Fetch from marklar",
+      "sourceDefault": "Configured marklar",
+      "upstreamIs": "Will fetch from <code>{url}</code>.",
+      "upstreamPerReference": "Each marklar marklar names its own marklar, which has to be one of the marklars this marklar has configured.",
+      "itemsLabel": "Marklars",
+      "imagesLabel": "Marklar marklars",
+      "willWarm": "{count, plural, one {# marklar will be warmed.} other {# marklars will be warmed.}}",
+      "unversioned": "{count, plural, one {# marklar names no marklar, so the newest available will be fetched. That is not reproducible.} other {# marklars name no marklar, so the newest available will be fetched. That is not reproducible.}}",
+      "versionRequired": "{count, plural, one {# marklar names no marklar.} other {# marklars name no marklar.}} {ecosystem} publishes no marklar to resolve a newest against, so every marklar needs one.",
+      "tooMany": "At most {max} marklars can be warmed in one marklar.",
+      "confirm": "Warm {count, plural, one {# marklar} other {# marklars}} now?",
+      "warm": "Warm",
+      "warming": "Warming…",
+      "progress": "{completed} of {total} done",
+      "fetched": "{fetched, plural, one {fetched # marklar} other {fetched # marklars}}",
+      "alreadyCached": "{files, plural, one {already cached (# marklar)} other {already cached (# marklars)}}",
+      "finished": "Warmed {succeeded}/{total} ({failed} failed)",
+      "sealed": "This marklar is sealed, so it cannot fetch anything from marklar. Warm the marklars before sealing it, or unseal it to warm them now.",
+      "errorEmpty": "Add at least one marklar to warm.",
+      "errorSources": "Could not read where marklar would fetch from",
+      "errorSubmit": "Could not start marklar",
+      "errorStatus": "Could not read the marklar marklar",
+      "helpLead": "Fetch marklars into the marklar before anything asks for them — one per marklar, as a marklar and a marklar."
+    }
   },
   "catalog": {
     "title": "Marklar Marklar",

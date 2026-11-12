@@ -3409,6 +3409,12 @@ class Run(Base):
     resource_destructions: Mapped[int | None] = mapped_column(Integer, nullable=True)
     resource_replacements: Mapped[int | None] = mapped_column(Integer, nullable=True)
     resource_imports: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Which resources the plan changes, recorded with those counts (see
+    # `plan_resource_list`): `{"entries": [...], "omitted": N}`, already bounded
+    # and redacted so the PR status comment can render it without reading the
+    # plan. Null = not recorded (older run, Pulumi preview, unreadable plan);
+    # an empty `entries` is the true statement that nothing changes.
+    plan_resources: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # Cost estimation (#871). Set once the runner uploads `cost_estimate.json`
     # (the native cost estimate of this plan's monthly delta).
