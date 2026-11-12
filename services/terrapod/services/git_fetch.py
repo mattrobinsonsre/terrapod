@@ -274,6 +274,13 @@ class GitError(RuntimeError):
     provider was briefly unavailable" -- which a caller could not do when every
     failure was a bare `RuntimeError`, so a run-creation request answered 500
     for both (#2471).
+
+    It is also the class `_classify` returns for a message it does not
+    recognise, which makes "permanent" the default and transience an
+    allow-list -- see `_classify`. Raised bare it claims nothing beyond "git
+    failed, and here are git's own words": no fault attributed to the
+    provider, no capability asserted about the server, nothing for the
+    operator to go and check that is fine.
     """
 
 
@@ -300,6 +307,26 @@ class GitUnsupported(GitError):
     """
 
 
+class GitRefNotFound(GitError):
+    """The remote cannot serve the requested ref or object.
+
+    A property of the request, so a retry cannot help and the operator has
+    something to act on -- which is the whole point of separating it from the
+    classes around it. The commonest way to reach it is a `vcs-ref` naming a
+    SHA or branch that does not exist on the remote, and before this existed
+    that was reported as a provider outage with nothing in the message
+    pointing at the ref (#2493).
+
+    `Server does not allow request for unadvertised object` is deliberately in
+    here despite being AMBIGUOUS: git prints it both for a SHA the remote does
+    not have and for a remote with `uploadpack.allowAnySHA1InWant` off, which
+    is a capability question. Both readings are permanent and both give the
+    operator something to change, so the split that matters -- retry or not --
+    is the same either way; the caller-facing message names both rather than
+    picking one.
+    """
+
+
 class GitTransient(GitError):
     """A network or server-side failure worth retrying."""
 
@@ -319,8 +346,14 @@ _ACCESS_DENIED = (
 )
 _UNSUPPORTED = (
     "does not support",
-    "unexpected disconnect while reading sideband",
     "filtering not recognized by server",
+)
+#: Each of these is git's own wording for "the remote will not serve the object
+#: you asked for". Permanent: the same request fails the same way next time.
+_BAD_REF = (
+    "server does not allow request for unadvertised object",
+    "couldn't find remote ref",
+    "not our ref",
 )
 _TRANSIENT = (
     "could not resolve host",
@@ -335,6 +368,13 @@ _TRANSIENT = (
     "503 service unavailable",
     "504 gateway",
     "internal server error",
+    # Git's canonical words for a connection dropped mid-transfer, and it used
+    # to sit in `_UNSUPPORTED` -- which is tested first, so a large repository
+    # over a flaky proxy told the operator their provider lacked a capability
+    # and nothing retried, on precisely the blip the retry exists to absorb
+    # (#2493). Git prints it alongside `early EOF` and `the remote end hung up
+    # unexpectedly`, both already here, so all three now agree.
+    "unexpected disconnect while reading sideband",
 )
 
 
@@ -353,15 +393,39 @@ def _classify(stderr: str, *, reachability_proven: bool) -> type[GitError]:
     the same commit worked. Classified the other way, a one-off blip on the
     provider's side would tell an operator their connection cannot see a
     repository it had just read.
+
+    **An unrecognised message is `GitError` -- permanent, not retried.** The
+    default used to be `GitTransient`, which maps to 502 plus the
+    `X-Terrapod-Upstream-Failure` marker plus "try again", so every message
+    nobody had listed was reported as the provider's outage and retried. The
+    costs are not symmetric. Called transient, a permanent failure is retried
+    (doubling the wait on the step that carries a retry), diagnosed as
+    somebody else's fault, and marked as an upstream outage for anything
+    reading that header -- an assertion about a third party we have not
+    established. Called permanent, a transient failure costs one run the
+    operator re-drives, with git's own words in front of them saying it was a
+    blip. And the commonest unrecognised message on this path is a user error:
+    a `vcs-ref` that does not exist (#2493).
+
+    **A specific permanent diagnosis beats a generic transport symptom**,
+    because git prints the symptom as a consequence -- a rejected `want` is
+    routinely followed by `fatal: the remote end hung up unexpectedly`. So
+    `_BAD_REF` is matched BEFORE `_TRANSIENT`, or a bad ref arriving with that
+    second line is retried and reported as an outage. The sideband disconnect
+    is the counter-example and the reason it moved rather than being reordered
+    around: it is not a diagnosis at all, it is the symptom, and it was simply
+    filed in the wrong table.
     """
     low = stderr.lower()
     if any(frag in low for frag in _UNSUPPORTED):
         return GitUnsupported
+    if any(frag in low for frag in _BAD_REF):
+        return GitRefNotFound
     if any(frag in low for frag in _TRANSIENT):
         return GitTransient
     if any(frag in low for frag in _ACCESS_DENIED):
         return GitTransient if reachability_proven else GitAccessDenied
-    return GitTransient
+    return GitError
 
 
 def _redact(text: str, auth_header: str | None) -> str:

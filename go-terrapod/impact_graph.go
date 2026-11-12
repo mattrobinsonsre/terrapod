@@ -66,7 +66,7 @@ func (c *Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGr
 	if len(id) > 4 && id[:4] != "run-" {
 		id = "run-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/impact-graph")
+	data, err := c.Get(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/impact-graph")
 	if err != nil {
 		return nil, err
 	}

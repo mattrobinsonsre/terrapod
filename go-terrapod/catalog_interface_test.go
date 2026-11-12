@@ -38,7 +38,7 @@ func TestGetCatalogItemInterface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if *path != "/api/terrapod/v1/catalog-items/ci-1/interface" {
+	if *path != "/api/v1/catalog-items/ci-1/interface" {
 		t.Errorf("requested %s", *path)
 	}
 	if iface.ResolvedVersion != "1.2.0" {

@@ -81,7 +81,7 @@ func (c *Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (
 	if err != nil {
 		return nil, fmt.Errorf("marshal search filter: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/workspaces/actions/search", body)
+	data, err := c.Post(ctx, "/api/v1/workspaces/actions/search", body)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (c *Client) BulkUpdateWorkspaces(
 	if err != nil {
 		return nil, fmt.Errorf("marshal bulk-update: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/workspaces/actions/bulk-update", body)
+	data, err := c.Post(ctx, "/api/v1/workspaces/actions/bulk-update", body)
 	if err != nil {
 		return nil, err
 	}

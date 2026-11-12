@@ -155,7 +155,7 @@ func TestCreateAndUploadState_RollbackOnUploadFail(t *testing.T) {
 		case r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/content"):
 			http.Error(w, `{"errors":[{"status":"500","detail":"boom"}]}`, http.StatusInternalServerError)
 		case r.Method == http.MethodDelete &&
-			strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/state-versions/") &&
+			strings.HasPrefix(r.URL.Path, "/api/v1/state-versions/") &&
 			strings.HasSuffix(r.URL.Path, "/manage"):
 			sawDelete = true
 			w.WriteHeader(http.StatusNoContent)

@@ -141,7 +141,7 @@ func (c *Client) RegeneratePlanSummary(ctx context.Context, runID string) (*Plan
 	if len(id) > 4 && id[:4] != "run-" {
 		id = "run-" + id
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/plan-summary/regenerate", nil)
+	data, err := c.Post(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/plan-summary/regenerate", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (c *Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*
 	if len(id) > 4 && id[:4] != "run-" {
 		id = "run-" + id
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/plan-summary/messages")
+	data, err := c.Get(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/plan-summary/messages")
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (c *Client) PostPlanSummaryMessage(ctx context.Context, runID, content stri
 	if err != nil {
 		return nil, fmt.Errorf("marshal message: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/plan-summary/messages", body)
+	data, err := c.Post(ctx, "/api/v1/runs/"+url.PathEscape(id)+"/plan-summary/messages", body)
 	if err != nil {
 		return nil, err
 	}

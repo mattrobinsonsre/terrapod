@@ -22,15 +22,15 @@ func newVCSConnFixture(t *testing.T) (*Client, *[]byte, *string) {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/vcs-connections":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/vcs-connections":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"vcs-aaa","type":"vcs-connections","attributes":{"name":"github-prod","provider":"github","status":"active","has-token":true,"github-app-id":12345}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/vcs-connections":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/vcs-connections":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"id":"vcs-aaa","type":"vcs-connections","attributes":{"name":"github-prod","provider":"github","has-token":true}},
 			  {"id":"vcs-bbb","type":"vcs-connections","attributes":{"name":"gitlab-internal","provider":"gitlab","has-token":true}}
 			]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/vcs-connections/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/vcs-connections/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"vcs-aaa","type":"vcs-connections","attributes":{"name":"github-prod","provider":"github","has-token":true}}}`))
 		case r.Method == http.MethodPatch:
 			_, _ = w.Write([]byte(`{"data":{"id":"vcs-aaa","type":"vcs-connections","attributes":{"name":"github-renamed","provider":"github","has-token":true}}}`))

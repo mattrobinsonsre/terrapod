@@ -19,55 +19,55 @@ func newCatalogFixture(t *testing.T) *Client {
 		p := r.URL.Path
 		switch {
 		// Provider templates
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/provider-templates":
+		case r.Method == http.MethodPost && p == "/api/v1/provider-templates":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"pt-1","type":"provider-templates","attributes":{
 			  "name":"aws-default","provider-type":"aws","body":"provider \"aws\" {}","parameters":[],
 			  "created-at":"2026-01-01T00:00:00Z"}}}`))
-		case r.Method == http.MethodGet && p == "/api/terrapod/v1/provider-templates":
+		case r.Method == http.MethodGet && p == "/api/v1/provider-templates":
 			_, _ = w.Write([]byte(`{"data":[{"id":"pt-1","type":"provider-templates","attributes":{"name":"aws-default"}}]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(p, "/api/terrapod/v1/provider-templates/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(p, "/api/v1/provider-templates/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"pt-1","type":"provider-templates","attributes":{"name":"aws-default"}}}`))
-		case r.Method == http.MethodPatch && strings.HasPrefix(p, "/api/terrapod/v1/provider-templates/"):
+		case r.Method == http.MethodPatch && strings.HasPrefix(p, "/api/v1/provider-templates/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"pt-1","type":"provider-templates","attributes":{"name":"aws-renamed"}}}`))
-		case r.Method == http.MethodDelete && strings.HasPrefix(p, "/api/terrapod/v1/provider-templates/"):
+		case r.Method == http.MethodDelete && strings.HasPrefix(p, "/api/v1/provider-templates/"):
 			w.WriteHeader(http.StatusNoContent)
 
 		// Catalog items
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-items":
+		case r.Method == http.MethodPost && p == "/api/v1/catalog-items":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"ci-1","type":"catalog-items","attributes":{
 			  "name":"vpc","module-name":"vpc","enabled":true,"created-at":"2026-01-01T00:00:00Z"}}}`))
-		case r.Method == http.MethodGet && p == "/api/terrapod/v1/catalog-items":
+		case r.Method == http.MethodGet && p == "/api/v1/catalog-items":
 			_, _ = w.Write([]byte(`{"data":[{"id":"ci-1","type":"catalog-items","attributes":{"name":"vpc"}}]}`))
-		case r.Method == http.MethodGet && p == "/api/terrapod/v1/catalog-items/ci-1/form":
+		case r.Method == http.MethodGet && p == "/api/v1/catalog-items/ci-1/form":
 			_, _ = w.Write([]byte(`{"data":{"id":"ci-1","type":"catalog-item-forms","attributes":{
 			  "resolved-version":"1.2.0","fields":[{"name":"cidr","type":"string","required":true}]}}}`))
-		case r.Method == http.MethodGet && p == "/api/terrapod/v1/catalog-items/ci-1/instances":
+		case r.Method == http.MethodGet && p == "/api/v1/catalog-items/ci-1/instances":
 			_, _ = w.Write([]byte(`{"data":[{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev","catalog-update-block":{"version":"2.0.0","reason":"inputs"}}}]}`))
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-items/ci-1/provision":
+		case r.Method == http.MethodPost && p == "/api/v1/catalog-items/ci-1/provision":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev","catalog-item-id":"ci-1"}}}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(p, "/api/terrapod/v1/catalog-items/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(p, "/api/v1/catalog-items/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"ci-1","type":"catalog-items","attributes":{"name":"vpc"}}}`))
-		case r.Method == http.MethodPatch && strings.HasPrefix(p, "/api/terrapod/v1/catalog-items/"):
+		case r.Method == http.MethodPatch && strings.HasPrefix(p, "/api/v1/catalog-items/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"ci-1","type":"catalog-items","attributes":{"name":"vpc","enabled":false}}}`))
-		case r.Method == http.MethodDelete && strings.HasPrefix(p, "/api/terrapod/v1/catalog-items/"):
+		case r.Method == http.MethodDelete && strings.HasPrefix(p, "/api/v1/catalog-items/"):
 			w.WriteHeader(http.StatusNoContent)
 
 		// Catalog instances
-		case r.Method == http.MethodGet && p == "/api/terrapod/v1/catalog-instances/ws-9":
+		case r.Method == http.MethodGet && p == "/api/v1/catalog-instances/ws-9":
 			_, _ = w.Write([]byte(`{"data":{"id":"ws-9","type":"catalog-instances","attributes":{"name":"vpc-dev","input-values":{"cidr":"10.0.0.0/16"},"catalog-update-block":{"version":"2.0.0","reason":"inputs"}}}}`))
-		case r.Method == http.MethodPatch && p == "/api/terrapod/v1/catalog-instances/ws-9":
+		case r.Method == http.MethodPatch && p == "/api/v1/catalog-instances/ws-9":
 			_, _ = w.Write([]byte(`{"data":{"id":"run-1","type":"runs","attributes":{"status":"queued","is-destroy":false}}}`))
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/destroy":
+		case r.Method == http.MethodPost && p == "/api/v1/catalog-instances/ws-9/destroy":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"run-2","type":"runs","attributes":{"status":"queued","is-destroy":true}}}`))
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/confirm":
+		case r.Method == http.MethodPost && p == "/api/v1/catalog-instances/ws-9/confirm":
 			_, _ = w.Write([]byte(`{"data":{"id":"run-1","type":"runs","attributes":{"status":"confirmed","is-destroy":false}}}`))
-		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/discard":
+		case r.Method == http.MethodPost && p == "/api/v1/catalog-instances/ws-9/discard":
 			_, _ = w.Write([]byte(`{"data":{"id":"run-1","type":"runs","attributes":{"status":"discarded","is-destroy":false}}}`))
-		case r.Method == http.MethodDelete && p == "/api/terrapod/v1/catalog-instances/ws-9":
+		case r.Method == http.MethodDelete && p == "/api/v1/catalog-instances/ws-9":
 			// The orphan escape hatch MUST carry ?orphan=true — without it the
 			// server 409s. Assert the SDK actually sends it.
 			if r.URL.RawQuery != "orphan=true" {
@@ -160,7 +160,7 @@ func TestCatalogAuthoringReadsRequireExplicitSensitiveQuery(t *testing.T) {
 	if err != nil || len(item.Attributes["variable-options"].([]any)[0].(map[string]any)) != 1 {
 		t.Fatalf("ordinary read must be redacted: %v %+v", err, item)
 	}
-	data, err := admin.Get(t.Context(), "/api/terrapod/v1/catalog-items/id?include-sensitive-values=true")
+	data, err := admin.Get(t.Context(), "/api/v1/catalog-items/id?include-sensitive-values=true")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestCatalogAuthoringReadsRequireExplicitSensitiveQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = user.Get(t.Context(), "/api/terrapod/v1/catalog-items/id?include-sensitive-values=true"); err == nil {
+	if _, err = user.Get(t.Context(), "/api/v1/catalog-items/id?include-sensitive-values=true"); err == nil {
 		t.Fatal("non-admin reveal must fail")
 	}
 }
@@ -194,7 +194,7 @@ func TestProviderTemplateAuthoringReadIsOptIn(t *testing.T) {
 	if err != nil || redacted.Attributes["body"] != nil {
 		t.Fatalf("ordinary read: %v %+v", err, redacted)
 	}
-	data, err := c.Get(t.Context(), "/api/terrapod/v1/provider-templates/id?include-sensitive-values=true")
+	data, err := c.Get(t.Context(), "/api/v1/provider-templates/id?include-sensitive-values=true")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +309,7 @@ func TestListAllCatalogInstances_LoopsAllPages(t *testing.T) {
 	}
 	var requested []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/terrapod/v1/catalog-items/ci-1/instances" {
+		if r.URL.Path != "/api/v1/catalog-items/ci-1/instances" {
 			t.Fatalf("unexpected path: %q", r.URL.Path)
 		}
 		page := r.URL.Query().Get("page[number]")

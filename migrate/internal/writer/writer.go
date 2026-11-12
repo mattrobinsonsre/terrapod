@@ -713,7 +713,7 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 			if dest.StateSize == 0 {
 				out.State = "errored"
 				out.Error = fmt.Sprintf(
-					"conflict on state upload: destination state-version %s exists at serial %d but has size 0 (orphan from a prior failed upload). Delete it via `DELETE /api/terrapod/v1/state-versions/%s/manage` and re-run apply.",
+					"conflict on state upload: destination state-version %s exists at serial %d but has size 0 (orphan from a prior failed upload). Delete it via `DELETE /api/v1/state-versions/%s/manage` and re-run apply.",
 					dest.ID, dest.Serial, dest.ID)
 				return out
 			}

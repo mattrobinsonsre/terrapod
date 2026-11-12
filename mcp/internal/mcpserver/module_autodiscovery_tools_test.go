@@ -57,7 +57,7 @@ func TestModuleRuleListTool(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("tool error: %s", resultText(t, res))
 	}
-	if got.path != "/api/terrapod/v1/module-autodiscovery-rules" {
+	if got.path != "/api/v1/module-autodiscovery-rules" {
 		t.Errorf("requested %s", got.path)
 	}
 	if out := resultText(t, res); !strings.Contains(out, "modrule-1") || !strings.Contains(out, `"count":1`) {
@@ -74,7 +74,7 @@ func TestModuleRulePreviewTool(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("tool error: %s", resultText(t, res))
 	}
-	if got.method != http.MethodGet || got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-1/preview" {
+	if got.method != http.MethodGet || got.path != "/api/v1/module-autodiscovery-rules/modrule-1/preview" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if out := resultText(t, res); !strings.Contains(out, "modules/create") {
@@ -99,7 +99,7 @@ func TestModuleRuleScanToolRegistersAll(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("tool error: %s", resultText(t, res))
 	}
-	if got.method != http.MethodPost || got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-1/scan" {
+	if got.method != http.MethodPost || got.path != "/api/v1/module-autodiscovery-rules/modrule-1/scan" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if _, ok := got.attrs["subdirectories"]; ok {
@@ -165,7 +165,7 @@ func TestModuleRuleRepositoriesTool(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("tool error: %s", resultText(t, res))
 	}
-	if got.method != http.MethodGet || got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-1/repositories" {
+	if got.method != http.MethodGet || got.path != "/api/v1/module-autodiscovery-rules/modrule-1/repositories" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	// A default page size, so an org with thousands of repositories cannot

@@ -6,10 +6,10 @@
 //
 //	JSON:API type: "catalog-instances"
 //	ID format: the provisioned workspace UUID
-//	Create:  POST   /api/terrapod/v1/catalog-items/{item}/provision
-//	Read:    GET    /api/terrapod/v1/catalog-instances/{ws}
-//	Update:  PATCH  /api/terrapod/v1/catalog-instances/{ws}   (reconfigure)
-//	Delete:  POST   /api/terrapod/v1/catalog-instances/{ws}/destroy
+//	Create:  POST   /api/v1/catalog-items/{item}/provision
+//	Read:    GET    /api/v1/catalog-instances/{ws}
+//	Update:  PATCH  /api/v1/catalog-instances/{ws}   (reconfigure)
+//	Delete:  POST   /api/v1/catalog-instances/{ws}/destroy
 //
 // Lifecycle mapping:
 //

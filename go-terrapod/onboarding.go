@@ -107,7 +107,7 @@ type CreateOnboardingSessionRequest struct {
 // GetOnboardingAvailability reports whether the optional AI onboarding mode is
 // available (any authenticated user).
 func (c *Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvailability, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/onboarding")
+	data, err := c.Get(ctx, "/api/v1/onboarding")
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (c *Client) CreateOnboardingSession(ctx context.Context, req CreateOnboardi
 		return nil, fmt.Errorf("marshal create onboarding-session: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/onboarding-sessions", url.PathEscape(req.WorkspaceID)),
+		fmt.Sprintf("/api/v1/workspaces/%s/onboarding-sessions", url.PathEscape(req.WorkspaceID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func (c *Client) ListOnboardingSessions(ctx context.Context, workspaceID string)
 		return nil, fmt.Errorf("workspace id is required")
 	}
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/onboarding-sessions", url.PathEscape(workspaceID)))
+		fmt.Sprintf("/api/v1/workspaces/%s/onboarding-sessions", url.PathEscape(workspaceID)))
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (c *Client) GetOnboardingSession(ctx context.Context, sessionID string) (*O
 	if sessionID == "" {
 		return nil, fmt.Errorf("session id is required")
 	}
-	data, err := c.Get(ctx, "/api/terrapod/v1/onboarding-sessions/"+url.PathEscape(sessionID))
+	data, err := c.Get(ctx, "/api/v1/onboarding-sessions/"+url.PathEscape(sessionID))
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (c *Client) StartOnboardingDiscovery(ctx context.Context, sessionID string,
 		return nil, fmt.Errorf("marshal start onboarding-discovery: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/onboarding-sessions/%s/discover", url.PathEscape(sessionID)),
+		fmt.Sprintf("/api/v1/onboarding-sessions/%s/discover", url.PathEscape(sessionID)),
 		body)
 	if err != nil {
 		return nil, err

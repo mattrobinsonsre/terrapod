@@ -20,7 +20,7 @@ func newRoleFixture(t *testing.T) (*Client, *[]byte) {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/roles":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/roles":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"name":"sre","type":"roles","attributes":{
 			  "description":"SRE team",
@@ -29,12 +29,12 @@ func newRoleFixture(t *testing.T) (*Client, *[]byte) {
 			  "deny-labels":{},"deny-names":[],
 			  "built-in":false
 			}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/roles":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/roles":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"name":"admin","type":"roles","attributes":{"workspace-permission":"admin","built-in":true}},
 			  {"name":"sre","type":"roles","attributes":{"workspace-permission":"admin","built-in":false}}
 			]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/roles/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/roles/"):
 			_, _ = w.Write([]byte(`{"data":{"name":"sre","type":"roles","attributes":{
 			  "workspace-permission":"admin","pool-permission":"admin",
 			  "allow-labels":{"team":"sre"},"built-in":false
@@ -449,7 +449,7 @@ func TestGetResourceAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "/api/terrapod/v1/workspaces/ws-1/access" {
+	if path != "/api/v1/workspaces/ws-1/access" {
 		t.Errorf("path: %s", path)
 	}
 	if len(acc.Roles) != 1 || acc.Roles[0].Role != "sre" {

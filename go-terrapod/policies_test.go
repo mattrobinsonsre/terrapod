@@ -18,11 +18,11 @@ func newPolicyFixture(t *testing.T) *Client {
 			  "name":"deny-public","description":"no public buckets","rego":"package x",
 			  "created-at":"2026-06-01T00:00:00Z","updated-at":"2026-06-01T00:00:00Z"
 			},"relationships":{"policy-set":{"data":{"id":"polset-aaa","type":"policy-sets"}}}}}`))
-		case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/policies/"):
+		case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/api/v1/policies/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"pol-111","type":"policies","attributes":{
 			  "name":"renamed","rego":"package y"
 			},"relationships":{"policy-set":{"data":{"id":"polset-aaa","type":"policy-sets"}}}}}`))
-		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/policies/"):
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/policies/"):
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.Error(w, "unhandled", http.StatusNotFound)

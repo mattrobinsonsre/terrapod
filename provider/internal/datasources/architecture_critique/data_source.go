@@ -1,7 +1,7 @@
 // Package architecture_critique implements the terrapod_architecture_critique
 // data source (#1036 Part 2).
 //
-// API Contract: GET /api/terrapod/v1/workspaces/{id}/architecture-critique
+// API Contract: GET /api/v1/workspaces/{id}/architecture-critique
 // Reports the AI architecture critic's assessment of a workspace's CURRENT
 // deployed system, inferred from its latest Terraform state and critiqued
 // across reliability/security/cost/operations/scalability. Every finding is

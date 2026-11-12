@@ -20,8 +20,8 @@ import (
 // informational only.
 
 const (
-	providerPublishBase = "/api/terrapod/v1/registry-providers/private/default"
-	modulePublishBase   = "/api/terrapod/v1/registry-modules/private/default"
+	providerPublishBase = "/api/v1/registry-providers/private/default"
+	modulePublishBase   = "/api/v1/registry-modules/private/default"
 )
 
 // UploadProviderSHASUMS uploads the client-built SHA256SUMS manifest for a

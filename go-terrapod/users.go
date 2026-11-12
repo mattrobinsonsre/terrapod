@@ -45,7 +45,7 @@ func (c *Client) CreateUser(ctx context.Context, req CreateUserRequest) (*User, 
 	if err != nil {
 		return nil, fmt.Errorf("marshal create user: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/users", body)
+	data, err := c.Post(ctx, "/api/v1/users", body)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (c *Client) CreateUser(ctx context.Context, req CreateUserRequest) (*User, 
 
 // GetUser reads a user by email.
 func (c *Client) GetUser(ctx context.Context, email string) (*User, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/users/"+url.PathEscape(email))
+	data, err := c.Get(ctx, "/api/v1/users/"+url.PathEscape(email))
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (c *Client) GetUser(ctx context.Context, email string) (*User, error) {
 // ListUsers returns every user. Visibility scoped by the caller's
 // role (admin/audit see all).
 func (c *Client) ListUsers(ctx context.Context) ([]User, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/users")
+	data, err := c.Get(ctx, "/api/v1/users")
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (c *Client) UpdateUser(ctx context.Context, email string, req UpdateUserReq
 	if err != nil {
 		return nil, fmt.Errorf("marshal update user: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/users/"+url.PathEscape(email), body)
+	data, err := c.Patch(ctx, "/api/v1/users/"+url.PathEscape(email), body)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (c *Client) UpdateUser(ctx context.Context, email string, req UpdateUserReq
 // DeleteUser removes the user. Role assignments referencing the
 // user are also cleaned up by the server.
 func (c *Client) DeleteUser(ctx context.Context, email string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/users/"+url.PathEscape(email))
+	return c.Delete(ctx, "/api/v1/users/"+url.PathEscape(email))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

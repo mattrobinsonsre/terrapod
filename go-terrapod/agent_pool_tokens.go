@@ -49,7 +49,7 @@ func (c *Client) CreateAgentPoolToken(ctx context.Context, poolID string, req Cr
 		return nil, fmt.Errorf("marshal create pool-token: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/agent-pools/%s/tokens", url.PathEscape(poolID)),
+		fmt.Sprintf("/api/v1/agent-pools/%s/tokens", url.PathEscape(poolID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (c *Client) CreateAgentPoolToken(ctx context.Context, poolID string, req Cr
 // the pool. The raw Token value is never present here.
 func (c *Client) ListAgentPoolTokens(ctx context.Context, poolID string) ([]AgentPoolToken, error) {
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/agent-pools/%s/tokens", url.PathEscape(poolID)))
+		fmt.Sprintf("/api/v1/agent-pools/%s/tokens", url.PathEscape(poolID)))
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (c *Client) GetAgentPoolToken(ctx context.Context, poolID, tokenID string) 
 // DeleteAgentPoolToken revokes a token by id.
 func (c *Client) DeleteAgentPoolToken(ctx context.Context, poolID, tokenID string) error {
 	return c.Delete(ctx,
-		fmt.Sprintf("/api/terrapod/v1/agent-pools/%s/tokens/%s",
+		fmt.Sprintf("/api/v1/agent-pools/%s/tokens/%s",
 			url.PathEscape(poolID), url.PathEscape(tokenID)))
 }
 

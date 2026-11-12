@@ -20,7 +20,7 @@ func newPolicySetFixture(t *testing.T) (*Client, *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/policy-sets":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/policy-sets":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"polset-aaa","type":"policy-sets","attributes":{
 			  "name":"sec-baseline","enforcement-level":"mandatory","enabled":true,
@@ -29,12 +29,12 @@ func newPolicySetFixture(t *testing.T) (*Client, *http.Request) {
 			  "vcs-branch":"main","policy-path":"policies",
 			  "vcs-last-commit-sha":"abc123","vcs-last-synced-at":"2026-05-28T00:00:00Z"
 			}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/policy-sets":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/policy-sets":
 			_, _ = w.Write([]byte(`{"data":[
 			  {"id":"polset-aaa","type":"policy-sets","attributes":{"name":"sec-baseline","source":"inline","enabled":true,"enforcement-level":"advisory","policy-count":2}},
 			  {"id":"polset-bbb","type":"policy-sets","attributes":{"name":"cost-controls","source":"vcs","enabled":true,"enforcement-level":"mandatory","policy-count":5}}
 			]}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/policy-sets/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/policy-sets/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"polset-aaa","type":"policy-sets","attributes":{
 			  "name":"sec-baseline","enforcement-level":"mandatory","enabled":true,
 			  "global-scope":false,"source":"vcs","policy-count":3,

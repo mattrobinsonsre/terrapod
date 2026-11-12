@@ -79,7 +79,7 @@ projects:
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/vcs-connections":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/vcs-connections":
 			// Pretend the operator pre-wired one Terrapod-side
 			// connection that matches the atlantis-derived host.
 			_, _ = w.Write([]byte(`{"data":[{"id":"vcs-fixt","type":"vcs-connections","attributes":{"name":"github-prod","provider":"github","server-url":"https://github.com","has-token":true}}]}`))

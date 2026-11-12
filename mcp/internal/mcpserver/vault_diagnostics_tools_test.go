@@ -33,7 +33,7 @@ func TestVaultStatusToolReturnsTheSample(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("call: %v %s", err, resultText(t, res))
 	}
-	if gotPath != "/api/terrapod/v1/admin/vault" {
+	if gotPath != "/api/v1/admin/vault" {
 		t.Fatalf("path = %s", gotPath)
 	}
 	out := resultText(t, res)
@@ -70,7 +70,7 @@ func TestVaultReferenceCheckToolPostsTheReference(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("call: %v %s", err, resultText(t, res))
 	}
-	if gotPath != "/api/terrapod/v1/workspaces/ws-1/vault-reference-checks" {
+	if gotPath != "/api/v1/workspaces/ws-1/vault-reference-checks" {
 		t.Fatalf("path = %s", gotPath)
 	}
 	ref := gotBody["data"].(map[string]any)["attributes"].(map[string]any)["reference"].(map[string]any)
@@ -95,7 +95,7 @@ func TestVaultReferenceCheckToolForAVariableSetVariable(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("call: %v %s", err, resultText(t, res))
 	}
-	if gotPath != "/api/terrapod/v1/varsets/varset-7/vault-reference-checks" {
+	if gotPath != "/api/v1/varsets/varset-7/vault-reference-checks" {
 		t.Fatalf("path = %s", gotPath)
 	}
 }

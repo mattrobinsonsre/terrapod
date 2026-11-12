@@ -142,6 +142,26 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
   omits (#2469). A fallback is also how "native only" stops being true without
   anyone deciding it, so the provider and go-terrapod each carry a test refusing
   one. Widening this pair is a decision to take here first.
+
+  **These consumers also have a FLOOR, independent of the pair: Terrapod 1.7.0.**
+  They address the canonical `/api/v1` prefix, which Terrapod began mounting in
+  1.7.0, so against anything older every native call answers 404. It is strictly
+  more permissive than the same-MAJOR rule above and is recorded separately
+  because it is a property of the consumer's own code rather than of the version
+  pair — an unpinned source build is subject to it too. It exists because these
+  consumers moved off the deprecated `/api/terrapod/v1` alias (#2497), which
+  reached further back; the alias is removed from the server at v2.1.0, so the
+  move had to happen before then either way, and a 2.x consumer reaching a 1.6
+  server was never something this page promised.
+
+  `go-terrapod`'s `MinimumAPIVersion` is the floor, and `VersionCheck` reports a
+  target below it naming the prefix and the version. That matters because the
+  alternative way to learn it is a 404 on every call, which names neither; and it
+  has real teeth in `terrapod-migrate`, whose gate **refuses** rather than warning
+  (the provider warns and proceeds, deliberately). The same-major rule means no
+  supported pairing is affected: 2.0.x and the held 1.11.x line both mount
+  `/api/v1`. Adopting a 404-fallback to reach further back is the helper #2469
+  removed, and is refused for the reasons above.
 - **API ↔ runner / listener:** a runner or listener image is **forward-compatible
   with a newer API across at least 2 minor versions** (`N-2`). You can upgrade the
   control plane and let runners/listeners catch up later; the reverse (a newer

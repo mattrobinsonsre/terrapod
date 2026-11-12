@@ -45,7 +45,7 @@ func newOnboardingFixture(t *testing.T) *Client {
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		p := r.URL.Path
 		switch {
-		case r.Method == http.MethodGet && p == "/api/terrapod/v1/onboarding":
+		case r.Method == http.MethodGet && p == "/api/v1/onboarding":
 			_, _ = w.Write([]byte(`{"data":{"type":"onboarding-availability","attributes":{
 			  "ai-available":true,"ai-model-configured":true}}}`))
 

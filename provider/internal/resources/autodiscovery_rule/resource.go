@@ -5,10 +5,10 @@
 //
 //	JSON:API type: "autodiscovery-rules"
 //	ID format: bare UUID (no prefix)
-//	Create:  POST   /api/terrapod/v1/autodiscovery-rules
-//	Read:    GET    /api/terrapod/v1/autodiscovery-rules/{id}
-//	Update:  PATCH  /api/terrapod/v1/autodiscovery-rules/{id}
-//	Delete:  DELETE /api/terrapod/v1/autodiscovery-rules/{id}
+//	Create:  POST   /api/v1/autodiscovery-rules
+//	Read:    GET    /api/v1/autodiscovery-rules/{id}
+//	Update:  PATCH  /api/v1/autodiscovery-rules/{id}
+//	Delete:  DELETE /api/v1/autodiscovery-rules/{id}
 //
 // Attribute mapping (JSON:API attribute -> Terraform schema attribute):
 //
@@ -915,7 +915,7 @@ func (r *autodiscoveryRuleResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	data, err := r.tc.Post(ctx, "/api/terrapod/v1/autodiscovery-rules", body)
+	data, err := r.tc.Post(ctx, "/api/v1/autodiscovery-rules", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create autodiscovery rule", err.Error())
 		return
@@ -938,7 +938,7 @@ func (r *autodiscoveryRuleResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	data, err := r.tc.Get(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString())
+	data, err := r.tc.Get(ctx, "/api/v1/autodiscovery-rules/"+state.ID.ValueString())
 	if err != nil {
 		var nf *terrapod.NotFoundError
 		if errors.As(err, &nf) {
@@ -980,7 +980,7 @@ func (r *autodiscoveryRuleResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	data, err := r.tc.Patch(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString(), body)
+	data, err := r.tc.Patch(ctx, "/api/v1/autodiscovery-rules/"+state.ID.ValueString(), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update autodiscovery rule", err.Error())
 		return
@@ -1003,7 +1003,7 @@ func (r *autodiscoveryRuleResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	err := r.tc.Delete(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString())
+	err := r.tc.Delete(ctx, "/api/v1/autodiscovery-rules/"+state.ID.ValueString())
 	if err != nil {
 		var nf *terrapod.NotFoundError
 		if !errors.As(err, &nf) {

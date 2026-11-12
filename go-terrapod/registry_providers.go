@@ -43,7 +43,7 @@ func (c *Client) CreateRegistryProvider(ctx context.Context, req CreateRegistryP
 	if err != nil {
 		return nil, fmt.Errorf("marshal create registry-provider: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/registry-providers", body)
+	data, err := c.Post(ctx, "/api/v1/registry-providers", body)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (c *Client) GetRegistryProvider(ctx context.Context, name string) (*Registr
 // server's JSON:API list through the same per-resource projector the
 // single-resource Get uses.
 func (c *Client) ListRegistryProviders(ctx context.Context) ([]RegistryProvider, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/registry-providers")
+	data, err := c.Get(ctx, "/api/v1/registry-providers")
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (c *Client) DeleteRegistryProvider(ctx context.Context, name string) error 
 // ── Internal helpers ─────────────────────────────────────────────────
 
 func registryProviderPath(name string) string {
-	return fmt.Sprintf("/api/terrapod/v1/registry-providers/private/default/%s", url.PathEscape(name))
+	return fmt.Sprintf("/api/v1/registry-providers/private/default/%s", url.PathEscape(name))
 }
 
 func parseRegistryProvider(body []byte) (*RegistryProvider, error) {

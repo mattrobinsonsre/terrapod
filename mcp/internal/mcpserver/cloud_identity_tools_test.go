@@ -281,7 +281,7 @@ func TestOIDCSigningKeysTool(t *testing.T) {
 
 	out := callTool(t, sess, "terrapod_oidc_signing_keys", map[string]any{})
 
-	if want := "/api/terrapod/v1/oidc/signing-keys"; path != want {
+	if want := "/api/v1/oidc/signing-keys"; path != want {
 		t.Errorf("tool requested %q, want %q", path, want)
 	}
 	if out["signing-kid"] != "kid-old" {
@@ -418,7 +418,7 @@ func TestOIDCSigningKeyRotateTool(t *testing.T) {
 	if method != http.MethodPost {
 		t.Errorf("tool used %s, want POST", method)
 	}
-	if want := "/api/terrapod/v1/oidc/signing-keys/actions/rotate"; path != want {
+	if want := "/api/v1/oidc/signing-keys/actions/rotate"; path != want {
 		t.Errorf("tool requested %q, want %q", path, want)
 	}
 	key, ok := out["key"].(map[string]any)

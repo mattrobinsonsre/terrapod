@@ -5,10 +5,10 @@
 //
 //	JSON:API type: "provider-templates"
 //	ID format: bare UUID (no prefix)
-//	Create:  POST   /api/terrapod/v1/provider-templates
-//	Read:    GET    /api/terrapod/v1/provider-templates/{id}
-//	Update:  PATCH  /api/terrapod/v1/provider-templates/{id}
-//	Delete:  DELETE /api/terrapod/v1/provider-templates/{id}
+//	Create:  POST   /api/v1/provider-templates
+//	Read:    GET    /api/v1/provider-templates/{id}
+//	Update:  PATCH  /api/v1/provider-templates/{id}
+//	Delete:  DELETE /api/v1/provider-templates/{id}
 //
 // Attribute mapping (JSON:API attribute -> Terraform schema attribute):
 //
@@ -263,7 +263,7 @@ func (r *providerTemplateResource) ImportState(ctx context.Context, req resource
 
 func (r *providerTemplateResource) readAuthoring(ctx context.Context, id string) (*terrapod.ProviderTemplate, error) {
 	// The ordinary SDK read masks the body and defaults; state needs both.
-	data, err := r.tc.Get(ctx, "/api/terrapod/v1/provider-templates/"+url.PathEscape(id)+"?include-sensitive-values=true")
+	data, err := r.tc.Get(ctx, "/api/v1/provider-templates/"+url.PathEscape(id)+"?include-sensitive-values=true")
 	if err != nil {
 		return nil, err
 	}

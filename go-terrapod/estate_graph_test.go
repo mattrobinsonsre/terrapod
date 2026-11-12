@@ -21,7 +21,7 @@ const estateGraphBody = `{"data":{"id":"estate-graph","type":"estate-graphs","at
 
 func TestGetEstateGraph(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/terrapod/v1/estate-graph" {
+		if r.URL.Path != "/api/v1/estate-graph" {
 			http.Error(w, "unexpected path", http.StatusNotFound)
 			return
 		}

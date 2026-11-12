@@ -7,10 +7,10 @@
 //
 //	JSON:API type: "module-autodiscovery-rules"
 //	ID format: "modrule-<uuid>"
-//	Create:  POST   /api/terrapod/v1/module-autodiscovery-rules
-//	Read:    GET    /api/terrapod/v1/module-autodiscovery-rules/{id}
-//	Update:  PATCH  /api/terrapod/v1/module-autodiscovery-rules/{id}
-//	Delete:  DELETE /api/terrapod/v1/module-autodiscovery-rules/{id}
+//	Create:  POST   /api/v1/module-autodiscovery-rules
+//	Read:    GET    /api/v1/module-autodiscovery-rules/{id}
+//	Update:  PATCH  /api/v1/module-autodiscovery-rules/{id}
+//	Delete:  DELETE /api/v1/module-autodiscovery-rules/{id}
 //
 // Attribute mapping (JSON:API attribute -> Terraform schema attribute):
 //

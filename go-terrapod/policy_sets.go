@@ -114,7 +114,7 @@ func (c *Client) CreatePolicySet(ctx context.Context, req CreatePolicySetRequest
 	if err != nil {
 		return nil, fmt.Errorf("marshal create policy-set: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/policy-sets", body)
+	data, err := c.Post(ctx, "/api/v1/policy-sets", body)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (c *Client) CreatePolicySet(ctx context.Context, req CreatePolicySetRequest
 
 // GetPolicySet reads a policy set by id.
 func (c *Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/policy-sets/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/policy-sets/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (c *Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error
 
 // ListPolicySets returns all policy sets.
 func (c *Client) ListPolicySets(ctx context.Context) ([]PolicySet, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/policy-sets")
+	data, err := c.Get(ctx, "/api/v1/policy-sets")
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (c *Client) UpdatePolicySet(ctx context.Context, id string, req UpdatePolic
 	if err != nil {
 		return nil, fmt.Errorf("marshal update policy-set: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/policy-sets/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/policy-sets/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -162,14 +162,14 @@ func (c *Client) UpdatePolicySet(ctx context.Context, id string, req UpdatePolic
 
 // DeletePolicySet removes a policy set and its policies.
 func (c *Client) DeletePolicySet(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/policy-sets/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/policy-sets/"+url.PathEscape(id))
 }
 
 // SyncPolicySet triggers an immediate sync of a VCS-sourced policy set.
 // Returns the policy set state at the time of enqueue (sync happens
 // asynchronously). Returns an error if the policy set is not VCS-sourced.
 func (c *Client) SyncPolicySet(ctx context.Context, id string) (*PolicySet, error) {
-	path := fmt.Sprintf("/api/terrapod/v1/policy-sets/%s/actions/sync", url.PathEscape(id))
+	path := fmt.Sprintf("/api/v1/policy-sets/%s/actions/sync", url.PathEscape(id))
 	data, err := c.Post(ctx, path, nil)
 	if err != nil {
 		return nil, err
@@ -372,7 +372,7 @@ func (c *Client) AddPolicy(ctx context.Context, policySetID string, req AddPolic
 	if err != nil {
 		return nil, fmt.Errorf("marshal add policy: %w", err)
 	}
-	path := fmt.Sprintf("/api/terrapod/v1/policy-sets/%s/policies", url.PathEscape(policySetID))
+	path := fmt.Sprintf("/api/v1/policy-sets/%s/policies", url.PathEscape(policySetID))
 	data, err := c.Post(ctx, path, body)
 	if err != nil {
 		return nil, err
@@ -397,7 +397,7 @@ func (c *Client) UpdatePolicy(ctx context.Context, policyID string, req UpdatePo
 	if err != nil {
 		return nil, fmt.Errorf("marshal update policy: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/policies/"+url.PathEscape(policyID), body)
+	data, err := c.Patch(ctx, "/api/v1/policies/"+url.PathEscape(policyID), body)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +406,7 @@ func (c *Client) UpdatePolicy(ctx context.Context, policyID string, req UpdatePo
 
 // DeletePolicy removes a single policy. 409 if the parent set is VCS-sourced.
 func (c *Client) DeletePolicy(ctx context.Context, policyID string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/policies/"+url.PathEscape(policyID))
+	return c.Delete(ctx, "/api/v1/policies/"+url.PathEscape(policyID))
 }
 
 func parsePolicy(body []byte) (*Policy, error) {
@@ -440,7 +440,7 @@ func policyFromResource(res *Resource) *Policy {
 // A consumer that needs one policy fetches the set and picks it out. That is
 // one request either way, since the set is where they live.
 func (c *Client) ListPolicies(ctx context.Context, policySetID string) ([]Policy, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/policy-sets/"+url.PathEscape(policySetID))
+	data, err := c.Get(ctx, "/api/v1/policy-sets/"+url.PathEscape(policySetID))
 	if err != nil {
 		return nil, err
 	}

@@ -18,13 +18,13 @@ func newRegModFixture(t *testing.T) *Client {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/registry-modules":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/registry-modules":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"mod-aaa","type":"registry-modules","attributes":{
 			  "name":"vpc","provider":"aws","namespace":"default","status":"active",
 			  "labels":{"team":"sre"}
 			}}}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/registry-modules/private/default/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/registry-modules/private/default/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"mod-aaa","type":"registry-modules","attributes":{
 			  "name":"vpc","provider":"aws","namespace":"default"
 			}}}`))
@@ -95,7 +95,7 @@ func TestDeleteRegistryModule(t *testing.T) {
 
 func TestListRegistryModules(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/terrapod/v1/registry-modules" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v1/registry-modules" {
 			http.Error(w, "unhandled", http.StatusNotFound)
 			return
 		}
@@ -149,7 +149,7 @@ func TestGetModuleInterfaceCarriesTheParseError(t *testing.T) {
 }
 
 func TestGetModuleInterface(t *testing.T) {
-	const ifacePath = "/api/terrapod/v1/registry-modules/private/default/vpc/aws/1.2.3/interface"
+	const ifacePath = "/api/v1/registry-modules/private/default/vpc/aws/1.2.3/interface"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "unhandled", http.StatusNotFound)

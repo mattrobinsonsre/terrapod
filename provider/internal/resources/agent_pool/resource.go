@@ -4,10 +4,10 @@
 //
 //	JSON:API type: "agent-pools"
 //	ID prefix: "apool-"
-//	Create:  POST   /api/terrapod/v1/agent-pools
-//	Read:    GET    /api/terrapod/v1/agent-pools/{id}
-//	Update:  PATCH  /api/terrapod/v1/agent-pools/{id}
-//	Delete:  DELETE /api/terrapod/v1/agent-pools/{id}
+//	Create:  POST   /api/v1/agent-pools
+//	Read:    GET    /api/v1/agent-pools/{id}
+//	Update:  PATCH  /api/v1/agent-pools/{id}
+//	Delete:  DELETE /api/v1/agent-pools/{id}
 //
 // Attribute mapping (JSON:API attribute -> Terraform schema attribute):
 //

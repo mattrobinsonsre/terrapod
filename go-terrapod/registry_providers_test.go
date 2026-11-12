@@ -17,10 +17,10 @@ func newRegProvFixture(t *testing.T) *Client {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/registry-providers":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/registry-providers":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"prov-aaa","type":"registry-providers","attributes":{"name":"myprov","namespace":"default"}}}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/registry-providers/private/default/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/registry-providers/private/default/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"prov-aaa","type":"registry-providers","attributes":{"name":"myprov","namespace":"default"}}}`))
 		case r.Method == http.MethodPatch:
 			_, _ = w.Write([]byte(`{"data":{"id":"prov-aaa","type":"registry-providers","attributes":{"name":"myprov","labels":{"team":"sre"}}}}`))
@@ -85,7 +85,7 @@ func TestDeleteRegistryProvider(t *testing.T) {
 
 func TestListRegistryProviders(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/terrapod/v1/registry-providers" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v1/registry-providers" {
 			http.Error(w, "unhandled", http.StatusNotFound)
 			return
 		}

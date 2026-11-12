@@ -67,7 +67,7 @@ func TestCreateModuleAutodiscoveryRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.method != http.MethodPost || got.path != "/api/terrapod/v1/module-autodiscovery-rules" {
+	if got.method != http.MethodPost || got.path != "/api/v1/module-autodiscovery-rules" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if got.body["pattern"] != "**/*.tf" || got.body["repo-url"] == nil {
@@ -93,7 +93,7 @@ func TestUpdateModuleAutodiscoveryRuleSendsOnlyWhatIsSet(t *testing.T) {
 	if _, err := c.UpdateModuleAutodiscoveryRule(t.Context(), "modrule-1", ModuleAutodiscoveryRuleRequest{Enabled: &off}); err != nil {
 		t.Fatal(err)
 	}
-	if got.method != http.MethodPatch || got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-1" {
+	if got.method != http.MethodPatch || got.path != "/api/v1/module-autodiscovery-rules/modrule-1" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if len(got.body) != 1 || got.body["enabled"] != false {
@@ -118,7 +118,7 @@ func TestGetAndDeleteModuleAutodiscoveryRule(t *testing.T) {
 	if err != nil || r.Name != "mg" {
 		t.Fatalf("get: %+v %v", r, err)
 	}
-	if got.method != http.MethodGet || got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-1" {
+	if got.method != http.MethodGet || got.path != "/api/v1/module-autodiscovery-rules/modrule-1" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 
@@ -170,7 +170,7 @@ func TestPreviewModuleAutodiscoveryRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.method != http.MethodGet || got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-1/preview" {
+	if got.method != http.MethodGet || got.path != "/api/v1/module-autodiscovery-rules/modrule-1/preview" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if p.Ref != "main" || p.FilesWalked != 12 || len(p.Entries) != 2 {
@@ -190,7 +190,7 @@ func TestPreviewUnsavedModuleAutodiscoveryRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.method != http.MethodPost || got.path != "/api/terrapod/v1/module-autodiscovery-rules/preview" {
+	if got.method != http.MethodPost || got.path != "/api/v1/module-autodiscovery-rules/preview" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if p.Entries == nil {
@@ -209,7 +209,7 @@ func TestScanModuleAutodiscoveryRuleRegistersAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.method != http.MethodPost || got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-1/scan" {
+	if got.method != http.MethodPost || got.path != "/api/v1/module-autodiscovery-rules/modrule-1/scan" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if _, ok := got.body["subdirectories"]; ok {
@@ -286,7 +286,7 @@ func TestPreviewModuleAutodiscoveryRuleGroupsByRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-3/preview" ||
+	if got.path != "/api/v1/module-autodiscovery-rules/modrule-3/preview" ||
 		got.query != "page%5Bnumber%5D=2&page%5Bsize%5D=2" {
 		t.Errorf("requested %s ?%s", got.path, got.query)
 	}
@@ -352,7 +352,7 @@ func TestPreviewUnsavedModuleAutodiscoveryRulePages(t *testing.T) {
 	}, ModuleAutodiscoveryPreviewOptions{Repository: "ignored", PageNumber: 3}); err != nil {
 		t.Fatal(err)
 	}
-	if got.method != http.MethodPost || got.path != "/api/terrapod/v1/module-autodiscovery-rules/preview" {
+	if got.method != http.MethodPost || got.path != "/api/v1/module-autodiscovery-rules/preview" {
 		t.Errorf("requested %s %s", got.method, got.path)
 	}
 	if got.query != "page%5Bnumber%5D=3" {
@@ -429,7 +429,7 @@ func TestListModuleAutodiscoveryRuleRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-3/repositories" ||
+	if got.path != "/api/v1/module-autodiscovery-rules/modrule-3/repositories" ||
 		got.query != "filter%5Bstatus%5D=active&page%5Bsize%5D=10" {
 		t.Errorf("requested %s ?%s", got.path, got.query)
 	}

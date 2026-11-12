@@ -120,7 +120,7 @@ func (c *Client) ListDeletedWorkspaces(ctx context.Context, opts DeletedWorkspac
 	if opts.PageSize > 0 {
 		q.Set("page[size]", strconv.Itoa(opts.PageSize))
 	}
-	path := "/api/terrapod/v1/deleted-workspaces"
+	path := "/api/v1/deleted-workspaces"
 	if encoded := q.Encode(); encoded != "" {
 		path += "?" + encoded
 	}
@@ -170,7 +170,7 @@ func (c *Client) ListAllDeletedWorkspaces(ctx context.Context) ([]DeletedWorkspa
 
 // GetDeletedWorkspace fetches one deleted workspace's marker.
 func (c *Client) GetDeletedWorkspace(ctx context.Context, workspaceID string) (*DeletedWorkspace, error) {
-	body, err := c.Get(ctx, "/api/terrapod/v1/deleted-workspaces/"+url.PathEscape(workspaceID))
+	body, err := c.Get(ctx, "/api/v1/deleted-workspaces/"+url.PathEscape(workspaceID))
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (c *Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID string
 	if err != nil {
 		return nil, fmt.Errorf("encode restore request: %w", err)
 	}
-	body, err := c.Post(ctx, "/api/terrapod/v1/deleted-workspaces/"+url.PathEscape(workspaceID)+"/restore", payload)
+	body, err := c.Post(ctx, "/api/v1/deleted-workspaces/"+url.PathEscape(workspaceID)+"/restore", payload)
 	if err != nil {
 		return nil, err
 	}

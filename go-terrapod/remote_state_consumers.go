@@ -43,7 +43,7 @@ func (c *Client) CreateRemoteStateConsumer(ctx context.Context, req CreateRemote
 		return nil, fmt.Errorf("marshal create remote-state-consumer: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers", url.PathEscape(req.ProducerWorkspaceID)),
+		fmt.Sprintf("/api/v1/workspaces/%s/remote-state-consumers", url.PathEscape(req.ProducerWorkspaceID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (c *Client) CreateRemoteStateConsumer(ctx context.Context, req CreateRemote
 
 // GetRemoteStateConsumer reads an edge by id.
 func (c *Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/remote-state-consumers/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/remote-state-consumers/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (c *Client) GetRemoteStateConsumer(ctx context.Context, id string) (*Remote
 // producer workspace.
 func (c *Client) ListRemoteStateConsumers(ctx context.Context, producerWorkspaceID string) ([]RemoteStateConsumer, error) {
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers", url.PathEscape(producerWorkspaceID)))
+		fmt.Sprintf("/api/v1/workspaces/%s/remote-state-consumers", url.PathEscape(producerWorkspaceID)))
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (c *Client) ListRemoteStateConsumers(ctx context.Context, producerWorkspace
 
 // DeleteRemoteStateConsumer revokes the grant. Idempotent.
 func (c *Client) DeleteRemoteStateConsumer(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/remote-state-consumers/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/remote-state-consumers/"+url.PathEscape(id))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

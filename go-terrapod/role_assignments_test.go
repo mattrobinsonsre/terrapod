@@ -25,7 +25,7 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/role-assignments":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/role-assignments":
 			items := make([]map[string]any, 0, len(store))
 			for _, a := range store {
 				items = append(items, map[string]any{
@@ -41,7 +41,7 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 			}
 			b, _ := json.Marshal(map[string]any{"data": items})
 			_, _ = w.Write(b)
-		case r.Method == http.MethodPut && r.URL.Path == "/api/terrapod/v1/role-assignments":
+		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/role-assignments":
 			var doc struct {
 				Data struct {
 					Attributes struct {
@@ -71,8 +71,8 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 			}
 			store = next
 			w.WriteHeader(http.StatusNoContent)
-		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/role-assignments/"):
-			parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/role-assignments/"), "/")
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/role-assignments/"):
+			parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/role-assignments/"), "/")
 			if len(parts) != 3 {
 				http.Error(w, "bad path", http.StatusBadRequest)
 				return

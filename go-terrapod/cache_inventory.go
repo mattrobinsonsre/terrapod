@@ -40,10 +40,6 @@ import (
 //
 // Every route here requires platform admin.
 //
-// # Paths use the canonical /api/v1 prefix with no legacy fallback
-//
-// These endpoints exist on no release, so a fallback to /api/terrapod/v1 is
-// code that can never succeed.
 
 // ── the package cache ──────────────────────────────────────────────────────
 

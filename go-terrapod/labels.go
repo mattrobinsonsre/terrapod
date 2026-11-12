@@ -8,7 +8,7 @@ import (
 )
 
 // The labels browser is the read-only cross-entity label index served at
-// /api/terrapod/v1/labels. All three endpoints are RBAC-filtered: results
+// /api/v1/labels. All three endpoints are RBAC-filtered: results
 // only include labels carried by entities the caller can read. Responses
 // are plain JSON ({"data": ...}), not JSON:API resources.
 
@@ -38,7 +38,7 @@ type LabelEntity struct {
 
 // ListLabelKeys returns all label keys in use across readable entities.
 func (c *Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/labels")
+	data, err := c.Get(ctx, "/api/v1/labels")
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (c *Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error) {
 // ListLabelValues returns the distinct values for a key. An empty slice is
 // a valid response (no readable entity carries the key).
 func (c *Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/labels/"+url.PathEscape(key))
+	data, err := c.Get(ctx, "/api/v1/labels/"+url.PathEscape(key))
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (c *Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue,
 // by entity type ("workspaces", "agent-pools", "registry-modules",
 // "registry-providers"). Empty type lists are kept.
 func (c *Client) ListLabelEntities(ctx context.Context, key, value string) (map[string][]LabelEntity, error) {
-	path := fmt.Sprintf("/api/terrapod/v1/labels/%s/%s", url.PathEscape(key), url.PathEscape(value))
+	path := fmt.Sprintf("/api/v1/labels/%s/%s", url.PathEscape(key), url.PathEscape(value))
 	data, err := c.Get(ctx, path)
 	if err != nil {
 		return nil, err

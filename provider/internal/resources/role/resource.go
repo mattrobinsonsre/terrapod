@@ -4,10 +4,10 @@
 //
 //	JSON:API type: "roles"
 //	ID: role name (string, not UUID)
-//	Create:  POST   /api/terrapod/v1/roles
-//	Read:    GET    /api/terrapod/v1/roles/{name}
-//	Update:  PATCH  /api/terrapod/v1/roles/{name}
-//	Delete:  DELETE /api/terrapod/v1/roles/{name}
+//	Create:  POST   /api/v1/roles
+//	Read:    GET    /api/v1/roles/{name}
+//	Update:  PATCH  /api/v1/roles/{name}
+//	Delete:  DELETE /api/v1/roles/{name}
 //
 // Migrated to go-terrapod (#347). Roles use "name" at the data
 // envelope level instead of "id" — the SDK absorbs that quirk so the

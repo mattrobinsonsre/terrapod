@@ -59,7 +59,7 @@ func newWorkspaceFixtureServer(t *testing.T) *workspaceFixtureServer {
 			f.readHandler(w, r)
 		case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/api/v2/workspaces/"):
 			f.updateHandler(w, r)
-		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/workspaces/"):
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/workspaces/"):
 			f.deleteHandler(w, r)
 		default:
 			t.Logf("unhandled request: %s %s", r.Method, r.URL.Path)
@@ -364,7 +364,7 @@ func TestUpdateWorkspace_PartialUpdate(t *testing.T) {
 }
 
 func TestDeleteWorkspace_UsesTerrapodNativePath(t *testing.T) {
-	// Workspace delete lives on /api/terrapod/v1/, not /api/v2/.
+	// Workspace delete lives on /api/v1/, not /api/v2/.
 	// This is critical — /api/v2/workspaces/{id} returns 405 (see
 	// provider #353). Regression-protect the path here.
 	f := newWorkspaceFixtureServer(t)
@@ -377,7 +377,7 @@ func TestDeleteWorkspace_UsesTerrapodNativePath(t *testing.T) {
 	if err := c.DeleteWorkspace(t.Context(), "ws-aaa"); err != nil {
 		t.Fatalf("DeleteWorkspace: %v", err)
 	}
-	if calledPath != "/api/terrapod/v1/workspaces/ws-aaa" {
+	if calledPath != "/api/v1/workspaces/ws-aaa" {
 		t.Errorf("wrong delete path: %q (must be Terrapod-native, NOT /api/v2/)", calledPath)
 	}
 }

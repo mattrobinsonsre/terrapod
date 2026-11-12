@@ -20,9 +20,9 @@ func newSigningKeyFixture(t *testing.T, listBody, rotateBody string, rotateStatu
 		seen = append(seen, r.Method+" "+r.URL.Path)
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/oidc/signing-keys":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/oidc/signing-keys":
 			_, _ = w.Write([]byte(listBody))
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/oidc/signing-keys/actions/rotate":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/oidc/signing-keys/actions/rotate":
 			w.WriteHeader(rotateStatus)
 			_, _ = w.Write([]byte(rotateBody))
 		default:
@@ -58,7 +58,7 @@ func TestListOIDCSigningKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListOIDCSigningKeys: %v", err)
 	}
-	if want := []string{"GET /api/terrapod/v1/oidc/signing-keys"}; len(*seen) != 1 || (*seen)[0] != want[0] {
+	if want := []string{"GET /api/v1/oidc/signing-keys"}; len(*seen) != 1 || (*seen)[0] != want[0] {
 		t.Fatalf("requests = %v, want %v", *seen, want)
 	}
 	if len(got.Keys) != 2 {
@@ -121,7 +121,7 @@ func TestRotateOIDCSigningKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateOIDCSigningKey: %v", err)
 	}
-	if want := "POST /api/terrapod/v1/oidc/signing-keys/actions/rotate"; len(*seen) != 1 || (*seen)[0] != want {
+	if want := "POST /api/v1/oidc/signing-keys/actions/rotate"; len(*seen) != 1 || (*seen)[0] != want {
 		t.Fatalf("requests = %v, want [%s]", *seen, want)
 	}
 	if got.Key.Kid != "kid-new" {
@@ -377,7 +377,7 @@ func TestUpdateWorkspaceRoundTripsOIDCAudiences(t *testing.T) {
 
 func TestGetOIDCAudienceDefaults(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/terrapod/v1/oidc/audience-defaults" {
+		if r.URL.Path != "/api/v1/oidc/audience-defaults" {
 			t.Errorf("requested %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")

@@ -163,7 +163,7 @@ func (c *Client) CreateVCSConnection(ctx context.Context, req CreateVCSConnectio
 	if err != nil {
 		return nil, fmt.Errorf("marshal create vcs-connection: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/vcs-connections", body)
+	data, err := c.Post(ctx, "/api/v1/vcs-connections", body)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (c *Client) CreateVCSConnection(ctx context.Context, req CreateVCSConnectio
 
 // GetVCSConnection reads a VCS connection by id.
 func (c *Client) GetVCSConnection(ctx context.Context, id string) (*VCSConnection, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/vcs-connections/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/vcs-connections/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (c *Client) GetVCSConnection(ctx context.Context, id string) (*VCSConnectio
 // ListVCSConnections returns every connection. Terrapod doesn't
 // paginate this endpoint (the count is small).
 func (c *Client) ListVCSConnections(ctx context.Context) ([]VCSConnection, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/vcs-connections")
+	data, err := c.Get(ctx, "/api/v1/vcs-connections")
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (c *Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, er
 		q := url.Values{}
 		q.Set("page[number]", strconv.Itoa(page))
 		q.Set("page[size]", strconv.Itoa(pageSize))
-		data, err := c.Get(ctx, "/api/terrapod/v1/vcs-connections?"+q.Encode())
+		data, err := c.Get(ctx, "/api/v1/vcs-connections?"+q.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +242,7 @@ func (c *Client) UpdateVCSConnection(ctx context.Context, id string, req UpdateV
 	if err != nil {
 		return nil, fmt.Errorf("marshal update vcs-connection: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/vcs-connections/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/vcs-connections/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (c *Client) UpdateVCSConnection(ctx context.Context, id string, req UpdateV
 // referencing the connection lose their VCS link; the workspaces
 // themselves are not deleted.
 func (c *Client) DeleteVCSConnection(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/vcs-connections/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/vcs-connections/"+url.PathEscape(id))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

@@ -3058,16 +3058,31 @@ class TestAFailedVCSFetchDuringRunCreation:
                 )
             return resp, create, latest
 
+    #: `(class, status, does it carry the upstream-failure marker)`.
+    #:
+    #: The marker is the half that matters and the half that was wrong (#2493):
+    #: it is a positive assertion that the PROVIDER failed, read by whatever
+    #: watches that header. `GitError` -- what `_classify` returns for a message
+    #: it does not recognise -- must not carry it, because an unlisted message
+    #: is no evidence at all about a third party. Asserted in both directions,
+    #: or "nothing carries the marker" would pass just as well as the contract.
+    GIT_FAILURE_MAPPING = [
+        ("GitRefNotFound", 422, False),
+        ("GitAccessDenied", 422, False),
+        ("GitUnsupported", 422, False),
+        ("GitError", 422, False),
+        ("GitTimeout", 504, True),
+        ("GitTransient", 502, True),
+    ]
+
     @pytest.mark.parametrize(
-        ("exc_name", "status"),
-        [
-            ("GitAccessDenied", 422),
-            ("GitUnsupported", 422),
-            ("GitTimeout", 504),
-            ("GitTransient", 502),
-        ],
+        ("exc_name", "status", "marked"),
+        [pytest.param(*row, id=row[0]) for row in GIT_FAILURE_MAPPING],
     )
-    async def test_each_failure_class_gets_its_own_status_never_a_500(self, exc_name, status):
+    async def test_each_failure_class_gets_its_own_status_never_a_500(
+        self, exc_name, status, marked
+    ):
+        from terrapod.api.errors import UPSTREAM_FAILURE_HEADER
         from terrapod.services import git_fetch
 
         kind = getattr(git_fetch, exc_name)
@@ -3076,6 +3091,59 @@ class TestAFailedVCSFetchDuringRunCreation:
         )
         assert resp.status_code == status, resp.text
         assert resp.status_code != 500
+        assert (UPSTREAM_FAILURE_HEADER in resp.headers) is marked, (
+            f"{exc_name} {'lost' if marked else 'gained'} the upstream-failure marker"
+        )
+
+    def test_the_mapping_covers_every_class_the_classifier_can_RETURN(self):
+        """Derived from `_classify`, so a class added there cannot land on the
+        catch-all and answer 500 -- which is the whole of #2471 -- or on the
+        transient handler and be reported as somebody else's outage, which is
+        the whole of #2493.
+
+        A list written here instead would have been satisfied by the four
+        classes that already existed.
+        """
+        import ast
+        import inspect
+
+        from terrapod.services import git_fetch
+
+        fn = ast.parse(inspect.getsource(git_fetch._classify).lstrip()).body[0]
+        returned = {
+            sub.id
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Return)
+            for sub in ast.walk(node.value)
+            if isinstance(sub, ast.Name) and sub.id.startswith("Git")
+        }
+        assert returned, "read nothing out of _classify -- teach this walker its new shape"
+        assert returned <= {n for n, _s, _m in self.GIT_FAILURE_MAPPING}, (
+            f"_classify can return {sorted(returned - {n for n, _s, _m in self.GIT_FAILURE_MAPPING})}"
+            ", which this mapping does not pin"
+        )
+
+    async def test_a_bad_ref_tells_the_caller_to_fix_the_REF(self):
+        """The reported shape: a `vcs-ref` naming a SHA the remote does not have
+        answered 502 "try again" with nothing pointing at the ref (#2493). Both
+        readings of git's ambiguous wording are named, because the server cannot
+        tell them apart -- the same message means an absent object and a server
+        with `uploadpack.allowAnySHA1InWant` off.
+        """
+        from terrapod.services import git_fetch
+
+        resp, _c, _l = await self._post(
+            self._vcs_workspace(),
+            git_fetch.GitRefNotFound(
+                "git fetch origin deadbeef failed (exit 128): error: Server does not "
+                "allow request for unadvertised object deadbeef"
+            ),
+        )
+        assert resp.status_code == 422, resp.text
+        body = resp.text.lower()
+        assert "ref exists on the remote" in body
+        assert "unadvertised objects" in body
+        assert "try again" not in body, "a permanent refusal must not advise a retry"
 
     async def test_the_git_error_reaches_the_caller_rather_than_only_the_log(self):
         """The whole complaint: the client got "Internal Server Error" and the
@@ -3091,7 +3159,15 @@ class TestAFailedVCSFetchDuringRunCreation:
         assert "Nothing was created" in resp.text
 
     @pytest.mark.parametrize(
-        "exc_name", ["GitAccessDenied", "GitUnsupported", "GitTimeout", "GitTransient"]
+        "exc_name",
+        [
+            "GitAccessDenied",
+            "GitUnsupported",
+            "GitRefNotFound",
+            "GitError",
+            "GitTimeout",
+            "GitTransient",
+        ],
     )
     async def test_a_failed_fetch_never_falls_back_to_older_code(self, exc_name):
         """The invariant. No run, and the older-configuration-version lookup is

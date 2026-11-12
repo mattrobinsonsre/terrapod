@@ -49,7 +49,7 @@ func (c *Client) CreateAgentPool(ctx context.Context, req CreateAgentPoolRequest
 	if err != nil {
 		return nil, fmt.Errorf("marshal create agent-pool: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/agent-pools", body)
+	data, err := c.Post(ctx, "/api/v1/agent-pools", body)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (c *Client) CreateAgentPool(ctx context.Context, req CreateAgentPoolRequest
 
 // GetAgentPool reads a pool by id.
 func (c *Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/agent-pools/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/agent-pools/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (c *Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error
 // scope is determined by pool RBAC (admin sees all; regular users see
 // pools they have read access to).
 func (c *Client) ListAgentPools(ctx context.Context) ([]AgentPool, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/agent-pools")
+	data, err := c.Get(ctx, "/api/v1/agent-pools")
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (c *Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error) {
 		q := url.Values{}
 		q.Set("page[number]", strconv.Itoa(page))
 		q.Set("page[size]", strconv.Itoa(pageSize))
-		data, err := c.Get(ctx, "/api/terrapod/v1/agent-pools?"+q.Encode())
+		data, err := c.Get(ctx, "/api/v1/agent-pools?"+q.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +127,7 @@ func (c *Client) UpdateAgentPool(ctx context.Context, id string, req UpdateAgent
 	if err != nil {
 		return nil, fmt.Errorf("marshal update agent-pool: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/agent-pools/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/agent-pools/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (c *Client) UpdateAgentPool(ctx context.Context, id string, req UpdateAgent
 // DeleteAgentPool removes the pool. Workspaces referencing it lose
 // their pool binding; listeners in the pool are evicted.
 func (c *Client) DeleteAgentPool(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/agent-pools/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/agent-pools/"+url.PathEscape(id))
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

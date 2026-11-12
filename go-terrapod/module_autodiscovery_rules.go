@@ -270,7 +270,7 @@ type ModuleAutodiscoveryRepositoryList struct {
 	Pagination ListMeta                        `json:"pagination"`
 }
 
-const moduleRulesPath = "/api/terrapod/v1/module-autodiscovery-rules"
+const moduleRulesPath = "/api/v1/module-autodiscovery-rules"
 
 // ListModuleAutodiscoveryRules returns one page of rules — the whole list when
 // the server does not page it. Use ListAllModuleAutodiscoveryRules to be sure.

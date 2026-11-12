@@ -86,7 +86,7 @@ func (c *Client) DeleteModuleWorkspaceLink(ctx context.Context, moduleName, modu
 // ── Internal helpers ─────────────────────────────────────────────────
 
 func moduleLinksPath(name, provider string) string {
-	return fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s/workspace-links",
+	return fmt.Sprintf("/api/v1/registry-modules/private/default/%s/%s/workspace-links",
 		url.PathEscape(name), url.PathEscape(provider))
 }
 

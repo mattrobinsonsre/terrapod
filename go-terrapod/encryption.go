@@ -19,7 +19,7 @@ type EncryptionStatus struct {
 
 // GetEncryptionStatus fetches encryption-at-rest status. Requires platform admin.
 func (c *Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, error) {
-	body, err := c.Get(ctx, "/api/terrapod/v1/admin/encryption")
+	body, err := c.Get(ctx, "/api/v1/admin/encryption")
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (c *Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, er
 // old rows. Requires platform admin; returns ConflictError when encryption is
 // disabled.
 func (c *Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error) {
-	body, err := c.Post(ctx, "/api/terrapod/v1/admin/encryption/rotate-dek", nil)
+	body, err := c.Post(ctx, "/api/v1/admin/encryption/rotate-dek", nil)
 	if err != nil {
 		return nil, err
 	}

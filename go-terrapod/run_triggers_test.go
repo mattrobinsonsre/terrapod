@@ -28,7 +28,7 @@ func newRunTriggerFixture(t *testing.T) (*Client, *[]byte) {
 			  "workspace":{"data":{"id":"ws-app","type":"workspaces"}},
 			  "sourceable":{"data":{"id":"ws-network","type":"workspaces"}}
 			}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/run-triggers/rt-aaa":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/run-triggers/rt-aaa":
 			_, _ = w.Write([]byte(`{"data":{"id":"rt-aaa","type":"run-triggers","relationships":{
 			  "workspace":{"data":{"id":"ws-app","type":"workspaces"}},
 			  "sourceable":{"data":{"id":"ws-network","type":"workspaces"}}

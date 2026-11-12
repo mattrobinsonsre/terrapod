@@ -4,10 +4,10 @@
 //
 //	JSON:API type: "users"
 //	ID: email (string, not a generated ID)
-//	Create:  POST   /api/terrapod/v1/users
-//	Read:    GET    /api/terrapod/v1/users/{email}
-//	Update:  PATCH  /api/terrapod/v1/users/{email}
-//	Delete:  DELETE /api/terrapod/v1/users/{email}
+//	Create:  POST   /api/v1/users
+//	Read:    GET    /api/v1/users/{email}
+//	Update:  PATCH  /api/v1/users/{email}
+//	Delete:  DELETE /api/v1/users/{email}
 //
 // Migrated to go-terrapod (#347).
 package user

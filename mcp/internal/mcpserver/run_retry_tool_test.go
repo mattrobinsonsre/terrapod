@@ -33,8 +33,8 @@ func TestRunRetryToolQueuesAndReturnsTheNewRun(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("tool reported an error: %s", resultText(t, res))
 	}
-	if gotMethod != http.MethodPost || gotPath != "/api/terrapod/v1/runs/run-aaaa/actions/retry" {
-		t.Errorf("tool hit %s %s, want POST /api/terrapod/v1/runs/run-aaaa/actions/retry", gotMethod, gotPath)
+	if gotMethod != http.MethodPost || gotPath != "/api/v1/runs/run-aaaa/actions/retry" {
+		t.Errorf("tool hit %s %s, want POST /api/v1/runs/run-aaaa/actions/retry", gotMethod, gotPath)
 	}
 	// The caller follows the new run, so its id has to come back.
 	if out := resultText(t, res); !strings.Contains(out, "run-bbbb") {

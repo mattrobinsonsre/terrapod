@@ -51,7 +51,7 @@ func (c *Client) CreateExecutionHook(ctx context.Context, req CreateExecutionHoo
 	if err != nil {
 		return nil, fmt.Errorf("marshal create execution hook: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/execution-hooks", body)
+	data, err := c.Post(ctx, "/api/v1/execution-hooks", body)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (c *Client) CreateExecutionHook(ctx context.Context, req CreateExecutionHoo
 
 // GetExecutionHook reads a hook by id.
 func (c *Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/execution-hooks/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/execution-hooks/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (c *Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHoo
 
 // ListExecutionHooks returns every execution hook.
 func (c *Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/execution-hooks")
+	data, err := c.Get(ctx, "/api/v1/execution-hooks")
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (c *Client) UpdateExecutionHook(ctx context.Context, id string, req UpdateE
 	if err != nil {
 		return nil, fmt.Errorf("marshal update execution hook: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/execution-hooks/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/execution-hooks/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (c *Client) UpdateExecutionHook(ctx context.Context, id string, req UpdateE
 
 // DeleteExecutionHook removes a hook and all its workspace associations.
 func (c *Client) DeleteExecutionHook(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/execution-hooks/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/execution-hooks/"+url.PathEscape(id))
 }
 
 // ── Workspace association ────────────────────────────────────────────
@@ -112,7 +112,7 @@ func (c *Client) AssignWorkspaceToExecutionHook(ctx context.Context, hookID, wor
 		return fmt.Errorf("marshal assign body: %w", err)
 	}
 	_, err = c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/execution-hooks/%s/relationships/workspaces", url.PathEscape(hookID)),
+		fmt.Sprintf("/api/v1/execution-hooks/%s/relationships/workspaces", url.PathEscape(hookID)),
 		body)
 	return err
 }
@@ -124,14 +124,14 @@ func (c *Client) UnassignWorkspaceFromExecutionHook(ctx context.Context, hookID,
 		return fmt.Errorf("marshal unassign body: %w", err)
 	}
 	return c.DeleteWithBody(ctx,
-		fmt.Sprintf("/api/terrapod/v1/execution-hooks/%s/relationships/workspaces", url.PathEscape(hookID)),
+		fmt.Sprintf("/api/v1/execution-hooks/%s/relationships/workspaces", url.PathEscape(hookID)),
 		body)
 }
 
 // IsWorkspaceAssignedToExecutionHook reports whether the workspace is in the
 // hook's `workspaces` relationship. Helper for Terraform Read paths.
 func (c *Client) IsWorkspaceAssignedToExecutionHook(ctx context.Context, hookID, workspaceID string) (bool, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/execution-hooks/"+url.PathEscape(hookID))
+	data, err := c.Get(ctx, "/api/v1/execution-hooks/"+url.PathEscape(hookID))
 	if err != nil {
 		return false, err
 	}

@@ -539,7 +539,7 @@ func (c *Client) RetryRun(ctx context.Context, runID string) (*Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+id+"/actions/retry", nil)
+	data, err := c.Post(ctx, "/api/v1/runs/"+id+"/actions/retry", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +576,7 @@ func (c *Client) RetryRunOutstandingHosts(ctx context.Context, runID string) (*R
 	}
 	data, err := c.Post(
 		ctx,
-		"/api/terrapod/v1/runs/"+id+"/actions/retry",
+		"/api/v1/runs/"+id+"/actions/retry",
 		[]byte(`{"only-outstanding-hosts":true}`),
 	)
 	if err != nil {

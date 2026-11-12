@@ -5,10 +5,10 @@
 //
 //	JSON:API type: "catalog-items"
 //	ID format: bare UUID (no prefix)
-//	Create:  POST   /api/terrapod/v1/catalog-items
-//	Read:    GET    /api/terrapod/v1/catalog-items/{id}
-//	Update:  PATCH  /api/terrapod/v1/catalog-items/{id}
-//	Delete:  DELETE /api/terrapod/v1/catalog-items/{id}
+//	Create:  POST   /api/v1/catalog-items
+//	Read:    GET    /api/v1/catalog-items/{id}
+//	Update:  PATCH  /api/v1/catalog-items/{id}
+//	Delete:  DELETE /api/v1/catalog-items/{id}
 //
 // Attribute mapping (JSON:API attribute -> Terraform schema attribute):
 //
@@ -433,7 +433,7 @@ func (r *catalogItemResource) ImportState(ctx context.Context, req resource.Impo
 
 func (r *catalogItemResource) readAuthoring(ctx context.Context, id string) (*terrapod.CatalogItem, error) {
 	// The ordinary SDK read masks defaults; state must reflect the managed value.
-	data, err := r.tc.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id)+"?include-sensitive-values=true")
+	data, err := r.tc.Get(ctx, "/api/v1/catalog-items/"+url.PathEscape(id)+"?include-sensitive-values=true")
 	if err != nil {
 		return nil, err
 	}

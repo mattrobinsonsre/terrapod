@@ -10,7 +10,7 @@ import (
 
 // Service catalog (#535): provider templates, catalog items, and the
 // provision/lifecycle flow over catalog instances. The whole surface lives
-// under /api/terrapod/v1 and is gated server-side on catalog.enabled (404 when
+// under /api/v1 and is gated server-side on catalog.enabled (404 when
 // the feature is off). See docs/service-catalog.md.
 //
 // Catalog items and provider templates carry open-ended attribute sets
@@ -62,7 +62,7 @@ func (c *Client) CreateProviderTemplate(ctx context.Context, attrs map[string]an
 	if err != nil {
 		return nil, fmt.Errorf("marshal create provider-template: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/provider-templates", body)
+	data, err := c.Post(ctx, "/api/v1/provider-templates", body)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (c *Client) CreateProviderTemplate(ctx context.Context, attrs map[string]an
 // GetProviderTemplate reads the redacted provider template by id. Platform-admin
 // authoring callers can use Get with ?include-sensitive-values=true.
 func (c *Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderTemplate, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/provider-templates/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/provider-templates/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (c *Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderT
 
 // ListProviderTemplates returns all provider templates (admin/audit).
 func (c *Client) ListProviderTemplates(ctx context.Context) ([]ProviderTemplate, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/provider-templates")
+	data, err := c.Get(ctx, "/api/v1/provider-templates")
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (c *Client) UpdateProviderTemplate(ctx context.Context, id string, attrs ma
 	if err != nil {
 		return nil, fmt.Errorf("marshal update provider-template: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/provider-templates/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/provider-templates/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (c *Client) UpdateProviderTemplate(ctx context.Context, id string, attrs ma
 // DeleteProviderTemplate removes a provider template (admin only). Returns a
 // ConflictError if it is still referenced by a catalog item.
 func (c *Client) DeleteProviderTemplate(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/provider-templates/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/provider-templates/"+url.PathEscape(id))
 }
 
 // ── Catalog items ──────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ func (c *Client) CreateCatalogItem(ctx context.Context, attrs map[string]any) (*
 	if err != nil {
 		return nil, fmt.Errorf("marshal create catalog-item: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/catalog-items", body)
+	data, err := c.Post(ctx, "/api/v1/catalog-items", body)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (c *Client) CreateCatalogItem(ctx context.Context, attrs map[string]any) (*
 // GetCatalogItem reads a redacted catalog item by id (requires catalog read).
 // Platform-admin authoring callers can use Get with ?include-sensitive-values=true.
 func (c *Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id))
+	data, err := c.Get(ctx, "/api/v1/catalog-items/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (c *Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, e
 
 // ListCatalogItems returns catalog items the caller has at least read on.
 func (c *Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items")
+	data, err := c.Get(ctx, "/api/v1/catalog-items")
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (c *Client) UpdateCatalogItem(ctx context.Context, id string, attrs map[str
 	if err != nil {
 		return nil, fmt.Errorf("marshal update catalog-item: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id), body)
+	data, err := c.Patch(ctx, "/api/v1/catalog-items/"+url.PathEscape(id), body)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (c *Client) UpdateCatalogItem(ctx context.Context, id string, attrs map[str
 // DeleteCatalogItem removes a catalog item (admin only). Returns a
 // ConflictError if the item still has provisioned instances.
 func (c *Client) DeleteCatalogItem(ctx context.Context, id string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id))
+	return c.Delete(ctx, "/api/v1/catalog-items/"+url.PathEscape(id))
 }
 
 // GetCatalogItemForm returns the provision form (the fields a user fills in)
@@ -183,7 +183,7 @@ func (c *Client) DeleteCatalogItem(ctx context.Context, id string) error {
 // module's interface could not be read, so an empty "fields" is not a module
 // that takes no variables.
 func (c *Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]any, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id)+"/form")
+	data, err := c.Get(ctx, "/api/v1/catalog-items/"+url.PathEscape(id)+"/form")
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ type CatalogItemInterface struct {
 // provision view, this is the module's own surface, and the only place its
 // outputs can be read. Requires catalog read on the item.
 func (c *Client) GetCatalogItemInterface(ctx context.Context, id string) (*CatalogItemInterface, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id)+"/interface")
+	data, err := c.Get(ctx, "/api/v1/catalog-items/"+url.PathEscape(id)+"/interface")
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func (c *Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs 
 	if err != nil {
 		return nil, fmt.Errorf("marshal provision: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(itemID)+"/provision", body)
+	data, err := c.Post(ctx, "/api/v1/catalog-items/"+url.PathEscape(itemID)+"/provision", body)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (c *Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs 
 
 // ListCatalogInstances returns the provisioned instances of a catalog item.
 func (c *Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(itemID)+"/instances")
+	data, err := c.Get(ctx, "/api/v1/catalog-items/"+url.PathEscape(itemID)+"/instances")
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +285,7 @@ func (c *Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]
 		q := url.Values{}
 		q.Set("page[number]", strconv.Itoa(page))
 		q.Set("page[size]", strconv.Itoa(pageSize))
-		data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(itemID)+"/instances?"+q.Encode())
+		data, err := c.Get(ctx, "/api/v1/catalog-items/"+url.PathEscape(itemID)+"/instances?"+q.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +311,7 @@ func (c *Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]
 // GetCatalogInstance reads a single catalog instance by workspace id (requires
 // catalog read on the originating item).
 func (c *Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogInstance, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID))
+	data, err := c.Get(ctx, "/api/v1/catalog-instances/"+url.PathEscape(wsID))
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (c *Client) ReconfigureCatalogInstance(ctx context.Context, wsID string, at
 	if err != nil {
 		return nil, fmt.Errorf("marshal reconfigure: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID), body)
+	data, err := c.Patch(ctx, "/api/v1/catalog-instances/"+url.PathEscape(wsID), body)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +341,7 @@ func (c *Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs 
 	if err != nil {
 		return nil, fmt.Errorf("marshal destroy: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID)+"/destroy", body)
+	data, err := c.Post(ctx, "/api/v1/catalog-instances/"+url.PathEscape(wsID)+"/destroy", body)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func (c *Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs 
 // provisioner only read, so a non-auto-apply provision/reconfigure/destroy is
 // confirmed here rather than via the workspace run API. Requires catalog 'use'.
 func (c *Client) ConfirmCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error) {
-	data, err := c.Post(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID)+"/confirm", nil)
+	data, err := c.Post(ctx, "/api/v1/catalog-instances/"+url.PathEscape(wsID)+"/confirm", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +363,7 @@ func (c *Client) ConfirmCatalogInstanceRun(ctx context.Context, wsID string) (*C
 // DiscardCatalogInstanceRun discards the instance's pending planned run.
 // Catalog-surface counterpart of confirm. Requires catalog 'use'.
 func (c *Client) DiscardCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error) {
-	data, err := c.Post(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID)+"/discard", nil)
+	data, err := c.Post(ctx, "/api/v1/catalog-instances/"+url.PathEscape(wsID)+"/discard", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +376,7 @@ func (c *Client) DiscardCatalogInstanceRun(ctx context.Context, wsID string) (*C
 // teardown is DestroyCatalogInstance, which reclaims the infrastructure.
 // Requires catalog 'admin' on the originating item.
 func (c *Client) OrphanCatalogInstance(ctx context.Context, wsID string) error {
-	return c.Delete(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID)+"?orphan=true")
+	return c.Delete(ctx, "/api/v1/catalog-instances/"+url.PathEscape(wsID)+"?orphan=true")
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

@@ -23,7 +23,7 @@ func newRunTaskFixture(t *testing.T) *Client {
 			  "name":"opa-check","url":"https://opa.example/api/v1/data","stage":"post_plan",
 			  "enforcement-level":"mandatory","enabled":true,"has-hmac-key":true
 			}}}`))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/run-tasks/"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/run-tasks/"):
 			_, _ = w.Write([]byte(`{"data":{"id":"rt-aaa","type":"run-tasks","attributes":{"name":"opa-check","url":"https://opa.example/api/v1/data","stage":"post_plan","enforcement-level":"mandatory"}}}`))
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/run-tasks"):
 			_, _ = w.Write([]byte(`{"data":[

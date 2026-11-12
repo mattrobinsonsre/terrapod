@@ -72,7 +72,7 @@ func (c *Client) CreateAPIToken(ctx context.Context, userID string, req CreateAP
 		return nil, fmt.Errorf("marshal create api-token: %w", err)
 	}
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/users/%s/authentication-tokens", url.PathEscape(userID)),
+		fmt.Sprintf("/api/v1/users/%s/authentication-tokens", url.PathEscape(userID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -84,13 +84,13 @@ func (c *Client) CreateAPIToken(ctx context.Context, userID string, req CreateAP
 // The path user must be the caller, or the caller must be an admin.
 func (c *Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error) {
 	return c.listAPITokens(ctx,
-		fmt.Sprintf("/api/terrapod/v1/users/%s/authentication-tokens", url.PathEscape(userID)))
+		fmt.Sprintf("/api/v1/users/%s/authentication-tokens", url.PathEscape(userID)))
 }
 
 // ListAllAPITokens lists every token across all users (admin only). Pass a kind
 // ("interactive", "service_bound", "service_detached") to filter, or "" for all.
 func (c *Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken, error) {
-	path := "/api/terrapod/v1/admin/authentication-tokens"
+	path := "/api/v1/admin/authentication-tokens"
 	if kind != "" {
 		path += "?kind=" + url.QueryEscape(kind)
 	}
@@ -101,13 +101,13 @@ func (c *Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken,
 // caller: their own bound service tokens, plus all detached tokens when the
 // caller is an admin. Drives the in-app expiry warnings.
 func (c *Client) ListExpiringAPITokens(ctx context.Context) ([]APIToken, error) {
-	return c.listAPITokens(ctx, "/api/terrapod/v1/authentication-tokens/expiring")
+	return c.listAPITokens(ctx, "/api/v1/authentication-tokens/expiring")
 }
 
 // GetAPIToken fetches one token's metadata by id (the raw Token is never present).
 func (c *Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, error) {
 	data, err := c.Get(ctx,
-		fmt.Sprintf("/api/terrapod/v1/authentication-tokens/%s", url.PathEscape(tokenID)))
+		fmt.Sprintf("/api/v1/authentication-tokens/%s", url.PathEscape(tokenID)))
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (c *Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, er
 // holds the new raw secret.
 func (c *Client) RotateAPIToken(ctx context.Context, tokenID string) (*APIToken, error) {
 	data, err := c.Post(ctx,
-		fmt.Sprintf("/api/terrapod/v1/authentication-tokens/%s/actions/rotate", url.PathEscape(tokenID)),
+		fmt.Sprintf("/api/v1/authentication-tokens/%s/actions/rotate", url.PathEscape(tokenID)),
 		nil)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (c *Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinned
 		return nil, fmt.Errorf("marshal retag api-token: %w", err)
 	}
 	data, err := c.Patch(ctx,
-		fmt.Sprintf("/api/terrapod/v1/authentication-tokens/%s", url.PathEscape(tokenID)),
+		fmt.Sprintf("/api/v1/authentication-tokens/%s", url.PathEscape(tokenID)),
 		body)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (c *Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinned
 // RevokeAPIToken deletes a single token by id.
 func (c *Client) RevokeAPIToken(ctx context.Context, tokenID string) error {
 	return c.Delete(ctx,
-		fmt.Sprintf("/api/terrapod/v1/authentication-tokens/%s", url.PathEscape(tokenID)))
+		fmt.Sprintf("/api/v1/authentication-tokens/%s", url.PathEscape(tokenID)))
 }
 
 // RevokeAllAPITokensForUser revokes every token bound to an identity — the
@@ -165,7 +165,7 @@ func (c *Client) RevokeAllAPITokensForUser(ctx context.Context, email string) (i
 		return 0, fmt.Errorf("marshal revoke-all: %w", err)
 	}
 	data, err := c.Post(ctx,
-		"/api/terrapod/v1/admin/authentication-tokens/actions/revoke-all", body)
+		"/api/v1/admin/authentication-tokens/actions/revoke-all", body)
 	if err != nil {
 		return 0, err
 	}

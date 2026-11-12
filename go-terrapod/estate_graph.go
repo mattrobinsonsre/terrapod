@@ -46,7 +46,7 @@ type EstateGraphMeta struct {
 // The result is filtered to the workspaces the caller can read, so a token with
 // narrow RBAC sees a correspondingly smaller graph.
 func (c *Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error) {
-	data, err := c.Get(ctx, "/api/terrapod/v1/estate-graph")
+	data, err := c.Get(ctx, "/api/v1/estate-graph")
 	if err != nil {
 		return nil, err
 	}
