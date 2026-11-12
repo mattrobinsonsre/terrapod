@@ -634,6 +634,14 @@ about that loss is loud. The API warns at startup when
 `configureTimeoutMinutes` exceeds what the cap permits; raise the cap, or lower
 the ceiling.
 
+**`configure_parallelism`** is the workspace's own setting for how many hosts a
+configure touches at once -- it becomes ansible's `ANSIBLE_FORKS`, and it falls
+back to the workspace's `parallelism` when no configure value is pinned. It is
+separate from `parallelism` deliberately: that one is the engine's
+`-parallelism` for terraform resource graph concurrency, and a fleet size has
+nothing to do with a resource count. Tuning a slow configure starts here, and
+**not** by raising `parallelism`, which would also retune every plan and apply.
+
 **`runners.configureNoProgressSeconds`** (default 1800, `0` disables) is the one
 that actually catches a stuck configure. A play wedged on a single unreachable
 host would otherwise burn the whole ceiling before anything noticed, so the

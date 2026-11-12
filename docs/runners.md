@@ -216,8 +216,22 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 | `runners.hostAliases` | Static `/etc/hosts` entries, for names cluster DNS does not serve |
 | `runners.nodeSelector` | `{}` | Node selector for Job pods |
 | `runners.tolerations` | `[]` | Tolerations for Job pods |
-| `runners.affinity` | `{}` | Affinity rules for Job pods |
+| `runners.affinity` | `{}` | Affinity rules for Job pods. A **configure** Job can be placed differently -- see `runners.configure` below |
 | `runners.podAnnotations` | `{}` | Annotations added to Job pods |
+| `runners.configure.nodeSelector` | `{}` | Overrides `runners.nodeSelector` for **configure** Jobs only |
+| `runners.configure.tolerations` | `[]` | Overrides `runners.tolerations` for **configure** Jobs only |
+| `runners.configure.affinity` | `{}` | Overrides `runners.affinity` for **configure** Jobs only |
+
+The `runners.configure.*` block exists because a configure is the one phase
+that is **not safely restartable** (#2524): an interruption leaves hosts
+half-configured, mid-release. A plan or an apply that loses its node is
+re-run and nothing is worse for it, so spot or preemptible capacity is a
+reasonable place for those -- and the wrong place for a playbook that has
+already changed half a fleet. Set the three keys above to keep configure Jobs
+on on-demand nodes while everything else stays where it is; each one
+**replaces** its `runners.*` sibling for configure Jobs rather than merging
+with it, so state the whole value you want.
+
 | `runners.priorityClassName` | `""` | Priority class for Job pods |
 | `runners.topologySpreadConstraints` | `[]` | Topology spread constraints |
 | `runners.podSecurityContext` | `{}` | Pod-level security context override |

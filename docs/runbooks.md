@@ -1108,7 +1108,8 @@ A rule whose `repo-url` names an org, group or pattern (`target-kind` `namespace
 
 ### Diagnosis
 
-1. The bulk-update is **all-or-nothing in a single transaction** and **never triggers runs** — it is a pure settings write. So the blast radius is the settings delta only; no plans/applies were kicked off by the bulk-update itself. The change lands on each workspace's *next normal run*.
+1. The bulk-update is **all-or-nothing in a single transaction** and **never triggers runs** — it is a pure settings write. So the blast radius is the settings delta only; no plans/applies were kicked off by the bulk-update itself.
+   > **This is the SETTINGS bulk endpoint, not the Workspaces page's selection menu.** The two are different surfaces and their blast radii are opposites: this one writes settings in one transaction and starts nothing, while the selection menu starts runs on each selected workspace and writes no settings. If what you did was tick workspaces on the Workspaces list and choose Plan, Retry, Cancel, Apply or Discard, go to [Recovering from a bulk run action](#recovering-from-a-bulk-run-action-on-selected-workspaces) instead — nothing on this page applies to it. The change lands on each workspace's *next normal run*.
 2. `dry_run` defaults to **on**. Confirm whether the offending call actually committed (`dry_run: false`) or was a preview.
 3. Identify the exact field(s) changed and the selection filter used (audit log captures the bulk-update call).
 
@@ -1121,6 +1122,74 @@ A rule whose `repo-url` names an org, group or pattern (`target-kind` `namespace
 
 - Re-query the affected workspaces (server-side workspace search) and confirm the field is restored
 - No unexpected runs were created by the revert. The bulk-update still triggers none itself, but it is no longer true that any run you see came from VCS or drift: a bulk-update that turns `auto-configure-enabled` on across a matched set lets the auto-configure cycle create runs of its own thereafter, and those carry `source: auto-configure` rather than arriving from a push or a drift check. Check a surprising run's `source` before attributing it.
+
+## Recovering from a bulk run action on selected workspaces
+
+**Symptom**: workspaces were ticked on the Workspaces list and an action was
+chosen from the Selection menu — Plan, Retry run, Cancel run, Apply or Discard
+— and the result was not what was intended. Typically an **Apply** across more
+workspaces than meant.
+
+**Why it needs its own runbook**: this is the opposite shape to the settings
+[bulk-update](#reverting-or-recovering-from-a-bad-bulk-update) above, and the
+differences are the whole of the recovery.
+
+| | settings bulk-update | Selection menu |
+|---|---|---|
+| what it writes | workspace settings | nothing |
+| what it starts | nothing | one run action per selected workspace |
+| atomicity | one transaction, all-or-nothing | **one request per workspace, sequential, no transaction** |
+| a partial result | impossible | **the normal failure mode** |
+| dry run | `dry_run` defaults on | **none — the action happens when confirmed** |
+
+Apply and Discard prompt in the irreversible tier, so they confirm on a precise
+pointer as well as on touch. Plan is `plan-only`, so it writes no state and the
+worst case is wasted runner capacity.
+
+### Diagnosis
+
+1. **Work out how far it got.** The fan-out is sequential and each refusal is
+   reported against its own workspace in the panel, which stays on screen until
+   dismissed — read it before navigating away, because it is the only
+   per-workspace record the UI keeps. If it is gone, the audit log has one entry
+   per call: `POST /api/v1/runs` for Plan, or
+   `POST /api/v1/runs/{id}/actions/{apply,discard,cancel,retry}` for the rest.
+2. **Separate "refused" from "done".** A workspace with no run to act on is
+   refused client-side and never reaches the API; a workspace whose run was in
+   the wrong state is refused by the API with its own reason. Neither started
+   anything. Only a 2xx did.
+3. **For an unintended Apply, find which applies are still in flight.** An apply
+   already `applying` is the one case where speed matters — see Resolution.
+
+### Resolution
+
+- **An apply that has not started yet** (the run is `confirmed` but no runner
+  Job has claimed it): cancel it, the same way you would cancel any run. The
+  Selection menu's own Cancel will do it across the same selection.
+- **An apply already in flight**: it is a normal apply, so treat it as one. Do
+  **not** reach for the Selection menu's Cancel as a safety net on a
+  part-applied fleet — cancelling mid-apply is what leaves state and reality
+  disagreeing. Let it finish, then roll the workspace back deliberately with
+  [Rollback State Version](api-reference.md#rollback-state-version-terrapod-extension)
+  — and read [the 409 after a rollback](#every-applys-state-upload-is-refused-with-409-after-a-rollback)
+  first, because a rollback moves the serial, so an apply from a runner that
+  planned against the old one is refused. That is the behaviour, not a fault.
+- **An unintended Plan**: nothing to undo. The plans supersede on the next real
+  run; they cost runner capacity and nothing else.
+- **An unintended Discard**: the run is gone and cannot be undiscarded. Queue a
+  fresh plan.
+- **Partial progress is expected, so re-running the action is safe for the ones
+  that were refused** — the refusals are reported per workspace precisely so the
+  selection can be narrowed and retried.
+
+### Verification
+
+- The panel reports every workspace as either done or refused-with-a-reason, and
+  the count matches the selection.
+- `GET /api/v1/workspaces/{id}/runs?page[size]=1` on each affected workspace
+  shows the state you expect, and no further runs appear.
+- For a rolled-back apply, the workspace's current state version is the one you
+  intended and its next plan reports the drift you expect rather than a surprise.
 
 ## Cross-workspace `terraform_remote_state` returns 403
 
@@ -1683,6 +1752,7 @@ This is **by design** — sealed mode guarantees no upstream fetch ever happens,
 - Confirm sealed mode is on: `registry.cache_only` in the API ConfigMap (`helm get values` / the rendered `config.yaml`).
 - Identify the missing artifact from the 404 detail (tool+version+os/arch, or provider `host/ns/type@version`).
 - List what IS cached: `GET /api/v1/admin/binary-cache` and `GET /api/v1/admin/provider-cache` (admin), or the `/admin/binary-cache` UI.
+- **A sealed node fails on a missing COLLECTION or IMAGE as readily as on a missing provider**, and those are different routes. For the language-package cache: `GET /api/v1/admin/package-cache` for what is held, and `GET /api/v1/admin/package-cache/sources` for what could be warmed at all — its `meta.sealed` is there to answer "can I warm right now" before you try. For container images: the OCI cache's own listing. A configure installing its collections is the slowest first run there is, so it is the one most worth warming and the one most likely to be the symptom here.
 - Remember partial versions resolve **only against the cache** when sealed — a workspace pinned to `engine_version = "1.12"` needs a cached `1.12.x`; if none is cached the resolve itself 404s.
 - The **platform Terrapod provider** (`<host>/default/terrapod`) and the **SHA256SUMS** used for runner re-verification are subject to the same gate — they must be cached too (SHA256SUMS are persisted when the binary is warmed under `verify=signature`).
 
@@ -1691,6 +1761,7 @@ This is **by design** — sealed mode guarantees no upstream fetch ever happens,
 1. **Preferred — warm the missing artifacts, keep sealed.** Sealed mode refuses to fetch, so warm from a path that *can* reach the source:
    - Temporarily set `registry.cache_only: false` (optionally with the upstream overrides pointing at an internal mirror), bulk-warm the needed entries via `POST /api/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel, confirm they appear in the cache lists, then set `cache_only: true` again. See [Cache pre-population](registry.md#cache-pre-population).
    - Or warm a staging Terrapod that shares/replicates the same object store + DB, so the sealed instance sees the artifacts.
+   - The package and image caches have their own warm routes — `POST /api/v1/admin/package-cache/warm` and `POST /api/v1/admin/oci/warm`, plus the **Warm package and image caches** panel on the same `/admin/binary-cache` page. While still sealed they answer `409` with `Warm before sealing, or unseal to warm.`, which is the same gate as above rather than a separate fault.
 2. **Escape hatch — unseal.** Set `registry.cache_only: false` to re-allow upstream fall-through (only viable if the instance actually has egress to upstream or an internal mirror).
 
 ### Verification
