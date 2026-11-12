@@ -1179,21 +1179,31 @@ jobs:
           #
           # The split happens after collection, so a new test file is assigned
           # automatically and cannot be silently missed (#1468).
+          #
+          # FOUR shards, not five. These run serial -- the session-scoped table
+          # fixture races under xdist -- so a shard removed makes the others
+          # longer, and the trade was measured on run 43266562587: five shards
+          # were 3.9-6.4 min for 26.7 min of work, finishing at 7.0 min against
+          # a run that ended at 10.2. At four the slowest lands near 6.7, so
+          # integration is still nowhere near the tail.
+          #
+          # What the freed slot buys is upstream of that. Concurrency is pinned
+          # at 20 from 0.5 to 5.5 minutes, so the first half of a run is
+          # slot-bound; one less job here drains that backlog sooner, the image
+          # builds finish sooner, and E2E and CodeQL -- which both wait on
+          # `build-images-amd64` -- start sooner. They gain no slot directly.
           - name: integration-1
             paths: tests/integration
-            pytest_args: "--shard 1/5"
+            pytest_args: "--shard 1/4"
           - name: integration-2
             paths: tests/integration
-            pytest_args: "--shard 2/5"
+            pytest_args: "--shard 2/4"
           - name: integration-3
             paths: tests/integration
-            pytest_args: "--shard 3/5"
+            pytest_args: "--shard 3/4"
           - name: integration-4
             paths: tests/integration
-            pytest_args: "--shard 4/5"
-          - name: integration-5
-            paths: tests/integration
-            pytest_args: "--shard 5/5"
+            pytest_args: "--shard 4/4"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
