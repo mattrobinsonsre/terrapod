@@ -6,6 +6,7 @@ import { describe, it } from 'node:test'
 import {
   HOST_LOG_DELIMITER,
   HOST_LOG_HEADER,
+  HOST_LOG_HEADER_V1,
   HOST_LOG_HOSTLESS,
   filterHostLog,
   parseHostLog,
@@ -15,12 +16,17 @@ import {
 } from '../src/lib/host-log.ts'
 
 /**
- * The per-host log parser (#2144).
+ * The per-host log parser (#2144, #2513).
  *
  * The format is written by an ansible callback plugin running under the
  * execution environment's Python, so the two sides cannot share a constant and
  * the literals are restated in TypeScript. That restatement is the risk, which
- * is why the last block here reads the plugin's own source.
+ * is why one block here reads the plugin's own source — including a complete
+ * example block, which this parser has to accept.
+ *
+ * Both formats are covered. v2 is what the runner writes; v1 is what a stored
+ * log written by an older runner image still carries, and a stored log outlives
+ * the image that wrote it.
  */
 
 const PLUGIN = join(
@@ -35,25 +41,47 @@ const PLUGIN = join(
 )
 
 const H = HOST_LOG_HEADER
+const H1 = HOST_LOG_HEADER_V1
+
+/** One v2 block header, in the shape the callback writes. */
+const block = (host: string, status: string, label: string, stamp = '[10:28:30 +2.9s]') =>
+  `${stamp.padEnd(16)}  ${host.padEnd(16)}  ${status.padEnd(7)}  ${label}`.trimEnd()
+
+/** One v2 body line: indented, so it belongs to the block above it. */
+const body = (text: string) => `                  ${text}`
+
+/** One v1 line: the superseded per-line host prefix. */
 const tag = (host: string, text: string) => `${host.padEnd(10)}${HOST_LOG_DELIMITER}${text}`
 
-describe('parseHostLog', () => {
-  it('attributes every line of a multi-line result, not just the first', () => {
+describe('parseHostLog, v2 blocks', () => {
+  it('attributes every line of a block, not just its header', () => {
     // The whole reason this is a callback rather than a parser over ansible's
-    // own output: `ok: [web1] => {` names the host and the lines that follow
-    // it do not.
-    const log = [H, tag('web1', 'ok: [web1] => {'), tag('web1', '    "msg": "hi"'), tag('web1', '}')].join('\n')
+    // own output: the dumped result's lines carry no host of their own, and in
+    // v2 they carry no prefix either — the block they are indented under is
+    // what attributes them.
+    const log = [
+      H,
+      block('web1', 'ok', 'platform : say hello'),
+      body('{'),
+      body('    "msg": "hi"'),
+      body('}'),
+    ].join('\n')
     const parsed = parseHostLog(log)
     assert.equal(parsed.tagged, true)
+    assert.equal(parsed.version, 2)
     assert.deepEqual(
       parsed.lines.map(l => l.host),
-      ['web1', 'web1', 'web1'],
+      ['web1', 'web1', 'web1', 'web1'],
     )
     assert.deepEqual(parsed.hosts, ['web1'])
   })
 
   it('treats the marker as belonging to no single host', () => {
-    const log = [H, tag(HOST_LOG_HOSTLESS, 'TASK [x] ***'), tag('web1', 'ok: [web1]')].join('\n')
+    const log = [
+      H,
+      block(HOST_LOG_HOSTLESS, 'play', 'PLAY [configure]', '[2026-11-11 10:28:27]'),
+      block('web1', 'changed', 'platform : deploy'),
+    ].join('\n')
     const parsed = parseHostLog(log)
     assert.deepEqual(
       parsed.lines.map(l => l.host),
@@ -62,22 +90,50 @@ describe('parseHostLog', () => {
     assert.deepEqual(parsed.hosts, ['web1'], 'the marker is not a host')
   })
 
-  it('reports an untagged log as untagged rather than as empty', () => {
-    // An older runner image emits ansible's plain output. The viewer keys the
-    // per-host switch on this, so reporting it as tagged-but-hostless would
-    // offer a picker with nothing in it.
-    const parsed = parseHostLog('PLAY [x] ***\nok: [web1]\n')
-    assert.equal(parsed.tagged, false)
-    assert.deepEqual(parsed.hosts, [])
-    assert.ok(parsed.lines.length >= 2, 'the lines are still there to render')
+  it('closes a block when something unframed follows it', () => {
+    // Another callback's line — `ansible.posix.profile_tasks` prints one at the
+    // start of every task — is emitted exactly as it was written. It belongs to
+    // no host, and it must not be swallowed by the block above it either.
+    const profile = 'Wednesday 11 November 2026  10:28:27 +0000 (0:00:00.018) ****'
+    const log = [H, block('web1', 'ok', 'a task'), body('{}'), profile, 'plain line'].join('\n')
+    const parsed = parseHostLog(log)
+    assert.deepEqual(
+      parsed.lines.map(l => l.host),
+      ['web1', 'web1', null, null],
+    )
+  })
+
+  it('does not invent a host from a line that merely opens with a bracket', () => {
+    // Pass-through output is emitted exactly as it was written, so a line of it
+    // can start with anything. A loose `^\[[^\]]*\]\s+` grammar reads the second
+    // word of `[custom] WARN disk is filling` as a host and the third as a
+    // result, and the picker gains an entry called `WARN`. Requiring the
+    // bracket to hold a TIME is what closes that, and it costs nothing: our own
+    // producer always writes one.
+    //
+    // `[WARNING]:` and `[ERROR]:` are in here too — they are what ansible
+    // itself prints outside a task — but they are not the hard case: the colon
+    // already stops them.
+    const log = [
+      H,
+      '[custom] WARN disk is filling on the build host',
+      '[WARNING]: something about a python interpreter',
+      '[ERROR]: boom',
+    ].join('\n')
+    const parsed = parseHostLog(log)
+    assert.deepEqual(parsed.hosts, [], 'no host may be invented from a bracketed word')
+    assert.equal(parsed.lines.length, 3, 'and nothing may be dropped either')
+    assert.ok(
+      parsed.lines.every(l => l.host === null),
+      'every unframed line belongs to no host, so it shows in every view',
+    )
   })
 
   it('keeps the lines that precede the header', () => {
     // The collection install writes galaxy output to the same artifact first,
     // and the orchestrator's own lines are rolled in around it. Dropping them
-    // would lose real output; parsing them would eat the first pipe out of an
-    // ordinary line of prose.
-    const log = ['Installing collection a.b | version 1.0', H, tag('web1', 'ok: [web1]')].join('\n')
+    // would lose real output.
+    const log = ['Installing collection a.b | version 1.0', H, block('web1', 'ok', 't')].join('\n')
     const parsed = parseHostLog(log)
     assert.deepEqual(parsed.lines[0], {
       host: null,
@@ -86,25 +142,61 @@ describe('parseHostLog', () => {
     assert.deepEqual(parsed.hosts, ['web1'])
   })
 
-  it('does not drop a line it cannot parse', () => {
-    const log = [H, 'something printed straight to the terminal', tag('web1', 'ok')].join('\n')
-    const parsed = parseHostLog(log)
-    assert.equal(parsed.lines.length, 2)
-    assert.equal(parsed.lines[0].text, 'something printed straight to the terminal')
-    assert.equal(parsed.lines[0].host, null, 'unparsed is context, never hidden')
-  })
-
   it('returns an empty result for no input rather than throwing', () => {
     for (const input of [null, undefined, '']) {
       const parsed = parseHostLog(input)
       assert.equal(parsed.tagged, false)
+      assert.equal(parsed.version, null)
       assert.deepEqual(parsed.hosts, [])
     }
   })
 
   it('lists hosts in first-seen order and never twice', () => {
-    const log = [H, tag('web2', 'a'), tag('web1', 'b'), tag('web2', 'c')].join('\n')
+    const log = [
+      H,
+      block('web2', 'ok', 'a'),
+      block('web1', 'ok', 'b'),
+      block('web2', 'ok', 'c'),
+    ].join('\n')
     assert.deepEqual(parseHostLog(log).hosts, ['web2', 'web1'])
+  })
+
+  it('reports an unframed log as unframed rather than as empty', () => {
+    // An older runner image emits ansible's plain output. The viewer keys the
+    // per-host switch on this, so reporting it as tagged-but-hostless would
+    // offer a picker with nothing in it.
+    const parsed = parseHostLog('PLAY [x] ***\nok: [web1]\n')
+    assert.equal(parsed.tagged, false)
+    assert.deepEqual(parsed.hosts, [])
+    assert.ok(parsed.lines.length >= 2, 'the lines are still there to render')
+  })
+})
+
+describe('parseHostLog, v1 prefixes (a stored log outlives its runner)', () => {
+  it('still attributes every line of a multi-line result', () => {
+    const log = [H1, tag('web1', 'ok: [web1] => {'), tag('web1', '    "msg": "hi"')].join('\n')
+    const parsed = parseHostLog(log)
+    assert.equal(parsed.tagged, true)
+    assert.equal(parsed.version, 1)
+    assert.deepEqual(parsed.hosts, ['web1'])
+    assert.equal(parsed.lines[1].text, '    "msg": "hi"', 'the prefix is removed, as it was')
+  })
+
+  it('still treats the marker as belonging to no single host', () => {
+    const log = [H1, tag(HOST_LOG_HOSTLESS, 'TASK [x] ***'), tag('web1', 'ok: [web1]')].join('\n')
+    const parsed = parseHostLog(log)
+    assert.deepEqual(
+      parsed.lines.map(l => l.host),
+      [null, 'web1'],
+    )
+    assert.deepEqual(parsed.hosts, ['web1'])
+  })
+
+  it('does not drop a line it cannot parse', () => {
+    const log = [H1, 'something printed straight to the terminal', tag('web1', 'ok')].join('\n')
+    const parsed = parseHostLog(log)
+    assert.equal(parsed.lines.length, 2)
+    assert.equal(parsed.lines[0].host, null, 'unparsed is context, never hidden')
   })
 })
 
@@ -123,21 +215,29 @@ describe('unescapeHost', () => {
     assert.equal(unescapeHost('web1.example.com'), 'web1.example.com')
   })
 
-  it('recovers a host carrying the delimiter without breaking the split', () => {
-    const log = [H, tag('we%7Cird', 'ok: [we|ird]')].join('\n')
+  it('recovers a host whose name carries whitespace without splitting the header', () => {
+    // The one v2 actually rests on: the host is the first whitespace-delimited
+    // field, so an unescaped space would be read as a host and a result.
+    const log = [H, block('spa%20ced', 'ok', 'a task')].join('\n')
     const parsed = parseHostLog(log)
-    assert.deepEqual(parsed.hosts, ['we|ird'])
-    assert.equal(parsed.lines[0].text, 'ok: [we|ird]')
+    assert.deepEqual(parsed.hosts, ['spa ced'])
+    assert.equal(parsed.lines[0].host, 'spa ced')
   })
 })
 
 describe('stripHostTags', () => {
-  it('yields ansible’s own words', () => {
-    const log = [H, tag(HOST_LOG_HOSTLESS, 'TASK [x] ***'), tag('web1', 'ok: [web1]')].join('\n')
+  it('yields the whole v2 log without its header', () => {
+    // There is no second rendering to fall back to: the blocks ARE the log.
+    const log = [H, block('web1', 'ok', 'a task'), body('{}')].join('\n')
+    assert.equal(stripHostTags(log), [block('web1', 'ok', 'a task'), body('{}')].join('\n'))
+  })
+
+  it('yields ansible’s own words for a v1 log', () => {
+    const log = [H1, tag(HOST_LOG_HOSTLESS, 'TASK [x] ***'), tag('web1', 'ok: [web1]')].join('\n')
     assert.equal(stripHostTags(log), 'TASK [x] ***\nok: [web1]')
   })
 
-  it('is a no-op on an untagged log', () => {
+  it('is a no-op on an unframed log', () => {
     const plain = 'PLAY [x] ***\nok: [web1]\n'
     assert.equal(stripHostTags(plain), plain)
   })
@@ -146,36 +246,43 @@ describe('stripHostTags', () => {
 describe('filterHostLog', () => {
   const log = [
     H,
-    tag(HOST_LOG_HOSTLESS, 'TASK [first] ***'),
-    tag('web1', 'ok: [web1]'),
-    tag('web2', 'ok: [web2]'),
-    tag(HOST_LOG_HOSTLESS, 'PLAY RECAP ***'),
+    block(HOST_LOG_HOSTLESS, 'play', 'PLAY [configure]', '[2026-11-11 10:28:27]'),
+    block('web1', 'ok', 'platform : first'),
+    body('  "msg": "from web1"'),
+    block('web2', 'FAILED', 'platform : first'),
+    body('  "msg": "from web2"'),
+    block(HOST_LOG_HOSTLESS, 'recap', 'PLAY RECAP', '[2026-11-11 10:29:01]'),
+    body('web1 : ok=1'),
   ].join('\n')
 
-  it('keeps one host’s lines', () => {
+  it('keeps one host’s whole block, body and all', () => {
     const out = filterHostLog(parseHostLog(log), 'web1')
-    assert.ok(out.includes('ok: [web1]'))
-    assert.ok(!out.includes('ok: [web2]'))
+    assert.match(out, /from web1/)
+    assert.doesNotMatch(out, /from web2/, 'a body line must go with its own block')
+    assert.doesNotMatch(out, /FAILED/)
   })
 
-  it('keeps the shared context, because a result with no banner is unreadable', () => {
+  it('keeps the shared context, because a result with no play is unreadable', () => {
     const out = filterHostLog(parseHostLog(log), 'web1')
-    assert.ok(out.includes('TASK [first] ***'), 'the banner says which task this is')
-    assert.ok(out.includes('PLAY RECAP ***'))
+    assert.match(out, /PLAY \[configure\]/, 'the banner says which play this is')
+    assert.match(out, /PLAY RECAP/)
+    assert.match(out, /web1 : ok=1/, 'the recap is one host-less block, body included')
   })
 
   it('yields only context for a host that produced nothing', () => {
     // A host in the inventory that the run never reached is exactly what
     // someone looks for, so selecting it must not look like an error.
     const out = filterHostLog(parseHostLog(log), 'db1')
-    assert.equal(out, 'TASK [first] ***\nPLAY RECAP ***')
+    assert.match(out, /PLAY \[configure\]/)
+    assert.doesNotMatch(out, /from web1/)
+    assert.doesNotMatch(out, /from web2/)
   })
 })
 
 describe('the format agrees with the plugin that writes it', () => {
   const src = readFileSync(PLUGIN, 'utf8')
   const literal = (name: string) => {
-    const m = src.match(new RegExp(`^${name} = "([^"]+)"`, 'm'))
+    const m = src.match(new RegExp(`^${name} = "([^"]*)"`, 'm'))
     assert.ok(m, `could not read ${name} from the plugin — has it been renamed?`)
     return m![1]
   }
@@ -184,27 +291,37 @@ describe('the format agrees with the plugin that writes it', () => {
     assert.equal(
       HOST_LOG_HEADER,
       literal('HEADER'),
-      'the viewer would stop recognising a tagged log and silently drop the per-host switch',
+      'the viewer would stop recognising a framed log and silently drop the per-host switch',
     )
-  })
-
-  it('uses the plugin’s delimiter', () => {
-    assert.equal(HOST_LOG_DELIMITER, literal('DELIMITER'))
   })
 
   it('uses the plugin’s host-less marker', () => {
     assert.equal(
       HOST_LOG_HOSTLESS,
       literal('HOSTLESS'),
-      'banners would be attributed to a host literally named as the marker',
+      'play-level output would be attributed to a host literally named as the marker',
     )
   })
 
-  it('parses a line padded to the plugin’s own width', () => {
-    const pad = Number(src.match(/^_PAD = (\d+)/m)![1])
-    const line = 'web1'.padEnd(pad) + HOST_LOG_DELIMITER + 'ok: [web1]'
-    const parsed = parseHostLog([HOST_LOG_HEADER, line].join('\n'))
-    assert.deepEqual(parsed.lines[0], { host: 'web1', text: 'ok: [web1]' })
+  it('parses the plugin’s own example block', () => {
+    // The strongest tie available across the process boundary: the plugin
+    // carries one complete block header in the exact shape it writes, and this
+    // parser has to agree about which field is the host. A grammar that
+    // narrowed, or a column that moved, fails here rather than in production.
+    const example = literal('EXAMPLE_BLOCK')
+    const parsed = parseHostLog([HOST_LOG_HEADER, example].join('\n'))
+    assert.equal(parsed.tagged, true)
+    assert.deepEqual(parsed.hosts, ['web1'], `the example did not parse: ${example}`)
+    assert.equal(parsed.lines[0].text, example, 'and the line itself is returned untouched')
+  })
+
+  it('reads the plugin’s indent as a body line', () => {
+    const indent = literal('INDENT')
+    assert.equal(indent.trim(), '', 'a body line’s indent must be whitespace')
+    const parsed = parseHostLog(
+      [HOST_LOG_HEADER, literal('EXAMPLE_BLOCK'), `${indent}"msg": "hi"`].join('\n'),
+    )
+    assert.equal(parsed.lines[1].host, 'web1', 'the body line lost its block')
   })
 })
 
@@ -217,9 +334,9 @@ describe('pickerHostList', () => {
 
   it('offers a targeted host that has produced no output at all', () => {
     // The requirement, and the reason the picker cannot be built from the log:
-    // `db2` appears in no tagged line, and an inventory host the run has not
-    // reached is exactly what someone goes looking for. A picker built from the
-    // log alone omits the one entry the control exists to provide.
+    // `db2` appears in no block, and an inventory host the run has not reached
+    // is exactly what someone goes looking for. A picker built from the log
+    // alone omits the one entry the control exists to provide.
     const out = pickerHostList(['web1', 'web2'], rows)
     assert.deepEqual(
       out.map(h => h.host),
@@ -264,8 +381,8 @@ describe('pickerHostList', () => {
   })
 
   it('offers the targeted hosts even before any output has arrived', () => {
-    // Mid-run, before the first tagged line: the list is already complete,
-    // because `/host-results` is complete from run creation.
+    // Mid-run, before the first block: the list is already complete, because
+    // `/host-results` is complete from run creation.
     assert.deepEqual(
       pickerHostList([], rows).map(h => h.host),
       ['web1', 'web2', 'db2'],
@@ -273,55 +390,59 @@ describe('pickerHostList', () => {
   })
 })
 
-// ── #2413 F18: the tags must survive a COLOURED stream ────────────────────
+// ── #2413 F18 / #2513: the framing must survive a COLOURED stream ─────────
 
 describe('a coloured configure log', () => {
-  // The configure now runs with `ANSIBLE_FORCE_COLOR=1`, to match what
-  // terraform and tofu already emit, so every line this parses can carry SGR
-  // sequences.
+  // The configure runs with `ANSIBLE_FORCE_COLOR=1`, to match what terraform
+  // and tofu already emit, so every line this parses can carry SGR sequences.
   //
-  // It is safe by CONSTRUCTION rather than by luck, and that is what these pin:
-  // the callback builds `prefix + line` (`_tp_tag`), so the host field and the
-  // delimiter are always written BEFORE ansible's bytes. Colour can therefore
-  // only appear after the first ` | `, where it is opaque text to this parser.
-  // If the callback ever colours its own prefix, these fail.
+  // In v2 the WHOLE BLOCK is coloured by its result, so colour appears at the
+  // START of every line rather than after a delimiter — the inverse of v1,
+  // where it could only ever appear after the first ` | `. That is why the
+  // parser strips a LEADING run of SGR before matching, and these pin it.
   const ESC = '\u001b'
+  const red = (text: string) => `${ESC}[0;31m${text}${ESC}[0m`
+  const green = (text: string) => `${ESC}[0;32m${text}${ESC}[0m`
 
   it('keeps the host, and leaves the colour in the text', () => {
-    const log = [
-      HOST_LOG_HEADER,
-      `web1       ${HOST_LOG_DELIMITER}${ESC}[0;32mok: [web1]${ESC}[0m`,
-    ].join('\n')
-    const parsed = parseHostLog(log)
+    const line = green(block('web1', 'ok', 'platform : say hello'))
+    const parsed = parseHostLog([H, line].join('\n'))
     assert.equal(parsed.tagged, true)
     assert.deepEqual(parsed.hosts, ['web1'])
-    assert.equal(parsed.lines[0].host, 'web1')
-    assert.equal(parsed.lines[0].text, `${ESC}[0;32mok: [web1]${ESC}[0m`)
+    assert.equal(parsed.lines[0].text, line, 'colour is preserved byte for byte')
   })
 
-  it('does not invent a host from a colour code on a host-less line', () => {
-    // The failure worth ruling out: if an SGR sequence ever preceded the
-    // marker, `field === '~'` would be false and the picker would gain a host
-    // whose name is an escape sequence.
-    const log = [
-      HOST_LOG_HEADER,
-      `${HOST_LOG_HOSTLESS}          ${HOST_LOG_DELIMITER}${ESC}[0;34mTASK [say hello] ***${ESC}[0m`,
-    ].join('\n')
-    const parsed = parseHostLog(log)
+  it('attributes a coloured body line to its coloured block', () => {
+    const parsed = parseHostLog(
+      [H, red(block('web2', 'FAILED', 'platform : check')), red(body('"msg": "boom"'))].join('\n'),
+    )
+    assert.deepEqual(
+      parsed.lines.map(l => l.host),
+      ['web2', 'web2'],
+    )
+  })
+
+  it('does not invent a host from a colour code on a host-less block', () => {
+    // The failure worth ruling out: if an SGR sequence ever defeated the
+    // marker test, the picker would gain a host whose name is an escape
+    // sequence.
+    const parsed = parseHostLog(
+      [H, green(block(HOST_LOG_HOSTLESS, 'play', 'PLAY [x]', '[2026-11-11 10:28:27]'))].join('\n'),
+    )
     assert.equal(parsed.lines[0].host, null)
     assert.deepEqual(parsed.hosts, [], 'no host may be invented from a colour code')
   })
 
-  it('keeps the host-less banners when filtered, colour and all', () => {
+  it('keeps the host-less blocks when filtered, colour and all', () => {
     const log = [
-      HOST_LOG_HEADER,
-      `${HOST_LOG_HOSTLESS}          ${HOST_LOG_DELIMITER}${ESC}[0;34mTASK [one] ***${ESC}[0m`,
-      `web1       ${HOST_LOG_DELIMITER}${ESC}[0;32mchanged: [web1]${ESC}[0m`,
-      `web2       ${HOST_LOG_DELIMITER}${ESC}[0;32mchanged: [web2]${ESC}[0m`,
+      H,
+      green(block(HOST_LOG_HOSTLESS, 'play', 'PLAY [x]', '[2026-11-11 10:28:27]')),
+      green(block('web1', 'changed', 'platform : one')),
+      green(block('web2', 'changed', 'platform : one')),
     ].join('\n')
     const only = filterHostLog(parseHostLog(log), 'web1')
-    assert.match(only, /TASK \[one\]/, 'a banner is the context a result attaches to')
-    assert.match(only, /changed: \[web1\]/)
+    assert.match(only, /PLAY \[x\]/, 'a banner is the context a block attaches to')
+    assert.match(only, /web1/)
     assert.doesNotMatch(only, /web2/)
     assert.ok(only.includes(ESC), 'colour is preserved through the filter')
   })

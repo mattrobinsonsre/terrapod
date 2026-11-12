@@ -608,10 +608,12 @@ function LogPanel({
 
   const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
 
-  // The per-host switch (#2144). Parsed from the log's own content, so the
-  // control appears only when the runner actually tagged it: an older runner
-  // image emits ansible's plain output, and the fallback is the traditional
-  // view with the switch absent rather than an empty per-host pane.
+  // The per-host switch (#2144, #2513). Parsed from the log's own content, so
+  // the control appears only when the runner actually framed it: an older
+  // runner image emits ansible's plain output, and the fallback is the whole
+  // log with the switch absent rather than an empty per-host pane. Both
+  // framings parse -- v2's blocks and v1's per-line prefixes -- because a
+  // stored log outlives the runner image that wrote it.
   const hostLog = useMemo(() => parseHostLog(cleanLog), [cleanLog])
   const [hostFilter, setHostFilter] = useState(initialHost)
 
@@ -663,9 +665,10 @@ function LogPanel({
     [hostLog.hosts, hostRows],
   )
 
-  // The text actually shown. For a tagged log this is never `cleanLog`: even
-  // the combined view has to have the tags removed, because the traditional
-  // view's whole promise is ansible's own words and nothing else.
+  // The text actually shown. For a framed log this is never `cleanLog`: even
+  // the unfiltered view has the format header removed, and a v1 log has its
+  // per-line prefixes removed too, because those are the viewer's framing
+  // rather than output.
   const shownLog = useMemo(() => {
     if (!hostLog.tagged) return cleanLog
     return hostFilter ? filterHostLog(hostLog, hostFilter) : stripHostTags(cleanLog)
@@ -673,8 +676,8 @@ function LogPanel({
 
   const htmlContent = useMemo(() => {
     // The page's precomputed HTML is an incremental conversion of the RAW log,
-    // so it still carries the host prefixes and cannot serve a tagged one --
-    // and converting per render is what the filter costs. A fresh Convert, for
+    // so it still carries the framing and cannot serve a framed one -- and
+    // converting per render is what the filter costs. A fresh Convert, for
     // the reason the indexed path gives: the shared instance carries SGR state
     // between calls and would drift colour.
     if (hostLog.tagged) {
@@ -2673,16 +2676,16 @@ function RunDetailPageInner() {
           />
         )}
 
-        {/* Configure log (#2144). The per-host switch lives inside LogPanel
-            and appears from the log's own content, so nothing here has to know
-            whether the runner tagged it. */}
+        {/* Configure log (#2144, #2513). The per-host switch lives inside
+            LogPanel and appears from the log's own content, so nothing here
+            has to know how the runner framed it. */}
         {view === 'configure' && (
           <LogPanel
             log={configureLog}
-            // Used only on the UNTAGGED path -- a configure from a runner that
-            // predates the callback. A tagged log cannot use it, because it is
+            // Used only on the UNFRAMED path -- a configure from a runner that
+            // predates the callback. A framed log cannot use it, because it is
             // an incremental conversion of the raw bytes and still carries the
-            // prefixes; LogPanel recomputes in that case. Passing it anyway
+            // framing; LogPanel recomputes in that case. Passing it anyway
             // rather than `undefined` keeps the older-runner case on the same
             // fast path as plan and apply.
             precomputedHtml={configureHtml}
@@ -2695,10 +2698,10 @@ function RunDetailPageInner() {
             runId={runId}
             isStreaming={attrs.status === 'configuring'}
             // #2413 F17. Passed to all three panels rather than this one alone:
-            // the picker and the filter are both gated on the LOG carrying host
-            // tags (`shownLog` returns `cleanLog` untouched when it does not),
-            // so a phase that gains tagging later needs no change here. Today
-            // only a configure from a current runner is tagged.
+            // the picker and the filter are both gated on the LOG carrying the
+            // framing (`shownLog` returns `cleanLog` untouched when it does
+            // not), so a phase that gains it later needs no change here. Today
+            // only a configure from a current runner carries it.
             initialHost={hostParam}
             onHostChange={switchHost}
             onRefresh={() => loadConfigureLog(true)}

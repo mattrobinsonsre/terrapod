@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -280,7 +281,25 @@ class TestThePluginStaysShippableIntoAnyExecutionEnvironment:
             f"the callback plugin imports Terrapod ({sorted(imported)}) — it runs "
             "inside the execution environment, which ships none of it"
         )
-        assert imported <= {"json", "os", "time", "ansible", "__future__"}, sorted(imported)
+        # Two clauses, because neither is the other. The DERIVED one is the
+        # property: anything outside `ansible` has to be in the standard
+        # library, and `sys.stdlib_module_names` is the authority on that
+        # rather than a name somebody recognised. The LIST is narrower on
+        # purpose -- it is read on THIS interpreter, so a module added to the
+        # stdlib after 3.10 would satisfy the derived clause and still be a
+        # `ModuleNotFoundError` on the oldest EE line. Every entry below is one
+        # somebody has confirmed exists there.
+        third_party = imported - {"ansible", "__future__"} - sys.stdlib_module_names
+        assert not third_party, (
+            f"the callback plugin imports {sorted(third_party)}, which is neither "
+            "ansible nor the standard library — the EE ships an operator's own "
+            "image and owes us nothing"
+        )
+        allowed = {"datetime", "json", "os", "re", "time", "ansible", "__future__"}
+        assert imported <= allowed, (
+            f"{sorted(imported - allowed)} is new here. It must exist on Python 3.10, "
+            "the oldest published EE line (#2154) — check, then add it above"
+        )
 
     def test_nothing_in_terrapod_imports_it(self):
         """It is a data asset, not a module of ours.

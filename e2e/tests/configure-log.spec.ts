@@ -1,19 +1,26 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * The per-host configure log view (#2144).
+ * The per-host configure log view (#2144, #2513).
  *
- * The requirement is a switch between one host's output and the traditional
- * combined stream, usable MID-RUN in both directions. So these specs serve a
- * tagged log and drive the switch, and one of them serves a log that is still
- * arriving (no ETX) to prove the control does not wait for the run to finish —
- * which is the one thing that separates this from the plan-log index beside it,
- * whose picker deliberately appears only once the log is whole (#1590).
+ * The requirement is a switch between one host's output and the whole stream,
+ * usable MID-RUN in both directions. So these specs serve a framed log and
+ * drive the switch, and one of them serves a log that is still arriving (no
+ * ETX) to prove the control does not wait for the run to finish — which is the
+ * one thing that separates this from the plan-log index beside it, whose picker
+ * deliberately appears only once the log is whole (#1590).
  *
- * The last spec serves an UNTAGGED log, which is what a runner image predating
- * the callback emits. The fallback is the traditional view with the switch
- * absent, keyed on the log's own content. A blank per-host pane would be the
- * recorded "absent is not acceptable" failure.
+ * The log is **blocks** now, one per task per host, with the host a field of
+ * each block header rather than a prefix on every line. The property the filter
+ * rests on therefore moved, and these are what prove it moved intact: a body
+ * line is attributed by the block it is indented under, so a multi-line result
+ * travels with its own host and not with anybody else's.
+ *
+ * Two specs near the end serve OLDER logs, because a stored artifact outlives
+ * the runner image that wrote it: one in v1's per-line-prefix framing, which
+ * must still filter, and one with no header at all, where the fallback is the
+ * whole log with the switch absent. A blank per-host pane would be the recorded
+ * "absent is not acceptable" failure.
  */
 
 const RUN_ID = '33333333-3333-4333-8333-333333333333'
@@ -22,21 +29,54 @@ const WS_ID = '44444444-4444-4444-8444-444444444444'
 const STX = '\x02'
 const ETX = '\x03'
 
-const HEADER = '#terrapod-host-log v1'
+const HEADER = '#terrapod-host-log v2'
+const HEADER_V1 = '#terrapod-host-log v1'
+
+/** One block header, in the shape the callback writes (#2513). */
+const block = (host: string, status: string, label: string, stamp = '[10:28:30 +2.9s]') =>
+  `${stamp.padEnd(16)}  ${host.padEnd(16)}  ${status.padEnd(7)}  ${label}`.trimEnd()
+
+/** One body line: indented, so it belongs to the block above it. */
+const body = (text: string) => `                  ${text}`
+
+/** The superseded per-line prefix, for the back-compatibility spec below. */
 const tag = (host: string, text: string) => `${host.padEnd(10)} | ${text}`
 
 /**
  * Three hosts, a multi-line result, and a failure on one of them.
  *
- * The continuation lines matter: `ok: [web1] => {` names its host and the
- * `"msg"` and `}` lines after it do not, so a text parser could not attribute
- * them. Keeping them in the fixture is what makes the filter's job real.
+ * The body lines matter: in ansible's own output the dump under a result names
+ * no host, and neither does the `...ignoring` after an ignored failure. In v2
+ * they carry no prefix either — the block they are indented under is the whole
+ * of their attribution, which is what makes the filter's job real.
  */
 const TAGGED_BODY = [
   HEADER,
-  tag('~', ''),
-  tag('~', 'PLAY [configure] ***************************************************'),
-  tag('~', ''),
+  block('~', 'play', 'PLAY [configure]', '[2026-10-23 10:28:27]'),
+  block('web1', 'ok', 'platform : say hello'),
+  body('{'),
+  body('    "msg": "hello from web1"'),
+  body('}'),
+  block('web2', 'ok', 'platform : say hello'),
+  body('{'),
+  body('    "msg": "hello from web2"'),
+  body('}'),
+  block('db1', 'ok', 'platform : say hello'),
+  body('{'),
+  body('    "msg": "hello from db1"'),
+  body('}'),
+  block('web2', 'FAILED', 'platform : fail on web2'),
+  body('{"changed": false, "msg": "deliberate"}'),
+  body('...ignoring'),
+  block('~', 'recap', 'PLAY RECAP', '[2026-10-23 10:29:01]'),
+  body('web1  : ok=1  changed=0  unreachable=0  failed=0'),
+  body('web2  : ok=2  changed=0  unreachable=0  failed=0  ignored=1'),
+  body('db1   : ok=1  changed=0  unreachable=0  failed=0'),
+].join('\n')
+
+/** The same three hosts in the superseded v1 framing, which must still render. */
+const V1_BODY = [
+  HEADER_V1,
   tag('~', 'TASK [say hello] ***************************************************'),
   tag('web1', 'ok: [web1] => {'),
   tag('web1', '    "msg": "hello from web1"'),
@@ -44,18 +84,7 @@ const TAGGED_BODY = [
   tag('web2', 'ok: [web2] => {'),
   tag('web2', '    "msg": "hello from web2"'),
   tag('web2', '}'),
-  tag('db1', 'ok: [db1] => {'),
-  tag('db1', '    "msg": "hello from db1"'),
-  tag('db1', '}'),
-  tag('~', ''),
-  tag('~', 'TASK [fail on web2] ************************************************'),
-  tag('web2', 'fatal: [web2]: FAILED! => {"changed": false, "msg": "deliberate"}'),
-  tag('web2', '...ignoring'),
-  tag('~', ''),
   tag('~', 'PLAY RECAP *********************************************************'),
-  tag('~', 'web1  : ok=1  changed=0  unreachable=0  failed=0'),
-  tag('~', 'web2  : ok=2  changed=0  unreachable=0  failed=0  ignored=1'),
-  tag('~', 'db1   : ok=1  changed=0  unreachable=0  failed=0'),
 ].join('\n')
 
 /**
@@ -67,11 +96,11 @@ const TAGGED_BODY = [
  */
 const LONG_TAGGED_BODY = [
   HEADER,
-  tag('~', 'PLAY [configure] ***************************************************'),
+  block('~', 'play', 'PLAY [configure]', '[2026-10-23 10:28:27]'),
   ...Array.from({ length: 120 }, (_, i) =>
-    tag(i % 2 === 0 ? 'web1' : 'web2', `ok: [${i % 2 === 0 ? 'web1' : 'web2'}] line ${i}`),
+    block(i % 2 === 0 ? 'web1' : 'web2', 'ok', `platform : line ${i}`),
   ),
-  tag('~', 'PLAY RECAP *********************************************************'),
+  block('~', 'recap', 'PLAY RECAP', '[2026-10-23 10:29:01]'),
 ].join('\n')
 
 const UNTAGGED_BODY = [
@@ -211,19 +240,20 @@ test.describe('the configure log', () => {
 
     const pane = paneText(page)
     await expect(pane).toContainText('PLAY RECAP')
-    await expect(pane).toContainText('TASK [say hello]')
+    await expect(pane).toContainText('PLAY [configure]')
     await expect(pane).not.toContainText('hello from web1')
   })
 
-  test('shows ansible’s own words with no tag in the combined view', async ({ page }) => {
+  test('shows every block in the combined view, and never the header', async ({ page }) => {
     await stubRun(page, { body: TAGGED_BODY })
     await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
 
     const pane = paneText(page)
-    await expect(pane).toContainText('ok: [web1]')
-    // The prefix is the viewer's framing, not ansible's, so the traditional
-    // view must not show it.
-    await expect(pane).not.toContainText('web1       |')
+    await expect(pane).toContainText('platform : say hello')
+    await expect(pane).toContainText('hello from db1')
+    // The header describes the format rather than being an instance of it, so
+    // it is the viewer's business and never the reader's.
+    await expect(pane).not.toContainText(HEADER)
   })
 
   test('filters to one host and back again, mid-run, with the log still arriving', async ({ page }) => {
@@ -251,17 +281,20 @@ test.describe('the configure log', () => {
     await expect(pane).toContainText('hello from db1')
   })
 
-  test('keeps the task banners and the recap when one host is selected', async ({ page }) => {
-    // Context, not noise: a result with no banner above it is a line with
-    // nothing to attach it to.
+  test('keeps the play-level blocks and the recap when one host is selected', async ({ page }) => {
+    // Context, not noise: a block with no play above it has nothing to attach
+    // it to, and the recap's rows are how a reader sees what the run did.
     await stubRun(page, { body: TAGGED_BODY })
     await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
 
     await page.getByTestId('log-hosts-configure').selectOption('web1')
     const pane = paneText(page)
-    await expect(pane).toContainText('TASK [say hello]')
+    await expect(pane).toContainText('PLAY [configure]')
     await expect(pane).toContainText('PLAY RECAP')
-    await expect(pane).toContainText('TASK [fail on web2]')
+    // The recap is one host-less block, so its body survives the filter with it.
+    await expect(pane).toContainText('web2  : ok=2')
+    // ...while another host's own block does not.
+    await expect(pane).not.toContainText('platform : fail on web2')
   })
 
   test('attributes the continuation lines of a multi-line result', async ({ page }) => {
@@ -325,10 +358,10 @@ test.describe('the configure log', () => {
     await expect(paneText(page)).toContainText('hello from db1')
   })
 
-  test('falls back to the traditional view when the runner did not tag the log', async ({ page }) => {
-    // An older runner image. The switch is simply not offered; the log still
-    // renders in full. Showing an empty per-host pane instead would be worse
-    // than showing no switch.
+  test('renders a log with no header at all, and offers no switch for it', async ({ page }) => {
+    // A runner image predating the callback entirely. The switch is simply not
+    // offered; the log still renders in full. Showing an empty per-host pane
+    // instead would be worse than showing no switch.
     await stubRun(page, { body: UNTAGGED_BODY })
     await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
 
@@ -390,7 +423,31 @@ test.describe('the configure log', () => {
 
     await expect.poll(atBottom).toBe(true)
     await page.getByTestId('log-hosts-configure').selectOption('web1')
-    await expect(pane).not.toContainText('[web2]')
+    await expect(pane).not.toContainText('web2')
     await expect.poll(atBottom).toBe(true)
+  })
+
+  test('still filters a v1 log, which a stored artifact outlives its runner to be', async ({
+    page,
+  }) => {
+    // The back-compatibility half of versioning the header (#2513): an older
+    // runner image prefixed every line with its host instead of emitting
+    // blocks, and a log it wrote is still in storage. Dropping the picker for
+    // it would be the recorded "absent is not acceptable" failure applied to
+    // the one control that makes a fleet-sized log readable.
+    await stubRun(page, { body: V1_BODY })
+    await page.goto(`/workspaces/${WS_ID}/runs/${RUN_ID}?view=configure`)
+
+    const picker = page.getByTestId('log-hosts-configure')
+    await expect(picker).toBeVisible()
+    await picker.selectOption('web1')
+
+    const pane = paneText(page)
+    await expect(pane).toContainText('hello from web1')
+    await expect(pane).not.toContainText('hello from web2')
+    // The banner is host-less in v1 too, so it stays as the context it is...
+    await expect(pane).toContainText('TASK [say hello]')
+    // ...and the prefix is still removed, because v1's own words are underneath.
+    await expect(pane).not.toContainText('web1       |')
   })
 })
