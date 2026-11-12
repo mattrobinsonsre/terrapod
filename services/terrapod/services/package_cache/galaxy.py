@@ -134,15 +134,21 @@ async def _get_json(url: str, *, client: httpx.AsyncClient | None = None) -> dic
 
 
 async def fetch_collection(
-    namespace: str, name: str, *, client: httpx.AsyncClient | None = None
+    namespace: str, name: str, *, client: httpx.AsyncClient | None = None, base: str | None = None
 ) -> dict:
-    """Upstream's collection detail document."""
-    url = f"{upstream_base()}/api/v3/collections/{namespace}/{name}/"
+    """Upstream's collection detail document.
+
+    `base` overrides the configured upstream for ONE call. Warming uses it to
+    pull from a named mirror (`registry.package_cache.<eco>.mirrors`); serving
+    never passes it, so the proxy's own request-forgery surface is unchanged.
+    """
+    root = (base or upstream_base()).rstrip("/")
+    url = f"{root}/api/v3/collections/{namespace}/{name}/"
     return await _get_json(url, client=client)
 
 
 async def fetch_versions(
-    namespace: str, name: str, *, client: httpx.AsyncClient | None = None
+    namespace: str, name: str, *, client: httpx.AsyncClient | None = None, base: str | None = None
 ) -> dict:
     """Every version of a collection, as one document.
 
@@ -155,7 +161,8 @@ async def fetch_versions(
     A malformed or self-referential `next` would otherwise loop forever, so the
     walk is bounded and stops rather than following a link twice.
     """
-    url = f"{upstream_base()}/api/v3/collections/{namespace}/{name}/versions/?limit=100"
+    root = (base or upstream_base()).rstrip("/")
+    url = f"{root}/api/v3/collections/{namespace}/{name}/versions/?limit=100"
     owns = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
     try:
@@ -168,7 +175,7 @@ async def fetch_versions(
             if isinstance(data, list):
                 collected.extend(entry for entry in data if isinstance(entry, dict))
             nxt = (page.get("links") or {}).get("next")
-            url = _absolute_next(nxt)
+            url = _absolute_next(nxt, root)
     finally:
         if owns:
             await client.aclose()
@@ -180,27 +187,45 @@ async def fetch_versions(
     }
 
 
-def _absolute_next(nxt: object) -> str:
+def _absolute_next(nxt: object, root: str | None = None) -> str:
     """The next page URL, or empty when there is not one.
 
     Upstream may give a relative path. It is resolved against the *configured*
     upstream rather than followed as given, so a `next` pointing at another host
     cannot walk us off the operator's chosen registry — the same reasoning as
     never fetching a client-supplied URL.
+
+    `root` is the base this walk started from: the configured upstream for a
+    served request, a named mirror for a warm. Both are bases the operator wrote
+    down, so the containment above is unchanged — what would break it is taking
+    the host from the `next` link itself.
     """
     if not isinstance(nxt, str) or not nxt:
         return ""
+    base = (root or upstream_base()).rstrip("/")
     if nxt.startswith("/"):
-        return f"{upstream_base()}{nxt}"
-    base = upstream_base()
+        return f"{base}{nxt}"
     return nxt if nxt.startswith(base) else ""
 
 
 async def fetch_version(
-    namespace: str, name: str, version: str, *, client: httpx.AsyncClient | None = None
+    namespace: str,
+    name: str,
+    version: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+    base: str | None = None,
 ) -> dict:
-    """Upstream's version detail — where `download_url` and the digest live."""
-    url = f"{upstream_base()}/api/v3/collections/{namespace}/{name}/versions/{version}/"
+    """Upstream's version detail — where `download_url` and the digest live.
+
+    `base` overrides the configured upstream for ONE call. Warming uses it to
+    pull from a named mirror (`registry.package_cache.<eco>.mirrors`); serving
+    never passes it, so the proxy's own request-forgery surface is unchanged.
+    `download_url` is taken from this document, so a detail fetched from a mirror
+    points the artifact fetch at that mirror with nothing to rewrite.
+    """
+    root = (base or upstream_base()).rstrip("/")
+    url = f"{root}/api/v3/collections/{namespace}/{name}/versions/{version}/"
     return await _get_json(url, client=client)
 
 

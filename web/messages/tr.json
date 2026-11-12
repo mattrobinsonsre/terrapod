@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (herhangi)",
       "termLabel": "{key}: {value}",
       "hintStatus": "durum",
-      "hintHealth": "sağlık",
       "hintLabel": "etiket",
       "hintLabelKey": "etiket anahtarı",
       "hintName": "ad",
       "engineLabel": "Motor",
-      "engineAll": "Tüm motorlar"
+      "engineAll": "Tüm motorlar",
+      "flags": "Bayraklar",
+      "termFlag": "bayrak: {value}",
+      "termLocked": "kilitli: {value}",
+      "hintFlag": "bayrak",
+      "hintLocked": "kilitli"
     },
     "row": {
       "removeLabelFilter": "Filtreden kaldırmak için tıklayın",
@@ -149,6 +153,14 @@
       "local": "Yerel",
       "collapseAll": "Tümünü daralt",
       "expandAll": "Tümünü genişlet"
+    },
+    "flagName": {
+      "state-diverged": "Durum Ayrıştı",
+      "no-agent-pool": "Aracı havuzu yok",
+      "no-live-agent-pool": "Etkin aracı havuzu yok",
+      "vcs-error": "VCS Hatası",
+      "drifted": "Sürüklendi",
+      "drift-errored": "Sapma algılama başarısız"
     }
   },
   "status": {
@@ -1863,7 +1875,36 @@
       "continuePurge": "Temizliği sürdür",
       "continuing": "Sürdürülüyor…"
     },
-    "sealedWarning": "Bu düğüm mühürlü olduğundan burada temizlenen hiçbir şey yeniden getirilemez. Zamanlanmış temizlik tam bu nedenle bu önbellekleri atlar — bu kalıcı bir silme işlemidir."
+    "sealedWarning": "Bu düğüm mühürlü olduğundan burada temizlenen hiçbir şey yeniden getirilemez. Zamanlanmış temizlik tam bu nedenle bu önbellekleri atlar — bu kalıcı bir silme işlemidir.",
+    "warmAhead": {
+      "heading": "Paket ve imaj önbelleklerini ısıt",
+      "help": "Bildiğiniz her yerde bir sürüm verin: sürümüyle adlandırılmış bir ısıtma sonradan bir kilit dosyasına karşı denetlenebilir, “en yenisi her neyse” denetlenemez. Her satırı <code>ad sürüm</code> biçiminde yazın; Pulumi eklentileri için, belirli platformları ısıtmak üzere sona <code>os/arch</code> belirteçleri ekleyin.",
+      "ecosystemLabel": "Yapıt türü",
+      "ecosystemOff": "{ecosystem} (kapatılmış)",
+      "sourceLabel": "Şuradan getir",
+      "sourceDefault": "Yapılandırılmış yukarı akış",
+      "upstreamIs": "<code>{url}</code> adresinden getirilecek.",
+      "upstreamPerReference": "Her imaj başvurusu kendi ana makinesini belirtir ve bu makine, bu kurulumun yapılandırdığı yukarı akışlardan biri olmak zorundadır.",
+      "itemsLabel": "Yapıtlar",
+      "imagesLabel": "İmaj başvuruları",
+      "willWarm": "{count, plural, one {# yapıt ısıtılacak.} other {# yapıt ısıtılacak.}}",
+      "unversioned": "{count, plural, one {# satır bir sürüm belirtmiyor, bu yüzden mevcut en yenisi getirilecek. Bu yinelenebilir değil.} other {# satır bir sürüm belirtmiyor, bu yüzden her biri için mevcut en yenisi getirilecek. Bu yinelenebilir değil.}}",
+      "versionRequired": "{count, plural, one {# satır bir sürüm belirtmiyor.} other {# satır bir sürüm belirtmiyor.}} {ecosystem}, en yenisinin çözümleneceği bir dizin yayımlamıyor, bu yüzden her satırın bir sürüme ihtiyacı var.",
+      "tooMany": "Tek bir gönderimde en fazla {max} yapıt ısıtılabilir.",
+      "confirm": "{count, plural, one {# yapıt} other {# yapıt}} şimdi ısıtılsın mı?",
+      "warm": "Isıt",
+      "warming": "Isıtılıyor…",
+      "progress": "{total} işlemden {completed} tanesi tamamlandı",
+      "fetched": "{fetched, plural, one {# dosya getirildi} other {# dosya getirildi}}",
+      "alreadyCached": "{files, plural, one {zaten önbellekte (# dosya)} other {zaten önbellekte (# dosya)}}",
+      "finished": "{succeeded}/{total} ısıtıldı ({failed} başarısız)",
+      "sealed": "Bu düğüm mühürlü olduğundan yukarı akıştan hiçbir şey getiremez. Önbellekleri mühürlemeden önce ısıtın ya da şimdi ısıtmak için mührü kaldırın.",
+      "errorEmpty": "Isıtmak için en az bir satır ekleyin.",
+      "errorSources": "Isıtmanın nereden getireceği okunamadı",
+      "errorSubmit": "Isıtma başlatılamadı",
+      "errorStatus": "Isıtma işi okunamadı",
+      "helpLead": "Yapıtları, herhangi bir şey onları istemeden önce önbelleğe getirin — her satıra bir tane, bir ad ve bir sürüm olarak."
+    }
   },
   "catalog": {
     "title": "Hizmet Kataloğu",

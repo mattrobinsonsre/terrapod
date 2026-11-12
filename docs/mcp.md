@@ -360,6 +360,27 @@ nothing can be re-fetched and an eviction is a permanent deletion.
 > omission protected nobody and left an agent able to read that a cache had
 > grown and unable to act on it. Risk is signalled by the annotation.
 
+### Caches (gated) — fill them before a node is cut off
+
+The other direction. Where the evictions above reclaim space, these pre-populate
+a cache so a later run does not spend minutes filling a cold one — and so a
+deployment about to be disconnected from the internet already holds what it
+needs. Warming **adds**: nothing is removed and nothing a run depends on is
+changed, so the submissions are annotated `mutating` rather than `destructive`
+and a host need not interrupt for them.
+
+The shape to get right is that a submission is **accepted, not done**. A real
+dependency closure outlives one request, so the POST returns a job id and
+`terrapod_cache_warm_status` is the other half; reporting success off the
+submission alone says only that the server took the list.
+
+| Tool | Safety | What it does |
+|---|---|---|
+| `terrapod_cache_warm_sources` | read-only | Where a warm would pull from, and whether warming is possible at all. **Call this first.** `sealed` true means the node is forbidden from reaching upstream, so every submission can only fail — a deliberate configuration for an air-gapped deployment, not a fault to retry. `resolves_latest` false (which is `pulumi`) means a version is required. `mirrors` lists the labels `source` may name. |
+| `terrapod_cache_warm_packages` | mutating | Cache artifacts from any of the six ecosystems. **Give explicit versions** — ideally the exact set a lockfile pins, because that is what makes the warm checkable afterwards, and on a node about to be sealed an unverifiable warm is what gets discovered too late. `source` takes a mirror **label**, never a URL. Idempotent: already-held items are skipped, so re-running is the normal way to close the last gaps. |
+| `terrapod_cache_warm_images` | mutating | Pull container images through the mirror, manifest and every blob. A manifest-only warm would look cached and fail on the first layer a sealed node tried to serve. |
+| `terrapod_cache_warm_status` | read-only | A job's progress and its **per-item** outcomes. Poll until `finished`. Read the outcomes, not the counts: `fetched` 0 against a non-zero `files` means the item was **already cached** rather than newly pulled, which is how a converged re-run is told from a first one; `detail` on a *successful* item names a part that did not land, such as one architecture of a Pulumi plugin; `source` is where the bytes came from. |
+
 ## Safety model, in short
 
 - **Per-user RBAC** — the token *is* your identity; tools succeed only where your

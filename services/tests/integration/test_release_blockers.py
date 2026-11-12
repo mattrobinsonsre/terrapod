@@ -1089,7 +1089,8 @@ class TestSwitchingAWorkspaceToLocalExecution:
 
 
 class TestNarrowedLabelReservations:
-    """Seven reservations were released in v1.6.0 (#1450).
+    """Six reservations were released in v1.6.0 (#1450); `locked` was re-reserved with `flag`
+    when the filter gained `locked:` and `flag:` terms.
 
     They were held on the reasoning that reserving costs nothing — but only
     `status` was ever implemented as a virtual filter term, so the rest refused
@@ -1099,7 +1100,7 @@ class TestNarrowedLabelReservations:
 
     @pytest.mark.parametrize(
         "key",
-        ["pool", "mode", "backend", "drift", "version", "vcs", "locked", "branch"],
+        ["pool", "mode", "backend", "drift", "version", "vcs", "branch"],
     )
     async def test_a_released_key_is_usable_as_a_label(self, app, client, key):
         set_auth(app, admin_user())
@@ -1119,10 +1120,10 @@ class TestNarrowedLabelReservations:
         assert resp.status_code == 201, resp.text
         assert resp.json()["data"]["attributes"]["labels"][key] == "x"
 
-    @pytest.mark.parametrize("key", ["status", "owner"])
+    @pytest.mark.parametrize("key", ["status", "owner", "flag", "locked"])
     async def test_the_remaining_reservations_still_hold(self, app, client, key):
-        """Both survivors mislead about a real decision if used as a label:
-        `status` is the sole built-in filter term (`status:errored` would be
+        """Each mislead about a real decision if used as a label: `status`,
+        `flag` and `locked` are built-in filter terms (`status:errored` would be
         ambiguous), and `owner` maps to `owner_email`, which grants admin."""
         set_auth(app, admin_user())
         resp = await client.post(

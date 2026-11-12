@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (enhver)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "tilstand",
       "hintLabel": "label",
       "hintLabelKey": "labelnøgle",
       "hintName": "navn",
       "engineLabel": "Motor",
-      "engineAll": "Alle motorer"
+      "engineAll": "Alle motorer",
+      "flags": "Flag",
+      "termFlag": "flag: {value}",
+      "termLocked": "låst: {value}",
+      "hintFlag": "flag",
+      "hintLocked": "låst"
     },
     "row": {
       "removeLabelFilter": "Klik for at fjerne fra filter",
@@ -149,6 +153,14 @@
       "local": "Lokal",
       "collapseAll": "Fold alle sammen",
       "expandAll": "Udvid alle"
+    },
+    "flagName": {
+      "state-diverged": "Tilstand afveget",
+      "no-agent-pool": "Ingen agent-pulje",
+      "no-live-agent-pool": "Ingen aktiv agent-pulje",
+      "vcs-error": "VCS-fejl",
+      "drifted": "Afdriftet",
+      "drift-errored": "Afdriftsregistrering fejlede"
     }
   },
   "status": {
@@ -1863,7 +1875,36 @@
       "continuePurge": "Fortsæt rydningen",
       "continuing": "Fortsætter…"
     },
-    "sealedWarning": "Denne node er forseglet, så intet, der ryddes her, kan hentes igen. Den planlagte oprydning springer disse caches over af samme grund — det er en permanent sletning."
+    "sealedWarning": "Denne node er forseglet, så intet, der ryddes her, kan hentes igen. Den planlagte oprydning springer disse caches over af samme grund — det er en permanent sletning.",
+    "warmAhead": {
+      "heading": "Opvarm pakke- og image-caches",
+      "help": "Angiv en version, hvor den er kendt: en opvarmning, der nævner en version, kan bagefter holdes op mod en låsefil, »hvad der nu er nyest« kan ikke. Skriv hver linje som <code>navn version</code>; for Pulumi-plugins tilføjes efterfølgende <code>os/arch</code>-tokens for at opvarme bestemte platforme.",
+      "ecosystemLabel": "Artefakttype",
+      "ecosystemOff": "{ecosystem} (slået fra)",
+      "sourceLabel": "Hent fra",
+      "sourceDefault": "Konfigureret upstream",
+      "upstreamIs": "Hentes fra <code>{url}</code>.",
+      "upstreamPerReference": "Hver image-reference nævner sin egen vært, og den skal være en af de upstreams, denne installation har konfigureret.",
+      "itemsLabel": "Artefakter",
+      "imagesLabel": "Image-referencer",
+      "willWarm": "{count, plural, one {# artefakt bliver opvarmet.} other {# artefakter bliver opvarmet.}}",
+      "unversioned": "{count, plural, one {# linje nævner ingen version, så den nyeste tilgængelige hentes. Det er ikke reproducerbart.} other {# linjer nævner ingen version, så den nyeste tilgængelige hentes for hver af dem. Det er ikke reproducerbart.}}",
+      "versionRequired": "{count, plural, one {# linje nævner ingen version.} other {# linjer nævner ingen version.}} {ecosystem} udgiver intet indeks at slå et nyeste op i, så hver linje skal have en.",
+      "tooMany": "Der kan højst opvarmes {max} artefakter pr. indsendelse.",
+      "confirm": "Opvarm {count, plural, one {# artefakt} other {# artefakter}} nu?",
+      "warm": "Opvarm",
+      "warming": "Opvarmer…",
+      "progress": "{completed} af {total} færdige",
+      "fetched": "{fetched, plural, one {hentede # fil} other {hentede # filer}}",
+      "alreadyCached": "{files, plural, one {allerede i cachen (# fil)} other {allerede i cachen (# filer)}}",
+      "finished": "Opvarmede {succeeded}/{total} ({failed} mislykkedes)",
+      "sealed": "Denne node er forseglet og kan derfor ikke hente noget fra upstream. Opvarm cachene, før den forsegles, eller ophæv forseglingen for at opvarme dem nu.",
+      "errorEmpty": "Tilføj mindst én linje at opvarme.",
+      "errorSources": "Kunne ikke læse, hvor opvarmningen ville hente fra",
+      "errorSubmit": "Kunne ikke starte opvarmningen",
+      "errorStatus": "Kunne ikke læse opvarmningsjobbet",
+      "helpLead": "Hent artefakter ind i cachen, før noget beder om dem — én pr. linje, som et navn og en version."
+    }
   },
   "catalog": {
     "title": "Tjenestekatalog",

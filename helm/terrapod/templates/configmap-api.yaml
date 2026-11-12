@@ -318,16 +318,28 @@ data:
         pypi:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .npm }}
         npm:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .pulumi }}
         pulumi:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- /* Guarded, unlike `upstream`: this key HAS a code default, so
                  rendering it unconditionally would write "" for an operator
                  whose values omit it, overriding that default with an empty
@@ -341,16 +353,28 @@ data:
         go:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .nuget }}
         nuget:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- with .galaxy }}
         galaxy:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- with .mirrors }}
+          mirrors:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
@@ -971,6 +995,11 @@ data:
   runners.yaml: |
     token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds | int64 }}
     max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds | int64 }}
+    {{- /* The API sizes a configure's runner token from the Job's own deadline
+       plus this (#2526), for a listener too old to ask, so it has to read the
+       same value the listener builds the Job with. Spelled as
+       `configmap-runner.yaml` spells it, like every other key here. */}}
+    termination_grace_period_seconds: {{ .Values.runners.terminationGracePeriodSeconds | int64 }}
     stale_timeout_seconds: {{ .Values.runners.staleTimeoutSeconds | int64 }}
     launch_timeout_seconds: {{ dig "launchTimeoutSeconds" 300 .Values.runners | int64 }}
     ee_startup_timeout_seconds: {{ dig "eeStartupTimeoutSeconds" 600 .Values.runners | int64 }}

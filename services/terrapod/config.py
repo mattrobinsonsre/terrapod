@@ -242,8 +242,27 @@ class RunnerConfig(BaseSettings):
         default=120,
         description="Time budget for graceful shutdown + artifact uploads (pod terminationGracePeriodSeconds)",
     )
-    token_ttl_seconds: int = Field(default=3600, description="Default runner token TTL")
-    max_token_ttl_seconds: int = Field(default=7200, description="Maximum runner token TTL")
+    token_ttl_seconds: int = Field(
+        default=3600,
+        description=(
+            "Default runner token TTL, for a Job whose own deadline is not "
+            "known at mint time (a listener older than #2526). A listener that "
+            "sends the TTL its Job needs is sized from the Job instead."
+        ),
+    )
+    max_token_ttl_seconds: int = Field(
+        default=14400,
+        description=(
+            "Maximum runner token TTL. Raised from 7200 for #2526: it has to "
+            "clear the longest Job this deployment permits, and a configure "
+            "may run `configure_timeout_minutes` (180) -- so the shipped pair "
+            "clamped a configure's token to two hours and lost every upload a "
+            "longer one made at exit. Four hours covers the shipped configure "
+            "ceiling plus its launch and termination windows with headroom; "
+            "`test_the_shipped_cap_clears_the_shipped_configure_budget` is "
+            "what holds the two together."
+        ),
+    )
     node_selector: dict[str, str] = Field(default_factory=dict)
     tolerations: list[dict] = Field(default_factory=list)
     affinity: dict = Field(default_factory=dict)
@@ -455,6 +474,47 @@ def load_runner_config(path: str = "/etc/terrapod/runners.yaml") -> RunnerConfig
     so the layering — and env overrides — happen inside the model.
     """
     return RunnerConfig()
+
+
+#: Seconds a runner token is given beyond its Job's own deadline (#2526).
+#:
+#: Two windows, and both sit outside `activeDeadlineSeconds`. The token is
+#: minted BEFORE the Job exists -- the listener mints it, writes the auth
+#: Secret, then creates the Job -- so the mint-to-start gap is on the token's
+#: clock and not on the Job's. And when the Job is ended by its deadline, the
+#: uploads that matter most happen in the termination grace period that follows
+#: it, which is also outside it.
+#:
+#: Generous rather than tight, because the two directions are not symmetrical:
+#: a token a few minutes longer than its Job is a credential whose lifetime is
+#: still bounded by the Job it belongs to, while a token a few seconds shorter
+#: loses the log, the host events and the resource profile of exactly the
+#: longest runs -- silently, because every one of those uploads is best-effort.
+RUNNER_TOKEN_LAUNCH_MARGIN_SECONDS = 300
+
+
+def runner_token_ttl_for_job(timeout_minutes: int, grace_seconds: int) -> int:
+    """How long a runner token must live for a Job with this deadline (#2526).
+
+    **The invariant: a runner token outlives the Job it belongs to.** It did
+    not. `token_ttl_seconds` defaults to 3600 while a configure Job is allowed
+    `configure_timeout_minutes` (180) -- so a 66-minute configure finished its
+    playbook with a dead token and every upload it makes at exit answered 401:
+    the log, the per-host events, the oversized-payload sidecar and the resource
+    profile, which is also what carries why the run failed. The run was still
+    marked errored correctly, by the listener, so the loss was quiet.
+
+    One producer because the number has two readers that must agree: the
+    listener, which owns the Job's `activeDeadlineSeconds` and asks for a token
+    to match, and the mint endpoint, which has to size one for a listener too
+    old to ask. Two copies of this arithmetic is how they come to disagree.
+
+    Still clamped by `max_token_ttl_seconds` at the mint -- this says what the
+    Job needs, not what the operator permits. Where the operator's cap is below
+    this, `warn_about_phase_token_budget` says so at startup, because the
+    combination loses data rather than refusing anything.
+    """
+    return max(1, timeout_minutes) * 60 + max(0, grace_seconds) + RUNNER_TOKEN_LAUNCH_MARGIN_SECONDS
 
 
 # --- Storage Configuration Models ---
@@ -1537,6 +1597,19 @@ class PackageEcosystemConfig(BaseModel):
         "client names a package and Terrapod decides where packages come from — so this "
         "is the whole of the request-forgery surface and it is operator-set. Point it at "
         "an internal mirror to pull through that instead of the public registry.",
+    )
+    mirrors: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional registries this ecosystem may be WARMED from, by label "
+        '— e.g. `{"hub": "https://terrapod.hub.example/pypi"}`. Serving always '
+        "pulls through `upstream`; these are only reachable from a warm submission that "
+        "names one, which is what lets an operator fill this node from a sibling "
+        "Terrapod or an internal mirror without changing the deployment default and "
+        "restarting. They are labels rather than per-request URLs on purpose: `upstream` "
+        "above is the whole of the request-forgery surface precisely because it is "
+        "operator-set, and a warm body carrying a URL would hand an admin-authenticated "
+        "caller a server-side fetch to any host they name. A label keeps every URL this "
+        "deployment can fetch inside this file.",
     )
 
 

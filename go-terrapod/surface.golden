@@ -12,6 +12,7 @@ const KindOperator
 const ListingComplete
 const ListingUnknown
 const MaskedValue
+const MaxWarmItems
 const MinimumAPIVersion
 const ModuleAutodiscoveryTargetNamespace
 const ModuleAutodiscoveryTargetPattern
@@ -811,11 +812,23 @@ field PackageCacheListOptions.Ecosystem string
 field PackageCacheListOptions.Name string
 field PackageCacheListOptions.PageNumber int
 field PackageCacheListOptions.PageSize int
+field PackageCacheSource.Ecosystem string `json:"ecosystem"`
+field PackageCacheSource.Enabled bool `json:"enabled"`
+field PackageCacheSource.Mirrors map[string]string `json:"mirrors"`
+field PackageCacheSource.ResolvesLatest bool `json:"resolves-latest"`
+field PackageCacheSource.Upstream string `json:"upstream"`
+field PackageCacheSourcesMeta.MaxItems int `json:"max-items"`
+field PackageCacheSourcesMeta.Sealed bool `json:"sealed"`
 field PackageCacheTotal.Bytes int64 `json:"bytes"`
 field PackageCacheTotal.Ecosystem string `json:"ecosystem"`
 field PackageCacheTotal.Files int64 `json:"files"`
 field PackageEvictRequest.Ecosystem string `json:"ecosystem,omitempty"`
 field PackageEvictRequest.OlderThanDays *int `json:"older_than_days,omitempty"`
+field PackageWarmSpec.Ecosystem string `json:"ecosystem"`
+field PackageWarmSpec.Name string `json:"name"`
+field PackageWarmSpec.Platforms []string `json:"platforms,omitempty"`
+field PackageWarmSpec.Source string `json:"source,omitempty"`
+field PackageWarmSpec.Version string `json:"version,omitempty"`
 field PlanSummary.CreatedAt string `json:"created-at,omitempty"`
 field PlanSummary.Description string `json:"description,omitempty"`
 field PlanSummary.ErrorMessage string `json:"error-message,omitempty"`
@@ -1543,6 +1556,21 @@ field VaultStatus.UnavailableReason string `json:"unavailable-reason"`
 field WarmBinaryEntry.Platforms []WarmPlatform `json:"platforms,omitempty"`
 field WarmBinaryEntry.Tool string `json:"tool,omitempty"`
 field WarmBinaryEntry.Version string `json:"version"`
+field WarmItemOutcome.Detail string `json:"detail"`
+field WarmItemOutcome.Ecosystem string `json:"ecosystem"`
+field WarmItemOutcome.Fetched int `json:"fetched"`
+field WarmItemOutcome.Files int `json:"files"`
+field WarmItemOutcome.OK bool `json:"ok"`
+field WarmItemOutcome.Ref string `json:"ref"`
+field WarmItemOutcome.Source string `json:"source"`
+field WarmJobState.Completed int `json:"completed"`
+field WarmJobState.Failed int `json:"failed"`
+field WarmJobState.JobID string `json:"-"`
+field WarmJobState.Outcomes []WarmItemOutcome `json:"outcomes"`
+field WarmJobState.Status string `json:"status"`
+field WarmJobState.SubmittedAt string `json:"submitted-at"`
+field WarmJobState.Succeeded int `json:"succeeded"`
+field WarmJobState.Total int `json:"total"`
 field WarmPlatform.Arch string `json:"arch"`
 field WarmPlatform.OS string `json:"os"`
 field WarmProviderEntry.Platforms []WarmPlatform `json:"platforms,omitempty"`
@@ -1552,6 +1580,9 @@ field WarmResult.Error string `json:"error,omitempty"`
 field WarmResult.Kind string `json:"kind"`
 field WarmResult.OK bool `json:"ok"`
 field WarmResult.Ref string `json:"ref"`
+field WarmSubmission.JobID string `json:"-"`
+field WarmSubmission.Status string `json:"status"`
+field WarmSubmission.Total int `json:"total"`
 field Workspace.AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 field Workspace.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field Workspace.AISummaryMode string `json:"ai-summary-mode,omitempty"`
@@ -1967,6 +1998,7 @@ method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) OverridePolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error)
 method (*Client) OverrideRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
+method (*Client) PackageCacheSources(ctx context.Context) ([]PackageCacheSource, PackageCacheSourcesMeta, error)
 method (*Client) PackageCacheTotals(ctx context.Context) ([]PackageCacheTotal, CacheTotalsMeta, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PinIdentitySubject(ctx context.Context, providerName, email, subject string) error
@@ -2039,10 +2071,14 @@ method (*Client) UploadStateContent(ctx context.Context, stateVersionID string, 
 method (*Client) VCSArchiveCacheTotals(ctx context.Context) ([]VCSArchiveTotal, ArchiveTotalsMeta, error)
 method (*Client) VersionCheck(ctx context.Context) error
 method (*Client) WarmCacheBulk(ctx context.Context, req BulkWarmRequest) (*BulkWarmResponse, error)
+method (*Client) WarmImages(ctx context.Context, references []string) (*WarmSubmission, error)
+method (*Client) WarmJobStatus(ctx context.Context, jobID string) (*WarmJobState, error)
+method (*Client) WarmPackages(ctx context.Context, specs []PackageWarmSpec) (*WarmSubmission, error)
 method (*Client) WhoAmI(ctx context.Context) (*HANode, error)
 method (*ConflictError) Error() string
 method (*NotFoundError) Error() string
 method (*ValidationError) Error() string
+method (*WarmJobState) Finished() bool
 method (*WorkspaceSummary) UnmarshalJSON(data []byte) error
 type AIPolicyEvaluation struct
 type AIPolicyStatus struct
@@ -2172,8 +2208,11 @@ type OnboardingSession struct
 type Options struct
 type PackageCacheList struct
 type PackageCacheListOptions struct
+type PackageCacheSource struct
+type PackageCacheSourcesMeta struct
 type PackageCacheTotal struct
 type PackageEvictRequest struct
+type PackageWarmSpec struct
 type PlanSummary struct
 type PlanSummaryMessage struct
 type PlanSummaryRiskFactor struct
@@ -2263,9 +2302,12 @@ type VaultReferenceCheckOptions struct
 type VaultResolutionError struct
 type VaultStatus struct
 type WarmBinaryEntry struct
+type WarmItemOutcome struct
+type WarmJobState struct
 type WarmPlatform struct
 type WarmProviderEntry struct
 type WarmResult struct
+type WarmSubmission struct
 type Workspace struct
 type WorkspaceChange struct
 type WorkspaceComplianceReport struct

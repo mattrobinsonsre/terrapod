@@ -1,8 +1,8 @@
 // Compact stat chip — a small inline "LABEL value" pill used for the workspace
 // list's Total / Health / Locked counts (#719). Replaces the big stat cards on
 // every viewport so the counts don't burn vertical space. When `onClick` is
-// supplied the chip is an interactive toggle (e.g. Health → `status:unhealthy`
-// filter); otherwise it's a static readout. One primitive → all three counts
+// supplied the chip is an interactive toggle (e.g. Health → the `flag:` terms,
+// Locked → `locked:true`); otherwise it's a static readout. One primitive → all three counts
 // stay visually consistent and DRY.
 
 export function StatChip({

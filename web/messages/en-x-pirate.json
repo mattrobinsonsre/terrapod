@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (any)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "health",
       "hintLabel": "label",
       "hintLabelKey": "label key",
       "hintName": "name",
       "engineLabel": "Engine",
-      "engineAll": "All engines, arr"
+      "engineAll": "All engines, arr",
+      "flags": "Pennants",
+      "termFlag": "pennant: {value}",
+      "termLocked": "locked in th' brig: {value}",
+      "hintFlag": "pennant",
+      "hintLocked": "locked in th' brig"
     },
     "row": {
       "removeLabelFilter": "Click t'' cast off from th'' filter",
@@ -149,6 +153,14 @@
       "local": "Ashore",
       "collapseAll": "Batten down all",
       "expandAll": "Unfurl all"
+    },
+    "flagName": {
+      "state-diverged": "State Gone Adrift",
+      "no-agent-pool": "No Crew Muster",
+      "no-live-agent-pool": "No Crew Muster Aboard",
+      "vcs-error": "VCS Squall",
+      "drifted": "Adrift",
+      "drift-errored": "Drift Spyglass Failed"
     }
   },
   "status": {
@@ -1863,7 +1875,36 @@
       "continuePurge": "Press on with th'' purge",
       "continuing": "Pressin'' on…"
     },
-    "sealedWarning": "This vessel be battened down, so nothin'' purged here can be fetched again. Th'' scheduled swabbin'' skips these holds fer that reason — this be a permanent deletion."
+    "sealedWarning": "This vessel be battened down, so nothin'' purged here can be fetched again. Th'' scheduled swabbin'' skips these holds fer that reason — this be a permanent deletion.",
+    "warmAhead": {
+      "heading": "Warm th'' booty an'' likeness holds",
+      "help": "Give a version wherever ye know it: a warm named at a version can be checked against a lockfile after, an'' “whatever be newest” cannot. Write each line as <code>name version</code>; fer Pulumi plugins, add trailin'' <code>os/arch</code> tokens t'' warm particular platforms.",
+      "ecosystemLabel": "Kind o'' booty",
+      "ecosystemOff": "{ecosystem} (shut down)",
+      "sourceLabel": "Haul from",
+      "sourceDefault": "Th'' configured upstream",
+      "upstreamIs": "Hauled from <code>{url}</code> she''ll be.",
+      "upstreamPerReference": "Each likeness mark names its own host, an'' that host must be one o'' th'' upstreams this deployment has configured.",
+      "itemsLabel": "Booty",
+      "imagesLabel": "Likeness marks",
+      "willWarm": "{count, plural, one {# piece o'' booty be warmed.} other {# pieces o'' booty be warmed.}}",
+      "unversioned": "{count, plural, one {# line names nay version, so th'' newest afloat be hauled. Reproducible that bain''t.} other {# lines name nay version, so th'' newest afloat be hauled. Reproducible that bain''t.}}",
+      "versionRequired": "{count, plural, one {# line names nay version.} other {# lines name nay version.}} {ecosystem} publishes nay index t'' reckon a newest against, so every line needs one.",
+      "tooMany": "Nay more than {max} pieces o'' booty can be warmed in one haul.",
+      "confirm": "Warm {count, plural, one {# piece o'' booty} other {# pieces o'' booty}} now?",
+      "warm": "Warm her",
+      "warming": "Warmin''…",
+      "progress": "{completed} o'' {total} done",
+      "fetched": "{fetched, plural, one {hauled # scroll} other {hauled # scrolls}}",
+      "alreadyCached": "{files, plural, one {stowed already (# scroll)} other {stowed already (# scrolls)}}",
+      "finished": "Warmed {succeeded}/{total} ({failed} failed), aye",
+      "sealed": "This vessel be battened down, so nothin'' can be hauled from upstream. Warm th'' holds afore ye batten her down, or open her up t'' warm them now.",
+      "errorEmpty": "Add at least one line t'' warm.",
+      "errorSources": "Failed t'' read where th'' warmin'' would haul from",
+      "errorSubmit": "Failed t'' start th'' warmin''",
+      "errorStatus": "Failed t'' read th'' warmin'' task",
+      "helpLead": "Haul booty into th'' hold afore aught asks fer it — one per line, as a handle an'' a version."
+    }
   },
   "catalog": {
     "title": "Service Catalog",

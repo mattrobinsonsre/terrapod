@@ -3,9 +3,9 @@
 Labels are arbitrary string→string maps used by the label-based RBAC system
 and exposed in the workspace-list filter UI. To keep the filter language
 unambiguous, a small set of label keys are reserved for *virtual* fields —
-filter terms like `status:errored` resolve against a workspace's derived
-status, not against a literal label called `status`. Allowing literal labels
-with reserved keys would make the filter ambiguous.
+filter terms like `status:errored`, `flag:drifted` and `locked:true` resolve
+against a workspace's derived state, not against a literal label of that name.
+Allowing literal labels with reserved keys would make the filter ambiguous.
 
 This module is web-framework-agnostic: it raises `ValueError` on violations
 so it can be called from FastAPI routers, CLI tools, migration scripts, or
@@ -22,40 +22,46 @@ MAX_LABELS = 50
 MAX_LABEL_KEY_LEN = 63
 MAX_LABEL_VALUE_LEN = 255
 
-# Reserved label keys. Two, and the line between them and the rest is
+# Reserved label keys. Four, and the line between them and the rest is
 # deliberate: a key is reserved when using it as a label would MISLEAD ABOUT A
 # DECISION THE SYSTEM ACTUALLY MAKES.
 #
-#   `status` — parsing. It is the only key the workspace filter bar treats as a
-#     built-in virtual term (`parseFilterQuery` in
-#     `web/src/lib/workspace-filter.ts` special-cases exactly this one), so a
-#     literal `status` label would make `status:errored` ambiguous.
-#   `owner`  — authorization. `workspace_rbac_service` passes `labels` and
+#   `status`, `flag`, `locked` — parsing. These are the built-in virtual terms
+#     of the workspace filter bar (`parseFilterQuery` in
+#     `web/src/lib/workspace-filter.ts` special-cases exactly these three), so a
+#     literal label of any of those names would make `status:errored`,
+#     `flag:drifted` or `locked:true` ambiguous. `status` is the run's status;
+#     `flag` is one health condition per value; `locked` is the manual lock.
+#   `owner` — authorization. `workspace_rbac_service` passes `labels` and
 #     `owner_email` into the SAME permission call as adjacent inputs, and
 #     ownership grants `admin`. An operator writing `owner: alice` could
 #     reasonably believe they had granted alice admin. They have not. That is a
 #     security-shaped misunderstanding, and it is the only one in the set.
 #
-# This set held ten keys until v1.6.0 (#1450). The other eight — `pool`, `mode`,
-# `backend`, `drift`, `version`, `vcs`, `locked`, `branch` — were reserved for
-# merely DESCRIPTIVE overlap with a column, which is not enough to take a common
-# word away from operators: `version` legitimately means an app or module
-# version, not only `terraform_version`, and none of the eight was ever a
-# built-in filter term, so each refused a label AND gave the filter nothing in
-# return. `drift` and `locked` are answerable as `status:drifted` /
-# `status:locked` anyway.
+# This set held ten keys until v1.6.0 (#1450), then two. The other eight —
+# `pool`, `mode`, `backend`, `drift`, `version`, `vcs`, `locked`, `branch` — were
+# reserved for merely DESCRIPTIVE overlap with a column, which is not enough to
+# take a common word away from operators: `version` legitimately means an app or
+# module version, not only `terraform_version`. `locked` was released then
+# because `status:locked` answered it. That spelling is gone, so the reason is
+# gone, and `locked` is reserved again as the filter term `locked:true`.
 #
-# The house convention for a NEW virtual facet is to ride `status:` as a value
-# (`status:locked`, `status:unhealthy` both did) precisely so no new key has to
-# be reserved. If one ever genuinely needs its own key it takes a distinct name
-# (`pool-name:`) rather than breaking labels already in use.
+# Why `flag` and `locked` are their own keys rather than values of `status:`:
+# `status:` used to carry two meta-statuses that were not statuses at all
+# (`locked`, `unhealthy`), which stopped it being one mutually exclusive set and
+# made "two `status:` terms mean either" unsafe. They moved out so that
+# `status:` is only the run's status. Riding `status:` had been the cheap
+# option, since it avoids reserving a key; this is the cost of it.
 #
 # CHANGE-CONTROL: adding to this set is a behaviour change for any deployment
 # already using the key as a label — removing from it is additive and safe.
-# Update `docs/rbac.md` and the frontend filter parser comment either way.
+# Update `docs/rbac.md`, `docs/upgrading-to-2.0.md` and the frontend filter
+# parser comment either way.
 RESERVED_LABEL_KEYS: frozenset[str] = frozenset(
     {
-        "status",  # virtual filter term (errored, needs-confirm, drifted, locked, …)
+        "status",  # virtual filter term: the run's status (errored, needs-confirm, …)
+        "flag",  # virtual filter term: one health condition (drifted, vcs-error, …)
+        "locked",  # virtual filter term: the manual lock (locked:true / locked:false)
         "owner",  # real app concept: `owner_email`, which grants workspace admin
     }
 )

@@ -156,10 +156,26 @@ def _bound(text: str) -> str:
 #: Kept OUT of `failure_reason` itself, which is engine-agnostic and scrapes
 #: tofu-shaped errors -- a tofu run exiting 99 means nothing in particular, so
 #: mapping it there would mislabel one.
+#:
+#: **1 is deliberately absent, and that is the interesting entry** (#2525, which
+#: asked for it). A configure's exit code is ansible's only when ansible ran:
+#: `_run_configure_phase` returns a hand-written `1` when the policy gate
+#: blocked the configure and another when the gate could not be evaluated, and
+#: `main`'s own handlers return `1` for a failed binary download, an unusable
+#: configuration archive, an unavailable cloud identity and an orchestrator
+#: crash. Naming `1` here would label every one of those "ansible reported an
+#: error" -- a cause that is not merely vague but wrong, and wrong in the
+#: direction that sends an operator to their playbook. The ordinary log scrape
+#: already reports those from the runner's own fatal-error record, by name.
+#:
+#: 5 and 8 are safe for the mirror reason: nothing in the runner returns either,
+#: so on a configure they can only be ansible's.
 _ANSIBLE_EXIT_REASONS: dict[int, str] = {
     2: "the playbook failed on one or more hosts",
     3: "the playbook failed on all hosts",
     4: "one or more hosts were unreachable",
+    5: "ansible refused the options it was given",
+    8: "the configure was interrupted by a user",
     99: "the configure was interrupted before the playbook finished",
     250: "ansible exited with an unexpected error",
 }

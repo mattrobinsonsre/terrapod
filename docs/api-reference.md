@@ -1864,7 +1864,7 @@ Server-Sent Events stream for real-time workspace updates. The stream emits even
 |---|---|
 | `run_status_change` | Run transitions to a new state |
 | `run_updated` | A run's own fields changed **without** a state transition — carries `changed`, naming what moved (`plan-json` for the resource counts, `cost-estimate` for the cost totals, `resource-profile` for the runner's peaks and exit status). The runner uploads all three *after* the result POST that drove the transition, so a consumer that refetches only on `run_status_change` renders a run whose numbers have not arrived yet |
-| `log_updated` | A fresh log artifact landed in storage — carries `phase` (`plan` or `apply`). The authoritative final log is uploaded after the run has already turned terminal, so this is what tells a consumer to come back for the tail |
+| `log_updated` | A fresh log artifact landed in storage — carries `phase` (`plan`, `apply` or `configure`). The authoritative final log is uploaded after the run has already turned terminal, so this is what tells a consumer to come back for the tail |
 | `workspace_lock_change` | Workspace is locked or unlocked (includes `locked` boolean) |
 | `workspace_updated` | Workspace settings are modified |
 | `state_version_created` | New state version is uploaded |
@@ -3669,8 +3669,8 @@ Generates a short-lived HMAC-signed runner token scoped to the specified run. Ca
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) — the response's `expires_in` reports the clamped value. **Must be a positive integer**: anything else is `422`, including a boolean. A non-positive `maxTokenTTLSeconds` no longer means *no cap* — it falls back to the shipped default with a warning, so an unbounded runner token cannot be configured by accident |
-| `phase` | string | — | The Job's phase, `plan` or `apply`. Bound into the token so it cannot drive the other phase's endpoints (GHSA-xmrf-hxq9-m59m, new in 2.0). Omitted or unrecognised mints an unphased token |
+| `ttl` | integer | the Job's own budget, else `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. The listener sends the lifetime its Job needs, because it owns the Job's deadline; a listener that sends none gets this phase's budget derived from `runners.yaml` for a `configure`, and `runners.tokenTTLSeconds` otherwise. Clamped to `runners.maxTokenTTLSeconds` (default 14400) — the response's `expires_in` reports the clamped value. **Must be a positive integer**: anything else is `422`, including a boolean. A non-positive `maxTokenTTLSeconds` no longer means *no cap* — it falls back to the shipped default with a warning, so an unbounded runner token cannot be configured by accident |
+| `phase` | string | — | The Job's phase: `plan`, `apply` or `configure`. Bound into the token so it cannot drive another phase's endpoints (GHSA-xmrf-hxq9-m59m, new in 2.0). Omitted or unrecognised mints an unphased token |
 
 **Response:**
 ```json
@@ -3937,7 +3937,7 @@ POST /api/v1/autodiscovery-rules
 
 Returns `201` with the created rule, or `409` if a rule with that name already exists for the connection.
 
-> **Reserved label keys:** `labels` is validated like any other label write — reserved keys (`status`, `owner`) are rejected with `422`. This is enforced at rule create/update so the rule can't materialise workspaces that later become uneditable.
+> **Reserved label keys:** `labels` is validated like any other label write — reserved keys (`status`, `flag`, `locked`, `owner`) are rejected with `422`. This is enforced at rule create/update so the rule can't materialise workspaces that later become uneditable.
 
 ### Show Rule
 
@@ -4788,7 +4788,7 @@ Body (all fields optional — the runner sends whatever it could read):
 - `peak_memory_bytes` — from `/sys/fs/cgroup/memory.peak`
 - `peak_cpu_usec` — `usage_usec` from `/sys/fs/cgroup/cpu.stat`
 - `exit_code` — script's actual exit status
-- `failure_reason` — sent only with a non-zero `exit_code`: why the run failed, in a line or two. For a failed `init`, `plan` or `apply` it is tofu's own `Error:` summaries (at most three, each with its `on <file> line <n>` location, never a diagnostic's detail lines); for any other failure it is the runner's last logged error (a failed hook, an unusable configuration archive, a crash). The API strips ANSI and other control characters, caps it at 2,000 characters, and stores it as the run's `error-message`, which the reconciler then keeps, followed by `Runner exited with code N` (#1631). Ignored with a zero `exit_code`, and on a run that has already errored.
+- `failure_reason` — sent only with a non-zero `exit_code`: why the run failed, in a line or two. For a failed `init`, `plan` or `apply` it is tofu's own `Error:` summaries (at most three, each with its `on <file> line <n>` location, never a diagnostic's detail lines); for a failed `configure` it is what ansible's own exit code means — host failures, unreachable hosts, an interrupted play — since a log scrape has no `Error:` summaries to find in ansible's output; for any other failure it is the runner's last logged error (a failed hook, an unusable configuration archive, a crash). The API strips ANSI and other control characters, caps it at 2,000 characters, and stores it as the run's `error-message`, which the reconciler then keeps, followed by `Runner exited with code N` (#1631). For a failed **configure** the reconciler prefers its own per-host summary — which host failed, at which task, and what the module said — built from the run's `host-events` rows, because that says the same thing specifically (#2525). Ignored with a zero `exit_code`, and on a run that has already errored.
 
 Negative values, non-integers, or booleans return `400`, as does a non-string `failure_reason`. Missing fields are not clobbered (existing values preserved).
 
@@ -4866,6 +4866,10 @@ Terrapod keeps four pull-through caches. The CLI-binary and provider caches are
 above; this section covers the other two — the **package cache** (one table for
 all six language ecosystems) and the **VCS archive cache** (object storage only,
 no table). Every route here requires platform `admin`.
+
+It also covers **warming** — filling a cache deliberately before anything asks
+— for the package cache and the container mirror. The CLI-binary and provider
+warm routes are above, and are synchronous; these return a job id.
 
 For what fills each cache, how the scheduled sweep evicts it, and the operator
 walkthrough, see [Caches](caches.md).
@@ -5141,6 +5145,148 @@ as you go.
 > archives are unaffected — sealing forbids reaching a package registry, not your
 > own VCS. See [Sealed deployments](caches.md#sealed-deployments).
 
+### Where a Warm Would Fetch From (Admin)
+
+```
+GET /api/v1/admin/package-cache/sources
+```
+
+What a warm submission would reach, **before** one is made. One entry per
+warmable artifact kind (`data[].type` = `package-cache-sources`, `id` = the
+ecosystem), plus `oci`.
+
+```json
+{
+  "data": [
+    {
+      "type": "package-cache-sources",
+      "id": "galaxy",
+      "attributes": {
+        "ecosystem": "galaxy",
+        "enabled": true,
+        "upstream": "https://galaxy.ansible.com",
+        "mirrors": {"hub": "https://terrapod.hub.example/api/v1/package-cache/galaxy"},
+        "resolves-latest": true
+      }
+    }
+  ],
+  "meta": {"max-items": 500, "sealed": false}
+}
+```
+
+- **`upstream`** is the registry this ecosystem pulls through by default. It is
+  **empty for `oci`**, which has no single answer — an image reference's own
+  first path component names its host.
+- **`mirrors`** are the labels a warm submission's `source` may name, declared
+  in `api.config.registry.package_cache.<ecosystem>.mirrors`. They affect
+  **warming only**; serving always uses `upstream`.
+- **`resolves-latest`** is whether a `version` may be omitted. It is `false` for
+  `pulumi`, whose download protocol publishes no index to resolve a bare name
+  against — a property of that protocol rather than of the deployment.
+- **`meta.sealed`** reports `api.config.registry.cache_only` here as well as on
+  the 409 below, so a client can say warming is unavailable rather than offering
+  a submission that can only fail.
+
+### Warm the Package Cache (Admin)
+
+```
+POST /api/v1/admin/package-cache/warm
+```
+
+Caches artifacts ahead of a run, or ahead of sealing the node. Returns **202**
+with a job id — a real dependency closure outlives a request.
+
+```json
+{
+  "packages": [
+    {"ecosystem": "galaxy", "name": "community.general", "version": "9.2.0"},
+    {"ecosystem": "go", "name": "github.com/spf13/cobra", "version": "v1.8.1"},
+    {"ecosystem": "pulumi", "name": "aws", "version": "6.0.0",
+     "platforms": ["linux/amd64", "linux/arm64"]},
+    {"ecosystem": "pypi", "name": "requests", "version": "2.32.3", "source": "hub"}
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `ecosystem` | `galaxy`, `pypi`, `npm`, `go`, `nuget` or `pulumi` |
+| `name` | the artifact as its ecosystem names it — `namespace.collection`, a module path, a package id, `[kind:]plugin` |
+| `version` | **explicit wherever you know it.** Omitted, the newest upstream offers; refused for `pulumi` with a 422 |
+| `source` | a **label** from `mirrors` above, to warm from instead of `upstream`. Never a URL — an undeclared label is a 422 naming the declared ones |
+| `platforms` | `os/arch` pairs, `pulumi` only. Omitted, the runner's own `linux/amd64` and `linux/arm64` |
+
+At most 500 items per submission (422 beyond it). An unknown ecosystem is a 422;
+an ecosystem whose proxy is switched off is a 404.
+
+```json
+{
+  "data": {
+    "type": "warm-jobs",
+    "id": "warm-9f2c4a1b8e03",
+    "attributes": {"status": "queued", "total": 4},
+    "links": {"self": "/api/v1/admin/warm-jobs/warm-9f2c4a1b8e03"}
+  }
+}
+```
+
+### Warm the Container Mirror (Admin)
+
+```
+POST /api/v1/admin/oci/warm
+```
+
+`{"images": ["quay.io/ansible/awx-ee:24.6.1"]}` — each reference exactly as a
+client would pull it; an absent tag means `latest`. Pulls the manifest **and
+every blob it references**, because a manifest-only warm would look cached and
+fail on the first layer a sealed node tried to serve. Same 202 shape as above.
+
+### Warm Job Status (Admin)
+
+```
+GET /api/v1/admin/warm-jobs/{job_id}
+```
+
+```json
+{
+  "data": {
+    "type": "warm-jobs",
+    "id": "warm-9f2c4a1b8e03",
+    "attributes": {
+      "status": "finished",
+      "total": 2, "completed": 2, "succeeded": 1, "failed": 1,
+      "submitted-at": "2026-01-01T00:00:00Z",
+      "outcomes": [
+        {"ecosystem": "pypi", "ref": "requests@2.32.3", "ok": true, "detail": "",
+         "files": 6, "fetched": 0, "source": "https://pypi.org"},
+        {"ecosystem": "npm", "ref": "nope", "ok": false,
+         "detail": "404 from upstream", "files": 0, "fetched": 0, "source": ""}
+      ]
+    }
+  }
+}
+```
+
+`status` is `queued`, `running` or `finished`. **Read `outcomes`, not the
+counts** — "one failed" across twenty packages is not actionable, and finding
+the specific gaps before sealing is the purpose. One item failing never stops
+the rest.
+
+- **`files`** is how many files the item covers; **`fetched`** how many this run
+  pulled. `fetched` 0 with `files` above 0 means **already cached**, which is how
+  a converged re-run is told apart from a first one — warming is idempotent, so
+  re-running is the normal way to close the last gaps.
+- **`detail` on a successful item** names a part that did not land, such as one
+  architecture of a Pulumi plugin.
+- **`source`** is the base those bytes came from.
+
+Jobs are kept in Redis for a day and then report 404.
+
+> **Warming a sealed node is a 409**, naming `api.config.registry.cache_only`,
+> rather than a job reporting zero successes — which would read as a set of
+> missing packages and send an operator looking upstream for a problem that is
+> on this side.
+
 ---
 
 ## Encryption at Rest (Admin)
@@ -5342,7 +5488,7 @@ catalogue does not refuse every pending apply in the fleet. See
 |---|---|---|
 | `token` | string | The signed JWT |
 | `expires_in` | int | `api.config.auth.oidc_issuer.token_ttl_seconds` |
-| `phase` | string \| null | `plan` or `apply`, taken from the presented runner token. `null` when the token made no phase claim |
+| `phase` | string \| null | `plan`, `apply` or `configure`, taken from the presented runner token. `null` when the token made no phase claim |
 | `target` | string | Echoed, so the runner writes the file under the name it asked for |
 | `audiences` | array&lt;string&gt; | **This target's** audiences, verbatim and in order |
 

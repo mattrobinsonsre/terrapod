@@ -71,10 +71,21 @@ def tarball_filename(name: str, version: str) -> str:
 
 
 async def fetch_packument(
-    name: str, *, accept: str | None = None, client: httpx.AsyncClient | None = None
+    name: str,
+    *,
+    accept: str | None = None,
+    client: httpx.AsyncClient | None = None,
+    base: str | None = None,
 ) -> dict:
-    """The upstream packument for a package."""
-    url = f"{upstream_base()}/{name}"
+    """The upstream packument for a package.
+
+    `base` overrides the configured upstream for ONE call. Warming uses it to
+    pull from a named mirror (`registry.package_cache.<eco>.mirrors`); serving
+    never passes it, so the proxy's own request-forgery surface is unchanged.
+    Each version's `dist.tarball` is the packument's own, so a packument fetched
+    from a mirror carries tarball URLs on that mirror.
+    """
+    url = f"{(base or upstream_base()).rstrip('/')}/{name}"
     owns = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
     try:

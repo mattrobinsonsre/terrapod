@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (hvilken som helst)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "helse",
       "hintLabel": "etikett",
       "hintLabelKey": "etikettnøkkel",
       "hintName": "navn",
       "engineLabel": "Motor",
-      "engineAll": "Alle motorer"
+      "engineAll": "Alle motorer",
+      "flags": "Flagg",
+      "termFlag": "flagg: {value}",
+      "termLocked": "låst: {value}",
+      "hintFlag": "flagg",
+      "hintLocked": "låst"
     },
     "row": {
       "removeLabelFilter": "Klikk for å fjerne fra filter",
@@ -149,6 +153,14 @@
       "local": "Lokal",
       "collapseAll": "Slå sammen alle",
       "expandAll": "Utvid alle"
+    },
+    "flagName": {
+      "state-diverged": "Tilstand avviker",
+      "no-agent-pool": "Ingen agentpulje",
+      "no-live-agent-pool": "Ingen aktiv agentpulje",
+      "vcs-error": "VCS-feil",
+      "drifted": "Avdriftet",
+      "drift-errored": "Driftdeteksjon feilet"
     }
   },
   "status": {
@@ -1863,7 +1875,36 @@
       "continuePurge": "Fortsett tømmingen",
       "continuing": "Fortsetter …"
     },
-    "sealedWarning": "Denne noden er forseglet, så ingenting som tømmes her kan hentes på nytt. Den planlagte oppryddingen hopper over disse bufferne av samme grunn – dette er en permanent sletting."
+    "sealedWarning": "Denne noden er forseglet, så ingenting som tømmes her kan hentes på nytt. Den planlagte oppryddingen hopper over disse bufferne av samme grunn – dette er en permanent sletting.",
+    "warmAhead": {
+      "heading": "Varm opp pakke- og image-buffere",
+      "help": "Oppgi en versjon der den er kjent: en oppvarming som navngir en versjon, kan etterpå kontrolleres mot en låsefil, «hva som nå er nyest» kan ikke. Skriv hver linje som <code>navn versjon</code>; for Pulumi-plugins legger du til etterfølgende <code>os/arch</code>-tokener for å varme opp bestemte plattformer.",
+      "ecosystemLabel": "Artefakttype",
+      "ecosystemOff": "{ecosystem} (slått av)",
+      "sourceLabel": "Hent fra",
+      "sourceDefault": "Konfigurert oppstrømskilde",
+      "upstreamIs": "Hentes fra <code>{url}</code>.",
+      "upstreamPerReference": "Hver image-referanse navngir sin egen vert, og den må være en av oppstrømskildene denne installasjonen har konfigurert.",
+      "itemsLabel": "Artefakter",
+      "imagesLabel": "Image-referanser",
+      "willWarm": "{count, plural, one {# artefakt varmes opp.} other {# artefakter varmes opp.}}",
+      "unversioned": "{count, plural, one {# linje navngir ingen versjon, så den nyeste tilgjengelige hentes. Det er ikke reproduserbart.} other {# linjer navngir ingen versjon, så den nyeste tilgjengelige hentes for hver av dem. Det er ikke reproduserbart.}}",
+      "versionRequired": "{count, plural, one {# linje navngir ingen versjon.} other {# linjer navngir ingen versjon.}} {ecosystem} publiserer ingen indeks å slå opp et nyeste i, så hver linje trenger en.",
+      "tooMany": "Det kan varmes opp høyst {max} artefakter per innsending.",
+      "confirm": "Varme opp {count, plural, one {# artefakt} other {# artefakter}} nå?",
+      "warm": "Varm opp",
+      "warming": "Varmer opp …",
+      "progress": "{completed} av {total} ferdige",
+      "fetched": "{fetched, plural, one {hentet # fil} other {hentet # filer}}",
+      "alreadyCached": "{files, plural, one {allerede i bufferen (# fil)} other {allerede i bufferen (# filer)}}",
+      "finished": "Varmet opp {succeeded}/{total} ({failed} feilet)",
+      "sealed": "Denne noden er forseglet og kan derfor ikke hente noe fra oppstrøms. Varm opp bufferne før den forsegles, eller opphev forseglingen for å varme dem opp nå.",
+      "errorEmpty": "Legg til minst én linje å varme opp.",
+      "errorSources": "Kunne ikke lese hvor oppvarmingen ville hente fra",
+      "errorSubmit": "Kunne ikke starte oppvarmingen",
+      "errorStatus": "Kunne ikke lese oppvarmingsjobben",
+      "helpLead": "Hent artefakter inn i bufferen før noe ber om dem – én per linje, som et navn og en versjon."
+    }
   },
   "catalog": {
     "title": "Tjenestekatalog",
