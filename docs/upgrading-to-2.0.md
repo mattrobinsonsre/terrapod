@@ -556,6 +556,109 @@ clears a held run, which previously had no SDK route at all.
 
 See [policies.md](policies.md).
 
+### The `auto_apply` boolean is removed — one setting, not two
+
+**Affects:** HCL or Pulumi programs that set `auto_apply` on `terrapod_workspace`
+or `terrapod_autodiscovery_rule`, or read it off the `terrapod_workspace` data
+source; anything reading `auto-apply` from a workspace or autodiscovery-rule
+document on **`/api/v1`**; and Go code using go-terrapod's
+`Workspace.AutoApply`, `CreateWorkspaceRequest.AutoApply` or
+`UpdateWorkspaceRequest.AutoApply`, or the MCP `auto_apply` field on
+`terrapod_workspace_create` / `terrapod_workspace_update`.
+
+**Not affected:** the `tofu`/`terraform` CLI and anything else speaking
+`/api/tfe/v2`, where `auto-apply` is still returned (see below); the run
+document's own `auto-apply`, which is what a particular run decided rather than
+a workspace setting; and `terrapod_catalog_instance.auto_apply`, which is a
+different setting again (see below).
+
+One setting was described by two attributes: `auto_apply_mode`
+(`never` / `always` / `create` / `create_update`) and an `auto_apply` boolean
+that was its projection. Two attributes for one setting let a configuration
+state a contradiction:
+
+```hcl
+resource "terrapod_workspace" "app" {
+  name            = "app-prod"
+  auto_apply      = false
+  auto_apply_mode = "always"   # accepted, then resolved to "always"
+}
+```
+
+which was accepted without complaint, resolved towards **more** automation than
+the configuration asked for, and then failed the apply with "Provider produced
+inconsistent result after apply" — by which point the workspace had already been
+changed to auto-apply. With one attribute the contradiction cannot be written
+down.
+
+**What you must do before upgrading the provider:**
+
+1. Delete `auto_apply` from every `terrapod_workspace` and
+   `terrapod_autodiscovery_rule` block and state the mode instead —
+   `auto_apply = true` becomes `auto_apply_mode = "always"`, and
+   `auto_apply = false` becomes `auto_apply_mode = "never"`.
+2. Repoint anything reading `data.terrapod_workspace.<name>.auto_apply` at
+   `.auto_apply_mode`, comparing against `"never"` rather than against `false`.
+   Note that attribute previously reported a **blank** string — it was declared
+   and never populated — so a program that read it and found nothing was reading
+   the defect, not an unset workspace.
+3. Repoint anything reading `auto-apply` off a **`/api/v1`** workspace or
+   autodiscovery-rule document at `auto-apply-mode`, again comparing against
+   `"never"`. The key is gone from that surface; it is still on `/api/tfe/v2`.
+4. In Go, replace go-terrapod's `AutoApply` with `AutoApplyMode` — a
+   `*string` on both request types, and a `string` on `Workspace`. In an MCP
+   client, replace `auto_apply` with `auto_apply_mode`.
+
+A configuration that still names the boolean fails at **plan** time, before any
+request is made, with Terraform's own *An argument named "auto_apply" is not
+expected here*. Existing state needs no migration: the plugin framework ignores
+a prior-state field the current schema no longer defines, so the stale value is
+dropped on the next read rather than erroring.
+
+**Writing `auto-apply` to the API still works, on every write path.** Create,
+PATCH, bulk update and the autodiscovery-rule routes all accept the boolean and
+map it onto a mode (`true` → `always`, `false` → `never`), because a client
+written against the compatibility surface should not be refused for a change
+that is ours. Sending **both** spellings in one request is still a `422` rather
+than a guess — which is the whole point of the removal, so do not send the pair
+to be safe.
+
+**`/api/tfe/v2` still returns `auto-apply`.** It is derived as
+`auto-apply-mode != "never"` instead of being stored, which is what the boolean
+has always meant. That surface is frozen for `go-tfe` and the cloud backend,
+both of which read the key by name.
+
+#### The database column goes with it, and the rollout is briefly unavailable
+
+The migration drops `workspaces.auto_apply` and `autodiscovery_rules.auto_apply`
+(`runs.auto_apply` stays). It is a **contraction**, so unlike every other
+migration in this release it cannot be rolled through transparently:
+
+* **Stop 1.x API replicas before migrating, or accept a window of errors.** A
+  1.11 replica reads `workspaces.auto_apply` on every workspace query, and
+  1.11's readiness check has no handling for a schema that is *ahead* of its
+  code — so it stays in the load balancer and fails those queries until it is
+  replaced. This is stated as an expectation rather than worked around: it is
+  the one shape of change that cannot be made invisible to a pod that predates
+  it.
+* **After the upgrade, 2.0 pods protect themselves.** The migration records
+  itself in `schema_contractions`, and a 2.0 pod that finds a contraction
+  revision outside its own revision graph refuses readiness rather than serving
+  against a schema it cannot read. That covers every later contraction
+  automatically.
+* **Rolling back is supported and lossless.** `auto_apply_mode` is not
+  touched, and `downgrade()` recreates the boolean and derives it from the mode
+  exactly as every write path did before the drop — so a workspace on `create`
+  or `create_update` comes back on that mode, not flattened to `always`. 1.x
+  reads the pair and resolves it as it always did.
+
+**`terrapod_catalog_instance.auto_apply` is unchanged.** It is not this setting:
+it says whether the provision or reconfigure run that resource queues applies
+without waiting for a human, which is a property of that operation rather than a
+standing workspace setting.
+
+See [terraform-provider.md](terraform-provider.md#auto_apply_mode).
+
 ### Two columns are renamed, so the API rollout has a brief window of errors
 
 **Affects:** every deployment, but only for the length of one rolling upgrade, and

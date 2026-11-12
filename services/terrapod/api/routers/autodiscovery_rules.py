@@ -128,7 +128,9 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "ee-resource-cpu": rule.ee_resource_cpu,
             "ee-resource-memory": rule.ee_resource_memory,
             "oidc-audiences": dict(rule.oidc_audiences or {}),
-            "auto-apply": rule.auto_apply,
+            # The boolean projection is gone from this native surface (#2503);
+            # the mode is the setting. `/api/tfe/v2` has no rule routes at all,
+            # so there is no compatibility wire to keep it on.
             "auto-apply-mode": run_service.resolve_auto_apply_mode(rule),
             "on-directory-delete": rule.on_directory_delete,
             "labels": dict(rule.labels or {}),
@@ -491,8 +493,16 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             ),
         )
     if "auto-apply" in attrs:
-        out["auto_apply"] = bool(attrs["auto-apply"])
-        out["auto_apply_mode"] = "always" if attrs["auto-apply"] else "never"
+        # Accepted as an INPUT spelling and no longer stored (#2503): it has
+        # only ever meant one of two modes, so it maps onto one. Type-checked
+        # rather than coerced -- `bool("false")` is True, and this path used to
+        # write `bool(...)` of the raw value into a Boolean column, so the
+        # string meant `always` here too (#1301).
+        try:
+            raw = workspace_settings.validate_bool(attrs["auto-apply"], "auto-apply")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        out["auto_apply_mode"] = "always" if raw else "never"
     if "auto-apply-mode" in attrs:
         mode = attrs["auto-apply-mode"]
         if mode not in run_service.AUTO_APPLY_MODES:
@@ -500,9 +510,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
                 status_code=422,
                 detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
             )
-        # Both columns together, so the pair can never disagree (#1274).
         out["auto_apply_mode"] = mode
-        out["auto_apply"] = mode != "never"
     if "on-directory-delete" in attrs:
         odd = str(attrs["on-directory-delete"])
         if odd not in ("flag", "destroy"):
@@ -645,13 +653,15 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     resolved_workflow = out.get(
         "vcs_workflow", getattr(existing, "vcs_workflow", None) or "merge_then_apply"
     )
-    resolved_auto_apply = out.get("auto_apply", getattr(existing, "auto_apply", False))
+    resolved_mode = out.get(
+        "auto_apply_mode", run_service.resolve_auto_apply_mode(existing) if existing else "never"
+    )
     try:
         workspace_settings.check_apply_then_merge_allowed(
             resolved_workflow or "merge_then_apply",
             # A rule always materialises a VCS-connected workspace.
             has_vcs_connection=True,
-            auto_apply=bool(resolved_auto_apply),
+            auto_apply=resolved_mode != "never",
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -942,7 +952,6 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         hard_limit=fields.get("hard_limit", ""),
         resource_memory=fields.get("resource_memory", "2Gi"),
         oidc_audiences=fields.get("oidc_audiences", {}),
-        auto_apply=fields.get("auto_apply", False),
         auto_apply_mode=fields.get("auto_apply_mode", "never"),
         labels=fields.get("labels", {}),
         owner_email=fields.get("owner_email"),

@@ -101,24 +101,35 @@ func TestCreateWorkspace_Happy(t *testing.T) {
 	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", map[string]any{
-			"execution-mode": "agent",
-			"auto-apply":     true,
+			"execution-mode":  "agent",
+			"auto-apply-mode": "always",
 		})))
 	}
 
 	c := f.client()
-	autoApply := true
+	autoApplyMode := "always"
 	ws, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
 		Name:          "api-prod",
 		ExecutionMode: "agent",
-		AutoApply:     &autoApply,
+		AutoApplyMode: &autoApplyMode,
 		Labels:        map[string]string{"env": "prod"},
 	})
 	if err != nil {
 		t.Fatalf("CreateWorkspace: %v", err)
 	}
-	if ws.ID != "ws-aaa" || ws.Name != "api-prod" || ws.ExecutionMode != "agent" || !ws.AutoApply {
+	// The mode is the whole of the setting (#2503), so it is what the request
+	// carries and what the parse reads back -- no boolean either way.
+	if ws.ID != "ws-aaa" || ws.Name != "api-prod" || ws.ExecutionMode != "agent" {
 		t.Errorf("workspace: %+v", ws)
+	}
+	if ws.AutoApplyMode != "always" {
+		t.Errorf("auto-apply mode: %q", ws.AutoApplyMode)
+	}
+	if req := f.lastBody; !strings.Contains(string(req), `"auto-apply-mode":"always"`) {
+		t.Errorf("request body did not carry the mode: %s", req)
+	}
+	if strings.Contains(string(f.lastBody), `"auto-apply"`) {
+		t.Errorf("request body carried the superseded boolean: %s", f.lastBody)
 	}
 
 	// Verify the request body carried the expected attributes.
@@ -133,9 +144,15 @@ func TestCreateWorkspace_Happy(t *testing.T) {
 	if req.Data.Attributes["name"] != "api-prod" || req.Data.Attributes["execution-mode"] != "agent" {
 		t.Errorf("request attrs: %+v", req.Data.Attributes)
 	}
-	// auto-apply was set via pointer — its presence and value should round-trip.
-	if v, ok := req.Data.Attributes["auto-apply"].(bool); !ok || !v {
-		t.Errorf("auto-apply not set in request: %+v", req.Data.Attributes)
+	// The mode was set via pointer — its presence and value should round-trip.
+	if v, ok := req.Data.Attributes["auto-apply-mode"].(string); !ok || v != "always" {
+		t.Errorf("auto-apply-mode not set in request: %+v", req.Data.Attributes)
+	}
+	// And the superseded boolean is not sent under any circumstances (#2503):
+	// sending both is a 422, so an SDK that could send either is an SDK that
+	// can send both.
+	if _, present := req.Data.Attributes["auto-apply"]; present {
+		t.Errorf("superseded boolean sent: %+v", req.Data.Attributes)
 	}
 }
 

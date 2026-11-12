@@ -616,34 +616,28 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 				Default:     stringdefault.StaticString("local"),
 			},
-			// No schema default, deliberately — same shape as `auto_merge`
-			// below and as `auto_apply_mode` above.
+			// One setting, not two (#2503). The `auto_apply` boolean that used
+			// to sit here was this setting's projection, and carrying both let a
+			// configuration state a contradiction -- an explicit
+			// `auto_apply = false` beside `auto_apply_mode = "always"` -- which
+			// the server resolved towards MORE automation and then failed on,
+			// with "Provider produced inconsistent result after apply", once the
+			// workspace had already been changed. With one attribute the
+			// contradiction cannot be written down.
 			//
-			// The server derives this boolean from the mode (`auto_apply =
-			// mode != "never"`), and when a mode is configured the request
-			// builder sends ONLY the mode. A `booldefault.StaticBool(false)`
-			// therefore made the planned value a *known* false while the
-			// applied value came back true, which Terraform core rejects
-			// outright: "Provider produced inconsistent result after apply:
-			// .auto_apply: was cty.False, but now cty.True". That made every
-			// non-`never` mode un-appliable. Optional+Computed with
-			// UseStateForUnknown lets the server's projection land without a
-			// planned value to contradict it.
-			"auto_apply": schema.BoolAttribute{
-				Description: "Automatically apply successful plans. Superseded by `auto_apply_mode` when that is set; prefer `auto_apply_mode` for new configurations.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
+			// A configuration that still names the boolean gets Terraform's own
+			// "An argument named auto_apply is not expected here" at plan time,
+			// before any request is made; a state that still carries it is
+			// ignored on read, because the framework skips prior-state fields
+			// the current schema does not define.
 			"auto_apply_mode": schema.StringAttribute{
 				Description: "Conditional auto-apply: `never`, `always`, `create` (apply only plans that add resources) or `create_update` (also allow in-place updates). `create` and `create_update` never apply a plan that destroys or replaces a resource — that is left for a human. Optional + Computed with no default, so a configuration that does not set it inherits whatever the workspace has and never drifts.",
 				Optional:    true,
 				Computed:    true,
 			},
-			// Optional+Computed with no default, like auto_apply: a config that
-			// never mentions it inherits the server value (false) and never drifts.
+			// Optional+Computed with no default, like auto_apply_mode above: a
+			// config that never mentions it inherits the server value (false) and
+			// never drifts.
 			"pulumi_bind_plan": schema.BoolAttribute{
 				Description: "Pulumi workspaces only: bind the update to the approved preview " +
 					"(`preview --save-plan` then `up --plan`). Off by default, which runs a plain " +
@@ -1102,7 +1096,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"vcs_workflow": schema.StringAttribute{
-				Description: "VCS workflow mode: `merge_then_apply` (default, TFE/HCP standard) or `apply_then_merge` (Atlantis-style; PR runs are full plan-and-apply that wait on a `terrapod apply` comment). Apply-then-merge requires a VCS connection and is incompatible with `auto_apply=true`.",
+				Description: "VCS workflow mode: `merge_then_apply` (default, TFE/HCP standard) or `apply_then_merge` (Atlantis-style; PR runs are full plan-and-apply that wait on a `terrapod apply` comment). Apply-then-merge requires a VCS connection and is incompatible with auto-applying, so `auto_apply_mode` must be `never`.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -1636,15 +1630,11 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
 	}
-	// `auto_apply` has a schema Default, so it is always known here — sending
-	// it alongside `auto_apply_mode` would hit the API's either/or 422. The
-	// mode is the richer setting, so it wins and the boolean is left off.
+	// The mode is the whole setting (#2503); there is no boolean to send
+	// beside it, and nothing left for the API's either/or 422 to catch.
 	if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
 		v := m.AutoApplyMode.ValueString()
 		req.AutoApplyMode = &v
-	} else if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
-		v := m.AutoApply.ValueBool()
-		req.AutoApply = &v
 	}
 	if !m.ExecutionBackend.IsNull() && !m.ExecutionBackend.IsUnknown() {
 		req.ExecutionBackend = m.ExecutionBackend.ValueString()
@@ -1913,15 +1903,11 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
 	}
-	// `auto_apply` has a schema Default, so it is always known here — sending
-	// it alongside `auto_apply_mode` would hit the API's either/or 422. The
-	// mode is the richer setting, so it wins and the boolean is left off.
+	// The mode is the whole setting (#2503); there is no boolean to send
+	// beside it, and nothing left for the API's either/or 422 to catch.
 	if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
 		v := m.AutoApplyMode.ValueString()
 		req.AutoApplyMode = &v
-	} else if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
-		v := m.AutoApply.ValueBool()
-		req.AutoApply = &v
 	}
 	if !m.ExecutionBackend.IsNull() && !m.ExecutionBackend.IsUnknown() {
 		req.ExecutionBackend = m.ExecutionBackend.ValueString()
@@ -2181,7 +2167,6 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.ID = types.StringValue(ws.ID)
 	m.Name = types.StringValue(ws.Name)
 	m.ExecutionMode = types.StringValue(ws.ExecutionMode)
-	m.AutoApply = types.BoolValue(ws.AutoApply)
 	m.AutoApplyMode = types.StringValue(ws.AutoApplyMode)
 	m.ExecutionBackend = types.StringValue(ws.ExecutionBackend)
 	m.Engine = types.StringValue(ws.Engine)

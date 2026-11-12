@@ -168,14 +168,34 @@ class TestTheNativeSurfaceServesEveryEngine:
         ),
     }
 
+    #: Attributes the COMPATIBILITY surface serves and the native one does not.
+    #: The other direction, and a far shorter list, because it takes something
+    #: rarer: an attribute that is not a setting Terrapod stores at all, kept
+    #: alive only because a frozen client reads it by name.
+    TFE_ONLY_ATTRS = {
+        "auto-apply": (
+            "the boolean projection of `auto-apply-mode`, no longer stored (#2503). "
+            "`go-tfe` and the cloud backend read the key by name so it stays here, "
+            'derived as `mode != "never"`; the native surface carries the mode '
+            "alone, because offering both spellings of one setting is what let a "
+            "caller contradict itself. The WRITE path still accepts the boolean on "
+            "either prefix and maps it onto a mode"
+        ),
+    }
+
     async def test_a_terraform_workspace_reads_the_same_on_both_surfaces(self, app, client):
         """The same workspace, described identically wherever the two overlap.
 
         This asserted byte-identity until #1911, which was true and slightly
         stronger than the property worth holding. The surfaces are *designed* to
-        differ — the native one serves every engine — so the native body is a
-        strict SUPERSET, and what matters is that no shared attribute disagrees
-        and that every extra one is there on purpose.
+        differ — the native one serves every engine — so what matters is that no
+        shared attribute disagrees and that every unshared one is there on
+        purpose, in whichever direction it goes.
+
+        It was a strict SUPERSET until #2503, and is no longer: `auto-apply` is
+        served on the compatibility surface and not natively, because it is a
+        projection of a setting rather than a setting. That is one entry and it
+        is enumerated, so the next one cannot arrive unnoticed.
 
         Gated on the surface rather than on the workspace's engine, deliberately:
         gating on the engine would drop the attribute from the native body too,
@@ -190,14 +210,47 @@ class TestTheNativeSurfaceServesEveryEngine:
 
         n = native.json()["data"]["attributes"]
         t = tfe.json()["data"]["attributes"]
-        assert set(t) <= set(n), (
-            f"the TFE surface serves attributes the native one does not: {set(t) - set(n)}"
+        assert set(t) - set(n) == set(self.TFE_ONLY_ATTRS), (
+            f"compatibility-only attributes changed: {set(t) - set(n)}. Add it to "
+            f"TFE_ONLY_ATTRS with a reason, or serve it natively too."
         )
-        assert {k: n[k] for k in t} == t, "a shared attribute disagrees between the two surfaces"
+        shared = set(t) & set(n)
+        assert {k: n[k] for k in shared} == {k: t[k] for k in shared}, (
+            "a shared attribute disagrees between the two surfaces"
+        )
         assert set(n) - set(t) == set(self.NATIVE_ONLY_ATTRS), (
             f"native-only attributes changed: {set(n) - set(t)}. Add it to "
             f"NATIVE_ONLY_ATTRS with a reason, or stop serving it only there."
         )
+
+    async def test_the_compatibility_only_boolean_agrees_with_the_mode(self, app, client):
+        """`auto-apply` is not a setting, so the two surfaces cannot disagree.
+
+        The test above excuses it from the shared-attribute comparison because
+        the native surface does not carry it — which would leave the ONE
+        attribute that is derived rather than stored as the one nothing checks.
+        So it is checked here instead, against the mode the native surface
+        serves, for every mode the setting has.
+        """
+        set_auth(app, admin_user())
+        for i, (mode, expected) in enumerate(
+            (("never", False), ("always", True), ("create", True), ("create_update", True))
+        ):
+            tid = await _create(client, f"tf-aa-{i}", "terraform")
+            patched = await client.patch(
+                f"{NATIVE}/{tid}",
+                json={"data": {"attributes": {"auto-apply-mode": mode}}},
+                headers=AUTH,
+            )
+            assert patched.status_code == 200, patched.text
+            n = (await client.get(f"{NATIVE}/{tid}", headers=AUTH)).json()["data"]["attributes"]
+            t = (await client.get(f"/api/v2/workspaces/{tid}", headers=AUTH)).json()["data"][
+                "attributes"
+            ]
+            assert n["auto-apply-mode"] == mode
+            assert "auto-apply" not in n
+            assert t["auto-apply"] is expected, mode
+            assert t["auto-apply-mode"] == mode
 
 
 class TestTheTfeSurfaceStaysTerraformOnly:

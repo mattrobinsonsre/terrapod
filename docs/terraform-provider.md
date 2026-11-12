@@ -238,7 +238,7 @@ resource "terrapod_workspace" "app" {
   name              = "app-prod"
   execution_mode    = "agent"
   execution_backend = "tofu"
-  auto_apply        = false
+  auto_apply_mode   = "never"
 
   labels = {
     environment = "prod"
@@ -439,27 +439,49 @@ provider built from source reports itself as `dev`, which the SDK treats as
 
 ## `auto_apply_mode`
 
-`terrapod_workspace` carries both `auto_apply` (boolean) and `auto_apply_mode`
-(`never` / `always` / `create` / `create_update`). The mode is the richer form:
-the conditional values apply a successful plan only when its shape is within the
+`terrapod_workspace` and `terrapod_autodiscovery_rule` carry one auto-apply
+setting, `auto_apply_mode` (`never` / `always` / `create` / `create_update`).
+The conditional values apply a successful plan only when its shape is within the
 declared standard, and **never** auto-apply a plan containing a destroy or a
 replace.
-
-**Set one or the other, not both.** The API rejects a request carrying both, and
-the provider mirrors that: when `auto_apply_mode` is configured, a configured
-`auto_apply` is dropped from the request rather than sent alongside it. If you
-set both in HCL you will get the mode's behaviour and the boolean will appear to
-have been ignored — because it was. Configure the mode alone:
 
 ```hcl
 resource "terrapod_workspace" "app" {
   name            = "app-prod"
-  auto_apply_mode = "create_update"   # not auto_apply
+  auto_apply_mode = "create_update"
 }
 ```
 
-Both attributes are `Optional + Computed`, so a configuration that manages
-neither will not drift when the server projects one from the other.
+It is `Optional + Computed` with no default, so a configuration that does not
+manage it inherits whatever the workspace has and never drifts.
+
+### The `auto_apply` boolean is gone
+
+Before 2.0 the same setting was also exposed as an `auto_apply` boolean — the
+mode's projection, on `terrapod_workspace`, `terrapod_autodiscovery_rule` and the
+`terrapod_workspace` data source. Two attributes for one setting let a
+configuration state a contradiction:
+
+```hcl
+auto_apply      = false
+auto_apply_mode = "always"   # the old pair: accepted, then resolved to "always"
+```
+
+which was resolved towards **more** automation than the configuration asked for
+and then failed the apply with "Provider produced inconsistent result after
+apply" — after the workspace had already been changed. With one attribute that
+cannot be written down.
+
+To migrate, delete the boolean and state the mode: `auto_apply = true` becomes
+`auto_apply_mode = "always"`, and `auto_apply = false` becomes
+`auto_apply_mode = "never"`. A configuration that still names the boolean fails
+at **plan** time, before any request is made, with Terraform's own *An argument
+named "auto_apply" is not expected here*. Existing state needs nothing: the
+framework ignores a prior-state field the current schema no longer defines.
+
+`terrapod_catalog_instance.auto_apply` is a different setting and is unchanged —
+it says whether the provision or reconfigure run that resource queues applies
+without waiting for a human, rather than being a standing workspace setting.
 
 ## `plan_apply_enabled` and `configure_enabled`
 

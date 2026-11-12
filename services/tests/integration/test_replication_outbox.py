@@ -104,7 +104,7 @@ class TestUpdateAndDelete:
 
         async with get_db_session() as db:
             ws = await db.get(Workspace, ws_id)
-            ws.auto_apply = True
+            ws.auto_apply_mode = "always"
             await db.commit()
 
         ops = [e.op for e in await _events("workspaces")]

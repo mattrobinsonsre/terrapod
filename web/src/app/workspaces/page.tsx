@@ -113,7 +113,6 @@ interface Workspace {
   attributes: {
     name: string
     'execution-mode': string
-    'auto-apply': boolean
     'terraform-version': string
     // Which engine, not which binary — the status badge resolves its phase
     // vocabulary from this (#1407 §3). Optional: an older API does not send it,

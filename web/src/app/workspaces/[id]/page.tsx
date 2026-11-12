@@ -99,7 +99,6 @@ interface WorkspaceAttrs {
   'pulumi-bind-plan'?: boolean
   'execution-mode': string
   'execution-backend': string
-  'auto-apply': boolean
   'auto-apply-mode': string
   'terraform-version': string
   'terragrunt-enabled': boolean
@@ -1453,7 +1452,7 @@ function WorkspaceDetailContent() {
         : String(workspace.attributes['configure-parallelism']),
     )
     setEditMemory(workspace.attributes['resource-memory'])
-    setEditAutoApplyMode(workspace.attributes['auto-apply-mode'] || (workspace.attributes['auto-apply'] ? 'always' : 'never'))
+    setEditAutoApplyMode(workspace.attributes['auto-apply-mode'] || 'never')
     setEditExecMode(workspace.attributes['execution-mode'])
     setEditBackend(workspace.attributes['execution-backend'] || 'tofu')
     setEditVersion(workspace.attributes['terraform-version'] || '')
@@ -3478,11 +3477,7 @@ function WorkspaceDetailContent() {
                     attr="auto-apply-mode"
                     ctx={settingsCtx}
                     kind="select"
-                    display={tMode(
-                      autoApplyModeKey(
-                        attrs['auto-apply-mode'] || (attrs['auto-apply'] ? 'always' : 'never'),
-                      ),
-                    )}
+                    display={tMode(autoApplyModeKey(attrs['auto-apply-mode'] || 'never'))}
                     // Values are the API enum; the labels are translated.
                     options={[
                       { value: 'never', label: tMode('never') },

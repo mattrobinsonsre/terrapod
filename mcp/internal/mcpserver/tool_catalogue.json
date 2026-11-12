@@ -2350,15 +2350,8 @@
           "description": "ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default",
           "type": "string"
         },
-        "auto_apply": {
-          "description": "auto-apply successful plans (default false)",
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
         "auto_apply_mode": {
-          "description": "conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Set this OR auto_apply, not both.",
+          "description": "conditional auto-apply: never (the default -- a plan waits for a human), always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace.",
           "type": [
             "null",
             "string"
@@ -2670,15 +2663,8 @@
           "description": "ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default",
           "type": "string"
         },
-        "auto_apply": {
-          "description": "auto-apply successful plans",
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
         "auto_apply_mode": {
-          "description": "conditional auto-apply: never, always, create, create_update. Set this OR auto_apply, not both.",
+          "description": "conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Setting always on a workspace an operator deliberately put on create or create_update removes that guardrail -- say so before doing it.",
           "type": [
             "null",
             "string"

@@ -105,7 +105,6 @@ interface AutodiscoveryRule {
     'resource-memory': string
     'ee-resource-cpu'?: string
     'ee-resource-memory'?: string
-    'auto-apply': boolean
     'auto-apply-mode'?: string
     'on-directory-delete': 'flag' | 'destroy'
     labels: Record<string, string>
@@ -567,8 +566,7 @@ export default function AutodiscoveryPage() {
     setResourceMemory(a['resource-memory'])
     setEeResourceCpu(a['ee-resource-cpu'] ?? '')
     setEeResourceMemory(a['ee-resource-memory'] ?? '')
-    // Fall back to the boolean for a rule created before #1274.
-    setAutoApplyMode(a['auto-apply-mode'] || (a['auto-apply'] ? 'always' : 'never'))
+    setAutoApplyMode(a['auto-apply-mode'] || 'never')
     setOnDirectoryDelete(a['on-directory-delete'] === 'destroy' ? 'destroy' : 'flag')
     setLabels(a.labels || {})
     setOwnerEmail(a['owner-email'] || '')

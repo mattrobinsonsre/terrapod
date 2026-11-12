@@ -256,7 +256,7 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
    a. Publishes "check_job_status" event via SSE → listener queries K8s
    b. Listener POSTs Job status to Redis
    c. Reconciler reads status from Redis → transitions run state
-   d. On plan success + auto_apply: transitions to confirmed → apply phase
+   d. On plan success + auto-apply: transitions to confirmed → apply phase
         |
 10. Job completes, TTL controller cleans up after 10 minutes
     Secret is GC'd via ownerReference when Job is deleted
@@ -654,8 +654,16 @@ Any non-terminal state -----> canceled (user action)
 **Terminal states:** `applied`, `errored`, `discarded`, `canceled`
 
 **Key behaviors:**
-- `auto_apply=true`: planned transitions automatically to confirmed, then applying
-- `auto_apply=false`: planned waits for user confirmation
+- `auto_apply_mode = "always"`: planned transitions automatically to confirmed, then applying
+- `auto_apply_mode = "never"`: planned waits for user confirmation
+- `auto_apply_mode = "create"` / `"create_update"`: the run is held for a human
+  unless the plan's shape is within the declared comfort zone, and
+  `auto_apply_declined_reason` says why when it is held
+- One setting, not two. A boolean `auto_apply` column used to sit beside the
+  mode on `workspaces` and `autodiscovery_rules` and was removed in 2.0
+  (#2503); `runs.auto_apply` stays, because that is what a particular run
+  decided rather than a standing setting. `/api/tfe/v2` still serves an
+  `auto-apply` attribute, derived from the mode, for `go-tfe`
 - The `workspace.locked` flag is the CLI/manual state lock only (set by the `cloud`/`remote` backend's state lock and the UI padlock) — runs do **not** auto-set it. Per-workspace run serialization is enforced in the dispatcher instead: only one apply-capable run executes per workspace at a time; a manually locked workspace blocks apply-capable runs (plan-only/speculative runs are exempt)
 - Queue dispatch uses `SELECT ... FOR UPDATE SKIP LOCKED` (PostgreSQL job queue pattern)
 - Plan-only (speculative) runs skip the apply phase entirely

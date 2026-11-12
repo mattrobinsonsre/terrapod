@@ -131,7 +131,7 @@ Consumed, on both `POST` and `PATCH` unless noted:
 | Attribute | go-tfe field | Terrapod behaviour |
 |---|---|---|
 | `name` | `Name` | The workspace name; unique within the single organization |
-| `auto-apply` | `AutoApply` | Apply without confirmation after a successful plan |
+| `auto-apply` | `AutoApply` | Apply without confirmation after a successful plan. **Not stored** since #2503: on a read it is derived as `auto-apply-mode != "never"`, and on a write it maps onto a mode (`true` → `always`, `false` → `never`). It is emitted on this surface only, because `go-tfe` reads it by name; `/api/v1` carries `auto-apply-mode` alone. Sending both spellings in one request is a **422** |
 | `execution-mode` | `ExecutionMode` | `local` or `agent`. **`remote` is refused 422** — Terrapod has no hosted workers |
 | `agent-pool-id` | `AgentPoolID` | Resolved through `_resolve_pool_set_attrs`, shared by both paths |
 | `working-directory` | `WorkingDirectory` | The Terraform root |

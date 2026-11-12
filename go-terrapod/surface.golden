@@ -410,7 +410,6 @@ field CreateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansib
 field CreateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 field CreateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
-field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
@@ -1341,7 +1340,6 @@ field UpdateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansib
 field UpdateWorkspaceRequest.AnsibleExecutionEnvironment *string `json:"ansible-execution-environment,omitempty"`
 field UpdateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
-field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
@@ -1595,7 +1593,6 @@ field Workspace.AnsibleCollections []AnsibleCollection `json:"ansible-collection
 field Workspace.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
 field Workspace.AnsibleHostKeyChecking bool `json:"ansible-host-key-checking"`
 field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
-field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoConfigureEnabled bool `json:"auto-configure-enabled"`
 field Workspace.AutoMerge bool `json:"auto-merge"`

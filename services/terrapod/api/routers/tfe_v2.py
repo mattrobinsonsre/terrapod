@@ -953,11 +953,21 @@ def _workspace_json(
             "type": "workspaces",
             "attributes": {
                 "name": ws.name,
-                "auto-apply": ws.auto_apply,
-                # Conditional auto-apply (#1274). `auto-apply` remains the
-                # boolean projection — true whenever the workspace applies
-                # unattended at all — so an un-upgraded client is unaffected;
-                # `auto-apply-mode` carries which flavour.
+                # COMPATIBILITY-SURFACE ONLY, and no longer stored (#2503).
+                # `go-tfe` and the `terraform`/`tofu` cloud backend read this
+                # key by name, so it stays on `/api/tfe/v2` — derived from the
+                # one setting, which is what it has always meant. The native
+                # pop below takes it off `/api/v1`, where the mode is the only
+                # thing Terrapod's own consumers read.
+                #
+                # In the literal rather than conditional, for the reason the
+                # `pulumi-bind-plan` pop records: the attribute-contract gate
+                # AST-reads this dict and cannot see through a `**spread`, so
+                # building it conditionally would un-freeze the key entirely.
+                "auto-apply": run_service.resolve_auto_apply_mode(ws) != "never",
+                # Auto-apply (#1274, #2503): `never`, `always`, `create` or
+                # `create_update`. The setting itself, and the only form the
+                # native surface carries.
                 "auto-apply-mode": run_service.resolve_auto_apply_mode(ws),
                 "execution-mode": ws.execution_mode,
                 "operations": ws.execution_mode == "agent",
@@ -1244,6 +1254,14 @@ def _workspace_json(
             "default-run-kind",
         ):
             payload["data"]["attributes"].pop(_native_only, None)
+    else:
+        # The opposite direction to every pop above, and the only attribute
+        # that goes this way: `auto-apply` is a COMPATIBILITY projection of
+        # `auto-apply-mode` rather than a setting of its own (#2503). It is
+        # kept on `/api/tfe/v2` because `go-tfe` reads it by name, and taken
+        # off the native wire because offering both spellings of one setting
+        # is what let a caller contradict itself in the first place.
+        payload["data"]["attributes"].pop("auto-apply", None)
     return payload
 
 
@@ -1736,8 +1754,9 @@ async def _create_workspace_impl(
             detail="execution-mode must be 'local' or 'agent'",
         )
 
-    # Conditional auto-apply (#1274) — same either/or rule as PATCH, and the
-    # two columns are always written together so they cannot disagree.
+    # Auto-apply (#1274, #2503) — same either/or rule as PATCH. One column
+    # now, so the boolean is an INPUT spelling that maps onto a mode rather
+    # than a second thing to keep in step.
     if "auto-apply" in attrs and "auto-apply-mode" in attrs:
         raise HTTPException(
             status_code=422,
@@ -1746,8 +1765,17 @@ async def _create_workspace_impl(
                 "auto-apply-mode supersedes the boolean"
             ),
         )
+    # `validate_bool` rather than a truthiness test: `bool("false")` is True,
+    # so a stringified boolean meant `always` -- the opposite of what the
+    # caller asked for, with a 201 and no complaint (#1301, #2503).
     auto_apply_mode = attrs.get(
-        "auto-apply-mode", "always" if attrs.get("auto-apply", False) else "never"
+        "auto-apply-mode",
+        "always"
+        if (
+            "auto-apply" in attrs
+            and _422(workspace_settings.validate_bool, attrs["auto-apply"], "auto-apply")
+        )
+        else "never",
     )
     if auto_apply_mode not in run_service.AUTO_APPLY_MODES:
         raise HTTPException(
@@ -1784,7 +1812,6 @@ async def _create_workspace_impl(
         name=name,
         engine=engine,
         execution_mode=execution_mode,
-        auto_apply=auto_apply_mode != "never",
         vcs_workflow=vcs_workflow,
         # `bool()` COERCES, it does not check: bool("false") is True, so a
         # client that stringifies booleans enabled auto-merge against the
@@ -2578,9 +2605,21 @@ async def update_workspace(
             ),
         )
     if "auto-apply" in attrs:
-        # The old boolean still means exactly what it always did.
-        ws.auto_apply = attrs["auto-apply"]
-        ws.auto_apply_mode = "always" if attrs["auto-apply"] else "never"
+        # Still ACCEPTED, and no longer stored (#2503). `go-tfe` and anything
+        # written against the compatibility surface send the boolean, and it
+        # has only ever meant one of two modes — so it maps onto one here
+        # rather than being refused, which would break those clients for a
+        # change that is ours and not theirs.
+        #
+        # Type-checked rather than coerced, because `bool("false")` is True.
+        # This path used to write the raw value into a Boolean column too, so a
+        # stringified boolean failed loudly; with the column gone it would
+        # SILENTLY mean `always`, which is the opposite of what was asked.
+        ws.auto_apply_mode = (
+            "always"
+            if _422(workspace_settings.validate_bool, attrs["auto-apply"], "auto-apply")
+            else "never"
+        )
     if "auto-apply-mode" in attrs:
         mode = attrs["auto-apply-mode"]
         if mode not in run_service.AUTO_APPLY_MODES:
@@ -2590,10 +2629,7 @@ async def update_workspace(
                     "auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES)
                 ),
             )
-        # Write BOTH columns together so the boolean projection an old client
-        # reads never contradicts the mode.
         ws.auto_apply_mode = mode
-        ws.auto_apply = mode != "never"
 
     # VCS workflow + auto-merge (#282). We only validate when the relevant
     # fields are actually being touched in this PATCH — unrelated updates
@@ -2625,19 +2661,19 @@ async def update_workspace(
 
     # Cross-field invariants for apply_then_merge mode — checked against
     # the post-update state so the user can flip vcs_workflow and
-    # auto_apply in one PATCH.
+    # auto-apply in one PATCH.
     pending_workflow = ws.vcs_workflow
     # Read the post-update value: a PATCH may have set it via either
     # attribute, and both paths have already landed on `ws` above.
     #
     # The trigger set below must therefore name BOTH attributes too.
-    # `auto-apply-mode` writes `ws.auto_apply` just as `auto-apply` does
-    # (see the paired write above), so omitting it from the trigger let a
-    # mode-only PATCH set auto_apply=True on an apply_then_merge workspace
+    # `auto-apply` and `auto-apply-mode` both write `ws.auto_apply_mode` (see
+    # the pair of writes above), so omitting the mode from the trigger let a
+    # mode-only PATCH turn auto-apply on for an apply_then_merge workspace
     # while skipping this block entirely — reaching by curl exactly the
     # state the boolean attribute is refused for. Any future attribute
-    # that writes `auto_apply` belongs in this list.
-    pending_auto_apply = ws.auto_apply
+    # that writes `auto_apply_mode` belongs in this list.
+    pending_auto_apply = run_service.resolve_auto_apply_mode(ws) != "never"
     if pending_workflow == "apply_then_merge" and (
         "vcs-workflow" in attrs or "auto-apply" in attrs or "auto-apply-mode" in attrs
     ):

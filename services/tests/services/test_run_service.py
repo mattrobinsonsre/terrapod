@@ -125,6 +125,12 @@ def _mock_run(**kwargs):
     run.apply_finished_at = kwargs.get("apply_finished_at", None)
     run.error_message = kwargs.get("error_message", "")
     run.auto_apply = kwargs.get("auto_apply", False)
+    # `create_run` snapshots the boolean and the mode together, so the fixture
+    # derives one from the other unless a test states a conditional mode. It
+    # must be set EXPLICITLY: `resolve_auto_apply_mode` reads the mode alone
+    # since #2503, and an unset MagicMock attribute resolves to `never` -- so a
+    # fixture carrying only the boolean would silently never auto-apply.
+    run.auto_apply_mode = kwargs.get("auto_apply_mode", "always" if run.auto_apply else "never")
     run.plan_only = kwargs.get("plan_only", False)
     # `terraform plan -out=FILE` (#1903), explicit for the same reason as
     # `configuration_version_id` below: an unset MagicMock attribute is truthy,

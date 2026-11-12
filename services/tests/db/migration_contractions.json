@@ -50,6 +50,9 @@
   "a0b6c95a281d_audit_dual_actor": [
     "alter_column(audit_logs, action)"
   ],
+  "a7197ada2c0e_drop_auto_apply_boolean": [
+    "drop_column(auto_apply)"
+  ],
   "a7e74cad11d5_drop_role_level_columns": [
     "drop_column(roles)"
   ],

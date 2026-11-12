@@ -80,7 +80,6 @@
     "ansible-execution-environment",
     "ansible-host-key-checking",
     "ansible-version",
-    "auto-apply",
     "auto-apply-mode",
     "auto-configure-enabled",
     "auto-merge",

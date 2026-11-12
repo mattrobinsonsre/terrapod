@@ -397,7 +397,6 @@ def _materialise_rule(**overrides):
         "resource_memory": "2Gi",
         "ee_resource_cpu": "",
         "ee_resource_memory": "",
-        "auto_apply": True,
         "auto_apply_mode": "create_update",
         "owner_email": "platform@example.com",
         "var_files": [],
@@ -449,14 +448,13 @@ class TestMaterialisationInheritsTheRule:
             find_or_autocreate_workspace,
         )
 
-        rule = _materialise_rule(auto_apply=True, auto_apply_mode="create_update")
+        rule = _materialise_rule(auto_apply_mode="create_update")
         db = _autocreate_db()
 
         ws, created = await find_or_autocreate_workspace(db, rule, "accounts/prod/vpc")
 
         assert created is True
         assert ws.auto_apply_mode == "create_update"
-        assert ws.auto_apply is True
 
     @pytest.mark.asyncio
     async def test_a_never_rule_materialises_a_never_workspace(self):
@@ -464,13 +462,12 @@ class TestMaterialisationInheritsTheRule:
             find_or_autocreate_workspace,
         )
 
-        rule = _materialise_rule(auto_apply=False, auto_apply_mode="never")
+        rule = _materialise_rule(auto_apply_mode="never")
         db = _autocreate_db()
 
         ws, _ = await find_or_autocreate_workspace(db, rule, "accounts/dev/vpc")
 
         assert ws.auto_apply_mode == "never"
-        assert ws.auto_apply is False
 
     @pytest.mark.asyncio
     async def test_a_legacy_rule_without_the_column_defaults_to_never(self):
@@ -481,7 +478,7 @@ class TestMaterialisationInheritsTheRule:
             find_or_autocreate_workspace,
         )
 
-        rule = _materialise_rule(auto_apply=False)
+        rule = _materialise_rule()
         del rule.auto_apply_mode
         db = _autocreate_db()
 
@@ -587,7 +584,6 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "ee_resource_memory",
         "parallelism",
         "configure_parallelism",
-        "auto_apply",
         "auto_apply_mode",
         "labels",
         "owner_email",

@@ -150,13 +150,12 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "default_limit": ws.default_limit,
         "hard_limit": ws.hard_limit,
         "resource_memory": ws.resource_memory,
-        "auto_apply": ws.auto_apply,
-        # The boolean above is only a projection — it is true for `always`,
-        # `create` and `create_update` alike. Recording the mode as well is what
-        # makes a guardrail recoverable: without it an operator restoring a
-        # `create_update` workspace knows auto-apply was on but not that it was
-        # deliberately held back from changes and destroys, and the obvious way
-        # to turn it back on is `always` (#1313).
+        # The whole setting, which is what makes a guardrail recoverable: an
+        # operator restoring a `create_update` workspace can see it was
+        # deliberately held back from changes and destroys, rather than being
+        # told only that auto-apply was on and reaching for `always` (#1313).
+        # A boolean projection used to sit beside it; #2503 removed it, and the
+        # `settings` dict is keyed by column name, so it went with the column.
         "auto_apply_mode": ws.auto_apply_mode,
         "auto_merge": ws.auto_merge,
         "auto_merge_strategy": ws.auto_merge_strategy,
@@ -762,20 +761,23 @@ async def restore_workspace(
         trigger_prefixes=list(settings.get("trigger_prefixes") or []),
         auto_merge_strategy=settings.get("auto_merge_strategy") or "merge",
         # Constraint 2 — inert on return. Anything that can act on its own is
-        # off, whatever it was: auto-apply (in both columns, so the boolean and
-        # the mode cannot disagree), drift detection, and auto-merge, which
-        # writes to a VCS provider.
-        auto_apply=False,
+        # off, whatever it was: auto-apply, drift detection, and auto-merge,
+        # which writes to a VCS provider.
         auto_apply_mode="never",
         drift_detection_enabled=False,
         auto_merge=False,
     )
-    if settings.get("auto_apply"):
-        # Plain field names, so the list stays machine-readable. What it *was*
-        # — which matters, because "auto_apply" alone would send an operator
+    # BOTH spellings, because a marker is a stored snapshot and outlives the
+    # schema that wrote it: one from before #1274 carries only the boolean, one
+    # from before #2503 carries both, and one written now carries only the mode.
+    # Reading a single key would report "nothing was suppressed" for a marker
+    # whose workspace was auto-applying, which is the direction that matters.
+    if settings.get("auto_apply_mode", "never") != "never" or settings.get("auto_apply"):
+        # Plain field names, so the list stays machine-readable. WHICH mode it
+        # was — which matters, because the name alone would send an operator
         # restoring a `create_update` workspace to `always` — is on the
         # marker's `settings`, which the undelete surface returns (#1313).
-        report["suppressed"].append("auto_apply")
+        report["suppressed"].append("auto_apply_mode")
     if settings.get("drift_detection_enabled"):
         report["suppressed"].append("drift_detection_enabled")
     if settings.get("auto_merge"):

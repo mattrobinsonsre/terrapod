@@ -37,7 +37,7 @@ async def _mk(session, *, status: str, source: str = "tfe-api", **kw) -> tuple[W
         id=uuid.uuid4(),
         name=f"tr-{uuid.uuid4().hex[:10]}",
         execution_mode="agent",
-        auto_apply=kw.pop("auto_apply", False),
+        auto_apply_mode=kw.pop("auto_apply_mode", "never"),
         locked=kw.pop("locked", False),
     )
     session.add(ws)
