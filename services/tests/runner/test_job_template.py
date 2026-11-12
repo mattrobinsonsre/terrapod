@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from terrapod.config import RunnerPhaseScheduling
+
 
 def _runner_config():
     """Create a minimal RunnerConfig mock."""
@@ -20,6 +22,11 @@ def _runner_config():
     cfg.node_selector = {}
     cfg.tolerations = []
     cfg.affinity = {}
+    # A real empty block, not a mock attribute (#2524). Left unset it arrives
+    # TRUTHY, so `configure.node_selector` would be a MagicMock and every
+    # configure Job in the suite would carry a phantom nodeSelector -- the same
+    # trap as the two service-account fields in test_job_spec_golden.
+    cfg.configure = RunnerPhaseScheduling()
     cfg.priority_class_name = ""
     cfg.topology_spread_constraints = []
     cfg.pod_security_context = {}

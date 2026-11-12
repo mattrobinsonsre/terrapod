@@ -2054,10 +2054,43 @@ runners:
   #     - configMapRef:
   #         name: runner-config
 
-  # Shared Job settings
+  # Shared Job settings — these apply to EVERY runner Job: plan, apply and
+  # configure alike. See runners.configure below to place configure Jobs
+  # differently.
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
+  # Scheduling for CONFIGURE Jobs only, merged over the three settings above
+  # (#2524). The phases have very different interruption profiles and the
+  # shared settings cannot express that: a plan or an apply is minutes long and
+  # a retried plan is cheap, so interruptible (spot/preemptible) capacity suits
+  # them, while a configure can run for an hour and is NOT safely restartable —
+  # an interruption leaves hosts half-configured, mid-release, with maintenance
+  # windows left open. Pinning configure Jobs to capacity that will not be
+  # reclaimed used to mean moving every plan and apply with them.
+  #
+  # MERGED OVER the shared settings, never replacing them, so you add only what
+  # differs and an edit to the shared settings is not silently ignored here:
+  #   nodeSelector  per key, this block wins a collision (adding a key narrows
+  #                 placement, which is the point)
+  #   tolerations   appended (a toleration permits a node, it never attracts
+  #                 one, so appending cannot undo the narrowing above)
+  #   affinity      merged at nodeAffinity / podAffinity / podAntiAffinity, so
+  #                 overriding node placement keeps your pod anti-affinity. NOT
+  #                 deeper: nodeSelectorTerms are ORed and the matchExpressions
+  #                 within one are ANDed, so a deeper merge could only guess,
+  #                 and guessing wrong WIDENS where a configure may land.
+  #
+  # Empty (the default) behaves exactly as before this existed.
+  #
+  #   configure:
+  #     nodeSelector:
+  #       karpenter.sh/capacity-type: on-demand
+  configure:
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
   podAnnotations: {}
   priorityClassName: ""
   topologySpreadConstraints: []
