@@ -47,6 +47,8 @@ The table above is about traffic coming *in*. This one is the half that decides 
 
 **Sealed mode is the end state, not the starting state.** `registry.cache_only: true` is a hard guarantee that the caches never reach upstream — but it is something you switch on *after* the caches hold what you need. The documented order is: populate with `cache_only` off (upstream overrides pointed at your internal mirrors, then [bulk warm](registry.md#cache-pre-population)), then seal. See [Sealed (cache-only) mode](registry.md#sealed-cache-only-mode), which spells out the workflow and the cache-miss behaviour.
 
+Warming covers every artifact kind Terrapod caches, not only the binaries: `galaxy`, `pypi`, `npm`, `go`, `nuget` and `pulumi` packages and container images each have their own warm route, and a submission may be sourced from a nearer mirror rather than the public registry. Name versions explicitly, so what you warmed can afterwards be checked against what your runs pin — on a node that is about to be sealed, an unverifiable warm is the thing that gets discovered too late. See [Caches → Warming](caches.md#warming--filling-a-cache-before-anything-asks).
+
 The consequence worth planning for: a sealed deployment cannot fetch a terraform version or provider nobody warmed. That is the intended behaviour — it fails with an actionable error rather than silently reaching out — but it means cache population is an operational task with a lifecycle, not a one-off at install.
 
 ## Helm values

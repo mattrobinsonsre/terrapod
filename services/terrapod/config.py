@@ -1598,6 +1598,19 @@ class PackageEcosystemConfig(BaseModel):
         "is the whole of the request-forgery surface and it is operator-set. Point it at "
         "an internal mirror to pull through that instead of the public registry.",
     )
+    mirrors: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional registries this ecosystem may be WARMED from, by label "
+        '— e.g. `{"hub": "https://terrapod.hub.example/pypi"}`. Serving always '
+        "pulls through `upstream`; these are only reachable from a warm submission that "
+        "names one, which is what lets an operator fill this node from a sibling "
+        "Terrapod or an internal mirror without changing the deployment default and "
+        "restarting. They are labels rather than per-request URLs on purpose: `upstream` "
+        "above is the whole of the request-forgery surface precisely because it is "
+        "operator-set, and a warm body carrying a URL would hand an admin-authenticated "
+        "caller a server-side fetch to any host they name. A label keeps every URL this "
+        "deployment can fetch inside this file.",
+    )
 
 
 class PulumiPluginCacheConfig(PackageEcosystemConfig):
