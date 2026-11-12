@@ -442,6 +442,7 @@ field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
 field CreateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
 field CreateWorkspaceRequest.PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field CreateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field CreateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
@@ -1054,6 +1055,7 @@ field Run.RefreshOnly bool `json:"refresh-only"`
 field Run.ReplaceAddrs []string `json:"replace-addrs,omitempty"`
 field Run.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Run.ResourceMemory string `json:"resource-memory,omitempty"`
+field Run.RunKind string `json:"run-kind,omitempty"`
 field Run.RunVariableKeys []string `json:"run-variable-keys,omitempty"`
 field Run.RunnerExitCode *int64 `json:"runner-exit-code,omitempty"`
 field Run.RunnerExitReason string `json:"runner-exit-reason,omitempty"`
@@ -1355,6 +1357,7 @@ field UpdateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audie
 field UpdateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
 field UpdateWorkspaceRequest.PlanApplyEnabled *bool `json:"plan-apply-enabled,omitempty"`
 field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field UpdateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field UpdateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
@@ -1602,6 +1605,7 @@ field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
 field Workspace.Parallelism int64 `json:"parallelism,omitempty"`
 field Workspace.PlanApplyEnabled bool `json:"plan-apply-enabled"`
 field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field Workspace.Playbooks []string `json:"playbooks,omitempty"`
 field Workspace.PulumiBindPlan bool `json:"pulumi-bind-plan"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`

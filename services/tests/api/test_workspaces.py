@@ -109,6 +109,14 @@ def _mock_workspace(
     # `json.dumps` and fails with "Object of type MagicMock is not JSON
     # serializable", naming neither this helper nor the test that broke.
     ws.hard_limit = ""
+    # The playbook allow-list (#2527). Set explicitly for the same reason as
+    # every attribute above it: an unset MagicMock attribute is TRUTHY, so
+    # `list(ws.playbooks or [])` puts the mock itself in the response dict and
+    # the whole document fails to serialise -- and on the PATCH path the stored
+    # value is what the pair is reconciled against, so the mock reaches the
+    # validator and answers 422 on a request that never mentioned the field.
+    # `[]` is the real default, and it means NO restriction.
+    ws.playbooks = []
     # #2318's, set explicitly for the same reason as #2033's pair above -- and
     # to its REAL default, TRUE, so a test that reads it off this fixture reads
     # what a workspace actually has rather than whatever a mock would coerce to.
@@ -2993,6 +3001,267 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
             )
 
         assert resp.status_code == 422, f"{because}: got {resp.status_code} {resp.text[:200]}"
+
+
+class TestThePlaybookAllowListOnTheWorkspaceRoutes:
+    """`playbooks` as REQUESTS, not as validator calls (#2527).
+
+    Driven through the routes for the reason the class above gives: the defect
+    this guards is a route that does not read the attribute at all, and a test
+    that hands a value to `reconcile_playbooks` passes with the create or PATCH
+    branch deleted. Both branches are exercised, because they are separate code
+    and the PATCH one has the harder job -- it judges the MERGE of what was
+    sent with what is stored.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_stores_a_consistent_pair(self, _pub, *mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        added: list = []
+        mock_db.add = added.append
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/workspaces",
+                json={
+                    "data": {
+                        "attributes": {
+                            "name": "pb-ws",
+                            "configure-enabled": True,
+                            "config-directory": "ansible",
+                            "default-playbook": "release.yml",
+                            "playbooks": ["release.yml", "ops/drain-node.yml"],
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201, resp.text
+        ws = added[0]
+        # Byte for byte and in the order sent: nothing trimmed, nothing sorted.
+        assert ws.playbooks == ["release.yml", "ops/drain-node.yml"]
+        assert resp.json()["data"]["attributes"]["playbooks"] == [
+            "release.yml",
+            "ops/drain-node.yml",
+        ]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_refuses_a_default_outside_the_list(self, _pub, *mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        mock_db.add = MagicMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/workspaces",
+                json={
+                    "data": {
+                        "attributes": {
+                            "name": "pb-ws",
+                            "default-playbook": "other.yml",
+                            "playbooks": ["release.yml"],
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "'other.yml'" in detail and "'release.yml'" in detail
+        mock_db.add.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patch_judges_the_merge_not_the_payload(self, mock_resolve, _pub, *mocks):
+        """The half a payload-only check cannot do.
+
+        A caller sending ONLY `playbooks` has not said what the default is, so
+        the rule is about the row the write produces. A route that validated
+        the payload alone would accept a list the stored default is outside of
+        and leave the workspace unable to run its own Configure button.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(name="pb-ws")
+        ws.default_playbook = "release.yml"
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"playbooks": ["other.yml"]}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, resp.text
+        assert "'release.yml'" in resp.json()["detail"]
+        assert ws.playbooks == [], "the refused list was written anyway"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patch_takes_both_halves_in_one_payload(self, mock_resolve, _pub, *mocks):
+        """Moving the default INTO the new list, in one request.
+
+        The ordering matters and is easy to get wrong: reconciling before
+        `default-playbook` has been applied would judge the pair against the
+        OLD default and refuse a payload that is internally consistent.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(name="pb-ws")
+        ws.default_playbook = "release.yml"
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={
+                    "data": {
+                        "attributes": {
+                            "default-playbook": "other.yml",
+                            "playbooks": ["other.yml"],
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert ws.playbooks == ["other.yml"]
+        assert ws.default_playbook == "other.yml"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_a_patch_that_mentions_neither_is_not_refused(self, mock_resolve, _pub, *mocks):
+        """The lagging-client half (`reconcile_default_run_kind`'s lesson).
+
+        A workspace whose stored pair would be REFUSED if re-validated must
+        still accept a PATCH of something else: a client whose schema predates
+        `playbooks` cannot clear a field it has never heard of, and a permanent
+        422 on every write is how one came to be wedged before.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(name="pb-ws")
+        ws.playbooks = ["release.yml"]
+        ws.default_playbook = ""  # the pair a re-validation would reject
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"default-limit": "canary"}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert ws.playbooks == ["release.yml"], "an untouched list was rewritten"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_an_empty_list_clears_the_restriction(self, mock_resolve, _pub, *mocks):
+        """Opening a workspace back up, with no default to point at.
+
+        The direction a rule written as "a list needs a default" gets wrong:
+        clearing the list must not be refused for the absence it creates.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(name="pb-ws")
+        ws.playbooks = ["release.yml"]
+        ws.default_playbook = "release.yml"
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"playbooks": []}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert ws.playbooks == []
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_it_is_popped_from_the_compatibility_surface(self, mock_resolve, *mocks):
+        """Native-only, like the six roots beside it.
+
+        `terraform` and `tofu` have no configure operation, so the list could
+        only ever be noise on that wire -- and a provider reading a workspace
+        back through the compatibility route would see a value it had just
+        written come back absent.
+
+        Both doors in one test, deliberately: the property is the DIFFERENCE
+        between them, and a test that only ever opens one passes whichever way
+        the pop is written.
+        """
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="pb-ws")
+        ws.playbooks = ["release.yml"]
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run = MagicMock()
+        no_run.scalar_one_or_none.return_value = None
+
+        # Re-armed between the two requests rather than given six results: the
+        # read path issues the same three queries each time, and a single
+        # `return_value` would hand the latest-run query the workspace row.
+        def arm():
+            mock_db.execute.side_effect = [ws_result, no_run, _no_inert_vars()]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            arm()
+            native = await c.get(f"/api/v1/workspaces/ws-{ws.id}", headers=_AUTH)
+            arm()
+            tfe = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+
+        assert native.status_code == 200, native.text
+        assert tfe.status_code == 200, tfe.text
+        assert native.json()["data"]["attributes"]["playbooks"] == ["release.yml"]
+        assert "playbooks" not in tfe.json()["data"]["attributes"]
 
 
 class TestAWorkspaceMustHaveAtLeastOneOperation:

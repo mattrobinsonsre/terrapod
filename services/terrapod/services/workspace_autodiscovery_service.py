@@ -421,6 +421,7 @@ async def find_or_autocreate_workspace(
         config_directory=rule.config_directory,
         inventory_paths=list(rule.inventory_paths or []),
         default_playbook=rule.default_playbook,
+        playbooks=list(rule.playbooks or []),
         default_limit=rule.default_limit,
         hard_limit=rule.hard_limit,
         resource_memory=rule.resource_memory,

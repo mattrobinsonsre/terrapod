@@ -93,6 +93,10 @@ interface AutodiscoveryRule {
     'config-directory'?: string
     'inventory-paths'?: string[]
     'default-playbook'?: string
+    // Templated onto every workspace this rule materialises (#2527). `[]` is
+    // the OPEN state -- no restriction -- which is what a rule written before
+    // this existed keeps producing.
+    playbooks?: string[]
     'default-limit'?: string
   'hard-limit'?: string
     'resource-cpu': string
@@ -287,6 +291,7 @@ export default function AutodiscoveryPage() {
   // form to say why.
   const ruleHasNoOperations = !planApplyEnabled && !configureEnabled
   const [inventoryPaths, setInventoryPaths] = useState<string[]>([])
+  const [playbooks, setPlaybooks] = useState<string[]>([])
   const [defaultPlaybook, setDefaultPlaybook] = useState('')
   const [defaultLimit, setDefaultLimit] = useState('')
   const [hardLimit, setHardLimit] = useState('')
@@ -463,6 +468,7 @@ export default function AutodiscoveryPage() {
     setConfigureAllHosts(false)
     setConfigDirectory('')
     setInventoryPaths([])
+    setPlaybooks([])
     setDefaultPlaybook('')
     setDefaultLimit('')
     setHardLimit('')
@@ -546,6 +552,7 @@ export default function AutodiscoveryPage() {
     // API's missing key seeds (#1966).
     setConfigDirectory(a['config-directory'] ?? '')
     setInventoryPaths(a['inventory-paths'] || [])
+    setPlaybooks(a.playbooks || [])
     setDefaultPlaybook(a['default-playbook'] || '')
     setDefaultLimit(a['default-limit'] || '')
     setHardLimit(a['hard-limit'] || '')
@@ -638,6 +645,9 @@ export default function AutodiscoveryPage() {
       // meaning the configuration version's root.
       'config-directory': configDirectory.trim(),
       'inventory-paths': inventoryPaths.map(s => s.trim()).filter(Boolean),
+      // Blank rows dropped, like the list above: the server refuses an empty
+      // entry, so one left in the editor would 422 the whole rule.
+      playbooks: playbooks.map(s => s.trim()).filter(Boolean),
       'default-playbook': defaultPlaybook.trim(),
       'default-limit': defaultLimit.trim(),
       'hard-limit': hardLimit.trim(),
@@ -938,6 +948,7 @@ export default function AutodiscoveryPage() {
     'default-limit': defaultLimit,
     'hard-limit': hardLimit,
     'inventory-paths': inventoryPaths,
+    playbooks,
     'dynamic-inventory-enabled': dynamicInventoryEnabled,
     'inventory-scripts-enabled': inventoryScriptsEnabled,
     'ansible-host-key-checking': ansibleHostKeyChecking,
@@ -1011,6 +1022,7 @@ export default function AutodiscoveryPage() {
       case 'default-limit': setDefaultLimit(s); break
       case 'hard-limit': setHardLimit(s); break
       case 'inventory-paths': setInventoryPaths(v as string[]); break
+      case 'playbooks': setPlaybooks(v as string[]); break
       case 'dynamic-inventory-enabled': setDynamicInventoryEnabled(b); break
       case 'inventory-scripts-enabled': setInventoryScriptsEnabled(b); break
       case 'ansible-host-key-checking': setAnsibleHostKeyChecking(b); break
@@ -1138,6 +1150,8 @@ export default function AutodiscoveryPage() {
         return hintText(tWs('fields.defaultLimitTitle'))
       case 'hard-limit':
         return tieredHint(tWs, 'fields.hardLimitTitle')
+      case 'playbooks':
+        return tieredHint(tWs, 'fields.playbooksTitle')
       case 'inventory-paths':
         return hintText(tWs('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
@@ -1388,6 +1402,24 @@ export default function AutodiscoveryPage() {
           ctx={ruleCtx}
           kind="text"
           placeholder={tWs('fields.defaultLimitPlaceholder')}
+        />
+        {/* Templated onto every workspace the rule materialises (#2527). A
+            rule creating dozens of Ansible workspaces out of one repository is
+            exactly where an allow-list is worth writing once -- and the rule
+            itself carries no cross-field check, because it is a template: the
+            workspaces it writes are checked when they are written. */}
+        <Field
+          attr="playbooks"
+          ctx={ruleCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={playbooks}
+              onChange={(next) => setRuleValue('playbooks', next)}
+              placeholder={tWs('fields.playbooksPlaceholder')}
+              addLabel={tWs('fields.playbooksAdd')}
+            />
+          }
         />
         <Field
           attr="inventory-paths"

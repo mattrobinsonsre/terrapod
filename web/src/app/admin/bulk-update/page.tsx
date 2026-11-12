@@ -234,6 +234,12 @@ export default function BulkUpdatePage() {
   // what says "touch this at all" (#1929).
   const [uSetInventoryPaths, setUSetInventoryPaths] = useState(false)
   const [uInventoryPaths, setUInventoryPaths] = useState<string[]>([])
+  // The playbook allow-list (#2527). An empty list is the OPEN state, so
+  // ticking the box with no rows is how a fleet's restriction is REMOVED --
+  // which is why the checkbox is what decides whether the key is sent at all,
+  // exactly as `config-directory`'s does.
+  const [uSetPlaybooks, setUSetPlaybooks] = useState(false)
+  const [uPlaybooks, setUPlaybooks] = useState<string[]>([])
   const [uSetAnsibleCollections, setUSetAnsibleCollections] = useState(false)
   const [uAnsibleCollections, setUAnsibleCollections] = useState<string[]>([])
   // Only to tell the operator when the deployment publishes no issuer, so an
@@ -382,6 +388,11 @@ export default function BulkUpdatePage() {
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
     if (uSetInventoryPaths)
       u['inventory-paths'] = uInventoryPaths.map((s) => s.trim()).filter(Boolean)
+    // `filter(Boolean)` drops a row left blank, which the server refuses --
+    // one would 422 the whole fleet update. The surviving entries are sent
+    // byte for byte; nothing is normalised, because a value this writes is
+    // read back by a Terraform provider.
+    if (uSetPlaybooks) u.playbooks = uPlaybooks.map((s) => s.trim()).filter(Boolean)
     if (uSetAnsibleCollections)
       u['ansible-collections'] = parseCollectionLines(uAnsibleCollections)
     // Blank audience rows are refused by the server rather than dropped, and
@@ -1009,6 +1020,36 @@ export default function BulkUpdatePage() {
                 onChange={setUInventoryPaths}
                 placeholder={tWs('fields.inventoryPathsPlaceholder')}
                 addLabel={tWs('fields.inventoryPathsAdd')}
+              />
+            </fieldset>
+          )}
+        </div>
+        <div className="min-w-0 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetPlaybooks}
+              onChange={(e) => setUSetPlaybooks(e.target.checked)}
+              disabled={gateOff('playbooks')}
+            />
+            {t('update.setPlaybooks')}
+          </label>
+          {uSetPlaybooks && (
+            <fieldset disabled={gateOff('playbooks')} className="min-w-0 border-0 p-0 m-0 space-y-2">
+              {tieredHint(tWs, 'fields.playbooksTitle')}
+              {/* The cross-field rule is the fleet's, not one workspace's: a
+                  non-empty list has to contain EACH matched workspace's own
+                  `default-playbook`, so a list that is right for half the
+                  match set is refused for the rest. The server answers 422
+                  naming the offenders; said here so an operator reaches for
+                  the default-playbook box in the same update rather than
+                  discovering it from a refusal. */}
+              <p className="text-xs text-amber-300/80">{t('update.playbooksPairWarning')}</p>
+              <StringListEditor
+                values={uPlaybooks}
+                onChange={setUPlaybooks}
+                placeholder={tWs('fields.playbooksPlaceholder')}
+                addLabel={tWs('fields.playbooksAdd')}
               />
             </fieldset>
           )}

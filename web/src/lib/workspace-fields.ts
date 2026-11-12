@@ -260,6 +260,10 @@ export const FIELDS: readonly FieldSpec[] = [
     group: 'ansible',
     dependsOn: 'configure-enabled',
   },
+  // The allow-list over the playbook run option (#2527). Beside the default
+  // it bounds, because the two are one declaration: a non-empty list has to
+  // contain the default, and the server refuses the pair otherwise.
+  { attr: 'playbooks', id: 'ws-playbooks', group: 'ansible', dependsOn: 'configure-enabled' },
   { attr: 'default-limit', id: 'ws-default-limit', group: 'ansible', dependsOn: 'configure-enabled' },
   { attr: 'hard-limit', id: 'ws-hard-limit', group: 'ansible', dependsOn: 'configure-enabled' },
   {
@@ -594,6 +598,7 @@ export const LABEL_KEY: Record<string, string> = {
   // ansible
   'config-directory': 'fields.configDirectory',
   'default-playbook': 'fields.defaultPlaybook',
+  playbooks: 'fields.playbooks',
   'default-limit': 'fields.defaultLimit',
   'hard-limit': 'fields.hardLimit',
   'inventory-paths': 'fields.inventoryPaths',

@@ -208,6 +208,14 @@ type Workspace struct {
 	// DefaultPlaybook is the playbook a configure run executes unless the run
 	// overrides it, the way `vcs-ref` overrides `vcs-branch`.
 	DefaultPlaybook string `json:"default-playbook,omitempty"`
+	// Playbooks is the ALLOW-LIST the Playbook run option is bounded by, or
+	// nil/empty for no restriction. A configure naming a playbook outside it
+	// is refused with a 422 listing the allowed values, and DefaultPlaybook
+	// must be one of them.
+	//
+	// Empty is OPEN rather than closed: the field is opt-in and every
+	// workspace that predates it keeps today's free-text behaviour.
+	Playbooks []string `json:"playbooks,omitempty"`
 	// DefaultLimit is the default `--limit` for a configure run. Empty means
 	// the whole inventory, which is ansible's own default.
 	DefaultLimit string `json:"default-limit,omitempty"`
@@ -473,7 +481,15 @@ type CreateWorkspaceRequest struct {
 	// overridable per run. Empty is the server-side default for both, so an
 	// empty value here is omitted rather than sent.
 	DefaultPlaybook string `json:"default-playbook,omitempty"`
-	DefaultLimit    string `json:"default-limit,omitempty"`
+	// Playbooks is the ALLOW-LIST the Playbook run option is bounded by, or
+	// nil/empty for no restriction. A configure naming a playbook outside it
+	// is refused with a 422 listing the allowed values, and DefaultPlaybook
+	// must be one of them.
+	//
+	// Empty is OPEN rather than closed: the field is opt-in and every
+	// workspace that predates it keeps today's free-text behaviour.
+	Playbooks    []string `json:"playbooks,omitempty"`
+	DefaultLimit string   `json:"default-limit,omitempty"`
 	// HardLimit is the ceiling; see Workspace.HardLimit.
 	HardLimit string `json:"hard-limit,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
@@ -659,7 +675,12 @@ type UpdateWorkspaceRequest struct {
 	// defaulting to a playbook" would be a silent no-op -- the same defect
 	// `debug-mode` and `ai-policy-mode` shipped with.
 	DefaultPlaybook *string `json:"default-playbook,omitempty"`
-	DefaultLimit    *string `json:"default-limit,omitempty"`
+	// Playbooks is the allow-list; see Workspace.Playbooks. A nil slice
+	// leaves the stored list alone and a non-nil EMPTY slice clears it --
+	// the same `!= nil` convention InventoryPaths uses, which is why this
+	// one needs no pointer.
+	Playbooks    []string `json:"playbooks,omitempty"`
+	DefaultLimit *string  `json:"default-limit,omitempty"`
 	// HardLimit is a POINTER for the same reason as the fields above: an
 	// empty string REMOVES the ceiling, which widens every run, so it has to
 	// be distinguishable from "leave it alone".
@@ -1014,6 +1035,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.DefaultPlaybook != "" {
 		attrs["default-playbook"] = req.DefaultPlaybook
 	}
+	if req.Playbooks != nil {
+		attrs["playbooks"] = req.Playbooks
+	}
 	if req.HardLimit != "" {
 		attrs["hard-limit"] = req.HardLimit
 	}
@@ -1221,6 +1245,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.AnsibleCollections != nil {
 		// Same rule: `[]` is how every declared collection is removed.
 		attrs["ansible-collections"] = req.AnsibleCollections
+	}
+	if req.Playbooks != nil {
+		attrs["playbooks"] = req.Playbooks
 	}
 	if req.DefaultPlaybook != nil {
 		// *string so a caller can explicitly stop defaulting to a playbook
@@ -1441,6 +1468,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		InventoryPaths:                GetListAttr(res, "inventory-paths"),
 		AnsibleCollections:            GetAnsibleCollectionsAttr(res, "ansible-collections"),
 		DefaultPlaybook:               GetStringAttr(res, "default-playbook"),
+		Playbooks:                     GetListAttr(res, "playbooks"),
 		DefaultLimit:                  GetStringAttr(res, "default-limit"),
 		HardLimit:                     GetStringAttr(res, "hard-limit"),
 		VCSRepoURL:                    GetStringAttr(res, "vcs-repo-url"),

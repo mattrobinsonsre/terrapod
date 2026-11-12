@@ -101,6 +101,11 @@ _FIELD_MAP: dict[str, str] = {
     "config-directory": "config_directory",
     "inventory-paths": "inventory_paths",
     "default-playbook": "default_playbook",
+    # The allow-list over the `playbook` run option (#2527). The FORMAT rule is
+    # below; the cross-field half -- a non-empty list must contain the
+    # workspace's default -- is over the merge with each matched row, so it is
+    # in `_reject_a_playbook_list_without_its_default`.
+    "playbooks": "playbooks",
     "default-limit": "default_limit",
     "hard-limit": "hard_limit",
     "resource-cpu": "resource_cpu",
@@ -456,6 +461,7 @@ _SETTING_RULES: dict[str, Any] = {
         v, "default-playbook"
     ),
     "default-limit": lambda v: workspace_settings.validate_ansible_run_default(v, "default-limit"),
+    "playbooks": workspace_settings.validate_playbooks,
     "hard-limit": workspace_settings.validate_hard_limit,
     "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
     "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
@@ -721,6 +727,46 @@ def _reject_a_run_kind_a_workspace_cannot_offer(fields: dict[str, Any], workspac
             f"this update would leave {len(offenders)} matched workspace(s) with a "
             f"default-run-kind they cannot offer: {shown}{more}. Set the operation it "
             "needs in the same update, clear default-run-kind, or narrow the filter."
+        ),
+    )
+
+
+def _reject_a_playbook_list_without_its_default(fields: dict[str, Any], workspaces: list) -> None:
+    """Refuse a `playbooks` allow-list a matched workspace's default is outside (#2527).
+
+    Over the MERGE, like the two guards around it and for the same reason: one
+    list written across a hundred workspaces is right for the ones whose
+    `default-playbook` is in it and leaves the rest with a Configure button
+    their own API would refuse. `_SETTING_RULES` can judge the list's FORMAT
+    from the payload alone and cannot judge this, because the other half of the
+    pair is on each row.
+
+    It fires when EITHER field is in the update, which is the same rule the
+    single-workspace PATCH applies -- and deliberately not when neither is, so
+    a caller who touched something else entirely is never refused over a pair
+    they did not mention.
+    """
+    if "playbooks" not in fields and "default_playbook" not in fields:
+        return
+    offenders: list[str] = []
+    for w in workspaces:
+        playbooks = list(fields.get("playbooks", w.playbooks) or [])
+        if not playbooks:
+            continue
+        default = fields.get("default_playbook", w.default_playbook) or ""
+        if default not in playbooks:
+            offenders.append(w.name)
+    if not offenders:
+        return
+    shown = ", ".join(sorted(offenders)[:10])
+    more = f" (and {len(offenders) - 10} more)" if len(offenders) > 10 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"this update would leave {len(offenders)} matched workspace(s) with a "
+            f"default-playbook outside their playbooks allow-list: {shown}{more}. A bare "
+            "Configure runs the default, so it has to be one of the allowed playbooks. "
+            "Set default-playbook in the same update, clear playbooks, or narrow the filter."
         ),
     )
 
@@ -1064,6 +1110,7 @@ async def bulk_update_workspaces(
     _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
     _reject_leaving_a_workspace_with_no_operations(plan["fields"], workspaces)
     _reject_a_run_kind_a_workspace_cannot_offer(plan["fields"], workspaces)
+    _reject_a_playbook_list_without_its_default(plan["fields"], workspaces)
     _reject_scan_enforcement_on_unscannable_engines(plan["fields"], workspaces)
     await _reject_unrunnable_ee_selection(plan["fields"], workspaces, db)
     _reject_apply_then_merge_where_it_cannot_hold(plan["fields"], workspaces)

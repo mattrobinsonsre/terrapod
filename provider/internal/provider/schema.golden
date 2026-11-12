@@ -136,6 +136,7 @@ data terrapod_workspace.owner_email required=false optional=false computed=true 
 data terrapod_workspace.parallelism required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_workspace.plan_apply_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.plan_expiry_seconds required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_workspace.playbooks required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_workspace.pulumi_bind_plan required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.resource_cpu required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.resource_memory required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -240,6 +241,7 @@ resource terrapod_autodiscovery_rule.parallelism required=false optional=true co
 resource terrapod_autodiscovery_rule.pattern required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.plan_apply_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.plan_expiry_seconds required=false optional=true computed=false sensitive=false type=basetypes.Int64Type
+resource terrapod_autodiscovery_rule.playbooks required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.repo_url required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.resource_memory required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -622,6 +624,7 @@ resource terrapod_workspace.owner_email required=false optional=false computed=t
 resource terrapod_workspace.parallelism required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_workspace.plan_apply_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.plan_expiry_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
+resource terrapod_workspace.playbooks required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_workspace.pulumi_bind_plan required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.remote_state_consumers required=false optional=true computed=true sensitive=false type=types.SetType[basetypes.StringType]
 resource terrapod_workspace.resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType

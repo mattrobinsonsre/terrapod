@@ -654,6 +654,25 @@ class Workspace(Base):
     #: per run rather than in the playbook.
     default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
 
+    #: The playbooks this workspace may run, or `[]` for no restriction (#2527).
+    #:
+    #: An ALLOW-LIST over the `playbook` run option, in the same relationship to
+    #: it that `hard_limit` has to `--limit`: the option stays a run option and
+    #: keeps its workspace default, and this bounds what it may name. It is not
+    #: a definition model -- there is nothing per playbook here, no credentials,
+    #: no limit, no variables -- which is what separates it from #1971.
+    #:
+    #: Empty is OPEN, not closed. Every workspace that exists has no list, so
+    #: reading absence as "nothing may run" would stop every configure on the
+    #: deployment at upgrade; the field is opt-in and an empty list is exactly
+    #: today's free-text behaviour.
+    #:
+    #: Entries are repo-relative paths under `config_directory`, the same root
+    #: `inventory_paths` resolves against.
+    playbooks: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
+
     #: A `--limit` no run may escape; empty is no ceiling (#2451).
     #:
     #: Deliberately NOT `default_limit` with a second meaning. A default is an
@@ -2166,6 +2185,13 @@ class AutodiscoveryRule(Base):
     inventory_paths: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     default_playbook: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     default_limit: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+    #: Templated onto the workspaces this rule materialises, like every other
+    #: setting here (#2527). A rule creating dozens of Ansible workspaces out of
+    #: one repository is exactly where an allow-list is worth writing once.
+    playbooks: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
 
     #: The `hard_limit` to stamp on workspaces this rule creates (#2451).
     #: A ceiling matters MORE here than on a hand-made workspace: these are

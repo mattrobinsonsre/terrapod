@@ -1302,7 +1302,9 @@
       "applyChanges": "Aplicar alterações",
       "setOidcAudiences": "Definir audiences OIDC da identidade de execução (substitui o mapa em cada workspace correspondente)",
       "operationsNone": "Isso deixaria cada espaço de trabalho correspondente sem nenhuma operação. Um espaço de trabalho precisa manter planejar e aplicar, ou configurar, ou ambas.",
-      "setHardLimit": "Definir o limite rígido (um valor vazio remove o teto)"
+      "setHardLimit": "Definir o limite rígido (um valor vazio remove o teto)",
+      "setPlaybooks": "Definir os playbooks permitidos (substitui a lista em cada workspace correspondente; uma lista vazia remove a restrição)",
+      "playbooksPairWarning": "Uma lista não vazia tem de conter o playbook padrão de cada workspace correspondente, então defina-o na mesma atualização se ele ainda não for um destes."
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2310,7 +2312,8 @@
       "runOptions": "Opções de Execução",
       "agentPool": "Pool de agentes",
       "agentPoolCandidates": "{count, plural, one {# pool candidato} other {# pools candidatos}}",
-      "autoApplyHeld": "retido"
+      "autoApplyHeld": "retido",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Linha do Tempo",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Qual ação recebe o botão destacado neste workspace. Automático oferece a execução mais completa que consegue — em geral o certo, e errado quando a ação do dia a dia não é a maior: um workspace cuja parte de Terraform apenas mantém o inventário do Ansible, que aplica sem supervisão e nunca configura após um apply, quer Configurar aqui. Uma escolha que este workspace não pode oferecer é recusada ao salvar, e uma que a sua função não pode executar recai em Automático para você.",
       "configureParallelism": "Paralelismo da configuração",
       "configureParallelismTitle": "Quantos hosts uma configuração conduz ao mesmo tempo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo. É separado porque o ambiente de execução é dimensionado independentemente do orquestrador.",
-      "configureParallelismLead": "Quantos hosts uma configuração conduz ao mesmo tempo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo."
+      "configureParallelismLead": "Quantos hosts uma configuração conduz ao mesmo tempo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo.",
+      "playbooks": "Playbooks permitidos",
+      "playbooksLead": "Os playbooks que uma operação de configuração aqui pode executar. Deixe a lista vazia e qualquer playbook pode ser indicado, que é o padrão; adicione entradas e qualquer execução que indique outro é recusada.",
+      "playbooksTitle": "Cada entrada é um caminho relativo ao diretório de configuração, e a opção de execução passa a ser um seletor entre elas em vez de uma caixa de texto. O playbook padrão tem de ser uma das entradas, porque um Configurar sem mais nada executa o padrão. Use isso para manter um playbook longe de um workspace que ele nunca deve tocar — a drenagem de um nó, a atualização de um banco de dados —, onde uma lista é um controle e não uma convenção.",
+      "playbooksPlaceholder": "ex.: release.yml",
+      "playbooksAdd": "Adicionar playbook",
+      "playbooksAny": "Qualquer"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Execução completa",
       "queueFullRunConfirm": "Plan, apply E configurar este workspace? A configuração altera hosts reais depois que o apply altera infraestrutura real, sem revisão entre as duas.",
       "moreRunKinds": "Outros tipos de execução",
-      "openExplainingPhase": "abrir o log da fase que explica isso"
+      "openExplainingPhase": "abrir o log da fase que explica isso",
+      "configurePlaybookDefaultSuffix": "(padrão)",
+      "playbookIsDefault": "O playbook padrão do workspace"
     },
     "state": {
       "deleteConfirm": "Excluir a versão de estado #{serial}? Isso não pode ser desfeito.",

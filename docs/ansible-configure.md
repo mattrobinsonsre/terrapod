@@ -516,6 +516,76 @@ than ignored — `target-addrs`, `replace-addrs`, `refresh-only`, `save-plan`,
 configure has neither. `plan-only` is refused too: ansible's dry run is
 `--check`, which is its own option, not this one.
 
+## `playbooks` bounds what a run may name
+
+A repository often holds dozens of playbooks — `release.yml`,
+`drain-node.yml`, `upgrade-postgres-step01.yml`. Typing one from memory is
+error-prone, and a mistyped name fails only once the run has started. Worse,
+some playbooks must never run against some workspaces: a node drain or a
+database upgrade on production.
+
+`playbooks` on the workspace is the set a configure may choose from. It is the
+same relationship `hard-limit` has to `--limit`: the playbook stays a run
+option and keeps its default, and this bounds what it may name.
+
+```sh
+curl -X PATCH "$TERRAPOD/api/v1/workspaces/ws-…" \
+  -H 'Content-Type: application/vnd.api+json' \
+  -d '{"data":{"attributes":{
+        "default-playbook":"release.yml",
+        "playbooks":["release.yml","restart.yml","backup.yml"]}}}'
+```
+
+**An empty list is no restriction, not "none allowed".** `[]` is the default,
+and it is what every workspace has until somebody narrows it — so turning this
+on is opt-in and leaving it alone changes nothing. Reading an empty list the
+other way round would stop every configure on a deployment the moment it
+upgraded.
+
+Each entry is a path relative to `config-directory`, the same root
+`inventory-paths` resolves against. The list is stored byte for byte: nothing
+is trimmed, sorted or de-duplicated, and a duplicate is refused with a 422
+naming the entry.
+
+**The default has to be one of them.** A bare Configure runs
+`default-playbook`, so a default outside the list would leave the workspace
+unable to press its own button — the pair is refused on write, with the
+allowed values in the message. Setting both in one request is how you move a
+workspace onto a new list.
+
+With a list set, the UI turns the `playbook` run option from a text box into a
+**select** over it, with `default-playbook` pre-selected. Pressing Configure
+still runs immediately — there is no dialog and nothing to answer — and a bare
+press runs the default exactly as it did before. With no list, the text box
+stays.
+
+A run naming anything outside the list is refused at creation:
+
+```json
+{"errors": [{"status": "422", "detail": "playbook 'ops/drain-node.yml' is not allowed on this workspace. Allowed: 'release.yml', 'restart.yml', 'backup.yml'"}]}
+```
+
+The *effective* playbook is what is judged — the run's own, falling back to the
+workspace default — so a bare Configure is checked too, not only a run that
+names a file.
+
+**This is not a definition model.** There is nothing per playbook here: no
+limit, no credentials, no variables of its own. It gives an existing run option
+a set of valid values, the way the workspace already gives it a default.
+
+**Where to set it.** Workspace create and update, bulk update, an autodiscovery
+rule's template, and `terrapod_workspace`'s `playbooks` attribute. On an
+autodiscovery rule it is stamped onto every workspace the rule materialises,
+which is where a list is worth writing once; the rule itself carries no
+cross-field check, because the workspaces it writes are checked when they are
+written. On **bulk update** the check is over the merge with each matched
+workspace's own default, so a list that is right for half a match set is
+refused for the rest, naming the offenders.
+
+The Terraform provider checks the pair at **plan time** rather than leaving it
+to the API: a typo in either attribute fails before anything changes. See
+[`playbooks`](terraform-provider.md#playbooks).
+
 ## What a configure reports: one row per host
 
 Ansible's unit of outcome is the **host**, not the resource, so a configure's

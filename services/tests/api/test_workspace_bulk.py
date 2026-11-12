@@ -1175,6 +1175,141 @@ class TestABulkUpdateCannotLeaveAWorkspaceInert:
         assert ws.configure_enabled is True
 
 
+class TestBulkUpdateRefusesAPlaybookListWithoutItsDefault:
+    """`playbooks` across a matched set (#2527).
+
+    The same two-half shape as the class below, and the same reason the second
+    half needs a matched set: one allow-list written across a hundred
+    workspaces is right for the ones whose `default-playbook` is in it and
+    leaves the rest with a Configure button their own API would refuse.
+    `_SETTING_RULES` can judge the list's FORMAT from the payload alone and
+    cannot judge that.
+
+    Driven through the ROUTE throughout. The mutation to run against this class
+    is deleting the `_reject_a_playbook_list_without_its_default(...)` call from
+    the handler -- `reconcile_playbooks`' own unit tests pass without it.
+    """
+
+    async def _post(self, body, workspaces, user=None):
+        body = {"dry_run": False, **body}
+        app, db = _make_app(user or _admin())
+        db.execute = AsyncMock(return_value=_list_result(workspaces))
+        db.commit = AsyncMock()
+        db.rollback = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update",
+                json=body,
+                headers=_AUTH,
+            )
+        return resp, db
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_malformed_list_is_refused_from_the_payload_alone(self, *_mocks):
+        """No matched workspace is needed for the format half, and the refusal
+        must not depend on one -- a set that happens to be empty would otherwise
+        accept a list with a traversal in it."""
+        resp, db = await self._post(
+            {"filter": {"all": True}, "update": {"playbooks": ["../escape.yml"]}}, []
+        )
+        assert resp.status_code == 422, resp.text
+        assert "traversal" in resp.json()["detail"]
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_list_a_matched_workspace_s_default_is_outside_is_refused(self, *_mocks):
+        """The merge check, with the offender NAMED.
+
+        Half the matched set can take it. The refusal has to name the half that
+        cannot, or the operator is told the update failed and left to find out
+        which workspaces caused it by hand -- which on a fleet-wide update is
+        the whole difficulty.
+        """
+        ok = _mock_ws(name="ships-release")
+        ok.default_playbook = "release.yml"
+        ok.playbooks = []
+        bad = _mock_ws(name="ships-something-else")
+        bad.default_playbook = "legacy.yml"
+        bad.playbooks = []
+
+        resp, db = await self._post(
+            {"filter": {"all": True}, "update": {"playbooks": ["release.yml"]}},
+            [ok, bad],
+        )
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "ships-something-else" in detail, f"the refusal does not name the offender: {detail}"
+        assert "ships-release" not in detail, (
+            "a workspace that CAN take the list is named as an offender, which sends "
+            f"the operator after the wrong one: {detail}"
+        )
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_moving_the_default_in_the_same_update_is_accepted(self, *_mocks):
+        """The way out the refusal recommends, so the advice is true.
+
+        An error message naming a remedy that does not work is worse than one
+        naming none.
+        """
+        ws = _mock_ws(name="ships-something-else")
+        ws.default_playbook = "legacy.yml"
+        ws.playbooks = []
+
+        resp, db = await self._post(
+            {
+                "filter": {"all": True},
+                "update": {"playbooks": ["release.yml"], "default-playbook": "release.yml"},
+            },
+            [ws],
+        )
+        assert resp.status_code == 200, resp.text
+        assert ws.playbooks == ["release.yml"]
+        assert ws.default_playbook == "release.yml"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_clearing_the_list_is_never_refused(self, *_mocks):
+        """Opening a fleet back up. The direction a rule written as "a list
+        needs a default" gets wrong: an EMPTY list is the OPEN state, so it
+        cannot be refused for the default it does not need."""
+        ws = _mock_ws(name="restricted")
+        ws.default_playbook = ""
+        ws.playbooks = ["release.yml"]
+
+        resp, _db = await self._post({"filter": {"all": True}, "update": {"playbooks": []}}, [ws])
+        assert resp.status_code == 200, resp.text
+        assert ws.playbooks == []
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_update_mentioning_neither_is_not_refused(self, *_mocks):
+        """A caller who touched something else entirely must not be refused
+        over a pair they never mentioned -- the lagging-client half, the same
+        rule the single-workspace PATCH applies."""
+        ws = _mock_ws(name="already-inconsistent")
+        ws.default_playbook = ""
+        ws.playbooks = ["release.yml"]
+        # The attribute this update WRITES, set explicitly: the diff the
+        # response carries serialises the `from` value, and an auto-MagicMock
+        # there dies in `json.dumps` naming neither the attribute nor this test.
+        ws.default_limit = ""
+
+        resp, _db = await self._post(
+            {"filter": {"all": True}, "update": {"default-limit": "canary"}}, [ws]
+        )
+        assert resp.status_code == 200, resp.text
+        assert ws.playbooks == ["release.yml"], "an untouched list was rewritten"
+
+
 class TestBulkUpdateRefusesAnUnofferableRunKind:
     """`default-run-kind` across a matched set (#2479).
 

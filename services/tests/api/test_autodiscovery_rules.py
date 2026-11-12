@@ -84,6 +84,10 @@ def _mock_rule(
     r.default_limit = ""
     # And the ceiling (#2451), same reason as the pair above.
     r.hard_limit = ""
+    # Templated onto the workspaces the rule materialises (#2527); `[]` is
+    # the real default and means no restriction. Explicit for the reason the
+    # attributes above it are: an auto-MagicMock reaches `json.dumps`.
+    r.playbooks = []
     r.resource_cpu = "1"
     r.parallelism = 10
     r.configure_parallelism = None

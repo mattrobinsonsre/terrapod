@@ -102,7 +102,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 |---|---|
 | `terrapod_workspace_list` | List workspaces with status, execution mode, lock, drift, labels. Takes an `engine` filter — narrow with it before anything that assumes one engine. |
 | `terrapod_workspace_get` | One workspace by id or name — full config + status. |
-| `terrapod_run_list` | Recent runs for a workspace (status, plan-only/destroy, has-changes). |
+| `terrapod_run_list` | Recent runs for a workspace (status, `run_kind`, plan-only/destroy, has-changes). `run_kind` says in one word what each run IS — `plan_apply`, `configure` (an ansible configure and nothing else) or `full` (an apply followed by a configure) — so a kind need not be derived from the configure flags. |
 | `terrapod_run_queue` | Why a run has not started: the deployment queue oldest-first with each run's position, plus pending and running counts. Terraform/OpenTofu only. |
 | `terrapod_run_get` | One run's full status incl. Terrapod-native detail (has-changes, drift, resource profile, permitted actions). |
 | `terrapod_run_plan_json` | What a plan will do, from its structured JSON plan (`tofu show -json`). The default `view: changes` is compact, usually a few KB: tofu's add/change/destroy counts plus each resource the plan acts on, with only the attributes that change, sensitive values redacted. Narrow it with `address` (prefix or glob) and `actions`; page with `start`/`limit`. `view: full` returns the whole document, paged by `offset` once it is larger than `max_bytes` — often megabytes; sensitive values are redacted in both views (GHSA-3g53-5gw3-hh42). Needs `state:read` on the workspace (the `plan` tier, as raw state download does) since 2.0; a read-only principal is refused. |

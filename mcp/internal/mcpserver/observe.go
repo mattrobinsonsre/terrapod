@@ -181,7 +181,15 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		// IaC security scan nor an AI policy verdict (it IS cost-estimated, and
 		// it DOES evaluate OPA policy sets). So an agent reading a run needs to
 		// know which engine it is looking at before reaching for the next tool.
-		Engine   string `json:"engine,omitempty"`
+		Engine string `json:"engine,omitempty"`
+		// What the run IS, in one word (#2507): `plan_apply`, `configure` (an
+		// ansible configure and nothing else) or `full` (an apply followed by
+		// a configure). Without it an agent listing runs has to derive the
+		// kind from flags this summary does not even carry -- `is_configure`
+		// is not here -- and the UI's own derivation of exactly that is what
+		// labelled a configure-only run "plan + apply" AND "configure" at
+		// once. Whether a run is speculative stays `plan_only` below.
+		RunKind  string `json:"run_kind,omitempty"`
 		PlanOnly bool   `json:"plan_only"`
 		// A saved plan (#1903) sitting at `planned` looks exactly like a run
 		// awaiting a human, and is not: its apply is deferred, so it holds
@@ -209,7 +217,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_list",
-		Description: "List recent runs for a workspace (newest first) with the engine that produced each, status, whether each is plan-only/destroy or a deferred saved plan, whether the plan had changes, and — for conditional auto-apply — the run's mode and why it was held. A run with save_plan=true at `planned` is NOT holding the workspace: its apply was deferred by `terraform plan -out=FILE` and begins only when someone applies that file. A run showing auto_apply_declined_reason reached `planned` and stopped because its plan contained something its mode does not auto-apply (a destroy or replace, or an in-place update under `create`); it is waiting for a human to confirm or discard.",
+		Description: "List recent runs for a workspace (newest first) with the engine that produced each, status, `run_kind` -- which says in one word what each run IS: `plan_apply`, `configure` (an ansible configure and nothing else) or `full` (an apply followed by a configure) -- whether each is plan-only/destroy or a deferred saved plan, whether the plan had changes, and — for conditional auto-apply — the run's mode and why it was held. A run with save_plan=true at `planned` is NOT holding the workspace: its apply was deferred by `terraform plan -out=FILE` and begins only when someone applies that file. A run showing auto_apply_declined_reason reached `planned` and stopped because its plan contained something its mode does not auto-apply (a destroy or replace, or an in-place update under `create`); it is waiting for a human to confirm or discard.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runListIn) (*mcp.CallToolResult, runListOut, error) {
 		if in.WorkspaceID == "" {
@@ -228,6 +236,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			r := &runs[i]
 			out.Runs = append(out.Runs, runSummary{
 				ID: r.ID, Status: r.Status, Engine: r.Engine,
+				RunKind:  r.RunKind,
 				PlanOnly: r.PlanOnly, SavePlan: r.SavePlan,
 				IsDestroy:  r.IsDestroy,
 				HasChanges: r.HasChanges, Source: r.Source, CreatedAt: r.CreatedAt,
@@ -245,7 +254,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_get",
-		Description: "Get one run's full status incl. Terrapod-native detail: has-changes, drift flag, error message, the resource profile -- `peak-memory-bytes` and `runner-exit-*` are whichever phase reported LAST, so on a run that applies AND configures they describe the configure; read `phase-profiles` for a given phase's own figures -- which agent pool executed it (and which pools could have), `run-variable-keys` naming the variables this run overrode with `-var` or `-var-file` (the KEYS only -- the values are never echoed, because nothing records which of them were secrets), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
+		Description: "Get one run's full status incl. Terrapod-native detail: `run-kind`, which says in one word what the run IS -- `plan_apply`, `configure` (an ansible configure and nothing else) or `full` (an apply followed by a configure, one run driven as two Jobs) -- so you need not derive it from is-configure and configure-after-apply; whether it is speculative stays `plan-only`. Also: has-changes, drift flag, error message, the resource profile -- `peak-memory-bytes` and `runner-exit-*` are whichever phase reported LAST, so on a run that applies AND configures they describe the configure; read `phase-profiles` for a given phase's own figures -- which agent pool executed it (and which pools could have), `run-variable-keys` naming the variables this run overrode with `-var` or `-var-file` (the KEYS only -- the values are never echoed, because nothing records which of them were secrets), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runGetIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.RunID == "" {

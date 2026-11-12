@@ -1302,7 +1302,9 @@
       "applyChanges": "Tillämpa ändringar",
       "setOidcAudiences": "Ange OIDC-audiences för körningsidentitet (ersätter kartan på varje matchad arbetsyta)",
       "operationsNone": "Detta skulle lämna varje matchande arbetsyta helt utan operation. En arbetsyta måste behålla planera och tillämpa, eller konfigurera, eller båda.",
-      "setHardLimit": "Sätt hård gräns (ett tomt värde tar bort taket)"
+      "setHardLimit": "Sätt hård gräns (ett tomt värde tar bort taket)",
+      "setPlaybooks": "Sätt tillåtna playbooks (ersätter listan på varje matchad arbetsyta; en tom lista tar bort begränsningen)",
+      "playbooksPairWarning": "En icke-tom lista måste innehålla varje matchad arbetsytas egen standardplaybook, så sätt den i samma uppdatering om den inte redan är en av dessa."
     },
     "diff": {
       "colWorkspace": "Arbetsyta",
@@ -2310,7 +2312,8 @@
       "runOptions": "Körningsalternativ",
       "agentPool": "Agentpool",
       "agentPoolCandidates": "{count, plural, one {# kandidatpool} other {# kandidatpooler}}",
-      "autoApplyHeld": "pausad"
+      "autoApplyHeld": "pausad",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Tidslinje",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Vilken åtgärd som får den framhävda knappen på denna arbetsyta. Automatiskt erbjuder den mest fullständiga körning som är möjlig — oftast rätt, och fel där den vardagliga åtgärden inte är den största: en arbetsyta vars Terraform-hälft bara underhåller Ansible-inventariet, tillämpar obevakat och aldrig konfigurerar efter en tillämpning, vill ha Konfigurera här. Ett val som denna arbetsyta inte kan erbjuda avvisas när du sparar det, och ett val som din roll inte får köra faller tillbaka till Automatiskt för dig.",
       "configureParallelism": "Konfigurationsparallellitet",
       "configureParallelismTitle": "Hur många värdar en konfiguration driver samtidigt — ansibles forks (1-256). Lämna tomt för att ärva Parallellitet. Separat eftersom exekveringsmiljön dimensioneras oberoende av orkestreraren.",
-      "configureParallelismLead": "Hur många värdar en konfiguration driver samtidigt — ansibles forks (1-256). Lämna tomt för att ärva Parallellitet."
+      "configureParallelismLead": "Hur många värdar en konfiguration driver samtidigt — ansibles forks (1-256). Lämna tomt för att ärva Parallellitet.",
+      "playbooks": "Tillåtna playbooks",
+      "playbooksLead": "De playbooks en konfigurationsoperation här får köra. Lämna det tomt så får vilken playbook som helst namnges, vilket är standard; lägg till poster och en körning som namnger något annat avvisas.",
+      "playbooksTitle": "Varje post är en sökväg relativt konfigurationskatalogen, och körningsalternativet blir en väljare över dem i stället för ett textfält. Standardplaybooken måste vara en av posterna, eftersom ett blankt Konfigurera kör standarden. Använd det för att hålla en playbook borta från en arbetsyta den aldrig får röra — en nodavtappning, en databasuppgradering — där en lista är en kontroll snarare än en konvention.",
+      "playbooksPlaceholder": "t.ex. release.yml",
+      "playbooksAdd": "Lägg till playbook",
+      "playbooksAny": "Alla"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Fullständig körning",
       "queueFullRunConfirm": "Plan, apply OCH konfigurera denna arbetsyta? Konfigurationen ändrar riktiga värdar efter att apply har ändrat riktig infrastruktur, och det finns ingen separat granskning mellan dem.",
       "moreRunKinds": "Andra körningstyper",
-      "openExplainingPhase": "öppna loggen för fasen som förklarar det"
+      "openExplainingPhase": "öppna loggen för fasen som förklarar det",
+      "configurePlaybookDefaultSuffix": "(standard)",
+      "playbookIsDefault": "Arbetsytans standardplaybook"
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",

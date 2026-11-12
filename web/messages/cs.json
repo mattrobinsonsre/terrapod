@@ -1302,7 +1302,9 @@
       "applyChanges": "Aplikovat změny",
       "setOidcAudiences": "Nastavit OIDC audience identity běhu (nahradí mapu na každém odpovídajícím pracovním prostoru)",
       "operationsNone": "Tím by každý odpovídající pracovní prostor zůstal vůbec bez operací. Pracovní prostor si musí ponechat plánování a použití, konfiguraci nebo obojí.",
-      "setHardLimit": "Nastavit pevný limit (prázdná hodnota strop odstraní)"
+      "setHardLimit": "Nastavit pevný limit (prázdná hodnota strop odstraní)",
+      "setPlaybooks": "Nastavit povolené playbooky (nahradí seznam v každém odpovídajícím pracovním prostoru; prázdný seznam odstraní omezení)",
+      "playbooksPairWarning": "Neprázdný seznam musí obsahovat vlastní výchozí playbook každého odpovídajícího pracovního prostoru, takže jej nastavte ve stejné aktualizaci, pokud ještě není jednou z těchto položek."
     },
     "diff": {
       "colWorkspace": "Pracovní prostor",
@@ -2310,7 +2312,8 @@
       "runOptions": "Možnosti běhu",
       "agentPool": "Fond agentů",
       "agentPoolCandidates": "{count, plural, one {# kandidátský fond} few {# kandidátské fondy} other {# kandidátských fondů}}",
-      "autoApplyHeld": "pozastaveno"
+      "autoApplyHeld": "pozastaveno",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Časová osa",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Která akce dostane v tomto pracovním prostoru výrazné tlačítko. Automaticky nabídne nejúplnější běh, jaký může — obvykle správně, a nesprávně tam, kde každodenní akcí není ta největší: pracovní prostor, jehož část Terraform pouze udržuje inventář Ansible, kde použití probíhá bez dozoru a po němž se nikdy nekonfiguruje, chce zde Konfigurovat. Volba, kterou tento pracovní prostor nabídnout nemůže, je při uložení odmítnuta, a ta, kterou vaše role nemůže spustit, se pro vás vrátí na Automaticky.",
       "configureParallelism": "Paralelismus konfigurace",
       "configureParallelismTitle": "Kolik hostitelů konfigurace obsluhuje současně — forks v ansible (1-256). Nechte prázdné, aby se zdědil Paralelismus. Samostatné nastavení, protože běhové prostředí se dimenzuje nezávisle na orchestrátoru.",
-      "configureParallelismLead": "Kolik hostitelů konfigurace obsluhuje současně — forks v ansible (1-256). Nechte prázdné, aby se zdědil Paralelismus."
+      "configureParallelismLead": "Kolik hostitelů konfigurace obsluhuje současně — forks v ansible (1-256). Nechte prázdné, aby se zdědil Paralelismus.",
+      "playbooks": "Povolené playbooky",
+      "playbooksLead": "Playbooky, které zde může konfigurace spustit. Nechte prázdné a lze uvést jakýkoli playbook, což je výchozí chování; přidejte položky a běh, který uvede cokoli jiného, bude odmítnut.",
+      "playbooksTitle": "Každá položka je cesta relativně ke konfiguračnímu adresáři a volba běhu se místo textového pole změní na výběr z nich. Výchozí playbook musí být jednou z položek, protože samotné Konfigurovat spustí právě ten výchozí. Použijte to, abyste playbook nepustili do pracovního prostoru, kterého se nikdy nesmí dotknout — vyřazení uzlu z provozu, aktualizace databáze — kde je seznam nástrojem kontroly, a ne konvencí.",
+      "playbooksPlaceholder": "např. release.yml",
+      "playbooksAdd": "Přidat playbook",
+      "playbooksAny": "Jakýkoli"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Úplné spuštění",
       "queueFullRunConfirm": "Plan, apply A konfigurace tohoto pracovního prostoru? Konfigurace změní skutečné hostitele poté, co apply změní skutečnou infrastrukturu, a mezi nimi není samostatná kontrola.",
       "moreRunKinds": "Jiné druhy spuštění",
-      "openExplainingPhase": "otevřít protokol fáze, která to vysvětluje"
+      "openExplainingPhase": "otevřít protokol fáze, která to vysvětluje",
+      "configurePlaybookDefaultSuffix": "(výchozí)",
+      "playbookIsDefault": "Výchozí playbook pracovního prostoru"
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",

@@ -146,6 +146,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "config_directory": ws.config_directory,
         "inventory_paths": list(ws.inventory_paths or []),
         "default_playbook": ws.default_playbook,
+        "playbooks": list(ws.playbooks or []),
         "default_limit": ws.default_limit,
         "hard_limit": ws.hard_limit,
         "resource_memory": ws.resource_memory,
@@ -689,6 +690,7 @@ async def restore_workspace(
         config_directory=settings.get("config_directory") or "",
         inventory_paths=list(settings.get("inventory_paths") or []),
         default_playbook=settings.get("default_playbook") or "",
+        playbooks=list(settings.get("playbooks") or []),
         default_limit=settings.get("default_limit") or "",
         # `""` for a snapshot predating the column, which is the right
         # answer and worth stating: an absent ceiling restores as NO

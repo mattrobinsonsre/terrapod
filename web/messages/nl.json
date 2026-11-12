@@ -1302,7 +1302,9 @@
       "applyChanges": "Wijzigingen toepassen",
       "setOidcAudiences": "OIDC-audiences van de uitvoeringsidentiteit instellen (vervangt de map op elke overeengekomen workspace)",
       "operationsNone": "Hiermee zou elke overeenkomende workspace helemaal geen operatie meer hebben. Een workspace moet plannen en toepassen, of configureren, of beide houden.",
-      "setHardLimit": "Harde limiet instellen (een lege waarde verwijdert het plafond)"
+      "setHardLimit": "Harde limiet instellen (een lege waarde verwijdert het plafond)",
+      "setPlaybooks": "Toegestane playbooks instellen (vervangt de lijst op elke overeenkomende workspace; een lege lijst heft de beperking op)",
+      "playbooksPairWarning": "Een niet-lege lijst moet het eigen standaard-playbook van elke overeenkomende workspace bevatten, dus stel dat in dezelfde update in als het nog niet een van deze is."
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2310,7 +2312,8 @@
       "runOptions": "Uitvoeringsopties",
       "agentPool": "Agentpool",
       "agentPoolCandidates": "{count, plural, one {# kandidaat-pool} other {# kandidaat-pools}}",
-      "autoApplyHeld": "vastgehouden"
+      "autoApplyHeld": "vastgehouden",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Tijdlijn",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Welke actie in deze workspace de opvallende knop krijgt. Automatisch biedt de meest volledige run die mogelijk is — meestal goed, en verkeerd waar de dagelijkse actie niet de grootste is: een workspace waarvan de Terraform-helft alleen de Ansible-inventaris onderhoudt, onbeheerd toepast en na een toepassing nooit configureert, wil hier Configureren. Een keuze die deze workspace niet kan aanbieden wordt geweigerd als je opslaat, en een keuze die je rol niet mag uitvoeren valt voor jou terug op Automatisch.",
       "configureParallelism": "Configure-parallellisme",
       "configureParallelismTitle": "Hoeveel hosts een configure tegelijk aanstuurt — de forks van ansible (1-256). Laat leeg om Parallellisme over te nemen. Apart, omdat de uitvoeringsomgeving los van de orchestrator wordt gedimensioneerd.",
-      "configureParallelismLead": "Hoeveel hosts een configure tegelijk aanstuurt — de forks van ansible (1-256). Laat leeg om Parallellisme over te nemen."
+      "configureParallelismLead": "Hoeveel hosts een configure tegelijk aanstuurt — de forks van ansible (1-256). Laat leeg om Parallellisme over te nemen.",
+      "playbooks": "Toegestane playbooks",
+      "playbooksLead": "De playbooks die een configure-operatie hier mag uitvoeren. Laat het leeg en elk playbook mag genoemd worden — dat is de standaard; voeg items toe en een run die iets anders noemt, wordt geweigerd.",
+      "playbooksTitle": "Elk item is een pad relatief ten opzichte van de configuratiemap, en de uitvoeringsoptie wordt een keuzelijst daarover in plaats van een tekstvak. Het standaard-playbook moet een van de items zijn, want een kaal Configureren voert de standaard uit. Gebruik dit om een playbook weg te houden van een workspace die het nooit mag raken — een node-drain, een database-upgrade — waar een lijst een controlemiddel is in plaats van een conventie.",
+      "playbooksPlaceholder": "bijv. release.yml",
+      "playbooksAdd": "Playbook toevoegen",
+      "playbooksAny": "Alle"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Volledige run",
       "queueFullRunConfirm": "Plan, apply ÉN configureren voor deze workspace? Het configureren wijzigt echte hosts nadat de apply echte infrastructuur heeft gewijzigd, en er is geen tussentijdse beoordeling.",
       "moreRunKinds": "Andere runtypen",
-      "openExplainingPhase": "open het logboek van de fase die dit verklaart"
+      "openExplainingPhase": "open het logboek van de fase die dit verklaart",
+      "configurePlaybookDefaultSuffix": "(standaard)",
+      "playbookIsDefault": "Het standaard-playbook van de workspace"
     },
     "state": {
       "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",

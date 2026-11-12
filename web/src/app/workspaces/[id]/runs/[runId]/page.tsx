@@ -38,6 +38,7 @@ import {
 } from '@/lib/phase-vocabulary'
 import { gateOf, holdActivityKey, phaseOf, type Gate } from '@/lib/run-hold'
 import { RUN_TIMELINE_KEYS } from '@/lib/run-timeline'
+import { initialRunView } from '@/lib/run-initial-view'
 import { CopyButton } from '@/components/copy-button'
 
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
@@ -86,6 +87,17 @@ interface RunAttrs {
   // first, and without it a standalone configure. Either way its output is
   // its own log artifact, which is what the Configure pane reads (#2144).
   'is-configure'?: boolean
+  // What the run IS, in one word (#2507): `plan_apply`, `configure` or
+  // `full`. Derived by the server from `is-configure` and
+  // `configure-after-apply`, so no surface derives it itself -- which is what
+  // `initialRunView` reads to decide the view this page opens on (#2509).
+  // Optional because a build can outlive the server that sends it; absent
+  // falls through to Overview, which is this page's own default anyway.
+  'run-kind'?: string
+  /** Which playbook THIS run was asked to configure (#2527). Empty means the
+   *  workspace's `default-playbook`, which is what a git-driven configure
+   *  runs -- so the two are shown differently rather than resolved. */
+  playbook?: string
   /** When a LIVE configure's output last changed (#1977). Absent otherwise. */
   'last-output-at'?: string
   // `tofu plan -out=FILE` (#1903) -- apply-capable, apply deferred.
@@ -1323,6 +1335,11 @@ function RunDetailPageInner() {
         ? 'apply'
         : 'overview'
   const [activeView, setActiveView] = useState<RunView>(initialView)
+  // Whether the run has loaded yet, for the "decide once" half of #2509. A
+  // ref rather than state: it must not re-render, and the poll loop calls
+  // `loadRun` repeatedly -- so without it the view would snap back on every
+  // refresh, which is the tab jumping under the reader that the issue forbids.
+  const firstLoad = useRef(true)
 
   /** Put the per-host filter in the URL, so the filtered log has an address.
    *
@@ -1352,12 +1369,37 @@ function RunDetailPageInner() {
       if (!res.ok) throw new Error(t('errors.loadRun'))
       const data = await res.json()
       setRun(data.data)
+      // The default view, chosen from what the run IS -- ONCE, on the first
+      // load (#2509). A configure-only run has no plan and no apply, so the
+      // configure log is the only log it has and is what the reader came for;
+      // today that cost an extra click every time, including straight after
+      // queuing the configure.
+      //
+      // `?view=` / `?tab=` always win, so a deep link is untouched. And the
+      // choice is made on the FIRST load only -- the `firstLoad` guard -- so a
+      // later poll cannot move a tab under somebody reading Overview, which is
+      // the constraint the issue is explicit about.
+      if (firstLoad.current) {
+        firstLoad.current = false
+        if (!viewParam && !tabParam) {
+          const pick = initialRunView({
+            runKind: data.data?.attributes?.['run-kind'],
+            status: data.data?.attributes?.status,
+            statusTimestamps: data.data?.attributes?.['status-timestamps'],
+          })
+          // Through `switchView`, so the URL says what is on screen: the view
+          // the page chose is then addressable, shareable and survives a
+          // reload, which a state-only choice is not. `replaceState`, so no
+          // history entry is pushed and Back still leaves the run page.
+          if (pick) switchView(pick)
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadRun'))
     } finally {
       setLoading(false)
     }
-  }, [runId, t])
+  }, [runId, t, viewParam, tabParam, switchView])
 
   // Overview rollups for AI + policy (see aiInfo/policyInfo above).
   const loadAiInfo = useCallback(async () => {
@@ -2544,6 +2586,18 @@ function RunDetailPageInner() {
               <dt className="text-xs text-slate-500">{word('detailsPlanOnly')}</dt>
               <dd className="mt-1 text-sm text-slate-200">{attrs['plan-only'] ? t('common.yes') : t('common.no')}</dd>
             </div>
+            {/* Which playbook a configure ran (#2527). Shown only on a run
+                that carries one, and only when the run NAMED it: an empty
+                `playbook` means the workspace's own default, which is a
+                property of the workspace rather than of this run, and this
+                page has no workspace document to read it from. The runs list
+                shows the resolved value, because it has one. */}
+            {attrs['is-configure'] && attrs.playbook && (
+              <div>
+                <dt className="text-xs text-slate-500">{t('details.playbook')}</dt>
+                <dd className="mt-1 text-sm text-slate-200 font-mono break-all">{attrs.playbook}</dd>
+              </div>
+            )}
             {attrs['created-by'] && (
               <div>
                 <dt className="text-xs text-slate-500">{t('details.triggeredBy')}</dt>

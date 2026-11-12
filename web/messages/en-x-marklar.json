@@ -1302,7 +1302,9 @@
       "applyChanges": "Apply marklars",
       "setOidcAudiences": "Set OIDC marklar marklar marklars (replaces the marklar on every matched marklar)",
       "operationsNone": "This would leave every matched marklar with no marklar at all. A marklar must keep plan and apply, or configure, or both.",
-      "setHardLimit": "Set hard marklar (an empty marklar removes the marklar)"
+      "setHardLimit": "Set hard marklar (an empty marklar removes the marklar)",
+      "setPlaybooks": "Set allowed marklars (replaces the marklar on every matched marklar; an empty marklar removes the marklar)",
+      "playbooksPairWarning": "A non-empty marklar has to contain each matched marklar's own default marklar, so set that in the same marklar if it is not already one of these."
     },
     "diff": {
       "colWorkspace": "Marklar",
@@ -2310,7 +2312,8 @@
       "runOptions": "Marklar Marklars",
       "agentPool": "Marklar marklar",
       "agentPoolCandidates": "{count, plural, one {# candidate marklar} other {# candidate marklars}}",
-      "autoApplyHeld": "held"
+      "autoApplyHeld": "held",
+      "playbook": "Marklar"
     },
     "timeline": {
       "heading": "Marklar",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Which marklar gets the loud marklar on this marklar. Marklar offers the most complete marklar it can — usually right, and wrong where the everyday marklar is not the biggest one: a marklar whose Terraform marklar only maintains the Ansible marklar, applying unattended and never configuring after a marklar, wants Configure here. A marklar this marklar cannot offer is refused when you save it, and one your marklar cannot run falls back to Marklar for you.",
       "configureParallelism": "Marklar marklar",
       "configureParallelismTitle": "How many marklars a marklar drives at once — marklar''s marklars (1-256). Leave empty to inherit Marklar. Separate because the marklar is sized separately from the marklar.",
-      "configureParallelismLead": "How many marklars a marklar drives at once — marklar''s marklars (1-256). Leave empty to inherit Marklar."
+      "configureParallelismLead": "How many marklars a marklar drives at once — marklar''s marklars (1-256). Leave empty to inherit Marklar.",
+      "playbooks": "Allowed marklars",
+      "playbooksLead": "The marklars a marklar here may run. Leave it empty and any marklar may be named, which is the marklar; add marklars and a marklar naming anything else is refused.",
+      "playbooksTitle": "Each marklar is a marklar relative to the marklar marklar, and the marklar marklar becomes a marklar over them instead of a marklar marklar. The default marklar has to be one of the marklars, because a bare Configure runs the marklar. Use it to keep a marklar away from a marklar it must never touch — a marklar marklar, a marklar marklar — where a marklar is a marklar rather than a marklar.",
+      "playbooksPlaceholder": "e.g. release.yml",
+      "playbooksAdd": "Add marklar",
+      "playbooksAny": "Any"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Marklar Marklar",
       "queueFullRunConfirm": "Marklar, marklar AND marklar this marklar? The marklar changes real marklars after the marklar changes real marklar, and there is no separate marklar between them.",
       "moreRunKinds": "Other marklar marklars",
-      "openExplainingPhase": "open the marklar of the marklar that explains it"
+      "openExplainingPhase": "open the marklar of the marklar that explains it",
+      "configurePlaybookDefaultSuffix": "(marklar)",
+      "playbookIsDefault": "The marklar's default marklar"
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",

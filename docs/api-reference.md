@@ -764,6 +764,7 @@ invocation consumes them.
 | `config-directory` | string | The Ansible config root — `ansible.cfg`, playbooks, `roles/`, `group_vars/`, `host_vars/` — relative to the configuration version's root, with `""` meaning that root. Also the directory the resolver and the executor **run in** |
 | `inventory-paths` | list of strings | The inventory sources, in order, each a file or a directory, relative to `config-directory`. Empty falls through to the `inventory` pathlist in the operator's own `ansible.cfg` |
 | `default-playbook` | string | The playbook a configure runs when the run names none |
+| `playbooks` | list of strings | The playbooks a configure on this workspace **may name** — an allow-list over the `playbook` run option. `[]` (the default) is **no restriction**, not "none allowed". See [`playbooks`](#playbooks) |
 | `default-limit` | string | The default `--limit`. Empty is the whole inventory |
 | `hard-limit` | string | A `--limit` **no run may escape**. Empty is no ceiling. Unlike `default-limit`, which a run REPLACES when it supplies its own, this is intersected with whatever limit the run ends up with — so a run may narrow within it and none may widen past it. It bounds what the resolved reads return as well as what a run does. At most one group or host pattern: `canary`, or `!prod` for everything except production. Refused with a 422 naming both terms if it names two, because ansible's `&` is AND and has no form for “either of these”. See [a ceiling no run can widen past](ansible-configure.md#hard-limit-is-a-ceiling-no-run-can-widen-past) |
 
@@ -806,6 +807,78 @@ directory therefore returns the right hosts, the right groups, exit `0` and
 Settable on workspace create, workspace update, bulk update, and as
 autodiscovery rule template fields. See
 [Ansible Inventory](ansible-inventory.md) for the model they configure.
+
+### `playbooks`
+
+The playbooks a configure on this workspace may name — an **allow-list** over
+the `playbook` run option, in the same relationship to it that `hard-limit` has
+to `--limit`. The option stays a run option and keeps its default; this bounds
+what it may name.
+
+**An empty list is OPEN, not closed.** `[]` is the default and means *no
+restriction* — any playbook may be named, which is what every workspace does
+today. Reading it the other way round would stop every configure on a
+deployment at the moment of upgrade, so the field is opt-in and an empty list
+is exactly the pre-existing behaviour.
+
+Each entry is a path relative to `config-directory`, the same root
+`inventory-paths` resolves against. At most 50, and a duplicate is refused with
+a 422 naming the entry rather than collapsed — nothing here is trimmed, sorted
+or de-duplicated, because a Terraform provider writes the server's response
+back into state and a list that came back shorter would fail the apply as an
+inconsistent result.
+
+**A non-empty list must contain `default-playbook`, which must then be
+non-empty.** A bare Configure — one whose run options name no playbook — runs
+the default, so a default outside the list would leave the workspace unable to
+press its own button. Both halves are checked on create and on update, against
+the row the write **produces** rather than against the payload: a caller
+sending only `playbooks` has not said what the default is, and the pair is what
+has to be coherent. A caller who mentioned neither is not re-validated, so a
+client whose schema predates this field is never refused over a pair it cannot
+send.
+
+```json
+{
+  "data": {
+    "attributes": {
+      "default-playbook": "release.yml",
+      "playbooks": ["release.yml", "restart.yml", "ops/drain-node.yml"]
+    }
+  }
+}
+```
+
+A contradiction answers 422 naming both the offending value and what is
+allowed:
+
+```json
+{"errors": [{"status": "422", "detail": "default-playbook 'other.yml' is not in playbooks. Allowed: 'release.yml', 'restart.yml'"}]}
+```
+
+**At run creation**, a configure whose *effective* playbook — the run's own
+`playbook` option, falling back to `default-playbook` — is outside a non-empty
+list is refused the same way. That is what makes the list a control rather than
+a convention: a node drain or a database upgrade can be kept away from a
+workspace it must never touch, and a mistyped name fails at the request rather
+than once the playbook has started.
+
+On an **autodiscovery rule** it is a template field, stamped onto every
+workspace the rule materialises. The rule itself carries no cross-field check,
+because it is a template: the workspaces it writes are checked when they are
+written.
+
+It is **not** on a catalog item, and that is a decision rather than an
+omission. An item's Ansible block templates `default_playbook` onto the
+workspace it provisions; whether a catalog *author* should also bound which
+playbooks a provisioned workspace may run is a separate question about catalog
+authoring. An empty list on the provisioned workspace is today's behaviour, so
+nothing is lost by leaving it, and an operator can set one on the workspace.
+
+Settable on workspace create, workspace update, bulk update, and as an
+autodiscovery rule template field. On **bulk update** the cross-field check is
+over the merge with each matched workspace's own row, so a list that is right
+for half a match set is refused for the rest, naming the offenders.
 
 ### `engine-version`, and its older name `terraform-version`
 
@@ -1519,6 +1592,7 @@ triggers for the same reason. See
 | `variables` | array of `{key, value}` | `[]` | This run's own variables — the API equivalent of `-var` / `-var-file`. **Each `value` is an HCL expression, not a literal string**, matching `go-tfe`'s `RunVariable`: the string `x` is `"x"` (quotes included), the number 3 is `3`, and a list is `["a","b"]`. Sending a bare `x` produces the HCL expression `x`, which is a variable reference and will not parse. They take precedence over the workspace's variables **for this run only** and do not change them. A key pinned by a **priority** variable set is refused with `422` naming it rather than silently discarded, so an operator guardrail cannot be overridden from a run. **Terraform/OpenTofu only** — an HCL expression has no meaning to Pulumi, whose equivalent is `pulumi config set` on the workspace, so a truthy value on a Pulumi workspace is refused `422`. Values are stored encrypted and are **never returned**: `RunVariable` carries no `sensitive` flag, so a value typed on a command line may be a secret and nothing identifies which. An empty array is a no-op |
 | `save-plan` | boolean | `false` | A saved-plan run — `terraform plan -out=FILE`. See below |
 | `is-configure` | boolean | `false` | Run the workspace's Ansible playbook against its inventory instead of a plan or an apply. Requires `configure-enabled` on the workspace (422 otherwise) and the `run:apply` capability — a configure is apply-equivalent. See [Running a Configure](ansible-configure.md) |
+| `run-kind` | string | *derived* | **Read-only.** What the run IS, in one word: `plan_apply`, `configure` (a configure and nothing else) or `full` (a composite — an apply followed by a configure, one run driven as two runner Jobs). Derived from `is-configure` and `configure-after-apply` rather than stored, so there is no column and nothing to keep in step with them. Emitted so a client reads one attribute instead of writing the predicate itself. Whether a run is **speculative** stays `plan-only`: that fact already has a spelling on this document, and giving it a second one is how two consumers come to disagree. The vocabulary is the workspace's own `default-run-kind`, deliberately, so a UI switching on this and a preference written in that cannot mean different things |
 | `configure-after-apply` | boolean | *the workspace's setting* | Whether THIS run's apply is followed by a configure, overriding the workspace's standing `configure-after-apply` for one run. **Three states**: omit it to leave the workspace to decide (what the CLI and a git push do, since neither can pass a flag), `true` for plan + apply + configure, `false` to skip the configure on a workspace that normally runs it. `true` is refused with a 422 on a plan-only run or a destroy — there is no apply for a configure to follow — and on a workspace declaring no configure operation. Omitting it and sending `false` are different requests, so a client must not send `false` for "unset" |
 | `playbook` | string | `""` | The playbook this configure runs, relative to `config-directory`. Empty means the workspace's `default-playbook`. Refused on a run that is not a configure |
 | `limit` | string | `""` | `--limit` for this configure: which hosts, groups or patterns it reaches. Empty means the workspace's `default-limit`, **which may itself be empty, meaning every host in the inventory**. Refused on a run that is not a configure |

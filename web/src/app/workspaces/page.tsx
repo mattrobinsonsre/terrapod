@@ -1080,6 +1080,8 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.configureAllHostsHint'))
       case 'config-directory':
         return tieredHint(tDetail, 'fields.configDirectoryTitle')
+      case 'playbooks':
+        return tieredHint(tDetail, 'fields.playbooksTitle')
       case 'inventory-paths':
         return hintText(tDetail('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
@@ -1421,6 +1423,25 @@ function WorkspacesPageInner() {
           ctx={createCtx}
           kind="text"
           placeholder={tDetail('fields.defaultLimitPlaceholder')}
+        />
+        {/* The allow-list over the playbook run option (#2527). Directly
+            after the default it bounds: a non-empty list has to contain the
+            default and the server refuses the pair otherwise, so the two are
+            adjacent rather than one of them further down the form. Left empty
+            -- which is what a create form starts as -- it allow-lists nothing
+            and the workspace behaves exactly as one made before this existed. */}
+        <Field
+          attr="playbooks"
+          ctx={createCtx}
+          kind="list"
+          control={
+            <StringListEditor
+              values={listOf('playbooks')}
+              onChange={(next) => setValue('playbooks', next)}
+              placeholder={tDetail('fields.playbooksPlaceholder')}
+              addLabel={tDetail('fields.playbooksAdd')}
+            />
+          }
         />
         <Field
           attr="hard-limit"

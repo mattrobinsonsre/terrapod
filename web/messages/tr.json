@@ -1302,7 +1302,9 @@
       "applyChanges": "Değişiklikleri uygula",
       "setOidcAudiences": "OIDC çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki eşlemeyi değiştirir)",
       "operationsNone": "Bu, eşleşen her çalışma alanını hiç işlemi olmadan bırakırdı. Bir çalışma alanı planlama ve uygulamayı, yapılandırmayı ya da ikisini birlikte korumalıdır.",
-      "setHardLimit": "Katı limiti ayarla (boş değer üst sınırı kaldırır)"
+      "setHardLimit": "Katı limiti ayarla (boş değer üst sınırı kaldırır)",
+      "setPlaybooks": "İzin verilen playbook''ları ayarla (eşleşen her çalışma alanındaki listeyi değiştirir; boş liste kısıtlamayı kaldırır)",
+      "playbooksPairWarning": "Boş olmayan bir liste, eşleşen her çalışma alanının kendi varsayılan playbook''unu içermek zorundadır; bu nedenle bu girdilerden biri değilse onu da aynı güncellemede ayarlayın."
     },
     "diff": {
       "colWorkspace": "Çalışma Alanı",
@@ -2310,7 +2312,8 @@
       "runOptions": "Çalıştırma Seçenekleri",
       "agentPool": "Aracı havuzu",
       "agentPoolCandidates": "{count, plural, other {# aday havuz}}",
-      "autoApplyHeld": "beklemede"
+      "autoApplyHeld": "beklemede",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Zaman Çizelgesi",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Bu çalışma alanında hangi eylemin öne çıkan düğmeyi alacağı. Otomatik, yapabildiği en kapsamlı çalıştırmayı önerir — çoğunlukla doğrudur, günlük eylemin en büyüğü olmadığı yerlerde ise yanlıştır: Terraform tarafı yalnızca Ansible envanterini güncel tutan, gözetimsiz uygulayan ve bir uygulamanın ardından asla yapılandırmayan bir çalışma alanı burada Yapılandır''ı ister. Bu çalışma alanının sunamadığı bir seçim, kaydettiğinizde reddedilir; rolünüzün çalıştıramadığı bir seçim ise sizin için Otomatik''e geri döner.",
       "configureParallelism": "Yapılandırma paralelliği",
       "configureParallelismTitle": "Bir yapılandırmanın aynı anda kaç ana makineyi yürüttüğü — ansible’ın forks değeri (1-256). Paralellik değerini devralmak için boş bırakın. Ayrı tutulur, çünkü yürütme ortamı orkestratörden bağımsız olarak boyutlandırılır.",
-      "configureParallelismLead": "Bir yapılandırmanın aynı anda kaç ana makineyi yürüttüğü — ansible’ın forks değeri (1-256). Paralellik değerini devralmak için boş bırakın."
+      "configureParallelismLead": "Bir yapılandırmanın aynı anda kaç ana makineyi yürüttüğü — ansible’ın forks değeri (1-256). Paralellik değerini devralmak için boş bırakın.",
+      "playbooks": "İzin verilen playbook''lar",
+      "playbooksLead": "Burada bir yapılandırmanın çalıştırabileceği playbook''lar. Boş bırakırsanız herhangi bir playbook adlandırılabilir, varsayılan budur; girdi eklerseniz başka bir şey adlandıran bir çalıştırma reddedilir.",
+      "playbooksTitle": "Her girdi, yapılandırma dizinine göreli bir yoldur ve çalıştırma seçeneği metin kutusu yerine bunlar arasından bir seçiciye dönüşür. Varsayılan playbook girdilerden biri olmak zorundadır, çünkü yalın bir Yapılandır varsayılanı çalıştırır. Bunu, bir playbook''u asla dokunmaması gereken bir çalışma alanından uzak tutmak için kullanın — bir düğümün boşaltılması, bir veritabanı yükseltmesi — burada liste bir gelenek değil, bir denetim aracıdır.",
+      "playbooksPlaceholder": "örn. release.yml",
+      "playbooksAdd": "Playbook ekle",
+      "playbooksAny": "Herhangi bir playbook"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Tam çalıştırma",
       "queueFullRunConfirm": "Bu çalışma alanı için plan, apply VE yapılandırma? Yapılandırma, apply gerçek altyapıyı değiştirdikten sonra gerçek ana makineleri değiştirir ve aralarında ayrı bir inceleme yoktur.",
       "moreRunKinds": "Diğer çalıştırma türleri",
-      "openExplainingPhase": "bunu açıklayan aşamanın günlüğünü aç"
+      "openExplainingPhase": "bunu açıklayan aşamanın günlüğünü aç",
+      "configurePlaybookDefaultSuffix": "(varsayılan)",
+      "playbookIsDefault": "Çalışma alanının varsayılan playbook''u"
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",

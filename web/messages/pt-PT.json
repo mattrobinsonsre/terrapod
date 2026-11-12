@@ -1302,7 +1302,9 @@
       "applyChanges": "Aplicar alterações",
       "setOidcAudiences": "Definir audiences OIDC da identidade de execução (substitui o mapa em cada workspace correspondente)",
       "operationsNone": "Isto deixaria cada área de trabalho correspondente sem qualquer operação. Uma área de trabalho tem de manter planear e aplicar, ou configurar, ou ambas.",
-      "setHardLimit": "Definir o limite rígido (um valor vazio remove o limite superior)"
+      "setHardLimit": "Definir o limite rígido (um valor vazio remove o limite superior)",
+      "setPlaybooks": "Definir os playbooks permitidos (substitui a lista em cada workspace correspondente; uma lista vazia elimina a restrição)",
+      "playbooksPairWarning": "Uma lista não vazia tem de conter o playbook predefinido de cada workspace correspondente, pelo que o deve definir na mesma atualização se ainda não for um destes."
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2310,7 +2312,8 @@
       "runOptions": "Opções de Execução",
       "agentPool": "Conjunto de agentes",
       "agentPoolCandidates": "{count, plural, one {# conjunto candidato} other {# conjuntos candidatos}}",
-      "autoApplyHeld": "retido"
+      "autoApplyHeld": "retido",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Cronologia",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Que ação recebe o botão destacado neste workspace. Automático oferece a execução mais completa que consegue — em geral o correto, e errado quando a ação do dia a dia não é a maior: um workspace cuja parte de Terraform apenas mantém o inventário do Ansible, que aplica sem supervisão e nunca configura após um apply, quer Configurar aqui. Uma escolha que este workspace não pode oferecer é recusada ao guardar, e uma que a sua função não pode executar recai em Automático para si.",
       "configureParallelism": "Paralelismo da configuração",
       "configureParallelismTitle": "Quantos hosts uma configuração conduz em simultâneo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo. É separado porque o ambiente de execução é dimensionado independentemente do orquestrador.",
-      "configureParallelismLead": "Quantos hosts uma configuração conduz em simultâneo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo."
+      "configureParallelismLead": "Quantos hosts uma configuração conduz em simultâneo — os forks do ansible (1-256). Deixe vazio para herdar Paralelismo.",
+      "playbooks": "Playbooks permitidos",
+      "playbooksLead": "Os playbooks que uma operação de configuração aqui pode executar. Deixe a lista vazia e qualquer playbook pode ser indicado, o que é a predefinição; acrescente entradas e qualquer execução que indique outro é recusada.",
+      "playbooksTitle": "Cada entrada é um caminho relativo ao diretório de configuração, e a opção de execução passa a ser um seletor entre elas em vez de uma caixa de texto. O playbook predefinido tem de ser uma das entradas, porque um Configurar simples executa o predefinido. Utilize-o para manter um playbook afastado de um workspace que nunca deve tocar — o esvaziamento de um nó, a atualização de uma base de dados —, onde uma lista é um controlo e não uma convenção.",
+      "playbooksPlaceholder": "p. ex. release.yml",
+      "playbooksAdd": "Adicionar playbook",
+      "playbooksAny": "Qualquer"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Execução completa",
       "queueFullRunConfirm": "Plan, apply E configurar esta área de trabalho? A configuração altera anfitriões reais depois de o apply alterar infraestrutura real, sem revisão intermédia.",
       "moreRunKinds": "Outros tipos de execução",
-      "openExplainingPhase": "abrir o registo da fase que o explica"
+      "openExplainingPhase": "abrir o registo da fase que o explica",
+      "configurePlaybookDefaultSuffix": "(predefinido)",
+      "playbookIsDefault": "O playbook predefinido do workspace"
     },
     "state": {
       "deleteConfirm": "Eliminar a versão de estado #{serial}? Isto não pode ser anulado.",

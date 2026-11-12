@@ -1302,7 +1302,9 @@
       "applyChanges": "應用更改",
       "setOidcAudiences": "設定執行身分的 OIDC 受眾（替換每個相符工作區上的對映）",
       "operationsNone": "這會讓所有相符的工作區完全沒有任何作業。工作區必須保留計畫與套用、設定，或兩者之一。",
-      "setHardLimit": "設定強制 limit（空值會移除上限）"
+      "setHardLimit": "設定強制 limit（空值會移除上限）",
+      "setPlaybooks": "設定允許的 playbook（取代每個相符工作區上的清單；空清單會移除限制）",
+      "playbooksPairWarning": "非空清單必須包含每個相符工作區各自的預設 playbook；如果其中還沒有，請在同一次更新中一併設定預設 playbook。"
     },
     "diff": {
       "colWorkspace": "工作區",
@@ -2310,7 +2312,8 @@
       "runOptions": "執行選項",
       "agentPool": "代理集區",
       "agentPoolCandidates": "{count, plural, other {# 個候選集區}}",
-      "autoApplyHeld": "已保留"
+      "autoApplyHeld": "已保留",
+      "playbook": "playbook"
     },
     "timeline": {
       "heading": "時間線",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "決定此工作區中哪個操作佔據醒目的按鈕。自動會在可能的範圍內提供最完整的執行 — 通常這是對的，但在日常操作並非最大的那一項時就不對了：若某個工作區的 Terraform 部分只負責維護 Ansible 清單，以無人值守的方式套用，且從不在套用之後執行設定，那麼這裡應當選擇設定。此工作區無法提供的選項會在儲存時被拒絕，而您的角色無法執行的選項則會為您回退為自動。",
       "configureParallelism": "設定平行度",
       "configureParallelismTitle": "一次設定同時處理的主機數量 — 即 ansible 的 forks (1-256)。留空則繼承平行度。之所以單獨設定，是因為執行環境的規格與編排器分開決定。",
-      "configureParallelismLead": "一次設定同時處理的主機數量 — 即 ansible 的 forks (1-256)。留空則繼承平行度。"
+      "configureParallelismLead": "一次設定同時處理的主機數量 — 即 ansible 的 forks (1-256)。留空則繼承平行度。",
+      "playbooks": "允許的 playbook",
+      "playbooksLead": "此處的設定作業可以執行的 playbook。留空則可指定任意 playbook，這是預設行為；加入項目後，指定其他 playbook 的執行將被拒絕。",
+      "playbooksTitle": "每個項目都是相對於設定目錄的路徑；指定清單後，執行選項會變成從清單中挑選，而不再是文字輸入框。未指定任何選項的設定作業會執行預設 playbook，因此預設 playbook 必須是其中的某個項目。可以用它把某個 playbook 擋在絕不應觸及的工作區之外——例如節點排空或資料庫升級——在這種情況下，清單是一種管控手段，而不只是慣例。",
+      "playbooksPlaceholder": "例如 release.yml",
+      "playbooksAdd": "新增 playbook",
+      "playbooksAny": "不限"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "完整執行",
       "queueFullRunConfirm": "對此工作區執行計畫、套用與設定？套用變更真實基礎架構之後，設定會變更真實主機，兩者之間沒有獨立的審查。",
       "moreRunKinds": "其他執行類型",
-      "openExplainingPhase": "開啟說明該結果的階段日誌"
+      "openExplainingPhase": "開啟說明該結果的階段日誌",
+      "configurePlaybookDefaultSuffix": "（預設）",
+      "playbookIsDefault": "此工作區的預設 playbook"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",

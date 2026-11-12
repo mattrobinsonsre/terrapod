@@ -180,6 +180,13 @@ def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     ws.auto_configure_enabled = False
     ws.default_playbook = ""
     ws.default_limit = ""
+    # The playbook allow-list (#2527). `[]` is the real default and means NO
+    # restriction, so every configure built on this fixture is unrestricted.
+    # Explicit for the reason the attributes above it are: an auto-MagicMock is
+    # TRUTHY, so `list(ws.playbooks or [])` would make every configure on this
+    # fixture refused against a list containing one mock -- a refusal no test
+    # asked for, reported as a 422 about a playbook.
+    ws.playbooks = []
     return ws
 
 
@@ -2826,6 +2833,99 @@ class TestRetryOnlyOutstandingHosts:
         assert resp.status_code == 201
         assert mock_create.await_args.kwargs["ansible_limit"] == "web1:web2:web3"
         mock_outstanding.assert_not_called()
+
+
+class TestThePlaybookAllowListRefusesAConfigureOnTheRoute:
+    """A configure outside the workspace's allow-list is refused (#2527).
+
+    Driven as a REQUEST with the real `create_run`, for the reason the locked
+    class below gives: the fix is "the chokepoint refuses and the route
+    translates", and only a request exercises both halves. A test that calls
+    `require_allowed_playbook` passes with the `create_run` call deleted AND
+    with the exception left out of the route's translation tuple -- which would
+    turn a 422 into a 500.
+
+    The DETAIL is asserted, not just the status: a status-only assertion passes
+    for an unrelated 422, of which this route has many.
+    """
+
+    @staticmethod
+    def _app_for(ws):
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        # `create_run` reads the configuration version with `db.get`, and on an
+        # AsyncMock that returns a mock whose `speculative` is TRUTHY -- so the
+        # configure would be refused as speculative before the allow-list is
+        # reached, which reads as this test failing for its own reason.
+        cv = MagicMock()
+        cv.speculative = False
+        mock_db.get.return_value = cv
+        # And the EE selection, for the same class of reason: the workspace
+        # fixture leaves `ansible_execution_environment` a truthy auto-mock, so
+        # `create_run` refuses it as an EE this deployment does not publish --
+        # a 422 about the wrong thing entirely, which reads as the allow-list
+        # test failing for its own reason.
+        ws.ansible_execution_environment = ""
+        return app
+
+    @staticmethod
+    def _body(attrs, ws):
+        return {
+            "data": {
+                "attributes": attrs,
+                "relationships": {
+                    "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                },
+            }
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.run_service.ha_role.ensure_leader", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_playbook_outside_the_list_is_422_naming_the_allowed_values(
+        self, mock_resolve, _leader, *mocks
+    ):
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        ws.configure_enabled = True
+        ws.playbooks = ["release.yml"]
+        ws.default_playbook = "release.yml"
+        app = self._app_for(ws)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/runs",
+                json=self._body({"is-configure": True, "playbook": "ops/drain-node.yml"}, ws),
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422, (
+            f"expected 422, got {resp.status_code} ({resp.text}). A 500 here means the "
+            "refusal is not in the route's translation tuple."
+        )
+        detail = resp.json()["errors"][0]["detail"]
+        assert "'ops/drain-node.yml'" in detail, detail
+        assert "'release.yml'" in detail, (
+            f"the refusal does not say what IS allowed -- got {detail!r}. Without the "
+            "allowed values the caller cannot act on it, which is the whole reason the "
+            "list beats a typo'd free-text box."
+        )
+
+    # The ACCEPT direction is deliberately not here, and that is worth stating
+    # rather than leaving as a gap. It needs the whole happy-path mock stack
+    # (pool set, EE resolution, version pinning, the inventory artifact) for a
+    # property that is already pinned twice over: at the service tier by
+    # `tests/services/test_playbooks_allowlist.py`
+    # (`test_an_allowed_playbook_passes`, `test_an_empty_list_is_a_no_op`,
+    # `test_the_bare_configure_path_is_checked_through_the_default`), and at the
+    # route tier by `test_configure_trigger_route.py::test_write_tier_may`,
+    # which creates a configure through this route and gets a 201. So a guard
+    # that refused EVERY configure -- the thing a lone refusal test cannot see
+    # -- fails three named tests already.
 
 
 class TestALockedWorkspaceRefusesAConfigureOnTheRoute:

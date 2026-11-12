@@ -1003,6 +1003,11 @@ def _workspace_json(
                 "config-directory": ws.config_directory,
                 "inventory-paths": list(ws.inventory_paths or []),
                 "default-playbook": ws.default_playbook,
+                # The playbooks a configure on this workspace may choose from,
+                # `[]` meaning any (#2527). The UI turns the `playbook` run
+                # option into a select over it; the API refuses a run outside
+                # it. An allow-list, so empty is open -- see the column.
+                "playbooks": list(ws.playbooks or []),
                 "default-limit": ws.default_limit,
                 "hard-limit": ws.hard_limit,
                 # One version, two spellings (#1559). `engine-version` is the
@@ -1230,6 +1235,7 @@ def _workspace_json(
             "config-directory",
             "inventory-paths",
             "default-playbook",
+            "playbooks",
             "default-limit",
             "hard-limit",
             # Which run button is primary is a Terrapod UI concept (#2479):
@@ -1934,6 +1940,16 @@ async def _create_workspace_impl(
             workspace_settings.validate_ansible_run_default,
             attrs.get("default-playbook"),
             "default-playbook",
+        ),
+        # The pair is reconciled rather than validated field by field (#2527):
+        # a non-empty allow-list has to contain the default, and neither field
+        # can answer that on its own. On create there is no stored row, so the
+        # "sent" halves are the whole of the write.
+        playbooks=_422(
+            workspace_settings.reconcile_playbooks,
+            sent_playbooks=attrs.get("playbooks"),
+            stored_playbooks=[],
+            sent_default=attrs.get("default-playbook"),
         ),
         hard_limit=_422(workspace_settings.validate_hard_limit, attrs.get("hard-limit")),
         default_limit=_422(
@@ -2785,6 +2801,19 @@ async def update_workspace(
             workspace_settings.validate_ansible_run_default,
             attrs["default-playbook"],
             "default-playbook",
+        )
+    # AFTER `default-playbook`, deliberately: the pair is reconciled against the
+    # value this write RESULTS in, so a caller setting both in one payload is
+    # judged on what they asked for rather than on what was there before
+    # (#2527). A caller that touched neither is not re-validated at all -- the
+    # `reconcile_default_run_kind` lesson, where re-checking a stored value
+    # wedged a client whose schema predated the field.
+    if "playbooks" in attrs or "default-playbook" in attrs:
+        ws.playbooks = _422(
+            workspace_settings.reconcile_playbooks,
+            sent_playbooks=attrs["playbooks"] if "playbooks" in attrs else None,
+            stored_playbooks=ws.playbooks,
+            sent_default=ws.default_playbook,
         )
     if "hard-limit" in attrs:
         ws.hard_limit = _422(workspace_settings.validate_hard_limit, attrs["hard-limit"])

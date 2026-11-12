@@ -42,6 +42,7 @@
 //	"config-directory"                  → config_directory    (string, optional; NULL and "" differ — see below)
 //	"inventory-paths"                   → inventory_paths     (list,   optional+computed; ordered)
 //	"ansible-collections"               → ansible_collections (list of {name, version})
+//	"playbooks"                         → playbooks           (list,   optional+computed; the allow-list)
 //	"default-playbook"                  → default_playbook    (string, optional+computed)
 //	"default-limit"                     → default_limit       (string, optional+computed)
 //	"hard-limit"                        → hard_limit          (string, optional+computed)
@@ -173,6 +174,7 @@ type workspaceModel struct {
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
 	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
+	Playbooks                     types.List   `tfsdk:"playbooks"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
 	DefaultLimit                  types.String `tfsdk:"default_limit"`
 	HardLimit                     types.String `tfsdk:"hard_limit"`

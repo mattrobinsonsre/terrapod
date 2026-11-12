@@ -1302,7 +1302,9 @@
       "applyChanges": "Aplicar cambios",
       "setOidcAudiences": "Establecer audiencias OIDC de la identidad de ejecución (reemplaza el mapa en cada espacio de trabajo coincidente)",
       "operationsNone": "Esto dejaría cada espacio de trabajo coincidente sin ninguna operación. Un espacio de trabajo debe conservar planificar y aplicar, o configurar, o ambas.",
-      "setHardLimit": "Establecer el límite estricto (un valor vacío elimina el techo)"
+      "setHardLimit": "Establecer el límite estricto (un valor vacío elimina el techo)",
+      "setPlaybooks": "Establecer los playbooks permitidos (reemplaza la lista en cada espacio de trabajo coincidente; una lista vacía elimina la restricción)",
+      "playbooksPairWarning": "Una lista no vacía tiene que contener el playbook predeterminado propio de cada espacio de trabajo coincidente, así que establécelo en la misma actualización si todavía no es uno de estos."
     },
     "diff": {
       "colWorkspace": "Espacio de trabajo",
@@ -2310,7 +2312,8 @@
       "runOptions": "Opciones de ejecución",
       "agentPool": "Grupo de agentes",
       "agentPoolCandidates": "{count, plural, one {# grupo candidato} other {# grupos candidatos}}",
-      "autoApplyHeld": "retenido"
+      "autoApplyHeld": "retenido",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Cronología",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Qué acción recibe el botón destacado en este espacio de trabajo. Automático ofrece la ejecución más completa que puede — suele ser lo acertado, y es un error cuando la acción cotidiana no es la mayor: un espacio de trabajo cuya parte de Terraform solo mantiene el inventario de Ansible, que aplica sin supervisión y nunca configura tras un apply, quiere Configurar aquí. Una opción que este espacio de trabajo no puede ofrecer se rechaza al guardarla, y una que tu rol no puede ejecutar recurre a Automático por ti.",
       "configureParallelism": "Paralelismo de la configuración",
       "configureParallelismTitle": "Cuántos hosts gestiona a la vez una configuración — los forks de ansible (1-256). Déjalo vacío para heredar Paralelismo. Es independiente porque el entorno de ejecución se dimensiona por separado del orquestador.",
-      "configureParallelismLead": "Cuántos hosts gestiona a la vez una configuración — los forks de ansible (1-256). Déjalo vacío para heredar Paralelismo."
+      "configureParallelismLead": "Cuántos hosts gestiona a la vez una configuración — los forks de ansible (1-256). Déjalo vacío para heredar Paralelismo.",
+      "playbooks": "Playbooks permitidos",
+      "playbooksLead": "Los playbooks que puede ejecutar aquí una operación de configuración. Déjalo vacío y se podrá nombrar cualquier playbook, que es el comportamiento predeterminado; añade entradas y se rechazará toda ejecución que nombre cualquier otro.",
+      "playbooksTitle": "Cada entrada es una ruta relativa al directorio de configuración, y la opción de ejecución pasa a ser un selector sobre ellas en lugar de un campo de texto. El playbook predeterminado tiene que ser una de las entradas, porque un Configurar sin más ejecuta el predeterminado. Úsalo para mantener un playbook alejado de un espacio de trabajo que nunca debe tocar —el vaciado de un nodo, la actualización de una base de datos—, donde una lista es un control y no una convención.",
+      "playbooksPlaceholder": "p. ej. release.yml",
+      "playbooksAdd": "Añadir playbook",
+      "playbooksAny": "Cualquiera"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Ejecución completa",
       "queueFullRunConfirm": "¿Plan, apply Y configurar este espacio de trabajo? La configuración cambia hosts reales después de que el apply cambie infraestructura real, y no hay revisión intermedia.",
       "moreRunKinds": "Otros tipos de ejecución",
-      "openExplainingPhase": "abrir el registro de la fase que lo explica"
+      "openExplainingPhase": "abrir el registro de la fase que lo explica",
+      "configurePlaybookDefaultSuffix": "(predeterminado)",
+      "playbookIsDefault": "El playbook predeterminado del espacio de trabajo"
     },
     "state": {
       "deleteConfirm": "¿Eliminar la versión de estado n.º {serial}? Esto no se puede deshacer.",

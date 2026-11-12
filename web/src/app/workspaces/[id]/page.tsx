@@ -22,6 +22,7 @@ import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
 import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
 import { modeFromFlags } from '@/lib/dynamic-inventory'
 import { explainingPhase } from '@/lib/run-phases'
+import { isCompositeRun, primaryRunBadge, showsConfigureBadge } from '@/lib/run-badges'
 import { RunKindSplitButton, type RunKindOption } from '@/components/run-kind-split-button'
 import { availableRunKinds, type RunKindId } from '@/lib/run-kinds'
 import { categoryKey, nativeCategoryKey } from '@/lib/variable-category'
@@ -137,6 +138,9 @@ interface WorkspaceAttrs {
   // behaviour rather than something Terrapod added.
   'ansible-host-key-checking'?: boolean
   'default-playbook'?: string
+  // The playbooks a configure here may name, `[]` or absent meaning any
+  // (#2527). What turns the run option from a text box into a select.
+  playbooks?: string[]
   'default-limit'?: string
   'hard-limit'?: string
   locked: boolean
@@ -254,11 +258,23 @@ interface RunItem {
     'save-plan': boolean
     'is-destroy': boolean
     // The Ansible configure half (#1974). `is-configure` means the run carries
-    // one; `configure-after-apply` tells a COMPOSITE (an apply then a configure
-    // on one run) from a STANDALONE configure, which matters because the first
-    // also plans and applies.
+    // one. Its sibling `configure-after-apply` is deliberately NOT declared
+    // here any more (#2507): the only question this page asked of it -- is this
+    // a composite -- is what `run-kind` answers, and reading the pair is the
+    // three-attribute derivation that badged a configure-only run as a
+    // composite. `web/tests/run-kind-attribute.test.ts` holds it out.
     'is-configure': boolean
-    'configure-after-apply': boolean
+    // What the run IS, in one word (#2507): `plan_apply`, `configure` or
+    // `full`. The server derives it from the two flags above so this page
+    // does not -- deriving it here is what badged a configure-only run
+    // "plan + apply" AND "configure" at once. Optional because a build can
+    // outlive the server that sends it; `run-badges.ts` says what happens
+    // then.
+    'run-kind'?: string
+    // Which playbook THIS run was asked to configure (#2527). Empty means the
+    // workspace's `default-playbook`, which is what a git-driven configure
+    // runs, so the two are shown differently rather than resolved here.
+    playbook?: string
     'created-at': string
     'created-by': string
     'plan-started-at': string | null
@@ -427,6 +443,13 @@ function WorkspaceDetailContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastQueuedRunId, setLastQueuedRunId] = useState<string | null>(null)
+  // Which view the banner's "View run" should land on (#2509). `''` is the run
+  // page's own default, which is the right answer for a plan or an apply --
+  // Overview is where the Confirm button and the gates are. A STANDALONE
+  // configure names `configure` explicitly: the configure log is the only log
+  // it has, and an explicit `?view=` covers the most common entry without
+  // depending on the page inferring anything.
+  const [lastQueuedRunView, setLastQueuedRunView] = useState('')
 
   // Settings and views that only mean something to Terraform are hidden for
   // Pulumi rather than shown and ignored (#1555, #1568). `workspace` is null
@@ -444,6 +467,27 @@ function WorkspaceDetailContent() {
   // placeholder stops being formatted in the reader's locale.
   const phaseKeyFor = (name: string) =>
     phaseKey(workspace?.attributes.engine, 'words', name)
+  // What KIND of run this is, as the badges need it (#2507). Three one-line
+  // readers rather than the inference these cells used to carry, so the
+  // desktop table, the phone cards and the sort key cannot disagree about one
+  // run -- which they did: a configure-only run was badged "plan + apply" AND
+  // "configure" in both renders.
+  const runBadge = (run: RunItem) =>
+    primaryRunBadge({
+      runKind: run.attributes['run-kind'],
+      isDestroy: run.attributes['is-destroy'],
+      planOnly: run.attributes['plan-only'],
+    })
+  const runShowsConfigure = (run: RunItem) =>
+    showsConfigureBadge({
+      runKind: run.attributes['run-kind'],
+      isConfigure: run.attributes['is-configure'],
+    })
+  // The playbook a configure run used: its own, or the workspace's default
+  // when it named none (#2527). Resolved for DISPLAY only -- the run document
+  // keeps the two apart on purpose, and the caller renders the fallback muted.
+  const runPlaybook = (run: RunItem) =>
+    run.attributes.playbook || workspace?.attributes['default-playbook'] || ''
   // A run status that names a phase belongs to the engine; the rest (queued,
   // errored, canceled…) are the platform's own.
   const runStatusLabel = (status: string) =>
@@ -547,6 +591,10 @@ function WorkspaceDetailContent() {
   const [editInventoryScriptsEnabled, setEditInventoryScriptsEnabled] = useState(false)
   const [editAnsibleHostKeyChecking, setEditAnsibleHostKeyChecking] = useState(true)
   const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
+  // The allow-list over the playbook run option (#2527). `[]` is the OPEN
+  // state, so an empty editor means "any playbook", which is what every
+  // workspace has until somebody narrows it.
+  const [editPlaybooks, setEditPlaybooks] = useState<string[]>([])
   const [editDefaultLimit, setEditDefaultLimit] = useState('')
   const [editHardLimit, setEditHardLimit] = useState('')
   const [editBindPlan, setEditBindPlan] = useState(false)
@@ -845,7 +893,18 @@ function WorkspaceDetailContent() {
         // is never plan-only (the server refuses the pair), so it would
         // otherwise sort and filter as a plan + apply -- which is what it is
         // not (#1974). A COMPOSITE reads as both, because it is.
-        case 'type': return (item.attributes['is-destroy'] ? 'destroy' : item.attributes['is-configure'] ? (item.attributes['configure-after-apply'] ? 'plan + apply + configure' : 'configure') : item.attributes['plan-only'] ? 'plan only' : 'plan + apply') + (item.attributes['save-plan'] ? ' (saved)' : '')
+        case 'type': return [
+          primaryRunBadge({
+            runKind: item.attributes['run-kind'],
+            isDestroy: item.attributes['is-destroy'],
+            planOnly: item.attributes['plan-only'],
+          }),
+          showsConfigureBadge({
+            runKind: item.attributes['run-kind'],
+            isConfigure: item.attributes['is-configure'],
+          }) ? 'configure' : '',
+          item.attributes['save-plan'] ? 'saved' : '',
+        ].filter(Boolean).join(' + ')
         case 'source': return item.attributes.source
         case 'created-by': return item.attributes['created-by'] || ''
         case 'created-at': return item.attributes['created-at']
@@ -1423,6 +1482,7 @@ function WorkspaceDetailContent() {
     // API's missing key seeds (#1966).
     setEditConfigDir(workspace.attributes['config-directory'] ?? '')
     setEditInventoryPaths(workspace.attributes['inventory-paths'] || [])
+    setEditPlaybooks(workspace.attributes.playbooks || [])
     setEditDynamicInventoryEnabled(workspace.attributes['dynamic-inventory-enabled'] ?? false)
     setEditInventoryScriptsEnabled(workspace.attributes['inventory-scripts-enabled'] ?? false)
     setEditAnsibleHostKeyChecking(workspace.attributes['ansible-host-key-checking'] ?? true)
@@ -1527,6 +1587,10 @@ function WorkspaceDetailContent() {
               'inventory-scripts-enabled': editInventoryScriptsEnabled,
               'ansible-host-key-checking': editAnsibleHostKeyChecking,
               'default-playbook': editDefaultPlaybook,
+              // Blank rows dropped for the same reason as `inventory-paths`
+              // above: the server refuses an empty entry, so one left behind
+              // would 422 the whole save. A kept entry is sent byte for byte.
+              playbooks: editPlaybooks.filter((entry) => entry !== ''),
               'default-limit': editDefaultLimit,
               'hard-limit': editHardLimit,
               'var-files': editVarFiles,
@@ -1837,6 +1901,7 @@ function WorkspaceDetailContent() {
       const newRunId = runData?.data?.id as string | undefined
       if (newRunId) {
         setLastQueuedRunId(newRunId)
+        setLastQueuedRunView('')
         setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
       }
     } catch (err) {
@@ -2100,6 +2165,7 @@ function WorkspaceDetailContent() {
       const newRunId = runData?.data?.id as string | undefined
       if (newRunId) {
         setLastQueuedRunId(newRunId)
+        setLastQueuedRunView('configure')
         setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
       }
       setShowPlanOptions(false)
@@ -2182,6 +2248,7 @@ function WorkspaceDetailContent() {
       const newRunId = runData?.data?.id as string | undefined
       if (newRunId) {
         setLastQueuedRunId(newRunId)
+        setLastQueuedRunView('')
         setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
       }
       setShowPlanOptions(false)
@@ -2227,6 +2294,7 @@ function WorkspaceDetailContent() {
       const newRunId = runData?.data?.id as string | undefined
       if (newRunId) {
         setLastQueuedRunId(newRunId)
+        setLastQueuedRunView('')
         setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
       }
       setShowDestroyConfirm(false)
@@ -2759,6 +2827,7 @@ function WorkspaceDetailContent() {
         'configure-all-hosts': editConfigureAllHosts,
         'config-directory': editConfigDir,
         'default-playbook': editDefaultPlaybook,
+        playbooks: editPlaybooks,
         'default-limit': editDefaultLimit,
         'hard-limit': editHardLimit,
         'inventory-paths': editInventoryPaths,
@@ -2793,6 +2862,7 @@ function WorkspaceDetailContent() {
     // 389 characters it is an explanation, and a hover is unreachable on
     // touch and invisible to a keyboard.
     'hard-limit': 'fields.hardLimitTitle',
+    playbooks: 'fields.playbooksTitle',
     'inventory-paths': 'fields.inventoryPathsHint',
     'dynamic-inventory-enabled': 'fields.dynamicInventoryModeHint',
     'ansible-host-key-checking': 'fields.ansibleHostKeyCheckingHint',
@@ -2868,6 +2938,7 @@ function WorkspaceDetailContent() {
     'config-directory': (v) => setEditConfigDir(String(v)),
     'default-playbook': (v) => setEditDefaultPlaybook(String(v)),
     'default-limit': (v) => setEditDefaultLimit(String(v)),
+    playbooks: (v) => setEditPlaybooks(v as string[]),
     'inventory-paths': (v) => setEditInventoryPaths(v as string[]),
     'dynamic-inventory-enabled': (v) => setEditDynamicInventoryEnabled(Boolean(v)),
     'inventory-scripts-enabled': (v) => setEditInventoryScriptsEnabled(Boolean(v)),
@@ -3232,7 +3303,13 @@ function WorkspaceDetailContent() {
               {t('runQueuedBanner.message')}
             </p>
             <button
-              onClick={() => { setLastQueuedRunId(null); router.push(`/workspaces/${workspaceId}/runs/${lastQueuedRunId}`) }}
+              onClick={() => {
+                setLastQueuedRunId(null)
+                router.push(
+                  `/workspaces/${workspaceId}/runs/${lastQueuedRunId}` +
+                    (lastQueuedRunView ? `?view=${lastQueuedRunView}` : ''),
+                )
+              }}
               className="text-sm font-medium text-brand-400 hover:text-brand-300 transition-colors"
             >
               {t('runQueuedBanner.viewRun')} &rarr;
@@ -3796,6 +3873,45 @@ function WorkspaceDetailContent() {
                         placeholder={t('fields.defaultLimitPlaceholder')}
                         title={t('fields.defaultLimitTitle')}
                         className="mt-1 w-full min-h-11 sm:min-h-0 px-2 py-1 text-base sm:text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    }
+                  />
+                  {/* The allow-list over the playbook run option (#2527).
+                      Immediately after the default it bounds, because the two
+                      are one declaration: a non-empty list has to contain the
+                      default and the server refuses the pair otherwise, so
+                      editing one without seeing the other is how a save gets
+                      a 422 nobody expected. */}
+                  <Field
+                    attr="playbooks"
+                    ctx={ansibleCtx}
+                    kind="list"
+                    display={
+                      (attrs.playbooks || []).length > 0 ? (
+                        <span className="flex flex-wrap gap-1">
+                          {(attrs.playbooks || []).map((pb) => (
+                            <code
+                              key={pb}
+                              className="bg-slate-700 px-2 py-0.5 rounded text-xs"
+                            >
+                              {pb}
+                            </code>
+                          ))}
+                        </span>
+                      ) : (
+                        /* "Any" rather than "None": an empty list is the OPEN
+                           state, and `common.none` would read as the opposite
+                           of what it means -- the one place this attribute can
+                           be misunderstood. */
+                        <span className="text-slate-500">{t('fields.playbooksAny')}</span>
+                      )
+                    }
+                    control={
+                      <StringListEditor
+                        values={editPlaybooks}
+                        onChange={setEditPlaybooks}
+                        placeholder={t('fields.playbooksPlaceholder')}
+                        addLabel={t('fields.playbooksAdd')}
                       />
                     }
                   />
@@ -5442,14 +5558,47 @@ function WorkspaceDetailContent() {
                           <label htmlFor="cfg-playbook" className="block text-xs text-slate-400 mb-1">
                             {t('runs.configurePlaybook')}
                           </label>
-                          <input
-                            id="cfg-playbook"
-                            type="text"
-                            value={configurePlaybook}
-                            onChange={e => setConfigurePlaybook(e.target.value)}
-                            placeholder={attrs['default-playbook'] || t('runs.configurePlaybookPlaceholder')}
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-                          />
+                          {/* A SELECT when the workspace allow-lists playbooks,
+                              the text box when it does not (#2527). Not a
+                              wizard and not a dialog: pressing Configure still
+                              runs immediately with whatever the options say,
+                              and a bare press runs the default exactly as
+                              before -- which is why the state stays `''` until
+                              somebody picks something, so an untouched form
+                              sends no playbook at all.
+
+                              With no list the free-text box stays, because
+                              every workspace has no list until somebody writes
+                              one and a select over nothing would offer nothing.
+                              `default-playbook` is pre-selected rather than
+                              shown as a separate "use the default" option: the
+                              server guarantees it is IN the list, so an extra
+                              option would be a second way to say one thing. */}
+                          {(attrs.playbooks || []).length > 0 ? (
+                            <select
+                              id="cfg-playbook"
+                              data-testid="cfg-playbook-select"
+                              value={configurePlaybook || attrs['default-playbook'] || ''}
+                              onChange={e => setConfigurePlaybook(e.target.value)}
+                              className="w-full px-3 py-2 min-h-11 sm:min-h-0 bg-slate-900 border border-slate-600 rounded-lg text-base sm:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                            >
+                              {(attrs.playbooks || []).map((pb) => (
+                                <option key={pb} value={pb}>
+                                  {pb}
+                                  {pb === attrs['default-playbook'] ? ` ${t('runs.configurePlaybookDefaultSuffix')}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              id="cfg-playbook"
+                              type="text"
+                              value={configurePlaybook}
+                              onChange={e => setConfigurePlaybook(e.target.value)}
+                              placeholder={attrs['default-playbook'] || t('runs.configurePlaybookPlaceholder')}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                            />
+                          )}
                         </div>
                         <div>
                           <label htmlFor="cfg-limit" className="block text-xs text-slate-400 mb-1">
@@ -5636,15 +5785,24 @@ function WorkspaceDetailContent() {
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           <span className="flex flex-wrap items-center gap-1">
-                            {run.attributes['is-destroy'] ? (
+                            {/* WHICH plan/apply badge, or none at all (#2507).
+                                `null` is the case this cell did not have: a
+                                configure-only run is neither a destroy nor
+                                plan-only, so it fell through to the default
+                                and was badged "plan + apply" beside the
+                                configure badge -- two badges saying between
+                                them that Terraform was changing
+                                infrastructure, which is the one thing a
+                                configure does not do. */}
+                            {runBadge(run) === 'destroy' ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
                                 {t('runs.typeDestroy')}
                               </span>
-                            ) : run.attributes['plan-only'] ? (
+                            ) : runBadge(run) === 'planOnly' ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
                                 {phaseWord('badgePlanOnly')}
                               </span>
-                            ) : (
+                            ) : runBadge(run) === 'planApply' ? (
                               /* A badge like the other four, not bare text
                                  (#2413 F11). Four of the five markers in this
                                  cell are badges -- destroy, plan-only,
@@ -5657,12 +5815,12 @@ function WorkspaceDetailContent() {
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300">
                                 {phaseWord('typePlanApply')}
                               </span>
-                            )}
+                            ) : null}
                             {/* Additive like the saved-plan badge beside it, and
                                 for the same reason: a COMPOSITE is a plan+apply
                                 AND a configure, so one badge replacing the other
                                 would hide half of what the run does (#1974). */}
-                            {run.attributes['is-configure'] && (
+                            {runShowsConfigure(run) && (
                               /* A badge that NAMES a phase links to that
                                  phase's log, not to whichever phase explained
                                  the run (#2413 F16). On a composite that
@@ -5672,12 +5830,27 @@ function WorkspaceDetailContent() {
                                 type="button"
                                 onClick={(e) => goToRunView(e, run.id, 'configure')}
                                 className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300 hover:bg-violet-800/60 hover:text-violet-200 transition-colors"
-                                title={run.attributes['configure-after-apply']
+                                title={isCompositeRun({ runKind: run.attributes['run-kind'] })
                                   ? t('runs.typeConfigureAfterApplyHint')
                                   : t('runs.typeConfigureHint')}
                               >
                                 {t('runs.typeConfigure')}
                               </button>
+                            )}
+                            {/* Which playbook the run used (#2527). On a
+                                workspace whose runs are mostly configures the
+                                kind badge alone does not tell two of them
+                                apart, and the playbook is what does. Muted
+                                when it came from the workspace's default, so
+                                "this run asked for X" stays readable as
+                                something somebody chose. */}
+                            {runShowsConfigure(run) && runPlaybook(run) && (
+                              <code
+                                className={`px-1.5 py-0.5 rounded bg-slate-700/60 text-xs font-mono ${run.attributes.playbook ? 'text-slate-200' : 'text-slate-400'}`}
+                                title={run.attributes.playbook ? undefined : t('runs.playbookIsDefault')}
+                              >
+                                {runPlaybook(run)}
+                              </code>
                             )}
                             {/* Additive, not another branch: a saved plan can also
                                 be a destroy, and "deferred" is the fact that
@@ -5765,15 +5938,19 @@ function WorkspaceDetailContent() {
                           label: t('runs.type'),
                           value: (
                             <span className="flex flex-wrap items-center gap-1">
-                              {run.attributes['is-destroy'] ? (
+                              {/* The SAME rule as the desktop table (#2507):
+                                  one shared helper, so a configure-only run
+                                  cannot read as a composite on a phone and as
+                                  a configure on a desktop. */}
+                              {runBadge(run) === 'destroy' ? (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
                                   {t('runs.typeDestroy')}
                                 </span>
-                              ) : run.attributes['plan-only'] ? (
+                              ) : runBadge(run) === 'planOnly' ? (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
                                   {phaseWord('badgePlanOnly')}
                                 </span>
-                              ) : (
+                              ) : runBadge(run) === 'planApply' ? (
                                 /* The SAME badge as the desktop table (#2413
                                    F11). It was prose here while the desktop
                                    render became a badge, so on a phone the
@@ -5785,11 +5962,26 @@ function WorkspaceDetailContent() {
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300">
                                   {phaseWord('typePlanApply')}
                                 </span>
-                              )}
-                              {run.attributes['is-configure'] && (
+                              ) : null}
+                              {runShowsConfigure(run) && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300">
                                   {t('runs.typeConfigure')}
                                 </span>
+                              )}
+                              {/* Which playbook the run used (#2527). Beside
+                                  the kind, because on a workspace whose runs
+                                  are mostly configures the kind badge alone
+                                  does not tell two of them apart. Muted when
+                                  it is the workspace's default, so "this run
+                                  asked for X" stays distinguishable from "the
+                                  workspace's default ran". */}
+                              {runShowsConfigure(run) && runPlaybook(run) && (
+                                <code
+                                  className={`px-1.5 py-0.5 rounded bg-slate-700/60 text-xs font-mono ${run.attributes.playbook ? 'text-slate-200' : 'text-slate-400'}`}
+                                  title={run.attributes.playbook ? undefined : t('runs.playbookIsDefault')}
+                                >
+                                  {runPlaybook(run)}
+                                </code>
                               )}
                               {run.attributes['save-plan'] && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300">

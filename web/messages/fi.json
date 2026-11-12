@@ -1302,7 +1302,9 @@
       "applyChanges": "Käytä muutoksia",
       "setOidcAudiences": "Aseta ajoidentiteetin OIDC-audiencet (korvaa kartan jokaisessa vastaavassa työtilassa)",
       "operationsNone": "Tämä jättäisi jokaisen osuvan työtilan täysin ilman toimintoa. Työtilan on säilytettävä suunnittelu ja käyttöönotto, määritys tai molemmat.",
-      "setHardLimit": "Aseta ehdoton rajaus (tyhjä arvo poistaa ylärajan)"
+      "setHardLimit": "Aseta ehdoton rajaus (tyhjä arvo poistaa ylärajan)",
+      "setPlaybooks": "Aseta sallitut playbookit (korvaa luettelon jokaisessa osuvassa työtilassa; tyhjä luettelo poistaa rajoituksen)",
+      "playbooksPairWarning": "Ei-tyhjän luettelon on sisällettävä jokaisen osuvan työtilan oma oletusplaybook, joten aseta se samassa päivityksessä, jos se ei jo ole yksi näistä merkinnöistä."
     },
     "diff": {
       "colWorkspace": "Työtila",
@@ -2310,7 +2312,8 @@
       "runOptions": "Ajon vaihtoehdot",
       "agentPool": "Agenttiryhmä",
       "agentPoolCandidates": "{count, plural, one {# ehdokasryhmä} other {# ehdokasryhmää}}",
-      "autoApplyHeld": "odottaa"
+      "autoApplyHeld": "odottaa",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Aikajana",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Mikä toiminto saa korostetun painikkeen tässä työtilassa. Automaattinen tarjoaa täydellisimmän ajon, joka on mahdollinen — useimmiten oikein, mutta väärin silloin, kun jokapäiväinen toiminto ei ole laajin: työtila, jonka Terraform-puoli vain ylläpitää Ansible-inventaariota, ottaa muutokset käyttöön valvomatta eikä koskaan määritä käyttöönoton jälkeen, haluaa tähän Määritä. Valintaa, jota tämä työtila ei voi tarjota, ei hyväksytä tallennettaessa, ja valinta, jota roolisi ei voi ajaa, vaihtuu sinulle Automaattiseksi.",
       "configureParallelism": "Määrityksen rinnakkaisuus",
       "configureParallelismTitle": "Kuinka monta isäntää määritys käsittelee samanaikaisesti — ansiblen forks (1-256). Jätä tyhjäksi, niin peritään Rinnakkaisuus. Erillinen, koska suoritusympäristön koko määritetään orkestroijasta riippumatta.",
-      "configureParallelismLead": "Kuinka monta isäntää määritys käsittelee samanaikaisesti — ansiblen forks (1-256). Jätä tyhjäksi, niin peritään Rinnakkaisuus."
+      "configureParallelismLead": "Kuinka monta isäntää määritys käsittelee samanaikaisesti — ansiblen forks (1-256). Jätä tyhjäksi, niin peritään Rinnakkaisuus.",
+      "playbooks": "Sallitut playbookit",
+      "playbooksLead": "Playbookit, joita määritys täällä saa suorittaa. Jätä tyhjäksi, niin mikä tahansa playbook voidaan nimetä — tämä on oletus; lisää merkintöjä, niin mitään muuta nimeävä ajo hylätään.",
+      "playbooksTitle": "Jokainen merkintä on polku suhteessa asetushakemistoon, ja ajon vaihtoehto muuttuu tekstikentästä valitsimeksi niiden välillä. Oletusplaybookin on oltava yksi merkinnöistä, koska pelkkä Määritä suorittaa oletuksen. Käytä tätä pitämään playbook poissa työtilasta, johon se ei koskaan saa koskea — solmun tyhjennys, tietokannan päivitys — jolloin luettelo on hallintakeino eikä pelkkä tapa.",
+      "playbooksPlaceholder": "esim. release.yml",
+      "playbooksAdd": "Lisää playbook",
+      "playbooksAny": "Mikä tahansa"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Täysi ajo",
       "queueFullRunConfirm": "Plan, apply JA määritys tälle työtilalle? Määritys muuttaa oikeita koneita sen jälkeen kun apply on muuttanut oikeaa infrastruktuuria, eikä niiden välissä ole erillistä tarkistusta.",
       "moreRunKinds": "Muut ajotyypit",
-      "openExplainingPhase": "avaa sen vaiheen loki, joka selittää tämän"
+      "openExplainingPhase": "avaa sen vaiheen loki, joka selittää tämän",
+      "configurePlaybookDefaultSuffix": "(oletus)",
+      "playbookIsDefault": "Työtilan oletusplaybook"
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

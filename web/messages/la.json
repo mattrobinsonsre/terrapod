@@ -1302,7 +1302,9 @@
       "applyChanges": "Mutationes applicare",
       "setOidcAudiences": "Auditores OIDC identitatis exsecutionis statuere (chartam in omni loco operis conveniente substituit)",
       "operationsNone": "Hoc omne spatium operis congruens sine ulla operatione relinqueret. Spatium operis destinare et adhibere, aut configurare, aut utrumque servare debet.",
-      "setHardLimit": "Limitem firmum statuere (valor vacuus limitem supremum tollit)"
+      "setHardLimit": "Limitem firmum statuere (valor vacuus limitem supremum tollit)",
+      "setPlaybooks": "Libellos ludendi permissos statuere (indicem in omni loco operis congruenti substituit; index vacuus restrictionem tollit)",
+      "playbooksPairWarning": "Index non vacuus libellum ludendi praedefinitum proprium cuiusque loci operis congruentis continere debet; itaque eum in eadem renovatione statue, nisi iam unus ex his est."
     },
     "diff": {
       "colWorkspace": "Locus Operis",
@@ -2310,7 +2312,8 @@
       "runOptions": "Optiones Exsecutionis",
       "agentPool": "Copia agentium",
       "agentPoolCandidates": "{count, plural, one {# copia candidata} other {# copiae candidatae}}",
-      "autoApplyHeld": "retentum"
+      "autoApplyHeld": "retentum",
+      "playbook": "Libellus Ludendi"
     },
     "timeline": {
       "heading": "Series Temporum",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Quae actio bullam conspicuam in hoc loco operis accipit. Automaticum exsecutionem plenissimam quam potest offert — plerumque rectum, et falsum ubi actio quotidiana non est maxima: locus operis cuius pars Terraform solum inventarium Ansible curat, qui sine custode adhibet et numquam post applicationem configurat, hic Configurare vult. Electio quam hic locus operis offerre non potest respuitur cum eam servas, et ea quam partes tuae exsequi non possunt ad Automaticum tibi recidit.",
       "configureParallelism": "Parallelismus configurationis",
       "configureParallelismTitle": "Quot hospites configuratio simul agat — forks ansible (1-256). Vacuum relinque ut Parallelismus hereditetur. Separatum est quia ambitus exsecutionis seorsum a moderatore metitur.",
-      "configureParallelismLead": "Quot hospites configuratio simul agat — forks ansible (1-256). Vacuum relinque ut Parallelismus hereditetur."
+      "configureParallelismLead": "Quot hospites configuratio simul agat — forks ansible (1-256). Vacuum relinque ut Parallelismus hereditetur.",
+      "playbooks": "Libelli ludendi permissi",
+      "playbooksLead": "Libelli ludendi quos operatio configurandi hic exsequi potest. Relinque vacuum et quilibet libellus ludendi nominari potest, quod praedefinitum est; adde voces et cursus alium nominans recusatur.",
+      "playbooksTitle": "Quaeque vox est semita relativa ad directorium configurationis, et optio cursus fit selector inter eas pro area textus. Libellus ludendi praedefinitus una ex vocibus esse debet, quia Configurare nudum praedefinitum exsequitur. Hoc adhibe ut libellum ludendi a loco operis arceas quem numquam tangere debet — exhaustio nodi, promotio basis datorum — ubi index potestas est potius quam consuetudo.",
+      "playbooksPlaceholder": "ex. gr. release.yml",
+      "playbooksAdd": "Libellum ludendi addere",
+      "playbooksAny": "Quilibet"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Executio plena",
       "queueFullRunConfirm": "Consilium, exsecutio ET configuratio huius loci operis? Configuratio hospites veros mutat postquam exsecutio infrastructuram veram mutavit, nec inter ea recognitio separata est.",
       "moreRunKinds": "Alia genera executionis",
-      "openExplainingPhase": "acta phasis quae id explicat aperire"
+      "openExplainingPhase": "acta phasis quae id explicat aperire",
+      "configurePlaybookDefaultSuffix": "(praedefinitus)",
+      "playbookIsDefault": "Libellus ludendi praedefinitus loci operis"
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",

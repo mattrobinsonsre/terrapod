@@ -570,6 +570,48 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('the playbook option is a select at phone width when the workspace allow-lists them (#2527)', async ({
+    page,
+  }) => {
+    // A `<select>` where the sibling controls are text inputs, inside the same
+    // options panel the test above calls the place a monospace placeholder can
+    // push a phone wide. A native select is what #719 asks for -- it opens the
+    // platform picker on a phone rather than a bespoke dropdown -- and the
+    // longest option here is longer than the box, which is the case that
+    // overflows if the control is not allowed to shrink.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eresp-playbooks'), {
+      'configure-enabled': true,
+      'config-directory': 'ansible',
+      'default-playbook': 'release.yml',
+      playbooks: ['release.yml', 'ops/upgrade-postgres-step01.yml'],
+    })
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`)
+    await page.getByRole('button', { name: 'Options', exact: true }).click()
+
+    const select = page.getByTestId('cfg-playbook-select')
+    await expect(select).toBeVisible()
+    // The workspace's default is what a bare Configure runs, so it is what the
+    // picker opens on -- the "no wizard" half of the feature.
+    await expect(select).toHaveValue('release.yml')
+    await expectNoHorizontalPageScroll(page)
+
+    // Picking the other one must not widen the page either: the option's text
+    // is longer than the control, and a select that grows to its content is
+    // exactly how a phone starts scrolling sideways.
+    await select.selectOption('ops/upgrade-postgres-step01.yml')
+    await expectNoHorizontalPageScroll(page)
+
+    // And the allow-list editor on the Configuration tab, which is a list
+    // editor with monospace rows -- the other shape that overflows.
+    await page.goto(`/workspaces/${wsId}?tab=configuration`)
+    await expect(
+      page.getByText('Allowed playbooks', { exact: true }).filter({ visible: true }).first(),
+    ).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('a long lock reason wraps inside the lock card at phone width (#1705)', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2eresp-lockreason'))
