@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (jakékoli)",
       "termLabel": "{key}: {value}",
       "hintStatus": "stav",
-      "hintHealth": "stav zdraví",
       "hintLabel": "štítek",
       "hintLabelKey": "klíč štítku",
       "hintName": "název",
       "engineLabel": "Engine",
-      "engineAll": "Všechny enginy"
+      "engineAll": "Všechny enginy",
+      "flags": "Příznaky",
+      "termFlag": "příznak: {value}",
+      "termLocked": "zamčeno: {value}",
+      "hintFlag": "příznak",
+      "hintLocked": "zamčeno"
     },
     "row": {
       "removeLabelFilter": "Kliknutím odeberete z filtru",
@@ -149,6 +153,14 @@
       "local": "Místní",
       "collapseAll": "Sbalit vše",
       "expandAll": "Rozbalit vše"
+    },
+    "flagName": {
+      "state-diverged": "Stav se rozešel",
+      "no-agent-pool": "Žádný pool agentů",
+      "no-live-agent-pool": "Žádný živý pool agentů",
+      "vcs-error": "Chyba VCS",
+      "drifted": "Odchýleno",
+      "drift-errored": "Detekce odchylek selhala"
     }
   },
   "status": {

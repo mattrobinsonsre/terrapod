@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (any)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "health",
       "hintLabel": "label",
       "hintLabelKey": "label key",
       "hintName": "name",
       "engineLabel": "Engine",
-      "engineAll": "All engines, arr"
+      "engineAll": "All engines, arr",
+      "flags": "Pennants",
+      "termFlag": "pennant: {value}",
+      "termLocked": "locked in th' brig: {value}",
+      "hintFlag": "pennant",
+      "hintLocked": "locked in th' brig"
     },
     "row": {
       "removeLabelFilter": "Click t'' cast off from th'' filter",
@@ -149,6 +153,14 @@
       "local": "Ashore",
       "collapseAll": "Batten down all",
       "expandAll": "Unfurl all"
+    },
+    "flagName": {
+      "state-diverged": "State Gone Adrift",
+      "no-agent-pool": "No Crew Muster",
+      "no-live-agent-pool": "No Crew Muster Aboard",
+      "vcs-error": "VCS Squall",
+      "drifted": "Adrift",
+      "drift-errored": "Drift Spyglass Failed"
     }
   },
   "status": {

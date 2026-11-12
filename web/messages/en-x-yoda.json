@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (any)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "health",
       "hintLabel": "label",
       "hintLabelKey": "label key",
       "hintName": "name",
       "engineLabel": "Engine",
-      "engineAll": "All engines, these are"
+      "engineAll": "All engines, these are",
+      "flags": "Flags",
+      "termFlag": "flag: {value}",
+      "termLocked": "locked: {value}",
+      "hintFlag": "flag",
+      "hintLocked": "locked"
     },
     "row": {
       "removeLabelFilter": "To remove from the filter, click you must",
@@ -149,6 +153,14 @@
       "local": "Local",
       "collapseAll": "Collapse all, you will",
       "expandAll": "Expand all, you will"
+    },
+    "flagName": {
+      "state-diverged": "Diverged, State",
+      "no-agent-pool": "Pool of agents, none",
+      "no-live-agent-pool": "Pool of agents, none alive",
+      "vcs-error": "Error, VCS",
+      "drifted": "Drifted",
+      "drift-errored": "Failed, drift detection"
     }
   },
   "status": {

@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (أي)",
       "termLabel": "{key}: {value}",
       "hintStatus": "الحالة",
-      "hintHealth": "الحالة الصحية",
       "hintLabel": "التسمية",
       "hintLabelKey": "مفتاح التسمية",
       "hintName": "الاسم",
       "engineLabel": "المحرك",
-      "engineAll": "كل المحركات"
+      "engineAll": "كل المحركات",
+      "flags": "العلامات",
+      "termFlag": "علامة: {value}",
+      "termLocked": "مقفل: {value}",
+      "hintFlag": "علامة",
+      "hintLocked": "مقفل"
     },
     "row": {
       "removeLabelFilter": "انقر للإزالة من عامل التصفية",
@@ -149,6 +153,14 @@
       "local": "محلي",
       "collapseAll": "طيّ الكل",
       "expandAll": "توسيع الكل"
+    },
+    "flagName": {
+      "state-diverged": "الحالة متباعدة",
+      "no-agent-pool": "لا يوجد تجمّع وكلاء",
+      "no-live-agent-pool": "لا يوجد تجمّع وكلاء نشط",
+      "vcs-error": "خطأ في نظام التحكم في الإصدارات",
+      "drifted": "منحرف",
+      "drift-errored": "فشل اكتشاف الانحراف"
     }
   },
   "status": {

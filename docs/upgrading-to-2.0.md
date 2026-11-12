@@ -72,6 +72,7 @@ first — most rows do not apply to most deployments.
 |---|---|---|
 | Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
 | Move automation off the shapes that change: [a `status == "planning"` branch](#a-run-held-after-its-plan-reports-terraform-enterprises-statuses), [`ListRunPolicyEvaluations` and `IsBlocking()`](#policyevaluation-becomes-policycheck-in-the-go-sdk), and [a literal `queued` or `canceling` read from `/api/tfe/v2`](#a-runs-status-on-apitfev2-is-always-one-go-tfe-defines) | you have scripts or Go programs that read a run's status or its policy results | each is silent: a branch that no longer fires, a `switch` that falls through every case. The first two can be tried ahead of time on your current release |
+| [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status), and move bookmarked `status:locked` / `status:unhealthy` filters | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked`, or you share filter URLs | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then |
 | [Check your own EE images can function as uid 1000](#an-execution-environment-must-run-as-uid-1000) | you set `api.config.ansible.execution_environments`. Terrapod's own published images need nothing | the sidecar's startup probe asserts it, so a non-conforming image fails at pod start — which is better than mid-playbook, but it is still every configure on that workspace |
 | [Grant module `registry:read`](#downloading-a-protected-configuration-version-archive-needs-module-registryread-too) | anyone downloads configuration-version archives from workspaces provisioned by a **self-contained** catalog item | the grant exists on your current release, so doing it first means nobody meets the new `403` |
 | [Point consumers at the catalog surface](#a-human-read-of-a-catalog-instances-variables-no-longer-returns-their-values) | a script or an agent reads `/variables` on a catalog-provisioned workspace and uses the values | the route, the attribute names and the status code are all unchanged — only the content becomes `null`, so nothing reports it |
@@ -402,6 +403,66 @@ are both still answered next to the thing you did, without a comment per push.
 - **The web UI needs nothing.** The roles form now accumulates a repeated key
   instead of refusing it, and the policy-set form already supported several values
   per key.
+
+### The workspace filter has `flag:` and `locked:`, and `status:` is only the run's status
+
+**Affects:** anyone who bookmarks or shares a Workspaces filter containing
+`status:locked` or `status:unhealthy`, and any deployment that uses `flag` or
+`locked` as a **label key**. It does not change the HTTP API, and it changes no
+stored data.
+
+`status:` used to carry two values that were not statuses at all. `status:locked`
+matched a workspace's manual lock, and `status:unhealthy` matched "has at least
+one health condition". They rode `status:` because reserving a new label key takes
+that word away from every operator already using it as a label. The cost was that
+`status:` stopped being one set of mutually exclusive values, which is what made it
+impossible to let two `status:` terms mean "either": `status:locked status:errored`
+was "locked **and** errored".
+
+They are gone from `status:`, which now means only the run's status (thirteen
+values, exactly one per workspace):
+
+| Before | Now |
+|---|---|
+| `status:locked` | `locked:true` (and `locked:false` comes with it) |
+| `status:unhealthy` | `flag:state-diverged flag:no-agent-pool flag:no-live-agent-pool flag:vcs-error flag:drifted flag:drift-errored` |
+
+The **Health Issues** and **Locked** indicators on the workspace list insert
+exactly these, so clicking one shows what it means and lets you delete a condition
+from it. The six `flag:` terms union, so the result is the set `status:unhealthy`
+matched.
+
+**Two label keys become reserved.** `flag` and `locked` can no longer be used as
+label keys, for the same reason `status` and `owner` cannot. `locked` was released
+in 1.6.0 on the grounds that `status:locked` answered it; that spelling is gone, so
+the reason is gone with it. A resource that already carries one of these keys
+keeps working, but the next create or update that includes the key is refused with
+a `422`. Rename the label first:
+
+```sh
+# workspaces, agent pools, registry modules and providers, autodiscovery rules
+# and VCS connections all take labels; list the ones carrying either key
+curl -s -H "Authorization: Bearer $TOKEN" "$TERRAPOD_URL/api/v1/workspaces" \
+  | jq -r '.data[] | select(.attributes.labels | has("flag") or has("locked")) | .attributes.name'
+```
+
+That example finds workspaces only; check the other resource types the same way.
+
+**What else changes for the better.** The Status dropdown now lists the run
+statuses only. `state-diverged`, `vcs-error` and `drifted` moved to the new
+**Flags** dropdown, where they are matched against the server's `health-conditions`
+array instead of a derived status. That array is authoritative, and it fixes two
+disagreements: a workspace awaiting confirmation shows `needs-confirm` and used to
+hide an underlying `state-diverged` from `status:state-diverged`, and a workspace
+with drift detection turned off but a stale `drift-status` showed the Drifted pill
+with no drifted condition. The status **pill** is unchanged and still shows all
+sixteen with its existing precedence. Three conditions (`no-agent-pool`,
+`no-live-agent-pool`, `drift-errored`) had no filter at all before; the Flags
+dropdown is the first way to ask for them individually.
+
+**What this cannot do.** Because `flag:a flag:b` means "either", asking for two
+conditions *together* is not possible. It was not before either: the roll-up was
+all-or-nothing.
 
 ### A run held after its plan reports Terraform Enterprise's statuses
 

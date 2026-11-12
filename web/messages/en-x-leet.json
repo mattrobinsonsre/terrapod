@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (4ny)",
       "termLabel": "{key}: {value}",
       "hintStatus": "5747u5",
-      "hintHealth": "h34l7h",
       "hintLabel": "l4b3l",
       "hintLabelKey": "l4b3l k3y",
       "hintName": "n4m3",
       "engineLabel": "3ng1n3",
-      "engineAll": "4ll 3ng1n35"
+      "engineAll": "4ll 3ng1n35",
+      "flags": "F14g5",
+      "termFlag": "f14g: {value}",
+      "termLocked": "l0ck3d: {value}",
+      "hintFlag": "f14g",
+      "hintLocked": "l0ck3d"
     },
     "row": {
       "removeLabelFilter": "Cl1ck 70 r3m0v3 fr0m f1l73r",
@@ -149,6 +153,14 @@
       "local": "L0c4l",
       "collapseAll": "C0ll4p53 4ll",
       "expandAll": "3xp4nd 4ll"
+    },
+    "flagName": {
+      "state-diverged": "57473 D1v3rg3d",
+      "no-agent-pool": "N0 4g3n7 P00l",
+      "no-live-agent-pool": "N0 L1v3 4g3n7 P00l",
+      "vcs-error": "VC5 3rr0r",
+      "drifted": "Dr1f73d",
+      "drift-errored": "Dr1f7 D373c710n F41l3d"
     }
   },
   "status": {

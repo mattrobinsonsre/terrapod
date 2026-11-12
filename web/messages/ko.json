@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (모든 값)",
       "termLabel": "{key}: {value}",
       "hintStatus": "상태",
-      "hintHealth": "상태",
       "hintLabel": "라벨",
       "hintLabelKey": "라벨 키",
       "hintName": "이름",
       "engineLabel": "엔진",
-      "engineAll": "모든 엔진"
+      "engineAll": "모든 엔진",
+      "flags": "플래그",
+      "termFlag": "플래그: {value}",
+      "termLocked": "잠김: {value}",
+      "hintFlag": "플래그",
+      "hintLocked": "잠김"
     },
     "row": {
       "removeLabelFilter": "클릭하여 필터에서 제거",
@@ -149,6 +153,14 @@
       "local": "로컬",
       "collapseAll": "모두 접기",
       "expandAll": "모두 펼치기"
+    },
+    "flagName": {
+      "state-diverged": "상태 불일치",
+      "no-agent-pool": "에이전트 풀 없음",
+      "no-live-agent-pool": "활성 에이전트 풀 없음",
+      "vcs-error": "VCS 오류",
+      "drifted": "드리프트됨",
+      "drift-errored": "드리프트 감지 실패"
     }
   },
   "status": {

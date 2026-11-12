@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (any)",
       "termLabel": "{key}: {value}",
       "hintStatus": "marklar",
-      "hintHealth": "marklar",
       "hintLabel": "marklar",
       "hintLabelKey": "marklar marklar",
       "hintName": "marklar",
       "engineLabel": "Marklar",
-      "engineAll": "All marklars"
+      "engineAll": "All marklars",
+      "flags": "Marklar",
+      "termFlag": "marklar: {value}",
+      "termLocked": "marklar: {value}",
+      "hintFlag": "marklar",
+      "hintLocked": "marklar"
     },
     "row": {
       "removeLabelFilter": "Click to remove from marklar",
@@ -149,6 +153,14 @@
       "local": "Marklar",
       "collapseAll": "Marklar all",
       "expandAll": "Marklar all"
+    },
+    "flagName": {
+      "state-diverged": "Marklar Diverged",
+      "no-agent-pool": "No marklar marklar",
+      "no-live-agent-pool": "No live marklar marklar",
+      "vcs-error": "Marklar Marklar",
+      "drifted": "Drifted",
+      "drift-errored": "Marklar marklar failed"
     }
   },
   "status": {

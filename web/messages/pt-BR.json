@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (qualquer)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "saúde",
       "hintLabel": "rótulo",
       "hintLabelKey": "chave do rótulo",
       "hintName": "nome",
       "engineLabel": "Motor",
-      "engineAll": "Todos os motores"
+      "engineAll": "Todos os motores",
+      "flags": "Sinalizadores",
+      "termFlag": "sinalizador: {value}",
+      "termLocked": "bloqueado: {value}",
+      "hintFlag": "sinalizador",
+      "hintLocked": "bloqueado"
     },
     "row": {
       "removeLabelFilter": "Clique para remover do filtro",
@@ -149,6 +153,14 @@
       "local": "Local",
       "collapseAll": "Recolher tudo",
       "expandAll": "Expandir tudo"
+    },
+    "flagName": {
+      "state-diverged": "Estado Divergente",
+      "no-agent-pool": "Sem pool de agentes",
+      "no-live-agent-pool": "Sem pool de agentes ativo",
+      "vcs-error": "Erro de VCS",
+      "drifted": "Com Drift",
+      "drift-errored": "Falha na detecção de drift"
     }
   },
   "status": {

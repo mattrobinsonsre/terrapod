@@ -9,40 +9,44 @@
 //   - "key=value"        → same as key:value
 //   - "key:" / "key="    → label key-only predicate (any value, including empty)
 //
-// All terms are AND-ed: a workspace matches when every name term appears in
-// its name AND every label predicate matches one of its labels AND every
-// status predicate matches the workspace's resolved status.
+// How terms combine. Terms intersect (AND), with one exception: the two
+// multi-select dropdowns, Status and Flags, union their own selections.
 //
-// `status` is treated specially because it isn't a label — it's a derived
-// virtual field computed from latest-run / drift-status / state-diverged /
-// vcs-last-error. The accepted values are kebab-case lowercase versions of
-// the labels in `resolveStatus` on the workspaces page (see STATUS_FILTER
-// constants below).
+//   - `status:` is ONLY the run's status. A workspace has exactly one, so two
+//     `status:` terms can only mean "either": `status:planned status:applied`
+//     is planned OR applied.
+//   - `flag:` is one health condition each (`flag:drifted`, `flag:vcs-error`),
+//     derived from the server's `health-conditions` array. A workspace can
+//     carry several at once, and `flag:a flag:b` is "either".
+//   - `locked:true` / `locked:false` is its own key, not a flag: a lock is a
+//     deliberate state rather than something wrong. Keeping it out of the
+//     union is what makes `locked:true flag:drifted` mean locked AND drifted.
+//   - Everything else intersects: name terms, label terms (so `env:prod
+//     env:staging` still matches nothing), and each group against the others.
 //
-// One `status:` value is an aggregate rather than a single resolved status:
-// `status:unhealthy` (`HEALTH_ISSUE_STATUS`) matches any workspace with at
-// least one entry in its server-computed `health-conditions` array. It rides
-// the already-reserved `status` facet deliberately — so no NEW reserved label
-// key has to be introduced (which would risk trapping operators who already
-// use a real label like `health:` — see the reserved-key chokepoint in
-// `label_validation.py`). It is the roll-up of every health condition
-// (state-diverged, no-agent-pool, vcs-error, drifted, drift-errored), which is
-// strictly broader than any single `status:` value — e.g. a `needs-confirm`
-// run hides an underlying `state_diverged` from the resolved status, and
-// `no_agent_pool` / `drift_errored` have no resolved-status value at all. It
-// is matched on the same `health-conditions` array the "Health Issues"
-// indicator counts, so the filter can never drift from that indicator.
+// Why `status:` used to carry `locked` and `unhealthy` and no longer does.
+// Both rode the already-reserved `status` key because reserving a new key takes
+// the word away from every operator using it as a label. The cost was that
+// `status:` stopped being one mutually exclusive set, so "two values of one
+// field" was not safe to treat as a union: `status:locked status:errored` meant
+// locked AND errored. They are `locked:true` and the `flag:` terms now, `flag`
+// and `locked` are reserved label keys (see RESERVED_LABEL_KEYS), and `status:`
+// has thirteen values, one per workspace.
 //
-// `status` is the only reserved key THIS PARSER needs — it is the sole key
-// special-cased below, so a literal `status` label would make `status:errored`
-// ambiguous. `owner` is also reserved, but for an unrelated reason (it maps to
-// `owner_email`, which grants workspace admin); it parses here as an ordinary
-// label term. See `RESERVED_LABEL_KEYS` in
-// `services/terrapod/services/label_validation.py`.
+// `flag:` is matched against the `health-conditions` array rather than against
+// `resolveStatus`, which is the authoritative source. `resolveStatus` ranks
+// `needs-confirm` above every workspace-level signal, so a diverged workspace
+// awaiting confirmation shows `needs-confirm` and a status-based filter would
+// miss it; it also treats `drift-status: drifted` as drifted without checking
+// that drift detection is enabled, which the condition does.
 //
-// The set was narrowed from ten keys to those two in v1.6.0 (#1450): the other
-// eight were never built-in terms here, so each refused a label while giving
-// the filter nothing in return. See `docs/rbac.md` § Reserved label keys.
+// `status`, `flag` and `locked` are the keys THIS PARSER special-cases, so a
+// literal label of any of those names would make the filter ambiguous; all three
+// are reserved in `RESERVED_LABEL_KEYS` in
+// `services/terrapod/services/label_validation.py`. `owner` is also reserved,
+// but for an unrelated reason (it maps to `owner_email`, which grants workspace
+// admin); it parses here as an ordinary label term. See `docs/rbac.md`
+// § Reserved label keys.
 
 export interface NameTerm {
   kind: 'name'
@@ -60,19 +64,36 @@ export interface StatusTerm {
   value: string
 }
 
-/** The aggregate `status:` value matching any workspace with ≥1 health
- *  condition. Not a real resolved-status value — matched specially in
- *  `matchWorkspace` against the `health-conditions` array. */
-export const HEALTH_ISSUE_STATUS = 'unhealthy'
+export interface FlagTerm {
+  kind: 'flag'
+  value: string
+}
 
-/** The `status:` value matching manually-locked workspaces. Like
- *  `unhealthy`, it isn't a resolved-run status — it's matched specially in
- *  `matchWorkspace` against the workspace's `locked` attribute, and rides the
- *  `status` facet so no new reserved label key is introduced. Drives the
- *  clickable "Locked" stat chip. */
-export const LOCKED_STATUS = 'locked'
+export interface LockedTerm {
+  kind: 'locked'
+  value: string
+}
 
-export type FilterTerm = NameTerm | LabelTerm | StatusTerm
+/** The health-condition codes the server emits in `health-conditions`
+ *  (`_compute_health_conditions` in `tfe_v2.py`). The single list: the
+ *  `flag:` values, the Flags dropdown and the Health Issues expansion all
+ *  derive from it, so none can drift from the others. */
+export const FLAG_CODES: readonly string[] = [
+  'state_diverged',
+  'no_agent_pool',
+  'no_live_agent_pool',
+  'vcs_error',
+  'drifted',
+  'drift_errored',
+]
+
+/** `state_diverged` -> `state-diverged`. */
+export const flagValueForCode = (code: string): string => code.replaceAll('_', '-')
+
+/** The `flag:` values, in the order the server defines the conditions. */
+export const FLAG_VALUES: readonly string[] = FLAG_CODES.map(flagValueForCode)
+
+export type FilterTerm = NameTerm | LabelTerm | StatusTerm | FlagTerm | LockedTerm
 
 export interface ParsedFilter {
   terms: FilterTerm[]
@@ -93,11 +114,11 @@ export function parseFilterQuery(input: string): ParsedFilter {
     const key = token.slice(0, sep).trim()
     if (!key) continue // ":foo" or "=foo" with no key — skip
     const rest = token.slice(sep + 1)
-    if (key === 'status') {
-      // Status is virtual-only — `status:` with no value would be ambiguous
-      // (no workspace has a "label key" called status), so drop empty.
+    if (key === 'status' || key === 'flag' || key === 'locked') {
+      // Virtual-only — `status:` with no value would be ambiguous (no workspace
+      // has a "label key" called status), so drop empty. Same for flag and locked.
       if (rest === '') continue
-      terms.push({ kind: 'status', value: rest })
+      terms.push({ kind: key, value: rest })
       continue
     }
     terms.push({ kind: 'label', key, value: rest === '' ? null : rest })
@@ -109,7 +130,7 @@ export function serializeFilter(parsed: ParsedFilter): string {
   return parsed.terms
     .map(t => {
       if (t.kind === 'name') return t.value
-      if (t.kind === 'status') return `status:${t.value}`
+      if (t.kind === 'status' || t.kind === 'flag' || t.kind === 'locked') return `${t.kind}:${t.value}`
       return t.value === null ? `${t.key}:` : `${t.key}:${t.value}`
     })
     .join(' ')
@@ -136,6 +157,44 @@ export function toggleStatusTerm(parsed: ParsedFilter, value: string): ParsedFil
   return { terms: [...parsed.terms, { kind: 'status', value }] }
 }
 
+/** True if the parsed filter already contains a `flag:` term equal to `value`. */
+export function hasFlagTerm(parsed: ParsedFilter, value: string): boolean {
+  return parsed.terms.some(t => t.kind === 'flag' && t.value === value)
+}
+
+/** Toggle a `flag:value` term: remove it if present, append otherwise. */
+export function toggleFlagTerm(parsed: ParsedFilter, value: string): ParsedFilter {
+  if (hasFlagTerm(parsed, value)) {
+    return { terms: parsed.terms.filter(t => !(t.kind === 'flag' && t.value === value)) }
+  }
+  return { terms: [...parsed.terms, { kind: 'flag', value }] }
+}
+
+/** Add every health-condition flag, or remove them all when they are all
+ *  present. The Health Issues chip uses this so the filter bar shows what
+ *  "unhealthy" means, and a condition can be deleted from it. */
+export function toggleAllFlags(parsed: ParsedFilter): ParsedFilter {
+  const present = FLAG_VALUES.filter(v => hasFlagTerm(parsed, v))
+  if (present.length === FLAG_VALUES.length) {
+    return { terms: parsed.terms.filter(t => t.kind !== 'flag') }
+  }
+  const missing = FLAG_VALUES.filter(v => !hasFlagTerm(parsed, v))
+  return { terms: [...parsed.terms, ...missing.map(value => ({ kind: 'flag' as const, value }))] }
+}
+
+/** True if the filter has a `locked:` term, whatever its value. */
+export function hasLockedTerm(parsed: ParsedFilter): boolean {
+  return parsed.terms.some(t => t.kind === 'locked')
+}
+
+/** Toggle `locked:true`: remove any `locked:` term if present, else add it. */
+export function toggleLockedTerm(parsed: ParsedFilter): ParsedFilter {
+  if (hasLockedTerm(parsed)) {
+    return { terms: parsed.terms.filter(t => t.kind !== 'locked') }
+  }
+  return { terms: [...parsed.terms, { kind: 'locked', value: 'true' }] }
+}
+
 /** True if the parsed filter already contains a `key:value` label term. */
 export function hasLabelTerm(parsed: ParsedFilter, key: string, value: string): boolean {
   return parsed.terms.some(t => t.kind === 'label' && t.key === key && t.value === value)
@@ -160,18 +219,27 @@ export interface MatchableWorkspace {
   attributes: {
     name: string
     labels?: Record<string, string> | null
-    // Server-computed health conditions (see `_compute_health_conditions`).
-    // Only consulted by the `status:unhealthy` aggregate term; safe to omit.
-    'health-conditions'?: unknown[] | null
-    // Manual state lock. Only consulted by the `status:locked` term.
+    // Server-computed health conditions (see `_compute_health_conditions`),
+    // each `{ code, ... }`. Only consulted by `flag:` terms; safe to omit.
+    'health-conditions'?: { code?: string }[] | unknown[] | null
+    // Manual state lock. Only consulted by `locked:` terms.
     locked?: boolean | null
   }
+}
+
+function conditionCodes(ws: MatchableWorkspace): Set<string> {
+  const out = new Set<string>()
+  for (const c of ws.attributes['health-conditions'] || []) {
+    const code = (c as { code?: string } | null)?.code
+    if (code) out.add(code)
+  }
+  return out
 }
 
 /**
  * @param resolvedStatus  Caller-resolved status string for this workspace
  *   (e.g. "errored", "needs-confirm"). Only consulted when the filter
- *   contains status terms; safe to omit otherwise. The page resolves it
+ *   contains `status:` terms; safe to omit otherwise. The page resolves it
  *   from `latest-run` + drift / divergence / VCS-error signals via the
  *   `resolveStatus` helper, so this module stays UI-agnostic.
  */
@@ -182,27 +250,33 @@ export function matchWorkspace(
 ): boolean {
   const name = ws.attributes.name.toLowerCase()
   const labels = ws.attributes.labels || {}
+
+  const statuses: string[] = []
+  const flags: string[] = []
   for (const term of parsed.terms) {
     if (term.kind === 'name') {
       if (!name.includes(term.value.toLowerCase())) return false
     } else if (term.kind === 'status') {
-      if (term.value === HEALTH_ISSUE_STATUS) {
-        // Aggregate: any active health condition, independent of the single
-        // resolved status (which can mask underlying conditions, e.g.
-        // needs-confirm over state_diverged).
-        if ((ws.attributes['health-conditions'] || []).length === 0) return false
-      } else if (term.value === LOCKED_STATUS) {
-        // Manual state lock — matched on the workspace attribute, not the
-        // resolved run status (a locked workspace still has a run status).
-        if (!ws.attributes.locked) return false
-      } else if (resolvedStatus !== term.value) {
-        return false
-      }
+      statuses.push(term.value)
+    } else if (term.kind === 'flag') {
+      flags.push(term.value)
+    } else if (term.kind === 'locked') {
+      // Only the two literal values match; anything else matches nothing,
+      // rather than silently meaning "any".
+      if (term.value !== 'true' && term.value !== 'false') return false
+      if (!!ws.attributes.locked !== (term.value === 'true')) return false
     } else if (term.value === null) {
       if (!Object.prototype.hasOwnProperty.call(labels, term.key)) return false
     } else if (labels[term.key] !== term.value) {
       return false
     }
+  }
+
+  // The two dropdown groups union within themselves and intersect with the rest.
+  if (statuses.length > 0 && !statuses.some(v => v === resolvedStatus)) return false
+  if (flags.length > 0) {
+    const codes = conditionCodes(ws)
+    if (!flags.some(v => FLAG_CODES.some(c => flagValueForCode(c) === v && codes.has(c)))) return false
   }
   return true
 }

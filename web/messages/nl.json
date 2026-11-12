@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (elke)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "toestand",
       "hintLabel": "label",
       "hintLabelKey": "labelsleutel",
       "hintName": "naam",
       "engineLabel": "Engine",
-      "engineAll": "Alle engines"
+      "engineAll": "Alle engines",
+      "flags": "Vlaggen",
+      "termFlag": "vlag: {value}",
+      "termLocked": "vergrendeld: {value}",
+      "hintFlag": "vlag",
+      "hintLocked": "vergrendeld"
     },
     "row": {
       "removeLabelFilter": "Klik om uit het filter te verwijderen",
@@ -149,6 +153,14 @@
       "local": "Lokaal",
       "collapseAll": "Alles inklappen",
       "expandAll": "Alles uitklappen"
+    },
+    "flagName": {
+      "state-diverged": "State afgeweken",
+      "no-agent-pool": "Geen agentpool",
+      "no-live-agent-pool": "Geen actieve agentpool",
+      "vcs-error": "VCS-fout",
+      "drifted": "Afgedreven",
+      "drift-errored": "Driftdetectie mislukt"
     }
   },
   "status": {

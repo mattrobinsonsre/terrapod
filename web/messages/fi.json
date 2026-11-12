@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (mikä tahansa)",
       "termLabel": "{key}: {value}",
       "hintStatus": "tila",
-      "hintHealth": "kunto",
       "hintLabel": "tunniste",
       "hintLabelKey": "tunnisteavain",
       "hintName": "nimi",
       "engineLabel": "Moottori",
-      "engineAll": "Kaikki moottorit"
+      "engineAll": "Kaikki moottorit",
+      "flags": "Liput",
+      "termFlag": "lippu: {value}",
+      "termLocked": "lukittu: {value}",
+      "hintFlag": "lippu",
+      "hintLocked": "lukittu"
     },
     "row": {
       "removeLabelFilter": "Napsauta poistaaksesi suodattimesta",
@@ -149,6 +153,14 @@
       "local": "Paikallinen",
       "collapseAll": "Tiivistä kaikki",
       "expandAll": "Laajenna kaikki"
+    },
+    "flagName": {
+      "state-diverged": "Tila eronnut",
+      "no-agent-pool": "Ei agenttipoolia",
+      "no-live-agent-pool": "Ei aktiivista agenttipoolia",
+      "vcs-error": "VCS-virhe",
+      "drifted": "Ajautunut",
+      "drift-errored": "Ajautumisen tunnistus epäonnistui"
     }
   },
   "status": {

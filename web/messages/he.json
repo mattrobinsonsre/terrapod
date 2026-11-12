@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (כלשהו)",
       "termLabel": "{key}: {value}",
       "hintStatus": "סטטוס",
-      "hintHealth": "תקינות",
       "hintLabel": "תווית",
       "hintLabelKey": "מפתח תווית",
       "hintName": "שם",
       "engineLabel": "מנוע",
-      "engineAll": "כל המנועים"
+      "engineAll": "כל המנועים",
+      "flags": "דגלים",
+      "termFlag": "דגל: {value}",
+      "termLocked": "נעול: {value}",
+      "hintFlag": "דגל",
+      "hintLocked": "נעול"
     },
     "row": {
       "removeLabelFilter": "לחץ להסרה מהמסנן",
@@ -149,6 +153,14 @@
       "local": "מקומי",
       "collapseAll": "כווץ הכל",
       "expandAll": "הרחב הכל"
+    },
+    "flagName": {
+      "state-diverged": "מצב שהסתעף",
+      "no-agent-pool": "אין מאגר סוכנים",
+      "no-live-agent-pool": "אין מאגר סוכנים פעיל",
+      "vcs-error": "שגיאת VCS",
+      "drifted": "סטה",
+      "drift-errored": "זיהוי הסטייה נכשל"
     }
   },
   "status": {

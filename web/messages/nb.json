@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (hvilken som helst)",
       "termLabel": "{key}: {value}",
       "hintStatus": "status",
-      "hintHealth": "helse",
       "hintLabel": "etikett",
       "hintLabelKey": "etikettnøkkel",
       "hintName": "navn",
       "engineLabel": "Motor",
-      "engineAll": "Alle motorer"
+      "engineAll": "Alle motorer",
+      "flags": "Flagg",
+      "termFlag": "flagg: {value}",
+      "termLocked": "låst: {value}",
+      "hintFlag": "flagg",
+      "hintLocked": "låst"
     },
     "row": {
       "removeLabelFilter": "Klikk for å fjerne fra filter",
@@ -149,6 +153,14 @@
       "local": "Lokal",
       "collapseAll": "Slå sammen alle",
       "expandAll": "Utvid alle"
+    },
+    "flagName": {
+      "state-diverged": "Tilstand avviker",
+      "no-agent-pool": "Ingen agentpulje",
+      "no-live-agent-pool": "Ingen aktiv agentpulje",
+      "vcs-error": "VCS-feil",
+      "drifted": "Avdriftet",
+      "drift-errored": "Driftdeteksjon feilet"
     }
   },
   "status": {

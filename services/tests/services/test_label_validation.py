@@ -85,14 +85,28 @@ class TestReservedKeys:
         """The set is documented in rbac.md and depended on by the frontend
         filter parser. Lock it to flag any drift in review.
 
-        Narrowed from ten keys to two in v1.6.0 (#1450). A key is reserved only
-        where using it as a label would mislead about a decision the system
-        actually makes: `status` (the sole built-in filter term) and `owner`
-        (maps to `owner_email`, which grants workspace admin). The other eight
-        were mere descriptive overlap with a column and refused a label while
-        giving the filter nothing in return.
+        A key is reserved only where using it as a label would mislead about a
+        decision the system actually makes: `status`, `flag` and `locked` are
+        the built-in filter terms the parser special-cases, and `owner` maps to
+        `owner_email`, which grants workspace admin.
+
+        `locked` was released in v1.6.0 (#1450) on the grounds that
+        `status:locked` answered it. That spelling is gone (`locked:true`), so
+        the reason is gone and the key is reserved again. `flag` is new: one
+        health condition per value.
         """
-        assert RESERVED_LABEL_KEYS == frozenset({"status", "owner"})
+        assert RESERVED_LABEL_KEYS == frozenset({"status", "owner", "flag", "locked"})
+
+    @pytest.mark.parametrize("key", ["flag", "locked"])
+    def test_the_two_new_filter_keys_are_refused_as_labels(self, key):
+        with pytest.raises(LabelValidationError):
+            validate_labels({key: "anything"})
+
+    @pytest.mark.parametrize("key", ["flags", "lock", "unlocked", "drift", "health"])
+    def test_near_misses_stay_usable_as_labels(self, key):
+        """Reserving a word takes it from every operator using it, so only the
+        exact built-in keys are reserved, not their neighbours."""
+        assert validate_labels({key: "v"}) == {key: "v"}
 
     def test_clean_keys_alongside_reserved_still_rejected(self):
         """Mixed input with one reserved key still rejects — no partial accept."""

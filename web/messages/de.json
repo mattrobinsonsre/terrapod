@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: (beliebig)",
       "termLabel": "{key}: {value}",
       "hintStatus": "Status",
-      "hintHealth": "Zustand",
       "hintLabel": "Label",
       "hintLabelKey": "Label-Schlüssel",
       "hintName": "Name",
       "engineLabel": "Engine",
-      "engineAll": "Alle Engines"
+      "engineAll": "Alle Engines",
+      "flags": "Markierungen",
+      "termFlag": "Markierung: {value}",
+      "termLocked": "gesperrt: {value}",
+      "hintFlag": "Markierung",
+      "hintLocked": "gesperrt"
     },
     "row": {
       "removeLabelFilter": "Klicken, um aus dem Filter zu entfernen",
@@ -149,6 +153,14 @@
       "local": "Lokal",
       "collapseAll": "Alle einklappen",
       "expandAll": "Alle ausklappen"
+    },
+    "flagName": {
+      "state-diverged": "Zustand abgewichen",
+      "no-agent-pool": "Kein Agent-Pool",
+      "no-live-agent-pool": "Kein aktiver Agent-Pool",
+      "vcs-error": "VCS-Fehler",
+      "drifted": "Abgedriftet",
+      "drift-errored": "Drift-Erkennung fehlgeschlagen"
     }
   },
   "status": {

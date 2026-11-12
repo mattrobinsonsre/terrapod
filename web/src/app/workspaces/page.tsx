@@ -21,18 +21,23 @@ import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
 import {
   type ParsedFilter,
+  hasFlagTerm,
   hasLabelTerm,
+  hasLockedTerm,
   hasStatusTerm,
-  HEALTH_ISSUE_STATUS,
-  LOCKED_STATUS,
+  FLAG_VALUES,
+  flagValueForCode,
   matchWorkspace,
   parseFilterQuery,
   removeTerm,
   serializeFilter,
+  toggleAllFlags,
+  toggleFlagTerm,
   toggleLabelTerm,
+  toggleLockedTerm,
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
-import { WORKSPACE_STATUSES, resolveStatus } from '@/lib/workspace-status'
+import { RUN_STATUSES, resolveStatus } from '@/lib/workspace-status'
 import { defaultEngineVersion, versionToolFor } from '@/lib/engine-version'
 import {
   CREATE_INPUT,
@@ -361,7 +366,8 @@ function WorkspacesPageInner() {
   const hintLabel = (hint: string) => {
     switch (hint) {
       case 'status': return t('filter.hintStatus')
-      case 'health': return t('filter.hintHealth')
+      case 'flag': return t('filter.hintFlag')
+      case 'locked': return t('filter.hintLocked')
       case 'label': return t('filter.hintLabel')
       case 'label key': return t('filter.hintLabelKey')
       default: return t('filter.hintName')
@@ -478,6 +484,28 @@ function WorkspacesPageInner() {
       document.removeEventListener('keydown', onKey)
     }
   }, [statusMenuOpen])
+
+  // Flags dropdown: the health conditions, one `flag:` term each. Same
+  // outside-click and Escape handling as Status.
+  const [flagMenuOpen, setFlagMenuOpen] = useState(false)
+  const flagMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!flagMenuOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (flagMenuRef.current && !flagMenuRef.current.contains(e.target as Node)) {
+        setFlagMenuOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFlagMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [flagMenuOpen])
 
   // Label dropdown — same outside-click + Escape pattern as Status. The
   // dropdown is a two-level picker: first pick a label key, then a value.
@@ -659,6 +687,23 @@ function WorkspacesPageInner() {
     return counts
   }, [workspaces])
 
+  // Per-flag counts on the unfiltered list, for the Flags dropdown rows. Keyed
+  // by the `flag:` value, derived from the server's condition codes.
+  const flagCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const ws of workspaces) {
+      const seen = new Set<string>()
+      for (const c of ws.attributes['health-conditions'] || []) {
+        const v = flagValueForCode(c.code)
+        if (!seen.has(v)) {
+          seen.add(v)
+          counts[v] = (counts[v] || 0) + 1
+        }
+      }
+    }
+    return counts
+  }, [workspaces])
+
   // "Health issues" is ONE control rendered two ways (#719): the desktop
   // stat-grid card and the compact chip on the mobile filter row. Compute the
   // count + toggle once so both forms stay in sync.
@@ -666,12 +711,13 @@ function WorkspacesPageInner() {
     () => workspaces.filter(ws => (ws.attributes['health-conditions'] || []).length > 0).length,
     [workspaces],
   )
-  const healthFilterActive = hasStatusTerm(parsedFilter, HEALTH_ISSUE_STATUS)
-  const toggleHealth = () =>
-    setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, HEALTH_ISSUE_STATUS)))
-  const lockedFilterActive = hasStatusTerm(parsedFilter, LOCKED_STATUS)
-  const toggleLocked = () =>
-    setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, LOCKED_STATUS)))
+  // Health Issues inserts every condition as a `flag:` term, so the filter bar
+  // shows what "unhealthy" means and a condition can be removed from it. The
+  // terms union, so the result is the same set the old roll-up matched.
+  const healthFilterActive = FLAG_VALUES.every(v => hasFlagTerm(parsedFilter, v))
+  const toggleHealth = () => setFilterInput(serializeFilter(toggleAllFlags(parsedFilter)))
+  const lockedFilterActive = hasLockedTerm(parsedFilter)
+  const toggleLocked = () => setFilterInput(serializeFilter(toggleLockedTerm(parsedFilter)))
 
   // Distinct labels across the unfiltered list: key → sorted unique values
   // with workspace counts. Drives the two-level "+ Label" picker. Computed
@@ -705,7 +751,7 @@ function WorkspacesPageInner() {
   }, [filterInput])
 
   interface FilterSuggestion {
-    kind: 'label' | 'label-key' | 'status' | 'name'
+    kind: 'label' | 'label-key' | 'status' | 'flag' | 'locked' | 'name'
     insert: string
     display: string
     hint: string
@@ -718,22 +764,30 @@ function WorkspacesPageInner() {
     if (!tok) return []
     const lower = tok.toLowerCase()
     const out: FilterSuggestion[] = []
-    // Aggregate health-issues count for the `status:unhealthy` suggestion.
-    const unhealthyCount = workspaces.filter(
-      ws => (ws.attributes['health-conditions'] || []).length > 0,
-    ).length
+    const flagSuggestion = (v: string): FilterSuggestion => ({
+      kind: 'flag', insert: `flag:${v}`, display: `flag:${v}`, hint: 'flag', dot: 'bg-red-400', count: flagCounts[v] || 0,
+    })
+    const lockedSuggestion = (v: 'true' | 'false'): FilterSuggestion => ({
+      kind: 'locked', insert: `locked:${v}`, display: `locked:${v}`, hint: 'locked',
+    })
     const sepIdx = tok.search(/[:=]/)
     if (sepIdx >= 0) {
       // `key:partial` → suggest values for that key.
       const key = tok.slice(0, sepIdx)
       const partial = tok.slice(sepIdx + 1).toLowerCase()
       if (key === 'status') {
-        for (const s of WORKSPACE_STATUSES) {
+        for (const s of RUN_STATUSES) {
           if (!partial || s.filter.toLowerCase().includes(partial) || s.label.toLowerCase().includes(partial))
             out.push({ kind: 'status', insert: `status:${s.filter}`, display: `status:${s.filter}`, hint: 'status', dot: s.dot, count: statusCounts[s.filter] || 0 })
         }
-        if (unhealthyCount > 0 && (!partial || HEALTH_ISSUE_STATUS.includes(partial) || 'health issues'.includes(partial)))
-          out.push({ kind: 'status', insert: `status:${HEALTH_ISSUE_STATUS}`, display: `status:${HEALTH_ISSUE_STATUS}`, hint: 'health', dot: 'bg-red-400', count: unhealthyCount })
+      } else if (key === 'flag') {
+        for (const v of FLAG_VALUES) {
+          if (!partial || v.includes(partial)) out.push(flagSuggestion(v))
+        }
+      } else if (key === 'locked') {
+        for (const v of ['true', 'false'] as const) {
+          if (!partial || v.startsWith(partial)) out.push(lockedSuggestion(v))
+        }
       } else {
         const values = labelIndex.get(key)
         if (values) {
@@ -755,12 +809,16 @@ function WorkspacesPageInner() {
             out.push({ kind: 'label', insert: `${k}:${v}`, display: `${k}:${v}`, hint: 'label', count: c })
         }
       }
-      for (const s of WORKSPACE_STATUSES) {
+      for (const s of RUN_STATUSES) {
         if (s.filter.toLowerCase().includes(lower) || s.label.toLowerCase().includes(lower))
           out.push({ kind: 'status', insert: `status:${s.filter}`, display: `status:${s.filter}`, hint: 'status', dot: s.dot, count: statusCounts[s.filter] || 0 })
       }
-      if (unhealthyCount > 0 && (HEALTH_ISSUE_STATUS.includes(lower) || 'health'.includes(lower) || 'issues'.includes(lower)))
-        out.push({ kind: 'status', insert: `status:${HEALTH_ISSUE_STATUS}`, display: `status:${HEALTH_ISSUE_STATUS}`, hint: 'health', dot: 'bg-red-400', count: unhealthyCount })
+      for (const v of FLAG_VALUES) {
+        if (v.includes(lower) || 'flag'.includes(lower) || 'health'.includes(lower)) out.push(flagSuggestion(v))
+      }
+      if ('locked'.includes(lower)) {
+        out.push(lockedSuggestion('true'), lockedSuggestion('false'))
+      }
       for (const ws of workspaces) {
         const n = ws.attributes.name
         if (n.toLowerCase().includes(lower))
@@ -770,7 +828,7 @@ function WorkspacesPageInner() {
     // Dedup by inserted text; cap so the menu stays usable.
     const seen = new Set<string>()
     return out.filter(s => (seen.has(s.insert) ? false : (seen.add(s.insert), true))).slice(0, 12)
-  }, [currentToken, sortedLabelKeys, labelIndex, statusCounts, workspaces])
+  }, [currentToken, sortedLabelKeys, labelIndex, statusCounts, flagCounts, workspaces])
 
   function applyFilterSuggestion(s: FilterSuggestion) {
     const parts = filterInput.split(' ')
@@ -1865,12 +1923,10 @@ function WorkspacesPageInner() {
         {!loading && workspaces.length > 0 && (() => {
           const total = workspaces.length
           const locked = workspaces.filter(ws => ws.attributes.locked).length
-          // `unhealthy` is driven by the Health chip, not the Status dropdown,
-          // so it doesn't count toward the dropdown's active badge (which would
-          // otherwise show a count with no matching checked row inside).
-          const activeStatusCount = parsedFilter.terms.filter(
-            t => t.kind === 'status' && t.value !== HEALTH_ISSUE_STATUS && t.value !== LOCKED_STATUS,
-          ).length
+          // Each dropdown's badge counts only its own terms, so it never shows a
+          // number with no matching checked row inside.
+          const activeStatusCount = parsedFilter.terms.filter(t => t.kind === 'status').length
+          const activeFlagCount = parsedFilter.terms.filter(t => t.kind === 'flag').length
           const healthLabel = healthFilterActive
             ? t('stats.clearHealthFilter')
             : t('stats.filterHealth')
@@ -1880,7 +1936,7 @@ function WorkspacesPageInner() {
                   row; the filter input drops to its own row (basis-full) via
                   flex `order`. Total/Locked are desktop-only secondary counts;
                   Health is always shown (primary signal) and toggles the
-                  `status:unhealthy` filter. No big stat cards on any viewport. */}
+                  set of `flag:` terms. No big stat cards on any viewport. */}
               <div className="flex flex-wrap items-center gap-2">
                 <StatChip
                   label={t('stats.total')}
@@ -2032,7 +2088,7 @@ function WorkspacesPageInner() {
                       role="menu"
                       className="absolute end-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto"
                     >
-                      {WORKSPACE_STATUSES.map(opt => {
+                      {RUN_STATUSES.map(opt => {
                         const active = hasStatusTerm(parsedFilter, opt.filter)
                         const count = statusCounts[opt.filter] || 0
                         return (
@@ -2054,6 +2110,65 @@ function WorkspacesPageInner() {
                             </span>
                             <span className={'w-1.5 h-1.5 rounded-full ' + opt.dot} />
                             <span className="flex-1 text-start">{ts(opt.filter)}</span>
+                            <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-500')}>{count}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                {/* Flags dropdown — the health conditions, one `flag:` term each,
+                    selections union. Desktop-only, like Total and Locked: a
+                    phone keeps Health, Status and Label, and reaches one
+                    specific condition through the filter input. */}
+                <div className="relative order-5 max-sm:hidden" ref={flagMenuRef}>
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={flagMenuOpen}
+                    onClick={() => setFlagMenuOpen(o => !o)}
+                    className={
+                      'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ' +
+                      (activeFlagCount > 0
+                        ? 'bg-slate-700/60 text-slate-100 border-slate-600'
+                        : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
+                    }
+                  >
+                    <span>{t('filter.flags')}</span>
+                    {activeFlagCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                        {activeFlagCount}
+                      </span>
+                    )}
+                    <svg className={'w-3 h-3 transition-transform ' + (flagMenuOpen ? 'rotate-180' : '')} viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+                      <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {flagMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute end-0 z-10 mt-1 w-72 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto"
+                    >
+                      {FLAG_VALUES.map(v => {
+                        const active = hasFlagTerm(parsedFilter, v)
+                        const count = flagCounts[v] || 0
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={active}
+                            onClick={() => setFilterInput(serializeFilter(toggleFlagTerm(parsedFilter, v)))}
+                            className={
+                              'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ' +
+                              (active ? 'bg-slate-700/60 text-slate-100' : 'text-slate-300 hover:bg-slate-700/40')
+                            }
+                          >
+                            <span className="w-3 inline-flex justify-center text-brand-400">
+                              {active ? '✓' : ''}
+                            </span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                            <span className="flex-1 text-start">{t(`flagName.${v}`)}</span>
                             <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-500')}>{count}</span>
                           </button>
                         )
@@ -2210,6 +2325,10 @@ function WorkspacesPageInner() {
                         ? t('filter.termName', { value: term.value })
                         : term.kind === 'status'
                           ? t('filter.termStatus', { value: term.value })
+                          : term.kind === 'flag'
+                            ? t('filter.termFlag', { value: term.value })
+                            : term.kind === 'locked'
+                              ? t('filter.termLocked', { value: term.value })
                           : term.value === null
                             ? t('filter.termLabelAny', { key: term.key })
                             : t('filter.termLabel', { key: term.key, value: term.value })

@@ -117,12 +117,16 @@
       "termLabelAny": "{key}: （すべて）",
       "termLabel": "{key}: {value}",
       "hintStatus": "ステータス",
-      "hintHealth": "ヘルス",
       "hintLabel": "ラベル",
       "hintLabelKey": "ラベルキー",
       "hintName": "名前",
       "engineLabel": "エンジン",
-      "engineAll": "すべてのエンジン"
+      "engineAll": "すべてのエンジン",
+      "flags": "フラグ",
+      "termFlag": "フラグ: {value}",
+      "termLocked": "ロック済み: {value}",
+      "hintFlag": "フラグ",
+      "hintLocked": "ロック済み"
     },
     "row": {
       "removeLabelFilter": "クリックしてフィルターから削除",
@@ -149,6 +153,14 @@
       "local": "ローカル",
       "collapseAll": "すべて折りたたむ",
       "expandAll": "すべて展開"
+    },
+    "flagName": {
+      "state-diverged": "状態の乖離",
+      "no-agent-pool": "エージェントプールなし",
+      "no-live-agent-pool": "稼働中のエージェントプールなし",
+      "vcs-error": "VCSエラー",
+      "drifted": "ドリフト",
+      "drift-errored": "ドリフト検出に失敗"
     }
   },
   "status": {
