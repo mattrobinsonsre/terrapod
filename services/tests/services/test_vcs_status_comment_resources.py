@@ -282,6 +282,23 @@ class TestOneCommentHasOneBudget:
         fits = out[out.index("ws-fits</code>") :].split("</details>")[0]
         assert "aws_instance.srv_0" in fits and "see the run" not in fits
 
+    def test_noop_rows_carrying_a_gate_do_not_take_the_busy_rows_share(self):
+        busy = _big_list()
+        first = busy["entries"][0]["address"]
+        gate = (GateVerdict("policy", "guardrails", True, "mandatory"),)
+        for n_noop in (0, 2):
+            rows = [_row(name="ws-busy", resource_list=busy)] + [
+                _row(
+                    name=f"ws-noop-{i}",
+                    resource_list={"entries": [], "omitted": 0},
+                    gates=gate,
+                )
+                for i in range(n_noop)
+            ]
+            out = render_comment(rows)
+            assert first in out, n_noop
+            assert "see the run" not in out, n_noop
+
     def test_realistic_plans_are_not_degraded(self):
         """40 workspaces of 5 small resources, or 5 of 10, are ordinary PRs."""
         for n_ws, n_ent, attrs in [(40, 5, 2), (5, 10, 3), (1, 25, 8)]:
