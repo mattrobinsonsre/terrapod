@@ -105,6 +105,12 @@ jobs:
     permissions:
       contents: read
       packages: read
+      # The affected-families step reads the pull request's own file list. A
+      # job-level permissions block sets every unlisted scope to `none`, so
+      # without this the call 403s, the step falls back to running everything,
+      # and the run is green -- the gate would simply never work, visibly
+      # nowhere but this job's stderr.
+      pull-requests: read
     outputs:
       sha_short: ${{ steps.meta.outputs.sha_short }}
       images_exist: ${{ steps.check.outputs.images_exist }}
@@ -112,6 +118,10 @@ jobs:
       is_pr: ${{ steps.meta.outputs.is_pr }}
       version: ${{ steps.meta.outputs.version }}
       pkg_refresh: ${{ steps.meta.outputs.pkg_refresh }}
+      run_python: ${{ steps.affected.outputs.run_python }}
+      run_node: ${{ steps.affected.outputs.run_node }}
+      run_go: ${{ steps.affected.outputs.run_go }}
+      run_pulumi: ${{ steps.affected.outputs.run_pulumi }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -166,6 +176,73 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
+
+      # Which job families this change can PROVABLY not affect. The input sets
+      # are DERIVED from the tree by `scripts/ci-affected.py` -- from the test
+      # Dockerfiles' own COPY lines and each go.mod's own replace directives --
+      # rather than written down here, because a hand-kept path filter is a
+      # ledger and this repository's ledgers go stale. The specific hazard is
+      # depth: the Python tier reads `web/src/app/workspaces`, `web/messages`,
+      # `go-terrapod/*.go` and `mcp/internal/mcpserver/crud.go`, none of which
+      # anybody would guess. Read that script's header for the fail-safe rules;
+      # the short version is that every uncertainty resolves to running
+      # everything.
+      #
+      # PULL REQUESTS ONLY. A push to main or a release branch must build and
+      # scan every image: `create-manifests` writes the `sha-` manifest a later
+      # tag retags, and a scan reads the live advisory database rather than the
+      # image alone, so a scan that passed yesterday can legitimately fail today
+      # with no diff at all.
+      - name: Compute affected job families
+        id: affected
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          emit_all() {
+            for f in python node go pulumi; do
+              echo "run_$f=true" >> "$GITHUB_OUTPUT"
+            done
+          }
+
+          if [[ "${{ steps.meta.outputs.is_pr }}" != "true" ]]; then
+            echo "not a pull request -- every family runs" >&2
+            emit_all
+            exit 0
+          fi
+
+          n="${{ github.event.pull_request.number }}"
+          # Into the runner's temp dir rather than the checkout, so nothing is
+          # left in the working tree for a later step to trip over.
+          changed="${RUNNER_TEMP:-/tmp}/changed.txt"
+          raw="${RUNNER_TEMP:-/tmp}/changed.raw"
+          : > "$changed"
+
+          # The files endpoint caps at 3000 entries, and a truncated list would
+          # UNDER-report the change -- the one direction that skips wrongly. So
+          # compare what we listed against the pull request's own count and fall
+          # back to running everything whenever they disagree, or whenever
+          # either call fails.
+          # One TSV row per file, so the count still matches `changed_files`
+          # while both paths of a rename reach the deriver. Emitting two bare
+          # lines per rename instead would make `actual > expected` on any pull
+          # request containing one -- which falls back to running everything,
+          # silently, i.e. it would disable the gate for a whole class of change.
+          if expected=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${n}" --jq '.changed_files') \
+             && gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${n}/files" \
+                  --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$raw.tsv"; then
+            actual=$(grep -c . "$raw.tsv" || true)
+            tr '\t' '\n' < "$raw.tsv" | grep -v '^$' > "$raw" 
+            if [[ "$actual" == "$expected" ]]; then
+              mv "$raw" "$changed"
+            else
+              echo "listed $actual of $expected changed files -- running everything" >&2
+            fi
+          else
+            echo "could not list the pull request's files -- running everything" >&2
+          fi
+
+          python3 scripts/ci-affected.py --changed-file "$changed" >> "$GITHUB_OUTPUT"
 
       - name: Check if images exist
         id: check
@@ -287,6 +364,14 @@ jobs:
 
       - name: (docs-audit) Downloaded artifacts come from a declared dependency
         run: python3 scripts/docs-audit/check_artifact_deps.py
+      # Sits here, after `pip install pyyaml`, because it parses the workflow.
+      # Every job is either gated on a derived `run_<family>` or listed as
+      # always-run with a reason, the family names agree in both directions,
+      # and no gated job has a consumer that would cascade-skip or wedge behind
+      # it. All three fail silently otherwise -- a skipped job and a passing job
+      # look identical in the checks list, which is why this is gated at all.
+      - name: (docs-audit) CI path gating is coherent
+        run: python3 scripts/docs-audit/check_ci_affected.py
 
       # Needs PyYAML, installed above, like the artifact-dependency gate. A job
       # that boots the eval stack delivers images by one route on a pull request
@@ -538,7 +623,7 @@ jobs:
   node-checks:
     name: Node checks
     needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    if: needs.prepare.outputs.images_exist != 'true' && needs.prepare.outputs.run_node == 'true'
     runs-on: ubuntu-latest
 
     container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
@@ -609,7 +694,7 @@ jobs:
   go-modules:
     name: Go modules
     needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    if: needs.prepare.outputs.images_exist != 'true' && needs.prepare.outputs.run_go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -959,7 +1044,7 @@ jobs:
     # check would pass having tested nothing. And if the publish FAILS these
     # must still run: `ensure_test_image` falls back to building the base
     # locally, so a broken publish costs speed rather than coverage.
-    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' }}
+    if: ${{ !cancelled() && needs.prepare.outputs.images_exist != 'true' && needs.prepare.outputs.run_python == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -1204,7 +1289,7 @@ jobs:
     # `needs` edge SKIPS this when an image build fails, which would hide an
     # audit result behind an unrelated failure.
     needs: prepare
-    if: needs.prepare.outputs.images_exist != 'true'
+    if: needs.prepare.outputs.images_exist != 'true' && needs.prepare.outputs.run_python == 'true'
     runs-on: ubuntu-latest
     # Literal, not ${{ env.* }}: the env context is NOT available in a job's
     # `container:` or in `services:` — using it there makes the whole workflow
@@ -4121,8 +4206,26 @@ jobs:
           build-args: |
             PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
             BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
-          cache-from: type=gha,scope=${{ matrix.image }}-amd64
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
+          # A REGISTRY cache, not `type=gha`, because the Actions cache
+          # service scopes every entry to the ref that wrote it: an entry
+          # written by `refs/pull/N/merge` is readable by that one pull
+          # request and by nothing else. Measured before this change, the
+          # repository held 627 buildkit entries totalling 7.47 GB across
+          # three open pull requests and 5 entries totalling 0.06 GB on
+          # `refs/heads/main` -- so nothing was shared, and the pull
+          # requests were evicting each other against the 10 GB cap.
+          #
+          # A registry cache is an ordinary OCI artifact in GHCR. It has
+          # no ref scoping and no cap, so every run reads and writes the
+          # same ref: main's layers are there for a pull request, and a
+          # pull request's are there for the next one. `packages: write`
+          # and the GHCR login this job already has are all it needs.
+          #
+          # `ignore-error` because a pull request from a FORK gets a
+          # read-only token, so its export would fail; it should still
+          # build, and it can still read.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-amd64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-amd64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
 
       - name: Export image artifact
         if: needs.prepare.outputs.is_pr == 'true'
@@ -4217,8 +4320,26 @@ jobs:
           build-args: |
             PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
             BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
-          cache-from: type=gha,scope=${{ matrix.image }}-arm64
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
+          # A REGISTRY cache, not `type=gha`, because the Actions cache
+          # service scopes every entry to the ref that wrote it: an entry
+          # written by `refs/pull/N/merge` is readable by that one pull
+          # request and by nothing else. Measured before this change, the
+          # repository held 627 buildkit entries totalling 7.47 GB across
+          # three open pull requests and 5 entries totalling 0.06 GB on
+          # `refs/heads/main` -- so nothing was shared, and the pull
+          # requests were evicting each other against the 10 GB cap.
+          #
+          # A registry cache is an ordinary OCI artifact in GHCR. It has
+          # no ref scoping and no cap, so every run reads and writes the
+          # same ref: main's layers are there for a pull request, and a
+          # pull request's are there for the next one. `packages: write`
+          # and the GHCR login this job already has are all it needs.
+          #
+          # `ignore-error` because a pull request from a FORK gets a
+          # read-only token, so its export would fail; it should still
+          # build, and it can still read.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-arm64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/terrapod-buildcache:${{ matrix.image }}-arm64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
 
       # arm64 is now artifacted on PRs too — scan-images scans it as well.
       - name: Export image artifact
@@ -6117,6 +6238,7 @@ jobs:
   # nothing of ours having moved.
   pulumi-sdk-build:
     name: Pulumi SDK (${{ matrix.language }})
+    if: needs.prepare.outputs.run_pulumi == 'true'
     needs: prepare
     runs-on: ubuntu-latest
     permissions:

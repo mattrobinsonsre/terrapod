@@ -23,9 +23,13 @@ COPY services/tests ./tests
 # tests (tests/db) parse these; schema_version.py also resolves them at runtime.
 COPY alembic ./alembic
 
-# The image Dockerfiles themselves, so tests can assert what an image ships.
-# `engines/` must be COPYed into the listener image or the listener crashes on
-# import at startup — a failure no source-only test could see (#1487).
+# The image Dockerfiles themselves, so tests can assert what an image SHIPS.
+# Two defects of this shape have reached main, and neither was visible to any
+# source-only test, because the module is present in the tree the tests import
+# from: `engines/` was not COPYed into the listener image, so the listener
+# crashed on import at startup (#1487); and `reserved_env.py` was imported by
+# the runner Job and never COPYed into the runner image, so every Job died at
+# import.
 COPY docker ./docker
 COPY Tiltfile ./Tiltfile
 # The Tilt Go image guard compares these module floors with the container tags.
@@ -64,12 +68,6 @@ COPY services/ai_eval ./ai_eval
 # Helm chart values — the Helm-value-removal contract test (tests/helm) parses
 # values.yaml as text/YAML to freeze the operator-facing value keys. Chart only
 # (values + templates); no helm binary is invoked in the Python image.
-# The image Dockerfiles themselves, so a test can assert what an image SHIPS.
-# `reserved_env.py` was imported by the runner Job and never COPYed into the
-# runner image, so every Job died at import — a failure no source-only test could
-# see, because the module is present in the tree the tests import from.
-COPY docker ./docker
-
 COPY helm ./helm
 
 # Source for the API↔SDK↔provider contract test (tests/test_api_sdk_contract.py).
