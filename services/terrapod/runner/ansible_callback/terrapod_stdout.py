@@ -122,7 +122,6 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime
 
 from ansible import constants as C
 from ansible.plugins.callback.default import CallbackModule as DefaultCallback
@@ -348,11 +347,18 @@ class CallbackModule(DefaultCallback):
         play-level blocks carry the full date instead, so the log says what day
         it is exactly once rather than on every line.
         """
-        now = datetime.now()
+        # `time.gmtime` rather than a datetime, for two reasons that both
+        # matter here. It is explicitly UTC, so this stamp agrees with the
+        # run timestamps the API serves as RFC3339 UTC instead of reporting
+        # whatever zone the EE container happens to carry. And it needs no
+        # tz-constant choice: this file runs under the EE interpreter,
+        # anything from 3.10 to 3.14, and the alias ruff prefers for UTC
+        # does not exist below 3.11.
+        now = time.gmtime()
         if started is None:
-            return f"[{now:%Y-%m-%d %H:%M:%S}]"
+            return f"[{time.strftime('%Y-%m-%d %H:%M:%S', now)}]"
         elapsed = max(0.0, time.monotonic() - started)
-        return f"[{now:%H:%M:%S} +{format_duration(elapsed)}]"
+        return f"[{time.strftime('%H:%M:%S', now)} +{format_duration(elapsed)}]"
 
     def _tp_header_line(self, stamp: str, host: str, status: str, label: str) -> str:
         head = f"{stamp:<{_TIME_W}}  {host:<{_HOST_W}}  {status:<{_STATUS_W}}  {label}"
