@@ -44,6 +44,13 @@ def _make_listener(shutdown_event: asyncio.Event, **overrides) -> RunnerListener
             poll_interval=30,
             sse_read_timeout=30,
             sse_max_age=600,
+            # And `termination_grace_period_seconds` for the same class of
+            # reason again, since #2526: the launch sizes the runner token from
+            # the Job's deadline plus this, and `max(0, MagicMock())` raises
+            # `'>' not supported between instances of 'MagicMock' and 'int'` --
+            # which the launch reports as "could not obtain runner token", so
+            # the failure names neither this attribute nor the arithmetic.
+            termination_grace_period_seconds=120,
         )
         listener = RunnerListener()
 
@@ -297,7 +304,11 @@ class TestLaunchFailureReporting:
         listener = _make_listener(fresh_shutdown_event)
         listener._get_runner_token = AsyncMock(return_value="runtok:xyz")
         listener._http_client = AsyncMock()
-        listener.runner_config = MagicMock()
+        # `termination_grace_period_seconds` explicitly: the launch sizes the
+        # runner token from the Job's deadline plus it (#2526), and that
+        # expression is evaluated even where `_get_runner_token` itself is
+        # mocked out -- it is an argument to the call.
+        listener.runner_config = MagicMock(termination_grace_period_seconds=120)
 
         with (
             patch("terrapod.runner.job_template.build_job_spec", return_value={"kind": "Job"}),
@@ -349,7 +360,11 @@ class TestAuthSecretNaming:
         listener._get_runner_token = AsyncMock(return_value="runtok:xyz")
         listener._http_client = AsyncMock()
         listener._create_auth_secret = AsyncMock(return_value="ok")
-        listener.runner_config = MagicMock()
+        # `termination_grace_period_seconds` explicitly: the launch sizes the
+        # runner token from the Job's deadline plus it (#2526), and that
+        # expression is evaluated even where `_get_runner_token` itself is
+        # mocked out -- it is an argument to the call.
+        listener.runner_config = MagicMock(termination_grace_period_seconds=120)
 
         captured = {}
 
@@ -398,7 +413,11 @@ class TestAuthSecretNaming:
         # names are captured -- so the test would still pass, beside a broken
         # path, which is the kind of green that teaches nothing.
         listener._create_vars_secret = AsyncMock(return_value="ok")
-        listener.runner_config = MagicMock()
+        # `termination_grace_period_seconds` explicitly: the launch sizes the
+        # runner token from the Job's deadline plus it (#2526), and that
+        # expression is evaluated even where `_get_runner_token` itself is
+        # mocked out -- it is an argument to the call.
+        listener.runner_config = MagicMock(termination_grace_period_seconds=120)
 
         captured: dict[str, list] = {}
 

@@ -40,6 +40,56 @@ class TestAnsibleExitCodesAreNamed:
         assert failure_reason.ansible_exit_reason(137) is None
 
 
+class TestTheRemainingAnsibleExitCodes:
+    """#2525 asked for the rest of ansible's codes. Two of three were safe.
+
+    The interesting one is `1`, which is DELIBERATELY not mapped: a configure's
+    exit code is ansible's only when ansible ran, and `1` is also what the
+    runner itself returns when the policy gate blocked the configure, when the
+    gate could not be evaluated, when a binary download failed, when the
+    configuration archive was unusable, when cloud identity was unavailable and
+    when the orchestrator crashed.
+    """
+
+    def test_bad_options_and_a_user_interrupt_are_named(self):
+        for code in (5, 8):
+            assert failure_reason.ansible_exit_reason(code) is not None
+
+    def test_a_user_interrupt_reads_differently_from_the_other_interrupt(self):
+        """8 is a user's SIGINT; 99 is an interrupt mid-task with no PLAY RECAP,
+        which is what tells an operator the remainder is worth retrying."""
+        assert failure_reason.ansible_exit_reason(8) != failure_reason.ansible_exit_reason(99)
+
+    def test_1_is_not_named(self):
+        """Naming it would label every runner-side failure of a configure
+        "ansible reported an error" -- wrong, and wrong in the direction that
+        sends an operator to their playbook. The log scrape already reports
+        those from the runner's own fatal-error record, by name."""
+        assert failure_reason.ansible_exit_reason(1) is None
+
+    def test_the_runner_really_does_return_1_for_its_own_failures(self):
+        """The premise of the test above, measured rather than asserted: if the
+        configure phase stopped returning a hand-written 1, mapping it would
+        become safe and this would be the thing that says so."""
+        import ast
+        import inspect
+
+        from terrapod.runner import job_entrypoint
+
+        tree = ast.parse(inspect.getsource(job_entrypoint._run_configure_phase))
+        returned = {
+            node.value.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Return)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, int)
+        }
+        assert 1 in returned, (
+            "the configure phase no longer returns a hand-written 1, so exit "
+            "code 1 may now be ansible's alone -- re-examine _ANSIBLE_EXIT_REASONS"
+        )
+
+
 class TestEveryPhaseLogListAgrees:
     """The invariant is that the collections AGREE WITH EACH OTHER, which is
     precisely what failed: `_CONFIGURE_LOG` was added to the roll-in loop and

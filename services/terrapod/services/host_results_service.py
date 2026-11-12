@@ -30,8 +30,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy import select
@@ -421,3 +423,120 @@ async def list_events(db: AsyncSession, run: Run, *, host: str | None = None) ->
         query = query.where(RunHostEvent.host == host)
     result = await db.execute(query.order_by(RunHostEvent.seq.asc()))
     return list(result.scalars().all())
+
+
+# ── A failed configure's summary, for the run's error message (#2525) ──────
+
+#: How many hosts the summary names before it says "+N more".
+#:
+#: Three rather than all of them because this lands in `run.error_message`,
+#: which a notification body and a list tooltip both render: a playbook that
+#: failed on four hundred hosts must not produce a four-hundred-line error. The
+#: Hosts tab is where the whole set is read.
+MAX_SUMMARY_HOSTS = 3
+
+#: A module message in the summary is a recognition aid, not the payload. The
+#: whole result is in the event stream and, when it was large, in the sidecar.
+_SUMMARY_MSG_LIMIT = 300
+
+#: Ansible's output carries colour -- `ANSIBLE_FORCE_COLOR` is forced on so the
+#: log viewer's colour toggle works on a configure (#2413 F18) -- so a module
+#: message can arrive with escape sequences in it. The error message is rendered
+#: as plain text in a dozen places that have no renderer for them.
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+#: `failed` and `unreachable` are the only kinds that become rows (`ROW_KINDS`)
+#: and they read differently: a host that failed ran something, a host that was
+#: unreachable did not. Keyed on the same two so a third kind cannot arrive and
+#: be summarised as "failed".
+_KIND_VERB: dict[str, str] = {"failed": "failed", "unreachable": "unreachable"}
+
+
+def _one_line(text: str) -> str:
+    """A module message as one bounded line: no escapes, no control characters."""
+    text = _ANSI.sub("", text or "")
+    # `split()` with no argument splits on every run of whitespace, so this also
+    # removes the newlines, tabs and stray control whitespace a module's `msg`
+    # can carry -- the whole point being that this lands on one line.
+    text = " ".join(text.split())
+    if len(text) > _SUMMARY_MSG_LIMIT:
+        text = text[: _SUMMARY_MSG_LIMIT - 1] + "…"
+    return text
+
+
+def _where(event: RunHostEvent) -> str:
+    """`host at "task"`, or the bare host when the event names no task."""
+    return f'{event.host} at "{event.task_name}"' if event.task_name else event.host
+
+
+def render_failure_summary(events: Sequence[RunHostEvent]) -> str | None:
+    """What a failed configure's hosts say, or None when they say nothing.
+
+    `events` is a run's rows in the plugin's own sequence order, which is what
+    makes the FIRST event per host the one reported: ansible's first failure on
+    a host is the cause and the ones after it are usually consequences of it.
+
+    **An `ignored` event is not a failure of the run.** `ignore_errors: true`
+    means the playbook carried on, and the recap counts it under `ignored`
+    rather than `failures` -- so including one would report hosts as having
+    failed a run that failed for another reason entirely, or even one that
+    succeeded. They stay in the rows, where the Hosts tab shows them.
+
+    Pure, and separate from the query, because every judgement here is about
+    rendering: the query is one `select`, and this is the part worth pinning.
+    """
+    by_kind: dict[str, dict[str, RunHostEvent]] = {}
+    for event in events:
+        if event.ignored:
+            continue
+        if event.kind not in _KIND_VERB:
+            continue
+        # First event per host wins -- see the docstring.
+        by_kind.setdefault(event.kind, {}).setdefault(event.host, event)
+
+    blocks: list[str] = []
+    # `ROW_KINDS` order, so a run with both kinds reads the same way every time.
+    for kind in ROW_KINDS:
+        hosts = by_kind.get(kind)
+        if not hosts:
+            continue
+        count = len(hosts)
+        head = f"{count} host{'' if count == 1 else 's'} {_KIND_VERB[kind]}"
+        shown = list(hosts.values())[:MAX_SUMMARY_HOSTS]
+
+        lines: list[str] = []
+        if count == 1:
+            # The shape #2525 asks for, and the overwhelmingly common one.
+            lines.append(f"{head}: {_where(shown[0])}")
+            message = _one_line(shown[0].msg)
+            if message:
+                lines.append(f"  {message}")
+        else:
+            lines.append(f"{head}:")
+            for event in shown:
+                lines.append(f"  {_where(event)}")
+                message = _one_line(event.msg)
+                if message:
+                    lines.append(f"    {message}")
+            if count > len(shown):
+                lines.append(f"  +{count - len(shown)} more")
+        blocks.append("\n".join(lines))
+
+    return "\n\n".join(blocks) if blocks else None
+
+
+async def failure_summary(db: AsyncSession, run: Run) -> str | None:
+    """A failed configure's host summary for `run.error_message`, or None.
+
+    Reads the ROWS rather than the stream: they are already the two kinds a
+    reader needs, they are ordered by the plugin's own sequence, and the
+    question is answerable without fetching an object.
+
+    **The rows are already redacted.** `uploads.upload_host_events` puts the
+    whole capture through the run's redactor and refuses the upload outright
+    when it cannot (#1934), so every `msg` here went through it before the API
+    saw it. There is no second pass for the API to make: the redaction registry
+    lives in the runner process, built from the credentials that run was handed,
+    and the API never holds one.
+    """
+    return render_failure_summary(await list_events(db, run))

@@ -950,11 +950,13 @@ Tune token lifetimes based on your typical run duration:
 
 ```yaml
 runners:
-  tokenTTLSeconds: 3600       # Default token lifetime (1 hour)
-  maxTokenTTLSeconds: 7200    # Ceiling — a longer request is CLAMPED to this
+  tokenTTLSeconds: 3600       # Fallback for a listener that doesn't size its own
+  maxTokenTTLSeconds: 14400   # Ceiling — a longer request is CLAMPED to this
 ```
 
-For environments with fast runs, reduce the TTL to minimize the window of token validity. For long-running applies (large infrastructure), increase as needed.
+A listener asks for the lifetime its Job needs, so the ceiling is the setting that matters: **it has to clear the longest Job the deployment permits** (`runners.configureTimeoutMinutes`, 180 by default). Capped shorter, a Job that runs past the cap finishes with an expired token and loses its log, its per-host events and its resource profile — every one of those uploads is best-effort, so the loss is quiet. The API warns at startup when the pair is inconsistent.
+
+Reducing `tokenTTLSeconds` no longer shortens a run's credential window on its own, because the listener sizes from the Job; lower `maxTokenTTLSeconds` to narrow it, and `configureTimeoutMinutes` with it.
 
 For additional isolation, use:
 

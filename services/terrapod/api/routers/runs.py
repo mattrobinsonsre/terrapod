@@ -4304,9 +4304,20 @@ async def create_runner_token(
     claim sends no phase, and must still get a working token -- so an absent or
     unrecognised phase mints the older unphased form rather than failing or
     guessing one.
+
+    The `ttl` is the listener's too, and for the same reason: it owns the Job's
+    `activeDeadlineSeconds`, so it is the only party that knows how long the
+    token has to live (#2526). A listener that sends none gets this phase's
+    budget derived from `runners.yaml` rather than the bare default, because for
+    a configure the bare default is shorter than the Job by construction.
+    Whatever arrives is still clamped by `max_token_ttl_seconds`.
     """
-    from terrapod.auth.runner_tokens import RUNNER_PHASES, generate_runner_token
-    from terrapod.config import load_runner_config
+    from terrapod.auth.runner_tokens import (
+        RUNNER_PHASES,
+        _effective_max_ttl,
+        generate_runner_token,
+    )
+    from terrapod.config import load_runner_config, runner_token_ttl_for_job
 
     run = await _get_run(run_id, db)
 
@@ -4337,7 +4348,32 @@ async def create_runner_token(
         raise HTTPException(status_code=403, detail="Run not assigned to this listener")
 
     config = load_runner_config()
-    requested_ttl = body.get("ttl", config.token_ttl_seconds)
+    # The phase's own budget when the listener named no TTL (#2526).
+    #
+    # A listener current enough to ask sends the TTL its Job spec needs, which
+    # is the authoritative number because it owns `activeDeadlineSeconds`. One
+    # that does not is an older image, and for a CONFIGURE the default alone is
+    # wrong by construction: `token_ttl_seconds` is 3600 and a configure Job is
+    # allowed `configure_timeout_minutes` (180), so the token died an hour in
+    # and the uploads at exit all answered 401. The API reads the same
+    # `runners.yaml` the listener does and already sends
+    # `configure_timeout_minutes` to it as `timeout-minutes`, so this is the
+    # same number rather than a second copy of a guess.
+    #
+    # Only for a configure. A plan or an apply takes the Job builder's own
+    # 60-minute default, which this module does not hold -- the listener does --
+    # so sizing one here would be restating a number that lives elsewhere. A
+    # current listener asks for both, which is the fix for them.
+    phase_default_ttl = config.token_ttl_seconds
+    if body.get("phase") == "configure":
+        phase_default_ttl = max(
+            phase_default_ttl,
+            runner_token_ttl_for_job(
+                config.configure_timeout_minutes,
+                config.termination_grace_period_seconds,
+            ),
+        )
+    requested_ttl = body.get("ttl", phase_default_ttl)
     # Validated here because this is the request boundary and 422 is the answer.
     #
     # Unvalidated, a non-integer reached `ttl > max_ttl` inside
@@ -4439,9 +4475,13 @@ async def create_runner_token(
 
     token = generate_runner_token(run.id, ttl=requested_ttl, phase=phase)
 
-    # Compute actual TTL (may have been clamped)
-    max_ttl = config.max_token_ttl_seconds
-    actual_ttl = min(requested_ttl, max_ttl) if max_ttl > 0 else requested_ttl
+    # Compute actual TTL (may have been clamped), through the SAME cap the mint
+    # applied. This restated the clamp as `if max_ttl > 0 else requested_ttl`,
+    # which is the rule `_effective_max_ttl` stopped using: a non-positive cap
+    # falls back to the shipped default there, so a deployment with
+    # `maxTokenTTLSeconds: 0` minted a 14400s token and reported `expires_in`
+    # as whatever was asked for.
+    actual_ttl = min(requested_ttl, _effective_max_ttl(config.max_token_ttl_seconds))
 
     # `phase` echoed back so a listener can tell whether the server bound one —
     # additive, and absent from an older server's response, which reads as None.

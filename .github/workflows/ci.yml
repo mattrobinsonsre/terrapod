@@ -449,6 +449,16 @@ jobs:
       - name: (docs-audit) The forced-environment prose names the real set
         run: python3 scripts/docs-audit/check_forced_env.py
 
+      # A promoted log opens with a line saying it is a TAIL rather than the
+      # whole run, and the troubleshooting row quotes that line's opening words
+      # -- which is what an operator who meets a short log greps for. A doc that
+      # quotes a message goes stale silently: change the constant and the row
+      # still reads perfectly while matching nothing anybody will ever see. Here
+      # rather than beside the notice's own tests because the test image copies
+      # exactly one file out of `docs/`.
+      - name: (docs-audit) The docs quote the real promoted-log notice
+        run: python3 scripts/docs-audit/check_log_tail_notice.py
+
       # A LOCAL composite action's required inputs, read out of its own
       # `action.yml`. `ssh-target-gate` and `git-source-gate` both called
       # `./.github/actions/ghcr-login` with no `with:` block at all, so
@@ -1169,21 +1179,31 @@ jobs:
           #
           # The split happens after collection, so a new test file is assigned
           # automatically and cannot be silently missed (#1468).
+          #
+          # FOUR shards, not five. These run serial -- the session-scoped table
+          # fixture races under xdist -- so a shard removed makes the others
+          # longer, and the trade was measured on run 43266562587: five shards
+          # were 3.9-6.4 min for 26.7 min of work, finishing at 7.0 min against
+          # a run that ended at 10.2. At four the slowest lands near 6.7, so
+          # integration is still nowhere near the tail.
+          #
+          # What the freed slot buys is upstream of that. Concurrency is pinned
+          # at 20 from 0.5 to 5.5 minutes, so the first half of a run is
+          # slot-bound; one less job here drains that backlog sooner, the image
+          # builds finish sooner, and E2E and CodeQL -- which both wait on
+          # `build-images-amd64` -- start sooner. They gain no slot directly.
           - name: integration-1
             paths: tests/integration
-            pytest_args: "--shard 1/5"
+            pytest_args: "--shard 1/4"
           - name: integration-2
             paths: tests/integration
-            pytest_args: "--shard 2/5"
+            pytest_args: "--shard 2/4"
           - name: integration-3
             paths: tests/integration
-            pytest_args: "--shard 3/5"
+            pytest_args: "--shard 3/4"
           - name: integration-4
             paths: tests/integration
-            pytest_args: "--shard 4/5"
-          - name: integration-5
-            paths: tests/integration
-            pytest_args: "--shard 5/5"
+            pytest_args: "--shard 4/4"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -3910,9 +3930,13 @@ jobs:
             reg_port=5111
             k3d registry create eval-registry.localhost --port "$reg_port" \
               --image "${K3D_REGISTRY_IMAGE}"
+            # 300s, not 120. k3d's own --wait returns when the server
+            # container reports ready, which on a loaded runner is earlier than
+            # k3s has finished its bootstrap -- and the step added below is what
+            # actually proves the apiserver is usable.
             k3d cluster create terrapod-eval \
               --registry-use "k3d-eval-registry.localhost:${reg_port}" \
-              --wait --timeout 120s
+              --wait --timeout 300s
             # Tag serially (metadata only, cheap), push in parallel — five
             # independent pushes to a local registry, 70s serially.
             pids=()
@@ -3930,6 +3954,74 @@ jobs:
             for pid in "${pids[@]}"; do wait "$pid" || rc=1; done
             [ "$rc" -eq 0 ] || { echo "at least one push to the eval registry failed" >&2; exit 1; }
           fi
+      # Between the cluster and the install, because that is exactly where this
+      # job has been failing: `k3d cluster create --wait` returned, five image
+      # pushes then ran in parallel against the same runner, and `helm install`
+      # met `Kubernetes cluster unreachable ... EOF`. Three times on 2026-11-12,
+      # always the k3d leg, never kind, and the readyz output on the first one
+      # showed why -- `[-]poststarthook/rbac/bootstrap-roles failed` beside
+      # `[+]shutdown ok`, i.e. the apiserver was still bootstrapping or already
+      # restarting when the install arrived.
+      #
+      # So `--wait` is necessary and not sufficient: it waits for the container,
+      # this waits for the API. CONSECUTIVE successes rather than one, because a
+      # single /readyz between restarts is exactly the answer that misled the
+      # install; and it runs for both tools so kind is held to the same bar
+      # rather than being quietly exempt.
+      - name: Wait for the apiserver to be steadily ready
+        timeout-minutes: 6
+        run: |
+          set -uo pipefail
+          ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
+          k="kubectl --context $ctx --request-timeout=10s"
+
+          need=5          # consecutive OKs before the cluster is believed
+          streak=0
+          deadline=$((SECONDS + 240))
+          last=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if out=$($k get --raw /readyz 2>&1); then
+              streak=$((streak + 1))
+              [ "$streak" -ge "$need" ] && break
+            else
+              # A streak RESET is the signal worth printing: it means the
+              # apiserver answered and then stopped, which a single failed
+              # probe at the end would not distinguish from a slow start.
+              [ "$streak" -gt 0 ] && echo "readyz streak broken at $streak after $SECONDS s"
+              streak=0
+              last="$out"
+            fi
+            sleep 3
+          done
+
+          if [ "$streak" -ge "$need" ]; then
+            echo "apiserver steady: $need consecutive /readyz in $SECONDS s"
+            exit 0
+          fi
+
+          echo "::error::the apiserver never answered /readyz $need times in a row."
+          echo "last error: ${last:-<none>}"
+          echo
+          # The fallback that matters, and the reason this lives here rather than
+          # in the diagnostics step: with the apiserver dead every kubectl call
+          # there blocks until that step hits its own timeout, which is how three
+          # failures produced almost no data. The container log needs no API.
+          for c in k3d-terrapod-eval-server-0 terrapod-eval-control-plane; do
+            if docker inspect "$c" >/dev/null 2>&1; then
+              echo "::group::docker logs $c (last 200 lines)"
+              docker logs --tail 200 "$c" 2>&1 || true
+              echo "::endgroup::"
+              echo "::group::docker inspect $c -- state"
+              docker inspect -f '{{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} restarts={{.RestartCount}}' "$c" || true
+              echo "::endgroup::"
+            fi
+          done
+          echo "::group::runner resources, since this shape has been disk or memory before"
+          df -h / || true
+          free -m || true
+          echo "::endgroup::"
+          exit 1
+
       - name: make eval (install into the cluster)
         # Bounded below the job's own timeout so an install that will not
         # converge FAILS this step — leaving budget for diagnostics and

@@ -1864,7 +1864,7 @@ Server-Sent Events stream for real-time workspace updates. The stream emits even
 |---|---|
 | `run_status_change` | Run transitions to a new state |
 | `run_updated` | A run's own fields changed **without** a state transition — carries `changed`, naming what moved (`plan-json` for the resource counts, `cost-estimate` for the cost totals, `resource-profile` for the runner's peaks and exit status). The runner uploads all three *after* the result POST that drove the transition, so a consumer that refetches only on `run_status_change` renders a run whose numbers have not arrived yet |
-| `log_updated` | A fresh log artifact landed in storage — carries `phase` (`plan` or `apply`). The authoritative final log is uploaded after the run has already turned terminal, so this is what tells a consumer to come back for the tail |
+| `log_updated` | A fresh log artifact landed in storage — carries `phase` (`plan`, `apply` or `configure`). The authoritative final log is uploaded after the run has already turned terminal, so this is what tells a consumer to come back for the tail |
 | `workspace_lock_change` | Workspace is locked or unlocked (includes `locked` boolean) |
 | `workspace_updated` | Workspace settings are modified |
 | `state_version_created` | New state version is uploaded |
@@ -3669,8 +3669,8 @@ Generates a short-lived HMAC-signed runner token scoped to the specified run. Ca
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) — the response's `expires_in` reports the clamped value. **Must be a positive integer**: anything else is `422`, including a boolean. A non-positive `maxTokenTTLSeconds` no longer means *no cap* — it falls back to the shipped default with a warning, so an unbounded runner token cannot be configured by accident |
-| `phase` | string | — | The Job's phase, `plan` or `apply`. Bound into the token so it cannot drive the other phase's endpoints (GHSA-xmrf-hxq9-m59m, new in 2.0). Omitted or unrecognised mints an unphased token |
+| `ttl` | integer | the Job's own budget, else `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. The listener sends the lifetime its Job needs, because it owns the Job's deadline; a listener that sends none gets this phase's budget derived from `runners.yaml` for a `configure`, and `runners.tokenTTLSeconds` otherwise. Clamped to `runners.maxTokenTTLSeconds` (default 14400) — the response's `expires_in` reports the clamped value. **Must be a positive integer**: anything else is `422`, including a boolean. A non-positive `maxTokenTTLSeconds` no longer means *no cap* — it falls back to the shipped default with a warning, so an unbounded runner token cannot be configured by accident |
+| `phase` | string | — | The Job's phase: `plan`, `apply` or `configure`. Bound into the token so it cannot drive another phase's endpoints (GHSA-xmrf-hxq9-m59m, new in 2.0). Omitted or unrecognised mints an unphased token |
 
 **Response:**
 ```json
@@ -4788,7 +4788,7 @@ Body (all fields optional — the runner sends whatever it could read):
 - `peak_memory_bytes` — from `/sys/fs/cgroup/memory.peak`
 - `peak_cpu_usec` — `usage_usec` from `/sys/fs/cgroup/cpu.stat`
 - `exit_code` — script's actual exit status
-- `failure_reason` — sent only with a non-zero `exit_code`: why the run failed, in a line or two. For a failed `init`, `plan` or `apply` it is tofu's own `Error:` summaries (at most three, each with its `on <file> line <n>` location, never a diagnostic's detail lines); for any other failure it is the runner's last logged error (a failed hook, an unusable configuration archive, a crash). The API strips ANSI and other control characters, caps it at 2,000 characters, and stores it as the run's `error-message`, which the reconciler then keeps, followed by `Runner exited with code N` (#1631). Ignored with a zero `exit_code`, and on a run that has already errored.
+- `failure_reason` — sent only with a non-zero `exit_code`: why the run failed, in a line or two. For a failed `init`, `plan` or `apply` it is tofu's own `Error:` summaries (at most three, each with its `on <file> line <n>` location, never a diagnostic's detail lines); for a failed `configure` it is what ansible's own exit code means — host failures, unreachable hosts, an interrupted play — since a log scrape has no `Error:` summaries to find in ansible's output; for any other failure it is the runner's last logged error (a failed hook, an unusable configuration archive, a crash). The API strips ANSI and other control characters, caps it at 2,000 characters, and stores it as the run's `error-message`, which the reconciler then keeps, followed by `Runner exited with code N` (#1631). For a failed **configure** the reconciler prefers its own per-host summary — which host failed, at which task, and what the module said — built from the run's `host-events` rows, because that says the same thing specifically (#2525). Ignored with a zero `exit_code`, and on a run that has already errored.
 
 Negative values, non-integers, or booleans return `400`, as does a non-string `failure_reason`. Missing fields are not clobbered (existing values preserved).
 
@@ -5342,7 +5342,7 @@ catalogue does not refuse every pending apply in the fleet. See
 |---|---|---|
 | `token` | string | The signed JWT |
 | `expires_in` | int | `api.config.auth.oidc_issuer.token_ttl_seconds` |
-| `phase` | string \| null | `plan` or `apply`, taken from the presented runner token. `null` when the token made no phase claim |
+| `phase` | string \| null | `plan`, `apply` or `configure`, taken from the presented runner token. `null` when the token made no phase claim |
 | `target` | string | Echoed, so the runner writes the file under the name it asked for |
 | `audiences` | array&lt;string&gt; | **This target's** audiences, verbatim and in order |
 
