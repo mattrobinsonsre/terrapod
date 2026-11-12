@@ -548,14 +548,24 @@ multi-language implementation ships in the same PR**:
   they are not prose, and renaming them would break the contract gates.
 - **Branches** — feature branches off `main`; never push directly to `main`;
   never stack a PR on another open feature branch (always base on `main`).
-- **Merging — this repo requires branches to be up to date with `main`.** The
-  moment one PR merges, `main` advances and **every other open PR becomes
-  out-of-date and un-mergeable** until it is updated (`gh pr update-branch`).
-  So land PRs **strictly one at a time**: update → merge → *then* update the
-  next. Do **not** arm auto-merge on two or more PRs at once — the second one
-  silently stalls the instant the first lands, looking armed while nothing
-  happens. Don't bypass a failing required check with an admin override; fix
-  the check.
+- **Merging — queue it, don't drive it.** This repository requires branches to
+  be up to date with `main`, and a **merge queue** is what satisfies that for
+  you. Mark a PR for merge and it joins the queue; GitHub then builds each
+  entry against the **projected result of everything ahead of it** — entry 3 is
+  tested as though 1 and 2 had already landed — and merges each as it passes.
+  So **queue several**: that is the mechanism working, not a race. You do not
+  run `gh pr update-branch`, you do not wait to merge one before queuing the
+  next, and an entry that fails is ejected rather than landing something broken.
+
+  Two things the queue does **not** change. Don't bypass a failing required
+  check with an admin override; fix the check. And a PR that cannot pass still
+  must not sit in the queue being rebuilt behind every other entry — take it
+  out and fix it.
+
+  **If you are reading this in a fork or a checkout where no queue is
+  configured**, the older discipline applies instead: land PRs strictly one at
+  a time, updating each branch only when it is genuinely next, because
+  otherwise the second one stalls the instant the first lands.
 - **Namespace package (hard requirement)** — `services/terrapod/__init__.py`
   must **not** exist. Its absence enables PEP 420 implicit namespace packages
   so each Docker image can include only the sub-packages it needs.
@@ -939,15 +949,18 @@ What follows from this, in rough order of how much it saves:
   stalls everything in it. Group documentation and low-risk changes together freely;
   keep anything touching the run lifecycle, the policy or scanning gates, or a
   migration on its own.
-- **Don't start a run whose verdict will be thrown away.** In particular, do not
-  update a PR's branch until it is genuinely the next one you intend to merge:
-  updating early starts a full run that is invalidated the moment anything else
-  lands, while competing for the queue with the run you are waiting on.
+- **Don't start a run whose verdict will be thrown away.** The sharpest case —
+  updating a branch early, so its run is invalidated by whatever lands next —
+  is **retired by the merge queue**, which rebuilds entries against the
+  projected result itself. What remains is the case the queue cannot help with:
+  pushing repeatedly to a PR while you are still working on it. Commit freely,
+  push when you want a verdict.
 - **Never leave a persistently failing PR open.** It is re-run on every rebase for
   every other merge and never progresses, which is strictly worse than any choice
   about how many PRs to have in flight.
-- **A documentation-only change skips its own CI, but it is NOT free of the chain.**
-  It still advances the base branch, so it still puts every other open pull request
+- **A documentation-only change skips its own CI, and with a merge queue it is
+  now genuinely cheap** — it advances the base branch, but nothing else has to be
+  updated by hand in response. Without a queue the older caveat applies: it
   out of date and invalidates whatever they had in flight. Land one when nothing is
   waiting, or batch it with the other documentation you are about to land — not in
   the middle of driving a queue, which is how a "free" merge throws away two runs.
