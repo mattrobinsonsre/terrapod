@@ -1319,7 +1319,7 @@ jobs:
     # cheap ones downstream onto the critical path.
     #
     # Nothing is delayed by this. `create-manifests` is the only consumer and it
-    # already needs `scan-images`, a wave further on, so its own depth is
+    # already needs the `scan-images-*` jobs, a wave further on, so its own depth is
     # unchanged.
     #
     # `!cancelled()` keeps the signal independent of the ordering: a bare
@@ -1428,7 +1428,7 @@ jobs:
     # cheap ones downstream onto the critical path.
     #
     # Nothing is delayed by this. `create-manifests` is the only consumer and it
-    # already needs `scan-images`, a wave further on, so its own depth is
+    # already needs the `scan-images-*` jobs, a wave further on, so its own depth is
     # unchanged.
     #
     # `!cancelled()` keeps the signal independent of the ordering: a bare
@@ -4156,11 +4156,12 @@ jobs:
   # ── Build Images ───────────────────────────────────────
   # Built per-arch in SEPARATE jobs (not one arch×image matrix) so the
   # latency-sensitive consumers can depend on only the arch they need:
-  # e2e-test + scan-images run on amd64 and must NOT wait on the slow arm64
-  # web build. Splitting also gives each arch its own fail-fast scope, so a
-  # failing arm64 leg no longer cancels the amd64 images e2e needs. arm64
-  # still runs (build-validation + release manifests) and is now also
-  # artifacted on PRs so scan-images can scan it.
+  # e2e-test runs on amd64 and must NOT wait on the slow arm64 web build, and
+  # `scan-images-<arch>` waits on its own architecture alone. Splitting also
+  # gives each arch its own fail-fast scope, so a failing arm64 leg neither
+  # cancels the amd64 images e2e needs nor suppresses the amd64 scan. arm64
+  # still runs (build-validation + release manifests) and is artifacted on
+  # PRs so scan-images-arm64 can scan it.
   build-images-amd64:
     # ONE buildx invocation for all five images, not a matrix of five jobs.
     #
@@ -5035,28 +5036,145 @@ jobs:
   # that register — it suppresses nothing outside this pipeline, which
   # is why each entry is written to be read by someone outside the
   # project.
-  scan-images:
-    # One job per IMAGE, scanning both arches, rather than one per image+arch.
+  scan-images-amd64:
+    # One job per ARCHITECTURE, each waiting on only its OWN build.
     #
-    # As 5x2 this was ten jobs that all became eligible at the same instant as
-    # the eight E2E shards, two helm-eval-boot jobs and oci-conformance — 21 jobs
-    # for 20 concurrent slots. The E2E shards lost 27s, 44s and 57s of queue wait
-    # to it, and the shard that waited 44s was the straggler gating E2E Report,
-    # so the contention sat directly on the critical path (#1468).
+    # Separate jobs rather than one matrix job, because `needs` is per JOB: a
+    # matrix leg cannot depend on a different job from its sibling, so a single
+    # `scan-images` had to wait for BOTH builds. That was a false dependency in
+    # both directions -- arm64 finishes first (measured: 2.8 vs 3.3 min, and
+    # 2.9 vs 3.2 the run before), so its scan sat waiting on amd64; and a failed
+    # amd64 build suppressed the arm64 scan entirely, losing coverage of images
+    # that had built perfectly well.
     #
-    # Five jobs scan the same images with the same settings and free five slots
-    # at exactly the contended moment. Each takes roughly twice as long (~52-172s
-    # against 26-86s), which is well inside the slack before create-manifests.
+    # It is also what the build split upstream was FOR -- see the comment above
+    # `build-images-amd64`, which says the arches are separate jobs precisely so
+    # "the latency-sensitive consumers can depend on only the arch they need".
     #
-    # Deliberately NOT solved with `needs: [e2e-test]`. That works today only
-    # because create-manifests is gated behind python-test; once the integration
-    # shard is split, that slack disappears and deferred scans become the new
-    # critical path.
-    name: Scan ${{ matrix.image }}
-    needs: [prepare, build-images-amd64, build-images-arm64]
-    if: |
+    # The quota is per job, 20 concurrent, and these are created at the same
+    # moment as wave 3 (E2E, eval-boot, the CLI contract, the air-gap gate, OCI
+    # conformance). Measured on run 43261217946 the demand at that instant was
+    # 28 jobs against 20 slots, with two of the five scan jobs themselves among
+    # the eight that waited, at 64s and 87s. Two jobs here rather than five
+    # returns three slots to a window that is already short.
+    #
+    # The scanning itself is in scripts/ci-scan-images.sh -- shared, because two
+    # copies in this file would be two things to keep in step. Its header
+    # records why the scans inside a job are sequential (trivy locks its cache
+    # directory, and five parallel scans over one cache left six of ten images
+    # unscanned).
+    name: Scan images (amd64)
+    needs: [prepare, build-images-amd64]
+    if: >-
       always()
       && needs.build-images-amd64.result == 'success'
+      && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      # One download rather than five: `pattern` takes every image artifact for
+      # this architecture, and `merge-multiple` flattens them into one directory
+      # so the tarball names do not gain an artifact-name component. It stays
+      # HERE rather than moving into the script, because scripts/docs-audit/
+      # check_artifact_deps.py reads the workflow to prove every downloaded
+      # artifact comes from a job this one declares in `needs` -- hiding the
+      # download inside a script would make that check silently stop looking.
+      - name: Download image artifacts (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: image-*-amd64
+          merge-multiple: true
+          path: /tmp
+
+      - name: Scan every image
+        env:
+          ARCH: amd64
+          REGISTRY: ${{ env.REGISTRY }}
+          SHA_SHORT: ${{ needs.prepare.outputs.sha_short }}
+          IS_PR: ${{ needs.prepare.outputs.is_pr }}
+        run: scripts/ci-scan-images.sh
+
+      # One upload per image, each with its own category, so code scanning
+      # tracks an alert per image per architecture exactly as it did when this
+      # was five jobs. `always()` so a red scan still publishes what it produced.
+      - name: Upload SARIF — terrapod-api (amd64)
+        if: always() && hashFiles('trivy-terrapod-api-amd64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-api-amd64.sarif
+          category: trivy-terrapod-api-amd64
+
+      - name: Upload SARIF — terrapod-web (amd64)
+        if: always() && hashFiles('trivy-terrapod-web-amd64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-web-amd64.sarif
+          category: trivy-terrapod-web-amd64
+
+      - name: Upload SARIF — terrapod-runner (amd64)
+        if: always() && hashFiles('trivy-terrapod-runner-amd64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-runner-amd64.sarif
+          category: trivy-terrapod-runner-amd64
+
+      - name: Upload SARIF — terrapod-listener (amd64)
+        if: always() && hashFiles('trivy-terrapod-listener-amd64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-listener-amd64.sarif
+          category: trivy-terrapod-listener-amd64
+
+      - name: Upload SARIF — terrapod-migrations (amd64)
+        if: always() && hashFiles('trivy-terrapod-migrations-amd64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-migrations-amd64.sarif
+          category: trivy-terrapod-migrations-amd64
+
+  scan-images-arm64:
+    # One job per ARCHITECTURE, each waiting on only its OWN build.
+    #
+    # Separate jobs rather than one matrix job, because `needs` is per JOB: a
+    # matrix leg cannot depend on a different job from its sibling, so a single
+    # `scan-images` had to wait for BOTH builds. That was a false dependency in
+    # both directions -- arm64 finishes first (measured: 2.8 vs 3.3 min, and
+    # 2.9 vs 3.2 the run before), so its scan sat waiting on amd64; and a failed
+    # amd64 build suppressed the arm64 scan entirely, losing coverage of images
+    # that had built perfectly well.
+    #
+    # It is also what the build split upstream was FOR -- see the comment above
+    # `build-images-amd64`, which says the arches are separate jobs precisely so
+    # "the latency-sensitive consumers can depend on only the arch they need".
+    #
+    # The quota is per job, 20 concurrent, and these are created at the same
+    # moment as wave 3 (E2E, eval-boot, the CLI contract, the air-gap gate, OCI
+    # conformance). Measured on run 43261217946 the demand at that instant was
+    # 28 jobs against 20 slots, with two of the five scan jobs themselves among
+    # the eight that waited, at 64s and 87s. Two jobs here rather than five
+    # returns three slots to a window that is already short.
+    #
+    # The scanning itself is in scripts/ci-scan-images.sh -- shared, because two
+    # copies in this file would be two things to keep in step. Its header
+    # records why the scans inside a job are sequential (trivy locks its cache
+    # directory, and five parallel scans over one cache left six of ten images
+    # unscanned).
+    name: Scan images (arm64)
+    needs: [prepare, build-images-arm64]
+    if: >-
+      always()
       && needs.build-images-arm64.result == 'success'
       && needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
@@ -5064,140 +5182,79 @@ jobs:
       contents: read
       packages: read
       security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # On branch/tag builds the image lives in GHCR — log in and let Trivy pull
-      # the per-arch tag. On PRs nothing was pushed; the image arrives as a
-      # per-arch artifact from build-images-<arch> and is loaded into the local
-      # daemon below, where Trivy finds it by the same tag.
       - name: Log in to GHCR
-        if: needs.prepare.outputs.is_pr != 'true'
         uses: ./.github/actions/ghcr-login
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      # ── amd64 ──
-      - name: Download image artifact (amd64, PR)
+      # One download rather than five: `pattern` takes every image artifact for
+      # this architecture, and `merge-multiple` flattens them into one directory
+      # so the tarball names do not gain an artifact-name component. It stays
+      # HERE rather than moving into the script, because scripts/docs-audit/
+      # check_artifact_deps.py reads the workflow to prove every downloaded
+      # artifact comes from a job this one declares in `needs` -- hiding the
+      # download inside a script would make that check silently stop looking.
+      - name: Download image artifacts (PR)
         if: needs.prepare.outputs.is_pr == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: image-${{ matrix.image }}-amd64
+          pattern: image-*-arm64
+          merge-multiple: true
           path: /tmp
 
-      - name: Load image (amd64, PR)
-        if: needs.prepare.outputs.is_pr == 'true'
-        run: gunzip -c "/tmp/${{ matrix.image }}-amd64.tar.gz" | docker load
-
-      # Human-readable findings step. Always prints the table of CVEs Trivy would
-      # gate on to the action log — so a failure in the gating step below can be
-      # diagnosed without downloading SARIF or re-running Trivy locally.
-      # exit-code: '0' keeps this informational.
-      - name: Trivy findings (amd64, table, informational)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      - name: Scan every image
         env:
-          # The per-arch tag (sha-XXX-amd64) is an OCI index whose only child is
-          # that arch. Without this, Trivy defaults to the runner's platform when
-          # pulling from GHCR on branch/tag builds and fails with "no child with
-          # platform linux/amd64". Trivy reads TRIVY_PLATFORM as --platform.
-          TRIVY_PLATFORM: linux/amd64
-        with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          trivyignores: pentest/trivy/.trivyignore
-          exit-code: '0'
+          ARCH: arm64
+          REGISTRY: ${{ env.REGISTRY }}
+          SHA_SHORT: ${{ needs.prepare.outputs.sha_short }}
+          IS_PR: ${{ needs.prepare.outputs.is_pr }}
+        run: scripts/ci-scan-images.sh
 
-      - name: Scan with Trivy (amd64)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_PLATFORM: linux/amd64
-        with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
-          format: sarif
-          output: trivy-${{ matrix.image }}-amd64.sarif
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          trivyignores: pentest/trivy/.trivyignore
-          exit-code: '1'
-          limit-severities-for-sarif: true
-
-      # The category MUST stay distinct per image AND arch: code scanning keys
-      # results on it, so a shared category would have one arch silently
-      # overwrite the other's findings.
-      - name: Upload SARIF (amd64)
-        if: always()
+      # One upload per image, each with its own category, so code scanning
+      # tracks an alert per image per architecture exactly as it did when this
+      # was five jobs. `always()` so a red scan still publishes what it produced.
+      - name: Upload SARIF — terrapod-api (arm64)
+        if: always() && hashFiles('trivy-terrapod-api-arm64.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
-          sarif_file: trivy-${{ matrix.image }}-amd64.sarif
-          category: trivy-${{ matrix.image }}-amd64
+          sarif_file: trivy-terrapod-api-arm64.sarif
+          category: trivy-terrapod-api-arm64
 
-      # ── arm64 ──
-      - name: Download image artifact (arm64, PR)
-        if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          name: image-${{ matrix.image }}-arm64
-          path: /tmp
-
-      - name: Load image (arm64, PR)
-        if: needs.prepare.outputs.is_pr == 'true'
-        run: gunzip -c "/tmp/${{ matrix.image }}-arm64.tar.gz" | docker load
-
-      # Human-readable findings step. Always prints the table of CVEs Trivy would
-      # gate on to the action log — so a failure in the gating step below can be
-      # diagnosed without downloading SARIF or re-running Trivy locally.
-      # exit-code: '0' keeps this informational.
-      - name: Trivy findings (arm64, table, informational)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          # The per-arch tag (sha-XXX-arm64) is an OCI index whose only child is
-          # that arch. Without this, Trivy defaults to the runner's platform when
-          # pulling from GHCR on branch/tag builds and fails with "no child with
-          # platform linux/amd64". Trivy reads TRIVY_PLATFORM as --platform.
-          TRIVY_PLATFORM: linux/arm64
-        with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          trivyignores: pentest/trivy/.trivyignore
-          exit-code: '0'
-
-      - name: Scan with Trivy (arm64)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_PLATFORM: linux/arm64
-        with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
-          format: sarif
-          output: trivy-${{ matrix.image }}-arm64.sarif
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          trivyignores: pentest/trivy/.trivyignore
-          exit-code: '1'
-          limit-severities-for-sarif: true
-
-      # The category MUST stay distinct per image AND arch: code scanning keys
-      # results on it, so a shared category would have one arch silently
-      # overwrite the other's findings.
-      - name: Upload SARIF (arm64)
-        if: always()
+      - name: Upload SARIF — terrapod-web (arm64)
+        if: always() && hashFiles('trivy-terrapod-web-arm64.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
-          sarif_file: trivy-${{ matrix.image }}-arm64.sarif
-          category: trivy-${{ matrix.image }}-arm64
+          sarif_file: trivy-terrapod-web-arm64.sarif
+          category: trivy-terrapod-web-arm64
 
-  # ── Create Multi-Arch Manifests ────────────────────────
+      - name: Upload SARIF — terrapod-runner (arm64)
+        if: always() && hashFiles('trivy-terrapod-runner-arm64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-runner-arm64.sarif
+          category: trivy-terrapod-runner-arm64
+
+      - name: Upload SARIF — terrapod-listener (arm64)
+        if: always() && hashFiles('trivy-terrapod-listener-arm64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-listener-arm64.sarif
+          category: trivy-terrapod-listener-arm64
+
+      - name: Upload SARIF — terrapod-migrations (arm64)
+        if: always() && hashFiles('trivy-terrapod-migrations-arm64.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-terrapod-migrations-arm64.sarif
+          category: trivy-terrapod-migrations-arm64
+
   create-manifests:
     name: Manifest ${{ matrix.image }}
-    needs: [prepare, build-images-amd64, build-images-arm64, python-checks, node-checks, python-test, python-audit, host-checks, helm-smoke, secret-scan, codeql, sast, scan-images]
+    needs: [prepare, build-images-amd64, build-images-arm64, python-checks, node-checks, python-test, python-audit, host-checks, helm-smoke, secret-scan, codeql, sast, scan-images-amd64, scan-images-arm64]
     if: |
       always()
       && needs.build-images-amd64.result == 'success'
@@ -5212,7 +5269,8 @@ jobs:
       && (needs.secret-scan.result == 'success' || needs.secret-scan.result == 'skipped')
       && (needs.codeql.result == 'success' || needs.codeql.result == 'skipped')
       && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
-      && (needs.scan-images.result == 'success' || needs.scan-images.result == 'skipped')
+      && (needs.scan-images-amd64.result == 'success' || needs.scan-images-amd64.result == 'skipped')
+      && (needs.scan-images-arm64.result == 'success' || needs.scan-images-arm64.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -6255,11 +6313,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, quality-gate, helm-eval-boot, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-pulumi-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
+    needs: [prepare, quality-gate, helm-eval-boot, build-images-amd64, build-images-arm64, build-query, scan-images-amd64, scan-images-arm64, create-manifests, release-create, release-images, release-provider, release-pulumi-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.quality-gate.result == 'failure' || needs.helm-eval-boot.result == 'failure' || needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-pulumi-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.quality-gate.result == 'failure' || needs.helm-eval-boot.result == 'failure' || needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images-amd64.result == 'failure' || needs.scan-images-arm64.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-pulumi-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -6309,24 +6367,27 @@ jobs:
   # the tree being built is GENERATED, so a generator change can break it with
   # nothing of ours having moved.
   pulumi-sdk-build:
-    name: Pulumi SDK (${{ matrix.language }})
+    # All four languages in ONE job, generated in PARALLEL inside it.
+    #
+    # The quota is per JOB, 20 concurrent, and these four ran 1.1 min at their
+    # slowest for 2.3 min of work between them -- four slots in the saturated
+    # first wave to do what one can. They also each installed the Pulumi CLI,
+    # four downloads of the same archive.
+    #
+    # Each language keeps its OWN verification step, so a failure still names
+    # the language: the point of #2267 is that a silently smaller surface is
+    # this feature's failure mode, and a combined job must not reintroduce that
+    # by reporting one verdict for four SDKs.
+    name: Pulumi SDK
     if: needs.prepare.outputs.run_pulumi == 'true'
     needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    strategy:
-      # Every language, independently: a leg that fails must not hide the others,
-      # since the whole point is that a silently smaller surface is this
-      # feature's failure mode (#2267).
-      fail-fast: false
-      matrix:
-        language: [go, nodejs, python, dotnet]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: matrix.language == 'go'
         with:
           go-version-file: pulumi-provider/go.mod
 
@@ -6343,21 +6404,37 @@ jobs:
           sudo install -m 0755 pulumi/pulumi /usr/local/bin/pulumi
           pulumi version
 
-      - name: Generate the ${{ matrix.language }} SDK from the committed schema
+      - name: Generate all four SDKs from the committed schema
         run: |
           set -euo pipefail
-          pulumi package gen-sdk \
-            pulumi-provider/cmd/pulumi-resource-terrapod/schema.json \
-            --language "${{ matrix.language }}" --out "$RUNNER_TEMP/sdk"
+          gen() {
+            pulumi package gen-sdk \
+              pulumi-provider/cmd/pulumi-resource-terrapod/schema.json \
+              --language "$1" --out "$RUNNER_TEMP/sdk" > "gen-$1.log" 2>&1
+            echo "$?" > "genrc-$1"
+          }
+          for lang in go nodejs python dotnet; do gen "$lang" & done
+          wait
+
           # gen-sdk exits 0 when it writes nothing, which is the shape to
           # distrust -- an absent SDK would otherwise read as a passing build.
+          fail=0
+          for lang in go nodejs python dotnet; do
+            rc=$(cat "genrc-$lang" 2>/dev/null || echo 99)
+            if [ "$rc" != "0" ]; then
+              echo "::error::gen-sdk failed for $lang (rc=$rc)"
+              sed -n '1,40p' "gen-$lang.log" || true
+              fail=1
+            fi
+          done
           found=$(find "$RUNNER_TEMP/sdk" -type f \
             \( -name '*.go' -o -name '*.ts' -o -name '*.py' -o -name '*.cs' \) | wc -l)
           echo "generated source files: $found"
           test "$found" -gt 0 || {
-            echo "gen-sdk reported success and produced no sources for ${{ matrix.language }}."
-            exit 1
+            echo "gen-sdk reported success and produced no sources."
+            fail=1
           }
+          exit "$fail"
 
       # Go -- #2284's language. The generator emits no go.mod, so the module path
       # the SDK imports itself under has to be supplied; it must match
@@ -6365,7 +6442,6 @@ jobs:
       # own `internal` package does not resolve and the failure has nothing to do
       # with the schema.
       - name: Compile the Go SDK
-        if: matrix.language == 'go'
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/sdk/go"
@@ -6383,7 +6459,6 @@ jobs:
           }
 
       - name: Type-check the TypeScript SDK
-        if: matrix.language == 'nodejs'
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/sdk/nodejs"
@@ -6400,7 +6475,6 @@ jobs:
       # Python has no compile step, and the defect this catches was a package
       # that installed perfectly and could never be imported.
       - name: Install and import the Python SDK
-        if: matrix.language == 'python'
         run: |
           set -euo pipefail
           python3 -m venv "$RUNNER_TEMP/venv"
@@ -6435,7 +6509,6 @@ jobs:
       # compile check and wrong to paper over with a fixed number that would then
       # disagree with a real build.
       - name: Build the .NET SDK
-        if: matrix.language == 'dotnet'
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/sdk/dotnet"
@@ -6470,7 +6543,8 @@ jobs:
       - sast
       - build-images-amd64
       - build-images-arm64
-      - scan-images
+      - scan-images-amd64
+      - scan-images-arm64
       - e2e-test
       # `e2e-report` is deliberately absent, and must stay absent. It is already
       # excluded from the `results=()` verdict below (see the reasoning on the
@@ -6521,7 +6595,8 @@ jobs:
             "${{ needs.sast.result }}"
             "${{ needs.build-images-amd64.result }}"
             "${{ needs.build-images-arm64.result }}"
-            "${{ needs.scan-images.result }}"
+            "${{ needs.scan-images-amd64.result }}"
+            "${{ needs.scan-images-arm64.result }}"
             "${{ needs.e2e-test.result }}"
             "${{ needs.oci-conformance.result }}"
             "${{ needs.airgap-gate.result }}"
