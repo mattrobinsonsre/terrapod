@@ -1875,7 +1875,36 @@
       "continuePurge": "Continua lo svuotamento",
       "continuing": "Continuazione…"
     },
-    "sealedWarning": "Questo nodo è sigillato, quindi nulla di ciò che viene svuotato qui può essere recuperato di nuovo. La pulizia pianificata salta queste cache proprio per questo — è un''eliminazione definitiva."
+    "sealedWarning": "Questo nodo è sigillato, quindi nulla di ciò che viene svuotato qui può essere recuperato di nuovo. La pulizia pianificata salta queste cache proprio per questo — è un''eliminazione definitiva.",
+    "warmAhead": {
+      "heading": "Precarica le cache di pacchetti e immagini",
+      "help": "Indica una versione ogni volta che la conosci: un precaricamento indicato a una versione può poi essere confrontato con un file di lock, mentre «qualunque sia la più recente» no. Scrivi ogni riga nella forma <code>nome versione</code>; per i plugin Pulumi, aggiungi token <code>os/arch</code> finali per precaricare piattaforme specifiche.",
+      "ecosystemLabel": "Tipo di artefatto",
+      "ecosystemOff": "{ecosystem} (disattivato)",
+      "sourceLabel": "Scarica da",
+      "sourceDefault": "Upstream configurato",
+      "upstreamIs": "Verrà scaricato da <code>{url}</code>.",
+      "upstreamPerReference": "Ogni riferimento di immagine indica il proprio host, che deve essere uno degli upstream configurati in questo deployment.",
+      "itemsLabel": "Artefatti",
+      "imagesLabel": "Riferimenti di immagine",
+      "willWarm": "{count, plural, one {# artefatto verrà precaricato.} other {# artefatti verranno precaricati.}}",
+      "unversioned": "{count, plural, one {# riga non indica una versione, quindi verrà scaricata la più recente disponibile. Non è riproducibile.} other {# righe non indicano una versione, quindi verrà scaricata la più recente disponibile. Non è riproducibile.}}",
+      "versionRequired": "{count, plural, one {# riga non indica una versione.} other {# righe non indicano una versione.}} {ecosystem} non pubblica alcun indice su cui risolvere una più recente, quindi ogni riga ne ha bisogno.",
+      "tooMany": "In un solo invio si possono precaricare al massimo {max} artefatti.",
+      "confirm": "Precaricare ora {count, plural, one {# artefatto} other {# artefatti}}?",
+      "warm": "Precarica",
+      "warming": "Precaricamento in corso…",
+      "progress": "{completed} di {total} completati",
+      "fetched": "{fetched, plural, one {# file scaricato} other {# file scaricati}}",
+      "alreadyCached": "{files, plural, one {già in cache (# file)} other {già in cache (# file)}}",
+      "finished": "Precaricati {succeeded}/{total} ({failed} non riusciti)",
+      "sealed": "Questo nodo è sigillato, quindi non può scaricare nulla dall''upstream. Precarica le cache prima di sigillarlo, oppure togli il sigillo per precaricarle ora.",
+      "errorEmpty": "Aggiungi almeno una riga da precaricare.",
+      "errorSources": "Impossibile determinare da dove scaricherebbe il precaricamento",
+      "errorSubmit": "Impossibile avviare il precaricamento",
+      "errorStatus": "Impossibile leggere il processo di precaricamento",
+      "helpLead": "Scarica gli artefatti nella cache prima che qualcosa li richieda — uno per riga, con un nome e una versione."
+    }
   },
   "catalog": {
     "title": "Catalogo dei servizi",

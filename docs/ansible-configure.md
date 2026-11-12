@@ -623,6 +623,17 @@ for hours. It is sent **only** for a configure, so plan, apply, preview and up
 keep the builder's own 60 minutes and nothing changes for a deployment that runs
 no playbooks.
 
+**`runners.maxTokenTTLSeconds`** (default 14400) has to clear the first of
+these, and this is the pair most likely to be wrong in a deployment that has
+tuned either. A runner token has to outlive the Job it belongs to: everything a
+configure uploads — its log, its per-host events, the oversized-payload
+sidecar, and the resource profile that also carries *why* it failed — is
+uploaded at exit, so a token that expired mid-play turns all of them into
+`401`s. The run is still marked errored correctly, by the listener, so nothing
+about that loss is loud. The API warns at startup when
+`configureTimeoutMinutes` exceeds what the cap permits; raise the cap, or lower
+the ceiling.
+
 **`runners.configureNoProgressSeconds`** (default 1800, `0` disables) is the one
 that actually catches a stuck configure. A play wedged on a single unreachable
 host would otherwise burn the whole ceiling before anything noticed, so the
@@ -771,6 +782,36 @@ curl -H "Authorization: Bearer $TOKEN" \
 ```
 
 Read on the workspace is what it takes — the same as the run's log.
+
+### The run's error message is built from them
+
+A failed configure's error message names the hosts rather than the exit code.
+The rows above are what it is built from, so it reaches everything that renders
+a run's error: the run page, a notification body, the runs list.
+
+```
+1 host failed: web1.example.com at "platform : Wait for the service to start"
+  Failed to gather information about Pod(s) even after waiting for 3603 seconds
+
+Runner exited with code 2
+```
+
+Four things about it are worth knowing:
+
+- **The first failure on each host is the one named.** Ansible's own event order
+  is preserved, and the failures after the first on a host are usually
+  consequences of it.
+- **At most three hosts, then `+N more`.** This lands in a notification body and
+  a list tooltip; a playbook that failed on four hundred hosts must not produce
+  a four-hundred-line error. The whole set is on the Hosts tab.
+- **An `ignore_errors` failure is not counted.** The playbook carried on, so it
+  did not fail the run — it is in the rows, and on the Hosts tab, but not here.
+- **Unreachable hosts are summarised the same way**, which is what gives the
+  older "one or more hosts were unreachable" message the hosts it never named.
+
+Where there are no rows — nothing failed per-host, or the Job died before it
+could upload them — the message falls back to what the runner itself reported
+and then to the bare exit code.
 
 ## Reading the log: one host at a time, or all of them
 
@@ -1135,5 +1176,6 @@ the local case. That is why the fix is a volume rather than a variable.
 | A cloud rejects the token with a signature error | the value was read with surrounding whitespace — `| trim` the file for the forms that take the token rather than a path |
 | `The specified OIDC token file does not exist` | Azure's `oidc_token_file_path` names a path that is not there, usually the engine's directory rather than a configure's |
 | The cloud refuses an otherwise valid token | the trust policy conditions on `phase` and does not name `configure` |
+| A long configure ends with a short log, no Hosts tab and a null `peak-memory-bytes`, and the log begins `[terrapod] The runner did not store this phase's log` | its runner token expired before the playbook finished, so every upload it made at exit answered `401`. Raise `runners.maxTokenTTLSeconds` above `runners.configureTimeoutMinutes`, or lower the ceiling — the API warns at startup when the pair is inconsistent |
 | A catalog instance has a configure operation but nothing ever runs it | provisioning declares the operation and sets no trigger, and the catalog clamp withholds `run:apply` — see [Starting the configure](service-catalog.md#starting-the-configure) |
 | 422 naming `ansible-directory` when you provision a catalog item | the module version does not ship that subdirectory, or the path names the module root — the message says which, and names what the module version's top level does hold |

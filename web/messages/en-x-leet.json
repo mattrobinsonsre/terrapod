@@ -1875,7 +1875,36 @@
       "continuePurge": "C0n71nu3 purg3",
       "continuing": "C0n71nu1ng…"
     },
-    "sealedWarning": "7h15 n0d3 15 534l3d, 50 n07h1ng purg3d h3r3 c4n b3 f37ch3d 4g41n. 7h3 5ch3dul3d cl34nup 5k1p5 7h353 c4ch35 f0r 7h47 r3450n — 7h15 15 4 p3rm4n3n7 d3l3710n."
+    "sealedWarning": "7h15 n0d3 15 534l3d, 50 n07h1ng purg3d h3r3 c4n b3 f37ch3d 4g41n. 7h3 5ch3dul3d cl34nup 5k1p5 7h353 c4ch35 f0r 7h47 r3450n — 7h15 15 4 p3rm4n3n7 d3l3710n.",
+    "warmAhead": {
+      "heading": "W4rm p4ck4g3 4nd 1m4g3 c4ch35",
+      "help": "G1v3 4 v3r510n wh3r3v3r y0u kn0w 17: 4 w4rm n4m3d 47 4 v3r510n c4n 4f73rw4rd5 b3 ch3ck3d 4g41n57 4 l0ckf1l3, 4nd “wh473v3r 15 n3w357” c4nn07. Wr173 34ch l1n3 45 <code>n4m3 v3r510n</code>; f0r Pulum1 plug1n5, 4dd 7r41l1ng <code>05/4rch</code> 70k3n5 70 w4rm 5p3c1f1c pl47f0rm5.",
+      "ecosystemLabel": "4r71f4c7 k1nd",
+      "ecosystemOff": "{ecosystem} (5w17ch3d 0ff)",
+      "sourceLabel": "F37ch fr0m",
+      "sourceDefault": "C0nf1gur3d up57r34m",
+      "upstreamIs": "W1ll f37ch fr0m <code>{url}</code>.",
+      "upstreamPerReference": "34ch 1m4g3 r3f3r3nc3 n4m35 175 0wn h057, wh1ch h45 70 b3 0n3 0f 7h3 up57r34m5 7h15 d3pl0ym3n7 h45 c0nf1gur3d.",
+      "itemsLabel": "4r71f4c75",
+      "imagesLabel": "1m4g3 r3f3r3nc35",
+      "willWarm": "{count, plural, one {# 4r71f4c7 w1ll b3 w4rm3d.} other {# 4r71f4c75 w1ll b3 w4rm3d.}}",
+      "unversioned": "{count, plural, one {# l1n3 n4m35 n0 v3r510n, 50 7h3 n3w357 4v41l4bl3 w1ll b3 f37ch3d. 7h47 15 n07 r3pr0duc1bl3.} other {# l1n35 n4m3 n0 v3r510n, 50 7h3 n3w357 4v41l4bl3 w1ll b3 f37ch3d. 7h47 15 n07 r3pr0duc1bl3.}}",
+      "versionRequired": "{count, plural, one {# l1n3 n4m35 n0 v3r510n.} other {# l1n35 n4m3 n0 v3r510n.}} {ecosystem} publ15h35 n0 1nd3x 70 r350lv3 4 n3w357 4g41n57, 50 3v3ry l1n3 n33d5 0n3.",
+      "tooMany": "47 m057 {max} 4r71f4c75 c4n b3 w4rm3d 1n 0n3 5ubm15510n.",
+      "confirm": "W4rm {count, plural, one {# 4r71f4c7} other {# 4r71f4c75}} n0w?",
+      "warm": "W4rm",
+      "warming": "W4rm1ng…",
+      "progress": "{completed} 0f {total} d0n3",
+      "fetched": "{fetched, plural, one {f37ch3d # f1l3} other {f37ch3d # f1l35}}",
+      "alreadyCached": "{files, plural, one {4lr34dy c4ch3d (# f1l3)} other {4lr34dy c4ch3d (# f1l35)}}",
+      "finished": "W4rm3d {succeeded}/{total} ({failed} f41l3d)",
+      "sealed": "7h15 n0d3 15 534l3d, 50 17 c4nn07 f37ch 4ny7h1ng fr0m up57r34m. W4rm 7h3 c4ch35 b3f0r3 534l1ng 17, 0r un534l 17 70 w4rm 7h3m n0w.",
+      "errorEmpty": "4dd 47 l3457 0n3 l1n3 70 w4rm.",
+      "errorSources": "C0uld n07 r34d wh3r3 w4rm1ng w0uld f37ch fr0m",
+      "errorSubmit": "C0uld n07 574r7 w4rm1ng",
+      "errorStatus": "C0uld n07 r34d 7h3 w4rm1ng j0b",
+      "helpLead": "F37ch 4r71f4c75 1n70 7h3 c4ch3 b3f0r3 4ny7h1ng 45k5 f0r 7h3m — 0n3 p3r l1n3, 45 4 n4m3 4nd 4 v3r510n."
+    }
   },
   "catalog": {
     "title": "53rv1c3 C474l0g",

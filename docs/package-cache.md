@@ -150,10 +150,15 @@ moment to discover a gap.
 ```sh
 curl -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   https://terrapod.example.com/api/v1/admin/package-cache/warm \
-  -d '{"packages":[{"ecosystem":"pypi","name":"requests"},
+  -d '{"packages":[{"ecosystem":"pypi","name":"requests","version":"2.32.3"},
+                   {"ecosystem":"galaxy","name":"community.general","version":"9.2.0"},
                    {"ecosystem":"npm","name":"left-pad","version":"1.3.0"}]}'
 # → 202 {"data": {"id": "warm-9f2c...", "links": {"self": "…/admin/warm-jobs/warm-9f2c…"}}}
 ```
+
+**All six ecosystems** are warmable — `galaxy`, `pypi`, `npm`, `go`, `nuget` and
+`pulumi` — each through its own pull-through adapter, so a warmed artifact is
+byte-identical to one a run would have pulled and is held under the same key.
 
 Submission returns a job id rather than a result: a real dependency closure
 outlives an HTTP request, and a call that times out halfway leaves you unsure
@@ -161,11 +166,24 @@ what landed. Poll the job for progress and **per-item outcomes** — being told
 "failed" across twenty packages is not something you can act on, and finding the
 specific gaps is the entire point.
 
-Omit `version` to warm the newest upstream offers. For PyPI, **every file for that
-version is cached**, not one wheel: which wheel pip selects depends on the
-interpreter and platform doing the installing. For npm the **packument is cached
-alongside the tarball** — a sealed node cannot serve an install without it, since
-the dependency ranges live there and nowhere else.
+**Name a version wherever you know one.** A warm named at a version can
+afterwards be checked against the lockfile your runs pin; "the newest" can be
+checked against nothing. Omitting it stays supported as a convenience where the
+registry publishes a meaningful newest, and is refused for `pulumi`, whose
+download protocol has no index to resolve a bare name against.
+
+Each ecosystem's warm also caches the index documents a sealed install resolves
+through — galaxy's version list, npm's packument, go's `@v/list`, nuget's
+versions document — because the artifact alone produces a cache that looks full
+and cannot answer. For PyPI, **every file for that version is cached**, not one
+wheel: which wheel pip selects depends on the interpreter and platform doing the
+installing.
+
+A submission may name a `source`: a label declared in this ecosystem's
+`mirrors`, naming somewhere nearer than the public registry to warm *from*.
+[Caches → Warming](caches.md#warming--filling-a-cache-before-anything-asks) has
+the whole account, including what each ecosystem caches beyond the artifact and
+how to read a job's per-item outcomes.
 
 Re-running is safe and is the intended way to recover from a transient upstream
 failure: anything already cached is skipped and only the rest is retried.

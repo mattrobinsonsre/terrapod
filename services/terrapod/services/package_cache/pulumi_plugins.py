@@ -69,7 +69,7 @@ def first_party_base() -> str:
     return settings.registry.package_cache.pulumi.first_party_url.rstrip("/")
 
 
-def artifact_for(filename: str, parts: dict[str, str]) -> Artifact:
+def artifact_for(filename: str, parts: dict[str, str], *, base: str | None = None) -> Artifact:
     """Turn a parsed filename into something the substrate can fetch.
 
     `name` groups a plugin's platforms together — `pulumi-resource-aws` rather
@@ -92,7 +92,14 @@ def artifact_for(filename: str, parts: dict[str, str]) -> Artifact:
     # GitHub release asset lives under its tag. That is the same shape
     # `registry.platform_tools.pulumi_mirror_url` already assembles for the
     # Pulumi CLI itself, so this is the established pattern rather than a new one.
-    if parts["name"] == FIRST_PARTY_PLUGIN and parts["kind"] == FIRST_PARTY_KIND:
+    #
+    # A warm `base` override replaces BOTH, because a mirror an operator points a
+    # warm at is a mirror of whatever that plugin is -- honouring the first-party
+    # split under an override would warm Terrapod's own plugin from GitHub and
+    # everyone else's from the mirror, which is neither thing anyone meant.
+    if base:
+        upstream_url = f"{base.rstrip('/')}/{rebuilt}"
+    elif parts["name"] == FIRST_PARTY_PLUGIN and parts["kind"] == FIRST_PARTY_KIND:
         upstream_url = f"{first_party_base()}/v{parts['version']}/{rebuilt}"
     else:
         upstream_url = f"{upstream_base()}/{rebuilt}"

@@ -110,6 +110,11 @@ def _runner_config():
     cfg.server_url = "http://terrapod-api:8000"
     cfg.public_api_url = ""
     cfg.runner_namespace = "terrapod-runners"
+    # A real int: the launch sizes the runner token from the Job's deadline plus
+    # this (#2526), and `max(0, MagicMock())` raises rather than producing a
+    # number -- reported as "could not obtain runner token", which names neither
+    # this attribute nor the arithmetic.
+    cfg.termination_grace_period_seconds = 120
     default_def = MagicMock()
     default_def.name = "default"
     cfg.definitions = [default_def]

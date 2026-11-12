@@ -1875,7 +1875,36 @@
       "continuePurge": "Löschen fortsetzen",
       "continuing": "Wird fortgesetzt …"
     },
-    "sealedWarning": "Dieser Knoten ist versiegelt, nichts hier Gelöschtes kann also erneut abgerufen werden. Die geplante Bereinigung überspringt diese Zwischenspeicher genau deshalb – dies ist eine dauerhafte Löschung."
+    "sealedWarning": "Dieser Knoten ist versiegelt, nichts hier Gelöschtes kann also erneut abgerufen werden. Die geplante Bereinigung überspringt diese Zwischenspeicher genau deshalb – dies ist eine dauerhafte Löschung.",
+    "warmAhead": {
+      "heading": "Paket- und Image-Caches vorwärmen",
+      "help": "Geben Sie eine Version an, wo immer Sie sie kennen: Ein mit Version benanntes Vorwärmen lässt sich später gegen eine Lockdatei prüfen, „was auch immer das Neueste ist“ nicht. Schreiben Sie jede Zeile als <code>Name Version</code>; für Pulumi-Plugins hängen Sie <code>os/arch</code>-Token an, um bestimmte Plattformen vorzuwärmen.",
+      "ecosystemLabel": "Artefaktart",
+      "ecosystemOff": "{ecosystem} (abgeschaltet)",
+      "sourceLabel": "Beziehen von",
+      "sourceDefault": "Konfigurierte Quelle",
+      "upstreamIs": "Wird von <code>{url}</code> geholt.",
+      "upstreamPerReference": "Jede Image-Referenz nennt ihren eigenen Host, und der muss eine der in dieser Installation konfigurierten Quellen sein.",
+      "itemsLabel": "Artefakte",
+      "imagesLabel": "Image-Referenzen",
+      "willWarm": "{count, plural, one {# Artefakt wird vorgewärmt.} other {# Artefakte werden vorgewärmt.}}",
+      "unversioned": "{count, plural, one {# Zeile nennt keine Version, daher wird die neueste verfügbare geholt. Das ist nicht reproduzierbar.} other {# Zeilen nennen keine Version, daher wird jeweils die neueste verfügbare geholt. Das ist nicht reproduzierbar.}}",
+      "versionRequired": "{count, plural, one {# Zeile nennt keine Version.} other {# Zeilen nennen keine Version.}} {ecosystem} veröffentlicht keinen Index, gegen den sich ein Neuestes auflösen ließe, daher braucht jede Zeile eine.",
+      "tooMany": "Pro Übermittlung können höchstens {max} Artefakte vorgewärmt werden.",
+      "confirm": "{count, plural, one {# Artefakt} other {# Artefakte}} jetzt vorwärmen?",
+      "warm": "Vorwärmen",
+      "warming": "Wird vorgewärmt…",
+      "progress": "{completed} von {total} erledigt",
+      "fetched": "{fetched, plural, one {# Datei geholt} other {# Dateien geholt}}",
+      "alreadyCached": "{files, plural, one {bereits im Cache (# Datei)} other {bereits im Cache (# Dateien)}}",
+      "finished": "{succeeded}/{total} vorgewärmt ({failed} fehlgeschlagen)",
+      "sealed": "Dieser Knoten ist versiegelt und kann daher nichts aus einer externen Quelle holen. Wärmen Sie die Caches vor dem Versiegeln vor, oder heben Sie die Versiegelung auf, um jetzt vorzuwärmen.",
+      "errorEmpty": "Fügen Sie mindestens eine Zeile zum Vorwärmen hinzu.",
+      "errorSources": "Es konnte nicht ermittelt werden, woher das Vorwärmen beziehen würde",
+      "errorSubmit": "Das Vorwärmen konnte nicht gestartet werden",
+      "errorStatus": "Der Vorwärm-Auftrag konnte nicht gelesen werden",
+      "helpLead": "Artefakte in den Cache holen, bevor sie angefordert werden — eines pro Zeile, als Name und Version."
+    }
   },
   "catalog": {
     "title": "Dienstleistungskatalog",

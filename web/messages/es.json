@@ -1875,7 +1875,36 @@
       "continuePurge": "Continuar la purga",
       "continuing": "Continuando…"
     },
-    "sealedWarning": "Este nodo está sellado, así que nada de lo que se purgue aquí se podrá volver a obtener. Por eso la limpieza programada omite estas cachés — se trata de una eliminación permanente."
+    "sealedWarning": "Este nodo está sellado, así que nada de lo que se purgue aquí se podrá volver a obtener. Por eso la limpieza programada omite estas cachés — se trata de una eliminación permanente.",
+    "warmAhead": {
+      "heading": "Precalentar cachés de paquetes e imágenes",
+      "help": "Indique una versión siempre que la conozca: un precalentamiento nombrado con versión se puede comprobar después contra un archivo de bloqueo, y «lo más reciente que haya» no. Escriba cada línea como <code>nombre versión</code>; para los plugins de Pulumi, añada tokens <code>os/arch</code> al final para precalentar plataformas concretas.",
+      "ecosystemLabel": "Tipo de artefacto",
+      "ecosystemOff": "{ecosystem} (desactivado)",
+      "sourceLabel": "Obtener de",
+      "sourceDefault": "Origen configurado",
+      "upstreamIs": "Se obtendrá de <code>{url}</code>.",
+      "upstreamPerReference": "Cada referencia de imagen nombra su propio host, que tiene que ser uno de los orígenes que este despliegue tiene configurados.",
+      "itemsLabel": "Artefactos",
+      "imagesLabel": "Referencias de imagen",
+      "willWarm": "{count, plural, one {Se precalentará # artefacto.} other {Se precalentarán # artefactos.}}",
+      "unversioned": "{count, plural, one {# línea no indica versión, así que se obtendrá la más reciente disponible. Eso no es reproducible.} other {# líneas no indican versión, así que se obtendrá la más reciente disponible. Eso no es reproducible.}}",
+      "versionRequired": "{count, plural, one {# línea no indica versión.} other {# líneas no indican versión.}} {ecosystem} no publica ningún índice contra el que resolver una más reciente, así que cada línea necesita una.",
+      "tooMany": "Como máximo se pueden precalentar {max} artefactos en un envío.",
+      "confirm": "¿Precalentar ahora {count, plural, one {# artefacto} other {# artefactos}}?",
+      "warm": "Precalentar",
+      "warming": "Precalentando…",
+      "progress": "{completed} de {total} hechos",
+      "fetched": "{fetched, plural, one {# archivo obtenido} other {# archivos obtenidos}}",
+      "alreadyCached": "{files, plural, one {ya en caché (# archivo)} other {ya en caché (# archivos)}}",
+      "finished": "Precalentados {succeeded}/{total} ({failed} con error)",
+      "sealed": "Este nodo está sellado, así que no puede obtener nada del origen. Precaliente las cachés antes de sellarlo, o quítele el sello para precalentarlas ahora.",
+      "errorEmpty": "Añada al menos una línea para precalentar.",
+      "errorSources": "No se pudo averiguar de dónde obtendría el precalentamiento",
+      "errorSubmit": "No se pudo iniciar el precalentamiento",
+      "errorStatus": "No se pudo leer el trabajo de precalentamiento",
+      "helpLead": "Obtenga los artefactos en la caché antes de que algo los pida: uno por línea, con un nombre y una versión."
+    }
   },
   "catalog": {
     "title": "Catálogo de servicios",

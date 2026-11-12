@@ -1875,7 +1875,36 @@
       "continuePurge": "Pokračovat v mazání",
       "continuing": "Pokračuje…"
     },
-    "sealedWarning": "Tento uzel je zapečetěný, takže nic, co zde vymažete, už nelze znovu stáhnout. Plánované čištění proto tyto cache vynechává — jde o trvalé smazání."
+    "sealedWarning": "Tento uzel je zapečetěný, takže nic, co zde vymažete, už nelze znovu stáhnout. Plánované čištění proto tyto cache vynechává — jde o trvalé smazání.",
+    "warmAhead": {
+      "heading": "Předehřát cache balíčků a obrazů",
+      "help": "Uvádějte verzi všude, kde ji znáte: předehřátí uvedené s verzí lze později ověřit proti lock souboru, „cokoli je nejnovější“ nikoli. Každý řádek zapište ve tvaru <code>název verze</code>; u pluginů Pulumi připojte na konec tokeny <code>os/arch</code>, chcete-li předehřát konkrétní platformy.",
+      "ecosystemLabel": "Druh artefaktu",
+      "ecosystemOff": "{ecosystem} (vypnuto)",
+      "sourceLabel": "Stahovat z",
+      "sourceDefault": "Nakonfigurovaný upstream",
+      "upstreamIs": "Bude staženo z <code>{url}</code>.",
+      "upstreamPerReference": "Každý odkaz na obraz uvádí vlastního hostitele a ten musí být jedním z upstreamů nakonfigurovaných v této instalaci.",
+      "itemsLabel": "Artefakty",
+      "imagesLabel": "Odkazy na obrazy",
+      "willWarm": "{count, plural, one {Předehřeje se # artefakt.} few {Předehřejí se # artefakty.} many {Předehřeje se # artefaktu.} other {Předehřeje se # artefaktů.}}",
+      "unversioned": "{count, plural, one {# řádek neuvádí verzi, takže se stáhne nejnovější dostupná. To není reprodukovatelné.} few {# řádky neuvádějí verzi, takže se stáhnou nejnovější dostupné. To není reprodukovatelné.} many {# řádku neuvádí verzi, takže se stáhne nejnovější dostupná. To není reprodukovatelné.} other {# řádků neuvádí verzi, takže se stáhnou nejnovější dostupné. To není reprodukovatelné.}}",
+      "versionRequired": "{count, plural, one {# řádek neuvádí verzi.} few {# řádky neuvádějí verzi.} many {# řádku neuvádí verzi.} other {# řádků neuvádí verzi.}} {ecosystem} nezveřejňuje index, proti kterému by šlo nejnovější určit, takže verzi potřebuje každý řádek.",
+      "tooMany": "V jednom odeslání lze předehřát nejvýše {max} artefaktů.",
+      "confirm": "Předehřát nyní {count, plural, one {# artefakt} few {# artefakty} many {# artefaktu} other {# artefaktů}}?",
+      "warm": "Předehřát",
+      "warming": "Předehřívání…",
+      "progress": "Hotovo {completed} z {total}",
+      "fetched": "{fetched, plural, one {stažen # soubor} few {staženy # soubory} many {staženo # souboru} other {staženo # souborů}}",
+      "alreadyCached": "{files, plural, one {již v cache (# soubor)} few {již v cache (# soubory)} many {již v cache (# souboru)} other {již v cache (# souborů)}}",
+      "finished": "Předehřáto {succeeded}/{total} ({failed} selhalo)",
+      "sealed": "Tento uzel je zapečetěný, takže nemůže nic stáhnout z upstreamu. Předehřejte cache před zapečetěním, nebo pečeť sejměte a předehřejte je nyní.",
+      "errorEmpty": "Přidejte alespoň jeden řádek k předehřátí.",
+      "errorSources": "Nepodařilo se zjistit, odkud by předehřívání stahovalo",
+      "errorSubmit": "Předehřívání se nepodařilo spustit",
+      "errorStatus": "Úlohu předehřívání se nepodařilo přečíst",
+      "helpLead": "Stáhněte artefakty do cache dříve, než si o ně cokoli řekne — jeden na řádek, jako název a verzi."
+    }
   },
   "catalog": {
     "title": "Servisní katalog",

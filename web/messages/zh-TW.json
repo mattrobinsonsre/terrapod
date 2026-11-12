@@ -1875,7 +1875,36 @@
       "continuePurge": "繼續清除",
       "continuing": "正在繼續…"
     },
-    "sealedWarning": "本節點已密封，因此在此清除的內容無法重新取得。定期清理也正因如此會跳過這些快取 — 這是永久刪除。"
+    "sealedWarning": "本節點已密封，因此在此清除的內容無法重新取得。定期清理也正因如此會跳過這些快取 — 這是永久刪除。",
+    "warmAhead": {
+      "heading": "預熱套件與映像快取",
+      "help": "只要知道版本就請寫上：指定了版本的預熱日後可以與鎖定檔比對，而「最新的那個」無法比對。每行按 <code>名稱 版本</code> 的格式書寫；對於 Pulumi 外掛，在末尾加上 <code>os/arch</code> 令牌可預熱特定平台。",
+      "ecosystemLabel": "構件類型",
+      "ecosystemOff": "{ecosystem}（已關閉）",
+      "sourceLabel": "取得來源",
+      "sourceDefault": "已設定的上游",
+      "upstreamIs": "將從 <code>{url}</code> 取得。",
+      "upstreamPerReference": "每個映像參照都指明自己的主機，而該主機必須是本部署已設定的上游之一。",
+      "itemsLabel": "構件",
+      "imagesLabel": "映像參照",
+      "willWarm": "{count, plural, other {將預熱 # 個構件。}}",
+      "unversioned": "{count, plural, other {有 # 行未指明版本，因此將取得可用的最新版本。這是不可重現的。}}",
+      "versionRequired": "{count, plural, other {有 # 行未指明版本。}}{ecosystem} 不發布可用於解析最新版本的索引，因此每一行都需要指明版本。",
+      "tooMany": "一次提交最多可預熱 {max} 個構件。",
+      "confirm": "立即預熱 {count, plural, other {# 個構件}}？",
+      "warm": "預熱",
+      "warming": "正在預熱…",
+      "progress": "{total} 個中已完成 {completed} 個",
+      "fetched": "{fetched, plural, other {已取得 # 個檔案}}",
+      "alreadyCached": "{files, plural, other {已在快取中（# 個檔案）}}",
+      "finished": "已預熱 {succeeded}/{total}（{failed} 個失敗）",
+      "sealed": "本節點已密封，因此無法從上游取得任何內容。請在密封之前預熱這些快取，或解除密封後立即預熱。",
+      "errorEmpty": "請至少新增一行以進行預熱。",
+      "errorSources": "無法讀取預熱將從何處取得",
+      "errorSubmit": "無法啟動預熱",
+      "errorStatus": "無法讀取預熱作業",
+      "helpLead": "在有東西請求之前就把構件拉入快取 — 每行一個，寫明名稱與版本。"
+    }
   },
   "catalog": {
     "title": "服務目錄",

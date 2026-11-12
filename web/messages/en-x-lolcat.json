@@ -1875,7 +1875,36 @@
       "continuePurge": "Keep purjin",
       "continuing": "Keep goin…"
     },
-    "sealedWarning": "Dis node iz seeld up, so nuffin purjd heer can be fetchd agin. Teh scheduld cleenup skipz deez cachez for dat reezon — dis iz a permanunt deleshun."
+    "sealedWarning": "Dis node iz seeld up, so nuffin purjd heer can be fetchd agin. Teh scheduld cleenup skipz deez cachez for dat reezon — dis iz a permanunt deleshun.",
+    "warmAhead": {
+      "heading": "Warm teh packige an imij cachez",
+      "help": "Giv a vershun wenevr u noes it: a warm namd at a vershun can be checkd agin a lockfyle aftr, an “whatevr iz newist” cannot. Rite evry line liek <code>name version</code>; fer Pulumi pluginz, add trailin <code>os/arch</code> tokenz ta warm speshul platformz.",
+      "ecosystemLabel": "Artifakt kynd",
+      "ecosystemOff": "{ecosystem} (switchd off)",
+      "sourceLabel": "Grab frum",
+      "sourceDefault": "Teh configurd upstreem",
+      "upstreamIs": "Wil grab frum <code>{url}</code>.",
+      "upstreamPerReference": "Evry imij referins namez itz own host, wich haz ta be wun ov teh upstreemz dis deploymint haz configurd.",
+      "itemsLabel": "Artifaktz",
+      "imagesLabel": "Imij referinsez",
+      "willWarm": "{count, plural, one {# artifakt wil be warmd.} other {# artifaktz wil be warmd.}}",
+      "unversioned": "{count, plural, one {# line namez no vershun, so teh newist wun availibul getz grabd. Dat iz NOT reproducibul.} other {# linez naem no vershun, so teh newist wun availibul getz grabd. Dat iz NOT reproducibul.}}",
+      "versionRequired": "{count, plural, one {# line namez no vershun.} other {# linez naem no vershun.}} {ecosystem} publishez no indeks ta resolv a newist agenst, so evry line needz wun.",
+      "tooMany": "At moast {max} artifaktz can be warmd in wun submishun.",
+      "confirm": "Warm {count, plural, one {# artifakt} other {# artifaktz}} nao?",
+      "warm": "Maek warm",
+      "warming": "Warmin…",
+      "progress": "{completed} ov {total} dun",
+      "fetched": "{fetched, plural, one {grabd # fyle} other {grabd # fylez}}",
+      "alreadyCached": "{files, plural, one {alreddy cachd (# fyle)} other {alreddy cachd (# fylez)}}",
+      "finished": "Warmd {succeeded}/{total} ({failed} faild)",
+      "sealed": "Dis node iz seeld up, so it can not grab nuffin frum upstreem. Warm teh cachez b4 u seel it, or unseel it ta warm dem nao.",
+      "errorEmpty": "Add at leest wun line ta warm.",
+      "errorSources": "Could not haz where teh warmin wud grab frum",
+      "errorSubmit": "Could not start teh warmin",
+      "errorStatus": "Could not haz teh warmin job",
+      "helpLead": "Grab artifaktz into teh cache b4 anyfing askz fer dem — one per line, liek a naem an a vershun."
+    }
   },
   "catalog": {
     "title": "Servis Catalog",

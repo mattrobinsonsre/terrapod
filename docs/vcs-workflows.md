@@ -149,6 +149,29 @@ The AI policy gate is the one that can hold a run **without having ruled**: its 
 
 A workspace whose mandatory gate failed is **not** offered an apply — `terrapod apply` would be refused while the gate holds the run. Override the gate (or fix the finding and push), and the next comment update offers it.
 
+**Which resources change.** Each workspace's block also lists the resources its plan changes, so a reviewer typing `terrapod apply` can see which three resources the `+3` is about without leaving the pull request:
+
+````
+▸ accounts-beta-compute — 4 resources change
+    + aws_instance.web
+    + aws_security_group.web
+    ~ aws_db_instance.main
+        instance_class: t3.medium → t3.large
+    -/+ aws_eip.ip
+````
+
+`+` is a create, `~` an update, `-` a delete and `-/+` a replace, and an update lists the attributes that changed with their values before and after. This is **not the plan log**, and deliberately so: the log is stored unmasked on purpose, which is safe only while it stays inside the deployment, and a pull request is the second place a run's artifacts leave it. What the comment carries is a short structured list that can honour Terraform's own sensitive markers, and it is bounded when the run records it rather than when the comment renders:
+
+- at most **25 resources** per run, **8 attributes** per updated resource and **120 characters** per value, with a count of what was left out and a link to the run, which holds the whole plan;
+- a creation or deletion lists no attributes, since the resource is the unit of change;
+- a value Terraform marks sensitive shows as `(sensitive value)` wherever the marker points, if **either** side of the change marks it, including a block that was added or removed. A copy of a marked value in an attribute the provider did not mark is hidden too, and so is the value of any of the workspace's own sensitive variables and of this run's `-var` values, **at any length**: unlike the AI summary, this list has no minimum length, because a short secret on a public pull request is not acceptable. The value is hidden before it is shortened, so a secret cut by the length cap cannot leave a prefix behind. **If those variable values cannot be resolved, no list is recorded at all**: a comment without the list is the safe way to be wrong;
+- an attribute whose value is only known after apply reads `(known after apply)`;
+- the list is a code block, so plan content cannot notify anyone, render an image or close the block.
+
+The comment is shared by every workspace in the PR, so the lists share one budget as well. When a PR touches enough large plans to approach the provider's comment limit, a list over its fair share is replaced by a one-line pointer to the run. The table, the gate verdicts and the AI summary are never dropped.
+
+It covers Terraform and OpenTofu. A Pulumi preview has no resource addresses, so its block shows no list. A run that was planned before this was added shows none either, and its block is exactly what it was. After the merge, or after an apply, the list is still there beside the Apply column's outcome. The comment does not say *which* resource an apply failed on, because that would mean reading the apply log.
+
 **How many comments a PR gets: one.** Every affected workspace is a row of this table, and each row's [AI plan summary](ai-plan-summary.md) and gate verdicts sit together in that workspace's own collapsed block beneath it. Terrapod writes no second comment, and it edits this one in place on every push rather than adding another — however many workspaces the PR touches and however many times you push, a PR carries exactly one Terrapod comment.
 
 A **module** PR gets the same single comment, with a row for each workspace that consumes the module. A PR that touches no workspace gets no comment at all.

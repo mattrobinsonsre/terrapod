@@ -1875,7 +1875,36 @@
       "continuePurge": "Continuar o expurgo",
       "continuing": "A continuar…"
     },
-    "sealedWarning": "Este nó está selado, pelo que nada do que for expurgado aqui pode ser descarregado novamente. Por isso a limpeza agendada ignora estas caches — esta é uma eliminação permanente."
+    "sealedWarning": "Este nó está selado, pelo que nada do que for expurgado aqui pode ser descarregado novamente. Por isso a limpeza agendada ignora estas caches — esta é uma eliminação permanente.",
+    "warmAhead": {
+      "heading": "Aquecer as caches de pacotes e de imagens",
+      "help": "Indique uma versão sempre que a souber: um aquecimento indicado com versão pode depois ser confrontado com um ficheiro de bloqueio, e “o que for mais recente” não pode. Escreva cada linha na forma <code>nome versão</code>; para plug-ins do Pulumi, acrescente tokens <code>os/arch</code> no fim para aquecer plataformas específicas.",
+      "ecosystemLabel": "Tipo de artefacto",
+      "ecosystemOff": "{ecosystem} (desativado)",
+      "sourceLabel": "Descarregar de",
+      "sourceDefault": "Origem configurada",
+      "upstreamIs": "Será descarregado de <code>{url}</code>.",
+      "upstreamPerReference": "Cada referência de imagem indica o seu próprio anfitrião, que tem de ser uma das origens configuradas nesta implementação.",
+      "itemsLabel": "Artefactos",
+      "imagesLabel": "Referências de imagem",
+      "willWarm": "{count, plural, one {# artefacto será aquecido.} other {# artefactos serão aquecidos.}}",
+      "unversioned": "{count, plural, one {# linha não indica versão, pelo que será descarregada a mais recente disponível. Isso não é reproduzível.} other {# linhas não indicam versão, pelo que será descarregada a mais recente disponível. Isso não é reproduzível.}}",
+      "versionRequired": "{count, plural, one {# linha não indica versão.} other {# linhas não indicam versão.}} {ecosystem} não publica qualquer índice onde resolver uma mais recente, pelo que cada linha precisa de uma.",
+      "tooMany": "No máximo podem ser aquecidos {max} artefactos num só envio.",
+      "confirm": "Aquecer agora {count, plural, one {# artefacto} other {# artefactos}}?",
+      "warm": "Aquecer",
+      "warming": "A aquecer…",
+      "progress": "{completed} de {total} concluídos",
+      "fetched": "{fetched, plural, one {# ficheiro descarregado} other {# ficheiros descarregados}}",
+      "alreadyCached": "{files, plural, one {já em cache (# ficheiro)} other {já em cache (# ficheiros)}}",
+      "finished": "Aquecidos {succeeded}/{total} ({failed} falharam)",
+      "sealed": "Este nó está selado, pelo que não consegue descarregar nada da origem. Aqueça as caches antes de o selar, ou retire o selo para as aquecer agora.",
+      "errorEmpty": "Adicione pelo menos uma linha para aquecer.",
+      "errorSources": "Não foi possível determinar de onde o aquecimento descarregaria",
+      "errorSubmit": "Não foi possível iniciar o aquecimento",
+      "errorStatus": "Não foi possível ler a tarefa de aquecimento",
+      "helpLead": "Descarregue os artefactos para a cache antes que algo os peça — um por linha, com um nome e uma versão."
+    }
   },
   "catalog": {
     "title": "Catálogo de Serviços",
