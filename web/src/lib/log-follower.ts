@@ -22,13 +22,32 @@
  *    never finalises (a Job killed before its upload) cannot poll forever.
  *  - **idle**: no polling.
  *
- * While a finished phase is being followed, every fetch reads from offset 0
- * and REPLACES the text, rather than appending past the old offset. The live
- * snapshot is a tail window of the pod's output, capped by line count and
- * size, and the stored log is a separately assembled file. Byte offsets in one
- * are not offsets in the other, so appending at the old offset could duplicate
- * or drop text at the join. Reading from 0 costs a few extra reads of a
- * finished log, and always assembles it exactly once.
+ * EVERY fetch reads from offset 0 and REPLACES the text. Not only while
+ * following a finished phase -- that was the original rule and it was too
+ * narrow, because the live snapshot is not a growing buffer either: the
+ * listener PUTs `kubectl logs --tail=500` capped at 256KB and the API
+ * `setex`es it WHOLESALE each reconciler cycle, so it is a SLIDING window.
+ * The server then serves `data[offset:]` against whichever window it currently
+ * holds. Below the cap the window only grows and an offset happens to work,
+ * which is why this looked correct; past 500 lines or 256KB the window's own
+ * byte 0 moves forward, so a stale offset slices a window that has shifted --
+ * text duplicated or dropped at the join, and once the new window is shorter
+ * than the offset the slice is permanently EMPTY and the view freezes until
+ * the page is reloaded. That is the symptom reported on #2511, and it affects
+ * every phase.
+ *
+ * The same discontinuity exists between the two SOURCES (the tail window and
+ * the separately assembled stored log), which the original rule did cover.
+ *
+ * The fix is deliberately on this side rather than the server's. The server
+ * could re-base the stream by emitting STX whenever it serves the sliding
+ * window, but `/api/tfe/v2`'s plan-log endpoint is the same handler, and
+ * `go-tfe`'s LogReader consumes it WITH offsets -- re-basing there would
+ * duplicate output in `tofu apply` on somebody's terminal. So the client that
+ * knows the snapshot is a window is the one that stops trusting offsets.
+ *
+ * The cost is re-reading a window that is already capped at 500 lines / 256KB,
+ * once per poll, and the log is always assembled exactly once.
  *
  * A reset requested while a fetch is in flight is never dropped: it is queued
  * and runs as soon as the in-flight fetch finishes. A plain fetch requested
@@ -169,9 +188,10 @@ export function createLogFollower(opts: LogFollowerOptions): LogFollower {
     } else if (complete) {
       return // the log is final; nothing more will ever arrive
     }
-    // Following a finished phase: always read the whole log from 0 (see the
-    // module comment for why an old offset cannot be trusted there).
-    const from = reset || phase === 'finished' ? 0 : offset
+    // ALWAYS from 0, in every state. An old offset cannot be trusted against
+    // either source (see the module comment), so `offset` is kept only to
+    // notice an empty response, never to resume from.
+    const from = 0
     let bytes: Uint8Array | null
     try {
       bytes = await opts.read(from, reset)
