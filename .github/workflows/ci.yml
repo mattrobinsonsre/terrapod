@@ -2847,6 +2847,40 @@ jobs:
           fi
           echo "per-class blob policy renders OK, unknown class refused"
 
+      - name: (helm-smoke) Storage locations render, and bad ones are refused (#2547)
+        run: |
+          set -euo pipefail
+          L=api.config.storage.locations
+          render() {
+            docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+              template terrapod helm/terrapod --values helm/terrapod/values.yaml "$@"
+          }
+          out=$(render --set "$L.eu-west.backend=s3" --set "$L.eu-west.s3.bucket=eu-bucket") \
+            || { echo "FAIL: a valid storage location must render (#2547)"; exit 1; }
+          # A missing render line makes `locations` silently inert.
+          block=$(grep -A8 "locations:" <<<"$out" || true)
+          grep -q '"eu-west":' <<<"$block" || { echo "FAIL: a storage location must reach the ConfigMap (#2547)"; exit 1; }
+          grep -q 'bucket: "eu-bucket"' <<<"$block" || { echo "FAIL: a storage location's bucket must reach the ConfigMap (#2547)"; exit 1; }
+          # No locations configured renders nothing, exactly as before.
+          empty=$(render) || { echo "FAIL: the chart must render with no locations (#2547)"; exit 1; }
+          grep -q "config.yaml:" <<<"$empty" || { echo "FAIL: the no-locations render has no API config (#2547)"; exit 1; }
+          if grep -q "locations:" <<<"$empty"; then echo "FAIL: no locations must render no locations key (#2547)"; exit 1; fi
+          # Each refusal must be the schema's, for the stated reason (`set|expected error text`).
+          while IFS='|' read -r bad want; do
+            if err=$(render --set "$bad" 2>&1 >/dev/null); then
+              echo "FAIL: values.schema.json must refuse $bad (#2547)"; exit 1
+            fi
+            grep -qF "$want" <<<"$err" || { echo "FAIL: $bad was refused for another reason: $err (#2547)"; exit 1; }
+          done <<EOF
+          $L.default.backend=s3,$L.default.s3.bucket=b|Property name of "default" does not match
+          $L.Bad_Name.backend=s3,$L.Bad_Name.s3.bucket=b|Property name of "Bad_Name" does not match
+          $L.local.backend=filesystem|locations.local.backend must be one of the following
+          $L.eu-west.backend=s3|locations.eu-west: s3 is required
+          $L.eu-west.backend=s3,$L.eu-west.s3.region=x|locations.eu-west.s3: bucket is required
+          $L.eu-west.backend=azure,$L.eu-west.azure.account_name=a,$L.eu-west.azure.container_name=c,$L.eu-west.s3.bucket=b|locations.eu-west: Must not validate the schema (not)
+          EOF
+          echo "storage locations render OK, bad ones refused for the right reason"
+
       - name: (helm-smoke) Eval values render (embedded Postgres/Redis)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \

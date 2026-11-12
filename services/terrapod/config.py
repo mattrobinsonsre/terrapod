@@ -4,13 +4,22 @@ Configuration management for Terrapod API server.
 Non-secret configuration loaded from YAML file, secrets from environment variables.
 """
 
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
 import yaml
-from pydantic import BaseModel, Field, PostgresDsn, RedisDsn, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PostgresDsn,
+    RedisDsn,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -594,6 +603,81 @@ class FilesystemConfig(BaseModel):
     )
 
 
+DEFAULT_STORAGE_LOCATION = "default"
+_LOCATION_NAME_RE = re.compile(r"[a-z0-9-]{1,32}")
+
+
+class StorageLocationCredentials(BaseModel):
+    """How a location authenticates. Only the ambient default exists today."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["default"] = Field(
+        default="default",
+        description="Credential source. `default` = the API pod's ambient identity",
+    )
+
+
+_LOCATION_REQUIRED_FIELDS: dict[StorageBackend, tuple[str, ...]] = {
+    StorageBackend.S3: ("bucket",),
+    StorageBackend.AZURE: ("account_name", "container_name"),
+    StorageBackend.GCS: ("bucket",),
+}
+
+
+class StorageLocationConfig(BaseModel):
+    """A named storage location: a full backend definition (never filesystem)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    backend: StorageBackend = Field(description="Backend: s3, azure, or gcs")
+    s3: S3Config = Field(default_factory=S3Config)
+    azure: AzureConfig = Field(default_factory=AzureConfig)
+    gcs: GCSConfig = Field(default_factory=GCSConfig)
+    credentials: StorageLocationCredentials = Field(default_factory=StorageLocationCredentials)
+
+    @field_validator("backend")
+    @classmethod
+    def _not_filesystem(cls, v: StorageBackend) -> StorageBackend:
+        if v == StorageBackend.FILESYSTEM:
+            raise ValueError(
+                "a storage location cannot use the filesystem backend "
+                "(its presigned routes use one process-global store)"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _complete_backend_block(self) -> "StorageLocationConfig":
+        backend = self.backend.value
+        others = sorted(
+            self.model_fields_set & ({b.value for b in _LOCATION_REQUIRED_FIELDS} - {backend})
+        )
+        if others:
+            raise ValueError(f"a {backend} location must not set {', '.join(others)}")
+        block = getattr(self, backend)
+        missing = [
+            f"{backend}.{f}"
+            for f in _LOCATION_REQUIRED_FIELDS[self.backend]
+            if not getattr(block, f)
+        ]
+        if missing:
+            raise ValueError(f"a {backend} location must set {', '.join(missing)}")
+        return self
+
+
+def _store_identity(cfg: "StorageConfig | StorageLocationConfig") -> tuple[str, ...] | None:
+    """Where a backend definition stores objects; None for the filesystem."""
+    match cfg.backend:
+        case StorageBackend.S3:
+            return ("s3", cfg.s3.bucket, cfg.s3.endpoint_url, cfg.s3.prefix.strip("/"))
+        case StorageBackend.AZURE:
+            az = cfg.azure
+            return ("azure", az.account_name, az.container_name, az.prefix.strip("/"))
+        case StorageBackend.GCS:
+            return ("gcs", cfg.gcs.bucket, cfg.gcs.prefix.strip("/"))
+    return None
+
+
 class StorageConfig(BaseModel):
     """Storage configuration."""
 
@@ -605,6 +689,44 @@ class StorageConfig(BaseModel):
     azure: AzureConfig = Field(default_factory=AzureConfig)
     gcs: GCSConfig = Field(default_factory=GCSConfig)
     filesystem: FilesystemConfig = Field(default_factory=FilesystemConfig)
+    locations: dict[str, StorageLocationConfig] = Field(
+        default_factory=dict,
+        description="Named storage locations, each a full backend definition. The "
+        "top-level backend is the reserved `default` location. Empty = single store.",
+    )
+
+    @field_validator("locations")
+    @classmethod
+    def _valid_locations(
+        cls, v: dict[str, StorageLocationConfig]
+    ) -> dict[str, StorageLocationConfig]:
+        for name in v:
+            if name == DEFAULT_STORAGE_LOCATION:
+                raise ValueError(
+                    f"storage.locations: {name!r} is reserved; the top-level storage "
+                    "block is the default location"
+                )
+            if not _LOCATION_NAME_RE.fullmatch(name):
+                raise ValueError(
+                    f"storage.locations: invalid location name {name!r}; "
+                    "must match ^[a-z0-9-]{1,32}$"
+                )
+        return v
+
+    @model_validator(mode="after")
+    def _distinct_locations(self) -> "StorageConfig":
+        seen: dict[tuple[str, ...], str] = {}
+        if (default := _store_identity(self)) is not None:
+            seen[default] = DEFAULT_STORAGE_LOCATION
+        for name, location in self.locations.items():
+            identity = _store_identity(location)
+            if identity in seen:
+                raise ValueError(
+                    f"storage.locations: {name!r} points at the same place as {seen[identity]!r}"
+                )
+            if identity is not None:
+                seen[identity] = name
+        return self
 
 
 # --- SSO Configuration Models ---

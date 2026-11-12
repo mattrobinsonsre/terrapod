@@ -295,6 +295,7 @@
   "api.config.storage.gcs.presigned_url_expiry_seconds",
   "api.config.storage.gcs.project_id",
   "api.config.storage.gcs.service_account_email",
+  "api.config.storage.locations",
   "api.config.storage.s3.bucket",
   "api.config.storage.s3.endpoint_url",
   "api.config.storage.s3.prefix",
