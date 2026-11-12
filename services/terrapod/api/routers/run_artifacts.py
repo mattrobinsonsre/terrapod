@@ -47,6 +47,7 @@ from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import host_results_service
+from terrapod.services.plan_resource_list import build_resource_list, strict_sensitive_literals
 from terrapod.services.plan_summary import summarize_plan_json
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
@@ -116,6 +117,43 @@ def _summarize_plan_file(path: str) -> dict | None:
     """
     with open(path, "rb") as fh:
         return summarize_plan_json(fh.read())
+
+
+def _resource_list_from_file(path: str, secrets: list[str]) -> dict | None:
+    """Read a plan-JSON tempfile and build the bounded, redacted resource list.
+
+    A worker-thread twin of `_summarize_plan_file`, for the same reason: the
+    parse and the redaction walk the whole plan.
+    """
+    with open(path, "rb") as fh:
+        return build_resource_list(fh.read(), secrets)
+
+
+async def _plan_resources(run: Run, db: AsyncSession, tmp_path: str) -> dict | None:
+    """The list of resources this plan changes, or None to record nothing.
+
+    **Fails closed.** The list carries VALUES, which a pull request makes public,
+    so it is only built when the workspace's own sensitive variable values can be
+    resolved to scrub alongside the ones the plan marks. If they cannot, nothing
+    is recorded: a comment without the list is the safe way to be wrong, and a
+    list with the backstop missing is not. The counts, the upload and the plan
+    are unaffected either way.
+
+    Uses a STRICT resolver, not the summariser's. That one swallows its own
+    failures and returns `[]`, which is right for a best-effort prompt redaction
+    and would here mean "record the list with the backstop silently missing". It
+    resolves phase-blind (#2189), as the summariser's does.
+    """
+    try:
+        secrets = await strict_sensitive_literals(db, run)
+        return await asyncio.to_thread(_resource_list_from_file, tmp_path, secrets)
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        logger.warning(
+            "plan_json_output.resource_list_skipped",
+            run_id=str(run.id),
+            error=str(exc),
+        )
+        return None
 
 
 # A best-effort notification must not be able to outlive the request it rides
@@ -557,6 +595,10 @@ async def upload_plan_json_output(
         # parse failure leaves the count columns null — the download URL is
         # still served, just no UI summary.
         summary = await asyncio.to_thread(_summarize_plan_file, tmp_path)
+        # Which resources those counts are about, for the PR status comment.
+        # Recorded here, once, already bounded and redacted, so the comment
+        # never has to read the plan.
+        run.plan_resources = await _plan_resources(run, db, tmp_path)
         if summary is not None:
             run.resource_additions = summary["additions"]
             run.resource_changes = summary["changes"]
