@@ -46,6 +46,9 @@ MIRROR_LIST = ROOT / ".github" / "mirror-images.txt"
 PUBLISHED: dict[str, str] = {
     # ci.yml's build-images matrix, tagged `sha-<short>` per commit and `vX.Y.Z`
     # at release.
+    # Created by a `cache-to: type=registry` export rather than a `push`, so no
+    # derivation over the workflows can see it -- which is why it is listed.
+    "terrapod-buildcache": "ci.yml (the image builds' registry layer cache)",
     "terrapod-api": "ci.yml",
     "terrapod-web": "ci.yml",
     "terrapod-runner": "ci.yml",

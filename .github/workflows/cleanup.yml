@@ -32,6 +32,14 @@ jobs:
         # from the workflows and fails when one is missing from this list, so
         # the next image cannot be forgotten the way these were.
         image:
+          # The buildkit layer cache (ci.yml's image builds). Written by every
+          # build with `cache-to: type=registry,mode=max`, which REPLACES the
+          # tag and leaves the manifest it replaced untagged -- so this package
+          # accumulates a fresh set of untagged versions on every run, faster
+          # than anything else here. The keep-rule below reaps untagged
+          # versions, which is exactly the junk, and never the live tags
+          # (`<image>-<arch>`) a build reads.
+          - terrapod-buildcache
           # The five product images (ci.yml).
           - terrapod-api
           - terrapod-web
