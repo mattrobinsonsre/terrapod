@@ -179,8 +179,24 @@ func (c *Client) DeleteRole(ctx context.Context, name string) error {
 // ── Internal helpers ─────────────────────────────────────────────────
 
 func roleCreateAttrs(req CreateRoleRequest) map[string]any {
-	attrs := map[string]any{
-		"workspace-permission": req.WorkspacePermission,
+	attrs := map[string]any{}
+	// Guarded on `!= ""` like its three siblings below, and like every level in
+	// `roleUpdateAttrs`. It was the ONE level sent unconditionally, which made
+	// an unauthored level arrive on the wire as `""` -- a value that means
+	// nothing, since the server's own `_level` refuses it.
+	//
+	// That was harmless while the server ignored levels whenever `capabilities`
+	// was present. It stopped being harmless when the server started refusing a
+	// level that DISAGREES with the capability set (#2502): `""` disagrees with
+	// every derived summary, so a capability-authored create -- which is the
+	// shape `provider/examples/resources/terrapod_role/main.tf` ships, and the
+	// one `docs/rbac.md` documents -- answered 422.
+	//
+	// It also fixes a defect that predates that: a LEVEL-authored create which
+	// omitted `workspace_permission` sent `""` and was refused by `_level` for
+	// the same reason.
+	if req.WorkspacePermission != "" {
+		attrs["workspace-permission"] = req.WorkspacePermission
 	}
 	if req.AllowAll {
 		attrs["allow-all"] = true

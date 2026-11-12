@@ -1252,3 +1252,55 @@ class TestLevelsBesideAnExplicitCapabilitySet:
             )
         assert resp.status_code == 422
         assert "registry-permission" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_accepts_an_EMPTY_level_beside_capabilities(self, *mocks):
+        """An empty level is not an authored one, so there is nothing to disagree with.
+
+        This is the case the refusal above could not tell apart, and it is the
+        only value a PROVIDER create produces. `workspace_permission` is
+        Optional+Computed with no default, so on a create the planned value is
+        unknown and the framework renders an unknown as `""`; go-terrapod then
+        sent `workspace-permission` unconditionally -- the one level of four
+        with no guard. So the wire body was `{"capabilities": [...],
+        "workspace-permission": ""}`, `""` disagreed with every derived summary,
+        and every capability-authored create answered 422 -- including the shape
+        `provider/examples/resources/terrapod_role/main.tf` ships and
+        `docs/rbac.md` documents.
+
+        The SDK no longer sends it. This pins the server half, which is what
+        makes any OTHER client's empty level mean what it says.
+
+        `None` is covered too: a JSON `null` is the same statement.
+        """
+        read_caps = expand_preset(
+            workspace_permission="read",
+            pool_permission="read",
+            registry_permission="read",
+            catalog_permission="none",
+        )
+        for unauthored in ("", None):
+            app, mock_db = _make_app(_user())
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = None
+            mock_db.execute.return_value = result
+            mock_db.refresh = AsyncMock()
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/v1/roles",
+                    json={
+                        "data": {
+                            "name": f"unauthored-{unauthored!r}",
+                            "attributes": {
+                                "capabilities": read_caps,
+                                "workspace-permission": unauthored,
+                            },
+                        }
+                    },
+                    headers=_AUTH,
+                )
+            assert resp.status_code != 422, (
+                f"an unauthored level ({unauthored!r}) was refused: {resp.json().get('detail')}"
+            )

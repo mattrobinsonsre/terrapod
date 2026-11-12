@@ -121,6 +121,21 @@ def _authored_capabilities(attrs: dict) -> list[str]:
         if key not in attrs:
             continue
         sent = attrs[key]
+        # An EMPTY level is not an authored one, so there is nothing for it to
+        # disagree with. Keyed on presence alone, this refused a request no
+        # client meant to make: go-terrapod's create path sent
+        # `workspace-permission` unconditionally -- the one level of four with
+        # no guard -- so an unauthored level arrived as `""`, and `""` disagrees
+        # with every derived summary. That 422'd the capability-authored create
+        # which `provider/examples/resources/terrapod_role/main.tf` ships and
+        # `docs/rbac.md` documents.
+        #
+        # The SDK no longer sends it; this is the half that makes any OTHER
+        # client's empty level mean what it says. Nothing is quietly accepted
+        # that was not before: `_level` refuses `""` as a level in its own
+        # right, so an empty level still cannot SET anything.
+        if sent in ("", None):
+            continue
         # The summary is keyed by the attribute name with underscores, which is
         # the wire key's own spelling -- derived rather than restated, so the
         # two cannot drift.
