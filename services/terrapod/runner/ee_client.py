@@ -42,6 +42,7 @@ import contextlib
 import os
 import signal
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import httpx
@@ -108,7 +109,25 @@ _TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
 #: `job_entrypoint._configure_stdio` goes further still, line-buffering by hand
 #: in case a future image change drops it. The EE is the one Python container in
 #: a configure pod that Terrapod does not build, and so the one that was missed.
-_FORCED_CHILD_ENV = {"PYTHONUNBUFFERED": "1"}
+#:
+#: `FORCE_COLOR` is here for the same reasons rather than as a second idea
+#: (#2510). It is the cross-tool convention a rich-based CLI reads, and pip has
+#: honoured it since 23 -- so the resolver conflict report that `_pip_check`
+#: turns into a failed phase arrives coloured instead of as a wall of prose in
+#: the middle of a hundred successful installs. The runner is not a tty, so
+#: nothing here is coloured unless it is told to be, and the log viewer this
+#: lands in renders ANSI and offers a toggle (#2413 F18).
+#:
+#: **It is inert for ansible, measured rather than assumed**, which is what
+#: makes forcing it on EVERY child safe: ansible reads `ANSIBLE_FORCE_COLOR`,
+#: `ANSIBLE_NOCOLOR` and `NO_COLOR`, and nothing bare. Driving a real playbook
+#: with this set leaves its output monochrome, and with `ANSIBLE_FORCE_COLOR`
+#: set colours it -- so ansible's own colour stays where it is decided today,
+#: in `configure._FORCED_ENV`, which is the set an operator reads about. That
+#: is gated rather than merely stated:
+#: `test_ee_client.TestTheChildIsForcedToColour::test_it_is_inert_for_ansible_itself`
+#: fails if a future ansible-core starts honouring it.
+_FORCED_CHILD_ENV = {"PYTHONUNBUFFERED": "1", "FORCE_COLOR": "1"}
 
 
 def child_env(env: dict[str, str] | None) -> dict[str, str]:
@@ -120,11 +139,12 @@ def child_env(env: dict[str, str] | None) -> dict[str, str]:
     decision is pinned here, and the call site is pinned separately.
 
     **Ours wins over the caller's**, which is the one judgement in it. There is
-    no caller that legitimately wants a buffered configure log, and a phase
-    assembling its own environment has no reason to think about this at all --
-    so a value that silently lost to `galaxy_env`'s allow-list or to a future
-    `_FORCED_ENV` entry would reintroduce #2511 for one binary and leave the
-    others working, which is the shape of defect nobody finds.
+    no caller that legitimately wants a buffered configure log or a monochrome
+    one, and a phase assembling its own environment has no reason to think
+    about either at all -- so a value that silently lost to `galaxy_env`'s
+    allow-list or to a future `_FORCED_ENV` entry would reintroduce #2511 or
+    #2510 for one binary and leave the others working, which is the shape of
+    defect nobody finds.
     """
     merged = dict(env or {})
     merged.update(_FORCED_CHILD_ENV)
@@ -243,6 +263,7 @@ def run(
     log_file: str | None = None,
     tee_to_stdout: bool = True,
     capture: bool = False,
+    highlight: Callable[[bytes], bytes] | None = None,
 ) -> EEResult:
     """Run an allowlisted ansible entry point in the EE and stream its output.
 
@@ -268,6 +289,13 @@ def run(
             configuration dump is ours to read, not the operator's run log, and
             teeing it would put their whole effective config in the log of a
             configure that never asked for it.
+        highlight: given one line's bytes WITHOUT its terminator, returns the
+            bytes to emit in its place; the terminator is re-added here. For a
+            tool whose own output carries no colour -- `ansible-galaxy` prints
+            its progress plain by design -- so the runner can mark the two lines
+            that matter (#2510). Supplying it makes the stream LINE-buffered,
+            which is why it is opt-in: `ansible-playbook` is left alone, and the
+            most this ever holds back is one incomplete line.
 
     Raises:
         ExecutionEnvironmentUnavailable: the agent was unreachable, or answered
@@ -304,6 +332,39 @@ def run(
             sys.stdout.buffer.write(chunk)
             sys.stdout.buffer.flush()
 
+    #: Only ever an incomplete final line, and only when a highlighter is set.
+    partial = bytearray()
+
+    def deliver(chunk: bytes) -> None:
+        """Emit `chunk`, a whole line at a time when a highlighter is set.
+
+        It runs AFTER the redactor, never instead of it: the redactor decides
+        what may leave this process at all, and a highlighter that saw the
+        bytes first would be deciding what a secret looks like.
+
+        The buffer is kept here rather than inside the highlighter because the
+        split is a property of the transport -- the agent streams whatever the
+        socket gives it, so a line arrives in one chunk, two, or sharing one
+        with the line before -- and a per-tool highlighter that had to
+        rediscover that would be a second copy of it.
+        """
+        if highlight is None:
+            emit(chunk)
+            return
+        partial.extend(chunk)
+        while (newline := partial.find(b"\n")) != -1:
+            line = bytes(partial[:newline])
+            del partial[: newline + 1]
+            emit(highlight(line) + b"\n")
+
+    def deliver_tail() -> None:
+        """A last line with no terminator. Highlighted like any other: a tool
+        that dies mid-line is exactly when its last line is worth seeing."""
+        if partial:
+            line = bytes(partial)
+            partial.clear()
+            emit(highlight(line) if highlight is not None else line)
+
     try:
         with (
             httpx.Client(timeout=_TIMEOUT) as client,
@@ -325,9 +386,10 @@ def run(
                         )
                     for chunk in response.iter_bytes():
                         if send := redactor.feed(chunk):
-                            emit(send)
+                            deliver(send)
                 if tail := redactor.flush():
-                    emit(tail)
+                    deliver(tail)
+                deliver_tail()
             except httpx.HTTPError as exc:
                 raise ExecutionEnvironmentUnavailable(
                     f"could not stream {binary} from the execution-environment agent "

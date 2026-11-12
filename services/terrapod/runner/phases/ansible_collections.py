@@ -253,6 +253,12 @@ def pip_env(api_url: str) -> dict[str, str]:
     # with a read-only root -- site.ENABLE_USER_SITE is True and the install
     # lands in `<HOME>/.local/lib/pythonX.Y/site-packages`.
     env["PIP_USER"] = "1"
+    # NOTE: pip's colour is NOT set here. `FORCE_COLOR` is forced on every
+    # execution-environment child by `ee_client._FORCED_CHILD_ENV` (#2510),
+    # which is the one door the orchestrator runs them all through. Setting it
+    # again here would be a second producer of one value, and the first draft
+    # of this change did exactly that -- which colours pip and leaves anything
+    # the agent runs through a different env builder monochrome.
     return env
 
 
@@ -343,6 +349,58 @@ def galaxy_env(api_url: str, token: str, *, base: dict[str, str] | None = None) 
     }
 
 
+#: SGR, written out rather than pulled from a palette module: two colours used
+#: in one function do not earn an indirection, and the escape is what a reader
+#: checking this against a log needs to see.
+_GREEN = b"\x1b[32m"
+_BOLD_RED = b"\x1b[1;31m"
+_RESET = b"\x1b[0m"
+
+#: What `ansible-galaxy` says when a collection or a role lands. One phrase for
+#: both, because it prints the same one for each (`<name> was installed
+#: successfully`), so matching the whole line keeps the version and the path.
+_GALAXY_INSTALLED = b"was installed successfully"
+
+#: How it opens a fatal error. Anchored at the start, because the lines BELOW it
+#: are its detail and colouring those too would defeat the point of marking it.
+_GALAXY_ERROR = b"ERROR!"
+
+#: The start of any CSI sequence. A substring rather than a pattern, because the
+#: only question asked of it is "is this line already coloured" -- matching the
+#: whole sequence would be a second, weaker copy of the stripper the viewer owns.
+_ANSI_OPENER = b"\x1b["
+
+
+def highlight_galaxy_line(line: bytes) -> bytes:
+    """Mark the two `ansible-galaxy` lines worth finding in a scroll (#2510).
+
+    **It colours what the tool will not.** `ansible-galaxy` honours
+    `ANSIBLE_FORCE_COLOR` for its warnings and errors, and Terrapod does not set
+    it here -- `galaxy_env` is a deliberately bounded set and this phase's
+    output is not a playbook's -- so on the configure log #2510 counted, all
+    nine of its lines arrived plain. Those lines are the whole record of what a run
+    installed and of why it could not: the success line names the collection and
+    its version, and `ERROR!` is the first line of a failure that ends the
+    configure before any host is touched.
+
+    **A line that already carries ANSI is left exactly as it is.** Wrapping one
+    puts our reset in the middle of it, so the remainder of the line loses its
+    colour -- and an EE whose ansible-galaxy does colour its errors is the case
+    where this would be most visible. Cheaper to decline than to reason about
+    nesting.
+
+    Takes and returns one line's bytes with no terminator; `ee_client.run` does
+    the splitting and re-adds it.
+    """
+    if _ANSI_OPENER in line:
+        return line
+    if line.startswith(_GALAXY_ERROR):
+        return _BOLD_RED + line + _RESET
+    if _GALAXY_INSTALLED in line:
+        return _GREEN + line + _RESET
+    return line
+
+
 def _run_install(
     argv_tail: list[str],
     *,
@@ -378,6 +436,7 @@ def _run_install(
         cwd=str(cwd),
         env=env,
         log_file=log_file,
+        highlight=highlight_galaxy_line,
     )
     if result.error:
         # The agent could not run the entry point at all, which is a failure of
