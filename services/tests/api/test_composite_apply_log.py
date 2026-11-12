@@ -84,15 +84,32 @@ class TestTheConfigureArrivesOnTheApplyStream:
         assert APPLY in body
 
     @pytest.mark.asyncio
-    async def test_the_host_tag_is_stripped_from_the_tail(self):
-        """The operator's terminal gets ansible's words, not our framing.
+    async def test_the_framing_header_is_stripped_from_the_tail(self):
+        """The operator's terminal gets the output, not the format header.
 
         Measured on the live proof: the CLI showed `~          | TASK [...]`,
         because the strip was keyed on `format=plain` and the cloud backend
-        never asks for it. The prefix belongs to the configure tab's per-host
+        never asks for it. The framing belongs to the configure tab's per-host
         picker; the apply stream has no picker to serve.
+
+        What the framing IS changed with #2513 -- v2's blocks are output and
+        stay, where v1's per-line prefix was pure framing and goes. The header
+        is removed either way, and that is what this pins: it describes the
+        format rather than being an instance of it.
         """
-        tagged = mod._HOST_LOG_HEADER + b"\n~          | TASK [something]\n"
+        block = b"[10:28:30 +2.9s]  web1              changed  role : task\n"
+        body = await _serve(
+            _run(is_configure=True),
+            tail=("logs/w/configures/r.log", "configure"),
+            phase_bytes=mod._HOST_LOG_HEADER + b"\n" + block,
+        )
+        assert block in body, "a v2 block IS the output and must survive untouched"
+        assert mod._HOST_LOG_HEADER not in body
+
+    @pytest.mark.asyncio
+    async def test_a_v1_tail_still_has_its_per_line_prefix_stripped(self):
+        """A stored log outlives the runner image that wrote it."""
+        tagged = mod._HOST_LOG_HEADER_V1 + b"\n~          | TASK [something]\n"
         body = await _serve(
             _run(is_configure=True),
             tail=("logs/w/configures/r.log", "configure"),

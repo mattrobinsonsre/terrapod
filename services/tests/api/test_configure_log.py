@@ -1,15 +1,16 @@
-"""Reading a configure's log, and the format contract around it (#2144).
+"""Reading a configure's log, and the format contract around it (#2144, #2513).
 
 Before this there was no read path at all: `configure_log_key` had a write route
 and no GET anywhere, `_serve_log` had exactly two callers, and the web fetcher
 was typed `'plan' | 'apply'`. So a configure's output was written to storage and
 unreachable by every consumer -- the API, the SDK, the MCP tool and the UI.
 
-The format gate at the bottom is the one worth reading. The prefix is written by
-a plugin that imports `ansible`, which this process does not have, so the two
+The format gate at the bottom is the one worth reading. The framing is written
+by a plugin that imports `ansible`, which this process does not have, so the two
 sides cannot share a constant and the literals are restated here. Restating a
 contract is exactly how two sides drift, so the gate reads the plugin's own
-source and fails if either literal moves on either side.
+source -- including one complete example block -- and fails if either side
+moves.
 """
 
 from __future__ import annotations
@@ -86,40 +87,57 @@ class TestTheConfigureSubResource:
         assert runs_router._configure_status(_run("applied", is_configure=False)) == "unreachable"
 
 
-class TestStrippingTheHostTag:
-    """`format=plain` yields ansible's own words (user, 2026-10-23)."""
+class TestRemovingTheFraming:
+    """`format=plain` yields the output and not the framing (user, 2026-10-23)."""
 
-    HEADER = b"#terrapod-host-log v1"
+    HEADER = b"#terrapod-host-log v2"
+    HEADER_V1 = b"#terrapod-host-log v1"
 
-    def test_it_removes_the_prefix_and_the_header(self):
-        data = self.HEADER + b"\nweb1       | ok: [web1]\nweb1       |     done\n"
+    def test_a_v2_log_keeps_its_blocks_and_loses_only_the_header(self):
+        """There is no second rendering to fall back to: the blocks ARE the log.
+
+        v1 could strip its prefix and leave ansible's own words underneath.
+        v2 has no such underneath -- the block format is the one Terrapod owns
+        end to end (#2513) -- so stripping anything else would be deleting
+        output rather than unwrapping it.
+        """
+        block = b"[10:28:30 +2.9s]  web1              changed  role : task\n"
+        body = b'                  {"msg": "hi"}\n'
+        data = self.HEADER + b"\n" + block + body
+        assert runs_router._untag_host_log(data) == block + body
+
+    def test_a_v1_log_still_has_its_prefix_removed(self):
+        """A stored log outlives the runner image that wrote it."""
+        data = self.HEADER_V1 + b"\nweb1       | ok: [web1]\nweb1       |     done\n"
         assert runs_router._untag_host_log(data) == b"ok: [web1]\n    done\n"
 
-    def test_an_untagged_log_is_returned_byte_for_byte(self):
-        """An older runner, or a configure that ran without the plugin."""
+    def test_an_unframed_log_is_returned_byte_for_byte(self):
+        """A runner image predating all of this, or a configure without the plugin."""
         data = b"PLAY [x] ***\nok: [web1]\n"
         assert runs_router._untag_host_log(data) == data
 
     def test_bytes_before_the_header_are_left_alone(self):
-        """The same artifact legitimately carries untagged bytes first.
+        """The same artifact legitimately carries unframed bytes first.
 
         `ansible_collections.install` writes galaxy output to this file before
         ansible runs, and the orchestrator's own structlog lines are rolled in
-        around it. A prefix matcher let loose on those would eat the first pipe
-        out of an ordinary line of prose -- which is why the header is searched
-        for rather than assumed to be at offset 0.
+        around it. A v1 prefix matcher let loose on those would eat the first
+        pipe out of an ordinary line of prose -- which is why the header is
+        searched for rather than assumed to be at offset 0.
         """
         prose = b"Installing collection a.b | version 1.0\n"
-        data = prose + self.HEADER + b"\nweb1       | ok: [web1]\n"
+        block = b"[10:28:30 +2.9s]  web1              ok       role : task\n"
+        assert runs_router._untag_host_log(prose + self.HEADER + b"\n" + block) == prose + block
+        data = prose + self.HEADER_V1 + b"\nweb1       | ok: [web1]\n"
         assert runs_router._untag_host_log(data) == prose + b"ok: [web1]\n"
 
-    def test_the_hostless_marker_is_stripped_like_any_other(self):
-        data = self.HEADER + b"\n~          | TASK [x] ***\n"
+    def test_the_v1_hostless_marker_is_stripped_like_any_other(self):
+        data = self.HEADER_V1 + b"\n~          | TASK [x] ***\n"
         assert runs_router._untag_host_log(data) == b"TASK [x] ***\n"
 
-    def test_an_escaped_host_is_stripped_too(self):
+    def test_an_escaped_v1_host_is_stripped_too(self):
         """A host carrying the delimiter arrives escaped, so one pipe is the field."""
-        data = self.HEADER + b"\nwe%7Cird   | ok: [we|ird]\n"
+        data = self.HEADER_V1 + b"\nwe%7Cird   | ok: [we|ird]\n"
         assert runs_router._untag_host_log(data) == b"ok: [we|ird]\n"
 
 
@@ -134,24 +152,35 @@ class TestTheFormatContractHoldsAcrossTheProcessBoundary:
         """
         src = _PLUGIN.read_text()
         header = re.search(r'^HEADER = "(?P<v>[^"]+)"', src, re.M).group("v")
-        delimiter = re.search(r'^DELIMITER = "(?P<v>[^"]+)"', src, re.M).group("v")
 
         assert runs_router._HOST_LOG_HEADER == header.encode(), (
-            "the API's restated header no longer matches the plugin's — a tagged "
-            "log would be served with its prefixes intact to a caller asking for "
-            "plain text"
-        )
-        assert runs_router._HOST_LOG_DELIMITER == delimiter.encode(), (
-            "the API's restated delimiter no longer matches the plugin's"
+            "the API's restated header no longer matches the plugin's — a framed "
+            "log would be served with its header intact to a caller asking for "
+            "plain text, and a v1 matcher would be let loose on v2 blocks"
         )
 
-    def test_the_matcher_handles_the_plugins_own_padding_width(self):
-        """Derived from the plugin's `_PAD`, not from a number copied here."""
+    def test_the_plugins_own_example_block_survives_a_plain_read(self):
+        """The one line the plugin, the viewer and this all read out of one file.
+
+        A v2 block is OUTPUT, so `format=plain` must return it untouched. The
+        failure worth ruling out is the opposite of v1's: a matcher inherited
+        from the prefix format would eat the leading field of every block.
+        """
         src = _PLUGIN.read_text()
-        pad = int(re.search(r"^_PAD = (?P<v>\d+)", src, re.M).group("v"))
-        host = "web1"
-        line = host.ljust(pad) + " | " + "ok: [web1]"
-        data = runs_router._HOST_LOG_HEADER + b"\n" + line.encode() + b"\n"
+        example = re.search(r'^EXAMPLE_BLOCK = "(?P<v>[^"]+)"', src, re.M).group("v").encode()
+        data = runs_router._HOST_LOG_HEADER + b"\n" + example + b"\n"
+        assert runs_router._untag_host_log(data) == example + b"\n"
+
+    def test_the_v1_matcher_handles_the_old_padding_width(self):
+        """Frozen rather than derived: nothing writes v1 any more.
+
+        The plugin no longer carries `_PAD` or `DELIMITER` to read, because a
+        constant kept alive only for a test to read is the flag-nothing-reads
+        defect. What the API still needs is the ability to serve a log written
+        BEFORE v2, and that format can no longer move.
+        """
+        line = "web1".ljust(10) + " | " + "ok: [web1]"
+        data = b"#terrapod-host-log v1\n" + line.encode() + b"\n"
         assert runs_router._untag_host_log(data) == b"ok: [web1]\n"
 
 

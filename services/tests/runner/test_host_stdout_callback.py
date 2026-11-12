@@ -1,4 +1,4 @@
-"""The stdout callback, driven through real ansible (#2144).
+"""The stdout callback, driven through real ansible (#2144, #2513).
 
 The plugin REPLACES ansible's renderer, so every property worth asserting is a
 property of what ansible actually prints through it. A shape assertion about the
@@ -8,18 +8,27 @@ plugin` lines and no task output at all, because a subclass with no
 `DOCUMENTATION` inherits `default`'s code and not its OPTIONS. Nothing short of
 running it would have shown that.
 
-Four of these pin properties no text parser over ansible's combined stdout can
-have, which is the whole argument for a callback rather than a parser:
+v2 made the **block** the unit of output -- one per task per host, carrying the
+host, the task, the result and the time -- in place of v1's host prefix on every
+line. With no second format to fall back to (user, 2026-11-11: *"We own the
+ansible output... we are entitled to design our own output structure"*), the
+obligation that replaces "keep a traditional view" is **completeness**, and
+`test_nothing_ansible_printed_is_lost` is the test that holds it: it drives the
+same play twice, once through `default` and once through this, and requires
+every line of ansible's own output to survive.
 
-* a multi-line result's CONTINUATION lines carry their host -- measured, only
-  12 of 41 non-blank lines carry `[host]` in ansible's own output;
-* `...ignoring` after an ignored failure carries its host, where the text form
-  names none;
-* task banners and the PLAY RECAP carry an explicit host-less MARKER, so a
-  filtered view can show them as context and a viewer can still tell a tagged
-  log from an untagged one;
-* stripping the tag reproduces ansible's own bytes exactly, which is what makes
-  "keep a traditional view" ansible's rendering rather than a reimplementation.
+The rest pin properties no text parser over ansible's combined stdout can have,
+which is the whole argument for a callback rather than a parser:
+
+* a multi-line result, a failure's `[ERROR]` block and its `Origin:` path, the
+  dumped result and the trailing `...ignoring` all land INSIDE the failing
+  host's block -- in ansible's own output the first three are printed BEFORE
+  the line that names the host, and the last names none;
+* every block header carries its host structurally, so a host name that would
+  break the grammar is escaped rather than hoped about;
+* play-level output -- the PLAY banner, the PLAY RECAP -- carries an explicit
+  host-less marker, so a filtered view can show it as context and a viewer can
+  still tell a framed log from an unframed one.
 """
 
 from __future__ import annotations
@@ -41,12 +50,31 @@ _PLUGIN = (
     / "terrapod_stdout.py"
 )
 
-#: The format's three literals, read from the plugin rather than restated, so a
-#: change to either side cannot pass this file silently.
+#: The format's literals, read from the plugin rather than restated, so a change
+#: to either side cannot pass this file silently.
 _SRC = _PLUGIN.read_text()
-HEADER = re.search(r'^HEADER = "(?P<v>[^"]+)"', _SRC, re.M).group("v")
-DELIMITER = re.search(r'^DELIMITER = "(?P<v>[^"]+)"', _SRC, re.M).group("v")
-HOSTLESS = re.search(r'^HOSTLESS = "(?P<v>[^"]+)"', _SRC, re.M).group("v")
+
+
+def _literal(name: str) -> str:
+    match = re.search(rf'^{name} = "(?P<v>[^"]*)"', _SRC, re.M)
+    assert match is not None, f"{name} is gone from the plugin -- has it been renamed?"
+    return match.group("v")
+
+
+HEADER = _literal("HEADER")
+HOSTLESS = _literal("HOSTLESS")
+INDENT = _literal("INDENT")
+EXAMPLE_BLOCK = _literal("EXAMPLE_BLOCK")
+
+#: The block grammar, restated here exactly as the viewer restates it in
+#: TypeScript and for the same reason -- the plugin runs under the execution
+#: environment's Python and cannot be imported. `test_the_example_block_parses`
+#: is what ties this restatement to the plugin's own example of it.
+_BLOCK = re.compile(
+    r"^\[(?:\d{4}-\d{2}-\d{2} )?\d{2}:\d{2}:\d{2}[^\]]*\]\s+(\S+)\s+(\S+)(?:\s+(.*))?$"
+)
+_LEADING_SGR = re.compile(r"^(?:\x1b\[[0-9;]*m)+")
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _working_ansible() -> str | None:
@@ -66,22 +94,45 @@ def _working_ansible() -> str | None:
 ANSIBLE = _working_ansible()
 needs_ansible = pytest.mark.skipif(ANSIBLE is None, reason="no working ansible-playbook")
 
+#: A role, so the block label is exercised as `role : task` rather than a bare
+#: name -- which is what the issue asks the label to carry and what
+#: `Task.get_name()` already returns for a task inside one.
+_ROLE = textwrap.dedent(
+    """
+    - name: Deploy the application
+      ansible.builtin.debug:
+        msg: |-
+          hello from {{ inventory_hostname }}
+          second line
+    """
+).strip()
+
 _PLAY = textwrap.dedent(
     """
-    - name: tagging
+    - name: blocks
       hosts: all
       gather_facts: false
+      roles:
+        - platform
       tasks:
-        - name: a multi-line result
-          ansible.builtin.debug:
-            msg: "hello from {{ inventory_hostname }}"
         - name: skip on db1
           ansible.builtin.debug: {msg: "web only"}
           when: inventory_hostname in groups['web']
-        - name: fail on web2
-          ansible.builtin.fail: {msg: "deliberate"}
+        - name: a loop
+          ansible.builtin.debug: {msg: "item {{ item }}"}
+          loop: [alpha, beta]
+          when: inventory_hostname == 'web1'
+        - name: a changed result
+          ansible.builtin.command: "true"
+          changed_when: true
+          when: inventory_hostname == 'web1'
+        - name: fail on web2 with stdout and stderr
+          ansible.builtin.shell: "echo out-line-one; echo err-line >&2; exit 7"
           when: inventory_hostname == 'web2'
           ignore_errors: true
+        - name: unreachable survives
+          ansible.builtin.ping:
+          ignore_unreachable: true
     """
 ).strip()
 
@@ -96,12 +147,21 @@ _INVENTORY = textwrap.dedent(
         db:
           hosts:
             db1: {ansible_connection: local}
+        dead:
+          hosts:
+            hdead:
+              ansible_host: 127.0.0.1
+              ansible_port: 1
+              ansible_connection: ssh
+              ansible_ssh_common_args: "-o ConnectTimeout=2 -o StrictHostKeyChecking=no"
     """
 ).strip()
 
 #: Every character the format has to survive in a host name. Escaping rather
 #: than validating is forced: `validate_host_name` does not refuse `|`, and a
-#: host from a GIT inventory source never passes through it at all.
+#: host from a GIT inventory source never passes through it at all. The SPACE
+#: is the one the v2 grammar actually rests on -- the host is the first
+#: whitespace-delimited field of a block header.
 _HOSTILE_INVENTORY = textwrap.dedent(
     """
     all:
@@ -109,12 +169,22 @@ _HOSTILE_INVENTORY = textwrap.dedent(
         "we|ird": {ansible_connection: local}
         "ti~lde": {ansible_connection: local}
         "per%cent": {ansible_connection: local}
+        "spa ced": {ansible_connection: local}
         "plain": {ansible_connection: local}
     """
 ).strip()
 
 
-def _run(root: pathlib.Path, *, inventory: str, play: str, tagged: bool, free: bool = False) -> str:
+def _run(
+    root: pathlib.Path,
+    *,
+    inventory: str,
+    play: str,
+    tagged: bool,
+    free: bool = False,
+    color: bool = False,
+    extra_env: dict[str, str] | None = None,
+) -> str:
     """Drive ansible once and return its combined output.
 
     HOME is NOT relocated, for the reason `test_host_events_callback` records:
@@ -124,6 +194,9 @@ def _run(root: pathlib.Path, *, inventory: str, play: str, tagged: bool, free: b
     plugins = root / "cb"
     plugins.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(_PLUGIN, plugins / _PLUGIN.name)
+    role = root / "roles" / "platform" / "tasks"
+    role.mkdir(parents=True, exist_ok=True)
+    (role / "main.yml").write_text(_ROLE)
     (root / "inventory.yml").write_text(inventory)
     body = (
         play.replace("gather_facts: false", "gather_facts: false\n  strategy: free")
@@ -133,68 +206,153 @@ def _run(root: pathlib.Path, *, inventory: str, play: str, tagged: bool, free: b
     (root / "site.yml").write_text(body)
 
     env = dict(os.environ)
-    env.update({"ANSIBLE_FORCE_COLOR": "0", "ANSIBLE_RETRY_FILES_ENABLED": "False"})
+    env.update(
+        {
+            "ANSIBLE_FORCE_COLOR": "1" if color else "0",
+            "ANSIBLE_RETRY_FILES_ENABLED": "False",
+            "ANSIBLE_NOCOWS": "1",
+        }
+    )
     if tagged:
         env["ANSIBLE_CALLBACK_PLUGINS"] = str(plugins)
         env["ANSIBLE_STDOUT_CALLBACK"] = "terrapod_stdout"
+    env.update(extra_env or {})
     completed = subprocess.run(  # noqa: S603
         [str(ANSIBLE), "-i", "inventory.yml", "site.yml"],
         cwd=root,
         env=env,
         capture_output=True,
-        timeout=300,
+        timeout=600,
         check=False,
     )
     return completed.stdout.decode() + completed.stderr.decode()
 
 
-def _canon(text: str, *roots: pathlib.Path) -> str:
-    """Replace each run's own directory with a placeholder.
+#: A TASK/PLAY banner in ansible's own rendering. Its content is the task name,
+#: which the block header carries instead.
+_BANNER = re.compile(r"^(TASK|RUNNING HANDLER|PLAY|PLAY RECAP)\b.*\*+$")
 
-    Core 2.21 prints the playbook's ABSOLUTE path in its `[ERROR]` block
-    (`Origin: <dir>/site.yml:11:7`, with a source excerpt and a column
-    pointer), and 2.18 did not. The two runs below deliberately use separate
-    directories so neither can see the other's artifacts, so that one value
-    legitimately differs between them. Canonicalising it -- and nothing else --
-    keeps the comparison byte-exact about everything ansible actually said.
-    """
+#: `default`'s own status line, whose host and result the block header carries.
+_STATUS = re.compile(r"^(ok|changed|skipping|failed|fatal|included): \[[^\]]*\]")
+
+#: The item label, which the block header carries in its own label.
+_ITEM = re.compile(r"^\(item=[^)]*\)\s*(?:=>\s*)?")
+
+#: `delta`, `start` and `end` differ between two runs of the same play, as does
+#: the directory each ran in. Canonicalising exactly those -- and nothing else
+#: -- keeps the completeness comparison byte-exact about what ansible said.
+_VOLATILE = (
+    (re.compile(r'"(delta|end|start)": "[^"]*"'), r'"\1": "<t>"'),
+    (re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+"), "<t>"),
+)
+
+
+def _canon(text: str, *roots: pathlib.Path) -> str:
     for root in roots:
         text = text.replace(str(root), "<run>")
+    for pattern, replacement in _VOLATILE:
+        text = pattern.sub(replacement, text)
     return text
 
 
-def _strip(text: str) -> str:
-    """Remove the header and one prefix per line, as the traditional view does."""
-    out: list[str] = []
+class Block:
+    """One emitted block: its header's fields, and the lines indented under it."""
+
+    def __init__(self, host: str | None, status: str, label: str, header: str) -> None:
+        self.host = host
+        self.status = status
+        self.label = label
+        self.header = header
+        #: Body lines with any leading colour removed, for reading content.
+        self.body: list[str] = []
+        #: The same lines verbatim. Kept separately because "the whole block is
+        #: coloured" is a property of the BYTES, and an assertion over the
+        #: stripped form cannot see a body that lost its colour.
+        self.raw_body: list[str] = []
+
+    @property
+    def text(self) -> str:
+        return "\n".join([self.header, *self.body])
+
+
+def _blocks(text: str) -> list[Block]:
+    """Every block in a framed log, in order. Mirrors the viewer's parser."""
+    out: list[Block] = []
     seen = False
     for line in text.split("\n"):
         if line == HEADER:
             seen = True
             continue
-        if seen:
-            at = line.find(DELIMITER)
-            out.append(line[at + len(DELIMITER) :] if at >= 0 else line)
-        else:
-            out.append(line)
-    return "\n".join(out)
-
-
-def _hosts_of(text: str) -> list[str]:
-    """Every distinct host field that appeared, in first-seen order."""
-    seen: list[str] = []
-    for line in text.split("\n"):
-        at = line.find(DELIMITER)
-        if at < 0:
+        if not seen:
             continue
-        host = line[:at].strip()
-        if host not in seen:
-            seen.append(host)
-    return seen
+        probe = _LEADING_SGR.sub("", line)
+        match = _BLOCK.match(probe)
+        if match is not None:
+            field, status, label = match.group(1), match.group(2), match.group(3) or ""
+            host = None if field == HOSTLESS else field
+            out.append(Block(host, status, label, line))
+            continue
+        if out and probe.startswith(" "):
+            out[-1].body.append(probe)
+            out[-1].raw_body.append(line)
+    return out
+
+
+def _for(blocks: list[Block], host: str, label_contains: str) -> list[Block]:
+    return [b for b in blocks if b.host == host and label_contains in b.label]
+
+
+def _callback_complaints(text: str) -> list[str]:
+    """Every line where ansible names OUR plugin in a diagnostic.
+
+    DERIVED rather than matched against a phrase, because the phrase moved. The
+    guard was written against core 2.21, which says
+
+        [WARNING]: Failure using method (v2_runner_on_ok) in callback plugin ...
+
+    and **core 2.22 says something else entirely**:
+
+        [WARNING]: Callback dispatch 'v2_runner_on_ok' failed for plugin
+        'terrapod_stdout': 'display_ok_hosts'
+
+    so the literal matcher is a gate that cannot fail on a current core --
+    measured by removing `extends_documentation_fragment` on 2.22 and watching
+    it pass. The plugin ships to ten EE lines and an operator's own image, so
+    "whichever wording this core uses" is the only predicate worth having: the
+    property is that ansible never complains about us, and it names us when it
+    does.
+    """
+    return [
+        line
+        for line in text.split("\n")
+        if "terrapod_stdout" in line and ("WARNING" in line or "ERROR" in line)
+    ]
+
+
+@pytest.fixture(scope="module")
+def framed_run(tmp_path_factory) -> tuple[str, pathlib.Path]:
+    """One real run through the plugin, shared: every assertion reads this text.
+
+    The directory comes back with it because core prints the playbook's
+    ABSOLUTE path in its `[ERROR]` block (`Origin: <dir>/site.yml:11:7`), and
+    the completeness comparison below runs in a directory of its own so neither
+    run can see the other's artifacts -- so that one value legitimately differs
+    and has to be canonicalised on both sides.
+    """
+    if ANSIBLE is None:
+        pytest.skip("no working ansible-playbook")
+    root = tmp_path_factory.mktemp("framed")
+    return _run(root, inventory=_INVENTORY, play=_PLAY, tagged=True), root
+
+
+@pytest.fixture(scope="module")
+def framed(framed_run) -> str:
+    return framed_run[0]
 
 
 @needs_ansible
 class TestWhatAnsiblePrintsThroughIt:
-    def test_our_own_plugin_logs_no_failure_using_method_warning(self, tmp_path):
+    def test_ansible_never_complains_about_our_own_plugin(self, framed):
         """The regression guard for the defect the first probe run found.
 
         `default` reads its behaviour through `self.get_option(...)` --
@@ -204,81 +362,256 @@ class TestWhatAnsiblePrintsThroughIt:
         inherits the code and not the options, so each call raises and ansible
         renders it as a warning naming our plugin, swallowing the task output.
 
-        It is pinned here rather than left to the byte-identity test below
-        because the warnings go to stdout, so that test would fail with a diff
-        of eight warning lines and no indication that OPTIONS were the cause.
+        It is pinned separately from everything below because the warnings go
+        to stdout: a completeness diff would fail with a wall of warning lines
+        and no indication that OPTIONS were the cause.
         """
-        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
-        assert "Failure using method" not in out, out[:2000]
+        assert not _callback_complaints(framed), _callback_complaints(framed)[:5]
 
-    def test_stripping_the_tag_reproduces_ansibles_own_bytes(self, tmp_path):
-        """The traditional view IS ansible's rendering, not an imitation of it.
+    def test_the_example_block_parses_to_the_fields_it_claims(self):
+        """The plugin's own example, read back through the grammar.
 
-        Host-completion order varies run to run under the default strategy, so
-        the comparison is over SORTED lines: what is being pinned is that no
-        byte of ansible's own words is added, lost or altered, not the order
-        three hosts happened to finish in.
+        `EXAMPLE_BLOCK` is the one literal the viewer's TypeScript parser and
+        this file both read out of the plugin, because neither can import it.
+        Tying it to the grammar here and to real output below is what makes the
+        three agree without a shared constant.
         """
-        a, b = tmp_path / "a", tmp_path / "b"
-        plain = _run(a, inventory=_INVENTORY, play=_PLAY, tagged=False)
-        tagged = _run(b, inventory=_INVENTORY, play=_PLAY, tagged=True)
-        assert HEADER in tagged
-        assert sorted(_canon(_strip(tagged), a, b).split("\n")) == sorted(
-            _canon(plain, a, b).split("\n")
-        )
+        match = _BLOCK.match(EXAMPLE_BLOCK)
+        assert match is not None, f"the plugin's own example does not parse: {EXAMPLE_BLOCK!r}"
+        assert match.group(1) == "web1"
+        assert match.group(2) == "changed"
+        assert match.group(3) == "platform : Deploy"
+        assert INDENT.strip() == "", "a body line's indent must be whitespace, or it parses as one"
 
-    def test_a_multi_line_result_carries_its_host_on_every_line(self, tmp_path):
-        """The continuation lines are the reason this is a callback.
+    def test_every_block_carries_host_task_result_and_time(self, framed):
+        """The four fields the issue asks every block to be guaranteed to have."""
+        blocks = _blocks(framed)
+        assert blocks, framed[:2000]
+        results = [b for b in blocks if b.host is not None]
+        assert results, "no block was attributed to a host"
+        for block in results:
+            assert block.status, block.header
+            assert block.label, block.header
+            # `[HH:MM:SS +dur]` -- the duration comes from the callback itself,
+            # not from a `profile_tasks` line printed beside it.
+            assert re.match(r"^\[\d{2}:\d{2}:\d{2} \+[0-9.]+[a-z0-9]*\]", block.header), (
+                block.header
+            )
 
-        `ok: [web1] => {` names the host; the `"msg":` and `}` lines that follow
-        do not, and in ansible's own output nothing attributes them.
+    def test_a_block_is_one_task_on_one_host(self, framed):
+        """The point of the rewrite: the task and its result are ONE item."""
+        deploy = _for(_blocks(framed), "web1", "Deploy the application")
+        assert len(deploy) == 1, [b.header for b in deploy]
+        block = deploy[0]
+        assert block.label == "platform : Deploy the application", block.label
+        assert block.status in {"ok", "changed"}, block.status
+        # The multi-line result is the block's body, and carries no host of its
+        # own in ansible's output -- which is why this is a callback.
+        assert any("hello from web1" in line for line in block.body), block.body
+
+    def test_a_failure_carries_its_error_block_dump_and_ignoring_inside_it(self, framed):
+        """The three classes a text parser cannot attribute, all in one block.
+
+        In ansible's own output the `[ERROR]:` block and its `Origin:` path are
+        printed BEFORE the `fatal: [web2]` line that names the host, and
+        `...ignoring` after it names none at all.
         """
-        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
-        body = [ln for ln in out.split("\n") if '"msg": "hello from web1"' in ln]
-        assert body, out[:2000]
-        assert all(ln.split(DELIMITER)[0].strip() == "web1" for ln in body), body
-        closing = [ln for ln in out.split("\n") if ln.strip().endswith("| }")]
-        assert closing, "no continuation closing brace was tagged"
+        failed = _for(_blocks(framed), "web2", "fail on web2")
+        assert len(failed) == 1, [b.header for b in failed]
+        block = failed[0]
+        assert block.status == "FAILED", block.header
+        body = "\n".join(block.body)
+        assert "[ERROR]" in body, body
+        assert "Origin:" in body, body
+        assert "out-line-one" in body, "the module's stdout must be inside its block"
+        assert "err-line" in body, "the module's stderr must be inside its block"
+        assert "...ignoring" in body, "the ignore must be attributed, not left floating"
 
-    def test_ignoring_carries_its_host(self, tmp_path):
-        """One of the three classes a text parser cannot attribute."""
-        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
-        lines = [ln for ln in out.split("\n") if ln.rstrip().endswith("...ignoring")]
-        assert lines, out[:2000]
-        assert all(ln.split(DELIMITER)[0].strip() == "web2" for ln in lines), lines
+    def test_each_loop_item_is_its_own_block_naming_its_item(self, framed):
+        """ "plus the item for loop results" -- per item, not one block for all."""
+        items = _for(_blocks(framed), "web1", "a loop")
+        labels = sorted(b.label for b in items)
+        assert labels == ["a loop (item=alpha)", "a loop (item=beta)"], labels
+        for block in items:
+            item = block.label.split("item=")[1].rstrip(")")
+            assert any(f"item {item}" in line for line in block.body), block.body
 
-    def test_banners_and_the_recap_carry_the_hostless_marker(self, tmp_path):
+    def test_a_skip_and_an_unreachable_each_get_their_own_status(self, framed):
+        blocks = _blocks(framed)
+        skipped = _for(blocks, "db1", "skip on db1")
+        assert [b.status for b in skipped] == ["skipped"], [b.header for b in skipped]
+        unreachable = _for(blocks, "hdead", "unreachable survives")
+        assert [b.status for b in unreachable] == ["UNREACHABLE"], [b.header for b in unreachable]
+
+    def test_play_level_output_is_a_hostless_block(self, framed):
         """Context, not noise: a filtered view still has to show these.
 
-        The marker is explicit rather than "no prefix" because the absence of a
-        prefix is also what an older runner's log looks like, and the viewer
-        must not read "belongs to every host" as "this log is untagged".
+        The marker is explicit rather than "no host field" because the absence
+        of one is also what an older runner's log looks like, and the viewer
+        must not read "belongs to every host" as "this log is unframed".
         """
-        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
-        for needle in ("TASK [a multi-line result]", "PLAY RECAP"):
-            lines = [ln for ln in out.split("\n") if needle in ln]
-            assert lines, f"{needle} not found"
-            assert all(ln.split(DELIMITER)[0].strip() == HOSTLESS for ln in lines), lines
+        hostless = [b for b in _blocks(framed) if b.host is None]
+        kinds = {b.status for b in hostless}
+        assert "play" in kinds, [b.header for b in hostless]
+        assert "recap" in kinds, [b.header for b in hostless]
+        recap = next(b for b in hostless if b.status == "recap")
+        # The whole recap is one block, and every host is in it exactly once --
+        # `default` emits each row twice, once for the screen and once for its
+        # log file, and a frame that kept both would double it.
+        for host in ("web1", "web2", "db1", "hdead"):
+            rows = [line for line in recap.body if line.strip().startswith(host)]
+            assert len(rows) == 1, (host, recap.body)
+
+    def test_a_task_banner_is_not_emitted_beside_the_block_that_names_it(self, framed):
+        """The one thing v2 drops, and nothing is lost by it.
+
+        A TASK banner's entire content is the task name, which every block
+        carries in its label. Keeping it would reinstate the "the task and its
+        result are still two items" complaint this exists to fix.
+        """
+        assert "TASK [" not in _ANSI.sub("", framed), framed[:2000]
+        assert "Deploy the application" in framed, "...but the task name is still there"
+
+    def test_nothing_ansible_printed_is_lost(self, framed_run, tmp_path):
+        """The obligation that replaced "keep a traditional view".
+
+        Every line of ansible's own rendering has to survive into the block
+        format. Two things legitimately do not appear verbatim, and both are
+        carried by the block header instead: the TASK banner, and `default`'s
+        own `status: [host]` lead -- of which everything after the ` => ` is
+        the dumped result and MUST still be found.
+
+        Compared over sorted lines because host-completion order varies run to
+        run; what is pinned is that no byte of ansible's own words is lost, not
+        the order three hosts happened to finish in.
+        """
+        framed, framed_root = framed_run
+        plain = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=False)
+        haystack = _canon(_ANSI.sub("", framed), framed_root, tmp_path)
+        missing = []
+        for raw in _ANSI.sub("", plain).split("\n"):
+            line = _canon(raw.strip(), framed_root, tmp_path)
+            if not line or _BANNER.match(line):
+                continue
+            lead = _STATUS.match(line)
+            if lead is not None:
+                at = line.find(" => ")
+                if at < 0:
+                    continue
+                line = _ITEM.sub("", line[at + 4 :]).strip()
+                if not line:
+                    continue
+            if line not in haystack:
+                missing.append(line)
+        assert not missing, missing[:10]
 
     def test_a_host_name_cannot_break_the_format(self, tmp_path):
-        """Escaped, so the delimiter survives and nothing collides with the marker.
+        """Escaped, so the grammar holds and nothing collides with the marker.
 
-        `we|ird` carries the delimiter itself; `ti~lde` would otherwise be
+        `we|ird` carried the v1 delimiter; `ti~lde` would otherwise be
         indistinguishable from the host-less marker; `per%cent` proves `%` is
-        escaped FIRST, or the other two would be double-escaped.
+        escaped FIRST, or the other two would be double-escaped; and `spa ced`
+        is the one v2 actually rests on -- the host is the first
+        whitespace-delimited field, so a space would split it into a host and
+        a result.
         """
         out = _run(tmp_path, inventory=_HOSTILE_INVENTORY, play=_PLAY, tagged=True)
-        hosts = _hosts_of(out)
-        assert "we%7Cird" in hosts, hosts
-        assert "ti%7Elde" in hosts, hosts
-        assert "per%25cent" in hosts, hosts
+        hosts = {b.host for b in _blocks(out) if b.host is not None}
+        assert {"we%7Cird", "ti%7Elde", "per%25cent", "spa%20ced"} <= hosts, hosts
         # The common case stays legible -- escaping must not tax an ordinary name.
         assert "plain" in hosts, hosts
         # And nothing escaped can be mistaken for the marker.
-        assert [h for h in hosts if h == HOSTLESS] == [HOSTLESS]
+        assert HOSTLESS not in hosts, hosts
 
-    def test_the_free_strategy_is_tagged_too(self, tmp_path):
-        """Where ansible's own output is LEAST attributable, measured at 6 of 24."""
+    def test_the_free_strategy_is_framed_too(self, tmp_path):
+        """Where ansible's own output is LEAST attributable, measured at 6 of 24.
+
+        It is also where a duration taken from "when the task started" would be
+        wrong, because several tasks are in flight at once -- which is why the
+        clock is per host AND per task.
+        """
         out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True, free=True)
-        assert "Failure using method" not in out, out[:2000]
-        assert {"web1", "web2", "db1"} <= set(_hosts_of(out))
+        assert not _callback_complaints(out), _callback_complaints(out)[:5]
+        assert {"web1", "web2", "db1"} <= {b.host for b in _blocks(out) if b.host}
+
+    def test_the_whole_block_is_coloured_and_every_line_closes_its_own_colour(self, tmp_path):
+        """The colour applies to the block, not only to a status line.
+
+        Per LINE, which is the property that matters rather than a nicety:
+        ansible's `stringc` wraps each line in its own SGR pair, so a filtered
+        view that keeps some blocks and drops others can never leave a colour
+        unterminated.
+        """
+        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True, color=True)
+        opened = [ln for ln in out.split("\n") if ln.startswith("\x1b[")]
+        assert opened, out[:2000]
+        assert all(ln.endswith("\x1b[0m") for ln in opened), [
+            ln for ln in opened if not ln.endswith("\x1b[0m")
+        ][:5]
+        # A failure's WHOLE block is red -- body included, which is the change
+        # v2 makes and the half an assertion about the header alone cannot see.
+        failed = _for(_blocks(out), "web2", "fail on web2")
+        assert failed, out[:2000]
+        block = failed[0]
+        assert block.header.startswith("\x1b[0;31m"), block.header[:40]
+        assert block.raw_body, "the failure's own output is what has to be coloured"
+        uncoloured = [ln for ln in block.raw_body if not ln.startswith("\x1b[0;31m")]
+        assert not uncoloured, uncoloured[:5]
+        # ...and the ok blocks are a different colour, so "coloured by the
+        # RESULT" is pinned rather than "coloured".
+        ok = _for(_blocks(out), "web1", "Deploy the application")
+        assert ok and ok[0].header.startswith("\x1b[0;32m"), ok[0].header[:40] if ok else out[:800]
+
+    def test_another_callbacks_output_is_left_exactly_as_it_was(self, tmp_path):
+        """ "whatever an operator's own profile_tasks / timer callback emits".
+
+        It is emitted verbatim, which is what "left as it is" means, and the
+        parser reads an unindented non-block line back as host-less -- so it
+        still shows in every filtered view rather than being lost to one.
+        """
+        marker = "Wednesday 11 November 2026  10:28:27 +0000 (0:00:00.018) ****"
+        plugins = tmp_path / "cb"
+        plugins.mkdir(parents=True, exist_ok=True)
+        (plugins / "fake_profile.py").write_text(
+            textwrap.dedent(
+                f'''
+                """A stand-in for `ansible.posix.profile_tasks`, which is not in core."""
+
+                from __future__ import annotations
+
+                from ansible.plugins.callback import CallbackBase
+
+                DOCUMENTATION = """
+                    name: fake_profile
+                    type: aggregate
+                    short_description: a profile_tasks stand-in
+                    description: [prints a timing line at every task start]
+                """
+
+
+                class CallbackModule(CallbackBase):
+                    CALLBACK_VERSION = 2.0
+                    CALLBACK_TYPE = "aggregate"
+                    CALLBACK_NAME = "fake_profile"
+                    CALLBACK_NEEDS_ENABLED = True
+
+                    def v2_playbook_on_task_start(self, task, is_conditional):
+                        self._display.display({marker!r})
+                '''
+            ).strip()
+        )
+        out = _run(
+            tmp_path,
+            inventory=_INVENTORY,
+            play=_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_CALLBACKS_ENABLED": "fake_profile"},
+        )
+        assert marker in out, out[:2000]
+        # Verbatim: on its own line, with nothing added in front of it.
+        assert any(line == marker for line in out.split("\n")), [
+            ln for ln in out.split("\n") if marker in ln
+        ]
+        # And it does not become a block, nor get absorbed into the one above.
+        assert all(marker not in b.header for b in _blocks(out))
+        assert all(marker not in "\n".join(b.body) for b in _blocks(out))

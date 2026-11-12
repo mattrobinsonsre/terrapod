@@ -4849,7 +4849,12 @@ _ANSI_RE = re.compile(rb"\x1b\[[0-9;]*[a-zA-Z]")
 #: constant. Restating a contract is how two sides drift, which is why
 #: `test_host_log_format_agrees_with_the_plugin` reads the plugin's own source
 #: and fails if either literal moves.
-_HOST_LOG_HEADER = b"#terrapod-host-log v1"
+_HOST_LOG_HEADER = b"#terrapod-host-log v2"
+
+#: The superseded per-line-prefix format (#2144), still read because a stored
+#: log outlives the runner image that wrote it. Nothing produces it any more,
+#: so these two are frozen by definition rather than gated against the plugin.
+_HOST_LOG_HEADER_V1 = b"#terrapod-host-log v1"
 _HOST_LOG_DELIMITER = b" | "
 
 #: A host field is escaped, so it holds no delimiter and no newline -- which is
@@ -4868,21 +4873,31 @@ _HOST_LOG_LINE = re.compile(
 
 
 def _untag_host_log(data: bytes) -> bytes:
-    """Strip #2144's per-line host prefix, leaving ansible's own words.
+    """Remove the log's own framing, leaving the output a reader wants.
 
-    Only from the header onward. The same artifact legitimately carries
-    untagged bytes BEFORE it -- `ansible_collections.install` writes galaxy
-    output to the file first and the orchestrator's structlog lines are rolled
-    in around it -- and a prefix matcher let loose on those would eat the first
-    pipe out of an ordinary line of text.
+    For **v2** (#2513) that is the header line and nothing else: the blocks ARE
+    the log, the format Terrapod owns end to end, and there is no second
+    rendering to fall back to. For **v1** it is the header and one host prefix
+    per line, leaving ansible's own words.
 
-    An absent header means an untagged log (an older runner, or a configure that
-    ran without the plugin), and then there is nothing to do.
+    Only from the header onward, in both. The same artifact legitimately
+    carries untagged bytes BEFORE it -- `ansible_collections.install` writes
+    galaxy output to the file first and the orchestrator's structlog lines are
+    rolled in around it -- and a v1 prefix matcher let loose on those would eat
+    the first pipe out of an ordinary line of text.
+
+    An absent header means an untagged log (a runner image predating all of
+    this, or a configure that ran without the plugin), and then there is
+    nothing to do.
     """
     at = data.find(_HOST_LOG_HEADER)
+    if at >= 0:
+        head, tail = data[:at], data[at + len(_HOST_LOG_HEADER) :]
+        return head + (tail[1:] if tail[:1] == b"\n" else tail)
+    at = data.find(_HOST_LOG_HEADER_V1)
     if at < 0:
         return data
-    head, tail = data[:at], data[at + len(_HOST_LOG_HEADER) :]
+    head, tail = data[:at], data[at + len(_HOST_LOG_HEADER_V1) :]
     # Drop the header's own trailing newline so removing it leaves no blank line.
     tail = tail[1:] if tail[:1] == b"\n" else tail
     return head + _HOST_LOG_LINE.sub(b"", tail)

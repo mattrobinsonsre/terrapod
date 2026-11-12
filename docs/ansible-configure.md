@@ -735,7 +735,7 @@ Neither view is more delayed than the other, and neither is more delayed than
 the combined log was before: the switch is a filter over text the page already
 has, so selecting a host costs no request.
 
-### Why the runner tags the log rather than the viewer parsing it
+### Why the runner frames the log rather than the viewer parsing it
 
 Ansible's combined output cannot be attributed after the fact. Measured over a
 three-host play, only **12 of 41** non-blank lines carry `[host]` at all — six
@@ -748,41 +748,63 @@ are the ones you read when something breaks:
 - `...ignoring`, after an ignored failure, names no host.
 
 So Terrapod sets its own ansible **stdout callback**, which is handed the host
-structurally and prefixes every line it emits — including the continuation
-lines of a multi-line result, which nothing else can attribute. The callback
-subclasses ansible's own `default` renderer, so the combined view is ansible's
-rendering rather than an imitation of it: removing the prefix reproduces its
-output byte for byte.
+structurally. All three of those land inside the block for the host they belong
+to, as do the continuation lines of a multi-line result, which nothing reading
+the text afterwards could attribute.
 
 **This replaces a `stdout_callback` you have configured yourself.** Ansible
 permits exactly one, and Terrapod takes it because the platform is responsible
 for making the output readable in the UI and through the API. Your
 `ansible.cfg` is not replaced — Terrapod never writes that file — and your
 `callbacks_enabled` list is untouched, so every notification callback you run
-still runs.
+still runs, with its output in the stream exactly as it wrote it.
 
 ### The format, if you are reading the log with something else
 
-The stored log carries a header and one prefix per line:
+The stored log carries a header, and then one **block per task per host**:
 
 ```
-#terrapod-host-log v1
-web1       | ok: [web1] => {
-web1       |     "msg": "hello from web1"
-web1       | }
-~          | TASK [say hello] ***********************************************
+#terrapod-host-log v2
+[2026-11-11 10:28:27]  ~                 play     PLAY [configure]
+[10:28:30 +2.9s]       web1.example.com  changed  platform : Deploy the app
+[10:31:42 +3m12s]      web1.example.com  ok       platform : Wait for the service
+[10:31:42 +0.0s]       web2.example.com  FAILED   platform : Check the endpoint
+                  [ERROR]: Task failed: Module failed: ...
+                  {"msg": "connection refused", "rc": 7, "stderr": "..."}
+                  ...ignoring
+[2026-11-11 10:31:45]  ~                 recap    PLAY RECAP
+                  web1.example.com : ok=2 changed=1 unreachable=0 failed=0
 ```
 
-`~` marks a line belonging to no single host. A host name containing `|`, `~`,
-`%` or whitespace is percent-escaped in the field, so the first `|` is always
-the separator — an ordinary name is untouched.
+A **block header** is a bracketed time, then the host, the result and the task
+(`role : task` when the task is in a role). Every line **indented** under it
+belongs to that block, and so to that host — the module's `msg`, its `stdout`
+and `stderr`, any `[ERROR]` block with its `Origin:`, and the `...ignoring`
+after an ignored failure. The whole block is coloured by its result, using
+ansible's own `COLOR_OK`, `COLOR_CHANGED`, `COLOR_ERROR`, `COLOR_UNREACHABLE`
+and `COLOR_SKIP`.
 
-**Ask for `format=plain` and you get ansible's words with no prefix**, which is
-what the Go SDK's `Plain` option and the `terrapod_run_logs` MCP tool already
-send. The prefix is there for the viewer:
+A loop reports **one block per item**, with the item in the block's label
+(`platform : Install (item=nginx)`).
+
+The duration is the callback's own measurement of this host on this task, so it
+is right under `strategy: free` where several tasks are in flight at once. You
+do not need `ansible.posix.profile_tasks` to get it — and if you run it anyway,
+its lines are passed through untouched.
+
+`~` marks a block belonging to no single host: the `PLAY` banner, the
+`PLAY RECAP`. A host name containing whitespace, `|`, `~` or `%` is
+percent-escaped in its field, so the host is always one whitespace-delimited
+token — an ordinary name is untouched.
+
+`TASK [...]` banners are not emitted. Their whole content is the task name,
+which every block carries in its label.
+
+**`format=plain` gives you the same blocks with the header and the colour
+removed**, which is what the Go SDK's `Plain` option and the `terrapod_run_logs`
+MCP tool send:
 
 ```sh
-# ansible's own output, no framing
 curl -H "Authorization: Bearer $TOKEN" \
   "$TERRAPOD/api/v1/runs/run-.../configure"      # -> log-read-url
 curl "<log-read-url>?format=plain"
@@ -792,8 +814,10 @@ The header is deliberately **not** the first line of the stored log: a
 collection install writes its own output to the same artifact first. Anything
 before the header is shown in every view.
 
-A log with no header is one from a runner image that predates this. It renders
-in full, and the per-host picker is simply not offered.
+A log headed `#terrapod-host-log v1` is from an older runner image, which
+prefixed every line with its host (`web1 | ok: [web1]`) instead. It still
+renders, and the per-host picker still works on it. A log with **no** header
+predates both; it renders in full, and the picker is simply not offered.
 
 ## Variables a configure receives, and the ones only it receives
 

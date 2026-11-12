@@ -821,15 +821,20 @@ test.describe('Responsive harness (phone viewport)', () => {
     const token = getStoredToken();
     const wsId = await createWorkspace(token, uniqueName('resp-hosts'));
     const runId = await seedRun(token, wsId);
-    const tag = (host: string, text: string) => `${host.padEnd(10)} | ${text}`;
+    // One block per task per host (#2513). The host is a FIELD of the block
+    // header, so a long name widens its own line rather than a column — which
+    // is exactly the thing a phone width has to survive.
+    const block = (host: string, status: string, label: string) =>
+      `${'[10:28:30 +2.9s]'.padEnd(16)}  ${host.padEnd(16)}  ${status.padEnd(7)}  ${label}`;
     // A deliberately long host name: the one thing that could widen the page.
     const long = 'web-01.production.eu-west-1.internal.example.com';
     const body =
-      '\x02#terrapod-host-log v1\n' +
+      '\x02#terrapod-host-log v2\n' +
       [
-        tag('~', 'TASK [say hello] ***'),
-        tag('web1', 'ok: [web1]'),
-        tag(long, `ok: [${long}]`),
+        `${'[2026-11-11 10:28:27]'.padEnd(16)}  ${'~'.padEnd(16)}  play     PLAY [configure]`,
+        block('web1', 'ok', 'platform : say hello'),
+        block(long, 'changed', 'platform : say hello'),
+        `                  {"msg": "a long line from ${long} that must wrap rather than widen"}`,
       ].join('\n') + '\n';
 
     await page.route(`**/api/*/runs/${runId}`, async (route: Route) => {
@@ -872,8 +877,11 @@ test.describe('Responsive harness (phone viewport)', () => {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
     // Selecting still works on touch, and the filtered view renders.
     await picker.selectOption(long);
-    await expect(page.getByTestId('log-pre-configure').filter({ visible: true }).first())
-      .toContainText('TASK [say hello]');
+    const pane = page.getByTestId('log-pre-configure').filter({ visible: true }).first();
+    // The play block is host-less, so it survives the filter as the context it is.
+    await expect(pane).toContainText('PLAY [configure]');
+    // ...and the selected host's own block body comes with its block.
+    await expect(pane).toContainText('that must wrap rather than widen');
     // #1977. Text rather than an eighth control, precisely because this row is
     // where a phone starts scrolling sideways -- so it is asserted present AND
     // inside the overflow check below rather than either alone.

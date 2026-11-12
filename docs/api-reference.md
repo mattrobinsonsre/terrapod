@@ -1868,27 +1868,39 @@ phase. `log-read-url` carries a signed capability in place of the run id, as the
 apply log URLs do, and the capability is its own kind — one minted for a plan log will not
 read a configure log.
 
-Each line of the raw log is prefixed with the host it belongs to, behind a
-self-identifying header, so a viewer can show one host's output alone:
+The raw log is made of **one block per task per host**, behind a self-identifying header,
+so a viewer can show one host's output alone:
 
 ```
-#terrapod-host-log v1
-web1       | ok: [web1] => {
-web1       |     "msg": "hello from web1"
-web1       | }
-~          | TASK [say hello] ***********************************************
+#terrapod-host-log v2
+[2026-11-11 10:28:27]  ~                 play     PLAY [configure]
+[10:28:30 +2.9s]       web1.example.com  changed  platform : Deploy the app
+[10:31:42 +0.0s]       web2.example.com  FAILED   platform : Check the endpoint
+                  [ERROR]: Task failed: Module failed: ...
+                  {"msg": "connection refused", "rc": 7}
+[2026-11-11 10:31:45]  ~                 recap    PLAY RECAP
+                  web1.example.com : ok=2 changed=1 unreachable=0 failed=0
 ```
 
-`~` marks a line belonging to no single host — a task banner, the `PLAY RECAP`. A host
-name containing `|`, `~`, `%` or whitespace is percent-escaped in the field, so the first
-`|` is always the separator. The header is **not** necessarily the first line: a
+A block header is a bracketed time (and, for a result, the duration the callback measured
+for that host on that task), then the host, the result and the task. Every **indented**
+line below it belongs to that block and that host — the module's `msg`, `stdout`, `stderr`,
+any `[ERROR]` block with its `Origin:`, and a trailing `...ignoring`. A loop reports one
+block per item, with the item in the label. The whole block is coloured by its result using
+ansible's own `COLOR_*` values.
+
+`~` marks a block belonging to no single host — the `PLAY` banner, the `PLAY RECAP`. A host
+name containing whitespace, `|`, `~` or `%` is percent-escaped in its field, so the host is
+always one whitespace-delimited token. The header is **not** necessarily the first line: a
 collection install writes to the same artifact first, and anything before the header is
-untagged output that belongs to every view.
+unframed output that belongs to every view.
 
-**`format=plain` strips the prefix as well as the ANSI codes**, which is what the Go SDK's
-`Plain` option and the `terrapod_run_logs` MCP tool send — so a non-terminal consumer gets
-ansible's own words and the framing stays with the viewer that parses it. A log with no
-header is from a runner image predating this and is returned unchanged.
+**`format=plain` removes the header and the ANSI codes and returns the blocks**, which is
+what the Go SDK's `Plain` option and the `terrapod_run_logs` MCP tool send. There is no
+second rendering to fall back to: the block format is the one Terrapod emits. A log headed
+`#terrapod-host-log v1` is from an older runner image, which prefixed each line with its
+host; its prefixes are stripped, leaving ansible's own words. A log with no header predates
+both and is returned unchanged.
 
 ### Plan JSON Output
 

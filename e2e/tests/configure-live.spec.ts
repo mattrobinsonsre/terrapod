@@ -29,8 +29,12 @@ const WS_ID = '66666666-6666-4666-8666-666666666666'
 
 const STX = '\x02'
 const ETX = '\x03'
-const HEADER = '#terrapod-host-log v1'
-const BODY = [HEADER, `${STX}web1${ETX} ok: [web1]`, `${STX}web1${ETX} changed: [web1]`].join('\n')
+const HEADER = '#terrapod-host-log v2'
+const BODY = [
+  HEADER,
+  `${STX}[10:28:30 +2.9s]  web1              ok       platform : say hello${ETX}`,
+  `${STX}[10:28:33 +2.1s]  web1              changed  platform : deploy${ETX}`,
+].join('\n')
 
 /**
  * The run, with a `last-output-at` that MOVES between the first read and every
