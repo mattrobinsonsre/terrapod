@@ -31,6 +31,34 @@ async function seedConfigure(
   workspaceId: string,
   playbook?: string,
 ): Promise<string> {
+  // A run needs an uploaded configuration version first -- `create_run`
+  // refuses one without it, which is what every configure seeded here was
+  // hitting. Same shape as `seedRun` in e2e/helpers/api.ts, on the native
+  // surface because a configure is not a TFE concept.
+  const cvRes = await fetch(
+    `${API_URL}/api/v1/workspaces/${workspaceId}/configuration-versions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/vnd.api+json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        data: { type: 'configuration-versions', attributes: { 'auto-queue-runs': false } },
+      }),
+    },
+  )
+  if (!cvRes.ok) throw new Error(`seedConfigure cv: ${cvRes.status} ${await cvRes.text()}`)
+  const cvJson = await cvRes.json()
+  // No Authorization header, and FOLLOW the returned `upload-url` rather than
+  // rebuilding it from the id -- rebuilding produces the bare guessable address
+  // the signed capability replaced.
+  const upRes = await fetch(cvJson.data.attributes['upload-url'] as string, {
+    method: 'PUT',
+    body: 'terrapod-e2e-config-placeholder',
+  })
+  if (!upRes.ok) throw new Error(`seedConfigure upload: ${upRes.status}`)
+
   const attributes: Record<string, unknown> = { 'is-configure': true, 'plan-only': false }
   if (playbook) attributes.playbook = playbook
   const res = await fetch(`${API_URL}/api/v1/runs`, {
