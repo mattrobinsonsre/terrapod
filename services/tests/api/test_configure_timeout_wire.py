@@ -69,12 +69,59 @@ class TestTheListenerForwardsItWithABackwardCompatibleDefault:
     """
 
     def test_the_listener_passes_it_from_the_attribute(self):
+        """Asserted STRUCTURALLY rather than as a literal.
+
+        This read was hoisted into a local when the runner token had to be
+        sized from the same value (#2526) -- one read, two uses -- and the
+        literal this test used to match (`timeout_minutes=int(attrs.get(...)
+        or 60)` as one call-site expression) stopped existing. A test pinned
+        to an exact expression fails on a refactor that STRENGTHENS the
+        property it guards, which is the worst way for a guard to behave.
+
+        So the property, not the spelling: whatever the Job build is handed
+        must be read from the attribute, and must fall back to the builder's
+        own default.
+        """
         from terrapod.runner import listener
 
-        src = inspect.getsource(listener)
-        assert 'timeout_minutes=int(attrs.get("timeout-minutes") or 60)' in src, (
-            "the listener does not forward the ceiling, so the API can send it "
-            "and the Job will still carry the builder default"
+        tree = ast.parse(inspect.getsource(listener))
+
+        build = next(
+            (
+                n
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Call) and any(kw.arg == "timeout_minutes" for kw in n.keywords)
+            ),
+            None,
+        )
+        assert build is not None, "nothing in the listener passes timeout_minutes at all"
+
+        passed = next(kw.value for kw in build.keywords if kw.arg == "timeout_minutes")
+        assert isinstance(passed, ast.Name), (
+            "the Job build is handed an inline expression for timeout_minutes. "
+            "That is not wrong in itself, but it means the runner token can no "
+            "longer be sized from the same value (#2526) -- see "
+            "tests/runner/test_listener_token_ttl.py, which requires one read."
+        )
+
+        produced = {
+            ast.unparse(n.value)
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == passed.id for t in n.targets)
+        }
+        assert produced, f"nothing assigns {passed.id}, so its origin cannot be checked"
+        # Matched WITHOUT the quotes: ast.unparse normalises string literals to
+        # single quotes, so a matcher written with the source's double quotes
+        # finds nothing and fails on correct code.
+        assert any("attrs.get(" in e and "timeout-minutes" in e for e in produced), (
+            f"{passed.id} is not read from the timeout-minutes attribute, so the API "
+            f"can send the ceiling and the Job will still carry the builder default: "
+            f"{sorted(produced)}"
+        )
+        assert any("60" in e for e in produced), (
+            "the fallback is no longer the builder's own 60, so an API that predates "
+            f"this would make the listener build a different spec: {sorted(produced)}"
         )
 
     def test_the_builder_default_is_what_the_fallback_names(self):
