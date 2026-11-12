@@ -33,7 +33,13 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "a7197ada2c0e"
-down_revision = "26175f851307"
+# Re-parented onto 2f4124a96516 (the run-plan-resources migration, #2488)
+# rather than 26175f851307. Both were written against that parent, so the
+# chain forked into two heads the moment #2488 landed -- a fork a file-level
+# rebase cannot see, because neither file conflicts. The order carries no
+# meaning here: that migration adds run plan-resource storage and this one
+# drops two unrelated boolean columns.
+down_revision = "2f4124a96516"
 branch_labels = None
 depends_on = None
 
