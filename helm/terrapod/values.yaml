@@ -2122,8 +2122,20 @@ runners:
   # to disable debug mode across the deployment however workspaces are set.
   debugLingerSeconds: 1800
   terminationGracePeriodSeconds: 120  # Time budget for graceful shutdown + artifact uploads
+  # Runner token lifetime. tokenTTLSeconds is the fallback for a listener old
+  # enough not to say how long its Job needs; a current one asks for the Job's
+  # own deadline plus its launch and termination windows, and the API clamps
+  # that to maxTokenTTLSeconds.
+  #
+  # So the ceiling has to clear the LONGEST Job this deployment permits, which
+  # is configureTimeoutMinutes below. It did not: at 7200 a configure's token
+  # was capped two hours into a Job allowed three, and a configure that ran
+  # past it finished with a dead token — its log, its per-host events and its
+  # resource profile (which also carries why the run failed) every one a 401.
+  # The run was still errored correctly by the listener, so the loss was quiet.
+  # The API warns at startup if this pair is inconsistent.
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
-  maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
+  maxTokenTTLSeconds: 14400     # Runner token max TTL (4 hours; clears the 180-minute configure ceiling)
   staleTimeoutSeconds: 3600     # Seconds before a run with no Job status is marked errored
   # Seconds before a claimed run with no Job launched is errored (listener
   # claimed it but never created the Job — e.g. runner-token 401, K8s outage).

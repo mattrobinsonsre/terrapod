@@ -143,7 +143,12 @@ def _launch_listener(shutdown_event):
     listener._read_ca_bundle_pem = MagicMock(return_value="")
     listener._report_launch_failed = AsyncMock()
     listener._auth_headers = MagicMock(return_value={})
-    listener.runner_config = MagicMock(hooks_enabled=True, runner_namespace="ns")
+    # `termination_grace_period_seconds` explicitly for the same reason as the
+    # shared fixture in `test_listener`: the launch sizes the runner token from
+    # the Job's deadline plus it (#2526).
+    listener.runner_config = MagicMock(
+        hooks_enabled=True, runner_namespace="ns", termination_grace_period_seconds=120
+    )
     return listener
 
 

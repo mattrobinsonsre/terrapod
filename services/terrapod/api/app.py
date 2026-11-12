@@ -126,6 +126,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     async with get_db_session() as db:
         await init_token_signing_key(db)
 
+    # A configure Job allowed to outlive the token it is handed loses every
+    # upload it makes at exit (#2526). A warning and not a refusal -- see the
+    # helper's docstring -- and here rather than in `config.py`, which runs
+    # before logging is configured.
+    from terrapod.auth.runner_tokens import warn_about_phase_token_budget
+
+    warn_about_phase_token_budget()
+
     # Resolve the OIDC issuer signing key (#1901), only when an issuer is
     # published. Tolerant like the CA above rather than fatal: a deployment that
     # has not opted in must not be prevented from starting, and one that has can

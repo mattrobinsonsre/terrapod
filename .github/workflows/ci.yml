@@ -449,6 +449,16 @@ jobs:
       - name: (docs-audit) The forced-environment prose names the real set
         run: python3 scripts/docs-audit/check_forced_env.py
 
+      # A promoted log opens with a line saying it is a TAIL rather than the
+      # whole run, and the troubleshooting row quotes that line's opening words
+      # -- which is what an operator who meets a short log greps for. A doc that
+      # quotes a message goes stale silently: change the constant and the row
+      # still reads perfectly while matching nothing anybody will ever see. Here
+      # rather than beside the notice's own tests because the test image copies
+      # exactly one file out of `docs/`.
+      - name: (docs-audit) The docs quote the real promoted-log notice
+        run: python3 scripts/docs-audit/check_log_tail_notice.py
+
       # A LOCAL composite action's required inputs, read out of its own
       # `action.yml`. `ssh-target-gate` and `git-source-gate` both called
       # `./.github/actions/ghcr-login` with no `with:` block at all, so

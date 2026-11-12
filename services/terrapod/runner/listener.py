@@ -38,7 +38,7 @@ from terrapod.auth.listener_pop import (
     TIMESTAMP_HEADER,
     sign_request,
 )
-from terrapod.config import load_runner_config
+from terrapod.config import load_runner_config, runner_token_ttl_for_job
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import configure_logging, get_logger
 from terrapod.runner.job_template import run_object_slug
@@ -992,8 +992,24 @@ class RunnerListener:
         # terraform, so a listener ahead of its API behaves identically.
         engine = strategy_for(attrs.get("engine"))
 
+        # The Job's own deadline (#1977), read HERE rather than at the Job build
+        # below because the runner token has to be sized from it (#2526): a
+        # token shorter than its Job means every upload the Job makes at exit
+        # answers 401, which is how a long configure lost its log, its per-host
+        # events and its resource profile. One read, two uses.
+        timeout_minutes = int(attrs.get("timeout-minutes") or 60)
+
         try:
-            runner_token = await self._get_runner_token(run_id, phase=phase)
+            runner_token = await self._get_runner_token(
+                run_id,
+                phase=phase,
+                # This listener owns `activeDeadlineSeconds`, so it is the only
+                # party that knows how long the token must live. The API clamps
+                # it to `max_token_ttl_seconds` as it always has.
+                ttl=runner_token_ttl_for_job(
+                    timeout_minutes, self.runner_config.termination_grace_period_seconds
+                ),
+            )
         except Exception as e:
             logger.error("Failed to fetch runner token", run_id=run_id, error=str(e))
             await self._report_launch_failed(run_id, f"Could not obtain runner token: {e}")
@@ -1142,8 +1158,9 @@ class RunnerListener:
                 # The run's own Job deadline (#1977). The API sends this only
                 # for a configure, so the builder's 60-minute default still
                 # applies to every plan, apply, preview and up -- the spec this
-                # listener has always built.
-                timeout_minutes=int(attrs.get("timeout-minutes") or 60),
+                # listener has always built. Read above, where the runner token
+                # is sized from the same value (#2526).
+                timeout_minutes=timeout_minutes,
                 # The Ansible execution environment (#2154). Absent from an API
                 # that predates it, and absent on every plan and apply, so the
                 # default renders exactly the spec this listener always built:
@@ -1509,7 +1526,9 @@ class RunnerListener:
 
     # ── Shared Helpers ───────────────────────────────────────────────
 
-    async def _get_runner_token(self, run_id: str, *, phase: str | None = None) -> str:
+    async def _get_runner_token(
+        self, run_id: str, *, phase: str | None = None, ttl: int | None = None
+    ) -> str:
         """Request a short-lived runner token from the API.
 
         The Job's phase is sent so the API can bind it into the token
@@ -1517,10 +1536,18 @@ class RunnerListener:
         apply-phase routes, nor ask for the apply cloud identity (#1901). An API older than the claim ignores the field and
         returns an unphased token, which works exactly as it always did; the
         field is additive in both directions.
+
+        `ttl` is the lifetime this Job needs, which only this listener knows
+        because it owns the Job's `activeDeadlineSeconds` (#2526). Additive in
+        both directions too: an API that predates the sizing already accepted
+        `ttl` and clamps it to `max_token_ttl_seconds`, and a listener that
+        sends none gets that API's own default.
         """
         body: dict = {}
         if phase:
             body["phase"] = phase
+        if ttl is not None:
+            body["ttl"] = int(ttl)
         response = await arequest_with_retry(
             self._http_client,
             "POST",
