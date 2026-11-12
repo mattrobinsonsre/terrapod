@@ -94,6 +94,10 @@ class TestAutodiscoveryRule:
             config_directory="",
             inventory_paths=[],
             default_playbook="",
+            # The playbook allow-list (#2527); `[]` is the real default and means no
+            # restriction. Explicit because a `SimpleNamespace` RAISES on an unset
+            # attribute rather than inventing one, which is the harder failure to read.
+            playbooks=[],
             default_limit="",
             hard_limit="",
             # #2033's pair. Set explicitly, both off, because these reach a

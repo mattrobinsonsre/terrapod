@@ -81,11 +81,22 @@ type Run struct {
 	// setting) from a STANDALONE configure. Playbook and Limit are what this
 	// run was asked to configure -- empty meaning the workspace's defaults,
 	// which is what a git-driven configure runs.
-	IsConfigure         bool   `json:"is-configure"`
-	ConfigureAfterApply bool   `json:"configure-after-apply"`
-	Playbook            string `json:"playbook,omitempty"`
-	Limit               string `json:"limit,omitempty"`
-	AutoApply           bool   `json:"auto-apply"`
+	IsConfigure         bool `json:"is-configure"`
+	ConfigureAfterApply bool `json:"configure-after-apply"`
+	// RunKind is what the run IS, in one word: "configure", "full" (a
+	// composite) or "plan_apply". DERIVED by the server from the two flags
+	// above rather than stored, and emitted so a consumer reads one attribute
+	// instead of writing the predicate itself -- three surfaces each deriving
+	// it is how the run list came to badge a configure-only run "plan + apply"
+	// AND "configure" at once (#2507, #2509).
+	//
+	// Whether a run is SPECULATIVE is PlanOnly, not a fourth kind: that fact
+	// already has a spelling on this document and giving it a second one is
+	// how two consumers come to disagree.
+	RunKind   string `json:"run-kind,omitempty"`
+	Playbook  string `json:"playbook,omitempty"`
+	Limit     string `json:"limit,omitempty"`
+	AutoApply bool   `json:"auto-apply"`
 	// AutoApplyMode is the mode snapshotted at run creation (#1274), and
 	// AutoApplyDeclinedReason says why a conditional mode refused to apply
 	// this plan — empty unless the run is parked for a human.
@@ -654,6 +665,7 @@ func runFromResource(res *Resource) *Run {
 		IsDestroy:               GetBoolAttr(res, "is-destroy"),
 		IsConfigure:             GetBoolAttr(res, "is-configure"),
 		ConfigureAfterApply:     GetBoolAttr(res, "configure-after-apply"),
+		RunKind:                 GetStringAttr(res, "run-kind"),
 		Playbook:                GetStringAttr(res, "playbook"),
 		Limit:                   GetStringAttr(res, "limit"),
 		AutoApply:               GetBoolAttr(res, "auto-apply"),

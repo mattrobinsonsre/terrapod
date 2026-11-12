@@ -1302,7 +1302,9 @@
       "applyChanges": "변경 사항 적용",
       "setOidcAudiences": "실행 ID의 OIDC 대상 설정 (일치하는 모든 워크스페이스의 맵을 대체)",
       "operationsNone": "이렇게 하면 일치하는 모든 워크스페이스에 작업이 전혀 없게 됩니다. 워크스페이스는 플랜 및 적용, 구성 또는 둘 다 중 하나를 유지해야 합니다.",
-      "setHardLimit": "강제 limit 설정 (빈 값은 상한을 제거합니다)"
+      "setHardLimit": "강제 limit 설정 (빈 값은 상한을 제거합니다)",
+      "setPlaybooks": "허용된 플레이북 설정 (일치하는 모든 워크스페이스의 목록을 대체합니다. 빈 목록은 제한을 제거합니다)",
+      "playbooksPairWarning": "비어 있지 않은 목록에는 일치하는 각 워크스페이스의 기본 플레이북이 반드시 포함되어야 합니다. 아직 포함되어 있지 않다면 같은 업데이트에서 기본 플레이북도 함께 설정하십시오."
     },
     "diff": {
       "colWorkspace": "워크스페이스",
@@ -2310,7 +2312,8 @@
       "runOptions": "실행 옵션",
       "agentPool": "에이전트 풀",
       "agentPoolCandidates": "{count, plural, other {후보 풀 #개}}",
-      "autoApplyHeld": "보류"
+      "autoApplyHeld": "보류",
+      "playbook": "플레이북"
     },
     "timeline": {
       "heading": "타임라인",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "이 워크스페이스에서 어떤 작업이 눈에 띄는 버튼을 차지할지 결정합니다. 자동은 가능한 범위에서 가장 완전한 실행을 제시합니다 — 보통은 그것이 맞지만, 일상적인 작업이 가장 큰 작업이 아닌 경우에는 맞지 않습니다: Terraform 쪽이 Ansible 인벤토리를 유지하는 일만 하고, 무인으로 적용하며 적용 후에는 구성하지 않는 워크스페이스라면 여기서 구성을 고릅니다. 이 워크스페이스가 제시할 수 없는 선택은 저장할 때 거부되고, 사용자의 역할로 실행할 수 없는 선택은 사용자에게는 자동으로 되돌아갑니다.",
       "configureParallelism": "구성 병렬 처리 수",
       "configureParallelismTitle": "한 번의 구성이 동시에 처리하는 호스트 수 — ansible의 forks (1-256). 비워 두면 병렬 처리 수를 상속합니다. 실행 환경은 오케스트레이터와 따로 크기를 정하므로 설정도 분리되어 있습니다.",
-      "configureParallelismLead": "한 번의 구성이 동시에 처리하는 호스트 수 — ansible의 forks (1-256). 비워 두면 병렬 처리 수를 상속합니다."
+      "configureParallelismLead": "한 번의 구성이 동시에 처리하는 호스트 수 — ansible의 forks (1-256). 비워 두면 병렬 처리 수를 상속합니다.",
+      "playbooks": "허용된 플레이북",
+      "playbooksLead": "여기에서의 구성 작업이 실행할 수 있는 플레이북입니다. 비워 두면 어떤 플레이북이든 지정할 수 있으며 이것이 기본값입니다. 항목을 추가하면 그 외의 것을 지정한 실행은 거부됩니다.",
+      "playbooksTitle": "각 항목은 구성 디렉터리 기준 상대 경로이며, 목록을 지정하면 실행 옵션이 텍스트 입력란 대신 목록에서 고르는 선택기가 됩니다. 옵션 없이 실행한 구성 작업은 기본 플레이북을 실행하므로, 기본 플레이북은 반드시 항목 중 하나여야 합니다. 노드 드레인이나 데이터베이스 업그레이드처럼 절대 건드려서는 안 되는 워크스페이스에서 특정 플레이북을 멀리 두는 데 사용하십시오. 그런 경우 목록은 관례가 아니라 통제 수단입니다.",
+      "playbooksPlaceholder": "예: release.yml",
+      "playbooksAdd": "플레이북 추가",
+      "playbooksAny": "모두 허용"
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "전체 실행",
       "queueFullRunConfirm": "이 워크스페이스에서 플랜, 적용, 구성을 모두 실행하시겠습니까? 적용이 실제 인프라를 변경한 뒤 구성이 실제 호스트를 변경하며, 그 사이에 별도의 검토는 없습니다.",
       "moreRunKinds": "다른 실행 종류",
-      "openExplainingPhase": "이를 설명하는 단계의 로그 열기"
+      "openExplainingPhase": "이를 설명하는 단계의 로그 열기",
+      "configurePlaybookDefaultSuffix": "(기본)",
+      "playbookIsDefault": "이 워크스페이스의 기본 플레이북"
     },
     "state": {
       "deleteConfirm": "상태 버전 #{serial}을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",

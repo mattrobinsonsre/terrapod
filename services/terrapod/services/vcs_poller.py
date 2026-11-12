@@ -841,6 +841,12 @@ async def _create_vcs_run(
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,
+        # Reachable here and not merely defensive (#2527): a recovery or a
+        # push-driven configure can carry a playbook an operator has narrowed
+        # the allow-list past since. Skipped for the same reason as its
+        # siblings -- the platform decided on this run, so there is nobody to
+        # tell, and a workspace behaving exactly as declared is not an error.
+        workspace_settings.PlaybookNotAllowed,
         workspace_settings.WorkspaceLocked,
     ) as exc:
         # The platform decided on this run, so there is nobody to tell: skip

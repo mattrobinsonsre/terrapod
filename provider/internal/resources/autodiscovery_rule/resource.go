@@ -32,6 +32,7 @@
 //	"configure-enabled"  -> configure_enabled   (bool, optional+computed, default false)
 //	"config-directory"   -> config_directory    (string, optional+computed; "" is the config version's root)
 //	"inventory-paths"    -> inventory_paths     (list of strings, optional+computed; ordered, order is precedence)
+//	"playbooks"          -> playbooks           (list of strings, optional+computed; the allow-list)
 //	"default-playbook"   -> default_playbook    (string, optional+computed)
 //	"default-limit"      -> default_limit       (string, optional+computed)
 //	"parallelism"        -> parallelism
@@ -126,6 +127,7 @@ type autodiscoveryRuleModel struct {
 	ConfigureAllHosts    types.Bool   `tfsdk:"configure_all_hosts"`
 	ConfigDirectory      types.String `tfsdk:"config_directory"`
 	InventoryPaths       types.List   `tfsdk:"inventory_paths"`
+	Playbooks            types.List   `tfsdk:"playbooks"`
 	DefaultPlaybook      types.String `tfsdk:"default_playbook"`
 	DefaultLimit         types.String `tfsdk:"default_limit"`
 	ResourceCPU          types.String `tfsdk:"resource_cpu"`
@@ -503,6 +505,24 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 					"`production` and `staging` merges them into one inventory. Defaults " +
 					"to empty. Omitting this attribute leaves any existing server-side " +
 					"value untouched; set `inventory_paths = []` to clear it.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"playbooks": schema.ListAttribute{
+				ElementType: types.StringType,
+				MarkdownDescription: "The playbooks a configure run may name on workspaces " +
+					"this rule creates, each relative to `config_directory`. An " +
+					"**allow-list**: the server refuses a run whose playbook is outside " +
+					"it. **Defaults to empty**, which is the open state — any playbook " +
+					"is allowed. A non-empty list templates a `default_playbook` that " +
+					"has to be one of its entries, because a bare Configure runs the " +
+					"default; the pair is checked when each workspace is written, not " +
+					"here, so a rule is free to be edited one attribute at a time. " +
+					"Omitting this attribute leaves any existing server-side value " +
+					"untouched; set `playbooks = []` to clear it.",
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.List{
@@ -1235,6 +1255,7 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		val types.List
 	}{
 		{"inventory-paths", m.InventoryPaths},
+		{"playbooks", m.Playbooks},
 	} {
 		if !f.val.IsNull() && !f.val.IsUnknown() {
 			paths := make([]string, 0, len(f.val.Elements()))
@@ -1585,6 +1606,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		into *types.List
 	}{
 		{"inventory-paths", &m.InventoryPaths},
+		{"playbooks", &m.Playbooks},
 	} {
 		paths := terrapod.GetListAttr(res, f.key)
 		if len(paths) == 0 && f.into.IsNull() {

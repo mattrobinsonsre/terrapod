@@ -1302,7 +1302,9 @@
       "applyChanges": "choHmey lo'",
       "setOidcAudiences": "OIDC vum pong HevwI''mey choq (Hoch rurbogh Qumwo''Daq chart chartlh)",
       "operationsNone": "Qumwo''mey rurbogh Hoch pagh Qu'' ghajmoH. nab ''ej lo'', ghap Qum, ghap cha'' Hoch polnIS Qumwo''.",
-      "setHardLimit": "veH let choq (valur chIm veH teq)"
+      "setHardLimit": "veH let choq (valur chIm veH teq)",
+      "setPlaybooks": "chaw''lu''bogh Qu'' paqmey choq (Hoch rurbogh Qumwo''Daq tetlh qa''; tetlh chIm vaj Hoch chaw''lu'')",
+      "playbooksPairWarning": "tetlh chImbe'' Hoch rurbogh Qumwo'' Qu'' paq motlh ngaSnIS; vaj tetlhvamDaq tu''be''lu''chugh, rapbogh choHDaq ''oH choq."
     },
     "diff": {
       "colWorkspace": "Qumwo'",
@@ -2310,7 +2312,8 @@
       "runOptions": "Sar wIvmey",
       "agentPool": "toy''wI'' ghom",
       "agentPoolCandidates": "{count, plural, one {# ghom wIvlu''bogh} other {# ghom wIvlu''bogh}}",
-      "autoApplyHeld": "loS"
+      "autoApplyHeld": "loS",
+      "playbook": "Qu'' paq"
     },
     "timeline": {
       "heading": "poH tlhegh",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "nuq Qu' SeHlaw potlh Suq Qumwo'vamDaq. ta naQqu' noblaHbogh nob tlhoS — motlh QaQ, 'ach Qu' motlh 'oH Qu' tIn'e' 'oHbe'chugh qab: Qumwo' Terraform 'ay' Ansible ghom tetlh neH vu'bogh, nudwI' Hutlhbogh lo' 'ej lo' tlha' not Qumbogh, naDev Qum poQ. wIv noblaHbe'bogh Qumwo'vam, DapolDI' lajbe'lu'; 'ej ta vangmeH patlhlIj chaw'be'chugh, SoHvaD tlhoS wIvlu'.",
       "configureParallelism": "Qum tay'' Qu''mey",
       "configureParallelismTitle": "wa'' poH Qum hostmey mI'' — ansible forks (1-256). chIm chugh, tay'' Qu''mey tlha''. pIm, vumwI'' Daq ''ej nISwI'' pIm ''ar lughaj.",
-      "configureParallelismLead": "wa'' poH Qum hostmey mI'' — ansible forks (1-256). chIm chugh, tay'' Qu''mey tlha''."
+      "configureParallelismLead": "wa'' poH Qum hostmey mI'' — ansible forks (1-256). chIm chugh, tay'' Qu''mey tlha''.",
+      "playbooks": "chaw''lu''bogh Qu'' paqmey",
+      "playbooksLead": "naDev Qum vumlaHbogh Qu'' paqmey. chIm yIlI''Ha'': Hoch Qu'' paq chaw''lu'', motlh ''oH; tetlhDaq chel ''ej latlh pongbogh Qu'' lajlu''be''.",
+      "playbooksTitle": "Hoch tetlh Doch ''oH He, Qum tetlh-vo''. Qu'' wIv ghItlhmeH Daq moj''be''; wIvmeH tetlh moj. Qu'' paq motlh tetlhvamDaq tu''nISlu'', Qum neH Qu'' paq motlh vumqu''mo''. Qumwo'' pagh ghoblu''nISbogh Qu'' paq teqmeH yIlo'' — De''wI'' nganmey teqlu'', De''wI'' qawHaq chu''moHlu'' — pa'' tetlh ''oH SeH, tIgh ''oHbe''.",
+      "playbooksPlaceholder": "Da release.yml",
+      "playbooksAdd": "Qu'' paq chel",
+      "playbooksAny": "vay''"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "naQ ta",
       "queueFullRunConfirm": "nab, ta, Qum je Dalaj’a’? ta vumwI’mey teH choHpu’DI’, Qum qachmey teH choH; chaH joj Dojbe’ nughI.",
       "moreRunKinds": "latlh ta Segh",
-      "openExplainingPhase": "vay' QIjbogh chevmey De'wI' qonta' poSmoH"
+      "openExplainingPhase": "vay' QIjbogh chevmey De'wI' qonta' poSmoH",
+      "configurePlaybookDefaultSuffix": "(motlh)",
+      "playbookIsDefault": "Qumwo'' Qu'' paq motlh"
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",

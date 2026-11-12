@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -74,6 +77,82 @@ func (r *workspaceResource) ValidateConfig(ctx context.Context, req resource.Val
 	}
 	validateEngineVersionPair(m.EngineVersion, m.TerraformVersion, resp)
 	validateOperationsPair(m.PlanApplyEnabled, m.ConfigureEnabled, resp)
+	validatePlaybookAllowList(m.Playbooks, m.DefaultPlaybook, resp)
+}
+
+// validatePlaybookAllowList errors when a config's `playbooks` allow-list and
+// its `default_playbook` contradict each other (#2527).
+//
+// Two rules, and both are about the PAIR rather than either attribute:
+//
+//   - a non-empty list must contain the default, because a bare Configure runs
+//     the default and the server refuses a run whose playbook is outside the
+//     list — a workspace whose own button cannot be pressed;
+//   - a non-empty list needs a default at all, for the same reason.
+//
+// The server enforces both at the write boundary with a 422, so this catches
+// nothing the API would let through. What it buys is WHEN: a typo in either
+// attribute fails before Terraform has planned anything, rather than after it
+// has decided to change a workspace.
+//
+// Note what this refuses that the server would accept: a config that sets
+// `playbooks` and leaves `default_playbook` to a value the server already
+// holds. That is deliberate — the two are one declaration, and an allow-list
+// whose default lives somewhere this configuration cannot see is exactly the
+// pair that goes wrong silently. The error says how to resolve it.
+//
+// Every skip below is an UNKNOWN, never a null. An unknown comes from an
+// interpolation that has not resolved yet, so the pair is not decidable here
+// and the API's 422 is the backstop; a null is a decision the practitioner
+// made and is checked.
+func validatePlaybookAllowList(playbooks types.List, def types.String, resp *resource.ValidateConfigResponse) {
+	if playbooks.IsNull() || playbooks.IsUnknown() {
+		return
+	}
+	els := playbooks.Elements()
+	if len(els) == 0 {
+		// The open state: an empty list allow-lists nothing and keeps today's
+		// free-text behaviour, so there is no pair to contradict.
+		return
+	}
+	allowed := make([]string, 0, len(els))
+	for _, e := range els {
+		s, ok := e.(types.String)
+		if !ok || s.IsUnknown() {
+			// One unresolved entry makes the whole membership question
+			// undecidable: the default might be the value it resolves to.
+			return
+		}
+		allowed = append(allowed, s.ValueString())
+	}
+	if def.IsUnknown() {
+		return
+	}
+	quoted := make([]string, 0, len(allowed))
+	for _, a := range allowed {
+		quoted = append(quoted, strconv.Quote(a))
+	}
+	list := strings.Join(quoted, ", ")
+
+	if def.IsNull() || def.ValueString() == "" {
+		resp.Diagnostics.AddError(
+			"playbooks allow-list has no default_playbook",
+			"This configuration sets `playbooks` but leaves `default_playbook` empty, "+
+				"so a bare Configure — one whose run options name no playbook — would "+
+				"have no playbook to run. Set `default_playbook` to one of "+list+
+				", or set `playbooks = []` to allow any playbook.",
+		)
+		return
+	}
+	if !slices.Contains(allowed, def.ValueString()) {
+		resp.Diagnostics.AddError(
+			"default_playbook is not in playbooks",
+			"`default_playbook` is "+strconv.Quote(def.ValueString())+", which is not "+
+				"one of the playbooks this workspace allows: "+list+". A bare Configure "+
+				"runs the default, so the default has to be allowed. Correct whichever "+
+				"of the two is wrong, or set `playbooks = []` to allow any playbook.",
+		)
+	}
 }
 
 // validateOperationsPair errors when a config turns BOTH operations off
@@ -156,6 +235,7 @@ var unmanagedCollections = []struct {
 	{"drift_ignore_rules", "[]", func(m *workspaceModel) attr.Value { return m.DriftIgnoreRules }},
 	{"security_scan_skip_rules", "[]", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
 	{"inventory_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryPaths }},
+	{"playbooks", "[]", func(m *workspaceModel) attr.Value { return m.Playbooks }},
 	{"oidc_audiences", "{}", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
 	{"ansible_collections", "[]", func(m *workspaceModel) attr.Value { return m.AnsibleCollections }},
 }
@@ -201,6 +281,26 @@ func ansibleCollectionsForRequest(l types.List) []terrapod.AnsibleCollection {
 			entry.Version = v
 		}
 		out = append(out, entry)
+	}
+	return out
+}
+
+// playbooksForRequest converts the planned allow-list to the SDK shape, or nil
+// when the practitioner left the attribute out entirely (#2527).
+//
+// Same nil-versus-empty rule as inventory_paths and the collections above, and
+// here it carries the whole of the feature's opt-out: nil omits the key and
+// leaves the stored list alone, a non-nil `[]` clears it and restores the open
+// state in which any playbook may run. Stored byte for byte — no trimming, no
+// de-duplication, no sort — because the server returns this list verbatim and
+// state has to equal what was planned.
+func playbooksForRequest(l types.List) []string {
+	if l.IsNull() || l.IsUnknown() {
+		return nil
+	}
+	out := make([]string, 0, len(l.Elements()))
+	for _, v := range l.Elements() {
+		out = append(out, v.(types.String).ValueString())
 	}
 	return out
 }
@@ -863,11 +963,30 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"playbooks": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "The playbooks a configure run on this workspace may name, " +
+					"each relative to `config_directory`. An **allow-list**: the server " +
+					"refuses a run whose playbook is outside it, and the UI offers these " +
+					"as a select rather than a text box. The EMPTY list is the open " +
+					"state — any playbook is allowed — so the attribute is opt-in and " +
+					"every workspace that does not set it is unaffected. A non-empty " +
+					"list must contain `default_playbook`, because a bare Configure runs " +
+					"the default. Omitting this attribute leaves any existing " +
+					"server-side value untouched — it does not clear it; set " +
+					"`playbooks = []` to clear.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"default_playbook": schema.StringAttribute{
 				Description: "The playbook a configure run executes unless the run names " +
 					"another, the way `vcs_ref` overrides `vcs_branch` on a run. Relative " +
 					"to `config_directory`. Empty means the workspace has no default and " +
-					"every configure run must name its playbook.",
+					"every configure run must name its playbook. When `playbooks` is " +
+					"non-empty this must be one of its entries.",
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
@@ -1617,6 +1736,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
 		req.AnsibleCollections = c
 	}
+	if pb := playbooksForRequest(m.Playbooks); pb != nil {
+		req.Playbooks = pb
+	}
 	// An ordinary path now (#1966): a plain string on the request, like
 	// `working_directory` below. An unknown -- which is what an omitted
 	// Optional+Computed attribute plans as on a create -- is left off the
@@ -1893,6 +2015,9 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
 		req.AnsibleCollections = c
+	}
+	if pb := playbooksForRequest(m.Playbooks); pb != nil {
+		req.Playbooks = pb
 	}
 	// Still a POINTER on the update request, where create takes a plain
 	// string: that is what lets `&""` travel as an explicit "" and move the
@@ -2372,6 +2497,18 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		ipVal, ipDiag := types.ListValueFrom(ctx, types.StringType, ws.InventoryPaths)
 		diags.Append(ipDiag...)
 		m.InventoryPaths = ipVal
+	}
+	// The playbook allow-list (#2527) -- same null-versus-empty rule. The
+	// order carries no meaning here, unlike inventory_paths, but it is still
+	// read back exactly as sent: re-ordering what the practitioner wrote is
+	// "Provider produced inconsistent result after apply" however harmless
+	// the new order would be at run time.
+	if m.Playbooks.IsNull() && len(ws.Playbooks) == 0 {
+		m.Playbooks = types.ListNull(types.StringType)
+	} else {
+		pbVal, pbDiag := types.ListValueFrom(ctx, types.StringType, ws.Playbooks)
+		diags.Append(pbDiag...)
+		m.Playbooks = pbVal
 	}
 	if m.AnsibleCollections.IsNull() && len(ws.AnsibleCollections) == 0 {
 		m.AnsibleCollections = types.ListNull(ansibleCollectionObjType)

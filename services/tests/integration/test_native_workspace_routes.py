@@ -105,6 +105,15 @@ class TestTheNativeSurfaceServesEveryEngine:
             "alone and already uses `operations` for TFE's own execution-mode "
             "boolean (#1966)"
         ),
+        # The playbook allow-list (#2527). Native-only for the same reason as
+        # the Ansible roots above: no invocation of `terraform`, `tofu` or
+        # `tfci` reads it, so it is not on `docs/tfe-cli-surface.md` and has no
+        # business on the frozen surface. It bounds a CONFIGURE, which is not a
+        # concept that surface has at all.
+        "playbooks": (
+            "the per-workspace playbook allow-list; it bounds a configure, which "
+            "`/api/tfe/v2` has no concept of, and no CLI invocation reads it (#2527)"
+        ),
         # Which of the two operations gets the prominent button (#2479).
         "default-run-kind": (
             "which run kind is primary is a Terrapod UI concept: `terraform` and "

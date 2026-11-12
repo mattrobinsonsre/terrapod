@@ -1302,7 +1302,9 @@
       "applyChanges": "Zastosuj zmiany",
       "setOidcAudiences": "Ustaw audience OIDC tożsamości uruchomienia (zastępuje mapę na każdym dopasowanym obszarze roboczym)",
       "operationsNone": "To pozostawiłoby każdą dopasowaną przestrzeń robocza w ogóle bez operacji. Przestrzeń robocza musi zachować planowanie i stosowanie, konfigurację albo oba.",
-      "setHardLimit": "Ustaw sztywny limit (pusta wartość usuwa pułap)"
+      "setHardLimit": "Ustaw sztywny limit (pusta wartość usuwa pułap)",
+      "setPlaybooks": "Ustaw dozwolone playbooki (zastępuje listę w każdym dopasowanym obszarze roboczym; pusta lista usuwa ograniczenie)",
+      "playbooksPairWarning": "Niepusta lista musi zawierać własny domyślny playbook każdego dopasowanego obszaru roboczego, więc ustaw go w tej samej aktualizacji, jeśli nie jest już jednym z tych wpisów."
     },
     "diff": {
       "colWorkspace": "Obszar roboczy",
@@ -2310,7 +2312,8 @@
       "runOptions": "Opcje przebiegu",
       "agentPool": "Pula agentów",
       "agentPoolCandidates": "{count, plural, one {# pula kandydatów} few {# pule kandydatów} other {# pul kandydatów}}",
-      "autoApplyHeld": "wstrzymano"
+      "autoApplyHeld": "wstrzymano",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Oś czasu",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Która akcja otrzymuje w tym obszarze roboczym wyróżniony przycisk. Automatycznie proponuje najpełniejszy przebieg, jaki jest możliwy — zwykle słusznie, a niesłusznie tam, gdzie codzienną akcją nie jest ta największa: obszar roboczy, którego część Terraform tylko utrzymuje inwentarz Ansible, w którym stosowanie przebiega bez nadzoru i po którym nigdy nie następuje konfiguracja, chce tu mieć Konfiguruj. Wybór, którego ten obszar roboczy nie może zaoferować, zostaje odrzucony przy zapisie, a ten, którego nie może uruchomić Twoja rola, wraca dla Ciebie do Automatycznie.",
       "configureParallelism": "Równoległość konfiguracji",
       "configureParallelismTitle": "Ile hostów konfiguracja obsługuje jednocześnie — forks w ansible (1-256). Pozostaw puste, aby odziedziczyć Równoległość. Osobne ustawienie, ponieważ rozmiar środowiska wykonawczego ustala się niezależnie od orkiestratora.",
-      "configureParallelismLead": "Ile hostów konfiguracja obsługuje jednocześnie — forks w ansible (1-256). Pozostaw puste, aby odziedziczyć Równoległość."
+      "configureParallelismLead": "Ile hostów konfiguracja obsługuje jednocześnie — forks w ansible (1-256). Pozostaw puste, aby odziedziczyć Równoległość.",
+      "playbooks": "Dozwolone playbooki",
+      "playbooksLead": "Playbooki, które może tutaj uruchomić konfiguracja. Pozostaw puste i można wskazać dowolny playbook — tak jest domyślnie; dodaj wpisy i uruchomienie wskazujące cokolwiek innego zostanie odrzucone.",
+      "playbooksTitle": "Każdy wpis to ścieżka względem katalogu konfiguracji, a opcja uruchomienia zmienia się z pola tekstowego w listę wyboru spośród nich. Domyślny playbook musi być jednym z wpisów, ponieważ samo kliknięcie Konfiguruj uruchamia właśnie domyślny. Użyj tego, aby nie dopuścić playbooka do obszaru roboczego, którego nigdy nie powinien dotykać — wycofanie węzła z obsługi, aktualizacja bazy danych — gdzie lista jest mechanizmem kontroli, a nie konwencją.",
+      "playbooksPlaceholder": "np. release.yml",
+      "playbooksAdd": "Dodaj playbook",
+      "playbooksAny": "Dowolny"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Pełne uruchomienie",
       "queueFullRunConfirm": "Plan, apply I konfiguracja tej przestrzeni roboczej? Konfiguracja zmienia prawdziwe hosty po tym, jak apply zmieni prawdziwą infrastrukturę, i nie ma między nimi osobnego przeglądu.",
       "moreRunKinds": "Inne rodzaje uruchomienia",
-      "openExplainingPhase": "otwórz dziennik etapu, który to wyjaśnia"
+      "openExplainingPhase": "otwórz dziennik etapu, który to wyjaśnia",
+      "configurePlaybookDefaultSuffix": "(domyślny)",
+      "playbookIsDefault": "Domyślny playbook obszaru roboczego"
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

@@ -1302,7 +1302,9 @@
       "applyChanges": "Apply chaenges",
       "setOidcAudiences": "Set OIDC run identitee audiencez (replacez teh map on every matchd workspace)",
       "operationsNone": "Dis wud leev evry matchd werkspace wif no opurashun at all. A werkspace must keep plan an apply, or konfigur, or bof.",
-      "setHardLimit": "Set hard limit (a empteh valoo remooves teh ceilin)"
+      "setHardLimit": "Set hard limit (a empteh valoo remooves teh ceilin)",
+      "setPlaybooks": "Set allowd playbookz (replacez teh list on every matchd werkspace; a empteh list takez teh limitz off)",
+      "playbooksPairWarning": "A list wot aint empteh gotta contain each matchd werkspace's own defawlt playbook, so set dat in teh same updayt if it aint alreddy wun ov deez. srsly"
     },
     "diff": {
       "colWorkspace": "Werkspace",
@@ -2310,7 +2312,8 @@
       "runOptions": "Run Opshuns",
       "agentPool": "Agent Poolz",
       "agentPoolCandidates": "{count, plural, one {# candidat poolz} other {# candidat poolz}}",
-      "autoApplyHeld": "holdin"
+      "autoApplyHeld": "holdin",
+      "playbook": "Playbuk"
     },
     "timeline": {
       "heading": "Timeline",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Wich akshun getz teh loud buttun on dis workspace. Automatik offerz teh mostest complete run it can — usually rite, an rong wen teh evryday akshun aint teh biggest wun: a workspace wot haz a Terraform half wot only lookz after teh Ansibul inventoree, doin applyz all by itself an nevr konfigurin after a do-it, wantz Konfigur heer. A choyce dis workspace cant offur, we sez NO to it wen u savez it; an wun ur role cant run fallz bak 2 Automatik fer u. srsly",
       "configureParallelism": "Konfigur Parallelizm",
       "configureParallelismTitle": "How many hostz wun konfigur drivez at teh same tiem — ansibul forkz (1-256). Leev it empty an it takez Parallelizm. Separate coz teh execushun enviroment getz sized apart frum teh orkestraytor. srsly",
-      "configureParallelismLead": "How many hostz wun konfigur drivez at teh same tiem — ansibul forkz (1-256). Leev it empty an it takez Parallelizm."
+      "configureParallelismLead": "How many hostz wun konfigur drivez at teh same tiem — ansibul forkz (1-256). Leev it empty an it takez Parallelizm.",
+      "playbooks": "Allowd Playbookz",
+      "playbooksLead": "Teh playbookz wot a konfigur heer can run. Leev it empteh an enny playbook can be namd, wot iz teh defawlt; add sum entreez an a run wot namez anyfing els getz refusd. kthx",
+      "playbooksTitle": "Each entree iz a path relativ ta teh konfig direktoree, an teh run opshun turnz intoo a pickr ovr dem insted ov a text box. Teh defawlt playbook gotta be wun ov teh entreez, becuz a bare Konfigur runz teh defawlt. Use it ta keep a playbook away frum a werkspace it must nevr touch — a node drain, a databayse upgrade — wher a list iz a kontrol an not jus a habbit. srsly",
+      "playbooksPlaceholder": "liek release.yml",
+      "playbooksAdd": "Add playbuk",
+      "playbooksAny": "Enny"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "DO ALL TEH THINGS",
       "queueFullRunConfirm": "Plan, do it AN konfigur dis workspace? Teh konfigur touchez real kittehs after teh do-it touchez real infrastruktur, an no checkin in between. srsly?",
       "moreRunKinds": "Uvver run kindz",
-      "openExplainingPhase": "OPEN TEH LOG OV DA PART WOT SPLAINS IT"
+      "openExplainingPhase": "OPEN TEH LOG OV DA PART WOT SPLAINS IT",
+      "configurePlaybookDefaultSuffix": "(defawlt)",
+      "playbookIsDefault": "Teh werkspace's defawlt playbook"
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",

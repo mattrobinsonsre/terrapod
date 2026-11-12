@@ -1302,7 +1302,9 @@
       "applyChanges": "Anvend ændringer",
       "setOidcAudiences": "Angiv OIDC-audiences for kørselsidentitet (erstatter mappet på hvert matchet arbejdsområde)",
       "operationsNone": "Dette ville efterlade hvert matchende arbejdsområde helt uden handling. Et arbejdsområde skal beholde planlæg og anvend, eller konfigurer, eller begge.",
-      "setHardLimit": "Sæt hård grænse (en tom værdi fjerner loftet)"
+      "setHardLimit": "Sæt hård grænse (en tom værdi fjerner loftet)",
+      "setPlaybooks": "Sæt tilladte playbooks (erstatter listen på hvert matchet arbejdsområde; en tom liste fjerner begrænsningen)",
+      "playbooksPairWarning": "En ikke-tom liste skal indeholde hvert matchet arbejdsområdes egen standard-playbook, så sæt den i samme opdatering, hvis den ikke allerede er en af disse."
     },
     "diff": {
       "colWorkspace": "Arbejdsområde",
@@ -2310,7 +2312,8 @@
       "runOptions": "Kørselsindstillinger",
       "agentPool": "Agentpulje",
       "agentPoolCandidates": "{count, plural, one {# kandidatpulje} other {# kandidatpuljer}}",
-      "autoApplyHeld": "afventer"
+      "autoApplyHeld": "afventer",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Tidslinje",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Hvilken handling der får den fremhævede knap i dette arbejdsområde. Automatisk tilbyder den mest komplette kørsel, der er mulig — oftest rigtigt, og forkert hvor den daglige handling ikke er den største: et arbejdsområde, hvis Terraform-halvdel kun vedligeholder Ansible-inventaret, anvender uden opsyn og aldrig konfigurerer efter en anvendelse, vil have Konfigurer her. Et valg, som dette arbejdsområde ikke kan tilbyde, afvises, når du gemmer det, og et valg, som din rolle ikke må køre, falder tilbage til Automatisk for dig.",
       "configureParallelism": "Konfigurationsparallelitet",
       "configureParallelismTitle": "Hvor mange værter en konfiguration driver samtidigt — ansibles forks (1-256). Lad feltet være tomt for at nedarve Parallelitet. Det er adskilt, fordi eksekveringsmiljøet dimensioneres uafhængigt af orkestratoren.",
-      "configureParallelismLead": "Hvor mange værter en konfiguration driver samtidigt — ansibles forks (1-256). Lad feltet være tomt for at nedarve Parallelitet."
+      "configureParallelismLead": "Hvor mange værter en konfiguration driver samtidigt — ansibles forks (1-256). Lad feltet være tomt for at nedarve Parallelitet.",
+      "playbooks": "Tilladte playbooks",
+      "playbooksLead": "De playbooks, en konfigurationshandling her må køre. Lad feltet være tomt, så kan enhver playbook nævnes, hvilket er standarden; tilføj poster, og en kørsel, der nævner noget andet, afvises.",
+      "playbooksTitle": "Hver post er en sti relativt til konfigurationsmappen, og kørselsindstillingen bliver en vælger over dem i stedet for et tekstfelt. Standard-playbooken skal være en af posterne, fordi et blankt Konfigurer kører standarden. Brug det til at holde en playbook væk fra et arbejdsområde, den aldrig må røre — en nodedræning, en databaseopgradering — hvor en liste er en kontrol frem for en konvention.",
+      "playbooksPlaceholder": "f.eks. release.yml",
+      "playbooksAdd": "Tilføj playbook",
+      "playbooksAny": "Enhver"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Fuld kørsel",
       "queueFullRunConfirm": "Plan, apply OG konfigurer dette arbejdsområde? Konfigurationen ændrer rigtige værter efter at apply har ændret rigtig infrastruktur, og der er ingen separat gennemgang imellem.",
       "moreRunKinds": "Andre kørselstyper",
-      "openExplainingPhase": "åbn loggen for den fase, der forklarer det"
+      "openExplainingPhase": "åbn loggen for den fase, der forklarer det",
+      "configurePlaybookDefaultSuffix": "(standard)",
+      "playbookIsDefault": "Arbejdsområdets standard-playbook"
     },
     "state": {
       "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",

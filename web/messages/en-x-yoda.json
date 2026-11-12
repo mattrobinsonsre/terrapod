@@ -1302,7 +1302,9 @@
       "applyChanges": "changes, Apply",
       "setOidcAudiences": "audiences, Set OIDC run identity (on every matched workspace, the map replaces)",
       "operationsNone": "With no operation at all, every matched workspace this would leave. Plan and apply, or configure, or both, a workspace must keep.",
-      "setHardLimit": "hard limit, Set (the ceiling, an empty value removes)"
+      "setHardLimit": "hard limit, Set (the ceiling, an empty value removes)",
+      "setPlaybooks": "allowed playbooks, Set (on every matched workspace, the list replaces; the restriction, an empty list removes)",
+      "playbooksPairWarning": "Each matched workspace's own default playbook, a non-empty list has to contain, so in the same update set that, if already one of these it is not."
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2310,7 +2312,8 @@
       "runOptions": "Options, Run",
       "agentPool": "Agent pool",
       "agentPoolCandidates": "{count, plural, one {# candidate pool, there is} other {# candidate pools, there are}}",
-      "autoApplyHeld": "held"
+      "autoApplyHeld": "held",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Timeline",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "The loud button on this workspace, which action gets it. The most complete run it can, Automatic offers — usually right, and wrong where the biggest one the everyday action is not: a workspace whose Terraform half only the Ansible inventory maintains, applying unattended and after an apply never configuring, Configure here it wants. A choice this workspace cannot offer, refused it is when you save it; and one your role cannot run, back to Automatic for you it falls.",
       "configureParallelism": "parallelism, Configure",
       "configureParallelismTitle": "Drive at once, how many hosts a configure does — ansible''s forks (1-256). Empty leave it, and Parallelism inherit it will. Separate it is, because sized separately from the orchestrator, the execution environment is.",
-      "configureParallelismLead": "Drive at once, how many hosts a configure does — ansible''s forks (1-256). Empty leave it, and Parallelism inherit it will."
+      "configureParallelismLead": "Drive at once, how many hosts a configure does — ansible''s forks (1-256). Empty leave it, and Parallelism inherit it will.",
+      "playbooks": "playbooks, Allowed",
+      "playbooksLead": "Run here, the playbooks a configure may. Empty leave it, and named any playbook may be — the default, that is; add entries, and refused a run naming anything else is.",
+      "playbooksTitle": "Relative to the config directory, a path each entry is, and instead of a text box, a picker over them the run option becomes. One of the entries the default playbook has to be, because the default a bare Configure runs. To keep a playbook away from a workspace it must never touch — a node drain, a database upgrade — use it, where a control a list is rather than a convention.",
+      "playbooksPlaceholder": "e.g. release.yml",
+      "playbooksAdd": "playbook, Add",
+      "playbooksAny": "Any, there may be"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Everything, run",
       "queueFullRunConfirm": "Plan, apply and configure this workspace, you would? Real hosts the configure changes, after real infrastructure the apply changes — and between them, separate review there is none.",
       "moreRunKinds": "Kinds of run, other",
-      "openExplainingPhase": "the log of the phase that explains it, open"
+      "openExplainingPhase": "the log of the phase that explains it, open",
+      "configurePlaybookDefaultSuffix": "(default)",
+      "playbookIsDefault": "The workspace's default playbook, this is"
     },
     "state": {
       "deleteConfirm": "State version #{serial}, delete? Undone, this cannot be.",

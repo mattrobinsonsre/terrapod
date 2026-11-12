@@ -1302,7 +1302,9 @@
       "applyChanges": "Anvend endringer",
       "setOidcAudiences": "Sett OIDC-audiences for kjøringsidentitet (erstatter kartet på hvert samsvarende arbeidsområde)",
       "operationsNone": "Dette ville etterlate hvert samsvarende arbeidsområde helt uten operasjon. Et arbeidsområde må beholde planlegg og anvend, eller konfigurer, eller begge.",
-      "setHardLimit": "Sett hard grense (en tom verdi fjerner taket)"
+      "setHardLimit": "Sett hard grense (en tom verdi fjerner taket)",
+      "setPlaybooks": "Sett tillatte playbooks (erstatter listen på hvert samsvarende arbeidsområde; en tom liste fjerner begrensningen)",
+      "playbooksPairWarning": "En ikke-tom liste må inneholde hvert samsvarende arbeidsområdes egen standard-playbook, så sett den i samme oppdatering hvis den ikke allerede er en av disse."
     },
     "diff": {
       "colWorkspace": "Arbeidsområde",
@@ -2310,7 +2312,8 @@
       "runOptions": "Kjøringsalternativer",
       "agentPool": "Agentgruppe",
       "agentPoolCandidates": "{count, plural, one {# kandidatgruppe} other {# kandidatgrupper}}",
-      "autoApplyHeld": "venter"
+      "autoApplyHeld": "venter",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Tidslinje",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Hvilken handling som får den fremhevede knappen i dette arbeidsområdet. Automatisk tilbyr den mest komplette kjøringen som er mulig — oftest riktig, og galt der den daglige handlingen ikke er den største: et arbeidsområde der Terraform-halvdelen bare vedlikeholder Ansible-inventaret, anvender uten tilsyn og aldri konfigurerer etter en anvendelse, vil ha Konfigurer her. Et valg som dette arbeidsområdet ikke kan tilby, avvises når du lagrer det, og et valg som rollen din ikke kan kjøre, faller tilbake til Automatisk for deg.",
       "configureParallelism": "Konfigurasjonsparallellitet",
       "configureParallelismTitle": "Hvor mange verter en konfigurasjon driver samtidig — ansibles forks (1-256). La feltet stå tomt for å arve Parallellitet. Det er atskilt fordi kjøremiljøet dimensjoneres uavhengig av orkestratoren.",
-      "configureParallelismLead": "Hvor mange verter en konfigurasjon driver samtidig — ansibles forks (1-256). La feltet stå tomt for å arve Parallellitet."
+      "configureParallelismLead": "Hvor mange verter en konfigurasjon driver samtidig — ansibles forks (1-256). La feltet stå tomt for å arve Parallellitet.",
+      "playbooks": "Tillatte playbooks",
+      "playbooksLead": "Playbookene en konfigurasjonsoperasjon her har lov til å kjøre. La det stå tomt, og hvilken som helst playbook kan navngis, som er standarden; legg til oppføringer, og en kjøring som navngir noe annet, avvises.",
+      "playbooksTitle": "Hver oppføring er en sti relativt til konfigurasjonsmappen, og kjøringsalternativet blir en velger over dem i stedet for et tekstfelt. Standard-playbooken må være en av oppføringene, fordi et bart Konfigurer kjører standarden. Bruk det til å holde en playbook borte fra et arbeidsområde den aldri skal berøre — en nodedrenering, en databaseoppgradering — der en liste er en kontroll snarere enn en konvensjon.",
+      "playbooksPlaceholder": "f.eks. release.yml",
+      "playbooksAdd": "Legg til playbook",
+      "playbooksAny": "Alle"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Full kjøring",
       "queueFullRunConfirm": "Plan, apply OG konfigurer dette arbeidsområdet? Konfigurasjonen endrer ekte verter etter at apply har endret ekte infrastruktur, og det er ingen separat gjennomgang imellom.",
       "moreRunKinds": "Andre kjøretyper",
-      "openExplainingPhase": "åpne loggen for fasen som forklarer det"
+      "openExplainingPhase": "åpne loggen for fasen som forklarer det",
+      "configurePlaybookDefaultSuffix": "(standard)",
+      "playbookIsDefault": "Arbeidsområdets standard-playbook"
     },
     "state": {
       "deleteConfirm": "Slett tilstandsversjon #{serial}? Dette kan ikke angres.",

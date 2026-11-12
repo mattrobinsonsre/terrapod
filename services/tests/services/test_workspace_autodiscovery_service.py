@@ -558,6 +558,13 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "config_directory",
         "inventory_paths",
         "default_playbook",
+        # And the allow-list that bounds what a configure on those workspaces
+        # may name (#2527). A rule creating dozens of Ansible workspaces out of
+        # one repository is exactly where a list is worth writing once rather
+        # than on each workspace afterwards -- and, like the ceiling below,
+        # adding it afterwards leaves a window in which every discovered
+        # workspace has none.
+        "playbooks",
         "default_limit",
         # And the ceiling those defaults sit under (#2451). A rule materialises
         # workspaces in bulk with nobody looking at each one, so the ceiling is

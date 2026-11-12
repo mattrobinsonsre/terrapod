@@ -119,6 +119,8 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "config-directory": rule.config_directory,
             "inventory-paths": list(rule.inventory_paths or []),
             "default-playbook": rule.default_playbook,
+            # Templated onto every workspace this rule materialises (#2527).
+            "playbooks": list(rule.playbooks or []),
             "default-limit": rule.default_limit,
             "hard-limit": rule.hard_limit,
             "resource-memory": rule.resource_memory,
@@ -435,6 +437,19 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
     ):
         if _key in attrs:
             out[_col] = str(attrs[_key] or "")
+    # The allow-list takes the SHARED rule for the same reason as the ceiling
+    # below (#2527): the loose list coercion above would strip and drop entries,
+    # and a template that silently stores something other than what was written
+    # stamps it on every workspace the rule materialises. Only the FORMAT is
+    # judged here -- the cross-field half is "the default must be in the list",
+    # which `_reject_a_playbook_list_without_its_default` does for a fleet and
+    # the workspace write does for one, and a RULE is neither: it is a template
+    # whose workspaces are checked when they are written.
+    if "playbooks" in attrs:
+        try:
+            out["playbooks"] = workspace_settings.validate_playbooks(attrs["playbooks"])
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     # The ceiling takes the SHARED rule, not the loose coercion above (#2451):
     # it is a single pattern term, and `str(... or "")` would accept a
     # multi-term one and stamp it on every workspace the rule materialises.
@@ -922,6 +937,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         config_directory=fields.get("config_directory", ""),
         inventory_paths=fields.get("inventory_paths", []),
         default_playbook=fields.get("default_playbook", ""),
+        playbooks=fields.get("playbooks", []),
         default_limit=fields.get("default_limit", ""),
         hard_limit=fields.get("hard_limit", ""),
         resource_memory=fields.get("resource_memory", "2Gi"),

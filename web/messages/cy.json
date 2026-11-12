@@ -1302,7 +1302,9 @@
       "applyChanges": "Gweithredu newidiadau",
       "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad OIDC (yn amnewid y map ar bob gweithfan gyfatebol)",
       "operationsNone": "Byddai hyn yn gadael pob gweithle cyfatebol heb unrhyw weithrediad o gwbl. Rhaid i weithle gadw cynllunio a gweithredu, neu gyflunio, neu'r ddau.",
-      "setHardLimit": "Gosod y terfyn caled (mae gwerth gwag yn tynnu''r terfyn uchaf)"
+      "setHardLimit": "Gosod y terfyn caled (mae gwerth gwag yn tynnu''r terfyn uchaf)",
+      "setPlaybooks": "Gosod y llyfrau chwarae a ganiateir (yn disodli'r rhestr ar bob gweithle sy'n cyfateb; mae rhestr wag yn tynnu'r cyfyngiad)",
+      "playbooksPairWarning": "Mae'n rhaid i restr nad yw'n wag gynnwys llyfr chwarae rhagosodedig pob gweithle sy'n cyfateb, felly gosodwch hwnnw yn yr un diweddariad os nad yw'n un o'r rhain eisoes."
     },
     "diff": {
       "colWorkspace": "Gweithfan",
@@ -2310,7 +2312,8 @@
       "runOptions": "Opsiynau Rhediad",
       "agentPool": "Pwll asiant",
       "agentPoolCandidates": "{count, plural, one {# pwll ymgeisydd} other {# pyllau ymgeisydd}}",
-      "autoApplyHeld": "dal"
+      "autoApplyHeld": "dal",
+      "playbook": "Llyfr chwarae"
     },
     "timeline": {
       "heading": "Llinell Amser",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Pa weithred sy''n cael y botwm amlwg ar y weithfan hon. Mae Awtomatig yn cynnig y rhediad mwyaf cyflawn y gall — yn gywir fel arfer, ac yn anghywir lle nad y weithred fwyaf yw''r un feunyddiol: ar weithfan nad yw ei hanner Terraform yn gwneud dim ond cynnal y rhestr eiddo Ansible, sy''n gweithredu heb oruchwyliaeth ac nad yw byth yn cyflunio ar ôl gweithredu, Cyflunio sydd eisiau yma. Caiff dewis na all y weithfan hon ei gynnig ei wrthod pan fyddwch yn ei gadw, ac mae un na all eich rôl ei redeg yn dychwelyd i Awtomatig ar eich cyfer.",
       "configureParallelism": "Cyfochredd cyflunio",
       "configureParallelismTitle": "Sawl gwesteiwr y mae cyflunio yn eu gyrru ar yr un pryd — forks ansible (1-256). Gadewch yn wag i etifeddu Cyfochredd. Ar wahân am fod yr amgylchedd gweithredu yn cael ei faintioli ar wahân i''r cydlynydd.",
-      "configureParallelismLead": "Sawl gwesteiwr y mae cyflunio yn eu gyrru ar yr un pryd — forks ansible (1-256). Gadewch yn wag i etifeddu Cyfochredd."
+      "configureParallelismLead": "Sawl gwesteiwr y mae cyflunio yn eu gyrru ar yr un pryd — forks ansible (1-256). Gadewch yn wag i etifeddu Cyfochredd.",
+      "playbooks": "Llyfrau chwarae a ganiateir",
+      "playbooksLead": "Y llyfrau chwarae y caiff gweithrediad cyflunio yma eu rhedeg. Gadewch hwn yn wag a chaniateir enwi unrhyw lyfr chwarae, sy'n rhagosodedig; ychwanegwch eitemau ac fe wrthodir rhediad sy'n enwi unrhyw beth arall.",
+      "playbooksTitle": "Mae pob eitem yn llwybr yn gymharol i'r cyfeiriadur cyfluniad, ac mae opsiwn y rhediad yn dod yn ddewisydd drostynt yn lle blwch testun. Mae'n rhaid i'r llyfr chwarae rhagosodedig fod yn un o'r eitemau, am fod Cyflunio moel yn rhedeg y rhagosodiad. Defnyddiwch hwn i gadw llyfr chwarae i ffwrdd o weithle na ddylai byth ei gyffwrdd — draenio nod, uwchraddio cronfa ddata — lle mae rhestr yn gyfrwng rheoli yn hytrach nag yn gonfensiwn.",
+      "playbooksPlaceholder": "e.e. release.yml",
+      "playbooksAdd": "Ychwanegu llyfr chwarae",
+      "playbooksAny": "Unrhyw un"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Rhediad Llawn",
       "queueFullRunConfirm": "Cynllunio, gweithredu A chyflunio’r gweithle hwn? Mae’r cyflunio yn newid gwesteiwyr go iawn ar ôl i’r gweithredu newid seilwaith go iawn, ac nid oes adolygiad ar wahân rhyngddynt.",
       "moreRunKinds": "Mathau rhediad eraill",
-      "openExplainingPhase": "agor log y cyfnod sy’n ei esbonio"
+      "openExplainingPhase": "agor log y cyfnod sy’n ei esbonio",
+      "configurePlaybookDefaultSuffix": "(rhagosodedig)",
+      "playbookIsDefault": "Llyfr chwarae rhagosodedig y gweithle"
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

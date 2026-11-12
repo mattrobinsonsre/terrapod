@@ -482,6 +482,19 @@ def _run_json(
                 # git-driven configure runs.
                 "is-configure": run.is_configure,
                 "configure-after-apply": run.configure_after_apply,
+                # What kind of run this IS, in one word (#2507, #2509):
+                # `configure`, `full` (a composite) or `plan_apply`. Derived
+                # from the two flags above rather than stored, so there is no
+                # column and nothing to keep in step with them.
+                #
+                # Emitted because three surfaces were each deriving it, and the
+                # run list derived it wrongly -- a configure-only run is
+                # neither a destroy nor plan-only, so it fell through to the
+                # default branch and was badged "plan + apply" AND "configure"
+                # at once. The vocabulary is the workspace's own
+                # `RUN_KIND_REQUIREMENTS`; `run_service.run_kind` says why
+                # `plan` is not one of the values a run reports.
+                "run-kind": run_service.run_kind(run),
                 "playbook": run.playbook or "",
                 "limit": run.ansible_limit or "",
                 "refresh-only": run.refresh_only,
@@ -1217,6 +1230,7 @@ async def create_run(
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,
+        workspace_settings.PlaybookNotAllowed,
         run_service.PlanOnlyConfigureConflict,
         run_service.ConfigureOptionConflict,
         run_service.SpeculativeConfigureRefused,
@@ -1908,6 +1922,7 @@ async def retry_run(
     except (
         run_service.PlanApplyNotEnabled,
         workspace_settings.ConfigureNotEnabled,
+        workspace_settings.PlaybookNotAllowed,
         run_service.PlanOnlyConfigureConflict,
         run_service.ConfigureOptionConflict,
         run_service.SpeculativeConfigureRefused,

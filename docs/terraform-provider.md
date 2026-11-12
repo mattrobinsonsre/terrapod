@@ -514,6 +514,46 @@ The refusal is evaluated against the row the write would produce, not against
 what the configuration sends, so turning `plan_apply_enabled` off is accepted on
 a workspace that has `configure_enabled` set and refused on one that does not.
 
+### `playbooks`
+
+The playbooks a configure on this workspace may name — an allow-list over the
+`playbook` run option, each entry relative to `config_directory`:
+
+```hcl
+resource "terrapod_workspace" "example" {
+  configure_enabled = true
+  config_directory  = "ansible"
+
+  default_playbook = "release.yml"
+  playbooks        = ["release.yml", "restart.yml", "backup.yml"]
+}
+```
+
+**An unset or empty list is no restriction.** That is the default and what
+every workspace has until somebody narrows it, so adding this attribute is
+opt-in and omitting it changes nothing.
+
+**`default_playbook` must be one of `playbooks`, and the provider refuses the
+pair at PLAN time** — `terraform plan` fails before anything changes, rather
+than the apply failing against the API's 422. A list set with
+`default_playbook` unset or empty is refused the same way, because a bare
+Configure would then have no playbook to run. Both errors name the offending
+value and list what is allowed.
+
+If either value is **unknown** at plan time — an interpolation that has not
+resolved — the check is skipped and the API's 422 enforces the same rule. An
+unknown is not a null: a null is a decision the configuration made and is
+checked.
+
+Omitting the attribute leaves the stored list untouched; set `playbooks = []`
+to clear it, which removes the restriction. It is also a template field on
+`terrapod_autodiscovery_rule`, stamped onto every workspace the rule
+materialises — the rule carries no cross-field check of its own, because the
+workspaces it writes are checked when they are written.
+
+See [`playbooks` bounds what a run may name](ansible-configure.md#playbooks-bounds-what-a-run-may-name)
+for what the list does at run time.
+
 ### `default_run_kind`
 
 A workspace with both operations can start four kinds of run, and the UI gives

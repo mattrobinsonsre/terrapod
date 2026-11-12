@@ -2305,6 +2305,16 @@
             "boolean"
           ]
         },
+        "playbooks": {
+          "description": "the playbooks a configure on this workspace may name -- an ALLOW-LIST over the playbook run option, each entry relative to config_directory. An EMPTY OR OMITTED list means NO RESTRICTION, which is what every workspace has today, so this is opt-in and setting it is what narrows the workspace. With a list set the API refuses a configure naming anything outside it (422, listing what is allowed), and default_playbook MUST be one of the entries -- a bare configure runs the default, so a default outside the list would leave the workspace unable to run its own button. Entries are stored exactly as written: nothing is trimmed or de-duplicated, and a duplicate is refused. At most 50",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
         "pulumi_bind_plan": {
           "description": "Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; setting it true is rejected on any other engine",
           "type": [
@@ -2685,6 +2695,16 @@
           "type": [
             "null",
             "integer"
+          ]
+        },
+        "playbooks": {
+          "description": "the playbooks a configure on this workspace may name -- an ALLOW-LIST over the playbook run option, each entry relative to config_directory. An EMPTY OR OMITTED list means NO RESTRICTION, which is what every workspace has today, so this is opt-in and setting it is what narrows the workspace. With a list set the API refuses a configure naming anything outside it (422, listing what is allowed), and default_playbook MUST be one of the entries -- a bare configure runs the default, so a default outside the list would leave the workspace unable to run its own button. Entries are stored exactly as written: nothing is trimmed or de-duplicated, and a duplicate is refused. At most 50. Omitting the field leaves the stored list alone; pass an empty list to clear it, which removes the restriction",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
           ]
         },
         "pulumi_bind_plan": {

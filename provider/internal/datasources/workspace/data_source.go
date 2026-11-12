@@ -52,6 +52,7 @@ type workspaceDataSourceModel struct {
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
 	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
 	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
+	Playbooks                     types.List   `tfsdk:"playbooks"`
 	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
 	DefaultLimit                  types.String `tfsdk:"default_limit"`
 	HardLimit                     types.String `tfsdk:"hard_limit"`
@@ -161,6 +162,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 					},
 				},
 			},
+			"playbooks":             computedList("The playbooks a configure run on this workspace may name, each relative to `config_directory`. An allow-list: the server refuses a run whose playbook is outside it. Null means no restriction -- any playbook is allowed -- which is the state of every workspace that has not set one."),
 			"default_playbook":      computedString("The playbook a configure run executes unless the run names another. Null when the workspace declares no default."),
 			"default_limit":         computedString("The default `--limit` for a configure run. Null means the whole inventory."),
 			"hard_limit":            computedString("A `--limit` no run may escape. Null means no ceiling. Unlike `default_limit`, which a run REPLACES when it supplies its own, this is intersected with whatever limit the run ends up with -- so a run may narrow within it and none may widen past it."),
@@ -482,6 +484,18 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.InventoryPaths = val
 	} else {
 		m.InventoryPaths = types.ListNull(types.StringType)
+	}
+
+	// The playbook allow-list (#2527). Empty collapses to null here, the way
+	// every other list on this data source does: there is no prior state on a
+	// read, so null and `[]` cannot be told apart and both mean the open state
+	// in which any playbook may run.
+	if playbooks := terrapod.GetListAttr(res, "playbooks"); len(playbooks) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, playbooks)
+		diags.Append(d...)
+		m.Playbooks = val
+	} else {
+		m.Playbooks = types.ListNull(types.StringType)
 	}
 
 	if varFiles := terrapod.GetListAttr(res, "var-files"); len(varFiles) > 0 {

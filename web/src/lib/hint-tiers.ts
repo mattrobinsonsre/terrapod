@@ -78,6 +78,12 @@ export const HINT_LEADS: Record<string, string> = {
   // which until then an operator learned only from a 422 after being
   // refused.
   'fields.hardLimitTitle': 'fields.hardLimitLead',
+  // The playbook allow-list (#2527). The lead carries what the list DOES and
+  // what leaving it empty means -- the half an operator must not have to hover
+  // for, because empty is the OPEN state and reads as the closed one. The
+  // mechanism (paths relative to the config directory, the run option becoming
+  // a picker, the default having to be a member) goes behind the icon.
+  'fields.playbooksTitle': 'fields.playbooksLead',
   'variables.vaultFileHint': 'variables.vaultFileLead',
   'variables.vaultFileTemplateHint': 'variables.vaultFileTemplateLead',
   'variables.gitSshHint': 'variables.gitSshLead',

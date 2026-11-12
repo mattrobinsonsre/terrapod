@@ -136,6 +136,16 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #2507/#2509/#2527: what the run document says a run IS, read by the run
+      // list and the run page. Its own project because two of its tests assert
+      // an ABSENCE -- a configure-only run must NOT carry the plan+apply badge
+      // -- and a project that seeded other runs first would make either answer
+      // look right.
+      name: 'run-kind',
+      testMatch: 'run-kind.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       // #1974: how a configure STARTS. Its own project because the first test
       // asserts the two trigger controls are ABSENT on a workspace with no
       // configure operation, which every other test here has to enable first.

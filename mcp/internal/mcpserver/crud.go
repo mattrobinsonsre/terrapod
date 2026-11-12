@@ -92,6 +92,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ConfigDirectory      string   `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty or omitted means the configuration version's ROOT, and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so setting this alone turns nothing on, and leaving it empty on a configure-enabled workspace is the ordinary way to say \"at the root\" rather than a missing value. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
 		InventoryPaths       []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source"`
 		DefaultPlaybook      string   `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook"`
+		Playbooks            []string `json:"playbooks,omitempty" jsonschema:"the playbooks a configure on this workspace may name -- an ALLOW-LIST over the playbook run option, each entry relative to config_directory. An EMPTY OR OMITTED list means NO RESTRICTION, which is what every workspace has today, so this is opt-in and setting it is what narrows the workspace. With a list set the API refuses a configure naming anything outside it (422, listing what is allowed), and default_playbook MUST be one of the entries -- a bare configure runs the default, so a default outside the list would leave the workspace unable to run its own button. Entries are stored exactly as written: nothing is trimmed or de-duplicated, and a duplicate is refused. At most 50"`
 		HardLimit            string   `json:"hard_limit,omitempty" jsonschema:"a --limit NO RUN MAY ESCAPE; empty means no ceiling. Distinct from default_limit, which a run replaces outright when it supplies its own -- this one is INTERSECTED with whatever limit the run ends up with, so a run may narrow within it and none may widen past it. It also bounds what the resolved inventory shows for this workspace"`
 		DefaultLimit         string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
 		// Whether a configure verifies the SSH host key of the hosts it
@@ -126,6 +127,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			"For a Pulumi workspace set engine=pulumi, and pulumi_bind_plan to bind its update to the approved preview. " +
 			"A workspace declares which OPERATIONS it has, as two independent booleans: plan_apply_enabled (the terraform/tofu/pulumi lifecycle, default TRUE) and configure_enabled (the ansible configure operation, default FALSE). " +
 			"So an ansible CONFIGURE operation needs configure_enabled=true — config_directory alone does not turn one on; it only says where it runs — plus inventory_paths and the run defaults; there is no separate inventory-settings object, these are workspace settings. " +
+			"playbooks ALLOW-LISTS what a configure may run: leave it out and any playbook may be named, as today; set it and default_playbook has to be one of the entries, because a bare configure runs the default. " +
 			"Both operations off is refused (422). default_run_kind picks which of them gets the prominent button; leave it out and the most complete kind the workspace has is offered first. " +
 			"Returns the created workspace.",
 		Annotations: mutating,
@@ -187,8 +189,13 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			ConfigDirectory: in.ConfigDirectory,
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
-			DefaultLimit:    in.DefaultLimit,
-			HardLimit:       in.HardLimit,
+			// A slice straight through: nil omits the key and leaves the
+			// stored list, a non-nil empty slice clears it -- the SDK's own
+			// `!= nil` convention, the same one InventoryPaths uses, so no
+			// pointer is needed to tell the two apart (#2527).
+			Playbooks:    in.Playbooks,
+			DefaultLimit: in.DefaultLimit,
+			HardLimit:    in.HardLimit,
 			// #2318's one. A pointer straight through, so a create that leaves
 			// it out sends nothing and takes the server's TRUE, which verifies.
 			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,
@@ -246,6 +253,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ConfigDirectory *string  `json:"config_directory,omitempty" jsonschema:"the directory the ansible CONFIGURE operation runs in, relative to the configuration version's root: its fetch scope and the working directory both the inventory resolver and the playbook executor run from. An ordinary path, exactly like working_directory -- empty means the configuration version's ROOT and a subdirectory means rooted there. It does NOT declare whether the workspace HAS a configure operation: configure_enabled does (#1966), so this cannot turn one on or off. On an update, OMITTING it leaves the stored value alone and passing an EMPTY STRING moves the operation to the configuration version's root, which is why this is the one ansible root that still distinguishes unset from empty. Distinct from working_directory, which is the terraform/pulumi root; one repository can have both, at different directories"`
 		InventoryPaths  []string `json:"inventory_paths,omitempty" jsonschema:"the ansible inventory sources, each a FILE or a DIRECTORY relative to the repository root. ORDERED -- the order IS the precedence ansible applies, so this is a list and not a set, and reordering it changes which value wins. Name the files or directories you mean rather than a parent: -i over a directory holding both production and staging MERGES them into one inventory, which is how a staging workspace ends up carrying production hosts. Pass an empty list to remove every source. Omitting the field leaves the stored list alone"`
 		DefaultPlaybook *string  `json:"default_playbook,omitempty" jsonschema:"the playbook a configure run executes unless the run names another, the way vcs_ref overrides vcs_branch on a run. Relative to config_directory. Empty means the workspace has no default and every configure run must name its playbook. Pass an empty string to stop defaulting to a playbook"`
+		Playbooks       []string `json:"playbooks,omitempty" jsonschema:"the playbooks a configure on this workspace may name -- an ALLOW-LIST over the playbook run option, each entry relative to config_directory. An EMPTY OR OMITTED list means NO RESTRICTION, which is what every workspace has today, so this is opt-in and setting it is what narrows the workspace. With a list set the API refuses a configure naming anything outside it (422, listing what is allowed), and default_playbook MUST be one of the entries -- a bare configure runs the default, so a default outside the list would leave the workspace unable to run its own button. Entries are stored exactly as written: nothing is trimmed or de-duplicated, and a duplicate is refused. At most 50. Omitting the field leaves the stored list alone; pass an empty list to clear it, which removes the restriction"`
 		HardLimit       *string  `json:"hard_limit,omitempty" jsonschema:"a --limit NO RUN MAY ESCAPE; empty means no ceiling. Unlike default_limit, which a run replaces when it supplies its own, this is INTERSECTED with the run's limit -- narrowing is allowed, widening is not. Pass an empty string to REMOVE the ceiling, which widens every run on this workspace"`
 		DefaultLimit    *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
 		// Host-key verification, settable here for the reason the block below
@@ -358,7 +366,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			"This is a config change (the new settings apply on the workspace's next run) — it does not itself queue a run. " +
 			"Which OPERATIONS the workspace has lives here as two independent booleans: plan_apply_enabled (the terraform/tofu/pulumi lifecycle) and configure_enabled (the ansible configure operation). configure_enabled=false is how you turn a configure operation off, and it leaves config_directory where it is so re-enabling resumes in the same directory; turning BOTH off is refused (422) against the resulting row. " +
 			"default_run_kind moves the prominent button between them, and is refused (422) against the resulting row — so turning an operation off while it still names that operation fails, and clearing it in the same call is what you want. " +
-			"The ansible configure operation's roots live here too (config_directory, inventory_paths, default_playbook, default_limit) — there is no separate inventory-settings object to configure.",
+			"The ansible configure operation's roots live here too (config_directory, inventory_paths, default_playbook, default_limit, and playbooks, which allow-lists what a configure may name) — there is no separate inventory-settings object to configure. Setting playbooks non-empty requires default_playbook to be one of its entries, judged against the RESULTING row, so narrowing the list past the stored default fails unless you move the default in the same call.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceUpdateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.WorkspaceID == "" {
@@ -403,8 +411,13 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			ConfigDirectory: in.ConfigDirectory,
 			InventoryPaths:  in.InventoryPaths,
 			DefaultPlaybook: in.DefaultPlaybook,
-			DefaultLimit:    in.DefaultLimit,
-			HardLimit:       in.HardLimit,
+			// A slice straight through: nil omits the key and leaves the
+			// stored list, a non-nil empty slice clears it -- the SDK's own
+			// `!= nil` convention, the same one InventoryPaths uses, so no
+			// pointer is needed to tell the two apart (#2527).
+			Playbooks:    in.Playbooks,
+			DefaultLimit: in.DefaultLimit,
+			HardLimit:    in.HardLimit,
 			// #2318's one. A pointer straight through, so a PATCH that does not
 			// mention it cannot disturb the stored setting.
 			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,

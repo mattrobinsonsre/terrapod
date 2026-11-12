@@ -1302,7 +1302,9 @@
       "applyChanges": "Applica modifiche",
       "setOidcAudiences": "Imposta le audience OIDC dell''identità di esecuzione (sostituisce la mappa su ogni workspace corrispondente)",
       "operationsNone": "Questo lascerebbe ogni spazio di lavoro corrispondente senza alcuna operazione. Uno spazio di lavoro deve conservare pianificare e applicare, o configurare, o entrambe.",
-      "setHardLimit": "Imposta il limite rigido (un valore vuoto rimuove il tetto)"
+      "setHardLimit": "Imposta il limite rigido (un valore vuoto rimuove il tetto)",
+      "setPlaybooks": "Imposta i playbook consentiti (sostituisce l'elenco in ogni workspace corrispondente; un elenco vuoto rimuove la restrizione)",
+      "playbooksPairWarning": "Un elenco non vuoto deve contenere il playbook predefinito di ogni workspace corrispondente, quindi impostalo nello stesso aggiornamento se non è già uno di questi."
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2310,7 +2312,8 @@
       "runOptions": "Opzioni di esecuzione",
       "agentPool": "Pool di agenti",
       "agentPoolCandidates": "{count, plural, one {# pool candidato} other {# pool candidati}}",
-      "autoApplyHeld": "in attesa"
+      "autoApplyHeld": "in attesa",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Cronologia",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Quale azione ottiene il pulsante in evidenza in questo workspace. Automatico propone l''esecuzione più completa possibile — di solito la scelta giusta, e quella sbagliata quando l''azione quotidiana non è la più ampia: un workspace la cui parte Terraform si limita a mantenere l''inventario Ansible, che applica senza supervisione e non configura mai dopo un apply, qui vuole Configura. Una scelta che questo workspace non può offrire viene rifiutata al salvataggio, e una che il tuo ruolo non può eseguire ripiega su Automatico per te.",
       "configureParallelism": "Parallelismo della configurazione",
       "configureParallelismTitle": "Quanti host una configurazione gestisce contemporaneamente — i forks di ansible (1-256). Lascia vuoto per ereditare Parallelismo. È separato perché l''ambiente di esecuzione viene dimensionato indipendentemente dall''orchestratore.",
-      "configureParallelismLead": "Quanti host una configurazione gestisce contemporaneamente — i forks di ansible (1-256). Lascia vuoto per ereditare Parallelismo."
+      "configureParallelismLead": "Quanti host una configurazione gestisce contemporaneamente — i forks di ansible (1-256). Lascia vuoto per ereditare Parallelismo.",
+      "playbooks": "Playbook consentiti",
+      "playbooksLead": "I playbook che un'operazione di configurazione può eseguire qui. Lascialo vuoto e si potrà indicare qualsiasi playbook, che è il comportamento predefinito; aggiungi voci e ogni esecuzione che ne indichi un altro viene rifiutata.",
+      "playbooksTitle": "Ogni voce è un percorso relativo alla directory di configurazione, e l'opzione di esecuzione diventa un selettore tra queste invece di una casella di testo. Il playbook predefinito deve essere una delle voci, perché un Configura senza altro esegue quello predefinito. Usalo per tenere un playbook lontano da un workspace che non deve mai toccare — lo svuotamento di un nodo, l'aggiornamento di un database — dove un elenco è un controllo e non una convenzione.",
+      "playbooksPlaceholder": "ad es. release.yml",
+      "playbooksAdd": "Aggiungi playbook",
+      "playbooksAny": "Qualsiasi"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Esecuzione completa",
       "queueFullRunConfirm": "Plan, apply E configurazione di questo workspace? La configurazione modifica host reali dopo che l’apply ha modificato infrastruttura reale, senza una revisione intermedia.",
       "moreRunKinds": "Altri tipi di esecuzione",
-      "openExplainingPhase": "apri il log della fase che lo spiega"
+      "openExplainingPhase": "apri il log della fase che lo spiega",
+      "configurePlaybookDefaultSuffix": "(predefinito)",
+      "playbookIsDefault": "Il playbook predefinito del workspace"
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

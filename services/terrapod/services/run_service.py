@@ -415,6 +415,45 @@ def resolve_configure_shape(
     )
 
 
+def run_kind(run) -> str:
+    """What KIND of run this is, as one word (#2507, #2509).
+
+    `configure` -- a configure and nothing else; `full` -- a composite, an
+    apply followed by a configure; `plan_apply` -- everything else, which is
+    every run with a plan/apply half and no configure.
+
+    DERIVED, never stored. There is no column and no migration: the two flags
+    it reads are already on the row and already serialised, so a stored copy
+    could only ever be a third thing to keep in step with them.
+
+    It exists because three surfaces were each deriving it from
+    `is-configure`, `configure-after-apply` and the workspace's
+    `plan-apply-enabled`, and the run LIST got it wrong: a configure-only run
+    is neither a destroy nor plan-only, so it fell through to the default
+    branch and was labelled "plan + apply" **and** "configure", as if it were a
+    composite (#2507). One producer instead -- and no gate can see three copies
+    of a three-attribute predicate disagreeing.
+
+    The vocabulary is `workspace_settings.RUN_KIND_REQUIREMENTS`'s, deliberately
+    and not by coincidence: that dict already names the kinds a workspace can
+    declare and a `default-run-kind` can name, so a second spelling here is how
+    a UI reading one and a setting written in the other come to disagree about
+    what a configure is. `plan` is in that dict and is NOT produced here: it is
+    a workspace's *button* preference ("queue a speculative plan"), and whether
+    a RUN is speculative is `plan-only`, which the run document already carries
+    and every consumer already reads. Emitting `plan` would give that one fact
+    two spellings on one document.
+
+    Note what this deliberately does not read: the workspace. A run carries
+    everything needed, so this answers the same way for a run whose workspace
+    has since been re-pointed -- which matters most on exactly the surface that
+    was wrong, a run list showing history.
+    """
+    if not run.is_configure:
+        return "plan_apply"
+    return "full" if run.configure_after_apply else "configure"
+
+
 def is_standalone_configure(run) -> bool:
     """Whether this run is a configure and NOTHING else (#1974).
 
@@ -1556,6 +1595,21 @@ async def create_run(
     workspace_settings.refuse_configure_on_locked_workspace(
         workspace,
         is_configure=is_configure,
+    )
+
+    # The workspace's playbook allow-list, at the same chokepoint and for the
+    # same reason (#2527). A mistyped playbook name otherwise fails only once
+    # the run has started, and a playbook that must never touch this workspace
+    # was a convention rather than a control. Refuses the EFFECTIVE playbook --
+    # the run's own, falling back to the workspace default -- so the bare
+    # Configure path is checked too rather than only the one that names a file.
+    # A no-op on every workspace with no list, which is all of them until
+    # somebody writes one. Raises `PlaybookNotAllowed`, a `ValueError`; callers
+    # react the way they react to the operation refusals above.
+    workspace_settings.require_allowed_playbook(
+        workspace,
+        is_configure=is_configure,
+        playbook=playbook,
     )
 
     # An explicit `auto_apply` argument (the CLI/API asking for a specific

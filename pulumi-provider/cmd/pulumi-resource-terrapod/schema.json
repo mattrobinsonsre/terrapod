@@ -1377,6 +1377,13 @@
                     "type": "integer",
                     "description": "Seconds a plan stays applicable on workspaces this rule creates. Unset means no expiry."
                 },
+                "playbooks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The playbooks a configure run may name on workspaces this rule creates, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it. **Defaults to empty**, which is the open state — any playbook is allowed. A non-empty list templates a \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e that has to be one of its entries, because a bare Configure runs the default; the pair is checked when each workspace is written, not here, so a rule is free to be edited one attribute at a time. Omitting this attribute leaves any existing server-side value untouched; set `playbooks = []` to clear it."
+                },
                 "repoUrl": {
                     "type": "string",
                     "description": "Full repository URL (e.g. https://github.com/myorg/monorepo)."
@@ -1491,6 +1498,7 @@
                 "parallelism",
                 "pattern",
                 "planApplyEnabled",
+                "playbooks",
                 "repoUrl",
                 "resourceCpu",
                 "resourceMemory",
@@ -1712,6 +1720,13 @@
                 "planExpirySeconds": {
                     "type": "integer",
                     "description": "Seconds a plan stays applicable on workspaces this rule creates. Unset means no expiry."
+                },
+                "playbooks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The playbooks a configure run may name on workspaces this rule creates, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it. **Defaults to empty**, which is the open state — any playbook is allowed. A non-empty list templates a \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e that has to be one of its entries, because a bare Configure runs the default; the pair is checked when each workspace is written, not here, so a rule is free to be edited one attribute at a time. Omitting this attribute leaves any existing server-side value untouched; set `playbooks = []` to clear it."
                 },
                 "repoUrl": {
                     "type": "string",
@@ -2002,6 +2017,13 @@
                     "planExpirySeconds": {
                         "type": "integer",
                         "description": "Seconds a plan stays applicable on workspaces this rule creates. Unset means no expiry."
+                    },
+                    "playbooks": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "The playbooks a configure run may name on workspaces this rule creates, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it. **Defaults to empty**, which is the open state — any playbook is allowed. A non-empty list templates a \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e that has to be one of its entries, because a bare Configure runs the default; the pair is checked when each workspace is written, not here, so a rule is free to be edited one attribute at a time. Omitting this attribute leaves any existing server-side value untouched; set `playbooks = []` to clear it."
                     },
                     "repoUrl": {
                         "type": "string",
@@ -6261,7 +6283,7 @@
                 },
                 "defaultPlaybook": {
                     "type": "string",
-                    "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook."
+                    "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook. When \u003cspan pulumi-lang-nodejs=\"`playbooks`\" pulumi-lang-dotnet=\"`Playbooks`\" pulumi-lang-go=\"`playbooks`\" pulumi-lang-python=\"`playbooks`\" pulumi-lang-yaml=\"`playbooks`\" pulumi-lang-java=\"`playbooks`\" pulumi-lang-hcl=\"`playbooks`\"\u003e`playbooks`\u003c/span\u003e is non-empty this must be one of its entries."
                 },
                 "defaultRunKind": {
                     "type": "string",
@@ -6393,6 +6415,13 @@
                 "planExpirySeconds": {
                     "type": "integer",
                     "description": "Per-workspace plan expiry TTL in seconds (#646). An apply-capable planned run older than this is auto-discarded and must be re-planned. Unset / 0 = disabled (the default)."
+                },
+                "playbooks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The playbooks a configure run on this workspace may name, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it, and the UI offers these as a select rather than a text box. The EMPTY list is the open state — any playbook is allowed — so the attribute is opt-in and every workspace that does not set it is unaffected. A non-empty list must contain \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e, because a bare Configure runs the default. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `playbooks = []` to clear."
                 },
                 "pulumiBindPlan": {
                     "type": "boolean",
@@ -6565,6 +6594,7 @@
                 "parallelism",
                 "planApplyEnabled",
                 "planExpirySeconds",
+                "playbooks",
                 "pulumiBindPlan",
                 "remoteStateConsumers",
                 "resourceCpu",
@@ -6689,7 +6719,7 @@
                 },
                 "defaultPlaybook": {
                     "type": "string",
-                    "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook."
+                    "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook. When \u003cspan pulumi-lang-nodejs=\"`playbooks`\" pulumi-lang-dotnet=\"`Playbooks`\" pulumi-lang-go=\"`playbooks`\" pulumi-lang-python=\"`playbooks`\" pulumi-lang-yaml=\"`playbooks`\" pulumi-lang-java=\"`playbooks`\" pulumi-lang-hcl=\"`playbooks`\"\u003e`playbooks`\u003c/span\u003e is non-empty this must be one of its entries."
                 },
                 "defaultRunKind": {
                     "type": "string",
@@ -6785,6 +6815,13 @@
                 "planExpirySeconds": {
                     "type": "integer",
                     "description": "Per-workspace plan expiry TTL in seconds (#646). An apply-capable planned run older than this is auto-discarded and must be re-planned. Unset / 0 = disabled (the default)."
+                },
+                "playbooks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The playbooks a configure run on this workspace may name, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it, and the UI offers these as a select rather than a text box. The EMPTY list is the open state — any playbook is allowed — so the attribute is opt-in and every workspace that does not set it is unaffected. A non-empty list must contain \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e, because a bare Configure runs the default. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `playbooks = []` to clear."
                 },
                 "pulumiBindPlan": {
                     "type": "boolean",
@@ -6990,7 +7027,7 @@
                     },
                     "defaultPlaybook": {
                         "type": "string",
-                        "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook."
+                        "description": "The playbook a configure run executes unless the run names another, the way \u003cspan pulumi-lang-nodejs=\"`vcsRef`\" pulumi-lang-dotnet=\"`VcsRef`\" pulumi-lang-go=\"`vcsRef`\" pulumi-lang-python=\"`vcs_ref`\" pulumi-lang-yaml=\"`vcsRef`\" pulumi-lang-java=\"`vcsRef`\" pulumi-lang-hcl=\"`vcs_ref`\"\u003e`vcsRef`\u003c/span\u003e overrides \u003cspan pulumi-lang-nodejs=\"`vcsBranch`\" pulumi-lang-dotnet=\"`VcsBranch`\" pulumi-lang-go=\"`vcsBranch`\" pulumi-lang-python=\"`vcs_branch`\" pulumi-lang-yaml=\"`vcsBranch`\" pulumi-lang-java=\"`vcsBranch`\" pulumi-lang-hcl=\"`vcs_branch`\"\u003e`vcsBranch`\u003c/span\u003e on a run. Relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. Empty means the workspace has no default and every configure run must name its playbook. When \u003cspan pulumi-lang-nodejs=\"`playbooks`\" pulumi-lang-dotnet=\"`Playbooks`\" pulumi-lang-go=\"`playbooks`\" pulumi-lang-python=\"`playbooks`\" pulumi-lang-yaml=\"`playbooks`\" pulumi-lang-java=\"`playbooks`\" pulumi-lang-hcl=\"`playbooks`\"\u003e`playbooks`\u003c/span\u003e is non-empty this must be one of its entries."
                     },
                     "defaultRunKind": {
                         "type": "string",
@@ -7122,6 +7159,13 @@
                     "planExpirySeconds": {
                         "type": "integer",
                         "description": "Per-workspace plan expiry TTL in seconds (#646). An apply-capable planned run older than this is auto-discarded and must be re-planned. Unset / 0 = disabled (the default)."
+                    },
+                    "playbooks": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "The playbooks a configure run on this workspace may name, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it, and the UI offers these as a select rather than a text box. The EMPTY list is the open state — any playbook is allowed — so the attribute is opt-in and every workspace that does not set it is unaffected. A non-empty list must contain \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e, because a bare Configure runs the default. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `playbooks = []` to clear."
                     },
                     "pulumiBindPlan": {
                         "type": "boolean",
@@ -8120,6 +8164,12 @@
                     "planExpirySeconds": {
                         "type": "integer"
                     },
+                    "playbooks": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
                     "pulumiBindPlan": {
                         "type": "boolean"
                     },
@@ -8257,6 +8307,7 @@
                     "parallelism",
                     "planApplyEnabled",
                     "planExpirySeconds",
+                    "playbooks",
                     "pulumiBindPlan",
                     "resourceCpu",
                     "resourceMemory",

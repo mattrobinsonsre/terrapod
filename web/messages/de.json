@@ -1302,7 +1302,9 @@
       "applyChanges": "Änderungen anwenden",
       "setOidcAudiences": "OIDC-Audiences der Lauf-Identität setzen (ersetzt die Zuordnung auf jedem getroffenen Arbeitsbereich)",
       "operationsNone": "Dies würde jeden passenden Workspace ohne jede Operation zurücklassen. Ein Workspace muss Planen und Anwenden oder Konfigurieren oder beides behalten.",
-      "setHardLimit": "Hartes Limit setzen (ein leerer Wert entfernt die Obergrenze)"
+      "setHardLimit": "Hartes Limit setzen (ein leerer Wert entfernt die Obergrenze)",
+      "setPlaybooks": "Erlaubte Playbooks setzen (ersetzt die Liste in jedem passenden Workspace; eine leere Liste hebt die Einschränkung auf)",
+      "playbooksPairWarning": "Eine nicht leere Liste muss das jeweilige Standard-Playbook jedes passenden Workspace enthalten; setzen Sie dieses also in derselben Aktualisierung, wenn es nicht schon eines davon ist."
     },
     "diff": {
       "colWorkspace": "Arbeitsbereich",
@@ -2310,7 +2312,8 @@
       "runOptions": "Ausführungsoptionen",
       "agentPool": "Agent-Pool",
       "agentPoolCandidates": "{count, plural, one {# Kandidaten-Pool} other {# Kandidaten-Pools}}",
-      "autoApplyHeld": "angehalten"
+      "autoApplyHeld": "angehalten",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Zeitverlauf",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Welche Aktion in diesem Arbeitsbereich die auffällige Schaltfläche erhält. Automatisch bietet den vollständigsten Lauf an, der möglich ist — meist richtig, und falsch dort, wo die alltägliche Aktion nicht die umfassendste ist: Ein Arbeitsbereich, dessen Terraform-Hälfte nur das Ansible-Inventar pflegt, unbeaufsichtigt anwendet und nach einem Anwenden nie konfiguriert, möchte hier Konfigurieren. Eine Auswahl, die dieser Arbeitsbereich nicht anbieten kann, wird beim Speichern abgelehnt, und eine, die Ihre Rolle nicht ausführen darf, fällt für Sie auf Automatisch zurück.",
       "configureParallelism": "Konfigurations-Parallelität",
       "configureParallelismTitle": "Wie viele Hosts eine Konfiguration gleichzeitig ansteuert — ansibles forks (1-256). Leer lassen, um Parallelität zu übernehmen. Getrennt, weil die Ausführungsumgebung unabhängig vom Orchestrator dimensioniert wird.",
-      "configureParallelismLead": "Wie viele Hosts eine Konfiguration gleichzeitig ansteuert — ansibles forks (1-256). Leer lassen, um Parallelität zu übernehmen."
+      "configureParallelismLead": "Wie viele Hosts eine Konfiguration gleichzeitig ansteuert — ansibles forks (1-256). Leer lassen, um Parallelität zu übernehmen.",
+      "playbooks": "Erlaubte Playbooks",
+      "playbooksLead": "Die Playbooks, die eine Konfigurationsoperation hier ausführen darf. Lassen Sie es leer, und jedes Playbook darf genannt werden — das ist die Vorgabe; fügen Sie Einträge hinzu, und ein Lauf, der etwas anderes nennt, wird abgelehnt.",
+      "playbooksTitle": "Jeder Eintrag ist ein Pfad relativ zum Konfigurationsverzeichnis, und aus der Ausführungsoption wird eine Auswahlliste darüber statt eines Textfelds. Das Standard-Playbook muss einer der Einträge sein, denn ein bloßes Konfigurieren führt die Vorgabe aus. Damit halten Sie ein Playbook von einem Workspace fern, den es niemals berühren darf — ein Node-Drain, ein Datenbank-Upgrade — wo eine Liste eine Kontrolle und keine Konvention ist.",
+      "playbooksPlaceholder": "z. B. release.yml",
+      "playbooksAdd": "Playbook hinzufügen",
+      "playbooksAny": "Beliebig"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Vollständiger Lauf",
       "queueFullRunConfirm": "Plan, Apply UND Konfigurieren für diesen Workspace? Das Konfigurieren ändert echte Hosts, nachdem das Apply echte Infrastruktur geändert hat, und zwischen beiden gibt es keine separate Prüfung.",
       "moreRunKinds": "Andere Laufarten",
-      "openExplainingPhase": "das Protokoll der Phase öffnen, die es erklärt"
+      "openExplainingPhase": "das Protokoll der Phase öffnen, die es erklärt",
+      "configurePlaybookDefaultSuffix": "(Standard)",
+      "playbookIsDefault": "Das Standard-Playbook des Workspace"
     },
     "state": {
       "deleteConfirm": "Zustandsversion #{serial} löschen? Dies kann nicht rückgängig gemacht werden.",

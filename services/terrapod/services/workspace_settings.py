@@ -486,6 +486,13 @@ def sanitize_working_directory(raw: str) -> str:
 MAX_INVENTORY_PATHS = 20
 MAX_ANSIBLE_PATH_LEN = 500
 
+#: How many playbooks one workspace may ALLOW-LIST (#2527). A repository holds
+#: dozens; the list is the subset this workspace may run, so it is bounded like
+#: `inventory_paths` rather than like a lockfile. Past this the operator is
+#: describing the repository rather than narrowing it, and the honest answer is
+#: an empty list -- which is "no restriction", not "none allowed".
+MAX_PLAYBOOKS = 50
+
 
 def _check_relative_path(value: str, field: str) -> str:
     """Refuse what a repo-relative path may not be. Returns it UNCHANGED.
@@ -853,6 +860,134 @@ def validate_inventory_paths(raw: object) -> list[str]:
     if raw is None:
         return []
     return _validate_path_list(raw, "inventory-paths", MAX_INVENTORY_PATHS)
+
+
+def validate_playbooks(raw: object) -> list[str]:
+    """The playbooks this workspace may run, or `[]` for no restriction (#2527).
+
+    An ALLOW-LIST, and the empty list is the open state rather than the closed
+    one. That direction is forced: every workspace that exists today has no
+    list, and reading absence as "no playbook may run" would stop every
+    configure on the deployment at the moment of upgrade. So the field is
+    opt-in, and `[]` keeps today's free-text behaviour exactly.
+
+    Each entry is a repo-relative path under `config_directory`, validated the
+    same way `inventory_paths` entries are -- `inventory_paths` is itself
+    resolved under the config directory, measured, so the two agree about what
+    a path in this workspace means.
+
+    **Stored byte for byte, with duplicates refused rather than collapsed.**
+    The whole module refuses instead of normalising, for the reason its own
+    header gives: a Terraform provider writes the server's response back into
+    state, so a list that comes back shorter or re-ordered fails the apply as
+    an inconsistent result. A duplicate is therefore a 422 naming the entry --
+    which also tells the operator what they wrote twice, where silently
+    de-duplicating would leave them reading a list that does not match their
+    configuration.
+    """
+    if raw is None:
+        return []
+    paths = _validate_path_list(raw, "playbooks", MAX_PLAYBOOKS)
+    seen: set[str] = set()
+    for entry in paths:
+        if entry in seen:
+            raise ValueError(f"playbooks: {entry!r} appears more than once")
+        seen.add(entry)
+    return paths
+
+
+def reconcile_playbooks(
+    *, sent_playbooks: object | None, stored_playbooks: object, sent_default: object | None
+) -> list[str]:
+    """Validate `playbooks` and its relationship with `default_playbook` (#2527).
+
+    Returns the list the write should store. The caller has already resolved
+    `default_playbook` for this write (sent, or the stored value if the caller
+    said nothing about it) and passes it as `sent_default`.
+
+    Two rules, and both are about the pair rather than either field:
+
+    * a non-empty list must CONTAIN the default, because a bare Configure runs
+      the default and a default outside the list would be refused at run
+      creation -- a workspace whose own button cannot be pressed;
+    * a non-empty list needs a default at all, for the same reason.
+
+    **Checked only when the caller touched one of the two.** A PATCH that sets
+    something unrelated must not be refused over a pair it never mentioned:
+    that is the `reconcile_default_run_kind` lesson, where re-validating a
+    stored value wedged a lagging client against a field its schema did not
+    have. There is no orphan case to drop here -- the only writes that can set
+    either field are checked -- so a contradiction is always one the caller
+    just created, and refusing names both halves.
+    """
+    if sent_playbooks is None and sent_default is None:
+        # Neither touched. Return what is stored, unvalidated: see above.
+        return list(stored_playbooks or [])
+    playbooks = (
+        validate_playbooks(sent_playbooks)
+        if sent_playbooks is not None
+        else list(stored_playbooks or [])
+    )
+    if not playbooks:
+        return playbooks
+    default = sent_default if isinstance(sent_default, str) else ""
+    if not default:
+        raise ValueError(
+            "playbooks: a workspace that allow-lists playbooks needs a "
+            "default-playbook, because a configure with no playbook option runs "
+            "the default. Set default-playbook to one of "
+            + ", ".join(repr(p) for p in playbooks)
+            + ", or clear playbooks to allow any playbook"
+        )
+    if default not in playbooks:
+        raise ValueError(
+            f"default-playbook {default!r} is not in playbooks. Allowed: "
+            + ", ".join(repr(p) for p in playbooks)
+        )
+    return playbooks
+
+
+class PlaybookNotAllowed(ValueError):
+    """A configure named a playbook the workspace does not allow-list (#2527).
+
+    A `ValueError` subclass for the reason `PlanApplyNotEnabled` gives: a bare
+    `except ValueError` still catches it, and a router can answer 422 without
+    swallowing unrelated failures.
+    """
+
+
+def require_allowed_playbook(workspace, *, is_configure: bool, playbook: str) -> None:
+    """Refuse a configure whose playbook is outside the workspace's list (#2527).
+
+    The enforcement twin of `reconcile_playbooks`, in the same relationship as
+    `require_plan_apply_operation` is to `validate_operations`: one refuses the
+    workspace write, this refuses the RUN. Called from `run_service.create_run`
+    and nowhere else -- the only `Run` constructor on the live path, so no
+    caller has to remember the rule and none can route around it.
+
+    The EFFECTIVE playbook is what is checked -- the run's own, falling back to
+    the workspace default -- rather than the run's attribute alone. A bare
+    Configure sends nothing and runs the default, so checking the attribute
+    would leave the one path everybody takes unchecked. In practice the default
+    always passes, because `reconcile_playbooks` refuses a write that would
+    leave it outside the list; checking it anyway costs nothing and means this
+    function states the rule rather than relying on the other one.
+
+    An empty list is no restriction, so this is a no-op on every workspace that
+    has not opted in -- which is all of them until somebody writes a list.
+    """
+    if not is_configure:
+        return
+    allowed = list(getattr(workspace, "playbooks", None) or [])
+    if not allowed:
+        return
+    effective = playbook or (getattr(workspace, "default_playbook", "") or "")
+    if effective in allowed:
+        return
+    raise PlaybookNotAllowed(
+        f"playbook {effective!r} is not allowed on this workspace. Allowed: "
+        + ", ".join(repr(p) for p in allowed)
+    )
 
 
 def validate_ansible_run_default(raw: object, field: str) -> str:

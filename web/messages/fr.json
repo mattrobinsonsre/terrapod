@@ -1302,7 +1302,9 @@
       "applyChanges": "Appliquer les modifications",
       "setOidcAudiences": "Définir les audiences OIDC de l''identité d''exécution (remplace la carte sur chaque espace de travail correspondant)",
       "operationsNone": "Cela laisserait chaque espace de travail correspondant sans aucune opération. Un espace de travail doit conserver planifier et appliquer, ou configurer, ou les deux.",
-      "setHardLimit": "Définir la limite stricte (une valeur vide supprime le plafond)"
+      "setHardLimit": "Définir la limite stricte (une valeur vide supprime le plafond)",
+      "setPlaybooks": "Définir les playbooks autorisés (remplace la liste sur chaque espace de travail correspondant ; une liste vide supprime la restriction)",
+      "playbooksPairWarning": "Une liste non vide doit contenir le playbook par défaut propre à chaque espace de travail correspondant ; définissez-le donc dans la même mise à jour s'il n'en fait pas déjà partie."
     },
     "diff": {
       "colWorkspace": "Espace de travail",
@@ -2310,7 +2312,8 @@
       "runOptions": "Options d'exécution",
       "agentPool": "Pool d''agents",
       "agentPoolCandidates": "{count, plural, one {# pool candidat} other {# pools candidats}}",
-      "autoApplyHeld": "en attente"
+      "autoApplyHeld": "en attente",
+      "playbook": "Playbook"
     },
     "timeline": {
       "heading": "Chronologie",
@@ -2797,7 +2800,13 @@
       "defaultRunKindTitle": "Quelle action obtient le bouton bien visible sur cet espace de travail. Automatique propose l''exécution la plus complète possible — généralement le bon choix, et le mauvais lorsque l''action quotidienne n''est pas la plus large : un espace de travail dont la partie Terraform ne fait qu''entretenir l''inventaire Ansible, qui applique sans surveillance et ne configure jamais après une application, veut Configurer ici. Un choix que cet espace de travail ne peut pas proposer est refusé à l''enregistrement, et un choix que votre rôle ne peut pas exécuter revient à Automatique pour vous.",
       "configureParallelism": "Parallélisme de la configuration",
       "configureParallelismTitle": "Nombre d''hôtes qu''une configuration pilote simultanément — les forks d''ansible (1-256). Laissez vide pour hériter de Parallélisme. Séparé parce que l''environnement d''exécution est dimensionné indépendamment de l''orchestrateur.",
-      "configureParallelismLead": "Nombre d''hôtes qu''une configuration pilote simultanément — les forks d''ansible (1-256). Laissez vide pour hériter de Parallélisme."
+      "configureParallelismLead": "Nombre d''hôtes qu''une configuration pilote simultanément — les forks d''ansible (1-256). Laissez vide pour hériter de Parallélisme.",
+      "playbooks": "Playbooks autorisés",
+      "playbooksLead": "Les playbooks qu'une opération de configuration peut exécuter ici. Laissez la liste vide et n'importe quel playbook peut être nommé, ce qui est le comportement par défaut ; ajoutez des entrées et toute exécution nommant autre chose est refusée.",
+      "playbooksTitle": "Chaque entrée est un chemin relatif au répertoire de configuration, et l'option d'exécution devient un sélecteur parmi elles au lieu d'un champ de texte. Le playbook par défaut doit être l'une des entrées, car un simple Configurer exécute celui par défaut. Utilisez-la pour tenir un playbook à l'écart d'un espace de travail qu'il ne doit jamais toucher — la vidange d'un nœud, la mise à niveau d'une base de données — là où une liste est un contrôle et non une convention.",
+      "playbooksPlaceholder": "p. ex. release.yml",
+      "playbooksAdd": "Ajouter un playbook",
+      "playbooksAny": "N'importe lequel"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",
@@ -3007,7 +3016,9 @@
       "queueFullRun": "Exécution complète",
       "queueFullRunConfirm": "Plan, apply ET configuration de cet espace de travail ? La configuration modifie de vrais hôtes après que l’apply a modifié de vraies infrastructures, sans revue intermédiaire.",
       "moreRunKinds": "Autres types d’exécution",
-      "openExplainingPhase": "ouvrir le journal de la phase qui l’explique"
+      "openExplainingPhase": "ouvrir le journal de la phase qui l’explique",
+      "configurePlaybookDefaultSuffix": "(par défaut)",
+      "playbookIsDefault": "Le playbook par défaut de l'espace de travail"
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",
