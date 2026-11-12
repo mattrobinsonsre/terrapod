@@ -30,6 +30,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pruneSelection, toggleAll, headerState } from '../src/lib/workspace-selection.ts'
+import { renderedWorkspaceIds } from '../src/lib/workspace-grouping.ts'
 
 const here = path.dirname(new URL(import.meta.url).pathname)
 const sortableSrc = readFileSync(path.join(here, '..', 'src', 'lib', 'use-sortable.ts'), 'utf8')
@@ -113,6 +114,91 @@ describe('#2551: the rendered count cannot disagree with the rendered rows', () 
       'useSortable now filters, so the label and the rows can disagree again (#2551)',
     )
     assert.ok(sortableSrc.length > 500, 'read an empty or truncated use-sortable.ts')
+  })
+})
+
+describe('#2551: the GROUPED branch renders a different set, and selection follows it', () => {
+  // The hole the first version of this file had. It asserted the flat branch's
+  // label and the selection HELPERS' algebra, and the page has a second
+  // row-emitting branch: when `groupMode !== 'flat'` the rows come from
+  // `workspaceTree`, and a collapsed group renders neither its own rows nor its
+  // subtree. `collapsedGroups` is persisted in `localStorage`, so it survives a
+  // reload.
+  //
+  // `visibleIds` was derived from `sortedWorkspaces` -- the whole filtered set
+  // -- so select-all ticked workspaces whose rows were off screen, and the bulk
+  // action acted on them. Plan, Retry and Cancel carry no confirm, so nothing
+  // named them. That is the half the PR for this issue first claimed was
+  // impossible by construction; it was true of the flat branch only.
+  const tree = [
+    {
+      key: 'repo-a', label: 'repo-a',
+      workspaces: [{ id: 'a1', name: 'a1', workspace: null }],
+      children: [
+        {
+          key: 'sub', label: 'sub',
+          workspaces: [{ id: 'a2', name: 'a2', workspace: null }],
+          children: [],
+        },
+      ],
+    },
+    {
+      key: 'repo-b', label: 'repo-b',
+      workspaces: [{ id: 'b1', name: 'b1', workspace: null }],
+      children: [],
+    },
+  ]
+
+  it('nothing collapsed: every workspace in the tree is rendered', () => {
+    assert.deepEqual(renderedWorkspaceIds(tree, new Set()).sort(), ['a1', 'a2', 'b1'])
+  })
+
+  it('a collapsed group hides its own rows AND its whole subtree', () => {
+    // `repo-a` collapsed must hide a1 (its own) and a2 (its child's), because
+    // the render recurses into children under the same `!isCollapsed`.
+    assert.deepEqual(renderedWorkspaceIds(tree, new Set(['repo-a'])), ['b1'])
+  })
+
+  it('a collapsed CHILD hides only itself, and the path is prefix/key', () => {
+    // The path convention is the one `collapsedGroups` is keyed on in the
+    // component: `prefix/key`, or `key` at the root. A wrong convention here
+    // would silently hide nothing, which is the failing-open direction.
+    assert.deepEqual(renderedWorkspaceIds(tree, new Set(['repo-a/sub'])).sort(), ['a1', 'b1'])
+    // ...and the bare child key must NOT match, or the convention is not being
+    // honoured and a differently-nested group would collapse by accident.
+    assert.deepEqual(renderedWorkspaceIds(tree, new Set(['sub'])).sort(), ['a1', 'a2', 'b1'])
+  })
+
+  it('selecting all in grouped mode cannot reach a collapsed workspace', () => {
+    // The composed property, which is what actually broke: select-all over the
+    // RENDERED ids, then the bulk input built by filtering -- a2 is in neither.
+    const rendered = renderedWorkspaceIds(tree, new Set(['repo-a/sub']))
+    const selected = toggleAll(new Set(), rendered)
+    assert.ok(!selected.has('a2'), 'a collapsed workspace was selected by select-all')
+    assert.deepEqual([...selected].sort(), ['a1', 'b1'])
+  })
+
+  it('the PAGE derives visibleIds from the rendered set, not the filtered one', () => {
+    // Structural, because this is the regression: `sortedWorkspaces.map(...)`
+    // alone is the defect, and it type-checks, renders and passes every
+    // behavioural test. The flat fallback is required too -- dropping it would
+    // break the ungrouped page, which is the careless over-correction.
+    const m = pageSrc.match(/const visibleIds = useMemo\(\(\) => \{[\s\S]{0,600}?\}, \[/)
+    assert.ok(m, 'visibleIds is no longer a block-bodied useMemo')
+    assert.ok(
+      /renderedWorkspaceIds\(\s*workspaceTree\s*,\s*collapsedGroups\s*\)/.test(m[0]),
+      'visibleIds does not consult the rendered set in grouped mode, so select-all ' +
+        'can tick a workspace whose row is collapsed away: ' + m[0].slice(0, 200),
+    )
+    assert.ok(
+      /groupMode === 'flat'[\s\S]{0,160}sortedWorkspaces\.map/.test(m[0]),
+      'the flat branch no longer falls back to sortedWorkspaces',
+    )
+    assert.ok(
+      /\[groupMode, workspaceTree, collapsedGroups, sortedWorkspaces\]/.test(pageSrc),
+      'the memo does not depend on collapsedGroups, so collapsing a group would ' +
+        'not re-derive the visible set',
+    )
   })
 })
 

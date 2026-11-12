@@ -164,3 +164,39 @@ function sortGroups<T>(groups: WorkspaceGroup<T>[]): WorkspaceGroup<T>[] {
 export function countWorkspaces(group: WorkspaceGroup): number {
   return group.workspaces.length + group.children.reduce((sum, child) => sum + countWorkspaces(child), 0)
 }
+
+/**
+ * The workspace ids whose rows the GROUPED render actually emits.
+ *
+ * Not the same as "every workspace in the tree", and the difference is a
+ * selection defect rather than a cosmetic one (#2551). The grouped branch
+ * renders a group's rows only when it is expanded -- `{!isCollapsed &&
+ * group.workspaces.map(...)}` -- and recurses into its children under the same
+ * condition, so a collapsed group hides its own rows AND its whole subtree.
+ * `collapsedGroups` is persisted in `localStorage`, so this survives a reload.
+ *
+ * Meanwhile the page derived `visibleIds` from `sortedWorkspaces`, which is the
+ * whole filtered set regardless of grouping. So select-all ticked workspaces
+ * whose rows were not on screen, and because the bulk action's input is built
+ * by filtering `sortedWorkspaces` -- not the rendered rows -- those workspaces
+ * reached `runBulkAction`. Plan, Retry and Cancel carry no confirm, so there
+ * was not even a dialog naming them.
+ *
+ * This mirrors the render's own two conditions exactly, including the path
+ * convention (`prefix/key`, or `key` at the root) that `collapsedGroups` is
+ * keyed on. `test_workspace_grouping` pins that it agrees with the component.
+ */
+export function renderedWorkspaceIds<T>(
+  groups: readonly WorkspaceGroup<T>[],
+  collapsedGroups: ReadonlySet<string>,
+  pathPrefix = '',
+): string[] {
+  const ids: string[] = []
+  for (const group of groups) {
+    const fullPath = pathPrefix ? `${pathPrefix}/${group.key}` : group.key
+    if (collapsedGroups.has(fullPath)) continue // its rows AND its subtree
+    for (const item of group.workspaces) ids.push(item.id)
+    ids.push(...renderedWorkspaceIds(group.children, collapsedGroups, fullPath))
+  }
+  return ids
+}

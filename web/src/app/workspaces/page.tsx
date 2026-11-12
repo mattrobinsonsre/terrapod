@@ -83,6 +83,7 @@ import {
   buildWorkspaceTree,
   countWorkspaces,
   parseGroupParam,
+  renderedWorkspaceIds,
   serializeGroupParam,
 } from '@/lib/workspace-grouping'
 import {
@@ -986,7 +987,18 @@ function WorkspacesPageInner() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkRunning, setBulkRunning] = useState<{ action: BulkActionId; count: number } | null>(null)
   const [bulkResult, setBulkResult] = useState<{ action: BulkActionId; results: BulkResult[] } | null>(null)
-  const visibleIds = useMemo(() => sortedWorkspaces.map((w) => w.id), [sortedWorkspaces])
+  // The ids whose rows are ACTUALLY on screen. In grouped mode that is not the
+  // whole filtered set: a collapsed group renders neither its own rows nor its
+  // subtree, and that state is persisted in `localStorage`. Deriving this from
+  // `sortedWorkspaces` let select-all tick -- and a bulk action act on --
+  // workspaces the operator could not see (#2551). Plan, Retry and Cancel carry
+  // no confirm, so there was no dialog naming them either.
+  const visibleIds = useMemo(() => {
+    if (groupMode === 'flat' || workspaceTree.length === 0) {
+      return sortedWorkspaces.map((w) => w.id)
+    }
+    return renderedWorkspaceIds(workspaceTree, collapsedGroups)
+  }, [groupMode, workspaceTree, collapsedGroups, sortedWorkspaces])
   useEffect(() => {
     setSelected((cur) => pruneSelection(cur, visibleIds))
   }, [visibleIds])
