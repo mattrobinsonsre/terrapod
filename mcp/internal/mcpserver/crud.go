@@ -94,6 +94,22 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Playbooks            []string `json:"playbooks,omitempty" jsonschema:"the playbooks a configure on this workspace may name -- an ALLOW-LIST over the playbook run option, each entry relative to config_directory. An EMPTY OR OMITTED list means NO RESTRICTION, which is what every workspace has today, so this is opt-in and setting it is what narrows the workspace. With a list set the API refuses a configure naming anything outside it (422, listing what is allowed), and default_playbook MUST be one of the entries -- a bare configure runs the default, so a default outside the list would leave the workspace unable to run its own button. Entries are stored exactly as written: nothing is trimmed or de-duplicated, and a duplicate is refused. At most 50"`
 		HardLimit            string   `json:"hard_limit,omitempty" jsonschema:"a --limit NO RUN MAY ESCAPE; empty means no ceiling. Distinct from default_limit, which a run replaces outright when it supplies its own -- this one is INTERSECTED with whatever limit the run ends up with, so a run may narrow within it and none may widen past it. It also bounds what the resolved inventory shows for this workspace"`
 		DefaultLimit         string   `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan"`
+		// The third way a configure starts: a cron SCHEDULE (#2538). The
+		// other two are above -- a push to config_directory
+		// (auto_configure_enabled) and an apply (configure_after_apply) --
+		// and this one is the calendar.
+		//
+		// Enabled is a POINTER like its neighbours, so unset stays
+		// distinguishable from false. The two strings are PLAIN, because on
+		// CREATE empty is the server's own default for both -- no schedule,
+		// and UTC -- so "" and omitted mean the same thing and there is no
+		// third state left to express, the shape ConfigDirectory and
+		// DefaultPlaybook have here. On UPDATE the cron is a *string, where
+		// an explicit "" is what REMOVES a stored schedule; there is nothing
+		// stored to remove at creation.
+		ScheduledConfigureEnabled  *bool  `json:"scheduled_configure_enabled,omitempty" jsonschema:"run a configure on a CRON SCHEDULE. DEFAULTS TO FALSE. Distinct from auto_configure_enabled, which fires on a push to config_directory: this one is the calendar. Needs scheduled_configure_cron set to do anything, and needs configure_enabled, without which it is inert. Creating a workspace with it already true stamps the schedule clock at creation, so the first configure is the next OCCURRENCE rather than one fired the moment the workspace exists"`
+		ScheduledConfigureCron     string `json:"scheduled_configure_cron,omitempty" jsonschema:"when the scheduled configure runs, as a FIVE-FIELD cron expression read in scheduled_configure_timezone -- for example 0 2 * * 2 for 02:00 every Tuesday. Refused (422) if it does not parse, if it has six fields (a seconds-resolution schedule cannot be honoured), or if it fires more often than every 300 seconds. Stored exactly as you write it, never reformatted. Empty or omitted means NO SCHEDULE, which is the server default"`
+		ScheduledConfigureTimezone string `json:"scheduled_configure_timezone,omitempty" jsonschema:"the IANA zone the cron expression is read in, e.g. Europe/London; UTC by default. This is what makes it a schedule rather than an interval -- 0 2 * * * in Europe/London is 02:00 there in January AND in July, which are different instants in UTC. Empty or omitted takes the default"`
 		// Whether a configure verifies the SSH host key of the hosts it
 		// targets (#2318). A pointer like the declarations above, so omitting
 		// it takes the server's TRUE rather than asserting a false nobody
@@ -127,6 +143,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			"A workspace declares which OPERATIONS it has, as two independent booleans: plan_apply_enabled (the terraform/tofu/pulumi lifecycle, default TRUE) and configure_enabled (the ansible configure operation, default FALSE). " +
 			"So an ansible CONFIGURE operation needs configure_enabled=true — config_directory alone does not turn one on; it only says where it runs — plus inventory_paths and the run defaults; there is no separate inventory-settings object, these are workspace settings. " +
 			"playbooks ALLOW-LISTS what a configure may run: leave it out and any playbook may be named, as today; set it and default_playbook has to be one of the entries, because a bare configure runs the default. " +
+			"A configure can also run on a CRON SCHEDULE from the moment the workspace exists (scheduled_configure_enabled, scheduled_configure_cron, scheduled_configure_timezone), which is distinct from auto_configure_enabled: that one fires on a push to config_directory, this one on the calendar. " +
 			"Both operations off is refused (422). default_run_kind picks which of them gets the prominent button; leave it out and the most complete kind the workspace has is offered first. " +
 			"Returns the created workspace.",
 		Annotations: mutating,
@@ -180,6 +197,14 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AutoConfigureEnabled: in.AutoConfigureEnabled,
 			ConfigureAfterApply:  in.ConfigureAfterApply,
 			ConfigureAllHosts:    in.ConfigureAllHosts,
+			// #2538's three. Enabled is a pointer straight through, so a
+			// create that leaves it out takes the server's FALSE -- no
+			// schedule -- rather than asserting a value. The two strings are
+			// dropped by the SDK when empty, which is the same as not sending
+			// them: no schedule, and UTC.
+			ScheduledConfigureEnabled:  in.ScheduledConfigureEnabled,
+			ScheduledConfigureCron:     in.ScheduledConfigureCron,
+			ScheduledConfigureTimezone: in.ScheduledConfigureTimezone,
 			// #1929's four. ConfigDirectory is an ordinary path now, so "" and
 			// omitted mean the same thing on create and a plain string is the
 			// honest type; the SDK drops an empty one, which costs nothing

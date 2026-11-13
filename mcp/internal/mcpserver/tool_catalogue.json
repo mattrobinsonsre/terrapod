@@ -2497,6 +2497,21 @@
             "boolean"
           ]
         },
+        "scheduled_configure_cron": {
+          "description": "when the scheduled configure runs, as a FIVE-FIELD cron expression read in scheduled_configure_timezone -- for example 0 2 * * 2 for 02:00 every Tuesday. Refused (422) if it does not parse, if it has six fields (a seconds-resolution schedule cannot be honoured), or if it fires more often than every 300 seconds. Stored exactly as you write it, never reformatted. Empty or omitted means NO SCHEDULE, which is the server default",
+          "type": "string"
+        },
+        "scheduled_configure_enabled": {
+          "description": "run a configure on a CRON SCHEDULE. DEFAULTS TO FALSE. Distinct from auto_configure_enabled, which fires on a push to config_directory: this one is the calendar. Needs scheduled_configure_cron set to do anything, and needs configure_enabled, without which it is inert. Creating a workspace with it already true stamps the schedule clock at creation, so the first configure is the next OCCURRENCE rather than one fired the moment the workspace exists",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "scheduled_configure_timezone": {
+          "description": "the IANA zone the cron expression is read in, e.g. Europe/London; UTC by default. This is what makes it a schedule rather than an interval -- 0 2 * * * in Europe/London is 02:00 there in January AND in July, which are different instants in UTC. Empty or omitted takes the default",
+          "type": "string"
+        },
         "terraform_version": {
           "description": "the same version under its original name; prefer engine_version. Setting both to different values is rejected",
           "type": "string"
