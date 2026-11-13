@@ -20,10 +20,16 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from terrapod.auth import runner_token_state as rts
 
 _KEY = "tp:runtok_state:{}"
+#: The stamp lives in its OWN key, not inside the marker. A beta.4 replica
+#: compares the marker for equality with "revoked", so stamping it in place
+#: made that replica fail to recognise a revocation -- and on the `db is None`
+#: path it then ACCEPTS the token.
+_GRACE = "tp:runtok_grace:{}"
 
 
 class _FakeRedis:
@@ -44,7 +50,13 @@ def _redis(initial=None):
 
 
 def _stamped(age_seconds: float) -> str:
-    return f"revoked:{int(time.time() - age_seconds)}"
+    """The grace key's value: a bare unix timestamp."""
+    return str(int(time.time() - age_seconds))
+
+
+def _ended(run_id, age_seconds: float) -> dict:
+    """A run revoked `age_seconds` ago, in both keys as revocation writes them."""
+    return {_KEY.format(run_id): "revoked", _GRACE.format(run_id): _stamped(age_seconds)}
 
 
 class TestTheRouteListIsDerivedFromWhatTheRunnerUploads:
@@ -127,12 +139,12 @@ class TestPathEligibility:
 class TestTheGraceWindow:
     async def test_a_run_that_just_ended_is_inside_it(self):
         run_id = str(uuid.uuid4())
-        with _redis({_KEY.format(run_id): _stamped(1)}):
+        with _redis(_ended(run_id, 1)):
             assert await rts.terminal_upload_grace_active(run_id) is True
 
     async def test_a_run_that_ended_long_ago_is_outside_it(self):
         run_id = str(uuid.uuid4())
-        with _redis({_KEY.format(run_id): _stamped(rts.TERMINAL_UPLOAD_GRACE_SECONDS + 5)}):
+        with _redis(_ended(run_id, rts.TERMINAL_UPLOAD_GRACE_SECONDS + 5)):
             assert await rts.terminal_upload_grace_active(run_id) is False
 
     async def test_an_unstamped_marker_grants_nothing(self):
@@ -144,10 +156,10 @@ class TestTheGraceWindow:
         with _redis({_KEY.format(run_id): "revoked"}):
             assert await rts.terminal_upload_grace_active(run_id) is False
 
-    @pytest.mark.parametrize("value", ["revoked:", "revoked:soon", "active", "", "revoked:1:2"])
-    async def test_an_unparseable_marker_grants_nothing(self, value):
+    @pytest.mark.parametrize("value", ["", "soon", "revoked:1", "1.5", "  "])
+    async def test_an_unparseable_stamp_grants_nothing(self, value):
         run_id = str(uuid.uuid4())
-        with _redis({_KEY.format(run_id): value}):
+        with _redis({_KEY.format(run_id): "revoked", _GRACE.format(run_id): value}):
             assert await rts.terminal_upload_grace_active(run_id) is False
 
     async def test_a_missing_marker_grants_nothing(self):
@@ -157,7 +169,9 @@ class TestTheGraceWindow:
     async def test_a_stamp_in_the_future_grants_nothing(self):
         """Clock skew between replicas must not open the window wider than it is."""
         run_id = str(uuid.uuid4())
-        with _redis({_KEY.format(run_id): f"revoked:{int(time.time()) + 600}"}):
+        with _redis(
+            {_KEY.format(run_id): "revoked", _GRACE.format(run_id): str(int(time.time()) + 600)}
+        ):
             assert await rts.terminal_upload_grace_active(run_id) is False
 
     async def test_redis_being_away_grants_nothing(self):
@@ -177,9 +191,43 @@ class TestRevocationStampsTheMarker:
         redis = _FakeRedis()
         with patch("terrapod.redis.client.get_redis_client", return_value=redis):
             await rts.revoke_run_tokens(run_id)
-        head, _, stamp = redis.store[_KEY.format(run_id)].partition(":")
-        assert head == "revoked"
-        assert abs(int(stamp) - time.time()) < 5
+        # The marker keeps the EXACT bytes every version reads, so an older
+        # replica goes on refusing the token; the stamp sits beside it.
+        assert redis.store[_KEY.format(run_id)] == "revoked"
+        assert abs(int(redis.store[_GRACE.format(run_id)]) - time.time()) < 5
+
+    async def test_an_older_replica_still_recognises_the_marker(self):
+        """The rolling-upgrade property, and the whole reason for a second key.
+
+        A beta.4 replica tests `value == "revoked"` EXACTLY. Stamping the marker
+        in place made it fail that test, fall past the `_ACTIVE` branch, and --
+        on the `db is None` path used by the SSE variant, the package-cache
+        proxy and the OCI registry -- reach `return True` and ACCEPT a revoked
+        token. A compound condition (old replica AND the database briefly away),
+        but inside the advisory this grace sits in.
+
+        So the assertion is on the BYTES: whatever else revocation records, the
+        marker itself has to stay exactly what every shipped version reads.
+        """
+        run_id = uuid.uuid4()
+        redis = _FakeRedis()
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            await rts.revoke_run_tokens(run_id)
+        marker = redis.store[_KEY.format(run_id)]
+        assert marker == "revoked", (
+            f"the marker is {marker!r}; a replica comparing it for equality with "
+            "'revoked' no longer recognises a revocation, and with no session to "
+            "hand it accepts the token"
+        )
+
+    async def test_the_stamp_is_not_in_the_marker(self):
+        """The same property from the other side, so widening the marker's format
+        fails here rather than only on a replica nobody is running yet."""
+        run_id = uuid.uuid4()
+        redis = _FakeRedis()
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            await rts.revoke_run_tokens(run_id)
+        assert ":" not in redis.store[_KEY.format(run_id)]
 
     async def test_a_stamped_marker_still_refuses_the_token_itself(self):
         """The stamp is additional information, not a weakening: everything that
@@ -189,7 +237,7 @@ class TestRevocationStampsTheMarker:
         result = MagicMock()
         result.scalar_one_or_none.return_value = "planning"  # would allow, if read
         db.execute = AsyncMock(return_value=result)
-        with _redis({_KEY.format(run_id): _stamped(1)}):
+        with _redis(_ended(run_id, 1)):
             assert await rts.is_run_token_usable(run_id, db) is False
         db.execute.assert_not_awaited()
 
@@ -230,7 +278,7 @@ class TestTheThreeConditionsAtTheAuthBoundary:
 
         run_id = str(uuid.uuid4())
         req = self._request("PUT", f"/api/terrapod/v1/runs/{run_id}/artifacts/apply-log")
-        with _redis({_KEY.format(run_id): _stamped(1)}):
+        with _redis(_ended(run_id, 1)):
             assert await _end_of_phase_upload_allowed(req, run_id) is True
 
     @pytest.mark.parametrize("method", ["GET", "DELETE", "PATCH", "HEAD"])
@@ -241,7 +289,7 @@ class TestTheThreeConditionsAtTheAuthBoundary:
 
         run_id = str(uuid.uuid4())
         req = self._request(method, f"/api/terrapod/v1/runs/{run_id}/artifacts/apply-log")
-        with _redis({_KEY.format(run_id): _stamped(1)}):
+        with _redis(_ended(run_id, 1)):
             assert await _end_of_phase_upload_allowed(req, run_id) is False
 
     async def test_a_route_outside_the_set_is_refused(self):
@@ -249,7 +297,7 @@ class TestTheThreeConditionsAtTheAuthBoundary:
 
         run_id = str(uuid.uuid4())
         req = self._request("PUT", f"/api/terrapod/v1/runs/{run_id}/artifacts/state")
-        with _redis({_KEY.format(run_id): _stamped(1)}):
+        with _redis(_ended(run_id, 1)):
             assert await _end_of_phase_upload_allowed(req, run_id) is False
 
     async def test_a_run_that_ended_long_ago_is_refused(self):
@@ -257,7 +305,7 @@ class TestTheThreeConditionsAtTheAuthBoundary:
 
         run_id = str(uuid.uuid4())
         req = self._request("PUT", f"/api/terrapod/v1/runs/{run_id}/artifacts/apply-log")
-        with _redis({_KEY.format(run_id): _stamped(rts.TERMINAL_UPLOAD_GRACE_SECONDS + 5)}):
+        with _redis(_ended(run_id, rts.TERMINAL_UPLOAD_GRACE_SECONDS + 5)):
             assert await _end_of_phase_upload_allowed(req, run_id) is False
 
     async def test_the_grace_is_consulted_only_after_the_ordinary_check_refuses(self):
@@ -294,3 +342,107 @@ class TestTheThreeConditionsAtTheAuthBoundary:
             "the grace is being consulted before the ordinary liveness check, so "
             "every live run now pays for it and the ordinary path has changed"
         )
+
+
+class TestTheBoundaryItself:
+    """Driven through `get_current_user`, because the AST gate cannot see polarity.
+
+    The whole widening is one boolean at `dependencies.py`:
+
+        if not await is_run_token_usable(...) and not (await _end_of_phase_upload_allowed(...)):
+
+    Dropping the SECOND `not` inverts it: the four exit uploads become the only
+    thing refused, and every other runner-facing route accepts a REVOKED token
+    for the rest of its TTL -- which is GHSA-xmrf-hxq9-m59m in full, from a
+    one-character edit.
+
+    Nothing caught that. Every other test in this file calls
+    `_end_of_phase_upload_allowed` directly, so none of them reaches the
+    boolean; `test_the_grace_is_consulted_only_after_the_ordinary_check_refuses`
+    collects `ast.dump` of the `BoolOp` values and asserts membership and order,
+    which a `UnaryOp(Not, ...)` and a bare `Await(...)` satisfy identically; and
+    `test_every_runner_token_path_checks_liveness` asserts the string
+    `HTTP_401_UNAUTHORIZED` appears somewhere in the body, which is a presence
+    check in the file written to catch presence-vs-application.
+
+    Only a request through the boundary pins the sign, so that is what these do.
+    """
+
+    @staticmethod
+    def _request(method: str, path: str):
+        req = MagicMock()
+        req.method = method
+        req.url = MagicMock()
+        req.url.path = path
+        req.headers = {}
+        req.client = MagicMock()
+        req.client.host = "127.0.0.1"
+        return req
+
+    @staticmethod
+    def _db_with_status(status):
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = status
+        db.execute = AsyncMock(return_value=result)
+        return db
+
+    async def _call(self, *, method, path, marker, status="applied"):
+        from fastapi.security import HTTPAuthorizationCredentials
+
+        from terrapod.api.dependencies import get_current_user
+        from terrapod.auth.runner_tokens import generate_runner_token
+
+        run_id = str(uuid.uuid4())
+        token = generate_runner_token(run_id, phase="apply")
+        store = {} if marker is None else marker(run_id)
+        req = self._request(method, path.format(run_id=run_id))
+        creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+        with (
+            _redis(store),
+            patch("terrapod.api.dependencies._resolve_user_roles", return_value=["everyone"]),
+        ):
+            return await get_current_user(req, creds, self._db_with_status(status))
+
+    async def test_an_exit_upload_inside_the_window_is_admitted(self):
+        user = await self._call(
+            method="PUT",
+            path="/api/terrapod/v1/runs/{run_id}/artifacts/apply-log",
+            marker=lambda r: _ended(r, 1),
+        )
+        assert user.auth_method == "runner_token"
+
+    async def test_the_same_upload_outside_the_window_is_refused(self):
+        """The other sign of the same condition. Without this the window could be
+        unbounded and the admitting test above would not notice."""
+        with pytest.raises(HTTPException) as exc:
+            await self._call(
+                method="PUT",
+                path="/api/terrapod/v1/runs/{run_id}/artifacts/apply-log",
+                marker=lambda r: _ended(r, rts.TERMINAL_UPLOAD_GRACE_SECONDS + 5),
+            )
+        assert exc.value.status_code == 401
+
+    async def test_any_other_route_on_a_terminal_run_is_still_refused(self):
+        """THE ONE THAT PINS THE SIGN. Drop the second `not` and this route --
+        every runner-facing route that is not one of the four exit uploads --
+        starts accepting a revoked token, which is the advisory reopened."""
+        with pytest.raises(HTTPException) as exc:
+            await self._call(
+                method="PUT",
+                path="/api/terrapod/v1/runs/{run_id}/artifacts/state",
+                marker=lambda r: _ended(r, 1),
+            )
+        assert exc.value.status_code == 401
+
+    async def test_a_live_run_is_unaffected(self):
+        """The ordinary path must not have changed. Inverting the boolean refuses
+        a live run on a non-grace route, so this is the second sign-sensitive
+        case and it is the one an operator would notice first."""
+        user = await self._call(
+            method="PUT",
+            path="/api/terrapod/v1/runs/{run_id}/artifacts/state",
+            marker=None,
+            status="applying",
+        )
+        assert user.auth_method == "runner_token"

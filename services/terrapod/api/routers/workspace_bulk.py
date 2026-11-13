@@ -1039,6 +1039,13 @@ async def _apply(
                 # Named explicitly, so the guard above already refused any
                 # workspace that could not offer it.
                 setattr(ws, attr, new)
+            elif attr == "scheduled_configure_enabled":
+                # Not a plain setattr: turning the cron trigger ON must stamp
+                # the baseline, or `is_due` falls back to `created_at` and every
+                # workspace in the match set is due within the reconciler's next
+                # 60 seconds -- a fleet-wide configure from one request. Same
+                # shape and same surface as its sibling below.
+                workspace_settings.set_scheduled_configure_enabled(ws, new)
             elif attr == "auto_configure_enabled":
                 # Not a plain setattr: turning the trigger off must forget the
                 # auto-configure baseline too, or a later re-enable fires across

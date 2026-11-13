@@ -25,8 +25,11 @@ is why "cached active" does not delay a revocation in practice.
 **Fail OPEN on an infrastructure error, closed on an answer.** If Redis cannot be
 reached the row is consulted; if neither can be reached the request is allowed,
 because refusing would stop every live run on a transient Redis blip — a far
-worse outcome than a token remaining usable for a few more seconds. What is never
-allowed is a run that is *known* to be terminal or gone.
+worse outcome than a token remaining usable for a few more seconds. A run that is
+*known* to be terminal or gone is refused -- with one deliberate exception, the
+end-of-phase upload grace below, which admits the four routes the runner writes
+at exit and nothing else, for `TERMINAL_UPLOAD_GRACE_SECONDS` after the run ended
+and only when that end time was recorded.
 """
 
 import time
@@ -90,6 +93,21 @@ GRACE_PATH_SUFFIXES: frozenset[str] = frozenset(
 TERMINAL_STATES: frozenset[str] = frozenset({"applied", "errored", "discarded", "canceled"})
 
 
+def _grace_key(run_id: str) -> str:
+    """Where the end-of-phase grace reads the run's end time (#2564).
+
+    Separate from the revocation marker ON PURPOSE. Stamping the marker itself
+    would be cheaper by one key and is not safe across a rolling upgrade: a
+    replica that predates the stamp compares the marker for equality with
+    `revoked`, does not recognise `revoked:<ts>`, and on the `db is None` path
+    -- the SSE variant, the package-cache proxy, the OCI registry -- falls
+    through to ACCEPTING the token. The marker therefore keeps the exact bytes
+    every version reads, and the stamp lives where only a reader that knows to
+    look will find one.
+    """
+    return f"tp:runtok_grace:{run_id}"
+
+
 def _key(run_id: str | uuid.UUID) -> str:
     return f"{_STATE_PREFIX}{run_id}"
 
@@ -126,8 +144,12 @@ async def revoke_run_tokens(run_id: str | uuid.UUID) -> None:
         # by a replica that predates this is a bare `revoked`, which parses as
         # "no grace" -- fail closed, which is the right way round during a
         # rolling upgrade.
-        value = f"{_REVOKED}:{int(time.time())}"
-        await get_redis_client().set(_key(run_id), value, ex=_marker_ttl())
+        redis = get_redis_client()
+        await redis.set(_key(run_id), _REVOKED, ex=_marker_ttl())
+        # Second, and best-effort within the same guard: the marker is what
+        # refuses the token and must not be delayed or risked for a stamp whose
+        # only job is to widen a 120-second window.
+        await redis.set(_grace_key(run_id), str(int(time.time())), ex=_marker_ttl())
     except Exception:  # noqa: BLE001
         logger.debug("runner_token_revocation_marker_not_written", run_id=str(run_id))
 
@@ -148,7 +170,7 @@ async def is_run_token_usable(run_id: str, db=None) -> bool:  # type: ignore[no-
         cached = await redis.get(_key(run_id))
         if cached is not None:
             value = cached.decode() if isinstance(cached, bytes) else str(cached)
-            if value.split(":", 1)[0] == _REVOKED:
+            if value == _REVOKED:
                 return False
             if value == _ACTIVE:
                 return True
@@ -211,18 +233,17 @@ async def terminal_upload_grace_active(run_id: str) -> bool:
     try:
         from terrapod.redis.client import get_redis_client
 
-        cached = await get_redis_client().get(_key(run_id))
+        cached = await get_redis_client().get(_grace_key(run_id))
     except Exception:  # noqa: BLE001
         return False
     if cached is None:
-        return False
-    value = cached.decode() if isinstance(cached, bytes) else str(cached)
-    head, _, stamp = value.partition(":")
-    if head != _REVOKED or not stamp:
+        # No stamp: either nothing recorded when this run ended, or it ended
+        # before this shipped. Either way the end time is unknown, so there is
+        # no window -- an unanswerable question is a refusal.
         return False
     try:
-        at = int(stamp)
-    except ValueError:
+        at = int(cached.decode() if isinstance(cached, bytes) else str(cached))
+    except (ValueError, AttributeError):
         return False
     return 0 <= (time.time() - at) <= TERMINAL_UPLOAD_GRACE_SECONDS
 
