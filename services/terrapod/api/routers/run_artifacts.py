@@ -145,7 +145,10 @@ async def _plan_resources(run: Run, db: AsyncSession, tmp_path: str) -> dict | N
     resolves phase-blind (#2189), as the summariser's does.
     """
     try:
-        secrets = await strict_sensitive_literals(db, run)
+        # A savepoint, so a database error here rolls back only the lookup and
+        # the session the upload commits on stays usable.
+        async with db.begin_nested():
+            secrets = await strict_sensitive_literals(db, run)
         return await asyncio.to_thread(_resource_list_from_file, tmp_path, secrets)
     except Exception as exc:  # noqa: BLE001 - see the docstring
         logger.warning(
