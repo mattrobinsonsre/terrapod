@@ -20,9 +20,11 @@ on:
     # (the only `github.ref` use is the concurrency group, which is per-ref),
     # and every release and publish job is gated on `is_tag`, computed from
     # GITHUB_REF matching a version tag. A branch push is not a tag, so none of
-    # them can fire. `build-query` and `build-ee-agent` still run on a tag even
-    # when images exist, deliberately, so the Release attaches the same
-    # binaries.
+    # them can fire. `build-query` still runs on a tag even when images exist,
+    # deliberately: `release-query` attaches the linux binaries to the Release,
+    # and the image jobs that would otherwise produce them are skipped on that
+    # path. They are built from the same commit and the same pinned toolchain
+    # as the ones inside the images rather than being the same artifact (#2572).
     #
     # And the skip is EARNED rather than assumed: `create-manifests` requires
     # every lint, test and scan to be success-or-skipped, so a red run leaves no
@@ -973,66 +975,16 @@ jobs:
         run: go test ./... -v -count=1 -timeout 300s
         working-directory: ee-agent
 
-  # ── Build terrapod-ee-agent binary (baked into the runner image) ──────
-  # Static and stdlib-only, so the initContainer can copy it onto a shared
-  # volume and the EE can run it with no interpreter and no libraries of ours.
-
-  build-ee-agent:
-    # BOTH architectures in ONE job, not a matrix of two.
-    #
-    # The quota is per JOB -- 20 concurrent -- so two jobs spend two slots to
-    # cross-compile a binary that takes a few seconds either way. Measured on
-    # run 43261217946, `build-query` waited 48s for a slot and the image builds
-    # cannot even be CREATED until it finishes, so that queue time sits on the
-    # critical chain ahead of wave 2 and is paid twice.
-    #
-    # Cross-compiling needs no native runner, which is why both were on
-    # `ubuntu-latest` already; GOARCH is the only difference between them.
-    name: Build terrapod-ee-agent
-    needs: prepare
-    # CGO off is not an optimisation: the binary runs inside an arbitrary EE
-    # whose libc we do not choose, so it must not link one -- asserted below for
-    # both architectures.
-    if: needs.prepare.outputs.images_exist != 'true' || needs.prepare.outputs.is_tag == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: ee-agent/go.mod
-          cache: false
-
-      - name: Build linux/amd64 and linux/arm64
-        working-directory: ee-agent
-        env:
-          GOOS: linux
-          CGO_ENABLED: "0"
-        run: |
-          set -euo pipefail
-          for arch in amd64 arm64; do
-            GOARCH="$arch" go build -trimpath -ldflags "-s -w" \
-              -o "terrapod-ee-agent-linux-$arch" .
-          done
-          for arch in amd64 arm64; do
-            file "terrapod-ee-agent-linux-$arch"
-            file "terrapod-ee-agent-linux-$arch" | grep -q 'statically linked'
-          done
-
-      - name: Upload terrapod-ee-agent-linux-amd64 artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: terrapod-ee-agent-linux-amd64
-          path: ee-agent/terrapod-ee-agent-linux-amd64
-          retention-days: 1
-
-      - name: Upload terrapod-ee-agent-linux-arm64 artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: terrapod-ee-agent-linux-arm64
-          path: ee-agent/terrapod-ee-agent-linux-arm64
-          retention-days: 1
-
   build-query:
+    # TAG-ONLY since #2572. The image builds used to wait on this job and now
+    # cross-compile their own copy, so the single thing left that needs a
+    # binary from HERE is `release-query`, which attaches the linux ones to the
+    # Release. It cannot be folded into the image job for the same reason:
+    # on the normal release path the images already exist and
+    # `build-images-*` is SKIPPED, so a build living only there would leave a
+    # tag with no query binaries and `release-query` gated on a job that never
+    # ran -- a failure that reports nothing.
+    #
     # BOTH architectures in ONE job, not a matrix of two.
     #
     # The quota is per JOB -- 20 concurrent -- so two jobs spend two slots to
@@ -1049,7 +1001,7 @@ jobs:
     # (so release-query can attach the SAME linux binaries to the Release --
     # built once here, reused by both the image bake and the release, never
     # compiled twice).
-    if: needs.prepare.outputs.images_exist != 'true' || needs.prepare.outputs.is_tag == 'true'
+    if: needs.prepare.outputs.is_tag == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -4308,7 +4260,7 @@ jobs:
     # arm64 runner, and merging them would push one through emulation, which
     # costs far more than the slot it saves. See docker/docker-bake.hcl.
     name: Build images (amd64)
-    needs: [prepare, build-query, build-ee-agent]
+    needs: [prepare]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -4326,30 +4278,46 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      # Staged ONCE for all five targets. Only the api and runner images COPY
-      # the query binary and only the runner COPYs the agent, but they are a
-      # few MB and staging them unconditionally is cheaper than branching.
-      - name: Stage terrapod-query binary
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      # Built HERE rather than downloaded from a job in front of this one
+      # (#2572). Both are pure Go with CGO_ENABLED=0, so the arch that needs a
+      # binary can cross-compile it itself -- which removes the dependency edge
+      # that kept the five image builds a whole phase behind `prepare`, and the
+      # artifact round trip with it. Measured before: the image builds started
+      # at +50s because `build-query` (33s) and `build-ee-agent` (38s) ran
+      # first; they now start with `prepare`.
+      #
+      # `build-query` still exists, for TAGS only: `release-query` attaches the
+      # linux binaries to the Release, and on the normal release path the image
+      # jobs are SKIPPED because the images already exist -- so a build living
+      # only here would leave a tag with no query binaries at all.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          name: terrapod-query-linux-amd64
-          path: docker/query-bin
+          # Both modules pin the same `go` directive, which
+          # `scripts/docs-audit/check_go_directives.py` is what keeps true, so
+          # one toolchain serves both builds below.
+          go-version-file: query/go.mod
+          cache: false
 
-      - name: Normalise terrapod-query binary
+      - name: Build terrapod-query and terrapod-ee-agent for this arch
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: "0"
         run: |
-          mv docker/query-bin/terrapod-query-linux-amd64 docker/query-bin/terrapod-query
-          chmod 0755 docker/query-bin/terrapod-query
-
-      - name: Stage terrapod-ee-agent binary
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          name: terrapod-ee-agent-linux-amd64
-          path: docker/ee-agent-bin
-
-      - name: Normalise terrapod-ee-agent binary
-        run: |
-          mv docker/ee-agent-bin/terrapod-ee-agent-linux-amd64 docker/ee-agent-bin/terrapod-ee-agent
-          chmod 0755 docker/ee-agent-bin/terrapod-ee-agent
+          set -euo pipefail
+          mkdir -p docker/query-bin docker/ee-agent-bin
+          (cd query && go build -trimpath -ldflags "-s -w" \
+            -o ../docker/query-bin/terrapod-query ./cmd/terrapod-query)
+          (cd ee-agent && go build -trimpath -ldflags "-s -w" \
+            -o ../docker/ee-agent-bin/terrapod-ee-agent .)
+          # `go build` already writes 0755; set it anyway, because this is what
+          # the Normalise steps did and `Dockerfile.runner` never chmods the
+          # agent itself.
+          chmod 0755 docker/query-bin/terrapod-query docker/ee-agent-bin/terrapod-ee-agent
+          # Kept from `build-ee-agent`: the agent is copied into an execution
+          # environment that may share no libc with the runner image.
+          file docker/ee-agent-bin/terrapod-ee-agent
+          file docker/ee-agent-bin/terrapod-ee-agent | grep -q 'statically linked'
 
       - name: Build all five images
         env:
@@ -4442,7 +4410,7 @@ jobs:
     # arm64 runner, and merging them would push one through emulation, which
     # costs far more than the slot it saves. See docker/docker-bake.hcl.
     name: Build images (arm64)
-    needs: [prepare, build-query, build-ee-agent]
+    needs: [prepare]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -4460,30 +4428,46 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      # Staged ONCE for all five targets. Only the api and runner images COPY
-      # the query binary and only the runner COPYs the agent, but they are a
-      # few MB and staging them unconditionally is cheaper than branching.
-      - name: Stage terrapod-query binary
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      # Built HERE rather than downloaded from a job in front of this one
+      # (#2572). Both are pure Go with CGO_ENABLED=0, so the arch that needs a
+      # binary can cross-compile it itself -- which removes the dependency edge
+      # that kept the five image builds a whole phase behind `prepare`, and the
+      # artifact round trip with it. Measured before: the image builds started
+      # at +50s because `build-query` (33s) and `build-ee-agent` (38s) ran
+      # first; they now start with `prepare`.
+      #
+      # `build-query` still exists, for TAGS only: `release-query` attaches the
+      # linux binaries to the Release, and on the normal release path the image
+      # jobs are SKIPPED because the images already exist -- so a build living
+      # only here would leave a tag with no query binaries at all.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          name: terrapod-query-linux-arm64
-          path: docker/query-bin
+          # Both modules pin the same `go` directive, which
+          # `scripts/docs-audit/check_go_directives.py` is what keeps true, so
+          # one toolchain serves both builds below.
+          go-version-file: query/go.mod
+          cache: false
 
-      - name: Normalise terrapod-query binary
+      - name: Build terrapod-query and terrapod-ee-agent for this arch
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: "0"
         run: |
-          mv docker/query-bin/terrapod-query-linux-arm64 docker/query-bin/terrapod-query
-          chmod 0755 docker/query-bin/terrapod-query
-
-      - name: Stage terrapod-ee-agent binary
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          name: terrapod-ee-agent-linux-arm64
-          path: docker/ee-agent-bin
-
-      - name: Normalise terrapod-ee-agent binary
-        run: |
-          mv docker/ee-agent-bin/terrapod-ee-agent-linux-arm64 docker/ee-agent-bin/terrapod-ee-agent
-          chmod 0755 docker/ee-agent-bin/terrapod-ee-agent
+          set -euo pipefail
+          mkdir -p docker/query-bin docker/ee-agent-bin
+          (cd query && go build -trimpath -ldflags "-s -w" \
+            -o ../docker/query-bin/terrapod-query ./cmd/terrapod-query)
+          (cd ee-agent && go build -trimpath -ldflags "-s -w" \
+            -o ../docker/ee-agent-bin/terrapod-ee-agent .)
+          # `go build` already writes 0755; set it anyway, because this is what
+          # the Normalise steps did and `Dockerfile.runner` never chmods the
+          # agent itself.
+          chmod 0755 docker/query-bin/terrapod-query docker/ee-agent-bin/terrapod-ee-agent
+          # Kept from `build-ee-agent`: the agent is copied into an execution
+          # environment that may share no libc with the runner image.
+          file docker/ee-agent-bin/terrapod-ee-agent
+          file docker/ee-agent-bin/terrapod-ee-agent | grep -q 'statically linked'
 
       - name: Build all five images
         env:
@@ -6671,7 +6655,6 @@ jobs:
       - node-checks
       - go-modules
       - pulumi-sdk-build
-      - build-ee-agent
       - build-query
       - python-test
       - python-audit
@@ -6723,7 +6706,6 @@ jobs:
             "${{ needs.node-checks.result }}"
             "${{ needs.go-modules.result }}"
             "${{ needs.pulumi-sdk-build.result }}"
-            "${{ needs.build-ee-agent.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
             "${{ needs.python-audit.result }}"

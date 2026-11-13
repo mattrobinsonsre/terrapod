@@ -70,8 +70,10 @@ ALWAYS_RUN: dict[str, str] = {
     # as python-checks, one level down: the job is not what its name says.
     "helm-smoke": "holds the Go CVE scan and a docs gate, not just chart renders",
     "codeql": "one matrix over three languages; gating needs a dynamic matrix",
-    "build-query": "publishes a binary the image builds download",
-    "build-ee-agent": "publishes a binary the image builds download",
+    # Tag-only since #2572, and still ungated: on a tag it is the sole producer
+    # of the linux binaries `release-query` attaches, and a release must not
+    # depend on which paths a diff happened to touch.
+    "build-query": "on a tag, the only producer of the Release's query binaries",
     "build-images-amd64": "five downstream jobs load its artifacts",
     "build-images-arm64": "its manifests are the release's retag source",
     # Two reasons, and the first is the one that binds: the scan matrix is

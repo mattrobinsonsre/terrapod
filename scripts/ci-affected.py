@@ -58,10 +58,15 @@ change need checking".
 
 WHAT IS DELIBERATELY NOT GATED
 ------------------------------
-`build-query` and `build-ee-agent` publish artifacts the image builds download;
-`e2e-test`, `helm-eval-boot`, `cli-contract`, `airgap-gate` and
+`build-query` is the sole producer of the linux binaries `release-query`
+attaches to a Release, and a release must not depend on which paths a diff
+touched; `e2e-test`, `helm-eval-boot`, `cli-contract`, `airgap-gate` and
 `oci-conformance` load the PR's image artifacts.  Gating any of those starves a
 consumer, so they are out of scope here rather than quietly half-handled.
+
+The image builds no longer download those binaries at all -- they cross-compile
+their own (#2572), which is what let them move into the same phase as
+`prepare`.
 """
 
 from __future__ import annotations
