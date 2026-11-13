@@ -1060,44 +1060,68 @@ class TestProgressContract:
         return found
 
     @staticmethod
-    def _set(name: str) -> set[str]:
-        body = _SRC.split(f"{name} = frozenset(")[1].split(")")[0]
-        values = set(re.findall(r'"(v2_[a-z_]+)"', body))
-        assert values, f"{name} is empty or has been renamed"
-        return values
+    def _classification() -> dict[str, bool]:
+        """`_METHOD_ENDS_TASK`, read from the plugin's source.
+
+        One mapping rather than two sets, so "in both" is not a state that can
+        exist -- and so the ledger has a READER in the code rather than only in
+        this file, which a second set did not.
+        """
+        body = _SRC.split("_METHOD_ENDS_TASK = {")[1].split("}")[0]
+        found = dict(re.findall(r'"(v2_[a-z_]+)": (True|False)', body))
+        assert found, "_METHOD_ENDS_TASK is empty or has been renamed"
+        return {name: value == "True" for name, value in found.items()}
 
     def test_every_result_hook_is_classified(self):
-        """A hook in neither set, or in both, is the defect this catches.
+        """A hook missing from the mapping is the defect this catches.
 
-        `_tp_result` clears the still-running entry only for a TERMINAL hook.
-        Get that wrong in one direction and the ticker announces a finished
-        task for the rest of the play (#2575's own defect); in the other and
-        it goes silent while the task is still working (the loop defect found
-        fixing it). Both are silent, so neither default is safe to inherit.
+        `_tp_result` clears the still-running entry only for a hook that ends
+        the task. Get that wrong in one direction and the ticker announces a
+        finished task for the rest of the play (#2575's own defect); in the
+        other it goes silent while the task is still working (the loop defect
+        found fixing it). Both are silent, so neither default is safe to
+        inherit by omission.
         """
-        terminal = self._set("_TERMINAL_METHODS")
-        non_terminal = self._set("_NON_TERMINAL_METHODS")
-        assert not (terminal & non_terminal), terminal & non_terminal
+        classified = self._classification()
         hooks = self._hooks()
-        unclassified = hooks - terminal - non_terminal
+        unclassified = hooks - set(classified)
         assert not unclassified, (
-            f"{sorted(unclassified)} reach `_tp_result` and are in neither set. "
-            "Decide whether each means the task is OVER on that host and add it "
-            "to `_TERMINAL_METHODS` or `_NON_TERMINAL_METHODS`."
+            f"{sorted(unclassified)} reach `_tp_result` and are not in "
+            "`_METHOD_ENDS_TASK`. Decide whether each means the task is OVER on "
+            "that host and add it with True or False."
         )
-        stale = (terminal | non_terminal) - hooks
+        stale = set(classified) - hooks
         assert not stale, f"{sorted(stale)} are classified but reach nothing"
 
-    def test_an_item_hook_is_never_terminal(self):
+    def test_an_unclassified_hook_would_not_end_the_task(self):
+        """The fallback, asserted on the source because nothing can run it.
+
+        `test_every_result_hook_is_classified` keeps every hook in the mapping,
+        so the `.get` default is unreachable today -- which is why flipping it
+        survives every behavioural test. It still decides what happens to the
+        NEXT hook someone adds before CI tells them to classify it, and the two
+        directions are not equivalent: `False` leaves the entry for whichever
+        hook really does end the task, which will fire, while `True` ends the
+        task early and the ticker goes quiet while it is still working.
+        """
+        found = re.search(r"_METHOD_ENDS_TASK\.get\(method, (True|False)\)", _SRC)
+        assert found, "the classification lookup is no longer parseable"
+        assert found.group(1) == "False", (
+            "an unclassified result hook would END the task, so a newly added "
+            "one would silence the ticker mid-task until someone noticed"
+        )
+
+    def test_an_item_hook_never_ends_the_task(self):
         """The specific half, because the general gate above permits either.
 
         An item hook carries its PARENT's task uuid, so its key is the
         parent's: ending the task there ends it at the first iteration.
         """
-        terminal = self._set("_TERMINAL_METHODS")
+        classified = self._classification()
         items = {h for h in self._hooks() if "_item_on_" in h}
         assert items, "no item hooks found; the matcher has stopped matching"
-        assert not (items & terminal), sorted(items & terminal)
+        terminal_items = {h for h in items if classified.get(h)}
+        assert not terminal_items, sorted(terminal_items)
 
     def test_the_declared_defaults_match_the_code_fallbacks(self):
         """`get_option` can raise, and then the fallback IS the default.

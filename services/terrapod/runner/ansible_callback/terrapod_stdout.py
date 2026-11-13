@@ -441,29 +441,28 @@ def format_duration(seconds: float) -> str:
 #: -- a three-item loop of four-second commands announced four seconds of work
 #: and then nothing for the remaining eight.
 #:
-#: `test_every_result_hook_is_classified` fails on a hook in neither set or in
-#: both, so a new one cannot quietly inherit whichever default happens to be
-#: wrong for it.
-_TERMINAL_METHODS = frozenset(
-    {
-        "v2_runner_on_ok",
-        "v2_runner_on_failed",
-        "v2_runner_on_skipped",
-        "v2_runner_on_unreachable",
-        "v2_runner_on_async_ok",
-        "v2_runner_on_async_failed",
-    }
-)
-_NON_TERMINAL_METHODS = frozenset(
-    {
-        "v2_runner_item_on_ok",
-        "v2_runner_item_on_failed",
-        "v2_runner_item_on_skipped",
-        "v2_runner_on_async_poll",
-        "v2_runner_retry",
-        "v2_on_file_diff",
-    }
-)
+#: `test_every_result_hook_is_classified` fails on a hook missing from the
+#: mapping, so a new one cannot quietly inherit whichever default happens to
+#: be wrong for it.
+#: ONE mapping rather than a terminal set beside a non-terminal one. Two sets
+#: can disagree -- a hook in both, or in neither -- and only the second of them
+#: would have had a reader: the branch below consults the terminal set alone, so
+#: the other was a ledger nothing in the code read, which is the defect this
+#: file already exists to guard against in its own options.
+_METHOD_ENDS_TASK = {
+    "v2_runner_on_ok": True,
+    "v2_runner_on_failed": True,
+    "v2_runner_on_skipped": True,
+    "v2_runner_on_unreachable": True,
+    "v2_runner_on_async_ok": True,
+    "v2_runner_on_async_failed": True,
+    "v2_runner_item_on_ok": False,
+    "v2_runner_item_on_failed": False,
+    "v2_runner_item_on_skipped": False,
+    "v2_runner_on_async_poll": False,
+    "v2_runner_retry": False,
+    "v2_on_file_diff": False,
+}
 
 
 class CallbackModule(DefaultCallback):
@@ -905,11 +904,16 @@ class CallbackModule(DefaultCallback):
         # leaks is every ok task rather than every include.
         task = self._tp_field(result, "task")
         key = (getattr(task, "_uuid", None), name)
-        if method in _TERMINAL_METHODS:
+        if _METHOD_ENDS_TASK.get(method, False):
             started = self._tp_started.pop(key, self._tp_task_at)
         else:
             # Read without clearing: the task is still going, so the ticker
-            # must keep announcing it. See `_TERMINAL_METHODS`.
+            # must keep announcing it. See `_METHOD_ENDS_TASK`.
+            #
+            # An UNCLASSIFIED hook lands here, which is the safe direction: the
+            # entry simply waits for whichever hook really does end the task,
+            # and that one will fire. `test_every_result_hook_is_classified`
+            # fails on the omission rather than leaving it to be noticed.
             started = self._tp_started.get(key, self._tp_task_at)
 
         # An empty frame is `default` declining to speak -- `display_ok_hosts:
