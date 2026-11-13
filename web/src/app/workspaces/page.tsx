@@ -50,7 +50,7 @@ import {
   toggleLockedTerm,
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
-import { RUN_STATUSES, resolveStatus } from '@/lib/workspace-status'
+import { RUN_STATUSES, resolveStatus, runStatusOf } from '@/lib/workspace-status'
 import { defaultEngineVersion, versionToolFor } from '@/lib/engine-version'
 import {
   CREATE_INPUT,
@@ -701,10 +701,7 @@ function WorkspacesPageInner() {
       : workspaces
     if (parsedFilter.terms.length === 0) return byEngine
     return byEngine.filter(ws => {
-      // Status terms need the resolved status; pass it conditionally so
-      // workspaces without a status (— display) don't accidentally match
-      // an empty `status:` predicate.
-      return matchWorkspace(ws, parsedFilter, resolveStatus(ws).def?.filter ?? undefined)
+      return matchWorkspace(ws, parsedFilter, runStatusOf(ws))
     })
   }, [workspaces, parsedFilter, engineFilter])
 
@@ -787,7 +784,7 @@ function WorkspacesPageInner() {
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const ws of workspaces) {
-      const f = resolveStatus(ws).def?.filter
+      const f = runStatusOf(ws)
       if (f) counts[f] = (counts[f] || 0) + 1
     }
     return counts

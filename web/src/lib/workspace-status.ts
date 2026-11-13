@@ -68,6 +68,8 @@ export const RUN_STATUSES: ReadonlyArray<WorkspaceStatusDef> = WORKSPACE_STATUSE
   s => !s.isWorkspaceLevel,
 )
 
+const RUN_FILTERS: ReadonlySet<string> = new Set(RUN_STATUSES.map(s => s.filter))
+
 const STATUS_BY_FILTER: ReadonlyMap<string, WorkspaceStatusDef> = new Map(
   WORKSPACE_STATUSES.map(s => [s.filter, s] as const),
 )
@@ -104,6 +106,19 @@ export interface ResolvedStatus {
    *  starts would describe a different run, which is worse than no link
    *  target at all. */
   phaseStarts: Record<string, unknown> | null
+}
+
+/** The `status:` value for a workspace: its latest run's own status, one of
+ *  `RUN_STATUSES`, or undefined with no run. A planned run that awaits
+ *  confirmation reads as `needs-confirm`. Workspace-level conditions play no
+ *  part; they are `flag:`'s. The matcher and the dropdown counts both use it. */
+export function runStatusOf(ws: {
+  attributes: { 'latest-run': { status: string; 'plan-only': boolean } | null }
+}): string | undefined {
+  const run = ws.attributes['latest-run']
+  if (!run) return undefined
+  const status = run.status === 'planned' && !run['plan-only'] ? 'needs-confirm' : run.status
+  return RUN_FILTERS.has(status) ? status : undefined
 }
 
 /** Resolve a workspace's effective status from its signals.

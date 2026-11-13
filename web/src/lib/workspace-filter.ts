@@ -294,16 +294,14 @@ function conditionCodes(ws: MatchableWorkspace): Set<string> {
 }
 
 /**
- * @param resolvedStatus  Caller-resolved status string for this workspace
- *   (e.g. "errored", "needs-confirm"). Only consulted when the filter
- *   contains `status:` terms; safe to omit otherwise. The page resolves it
- *   from `latest-run` + drift / divergence / VCS-error signals via the
- *   `resolveStatus` helper, so this module stays UI-agnostic.
+ * @param runStatus  The workspace's latest run's own status (`runStatusOf`),
+ *   not the badge's resolved one. Only consulted when the filter contains
+ *   `status:` terms; undefined, for a workspace with no run, matches none.
  */
 export function matchWorkspace(
   ws: MatchableWorkspace,
   parsed: ParsedFilter,
-  resolvedStatus?: string,
+  runStatus?: string,
 ): boolean {
   const name = ws.attributes.name.toLowerCase()
   const labels = ws.attributes.labels || {}
@@ -333,7 +331,7 @@ export function matchWorkspace(
   // an unrecognised value in either matches nothing rather than dropping out.
   if (statuses.length > 0) {
     if (statuses.some(v => !RUN_STATUS_VALUES.has(v))) return false
-    if (!statuses.some(v => v === resolvedStatus)) return false
+    if (!statuses.some(v => v === runStatus)) return false
   }
   if (flags.length > 0) {
     const codes = conditionCodes(ws)
