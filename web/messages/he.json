@@ -124,6 +124,11 @@
       "running": "מריץ {action} בסביבות העבודה שנבחרו ({count})…",
       "resultSummary": "{action}: {ok} מתוך {total} הצליחו",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "הבקשה נכשלה ({status})",
+        "noRun": "אין הרצה לפעול עליה",
+        "network": "לא ניתן להגיע לשרת"
+      },
       "resultDismiss": "סגירה"
     },
     "filter": {

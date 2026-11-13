@@ -124,6 +124,11 @@
       "running": "Runnin' {action} on th' chosen workspaces ({count})…",
       "resultSummary": "{action}: {ok} o' {total} made it",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Request failed ({status}), matey",
+        "noRun": "No run t' act on",
+        "network": "Could not reach th' server"
+      },
       "resultDismiss": "Belay"
     },
     "filter": {

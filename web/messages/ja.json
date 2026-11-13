@@ -124,6 +124,11 @@
       "running": "選択したワークスペース（{count}）で {action} を実行中…",
       "resultSummary": "{action}: {total} 件中 {ok} 件が成功",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "リクエストに失敗しました（{status}）",
+        "noRun": "対象の実行がありません",
+        "network": "サーバーに接続できませんでした"
+      },
       "resultDismiss": "閉じる"
     },
     "filter": {

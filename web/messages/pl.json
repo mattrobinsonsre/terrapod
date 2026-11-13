@@ -124,6 +124,11 @@
       "running": "Wykonywanie {action} w wybranych przestrzeniach roboczych ({count})…",
       "resultSummary": "{action}: powiodło się {ok} z {total}",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Żądanie nie powiodło się ({status})",
+        "noRun": "Brak uruchomienia, na którym można działać",
+        "network": "Nie można połączyć się z serwerem"
+      },
       "resultDismiss": "Zamknij"
     },
     "filter": {

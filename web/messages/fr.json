@@ -124,6 +124,11 @@
       "running": "Exécution de {action} sur les espaces de travail sélectionnés ({count})…",
       "resultSummary": "{action} : {ok} sur {total} réussies",
       "resultFailed": "{name} : {reason}",
+      "failure": {
+        "status": "Échec de la requête ({status})",
+        "noRun": "Aucune exécution sur laquelle agir",
+        "network": "Impossible de joindre le serveur"
+      },
       "resultDismiss": "Fermer"
     },
     "filter": {

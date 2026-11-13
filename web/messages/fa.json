@@ -124,6 +124,11 @@
       "running": "در حال اجرای {action} روی فضاهای کاری انتخاب‌شده ({count})…",
       "resultSummary": "{action}: {ok} از {total} موفق",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "درخواست ناموفق بود ({status})",
+        "noRun": "اجرایی برای انجام عملیات وجود ندارد",
+        "network": "دسترسی به سرور ممکن نبود"
+      },
       "resultDismiss": "بستن"
     },
     "filter": {

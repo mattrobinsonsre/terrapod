@@ -124,6 +124,11 @@
       "running": "Marklar {action} on the marklar marklar ({count})…",
       "resultSummary": "{action}: {ok} of {total} marklar",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Marklar failed ({status})",
+        "noRun": "No marklar to act on",
+        "network": "Could not reach the marklar"
+      },
       "resultDismiss": "Marklar"
     },
     "filter": {

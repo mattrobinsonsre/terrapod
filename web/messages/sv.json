@@ -124,6 +124,11 @@
       "running": "Kör {action} på de valda arbetsytorna ({count})…",
       "resultSummary": "{action}: {ok} av {total} lyckades",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Begäran misslyckades ({status})",
+        "noRun": "Ingen körning att agera på",
+        "network": "Det gick inte att nå servern"
+      },
       "resultDismiss": "Stäng"
     },
     "filter": {

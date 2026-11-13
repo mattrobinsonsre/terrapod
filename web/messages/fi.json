@@ -124,6 +124,11 @@
       "running": "Suoritetaan {action} valituissa työtiloissa ({count})…",
       "resultSummary": "{action}: {ok}/{total} onnistui",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Pyyntö epäonnistui ({status})",
+        "noRun": "Ei ajoa, johon toiminnon voisi kohdistaa",
+        "network": "Palvelimeen ei saatu yhteyttä"
+      },
       "resultDismiss": "Sulje"
     },
     "filter": {

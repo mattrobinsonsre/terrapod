@@ -124,6 +124,11 @@
       "running": "{action} wordt uitgevoerd op de geselecteerde workspaces ({count})…",
       "resultSummary": "{action}: {ok} van {total} geslaagd",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Verzoek mislukt ({status})",
+        "noRun": "Geen run om op te handelen",
+        "network": "Kan de server niet bereiken"
+      },
       "resultDismiss": "Sluiten"
     },
     "filter": {

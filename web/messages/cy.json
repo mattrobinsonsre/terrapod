@@ -124,6 +124,11 @@
       "running": "Yn rhedeg {action} ar y gweithleoedd a ddewiswyd ({count})…",
       "resultSummary": "{action}: llwyddodd {ok} o {total}",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Methodd y cais ({status})",
+        "noRun": "Dim rhediad i weithredu arno",
+        "network": "Methu cyrraedd y gweinydd"
+      },
       "resultDismiss": "Cau"
     },
     "filter": {

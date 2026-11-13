@@ -124,6 +124,11 @@
       "running": "{action} Daq wIvlu'pu' ({count}) yIn…",
       "resultSummary": "{action}: {ok} {total} qoch",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "tlhob Qapbe' ({status})",
+        "noRun": "Sar tu'lu'be'",
+        "network": "server Daq 'el laHbe'"
+      },
       "resultDismiss": "SoQmoH"
     },
     "filter": {

@@ -12,7 +12,15 @@ export interface Endpoint {
   body?: unknown
 }
 
-export type BulkResult = { id: string; name: string; ok: true } | { id: string; name: string; ok: false; reason: string }
+// Why one workspace failed. The server's own words stay verbatim; the rest is typed so the
+// page words it, since this file writes no prose.
+export type BulkFailure =
+  | { kind: 'refused'; detail: string }
+  | { kind: 'status'; status: number }
+  | { kind: 'noRun' }
+  | { kind: 'network' }
+
+export type BulkResult = { id: string; name: string; ok: true } | { id: string; name: string; ok: false; failure: BulkFailure }
 
 // The endpoint for one workspace, or null when the workspace lacks the run the action needs.
 export function endpointFor(action: BulkActionId, w: BulkWorkspace): Endpoint | null {
@@ -33,15 +41,15 @@ export function endpointFor(action: BulkActionId, w: BulkWorkspace): Endpoint | 
 }
 
 // The server's reason, from the JSON:API errors array or the legacy `detail`.
-async function reasonFrom(res: Response): Promise<string> {
+async function failureFrom(res: Response): Promise<BulkFailure> {
   try {
     const body = await res.json()
-    if (Array.isArray(body?.errors) && body.errors[0]?.detail) return String(body.errors[0].detail)
-    if (typeof body?.detail === 'string') return body.detail
+    if (Array.isArray(body?.errors) && body.errors[0]?.detail) return { kind: 'refused', detail: String(body.errors[0].detail) }
+    if (typeof body?.detail === 'string' && body.detail) return { kind: 'refused', detail: body.detail }
   } catch {
     /* not JSON */
   }
-  return `Request failed (${res.status})`
+  return { kind: 'status', status: res.status }
 }
 
 // Sequential, not parallel: a batch can be dozens of workspaces, and the server
@@ -55,7 +63,7 @@ export async function runBulkAction(
   for (const w of selection) {
     const endpoint = endpointFor(action, w)
     if (!endpoint) {
-      results.push({ id: w.id, name: w.name, ok: false, reason: 'No run to act on' })
+      results.push({ id: w.id, name: w.name, ok: false, failure: { kind: 'noRun' } })
       continue
     }
     try {
@@ -64,9 +72,9 @@ export async function runBulkAction(
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: endpoint.body === undefined ? undefined : JSON.stringify(endpoint.body),
       })
-      results.push(res.ok ? { id: w.id, name: w.name, ok: true } : { id: w.id, name: w.name, ok: false, reason: await reasonFrom(res) })
-    } catch (err) {
-      results.push({ id: w.id, name: w.name, ok: false, reason: err instanceof Error ? err.message : String(err) })
+      results.push(res.ok ? { id: w.id, name: w.name, ok: true } : { id: w.id, name: w.name, ok: false, failure: await failureFrom(res) })
+    } catch {
+      results.push({ id: w.id, name: w.name, ok: false, failure: { kind: 'network' } })
     }
   }
   return results

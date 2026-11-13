@@ -124,6 +124,11 @@
       "running": "Probíhá {action} na vybraných pracovních prostorech ({count})…",
       "resultSummary": "{action}: uspělo {ok} z {total}",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Požadavek selhal ({status})",
+        "noRun": "Není žádný běh, se kterým by se dalo pracovat",
+        "network": "Server se nepodařilo kontaktovat"
+      },
       "resultDismiss": "Zavřít"
     },
     "filter": {

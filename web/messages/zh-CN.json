@@ -124,6 +124,11 @@
       "running": "正在所选工作区（{count}）上执行{action}…",
       "resultSummary": "{action}：{total} 个中 {ok} 个成功",
       "resultFailed": "{name}：{reason}",
+      "failure": {
+        "status": "请求失败（{status}）",
+        "noRun": "没有可操作的运行",
+        "network": "无法连接到服务器"
+      },
       "resultDismiss": "关闭"
     },
     "filter": {

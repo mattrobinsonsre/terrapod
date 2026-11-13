@@ -124,6 +124,11 @@
       "running": "Running {action} on the selected workspaces ({count})…",
       "resultSummary": "{action}: {ok} of {total} succeeded",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Request failed ({status})",
+        "noRun": "No run to act on",
+        "network": "Could not reach the server"
+      },
       "resultDismiss": "Dismiss"
     },
     "filter": {

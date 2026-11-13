@@ -1011,6 +1011,32 @@ test.describe("Workspaces", () => {
     expect(posts.some((u) => u.endsWith("/actions/retry"))).toBe(false);
     await page.unrouteAll({ behavior: "ignoreErrors" });
   });
+
+  test("a failure with no server message is worded by the page, not by the library", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-fail");
+    const ids = [await createWorkspace(getStoredToken(), `${prefix}-a`), await createWorkspace(getStoredToken(), `${prefix}-b`)];
+    await stubLatestRun(page, ids, (i) => ({
+      id: `run-stub-${i}`,
+      status: "errored",
+      actions: { ...NO_ACTIONS, "is-retryable": true },
+    }));
+    // The first workspace is unreachable, the second answers 500 with no body.
+    await page.route("**/api/v1/runs/*/actions/retry", (route) =>
+      route.request().url().includes("run-stub-0") ? route.abort() : route.fulfill({ status: 500, body: "" }),
+    );
+
+    await listOnly(page, prefix, 2);
+    await page.getByTestId("ws-select-all").check();
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-retry").click();
+
+    const result = page.getByTestId("ws-bulk-result");
+    await expect(result).toContainText("Retry run: 0 of 2", { timeout: 15_000 });
+    await expect(result).toContainText(`${prefix}-a: Could not reach the server`);
+    await expect(result).toContainText(`${prefix}-b: Request failed (500)`);
+    await page.unrouteAll({ behavior: "wait" });
+  });
 });
 
 test.describe("Workspaces: bulk confirmations at tablet width with a touch pointer", () => {

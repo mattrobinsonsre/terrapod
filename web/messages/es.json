@@ -124,6 +124,11 @@
       "running": "Ejecutando {action} en los espacios de trabajo seleccionados ({count})…",
       "resultSummary": "{action}: {ok} de {total} correctas",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "La solicitud falló ({status})",
+        "noRun": "No hay ninguna ejecución sobre la que actuar",
+        "network": "No se pudo conectar con el servidor"
+      },
       "resultDismiss": "Cerrar"
     },
     "filter": {

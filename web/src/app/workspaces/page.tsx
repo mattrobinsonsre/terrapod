@@ -26,7 +26,7 @@ import {
   type BulkActionId,
   type BulkWorkspace,
 } from '@/lib/workspace-bulk-actions'
-import { runBulkAction, type BulkResult } from '@/lib/workspace-bulk-run'
+import { runBulkAction, type BulkFailure, type BulkResult } from '@/lib/workspace-bulk-run'
 import { confirmLines } from '@/lib/workspace-bulk-confirm'
 import { headerState, pruneSelection, toggleAll, toggleOne } from '@/lib/workspace-selection'
 import { useSortable } from '@/lib/use-sortable'
@@ -1069,6 +1069,20 @@ function WorkspacesPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadWorkspaces is a hoisted function
     [selectedBulk, confirmIrreversible, confirmTouchMutation, t],
   )
+
+  // The server's own words verbatim; anything the client has to say is translated here.
+  const bulkFailureText = (f: BulkFailure): string => {
+    switch (f.kind) {
+      case 'refused':
+        return f.detail
+      case 'status':
+        return t('bulk.failure.status', { status: f.status })
+      case 'noRun':
+        return t('bulk.failure.noRun')
+      case 'network':
+        return t('bulk.failure.network')
+    }
+  }
 
   const selectionItems = useMemo<SelectionMenuItem[]>(
     () =>
@@ -2159,7 +2173,7 @@ function WorkspacesPageInner() {
                   .filter((r): r is Extract<BulkResult, { ok: false }> => !r.ok)
                   .map((r) => (
                     <li key={r.id} className="font-mono text-xs">
-                      {t('bulk.resultFailed', { name: r.name, reason: r.reason })}
+                      {t('bulk.resultFailed', { name: r.name, reason: bulkFailureText(r.failure) })}
                     </li>
                   ))}
               </ul>

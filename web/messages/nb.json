@@ -124,6 +124,11 @@
       "running": "Kjører {action} på de valgte arbeidsområdene ({count})…",
       "resultSummary": "{action}: {ok} av {total} lyktes",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Forespørselen mislyktes ({status})",
+        "noRun": "Ingen kjøring å utføre handlingen på",
+        "network": "Kunne ikke nå serveren"
+      },
       "resultDismiss": "Lukk"
     },
     "filter": {

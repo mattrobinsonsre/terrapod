@@ -124,6 +124,11 @@
       "running": "Виконується {action} у вибраних робочих просторах ({count})…",
       "resultSummary": "{action}: успішно {ok} із {total}",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Запит не виконано ({status})",
+        "noRun": "Немає запуску, до якого можна застосувати дію",
+        "network": "Не вдалося зв'язатися із сервером"
+      },
       "resultDismiss": "Закрити"
     },
     "filter": {

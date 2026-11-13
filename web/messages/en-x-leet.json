@@ -124,6 +124,11 @@
       "running": "Runn1ng {action} 0n 7h3 53l3c73d w0rk5p4c35 ({count})…",
       "resultSummary": "{action}: {ok} 0f {total} 5ucc33d3d",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "R3qu357 f41l3d ({status})",
+        "noRun": "N0 run 70 4c7 0n",
+        "network": "C0uld n07 r34ch 7h3 53rv3r"
+      },
       "resultDismiss": "D15m155"
     },
     "filter": {

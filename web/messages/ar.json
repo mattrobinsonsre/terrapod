@@ -124,6 +124,11 @@
       "running": "جارٍ تنفيذ {action} على مساحات العمل المحددة ({count})…",
       "resultSummary": "{action}: نجح {ok} من {total}",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "فشل الطلب ({status})",
+        "noRun": "لا يوجد تشغيل لاتخاذ إجراء بشأنه",
+        "network": "تعذر الوصول إلى الخادم"
+      },
       "resultDismiss": "إغلاق"
     },
     "filter": {

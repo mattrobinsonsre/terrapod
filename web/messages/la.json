@@ -124,6 +124,11 @@
       "running": "{action} in spatiis operis selectis ({count}) agitur…",
       "resultSummary": "{action}: {ok} ex {total} successerunt",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Petitio defecit ({status})",
+        "noRun": "Nullus cursus in quo agatur",
+        "network": "Servitor attingi non potuit"
+      },
       "resultDismiss": "Claude"
     },
     "filter": {

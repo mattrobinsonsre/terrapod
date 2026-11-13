@@ -124,6 +124,11 @@
       "running": "Seçili çalışma alanlarında ({count}) {action} çalıştırılıyor…",
       "resultSummary": "{action}: {total} içinden {ok} başarılı",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "İstek başarısız oldu ({status})",
+        "noRun": "İşlem yapılacak çalıştırma yok",
+        "network": "Sunucuya ulaşılamadı"
+      },
       "resultDismiss": "Kapat"
     },
     "filter": {
