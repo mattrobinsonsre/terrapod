@@ -1730,7 +1730,10 @@ class TestATerminalTransitionRevokesTheRunsRunnerTokens:
             "this run stays usable for the rest of its TTL"
         )
         marker = next(c for c in redis.set.await_args_list if c.args[0].endswith(str(run.id)))
-        assert marker.args[1] == "revoked"
+        # `revoked:<unix seconds>` since #2564 -- the stamp bounds the two-minute
+        # window in which the runner may finish uploading this phase's own log.
+        # What matters here is the head, which is what every reader keys on.
+        assert marker.args[1].split(":", 1)[0] == "revoked"
 
     async def test_a_non_terminal_transition_writes_no_marker(self):
         """The other direction: revoking on `planning` would kill the Job that is

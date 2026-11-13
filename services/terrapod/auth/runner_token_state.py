@@ -29,6 +29,7 @@ worse outcome than a token remaining usable for a few more seconds. What is neve
 allowed is a run that is *known* to be terminal or gone.
 """
 
+import time
 import uuid
 
 from terrapod.logging_config import get_logger
@@ -45,6 +46,41 @@ _ACTIVE_TTL = 15
 
 _REVOKED = "revoked"
 _ACTIVE = "active"
+
+#: Seconds after a run goes terminal during which the runner's own END-OF-PHASE
+#: uploads are still accepted (#2564).
+#:
+#: The runner writes the combined phase log and the resource profile at EXIT,
+#: after `LogCapture` has closed its handle -- which is necessarily after the
+#: `apply-result` POST that moved the run to `applied`. So by the time those two
+#: uploads happen the token has already been revoked, and every successful apply
+#: lost its stored log: the run page showed the last live snapshot until that
+#: expired and then showed nothing. A failed phase lost its log the same way,
+#: and that is the log most worth having.
+#:
+#: Two minutes covers the upload's own retry ladder with room to spare (the
+#: reported run retried at +2.1s and +6.2s) while leaving a token useless for
+#: anything an operator would mind. It is NOT a general reprieve: see
+#: `GRACE_PATH_SUFFIXES`, which is the half that makes this narrow.
+TERMINAL_UPLOAD_GRACE_SECONDS = 120
+
+#: The only routes the grace applies to: what the runner writes at exit.
+#: Write-once artifacts for a run that has already finished, on a token still
+#: scoped to that run and phase -- so the widening is "may finish uploading its
+#: own log", not "may act".
+#:
+#: `tests/auth/test_terminal_upload_grace.py` derives this from the runner's own
+#: exit path (`phases/log_capture.py`, `phases/resource_profile.py`) rather than
+#: trusting the list, because a new exit-time upload added there would otherwise
+#: start silently 401ing exactly as these two did.
+GRACE_PATH_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "/artifacts/plan-log",
+        "/artifacts/apply-log",
+        "/artifacts/configure-log",
+        "/resource-profile",
+    }
+)
 
 #: Terminal run statuses. Deliberately a copy rather than an import: this module
 #: is in the auth path, and importing `run_service` from there pulls the whole
@@ -85,7 +121,13 @@ async def revoke_run_tokens(run_id: str | uuid.UUID) -> None:
     try:
         from terrapod.redis.client import get_redis_client
 
-        await get_redis_client().set(_key(run_id), _REVOKED, ex=_marker_ttl())
+        # The marker carries WHEN, so the end-of-phase upload grace can be
+        # computed from it without a second key or a row read. A marker written
+        # by a replica that predates this is a bare `revoked`, which parses as
+        # "no grace" -- fail closed, which is the right way round during a
+        # rolling upgrade.
+        value = f"{_REVOKED}:{int(time.time())}"
+        await get_redis_client().set(_key(run_id), value, ex=_marker_ttl())
     except Exception:  # noqa: BLE001
         logger.debug("runner_token_revocation_marker_not_written", run_id=str(run_id))
 
@@ -106,7 +148,7 @@ async def is_run_token_usable(run_id: str, db=None) -> bool:  # type: ignore[no-
         cached = await redis.get(_key(run_id))
         if cached is not None:
             value = cached.decode() if isinstance(cached, bytes) else str(cached)
-            if value == _REVOKED:
+            if value.split(":", 1)[0] == _REVOKED:
                 return False
             if value == _ACTIVE:
                 return True
@@ -129,6 +171,12 @@ async def is_run_token_usable(run_id: str, db=None) -> bool:  # type: ignore[no-
         # next request on this token is answered from Redis.
         if redis is not None:
             try:
+                # Deliberately BARE, where `revoke_run_tokens` stamps the time:
+                # this write happens when a request arrives, not when the run
+                # ended, so a timestamp here would say the run went terminal now
+                # and hand an hour-old token a fresh upload grace (#2564). An
+                # unstamped marker grants none, which is the honest answer to
+                # "we do not know when this run ended".
                 await redis.set(_key(run_id), _REVOKED, ex=_marker_ttl())
             except Exception:  # noqa: BLE001
                 pass
@@ -140,6 +188,43 @@ async def is_run_token_usable(run_id: str, db=None) -> bool:  # type: ignore[no-
         except Exception:  # noqa: BLE001
             pass
     return True
+
+
+def path_is_grace_eligible(path: str) -> bool:
+    """True for a route the end-of-phase grace may apply to.
+
+    Suffix-matched because the same routes are served on the canonical and the
+    deprecated native prefixes, and our own runner images still construct the
+    deprecated one.
+    """
+    return any(path.endswith(s) for s in GRACE_PATH_SUFFIXES)
+
+
+async def terminal_upload_grace_active(run_id: str) -> bool:
+    """Whether this run went terminal recently enough to finish uploading.
+
+    Read from the revocation marker alone, deliberately: the row says a run is
+    terminal but not WHEN it became so, and `updated_at` moves for reasons that
+    have nothing to do with the transition. A marker that is missing, bare, or
+    unparseable yields False, so every uncertainty refuses.
+    """
+    try:
+        from terrapod.redis.client import get_redis_client
+
+        cached = await get_redis_client().get(_key(run_id))
+    except Exception:  # noqa: BLE001
+        return False
+    if cached is None:
+        return False
+    value = cached.decode() if isinstance(cached, bytes) else str(cached)
+    head, _, stamp = value.partition(":")
+    if head != _REVOKED or not stamp:
+        return False
+    try:
+        at = int(stamp)
+    except ValueError:
+        return False
+    return 0 <= (time.time() - at) <= TERMINAL_UPLOAD_GRACE_SECONDS
 
 
 async def is_run_token_usable_on_its_own_session(run_id: str) -> bool:
