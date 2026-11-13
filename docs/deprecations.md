@@ -104,7 +104,8 @@ is the point.
 
 A non-positive value used to disable the clamp entirely, so a runner token was
 minted with whatever lifetime was asked for. It now falls back to the shipped
-default (7200) and logs a warning. `values.schema.json` already constrains the
+default (14400, raised from 7200 for #2526) and logs a warning.
+`values.schema.json` already constrains the
 chart value to `minimum: 1`, so this is reachable only by a deployment setting
 the environment variable directly. If you set it to `0` deliberately, set an
 explicit large value instead — which is a readable choice where a magic zero

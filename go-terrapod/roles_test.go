@@ -533,3 +533,72 @@ func TestRole_AllowAll_UpdateLeaveAlone(t *testing.T) {
 		t.Errorf("explicit false must be sent: %v", attrs)
 	}
 }
+
+// A capability-authored create must not put an UNAUTHORED level on the wire.
+//
+// `workspace-permission` was the one level of four sent unconditionally, so a
+// request that authored `capabilities` and no level still carried
+// `"workspace-permission": ""`. That was inert while the server ignored levels
+// whenever `capabilities` was present; once the server began refusing a level
+// that DISAGREES with the capability set (#2502), `""` disagreed with every
+// derived summary and the create answered 422 -- for the exact shape
+// `provider/examples/resources/terrapod_role/main.tf` ships.
+//
+// The provider reaches here with `""` rather than with nothing because
+// `workspace_permission` is Optional+Computed with no default: on a create
+// there is no prior state, so the planned value is unknown and
+// `types.String.ValueString()` renders an unknown as `""`.
+func TestCreateRole_OmitsAnUnauthoredLevel(t *testing.T) {
+	c, lastBody := newRoleFixture(t)
+	if _, err := c.CreateRole(t.Context(), CreateRoleRequest{
+		Name:         "capability-authored",
+		Capabilities: []string{"workspace:read", "run:read", "run:plan"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(*lastBody, &req)
+
+	// Every level is absent, not empty. All four are checked together: three
+	// were already guarded and one was not, and a test that only covers the
+	// one that broke would not notice the next one losing its guard.
+	for _, k := range []string{
+		"workspace-permission", "pool-permission",
+		"registry-permission", "catalog-permission",
+	} {
+		if v, ok := req.Data.Attributes[k]; ok {
+			t.Errorf("%s was sent as %#v; an unauthored level must be ABSENT, "+
+				"because an empty one disagrees with every derived summary", k, v)
+		}
+	}
+	// ...and the thing that WAS authored is on the wire, so this is not passing
+	// by having sent nothing at all.
+	caps, ok := req.Data.Attributes["capabilities"].([]any)
+	if !ok || len(caps) != 3 {
+		t.Fatalf("capabilities missing or wrong: %#v", req.Data.Attributes["capabilities"])
+	}
+}
+
+// The converse, so the guard cannot be "fixed" by dropping the level always.
+func TestCreateRole_SendsAnAuthoredLevel(t *testing.T) {
+	c, lastBody := newRoleFixture(t)
+	if _, err := c.CreateRole(t.Context(), CreateRoleRequest{
+		Name:                "level-authored",
+		WorkspacePermission: "write",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(*lastBody, &req)
+	if req.Data.Attributes["workspace-permission"] != "write" {
+		t.Errorf("an authored level must reach the wire: %#v", req.Data.Attributes)
+	}
+}

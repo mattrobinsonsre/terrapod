@@ -1662,15 +1662,12 @@ function RunDetailPageInner() {
     if (!planFollower.current) {
       planFollower.current = createLogFollower({
         read: (offset, fresh) => readLog('plan', offset, fresh),
-        onText: (chunk, mode) => {
+        onText: (chunk) => {
           const html = ansiConverter.toHtml(chunk)
-          if (mode === 'replace') {
-            setPlanLog(chunk || null)
-            setPlanHtml(html)
-          } else {
-            setPlanLog(prev => (prev ?? '') + chunk)
-            setPlanHtml(prev => prev + html)
-          }
+          // Always a whole replace: the follower reads from offset 0 on every
+          // fetch, because the live snapshot is a SLIDING window.
+          setPlanLog(chunk || null)
+          setPlanHtml(html)
           // Read after the text is applied, so "complete" can never be true for
           // a log the viewer has not been given yet (#1590). A reset clears it
           // in the follower, so a refetched log stops being complete until its
@@ -1686,15 +1683,12 @@ function RunDetailPageInner() {
     if (!applyFollower.current) {
       applyFollower.current = createLogFollower({
         read: (offset, fresh) => readLog('apply', offset, fresh),
-        onText: (chunk, mode) => {
+        onText: (chunk) => {
           const html = ansiConverter.toHtml(chunk)
-          if (mode === 'replace') {
-            setApplyLog(chunk || null)
-            setApplyHtml(html)
-          } else {
-            setApplyLog(prev => (prev ?? '') + chunk)
-            setApplyHtml(prev => prev + html)
-          }
+          // Always a whole replace: the follower reads from offset 0 on every
+          // fetch, because the live snapshot is a SLIDING window.
+          setApplyLog(chunk || null)
+          setApplyHtml(html)
         },
       })
     }
@@ -1705,18 +1699,15 @@ function RunDetailPageInner() {
     if (!configureFollower.current) {
       configureFollower.current = createLogFollower({
         read: (offset, fresh) => readLog('configure', offset, fresh),
-        onText: (chunk, mode) => {
+        onText: (chunk) => {
           // The raw text is kept as well as the HTML, because the per-host
           // filter works on the text: the tag is in the bytes, and parsing
           // highlighted HTML to find it would be parsing our own output twice.
           const html = ansiConverter.toHtml(chunk)
-          if (mode === 'replace') {
-            setConfigureLog(chunk || null)
-            setConfigureHtml(html)
-          } else {
-            setConfigureLog(prev => (prev ?? '') + chunk)
-            setConfigureHtml(prev => prev + html)
-          }
+          // Always a whole replace: the follower reads from offset 0 on every
+          // fetch, because the live snapshot is a SLIDING window.
+          setConfigureLog(chunk || null)
+          setConfigureHtml(html)
         },
       })
     }

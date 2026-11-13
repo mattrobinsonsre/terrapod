@@ -1082,3 +1082,225 @@ class TestRoleReachPreviewGate:
             )
         assert resp.status_code == 200
         assert resp.json()["data"]["attributes"]["granted-count"] == 0
+
+
+class TestLevelsBesideAnExplicitCapabilitySet:
+    """A level sent alongside `capabilities` is refused when the two disagree,
+    rather than silently dropped (#2502).
+
+    The silent drop is what the provider defect was made of: it sent the prior
+    derived set back on every update, the server read that as authoring and
+    stored it verbatim, and the level the practitioner had edited went nowhere --
+    visible only as a plan that never converged. Refusing is what stops the same
+    trap catching a hand-written call or a future SDK.
+
+    The accepting half matters just as much and is the reason this is a
+    disagreement check rather than the workspace surface's flat "not both": a
+    client that reads a role back sees the derived levels in the response, so
+    sending them again is the ordinary shape of a round-trip and contradicts
+    nothing.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_update_refuses_a_level_that_disagrees(self, *mocks):
+        role = _mock_role(name="dev-team", ws_perm="read")
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = role
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        read_caps = expand_preset(
+            workspace_permission="read",
+            pool_permission="read",
+            registry_permission="read",
+            catalog_permission="none",
+        )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/v1/roles/dev-team",
+                json={
+                    "data": {
+                        "attributes": {
+                            "capabilities": read_caps,
+                            "workspace-permission": "write",
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        # Both halves are named, so the caller can see WHICH of the two they
+        # have to drop. An error naming only the field would leave them
+        # guessing which value the server believed.
+        assert "workspace-permission" in detail
+        assert "write" in detail
+        assert "read" in detail
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_update_accepts_a_level_that_agrees(self, *mocks):
+        """The round-trip the provider actually performs for an authored set.
+
+        Refusing the mere presence of a level -- the shape the workspace surface
+        uses for `auto-apply` -- would 422 every capability-authored role the
+        provider manages, because it sends the derived summary back with the set.
+        """
+        role = _mock_role(name="dev-team", ws_perm="read")
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = role
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        write_caps = expand_preset(
+            workspace_permission="write",
+            pool_permission="read",
+            registry_permission="read",
+            catalog_permission="none",
+        )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/v1/roles/dev-team",
+                json={
+                    "data": {
+                        "attributes": {
+                            "capabilities": write_caps,
+                            "workspace-permission": "write",
+                            "pool-permission": "read",
+                            "registry-permission": "read",
+                            "catalog-permission": "none",
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert set(resp.json()["data"]["attributes"]["capabilities"]) == set(write_caps)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_update_accepts_custom_against_a_non_preset_set(self, *mocks):
+        """`custom` is not a level the server can expand, so it is not a valid
+        level INPUT -- but it is exactly what a non-preset set summarises to, so
+        a client round-tripping one sends it back.
+
+        This is why the comparison is against the derived summary rather than
+        through `_level`: routing it through the valid-level check would refuse a
+        request whose two halves agree perfectly.
+        """
+        from terrapod.auth import capabilities as cap
+
+        role = _mock_role(name="dev-team", ws_perm="read")
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = role
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        granular = [cap.WORKSPACE_READ, cap.RUN_READ, cap.RUN_PLAN, cap.VAR_READ]
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/v1/roles/dev-team",
+                json={
+                    "data": {
+                        "attributes": {
+                            "capabilities": granular,
+                            "workspace-permission": "custom",
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["workspace-permission"] == "custom"
+        assert set(attrs["capabilities"]) == set(granular)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_refuses_a_level_that_disagrees(self, *mocks):
+        """Create drops the levels the same way update did, so it is refused the
+        same way -- one producer, so the two cannot disagree about it."""
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        read_caps = expand_preset(
+            workspace_permission="read",
+            pool_permission="read",
+            registry_permission="read",
+            catalog_permission="none",
+        )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v1/roles",
+                json={
+                    "data": {
+                        "name": "mismatch",
+                        "attributes": {
+                            "capabilities": read_caps,
+                            "registry-permission": "admin",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "registry-permission" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_accepts_an_EMPTY_level_beside_capabilities(self, *mocks):
+        """An empty level is not an authored one, so there is nothing to disagree with.
+
+        This is the case the refusal above could not tell apart, and it is the
+        only value a PROVIDER create produces. `workspace_permission` is
+        Optional+Computed with no default, so on a create the planned value is
+        unknown and the framework renders an unknown as `""`; go-terrapod then
+        sent `workspace-permission` unconditionally -- the one level of four
+        with no guard. So the wire body was `{"capabilities": [...],
+        "workspace-permission": ""}`, `""` disagreed with every derived summary,
+        and every capability-authored create answered 422 -- including the shape
+        `provider/examples/resources/terrapod_role/main.tf` ships and
+        `docs/rbac.md` documents.
+
+        The SDK no longer sends it. This pins the server half, which is what
+        makes any OTHER client's empty level mean what it says.
+
+        `None` is covered too: a JSON `null` is the same statement.
+        """
+        read_caps = expand_preset(
+            workspace_permission="read",
+            pool_permission="read",
+            registry_permission="read",
+            catalog_permission="none",
+        )
+        for unauthored in ("", None):
+            app, mock_db = _make_app(_user())
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = None
+            mock_db.execute.return_value = result
+            mock_db.refresh = AsyncMock()
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/v1/roles",
+                    json={
+                        "data": {
+                            "name": f"unauthored-{unauthored!r}",
+                            "attributes": {
+                                "capabilities": read_caps,
+                                "workspace-permission": unauthored,
+                            },
+                        }
+                    },
+                    headers=_AUTH,
+                )
+            assert resp.status_code != 422, (
+                f"an unauthored level ({unauthored!r}) was refused: {resp.json().get('detail')}"
+            )

@@ -1768,7 +1768,7 @@
           ]
         },
         "playbook": {
-          "description": "the playbook this configure runs, relative to the workspace's config_directory. Omit to use the workspace's default_playbook. Only valid with is_configure",
+          "description": "the playbook this configure runs, relative to the workspace's config_directory. Omit to use the workspace's default_playbook. A workspace MAY bound this with a playbooks allow-list, in which case anything outside it is refused 422 with the permitted set named -- read the workspace's playbooks via terrapod_workspace_get rather than guessing. Only valid with is_configure",
           "type": "string"
         },
         "refresh": {

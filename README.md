@@ -205,7 +205,8 @@ a 2.0 pre-release and are not in the stable 1.11.x line; everything else ships i
 | Private module registry | Publish, version, and share modules internally |
 | Private provider registry | Publish, version, and share providers with GPG signing and network-mirror caching |
 | Binary caching | Pull-through cache for the terraform / tofu / terragrunt CLI binaries |
-| Cache pre-population | Bulk-warm the binary + provider caches ahead of time via an admin endpoint + UI panel (for restricted-network / fast-first-run deployments) |
+| Bulk run actions | Tick workspaces on the Workspaces list and run Plan, Retry, Cancel, Apply or Discard across the selection; one request per workspace, every refusal reported against its own workspace |
+| Cache pre-population | Warm **every** cache the product keeps, ahead of time and at explicit versions -- CLI and provider binaries, six language-package ecosystems and container images -- via admin endpoints, the SDK, MCP tools or the UI panel (for restricted-network / fast-first-run deployments). Refused on a sealed node, so warm before sealing |
 | Sealed (cache-only) mode | Air-gap switch (`registry.cache_only`) guaranteeing no upstream fetch — flipped on *after* the caches are populated — cache-backed version resolution, actionable cache-miss errors, retention skips the caches |
 
 ### Integrations & operations

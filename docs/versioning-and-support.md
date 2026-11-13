@@ -237,12 +237,19 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
   an earlier one, silently rather than with an error. An ordinary `helm upgrade`
   moves them together (the listener Deployment carries a `checksum/runner-config`
   annotation, so a ConfigMap change rolls it), which is why this is reachable
-  only where `listener.image.tag` is pinned behind the chart. The current example
-  is [`runners.applyServiceAccount`](runners.md#separate-serviceaccounts-per-phase):
+  only where `listener.image.tag` is pinned behind the chart. Two current examples.
+  [`runners.applyServiceAccount`](runners.md#separate-serviceaccounts-per-phase):
   an older listener runs the apply phase on `runners.serviceAccount`, so a
   deployment that believes its plans are on a narrower cloud role is not getting
-  the split. **Unpin, or upgrade listeners with the chart, before relying on a
-  new runner-Job setting.**
+  the split. And [`runners.configure.*`](runners.md) -- `nodeSelector`,
+  `tolerations`, `affinity` for configure Jobs only -- which is the worse of the
+  two, because the guarantee it exists to give is the one it drops: an older
+  listener ignores the block and places configure Jobs on the general capacity,
+  which may be spot or preemptible, and a configure is the one phase that is
+  **not safely restartable**. An interruption leaves hosts half-configured,
+  mid-release. Both fail silently and in the permissive direction. **Unpin, or
+  upgrade listeners with the chart, before relying on a new runner-Job
+  setting.**
 - **API ↔ go-terrapod / provider / `terraform` CLI:** an SDK/provider/CLI built
   against API version `N` keeps working against API `≥ N` within the same MAJOR.
 

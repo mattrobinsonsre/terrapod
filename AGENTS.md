@@ -720,7 +720,14 @@ multi-language implementation ships in the same PR**:
   the Deployment templates) ↔ the `helm-smoke` CI job that renders the chart
   and asserts the wiring. Change one leg, update all three in the same PR.
   `Settings` is rendered into `config.yaml` by `configmap-api.yaml`;
-  `RunnerConfig` into `runners.yaml` by `configmap-runner.yaml`. The rules:
+  `RunnerConfig` into `runners.yaml` by `configmap-runner.yaml` -- **and, for the
+  fields the API process itself reads, into a second `runners.yaml` key by
+  `configmap-api.yaml` as well** (#2520). The API and the listener can be
+  separate deployments in separate clusters, so a `RunnerConfig` field the API
+  reads -- a token TTL, a timeout, a retry count -- has to reach the API's own
+  mount too, or it is silently inert there while working perfectly in the
+  listener. The gate is `services/tests/helm/test_api_reads_runner_config.py`,
+  which derives the field set from what the API actually reads. The rules:
   - **Non-sensitive settings flow through a ConfigMap, end to end.** Adding one
     has **three legs that must all land in the same PR**: (1) a `values.yaml`
     entry with a rationale comment, (2) a matching `values.schema.json`
@@ -730,8 +737,9 @@ multi-language implementation ships in the same PR**:
     `nodeSelector` / `affinity` / `tolerations` use schema `type: object` with
     no property restrictions), and (3) a **render line in the ConfigMap
     template**
-    (`configmap-api.yaml` for `Settings`, `configmap-runner.yaml` for
-    `RunnerConfig`). Miss leg 3 and the value is silently inert: the operator
+    (`configmap-api.yaml` for `Settings`; `configmap-runner.yaml` for
+    `RunnerConfig`, plus `configmap-api.yaml` again when the API reads the
+    field too -- see above). Miss leg 3 and the value is silently inert: the operator
     sets it in `values.yaml`, it never reaches the pod, and the code default
     wins. `helm template -f <profile>` must show the key in the rendered
     ConfigMap.
@@ -791,6 +799,14 @@ multi-language implementation ships in the same PR**:
     component's Secret creates material nothing reads -- and, in a namespace a
     second release also targets, two releases declare the same object and
     fight over owning it.
+  - **Render a value that can legitimately be `0` or `false` with `dig`, never
+    `| default`.** Go templates treat `0` and `false` as empty, so
+    `{{ .Values.x | default 10 }}` renders `10` for an operator who set `0`,
+    and `| default true` renders `true` for one who set `false`. Several
+    settings document `0` as the way to switch them off and several are
+    kill-switches, so for those the `default` form silently discards exactly
+    the value the operator went out of their way to set. `dig` distinguishes
+    absent from zero-valued and is what `configmap-api.yaml` uses for them.
   - **The chart never sets a non-sensitive setting via a `TERRAPOD_*` env var.**
     Deployment `env:` is reserved for secrets (`secretKeyRef`) and unavoidable
     runtime values (Downward API like `POD_NAME`, and the proxy/TLS env vars

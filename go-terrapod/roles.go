@@ -86,8 +86,13 @@ type CreateRoleRequest struct {
 
 	// Capabilities authors the role's grant directly as explicit
 	// "resource:verb" tokens (#585). When set it is the source of truth and
-	// the *Permission level fields are ignored (the server derives them as a
-	// summary). Leave empty to author by level instead.
+	// the *Permission level fields become a server-derived summary of it.
+	// Leave empty to author by level instead.
+	//
+	// A level set ALONGSIDE this must agree with what the set summarises to,
+	// or the server answers 422 (#2502). It used to drop the levels silently,
+	// which is how a caller's level edit could go nowhere with the only
+	// evidence being the next read coming back with the old grant.
 	Capabilities []string
 }
 
@@ -111,7 +116,11 @@ type UpdateRoleRequest struct {
 	CatalogPermission   string
 
 	// Capabilities replaces the role's grant with the given explicit
-	// capability set (#585); when non-empty it wins over the level fields.
+	// capability set (#585). A level sent alongside it must agree with what
+	// the set summarises to, or the server answers 422 rather than dropping
+	// the level (#2502) -- so send the levels alone to have the server expand
+	// a preset, or send this alone. Sending the DERIVED levels back unchanged
+	// is fine, and is what a caller that read the role first will do.
 	Capabilities []string
 }
 
@@ -170,8 +179,24 @@ func (c *Client) DeleteRole(ctx context.Context, name string) error {
 // ── Internal helpers ─────────────────────────────────────────────────
 
 func roleCreateAttrs(req CreateRoleRequest) map[string]any {
-	attrs := map[string]any{
-		"workspace-permission": req.WorkspacePermission,
+	attrs := map[string]any{}
+	// Guarded on `!= ""` like its three siblings below, and like every level in
+	// `roleUpdateAttrs`. It was the ONE level sent unconditionally, which made
+	// an unauthored level arrive on the wire as `""` -- a value that means
+	// nothing, since the server's own `_level` refuses it.
+	//
+	// That was harmless while the server ignored levels whenever `capabilities`
+	// was present. It stopped being harmless when the server started refusing a
+	// level that DISAGREES with the capability set (#2502): `""` disagrees with
+	// every derived summary, so a capability-authored create -- which is the
+	// shape `provider/examples/resources/terrapod_role/main.tf` ships, and the
+	// one `docs/rbac.md` documents -- answered 422.
+	//
+	// It also fixes a defect that predates that: a LEVEL-authored create which
+	// omitted `workspace_permission` sent `""` and was refused by `_level` for
+	// the same reason.
+	if req.WorkspacePermission != "" {
+		attrs["workspace-permission"] = req.WorkspacePermission
 	}
 	if req.AllowAll {
 		attrs["allow-all"] = true

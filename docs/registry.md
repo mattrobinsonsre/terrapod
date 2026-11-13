@@ -1115,11 +1115,27 @@ These are two of Terrapod's four caches; the [language package cache](caches.md#
 
 ## Cache pre-population
 
-Both caches normally fill on demand (a cache miss fetches from upstream), but you can also seed them ahead of time — essential for restricted-network deployments and useful anywhere you want the first run to be fast.
+Every cache normally fills on demand (a cache miss fetches from upstream), but you can also seed it ahead of time — essential for restricted-network deployments and useful anywhere you want the first run to be fast. **All four caches can be warmed**, plus container images:
 
-`POST /api/v1/admin/binary-cache/warm-bulk` warms many binaries and provider platforms in one call (see [API reference](api-reference.md#bulk-warm-cache-admin)). The same operation is available interactively in the **Warm cache** panel on the `/admin/binary-cache` page — one entry per line. Warming is resilient: each (entry, platform) is warmed independently and reported back with its own success/error, so one missing version never fails the batch.
+| what | route | notes |
+|---|---|---|
+| CLI + provider binaries | `POST /api/v1/admin/binary-cache/warm-bulk` | many binaries and provider platforms in one call ([API reference](api-reference.md#bulk-warm-cache-admin)) |
+| language packages | `POST /api/v1/admin/package-cache/warm` | six ecosystems — galaxy, pypi, npm, go, nuget, pulumi |
+| container images | `POST /api/v1/admin/oci/warm` | |
+| what can be warmed at all | `GET /api/v1/admin/package-cache/sources` | its `meta.sealed` answers "can I warm right now" before you try |
+| a warm in progress | `GET /api/v1/admin/warm-jobs/{id}` | |
 
-Warming honours the upstream-source overrides (`*_mirror_url`, `*_version_index_url`, `provider_cache.upstream_registries`), so it pulls from your internal mirror when one is configured.
+All of it is available interactively too: the **Warm cache** panel on the `/admin/binary-cache` page for the binaries (one entry per line), and the **Warm package and image caches** panel on the same page for the rest. The SDK and four MCP tools cover the same routes.
+
+Warming is resilient: each (entry, platform) is warmed independently and reported back with its own success/error, so one missing version never fails the batch.
+
+**Warming is REFUSED on a sealed node** — `409`, with `Warm before sealing, or unseal to warm.` That is the point rather than a limitation: a sealed node has no upstream reach, so there is nothing to warm from. Warm, then seal.
+
+For the binaries and providers, warming honours the upstream-source overrides (`*_mirror_url`, `*_version_index_url`, `provider_cache.upstream_registries`), so it pulls from your internal mirror when one is configured.
+
+For the **package** cache the mirror is chosen differently, and the difference is deliberate: `source` names a **label** from `api.config.registry.package_cache.<eco>.mirrors`, and a URL in the request body is refused `422`. A warm body carrying a URL would hand an admin-authenticated caller a server-side fetch to any host they name, so the set of reachable hosts stays something an operator declares in Helm values rather than something a request can choose.
+
+The per-cache detail, including what each ecosystem keys on, is in [caches.md](caches.md).
 
 ---
 
@@ -1130,7 +1146,7 @@ For air-gapped deployments, set `registry.cache_only: true` **once the caches ho
 - **Cache miss → actionable 404.** A request for a binary or provider platform that isn't cached returns a clear `404` (e.g. *"terraform 1.12.3 (linux/amd64) is not in the cache and sealed (cache_only) mode is enabled. Pre-populate it via the bulk-warm admin endpoint before sealing, or disable registry.cache_only."*) instead of silently attempting (and failing) an upstream request.
 - **Partial-version resolution is cache-backed.** `terraform_version = "1.12"` resolves to the highest **cached** `1.12.x`, never the upstream version index. If nothing cached matches, resolution fails with the same actionable error. (Outside sealed mode, resolution still consults the upstream index as before.)
 - **The provider mirror serves cached-only.** The version index and platform list reflect exactly what's cached — no upstream metadata fetch, no eager caching, no upstream-direct download URLs.
-- **The artifact-retention sweeper skips the binary + provider caches.** Evicting an un-refetchable artifact would lose it permanently, so those categories are left untouched while sealed (other retention categories are unaffected).
+- **The artifact-retention sweeper skips the binary, provider AND package caches.** Evicting an un-refetchable artifact would lose it permanently, so all three pull-through categories are left untouched while sealed. The remaining retention categories -- run artifacts, configuration versions, state versions -- are swept as normal, because none of them is refetched from upstream.
 
 **Workflow:** pre-populate the cache *first* — typically with `cache_only` **off**, pointing the upstream overrides at an internal mirror and running [bulk warm](#cache-pre-population) — then flip `cache_only: true` to seal. Pairs with the [forward proxy / CA](deployment-proxy.md) as defense-in-depth: the proxy controls *how* upstream would be reached; `cache_only` guarantees it *isn't*.
 

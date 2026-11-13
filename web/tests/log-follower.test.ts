@@ -13,7 +13,6 @@ import {
   createLogFollower,
   parseLogFrame,
   type LogFollower,
-  type LogTextMode,
 } from '../src/lib/log-follower.ts'
 
 const enc = new TextEncoder()
@@ -67,16 +66,19 @@ function harness(respond: (call: ReadCall, n: number) => Promise<Uint8Array | nu
   const clock = fakeClock()
   const calls: ReadCall[] = []
   let shown = ''
-  const writes: LogTextMode[] = []
+  const writes: string[] = []
   const follower: LogFollower = createLogFollower({
     read: async (offset, fresh) => {
       const call = { offset, fresh }
       calls.push(call)
       return respond(call, calls.length)
     },
-    onText: (text, mode) => {
-      writes.push(mode)
-      shown = mode === 'replace' ? text : shown + text
+    onText: (text) => {
+      // Recorded as 'replace' so the assertions that pin "no append is ever
+      // produced" keep meaning something: the mode is gone from the API
+      // BECAUSE only this one was reachable.
+      writes.push('replace')
+      shown = text
     },
     setTimer: clock.setTimer,
     clearTimer: clock.clearTimer,
@@ -236,19 +238,59 @@ describe('createLogFollower', () => {
     assert.equal(h.follower.isComplete(), true)
   })
 
-  it('apply log: streams incrementally without duplication, then follows to ETX', async () => {
+  it('a SLIDING live window does not freeze the view or duplicate text', async () => {
+    // The case the incremental reader could not see, and the reason this fix
+    // exists. The live snapshot is `kubectl logs --tail=500` capped at 256KB,
+    // `setex`ed WHOLESALE each reconciler cycle -- so once the output passes
+    // the cap the window's own byte 0 moves forward. A reader holding an
+    // offset into the PREVIOUS window then slices a window that has shifted.
+    //
+    // This fixture is that shift, in miniature: a three-line window that drops
+    // its oldest line as a new one arrives, so every window is shorter than
+    // the running total the old reader would have accumulated.
+    const lines = ['one\n', 'two\n', 'three\n', 'four\n', 'five\n']
+    let cycle = 0
+    const windowAt = (i: number) => lines.slice(Math.max(0, i - 2), i + 1).join('')
+    const h = harness((c) => {
+      // The server slices whatever window it currently holds at the offset it
+      // is given -- which is the whole defect, so the fixture models it.
+      const w = windowAt(Math.min(cycle, lines.length - 1))
+      cycle += 1
+      return bytes((c.offset === 0 ? STX : '') + enc.encode(w).slice(c.offset).length
+        ? (c.offset === 0 ? STX : '') + new TextDecoder().decode(enc.encode(w).slice(c.offset))
+        : '')
+    })
+    h.follower.setPhase('streaming')
+    await h.follower.fetch(true)
+    for (let i = 0; i < 4; i++) await h.clock.advance(2500)
+
+    // Every read from 0, so what is shown is exactly the newest window --
+    // never a stale join, and never empty.
+    assert.equal(h.shown(), windowAt(lines.length - 1))
+    assert.equal(h.shown(), 'three\nfour\nfive\n')
+    assert.ok(
+      h.calls.every((c) => c.offset === 0),
+      `a non-zero offset was asked for: ${JSON.stringify(h.calls.map((c) => c.offset))}`,
+    )
+    // No line appears twice, which an append past a shifted offset would do.
+    for (const l of lines) assert.ok(count(h.shown(), l) <= 1, `duplicated ${JSON.stringify(l)}`)
+    // And the view is not frozen on the first window.
+    assert.notEqual(h.shown(), windowAt(0))
+  })
+
+  it('apply log: streams without duplication, then follows to ETX', async () => {
     const live = ['Applying...\n', 'aws_instance.demo[0]: Creating...\n']
     const final = live.join('') + 'Apply complete! Resources: 1 added.\n'
-    const h = harness((c) => {
-      // Streaming reads are incremental against the growing live log.
-      if (c.offset === 0 && h.calls.length <= 1) return bytes(STX + live[0])
-      if (c.offset === enc.encode(live[0]).length) return bytes(live[1])
-      if (c.offset > 0) return bytes('')
-      // Once finished: the first full read is still the snapshot, then the
-      // stored log with ETX.
-      return h.calls.filter((x) => x.offset === 0).length <= 2
-        ? bytes(STX + live.join(''))
-        : bytes(STX + final + ETX)
+    let n = 0
+    let stored = false
+    const h = harness(() => {
+      // Every read is from 0 against the window as it currently stands, so the
+      // fixture does not branch on an offset -- there is only ever one. It
+      // branches on whether the runner's exit trap has landed the stored log,
+      // which is the real discriminator and the one the follower cannot see.
+      n += 1
+      if (!stored) return bytes(STX + (n === 1 ? live[0] : live.join('')))
+      return bytes(STX + final + ETX)
     })
     h.follower.setPhase('streaming')
     await h.follower.fetch(true)
@@ -256,11 +298,23 @@ describe('createLogFollower', () => {
     await h.clock.advance(2500)
     assert.equal(h.shown(), live.join(''))
     assert.equal(count(h.shown(), 'Creating'), 1)
-    assert.deepEqual(h.writes, ['replace', 'append'])
-
+    // Never `append`: the live snapshot is a sliding window, so a non-zero
+    // offset is never asked for and the mode is always a whole replace.
+    assert.ok(h.writes.length >= 2, `only ${h.writes.length} writes`)
+    assert.ok(
+      h.writes.every((m) => m === 'replace'),
+      `an append was produced: ${JSON.stringify(h.writes)}`,
+    )
+    assert.ok(
+      h.calls.every((c) => c.offset === 0),
+      `a non-zero offset was asked for: ${JSON.stringify(h.calls.map((c) => c.offset))}`,
+    )
+    // The phase ends, but the runner uploads the stored log from its EXIT
+    // trap -- so the first finished read is still the live snapshot.
     h.follower.setPhase('finished')
     await h.follower.fetch(true)
     assert.equal(h.shown(), live.join(''))
+    stored = true
     await h.clock.advance(1000)
     assert.equal(h.shown(), final)
     assert.equal(count(h.shown(), 'Creating'), 1)

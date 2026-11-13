@@ -4380,7 +4380,7 @@ A role's grant is its **`capabilities`** set — a list of `resource:verb` token
 ```
 - `workspace-permission` (`read`/`plan`/`write`/`admin`), `pool-permission` (`read`/`write`/`admin`), `registry-permission` (`read`/`write`/`admin`, modules + providers) default to `read`; `catalog-permission` (`none`/`read`/`use`/`admin`) defaults to `none` (opt-in, no `everyone` floor).
 - The levels are **not persisted**. On a create/update they are expanded into `capabilities`; on a **PATCH**, a level field replaces only that axis's capabilities, preserving granular capabilities on the other axes.
-- If both `capabilities` and level fields are sent, **`capabilities` wins** (the levels are ignored).
+- If both `capabilities` and level fields are sent, the levels must AGREE with what the set summarises to, or the request is refused with a **422** naming the field, the level sent and the level derived. `capabilities` is what gets stored and the levels are derived from it, so the two cannot both be honoured — and silently dropping the levels hid a lost edit (#2502). Sending the derived levels back unchanged, which is what a client that read the role does, is accepted.
 
 **Response:** every roles response includes the stored `capabilities` list **and** a derived, read-only permission-level summary (`workspace-permission`, `pool-permission`, `registry-permission`, `catalog-permission`) computed from the capabilities — each is the matching preset name, or the literal `"custom"` when the capability set matches no preset. Consumers that write levels must tolerate reading back `"custom"`.
 

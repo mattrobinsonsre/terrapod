@@ -90,6 +90,70 @@ def _validate_capabilities(caps_in) -> list[str]:
     return normalized
 
 
+def _authored_capabilities(attrs: dict) -> list[str]:
+    """The explicit capability set from a request, validated, with a level that
+    DISAGREES with it refused rather than silently dropped (#2502).
+
+    One producer for all three sites that accept `capabilities` (create, update
+    and the unsaved preview), so none of them can disagree about what a request
+    carrying both an explicit set and a level means.
+
+    Why refuse rather than ignore: an explicit set is the stored truth and the
+    levels are derived from it, so the two cannot both be honoured -- and the
+    silent drop is what made a `terrapod_role` level edit vanish. The caller had
+    asked for a level the server then did not store, and the only evidence was
+    the next read coming back with the old grant.
+
+    **Only when they disagree**, deliberately. A level that MATCHES what the set
+    summarises to is the ordinary, correct shape of a round-trip: every client
+    that reads a role back sees the derived levels in the response, so refusing
+    their presence outright -- the way the workspace surface refuses `auto-apply`
+    beside `auto-apply-mode` -- would reject a request that contradicts nothing
+    and break every capability-authored role the provider manages. That is also
+    why the comparison is against the DERIVED summary rather than through
+    `_level`: a set matching no preset summarises to the literal "custom", which
+    is not a valid level input, so validating it as one would 422 a request whose
+    two halves agree perfectly.
+    """
+    caps = _validate_capabilities(attrs["capabilities"])
+    summary = summarize_capabilities(caps)
+    for key in _LEVEL_INPUT:
+        if key not in attrs:
+            continue
+        sent = attrs[key]
+        # An EMPTY level is not an authored one, so there is nothing for it to
+        # disagree with. Keyed on presence alone, this refused a request no
+        # client meant to make: go-terrapod's create path sent
+        # `workspace-permission` unconditionally -- the one level of four with
+        # no guard -- so an unauthored level arrived as `""`, and `""` disagrees
+        # with every derived summary. That 422'd the capability-authored create
+        # which `provider/examples/resources/terrapod_role/main.tf` ships and
+        # `docs/rbac.md` documents.
+        #
+        # The SDK no longer sends it; this is the half that makes any OTHER
+        # client's empty level mean what it says. Nothing is quietly accepted
+        # that was not before: `_level` refuses `""` as a level in its own
+        # right, so an empty level still cannot SET anything.
+        if sent in ("", None):
+            continue
+        # The summary is keyed by the attribute name with underscores, which is
+        # the wire key's own spelling -- derived rather than restated, so the
+        # two cannot drift.
+        derived = summary[key.replace("-", "_")]
+        if sent != derived:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"'{key}' is '{sent}', but the 'capabilities' set in the same request "
+                    f"summarises to '{derived}'. An explicit capability set is what gets "
+                    "stored and the levels are derived from it, so the two cannot both be "
+                    "honoured. Send the levels alone to have the server expand the preset, "
+                    "or send 'capabilities' alone."
+                ),
+            )
+    return caps
+
+
 def _level(attrs: dict, key: str, default: str, valid: set[str]) -> str:
     v = attrs.get(key, default)
     if v not in valid:
@@ -280,9 +344,7 @@ async def create_role(
     # the level shorthand (validated here) is expanded into it. Levels are never
     # stored.
     capabilities = (
-        _validate_capabilities(attrs["capabilities"])
-        if "capabilities" in attrs
-        else _caps_from_level_input(attrs)
+        _authored_capabilities(attrs) if "capabilities" in attrs else _caps_from_level_input(attrs)
     )
     role = Role(
         name=name,
@@ -357,9 +419,11 @@ async def update_role(
     # The role's grant is the persisted capabilities. An explicit `capabilities`
     # set replaces it wholesale; otherwise a level edit replaces only the edited
     # axis's capabilities (preserving granular caps on the other axes). Levels are
-    # never stored. Capability-authoring wins over any level fields sent alongside.
+    # never stored. A level sent alongside an explicit `capabilities` set is
+    # refused when the two disagree (#2502) rather than silently dropped, which
+    # is what made a level edit vanish.
     if "capabilities" in attrs:
-        role.capabilities = _validate_capabilities(attrs["capabilities"])
+        role.capabilities = _authored_capabilities(attrs)
     elif _LEVEL_INPUT.keys() & attrs.keys():
         _apply_level_edits(role, attrs)
 
@@ -418,9 +482,7 @@ def _role_from_attrs(attrs: dict) -> Role:
     otherwise the preview would be answering about a role that cannot exist.
     """
     capabilities = (
-        _validate_capabilities(attrs["capabilities"])
-        if "capabilities" in attrs
-        else _caps_from_level_input(attrs)
+        _authored_capabilities(attrs) if "capabilities" in attrs else _caps_from_level_input(attrs)
     )
     return Role(
         name=attrs.get("name", "") or "(unsaved)",
