@@ -1337,7 +1337,8 @@
       "operationsNone": "這會讓所有相符的工作區完全沒有任何作業。工作區必須保留計畫與套用、設定，或兩者之一。",
       "setHardLimit": "設定強制 limit（空值會移除上限）",
       "setPlaybooks": "設定允許的 playbook（取代每個相符工作區上的清單；空清單會移除限制）",
-      "playbooksPairWarning": "非空清單必須包含每個相符工作區各自的預設 playbook；如果其中還沒有，請在同一次更新中一併設定預設 playbook。"
+      "playbooksPairWarning": "非空清單必須包含每個相符工作區各自的預設 playbook；如果其中還沒有，請在同一次更新中一併設定預設 playbook。",
+      "setScheduledConfigureCron": "指定設定作業的排程（空值會移除）"
     },
     "diff": {
       "colWorkspace": "工作區",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "每個項目都是相對於設定目錄的路徑；指定清單後，執行選項會變成從清單中挑選，而不再是文字輸入框。未指定任何選項的設定作業會執行預設 playbook，因此預設 playbook 必須是其中的某個項目。可以用它把某個 playbook 擋在絕不應觸及的工作區之外——例如節點排空或資料庫升級——在這種情況下，清單是一種管控手段，而不只是慣例。",
       "playbooksPlaceholder": "例如 release.yml",
       "playbooksAdd": "新增 playbook",
-      "playbooksAny": "不限"
+      "playbooksAny": "不限",
+      "scheduledConfigureEnabled": "依排程執行設定",
+      "scheduledConfigureEnabledHint": "無論是否有變更，Playbook 都會在固定時間執行，這樣整個機群會維持收斂，而不是只在推送之後才被修正。",
+      "scheduledConfigureCron": "排程",
+      "scheduledConfigureCronLead": "設定作業執行的時間，使用五欄位 cron 運算式。只有在開啟依排程執行設定時才會讀取，留空表示沒有排程。",
+      "scheduledConfigureCronTitle": "五個欄位分別是分、時、日、月與星期，依下方時區解讀：0 2 * * 2 代表每週二 02:00，0 2 * * * 代表每天 02:00。六欄位運算式會被拒絕，因為秒級排程無法兌現；觸發間隔短於五分鐘的運算式同樣會被拒絕 —— 一次設定作業可能執行一小時，而且無法安全重啟。",
+      "scheduledConfigureCronPlaceholder": "例如 0 2 * * 2",
+      "scheduledConfigureTimezone": "排程時區",
+      "scheduledConfigureTimezoneHint": "解讀排程所用的 IANA 時區，因此小時會跟隨日光節約時間 —— 例如 UTC、Europe/London 或 America/New_York。留空表示 UTC。",
+      "scheduledConfigureTimezonePlaceholder": "例如 Europe/London",
+      "scheduledConfigureLastAt": "上次排程執行"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

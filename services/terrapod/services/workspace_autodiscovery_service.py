@@ -44,6 +44,7 @@ from terrapod.db.models import (
     NotificationConfiguration,
     RunTask,
     Workspace,
+    now_utc,
 )
 from terrapod.logging_config import get_logger
 from terrapod.services import pool_set
@@ -461,6 +462,16 @@ async def find_or_autocreate_workspace(
         drift_detection_enabled=getattr(rule, "drift_detection_enabled", True),
         drift_detection_interval_seconds=getattr(rule, "drift_detection_interval_seconds", 86400),
         drift_ignore_rules=list(getattr(rule, "drift_ignore_rules", None) or []),
+        scheduled_configure_enabled=getattr(rule, "scheduled_configure_enabled", False),
+        scheduled_configure_cron=getattr(rule, "scheduled_configure_cron", ""),
+        scheduled_configure_timezone=getattr(rule, "scheduled_configure_timezone", "UTC"),
+        # Stamped when the rule templates a schedule ON, for the same reason the
+        # workspace PATCH stamps it: otherwise the next occurrence is computed
+        # from a `created_at` in the past and every materialised workspace
+        # configures itself the moment it is discovered.
+        scheduled_configure_last_at=(
+            now_utc() if getattr(rule, "scheduled_configure_enabled", False) else None
+        ),
         plan_expiry_seconds=getattr(rule, "plan_expiry_seconds", None),
         slack_channel=getattr(rule, "slack_channel", ""),
         debug_mode=getattr(rule, "debug_mode", False),

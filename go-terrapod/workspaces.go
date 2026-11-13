@@ -148,8 +148,10 @@ type Workspace struct {
 	//
 	// No `omitempty`, as on the pair above and for the same reason.
 	//
-	// There is deliberately no scheduled configure. An operator who wants one
-	// drives CreateRun from their own scheduler.
+	// A third trigger, a cron SCHEDULE, is the ScheduledConfigure* fields
+	// below (#2538). This comment used to say there deliberately was not one
+	// and that an operator wanting one drove CreateRun from their own
+	// scheduler; that is no longer true.
 	AutoConfigureEnabled bool `json:"auto-configure-enabled"`
 	ConfigureAfterApply  bool `json:"configure-after-apply"`
 	// ConfigureAllHosts forces a DERIVED configure -- one an inventory change
@@ -165,6 +167,26 @@ type Workspace struct {
 	// This flag is the override and it WIDENS. That direction is deliberate:
 	// a flag someone forgets leaves them configuring more, not less.
 	ConfigureAllHosts bool `json:"configure-all-hosts"`
+
+	// ScheduledConfigureEnabled, ScheduledConfigureCron and
+	// ScheduledConfigureTimezone are the third way a configure starts
+	// (#2538): a cron schedule, read in an IANA zone. Like the two triggers
+	// above, the pair means nothing without ConfigureEnabled, and the run it
+	// queues carries no run options -- it is the declared default playbook
+	// against the declared default limit, which is what bounds it.
+	//
+	// The cron is the five-field form and is stored EXACTLY as supplied: a
+	// schedule has several spellings and the server deliberately normalises
+	// none of them, so a consumer writing a read back gets its own text.
+	// Empty means no schedule, whatever ScheduledConfigureEnabled holds.
+	ScheduledConfigureEnabled  bool   `json:"scheduled-configure-enabled"`
+	ScheduledConfigureCron     string `json:"scheduled-configure-cron,omitempty"`
+	ScheduledConfigureTimezone string `json:"scheduled-configure-timezone,omitempty"`
+	// ScheduledConfigureLastAt is READ-ONLY: when the schedule last fired,
+	// RFC3339. Empty when it never has. It is what the next occurrence is
+	// measured from, so it is server state rather than a setting, and it
+	// appears in neither write request below.
+	ScheduledConfigureLastAt string `json:"scheduled-configure-last-at,omitempty"`
 
 	// AnsibleHostKeyChecking is whether a configure verifies the SSH host key
 	// of the hosts it targets (#2318). True is verification ON, and that is the
@@ -458,6 +480,14 @@ type CreateWorkspaceRequest struct {
 	// inventory change affected (#2229). A POINTER for the reason the pair
 	// above gives; the server-side default is FALSE, which narrows.
 	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
+	// ScheduledConfigure* start a configure on a cron schedule (#2538).
+	// Enabled is a POINTER for the reason its neighbours are; the two strings
+	// are plain, because on CREATE empty is the server default for both -- no
+	// schedule, and UTC -- so an empty value is omitted rather than sent, the
+	// same shape DefaultPlaybook and DefaultLimit have here.
+	ScheduledConfigureEnabled  *bool  `json:"scheduled-configure-enabled,omitempty"`
+	ScheduledConfigureCron     string `json:"scheduled-configure-cron,omitempty"`
+	ScheduledConfigureTimezone string `json:"scheduled-configure-timezone,omitempty"`
 	// AnsibleHostKeyChecking sets host-key verification on the new workspace
 	// (#2318). A POINTER for the reason the pair above gives; the server-side
 	// default is TRUE, which verifies.
@@ -645,6 +675,15 @@ type UpdateWorkspaceRequest struct {
 	// ConfigureAllHosts turns the narrowing off or back on (#2229). A POINTER
 	// so nil leaves the stored value alone.
 	ConfigureAllHosts *bool `json:"configure-all-hosts,omitempty"`
+	// ScheduledConfigure* turn a cron-scheduled configure on or off and move
+	// its schedule (#2538). All three are POINTERS, and the two strings are
+	// pointers for the reason DefaultPlaybook and DefaultLimit are: an empty
+	// string is a REAL value here -- `&""` on the cron removes the schedule --
+	// and a plain string would drop it, so "stop running on a schedule" would
+	// be a silent no-op. `&""` on the timezone resets it to UTC.
+	ScheduledConfigureEnabled  *bool   `json:"scheduled-configure-enabled,omitempty"`
+	ScheduledConfigureCron     *string `json:"scheduled-configure-cron,omitempty"`
+	ScheduledConfigureTimezone *string `json:"scheduled-configure-timezone,omitempty"`
 	// AnsibleHostKeyChecking turns host-key verification off or back on
 	// (#2318). A POINTER so nil leaves the stored value alone.
 	AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
@@ -1011,6 +1050,15 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ConfigureAllHosts != nil {
 		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
 	}
+	if req.ScheduledConfigureEnabled != nil {
+		attrs["scheduled-configure-enabled"] = *req.ScheduledConfigureEnabled
+	}
+	if req.ScheduledConfigureCron != "" {
+		attrs["scheduled-configure-cron"] = req.ScheduledConfigureCron
+	}
+	if req.ScheduledConfigureTimezone != "" {
+		attrs["scheduled-configure-timezone"] = req.ScheduledConfigureTimezone
+	}
 	if req.AnsibleHostKeyChecking != nil {
 		attrs["ansible-host-key-checking"] = *req.AnsibleHostKeyChecking
 	}
@@ -1217,6 +1265,18 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.ConfigureAllHosts != nil {
 		attrs["configure-all-hosts"] = *req.ConfigureAllHosts
+	}
+	// An explicit "" is SENT on both strings, not dropped: on the cron it is
+	// how the schedule is removed, and the server reads an absent key as
+	// "leave the stored value alone". Hence the nil checks (#2538).
+	if req.ScheduledConfigureEnabled != nil {
+		attrs["scheduled-configure-enabled"] = *req.ScheduledConfigureEnabled
+	}
+	if req.ScheduledConfigureCron != nil {
+		attrs["scheduled-configure-cron"] = *req.ScheduledConfigureCron
+	}
+	if req.ScheduledConfigureTimezone != nil {
+		attrs["scheduled-configure-timezone"] = *req.ScheduledConfigureTimezone
 	}
 	if req.AnsibleHostKeyChecking != nil {
 		attrs["ansible-host-key-checking"] = *req.AnsibleHostKeyChecking
@@ -1456,6 +1516,10 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AutoConfigureEnabled:          GetBoolAttr(res, "auto-configure-enabled"),
 		ConfigureAfterApply:           GetBoolAttr(res, "configure-after-apply"),
 		ConfigureAllHosts:             GetBoolAttr(res, "configure-all-hosts"),
+		ScheduledConfigureEnabled:     GetBoolAttr(res, "scheduled-configure-enabled"),
+		ScheduledConfigureCron:        GetStringAttr(res, "scheduled-configure-cron"),
+		ScheduledConfigureTimezone:    GetStringAttr(res, "scheduled-configure-timezone"),
+		ScheduledConfigureLastAt:      GetStringAttr(res, "scheduled-configure-last-at"),
 		AnsibleHostKeyChecking:        GetBoolAttr(res, "ansible-host-key-checking"),
 		DynamicInventoryEnabled:       GetBoolAttr(res, "dynamic-inventory-enabled"),
 		InventoryScriptsEnabled:       GetBoolAttr(res, "inventory-scripts-enabled"),

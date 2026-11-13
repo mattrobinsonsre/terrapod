@@ -29,6 +29,11 @@ uvicorn = {extras = ["standard"], version = ">=0.42,<0.55"}
 pydantic = "^2.10.0"
 pydantic-settings = "^2.14.2"
 structlog = ">=25.5,<27.0"
+# The first cron in the product, for scheduled configure runs (#2538).
+# API image only -- the scheduler runs there, and the three minimal
+# images build from their own `pyproject-{listener,migrations,runner}.toml`
+# manifests, so this does not reach them.
+croniter = "^7.0.0"
 httpx = "^0.28.0"
 slack-sdk = "^3.33.0"
 pyyaml = "^6.0.0"

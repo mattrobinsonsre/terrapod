@@ -1337,7 +1337,8 @@
       "operationsNone": "Isto deixaria cada área de trabalho correspondente sem qualquer operação. Uma área de trabalho tem de manter planear e aplicar, ou configurar, ou ambas.",
       "setHardLimit": "Definir o limite rígido (um valor vazio remove o limite superior)",
       "setPlaybooks": "Definir os playbooks permitidos (substitui a lista em cada workspace correspondente; uma lista vazia elimina a restrição)",
-      "playbooksPairWarning": "Uma lista não vazia tem de conter o playbook predefinido de cada workspace correspondente, pelo que o deve definir na mesma atualização se ainda não for um destes."
+      "playbooksPairWarning": "Uma lista não vazia tem de conter o playbook predefinido de cada workspace correspondente, pelo que o deve definir na mesma atualização se ainda não for um destes.",
+      "setScheduledConfigureCron": "Definir o agendamento da configuração (um valor vazio remove-o)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Cada entrada é um caminho relativo ao diretório de configuração, e a opção de execução passa a ser um seletor entre elas em vez de uma caixa de texto. O playbook predefinido tem de ser uma das entradas, porque um Configurar simples executa o predefinido. Utilize-o para manter um playbook afastado de um workspace que nunca deve tocar — o esvaziamento de um nó, a atualização de uma base de dados —, onde uma lista é um controlo e não uma convenção.",
       "playbooksPlaceholder": "p. ex. release.yml",
       "playbooksAdd": "Adicionar playbook",
-      "playbooksAny": "Qualquer"
+      "playbooksAny": "Qualquer",
+      "scheduledConfigureEnabled": "Configurar segundo um agendamento",
+      "scheduledConfigureEnabledHint": "O playbook é executado a uma hora fixa, tenha algo mudado ou não, e é assim que uma frota se mantém convergida em vez de ser corrigida apenas após um push.",
+      "scheduledConfigureCron": "Agendamento",
+      "scheduledConfigureCronLead": "Quando a configuração é executada, como uma expressão cron de cinco campos. Só é lida enquanto Configurar segundo um agendamento estiver ativo, e deixá-la vazia significa nenhum agendamento.",
+      "scheduledConfigureCronTitle": "Os cinco campos são minuto, hora, dia do mês, mês e dia da semana, lidos no fuso horário abaixo: 0 2 * * 2 é 02:00 de todas as terças-feiras e 0 2 * * * é 02:00 de todos os dias. Uma expressão de seis campos é recusada, porque um agendamento com resolução de segundos não pode ser cumprido, e o mesmo vale para tudo o que dispare mais vezes do que de cinco em cinco minutos — uma configuração pode demorar uma hora e não é reiniciável com segurança.",
+      "scheduledConfigureCronPlaceholder": "p. ex. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Fuso horário do agendamento",
+      "scheduledConfigureTimezoneHint": "O fuso IANA em que o agendamento é lido, para que a hora acompanhe a hora de verão — por exemplo UTC, Europe/London ou America/New_York. Vazio significa UTC.",
+      "scheduledConfigureTimezonePlaceholder": "p. ex. Europe/London",
+      "scheduledConfigureLastAt": "Última execução agendada"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

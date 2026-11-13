@@ -505,6 +505,9 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
     #: template column means adding it here and passing it through; that is the
     #: point of the test.
     TEMPLATED = (
+        "scheduled_configure_enabled",
+        "scheduled_configure_cron",
+        "scheduled_configure_timezone",
         # The engine the rule discovers is the engine its workspaces run
         # (#1570) -- a rule that found `Pulumi.<stack>.yaml` and created a
         # Terraform workspace would produce something that cannot run it.
@@ -658,6 +661,14 @@ class TestEveryWorkspaceSettingIsTemplatedOrLedgered:
         "trigger_prefixes": (
             "computed at materialisation — scoped to the discovered directory, so a "
             "templated value would break the poller's targeting"
+        ),
+        "scheduled_configure_last_at": (
+            "not a setting (#2538) -- it is when the schedule last FIRED, and a "
+            "rule cannot know that before the workspace exists. Materialisation "
+            "stamps it to `now` when the rule templates a schedule ON, for the "
+            "same reason `auto_configure_inventory_stamp` starts NULL: otherwise "
+            "the next occurrence is computed from a `created_at` already in the "
+            "past and every discovered workspace configures itself on sight"
         ),
         "working_directory": "the discovered directory itself",
         "stack": (

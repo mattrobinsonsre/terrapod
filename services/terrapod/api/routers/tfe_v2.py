@@ -85,6 +85,7 @@ from terrapod.db.models import (
     StateVersion,
     Workspace,
     generate_uuid7,
+    now_utc,
 )
 from terrapod.db.session import get_db
 from terrapod.engines import TERRAFORM
@@ -1089,6 +1090,16 @@ def _workspace_json(
                 "slack-channel": ws.slack_channel,
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
+                # Scheduled configure runs (#2538). `last-at` is read-only: it is
+                # when the schedule fired, not something a client sets.
+                "scheduled-configure-enabled": ws.scheduled_configure_enabled,
+                "scheduled-configure-cron": ws.scheduled_configure_cron,
+                "scheduled-configure-timezone": ws.scheduled_configure_timezone,
+                "scheduled-configure-last-at": (
+                    ws.scheduled_configure_last_at.isoformat().replace("+00:00", "Z")
+                    if ws.scheduled_configure_last_at
+                    else None
+                ),
                 # Security scanning (#1036): deterministic Checkov/Trivy scan stage.
                 "security-scan-enforcement": ws.security_scan_enforcement,
                 "security-scan-engine": ws.security_scan_engine,
@@ -2048,6 +2059,28 @@ async def _create_workspace_impl(
         drift_detection_interval_seconds=_clamp_drift_interval(
             attrs.get("drift-detection-interval-seconds", 86400)
         ),
+        scheduled_configure_enabled=attrs.get("scheduled-configure-enabled", False),
+        # Through `_422`, or the rule's ValueError leaves the route answering
+        # 500 on a typo. A validator reached only from its own unit test is the
+        # gap `test_scheduled_configure_write_paths` exists to catch.
+        scheduled_configure_timezone=_422(
+            workspace_settings.validate_schedule_timezone,
+            attrs.get("scheduled-configure-timezone"),
+        ),
+        scheduled_configure_cron=_422(
+            workspace_settings.validate_schedule_cron,
+            attrs.get("scheduled-configure-cron"),
+            timezone=_422(
+                workspace_settings.validate_schedule_timezone,
+                attrs.get("scheduled-configure-timezone"),
+            ),
+        ),
+        # Stamped at creation when the schedule is already on, so the first run
+        # is the next OCCURRENCE rather than one fired the moment the workspace
+        # exists. `is_due` measures from here.
+        scheduled_configure_last_at=(
+            now_utc() if attrs.get("scheduled-configure-enabled") else None
+        ),
         plan_expiry_seconds=_parse_plan_expiry(attrs.get("plan-expiry-seconds")),
         # The AI plan-summary opt-in (#401) was readable, serialised, and
         # settable by PATCH — but create silently dropped it (#1763). Both
@@ -2966,6 +2999,30 @@ async def update_workspace(
                 dropped_pool_ids=[str(p) for p in dropped],
                 actor=user.email,
             )
+    # Scheduled configure (#2538). The zone is resolved FIRST, because the cron
+    # rule's minimum-interval probe is anchored in it -- and `in attrs` rather
+    # than truthiness throughout, so sending "" clears a schedule and omitting
+    # the key leaves it alone (#316).
+    if "scheduled-configure-timezone" in attrs:
+        ws.scheduled_configure_timezone = _422(
+            workspace_settings.validate_schedule_timezone,
+            attrs["scheduled-configure-timezone"],
+        )
+    if "scheduled-configure-cron" in attrs:
+        ws.scheduled_configure_cron = _422(
+            workspace_settings.validate_schedule_cron,
+            attrs["scheduled-configure-cron"],
+            timezone=ws.scheduled_configure_timezone,
+        )
+    if "scheduled-configure-enabled" in attrs:
+        was_on = ws.scheduled_configure_enabled
+        ws.scheduled_configure_enabled = attrs["scheduled-configure-enabled"]
+        if ws.scheduled_configure_enabled and not was_on:
+            # Turning it ON stamps now, so the first run is the next occurrence
+            # rather than one fired immediately. Without this, enabling "02:00
+            # daily" at 14:00 computes the next occurrence from `created_at` --
+            # long past -- and configures the fleet on the spot.
+            ws.scheduled_configure_last_at = now_utc()
     if "drift-detection-enabled" in attrs:
         ws.drift_detection_enabled = attrs["drift-detection-enabled"]
         # Reset drift status when disabling drift detection

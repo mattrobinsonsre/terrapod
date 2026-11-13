@@ -84,6 +84,12 @@ export const HINT_LEADS: Record<string, string> = {
   // mechanism (paths relative to the config directory, the run option becoming
   // a picker, the default having to be a member) goes behind the icon.
   'fields.playbooksTitle': 'fields.playbooksLead',
+  // The configure schedule (#2538). The lead carries what the box takes, the
+  // switch that makes it live, and what leaving it empty means; the detail
+  // carries the field order and the two refusals an operator would otherwise
+  // meet as a 422 -- a six-field expression, and anything faster than five
+  // minutes.
+  'fields.scheduledConfigureCronTitle': 'fields.scheduledConfigureCronLead',
   'variables.vaultFileHint': 'variables.vaultFileLead',
   'variables.vaultFileTemplateHint': 'variables.vaultFileTemplateLead',
   'variables.gitSshHint': 'variables.gitSshLead',

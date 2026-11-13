@@ -1337,7 +1337,8 @@
       "operationsNone": "This would leave every matched work-deck with no order at all. A work-deck must keep chart an'' make good, or riggin'', or both.",
       "setHardLimit": "Set th'' iron-bound limit (an empty value lifts th'' ceilin'')",
       "setPlaybooks": "Set th'' permitted playbooks (replaces th'' list on every matched work-deck; an empty list lifts th'' ban)",
-      "playbooksPairWarning": "A list that bain''t empty must carry each matched work-deck''s own standin'' playbook, so set that in th'' same order if it bain''t already one o'' these, arr."
+      "playbooksPairWarning": "A list that bain''t empty must carry each matched work-deck''s own standin'' playbook, so set that in th'' same order if it bain''t already one o'' these, arr.",
+      "setScheduledConfigureCron": "Set th'' riggin'' schedule (an empty value casts it overboard)"
     },
     "diff": {
       "colWorkspace": "Work-deck",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Each entry be a course reckoned from th'' chart locker, an'' th'' voyage option turns into a pick-list over em instead o'' a writin'' box. Th'' standin'' playbook must be one o'' th'' entries, fer a bare Riggin'' sails th'' standin'' one. Use it t'' keep a playbook clear o'' a work-deck it must never touch — drainin'' a node, upgradin'' a database — where a list be a lock rather than a custom, arr.",
       "playbooksPlaceholder": "fer example release.yml",
       "playbooksAdd": "Hoist a playbook",
-      "playbooksAny": "Any o'' em"
+      "playbooksAny": "Any o'' em",
+      "scheduledConfigureEnabled": "Rig to a watch schedule",
+      "scheduledConfigureEnabledHint": "Th'' playbook sails at a fixed hour whether or not aught has changed, which be how a fleet stays converged instead o'' bein'' corrected only after a push, arr.",
+      "scheduledConfigureCron": "Watch schedule",
+      "scheduledConfigureCronLead": "When th'' riggin'' sails, as a five-field cron expression. It be read only while Rig to a watch schedule be on, an'' leavin'' it empty means no schedule at all.",
+      "scheduledConfigureCronTitle": "Th'' five fields be minute, hour, day o'' th'' month, month an'' day o'' th'' week, read in th'' time zone below: 0 2 * * 2 be 02:00 every Tuesday an'' 0 2 * * * be 02:00 every day. A six-field expression be refused, fer a seconds-resolution schedule cannot be honoured, an'' so be anythin'' firin'' more often than every five minutes — a riggin'' can run fer an hour an'' cannot be restarted safely, arr.",
+      "scheduledConfigureCronPlaceholder": "e.g. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Watch time zone",
+      "scheduledConfigureTimezoneHint": "Th'' IANA zone th'' schedule be read in, so th'' hour follows daylight savin'' — fer example UTC, Europe/London or America/New_York. Empty means UTC.",
+      "scheduledConfigureTimezonePlaceholder": "e.g. Europe/London",
+      "scheduledConfigureLastAt": "Last watch run"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

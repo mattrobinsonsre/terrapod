@@ -147,6 +147,12 @@ _FIELD_MAP: dict[str, str] = {
     "drift-detection-enabled": "drift_detection_enabled",
     "drift-detection-interval-seconds": "drift_detection_interval_seconds",
     "drift-ignore-rules": "drift_ignore_rules",
+    # Scheduled configure (#2538). `scheduled_configure_last_at` is deliberately
+    # absent -- it is when the schedule last fired, which is a result rather than
+    # a setting, and is listed in the parity gate's NEVER_BULK_SETTABLE.
+    "scheduled-configure-enabled": "scheduled_configure_enabled",
+    "scheduled-configure-cron": "scheduled_configure_cron",
+    "scheduled-configure-timezone": "scheduled_configure_timezone",
     "slack-channel": "slack_channel",
     "debug-mode": "debug_mode",
     "allow-fork-pr-plans": "allow_fork_pr_plans",
@@ -490,6 +496,11 @@ _SETTING_RULES: dict[str, Any] = {
     "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
     "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
     "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,
+    # The cron rule takes the zone only to anchor its minimum-interval probe, and
+    # bulk update has no per-workspace zone to hand it -- the gap between two
+    # firings is the same in any zone, so UTC is the right base here.
+    "scheduled-configure-cron": workspace_settings.validate_schedule_cron,
+    "scheduled-configure-timezone": workspace_settings.validate_schedule_timezone,
     "slack-channel": workspace_settings.validate_slack_channel,
     # Type-checked, never coerced -- see `validate_bool`.
     "terragrunt-enabled": lambda v: workspace_settings.validate_bool(v, "terragrunt-enabled"),
@@ -498,6 +509,9 @@ _SETTING_RULES: dict[str, Any] = {
         v, "drift-detection-enabled"
     ),
     "debug-mode": lambda v: workspace_settings.validate_bool(v, "debug-mode"),
+    "scheduled-configure-enabled": lambda v: workspace_settings.validate_bool(
+        v, "scheduled-configure-enabled"
+    ),
     "allow-fork-pr-plans": lambda v: workspace_settings.validate_bool(v, "allow-fork-pr-plans"),
 }
 

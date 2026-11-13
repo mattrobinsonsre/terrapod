@@ -45,6 +45,10 @@ type workspaceDataSourceModel struct {
 	AutoConfigureEnabled          types.Bool   `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply           types.Bool   `tfsdk:"configure_after_apply"`
 	ConfigureAllHosts             types.Bool   `tfsdk:"configure_all_hosts"`
+	ScheduledConfigureEnabled     types.Bool   `tfsdk:"scheduled_configure_enabled"`
+	ScheduledConfigureCron        types.String `tfsdk:"scheduled_configure_cron"`
+	ScheduledConfigureTimezone    types.String `tfsdk:"scheduled_configure_timezone"`
+	ScheduledConfigureLastAt      types.String `tfsdk:"scheduled_configure_last_at"`
 	AnsibleHostKeyChecking        types.Bool   `tfsdk:"ansible_host_key_checking"`
 	DynamicInventoryEnabled       types.Bool   `tfsdk:"dynamic_inventory_enabled"`
 	InventoryScriptsEnabled       types.Bool   `tfsdk:"inventory_scripts_enabled"`
@@ -142,6 +146,10 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"auto_configure_enabled":        computedBool("Whether a push that changes the workspace's ansible config root queues a configure. Defaults to false. The run uses `default_playbook` and `default_limit`, because a push carries no run options."),
 			"configure_all_hosts":           computedBool("Whether a derived configure — one an inventory change or an apply produced — targets every host rather than only the hosts that changed. Defaults to false, which narrows: a derived configure narrows when the ansible code under `config_directory` is unchanged since the last successful configure, and goes wide when it moved."),
 			"configure_after_apply":         computedBool("Whether an apply on this workspace is followed by a configure on the same run — which is what lets a `terraform`/`tofu` CLI apply stream the configure's logs. Defaults to false. A destroy apply never chains one."),
+			"scheduled_configure_enabled":   computedBool("Whether this workspace runs a configure on a cron schedule (#2538). Defaults to false. Needs `configure_enabled` and a non-empty `scheduled_configure_cron`; with either missing it is inert. The scheduled run carries no run options — it is `default_playbook` against `default_limit`."),
+			"scheduled_configure_cron":      computedString("The five-field cron expression the schedule fires on, for example `0 2 * * 2`. Empty means no schedule whatever `scheduled_configure_enabled` holds. Stored exactly as written — the server validates it and normalises nothing."),
+			"scheduled_configure_timezone":  computedString("The IANA time zone `scheduled_configure_cron` is read in. Defaults to `UTC`. A real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."),
+			"scheduled_configure_last_at":   computedString("When the schedule last fired, or null if it never has. It is what the next occurrence is measured from."),
 			"ansible_host_key_checking":     computedBool("Whether a configure verifies the SSH host key of the hosts it targets. Defaults to true, which is ansible's own default and the behaviour that already existed — first contact with an unseen host fails closed. Relaxing it makes the inventory resolver emit `ansible_ssh_common_args` as a variable on the `all` group rather than forcing an environment variable, so an inventory host variable still beats it and a single host may re-enable verification over a workspace-level relaxation."),
 			"dynamic_inventory_enabled":     computedBool("Whether ansible's `auto` inventory plugin — a declared plugin config, a YAML file with a top-level `plugin:` key — may run on the runner. Defaults to false. The API never executes a plugin in either state: off, a plugin source is refused by name rather than resolving partially; on, the API skips it and the runner re-resolves the inventory and is authoritative."),
 			"inventory_scripts_enabled":     computedBool("Whether ansible's `script` inventory plugin — an executable inventory script — may run on the runner. Defaults to false, and the API never executes one in either state. Separate from dynamic_inventory_enabled so declared plugin configs can be permitted without also permitting arbitrary executables: a declared config names a collection that can be pinned and installed, a script names nothing."),
@@ -369,6 +377,14 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	if v := terrapod.GetBoolPtrAttr(res, "configure-all-hosts"); v != nil {
 		m.ConfigureAllHosts = types.BoolValue(*v)
 	}
+	// Scheduled configure (#2538). Falls back to its own server-side default --
+	// FALSE -- for the reason the three above do: a server predating it sends
+	// the attribute not at all, and absent has to read as off rather than as
+	// a workspace that configures itself on a schedule nobody set.
+	m.ScheduledConfigureEnabled = types.BoolValue(false)
+	if v := terrapod.GetBoolPtrAttr(res, "scheduled-configure-enabled"); v != nil {
+		m.ScheduledConfigureEnabled = types.BoolValue(*v)
+	}
 	// Host-key verification (#2318). Falls back to its own server-side default --
 	// TRUE -- for exactly the reason `plan-apply-enabled` does above: a server
 	// predating #2318 sends the attribute not at all and a workspace read
@@ -424,6 +440,9 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	}
 	setOptionalString(&m.DriftStatus, terrapod.GetStringAttr(res, "drift-status"))
 	setOptionalString(&m.DriftLastCheckedAt, terrapod.GetStringAttr(res, "drift-last-checked-at"))
+	setOptionalString(&m.ScheduledConfigureCron, terrapod.GetStringAttr(res, "scheduled-configure-cron"))
+	setOptionalString(&m.ScheduledConfigureTimezone, terrapod.GetStringAttr(res, "scheduled-configure-timezone"))
+	setOptionalString(&m.ScheduledConfigureLastAt, terrapod.GetStringAttr(res, "scheduled-configure-last-at"))
 	setOptionalString(&m.DriftLatestRunID, terrapod.GetStringAttr(res, "drift-latest-run-id"))
 	setOptionalString(&m.LifecycleState, terrapod.GetStringAttr(res, "lifecycle-state"))
 	setOptionalString(&m.LifecycleReason, terrapod.GetStringAttr(res, "lifecycle-reason"))

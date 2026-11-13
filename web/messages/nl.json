@@ -1337,7 +1337,8 @@
       "operationsNone": "Hiermee zou elke overeenkomende workspace helemaal geen operatie meer hebben. Een workspace moet plannen en toepassen, of configureren, of beide houden.",
       "setHardLimit": "Harde limiet instellen (een lege waarde verwijdert het plafond)",
       "setPlaybooks": "Toegestane playbooks instellen (vervangt de lijst op elke overeenkomende workspace; een lege lijst heft de beperking op)",
-      "playbooksPairWarning": "Een niet-lege lijst moet het eigen standaard-playbook van elke overeenkomende workspace bevatten, dus stel dat in dezelfde update in als het nog niet een van deze is."
+      "playbooksPairWarning": "Een niet-lege lijst moet het eigen standaard-playbook van elke overeenkomende workspace bevatten, dus stel dat in dezelfde update in als het nog niet een van deze is.",
+      "setScheduledConfigureCron": "Schema van de configuratie instellen (een lege waarde verwijdert het)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Elk item is een pad relatief ten opzichte van de configuratiemap, en de uitvoeringsoptie wordt een keuzelijst daarover in plaats van een tekstvak. Het standaard-playbook moet een van de items zijn, want een kaal Configureren voert de standaard uit. Gebruik dit om een playbook weg te houden van een workspace die het nooit mag raken — een node-drain, een database-upgrade — waar een lijst een controlemiddel is in plaats van een conventie.",
       "playbooksPlaceholder": "bijv. release.yml",
       "playbooksAdd": "Playbook toevoegen",
-      "playbooksAny": "Alle"
+      "playbooksAny": "Alle",
+      "scheduledConfigureEnabled": "Configureren volgens een schema",
+      "scheduledConfigureEnabledHint": "Het playbook draait op een vast tijdstip, of er nu iets is veranderd of niet, en zo blijft een vloot convergent in plaats van pas na een push te worden gecorrigeerd.",
+      "scheduledConfigureCron": "Schema",
+      "scheduledConfigureCronLead": "Wanneer de configuratie draait, als cron-expressie met vijf velden. Hij wordt alleen gelezen zolang Configureren volgens een schema aan staat, en leeg laten betekent geen schema.",
+      "scheduledConfigureCronTitle": "De vijf velden zijn minuut, uur, dag van de maand, maand en dag van de week, gelezen in de tijdzone hieronder: 0 2 * * 2 is 02:00 uur elke dinsdag en 0 2 * * * is 02:00 uur elke dag. Een expressie met zes velden wordt geweigerd, omdat een schema op secondeniveau niet kan worden nagekomen, en hetzelfde geldt voor alles dat vaker dan elke vijf minuten afgaat — een configuratie kan een uur duren en is niet veilig herstartbaar.",
+      "scheduledConfigureCronPlaceholder": "bijv. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Tijdzone van het schema",
+      "scheduledConfigureTimezoneHint": "De IANA-zone waarin het schema wordt gelezen, zodat het uur de zomertijd volgt — bijvoorbeeld UTC, Europe/London of America/New_York. Leeg betekent UTC.",
+      "scheduledConfigureTimezonePlaceholder": "bijv. Europe/London",
+      "scheduledConfigureLastAt": "Laatste geplande uitvoering"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

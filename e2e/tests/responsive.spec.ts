@@ -653,6 +653,72 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('the configure schedule fits a phone on all three surfaces it is set from (#2538)', async ({
+    page,
+  }) => {
+    // Three controls added to one group, two of them free-text boxes holding a
+    // monospace-looking value, on a form that is already the densest in the
+    // product. That is the shape that pushes a phone sideways, and it is set
+    // from three separate surfaces, so each is driven here rather than
+    // trusting one of them to stand for the others.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eresp-schedule'), {
+      'configure-enabled': true,
+      'config-directory': 'ansible',
+      'default-playbook': 'site.yml',
+    })
+
+    // 1. the workspace's own Configuration tab.
+    await page.goto(`/workspaces/${wsId}?tab=configuration`)
+    await expect(
+      page
+        .getByText('Configure on a schedule', { exact: true })
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible({ timeout: 15_000 })
+    // `.filter({ visible: true })`, because a responsive page keeps BOTH
+    // renders in the DOM at every width and `.first()` alone takes whichever
+    // comes first in document order -- which may be the hidden one.
+    await expect(
+      page.getByText('Schedule time zone', { exact: true }).filter({ visible: true }).first(),
+    ).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // 2. the fleet form, where the cron sits behind an opt-in checkbox because
+    //    an empty expression is how a schedule is REMOVED.
+    await page.goto('/admin/bulk-update')
+    await expectNoHorizontalPageScroll(page)
+    const gate = page
+      .locator('label', { hasText: /Set the configure schedule/i })
+      .locator('input[type="checkbox"]')
+    await expect(gate).toBeVisible({ timeout: 15_000 })
+    const cron = page.getByLabel('Schedule', { exact: true })
+    await expect(cron).toHaveCount(0)
+    // Retried, and only while the box is still absent, so a handler that
+    // hydrates after the first click cannot toggle it back shut.
+    await expect(async () => {
+      if ((await cron.count()) === 0) await gate.check()
+      await expect(cron).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
+    // A real five-field expression in the box: the value is what the control
+    // has to hold without growing past the card.
+    await cron.fill('0 2 * * 2')
+    await expectNoHorizontalPageScroll(page)
+
+    // 3. the autodiscovery rule template.
+    await page.goto('/admin/autodiscovery')
+    await expectNoHorizontalPageScroll(page)
+    const scheduleSwitch = page.getByText('Configure on a schedule', { exact: true })
+    await expect(async () => {
+      if ((await scheduleSwitch.count()) === 0) {
+        const newRule = page.getByRole('button', { name: 'New Rule' })
+        if ((await newRule.count()) > 0) await newRule.click()
+      }
+      await expect(scheduleSwitch.first()).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 20_000 })
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('a long lock reason wraps inside the lock card at phone width (#1705)', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2eresp-lockreason'))

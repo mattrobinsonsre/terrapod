@@ -52,10 +52,51 @@ get, so the refusal names which of the three it was.
 The workspace setting is still the only route for the CLI, which is why it
 stays.
 
-There is deliberately **no scheduled configure**. An operator who wants a
-periodic one drives `POST /api/v1/runs` from their own scheduler — anything
-that can make an HTTP request on a timer — rather than Terrapod growing a
-second scheduling vocabulary beside drift detection's.
+### On a schedule
+
+A workspace can run a configure on a **cron schedule**:
+
+| attribute | meaning |
+|---|---|
+| `scheduled-configure-enabled` | off by default |
+| `scheduled-configure-cron` | a five-field expression, e.g. `0 2 * * 2` for 02:00 every Tuesday |
+| `scheduled-configure-timezone` | the IANA zone the expression is read in; `UTC` by default |
+| `scheduled-configure-last-at` | read-only — when it last fired |
+
+The zone is what makes it a schedule rather than an interval: `0 2 * * *` in
+`Europe/London` is 02:00 there in January **and** in July, which is 02:00 UTC
+in one and 01:00 UTC in the other.
+
+A scheduled run carries no run options, so it runs `default-playbook` against
+`default-limit`, exactly as a push-triggered one does — `default-limit` is what
+stops it going estate-wide.
+
+**Refused at the write, with a 422 naming the field:** an expression that does
+not parse; a six-field (seconds) expression, because a configure takes minutes
+to hours and the scheduler does not tick that fast; a schedule firing more often
+than every 300 seconds, measured from the schedule itself rather than its text,
+so `*/1 * * * *` and `0,1 * * * *` are both caught; and a zone that is not an
+IANA name. The expression is stored **exactly as you wrote it** — never
+reformatted — so what you read back is what you set.
+
+**It fires once, never catching up.** The next occurrence is computed from when
+the schedule last fired, so a deployment that was down across an occurrence runs
+one configure when it returns rather than one per missed window. Turning the
+schedule on stamps that moment too, so enabling "02:00 daily" at 14:00 waits for
+02:00 instead of configuring the fleet on the spot.
+
+**It skips rather than queues** when the workspace is locked or a configure is
+already on its way, and skipping does not advance the stamp — so a schedule that
+collided with a long configure fires at its next occurrence rather than being
+treated as having fired.
+
+This reverses a 2026-10-22 decision that there would deliberately be no
+scheduled configure. The objection then was to a second scheduling vocabulary
+beside drift detection's; what changed it is that AWX schedules job templates as
+a first-class feature, so a team migrating arrives with schedules they depend
+on. Drift detection keeps its interval, because the two answer different
+questions — drift asks how stale a view may be, a schedule asks when something
+should happen.
 
 ## Turning it on
 
@@ -69,12 +110,19 @@ resource "terrapod_workspace" "fleet" {
 
   auto_configure_enabled = true     # a push to ansible/ configures
   configure_after_apply  = false    # an apply does not
+
+  # ...and on a calendar. The zone is what keeps an overnight run overnight
+  # across a daylight-saving change; omit the cron for no schedule.
+  scheduled_configure_enabled  = true
+  scheduled_configure_cron     = "0 2 * * 2"   # 02:00 every Tuesday
+  scheduled_configure_timezone = "Europe/London"
 }
 ```
 
-`configure_enabled` is the declaration; the other two are triggers and mean
-nothing without it. All three default to **false** for an existing workspace,
+`configure_enabled` is the declaration; the other three are triggers and mean
+nothing without it. All four default to **false** for an existing workspace,
 so upgrading changes nothing about what runs.
+`scheduled_configure_last_at` is read-only — it is when the schedule last fired.
 
 This block is the workspace half on its own. For the whole of it in one piece —
 these settings plus the inventory rows, the credential and the placeholder that

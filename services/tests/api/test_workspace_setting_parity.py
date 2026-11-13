@@ -78,6 +78,7 @@ NEVER_BULK_SETTABLE: dict[str, str] = {
     "locked_by": "owned by the lock/unlock endpoints",
     # Drift *results*, as distinct from the drift settings below.
     "drift_last_checked_at": "drift run result, not a setting",
+    "scheduled_configure_last_at": "when the schedule last fired, not a setting",
     "drift_status": "drift run result, not a setting",
     "auto_configure_inventory_stamp": (
         "what the platform has already acted on, not a setting (#2224) — the "

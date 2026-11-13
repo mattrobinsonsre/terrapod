@@ -75,21 +75,26 @@ _SETTLE_PREFIX = "tp:inv_settle:"
 #: enough that a workspace which stops changing stops costing a key.
 _SETTLE_TTL_SECONDS = 3600
 
-#: A configure already on its way. NOT "any non-terminal run", which is the
+#: A configure already on its way. PUBLIC because the scheduled-configure
+#: creator (#2538) asks the same question and a second copy would be a second
+#: thing to drift -- `run_service` already records that this must NOT be
+#: merged with `MUTATING_SLOT_STATES`, which answers a different question.
+#:
+#: NOT "any non-terminal run", which is the
 #: recorded drift-detection incident: a `planned` run awaiting an operator's
 #: confirm can sit indefinitely, and keying on it froze drift for ever. A
 #: configure has no confirm step -- a standalone one goes `queued` ->
 #: `configuring` -> terminal -- so this cannot deadlock.
-_CONFIGURE_IN_FLIGHT = ("pending", "queued", "configuring")
+CONFIGURE_IN_FLIGHT = ("pending", "queued", "configuring")
 
 
-async def _configure_in_flight(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
+async def configure_in_flight(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
     result = await db.execute(
         select(Run.id)
         .where(
             Run.workspace_id == workspace_id,
             Run.is_configure.is_(True),
-            Run.status.in_(_CONFIGURE_IN_FLIGHT),
+            Run.status.in_(CONFIGURE_IN_FLIGHT),
         )
         .limit(1)
     )
@@ -128,7 +133,7 @@ async def _create_run(db: AsyncSession, ws: Workspace) -> Run | None:
         # and the lifecycle destroy retry all do.
         #
         # Without this the feature was inert, and silently so in the worst way:
-        # the run sat at `pending` for ever, and because `_CONFIGURE_IN_FLIGHT`
+        # the run sat at `pending` for ever, and because `CONFIGURE_IN_FLIGHT`
         # includes `pending`, every later cycle then saw a configure "already on
         # its way" and skipped. One dead run per workspace, then nothing at all.
         return await run_service.queue_run(db, run)
@@ -218,7 +223,7 @@ async def auto_configure_cycle() -> None:
                 if ws.auto_configure_inventory_stamp == current:
                     continue
 
-                if await _configure_in_flight(db, ws.id):
+                if await configure_in_flight(db, ws.id):
                     # Deliberately NOT stamped: the change has not been acted on,
                     # so a later tick must still see it.
                     logger.debug(

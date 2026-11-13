@@ -447,6 +447,9 @@ field CreateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field CreateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field CreateWorkspaceRequest.ScheduledConfigureCron string `json:"scheduled-configure-cron,omitempty"`
+field CreateWorkspaceRequest.ScheduledConfigureEnabled *bool `json:"scheduled-configure-enabled,omitempty"`
+field CreateWorkspaceRequest.ScheduledConfigureTimezone string `json:"scheduled-configure-timezone,omitempty"`
 field CreateWorkspaceRequest.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
 field CreateWorkspaceRequest.SecurityScanEngine string `json:"security-scan-engine,omitempty"`
 field CreateWorkspaceRequest.SecurityScanSeverityThreshold string `json:"security-scan-severity-threshold,omitempty"`
@@ -1375,6 +1378,9 @@ field UpdateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field UpdateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field UpdateWorkspaceRequest.ScheduledConfigureCron *string `json:"scheduled-configure-cron,omitempty"`
+field UpdateWorkspaceRequest.ScheduledConfigureEnabled *bool `json:"scheduled-configure-enabled,omitempty"`
+field UpdateWorkspaceRequest.ScheduledConfigureTimezone *string `json:"scheduled-configure-timezone,omitempty"`
 field UpdateWorkspaceRequest.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
 field UpdateWorkspaceRequest.SecurityScanEngine string `json:"security-scan-engine,omitempty"`
 field UpdateWorkspaceRequest.SecurityScanSeverityThreshold string `json:"security-scan-severity-threshold,omitempty"`
@@ -1640,6 +1646,10 @@ field Workspace.Playbooks []string `json:"playbooks,omitempty"`
 field Workspace.PulumiBindPlan bool `json:"pulumi-bind-plan"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`
+field Workspace.ScheduledConfigureCron string `json:"scheduled-configure-cron,omitempty"`
+field Workspace.ScheduledConfigureEnabled bool `json:"scheduled-configure-enabled"`
+field Workspace.ScheduledConfigureLastAt string `json:"scheduled-configure-last-at,omitempty"`
+field Workspace.ScheduledConfigureTimezone string `json:"scheduled-configure-timezone,omitempty"`
 field Workspace.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
 field Workspace.SecurityScanEngine string `json:"security-scan-engine,omitempty"`
 field Workspace.SecurityScanSeverityThreshold string `json:"security-scan-severity-threshold,omitempty"`

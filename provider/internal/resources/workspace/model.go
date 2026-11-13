@@ -60,12 +60,16 @@
 //	"oidc-audiences"                    → oidc_audiences      (map of lists, optional+computed)
 //	"drift-detection-enabled"           → drift_detection_enabled (bool, optional)
 //	"drift-detection-interval-seconds"  → drift_detection_interval_seconds (int, optional)
+//	"scheduled-configure-enabled"       → scheduled_configure_enabled (bool, optional+computed)
+//	"scheduled-configure-cron"          → scheduled_configure_cron (string, optional+computed)
+//	"scheduled-configure-timezone"      → scheduled_configure_timezone (string, optional+computed)
 //
 // Read-only attributes:
 //
 //	"owner-email"                       → owner_email         (string, computed)
 //	"drift-status"                      → drift_status        (string, computed)
 //	"drift-last-checked-at"             → drift_last_checked_at (string, computed)
+//	"scheduled-configure-last-at"       → scheduled_configure_last_at (string, computed)
 //	"locked"                            → locked              (bool,   computed)
 //	"lock-reason"                       → lock_reason         (string, computed)
 //	"locked-by"                         → locked_by           (string, computed)
@@ -133,6 +137,14 @@ type workspaceModel struct {
 	AutoConfigureEnabled types.Bool `tfsdk:"auto_configure_enabled"`
 	ConfigureAfterApply  types.Bool `tfsdk:"configure_after_apply"`
 	ConfigureAllHosts    types.Bool `tfsdk:"configure_all_hosts"`
+
+	// Scheduled configure (#2538): the third configure trigger, a cron
+	// schedule read in an IANA zone. ScheduledConfigureLastAt sits with the
+	// read-only attributes further down -- it is when the schedule last
+	// fired, which is server state rather than a setting.
+	ScheduledConfigureEnabled  types.Bool   `tfsdk:"scheduled_configure_enabled"`
+	ScheduledConfigureCron     types.String `tfsdk:"scheduled_configure_cron"`
+	ScheduledConfigureTimezone types.String `tfsdk:"scheduled_configure_timezone"`
 	// Whether a configure verifies the SSH host key of the hosts it targets
 	// (#2318). The server defaults it TRUE -- ansible's own default, and the
 	// behaviour that already existed -- which is why both requests carry it as a
@@ -224,19 +236,23 @@ type workspaceModel struct {
 	OwnerEmail         types.String `tfsdk:"owner_email"`
 	DriftStatus        types.String `tfsdk:"drift_status"`
 	DriftLastCheckedAt types.String `tfsdk:"drift_last_checked_at"`
-	DriftLatestRunID   types.String `tfsdk:"drift_latest_run_id"`
-	StateDiverged      types.Bool   `tfsdk:"state_diverged"`
-	LifecycleState     types.String `tfsdk:"lifecycle_state"`
-	LifecycleReason    types.String `tfsdk:"lifecycle_reason"`
-	VCSLastPolledAt    types.String `tfsdk:"vcs_last_polled_at"`
-	VCSLastAttemptedAt types.String `tfsdk:"vcs_last_attempted_at"`
-	VCSLastError       types.String `tfsdk:"vcs_last_error"`
-	VCSLastErrorAt     types.String `tfsdk:"vcs_last_error_at"`
-	AgentPoolName      types.String `tfsdk:"agent_pool_name"`
-	VCSConnectionName  types.String `tfsdk:"vcs_connection_name"`
-	Locked             types.Bool   `tfsdk:"locked"`
-	LockReason         types.String `tfsdk:"lock_reason"`
-	LockedBy           types.String `tfsdk:"locked_by"`
-	CreatedAt          types.String `tfsdk:"created_at"`
-	UpdatedAt          types.String `tfsdk:"updated_at"`
+	// When the cron schedule last fired (#2538). Server-volatile: the
+	// scheduler moves it, and it is what the next occurrence is measured
+	// from, so it is never settable from a configuration.
+	ScheduledConfigureLastAt types.String `tfsdk:"scheduled_configure_last_at"`
+	DriftLatestRunID         types.String `tfsdk:"drift_latest_run_id"`
+	StateDiverged            types.Bool   `tfsdk:"state_diverged"`
+	LifecycleState           types.String `tfsdk:"lifecycle_state"`
+	LifecycleReason          types.String `tfsdk:"lifecycle_reason"`
+	VCSLastPolledAt          types.String `tfsdk:"vcs_last_polled_at"`
+	VCSLastAttemptedAt       types.String `tfsdk:"vcs_last_attempted_at"`
+	VCSLastError             types.String `tfsdk:"vcs_last_error"`
+	VCSLastErrorAt           types.String `tfsdk:"vcs_last_error_at"`
+	AgentPoolName            types.String `tfsdk:"agent_pool_name"`
+	VCSConnectionName        types.String `tfsdk:"vcs_connection_name"`
+	Locked                   types.Bool   `tfsdk:"locked"`
+	LockReason               types.String `tfsdk:"lock_reason"`
+	LockedBy                 types.String `tfsdk:"locked_by"`
+	CreatedAt                types.String `tfsdk:"created_at"`
+	UpdatedAt                types.String `tfsdk:"updated_at"`
 }

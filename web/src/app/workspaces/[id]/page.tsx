@@ -120,6 +120,17 @@ interface WorkspaceAttrs {
   'auto-configure-enabled'?: boolean
   'configure-after-apply'?: boolean
   'configure-all-hosts'?: boolean
+  // The third trigger (#2538): a cron schedule, read in an IANA zone. All
+  // three optional only because an older API omits them, where the answer is
+  // the column default -- off, no expression, UTC.
+  'scheduled-configure-enabled'?: boolean
+  'scheduled-configure-cron'?: string
+  'scheduled-configure-timezone'?: string
+  // When the schedule last fired. Written by the scheduler, never by an
+  // operator, so it has no FIELDS entry and no control -- it is shown beside
+  // the three above the way `drift-last-checked-at` is shown beside the drift
+  // interval.
+  'scheduled-configure-last-at'?: string | null
   // An ordinary repo-relative path, `''` meaning the configuration version's
   // root -- `working-directory`'s shape exactly. It has NO null state: whether
   // there is a configure operation is `configure-enabled` above (#1966), not
@@ -573,6 +584,11 @@ function WorkspaceDetailContent() {
   const [editAutoConfigureEnabled, setEditAutoConfigureEnabled] = useState(false)
   const [editConfigureAfterApply, setEditConfigureAfterApply] = useState(false)
   const [editConfigureAllHosts, setEditConfigureAllHosts] = useState(false)
+  // The schedule (#2538). Seeded to the column defaults, so a workspace read
+  // from an API that predates them edits as what it actually does.
+  const [editScheduledConfigureEnabled, setEditScheduledConfigureEnabled] = useState(false)
+  const [editScheduledConfigureCron, setEditScheduledConfigureCron] = useState('')
+  const [editScheduledConfigureTimezone, setEditScheduledConfigureTimezone] = useState('UTC')
   // Where the configure operation runs (#1929) -- a plain text box now, because
   // the path is just a path: `''` is the configuration version's root, the way
   // it is for `working-directory` beside it, and there is no third state to
@@ -1479,6 +1495,17 @@ function WorkspaceDetailContent() {
     setEditAutoConfigureEnabled(workspace.attributes['auto-configure-enabled'] ?? false)
     setEditConfigureAfterApply(workspace.attributes['configure-after-apply'] ?? false)
     setEditConfigureAllHosts(workspace.attributes['configure-all-hosts'] ?? false)
+    setEditScheduledConfigureEnabled(
+      workspace.attributes['scheduled-configure-enabled'] ?? false,
+    )
+    setEditScheduledConfigureCron(workspace.attributes['scheduled-configure-cron'] ?? '')
+    // `||`, not `??`: the server substitutes UTC for an empty value, so a
+    // stored `''` and a missing key mean the same thing and must seed the same
+    // box -- and an empty zone box would read as "no zone", which is not a
+    // state this setting has.
+    setEditScheduledConfigureTimezone(
+      workspace.attributes['scheduled-configure-timezone'] || 'UTC',
+    )
     // `?? ''` and nothing else to decide: the stored `''` is the configuration
     // version's root and seeds an empty box, which is the same box an older
     // API's missing key seeds (#1966).
@@ -1569,6 +1596,14 @@ function WorkspaceDetailContent() {
               'auto-configure-enabled': editAutoConfigureEnabled,
               'configure-after-apply': editConfigureAfterApply,
               'configure-all-hosts': editConfigureAllHosts,
+              // The schedule (#2538). Sent verbatim and never trimmed, for the
+              // reason `config-directory` is not: the server refuses a cron it
+              // cannot read and a zone that is not IANA, naming the field, so
+              // normalising here would hide a refusal the operator needs to
+              // read and store something other than what they typed.
+              'scheduled-configure-enabled': editScheduledConfigureEnabled,
+              'scheduled-configure-cron': editScheduledConfigureCron,
+              'scheduled-configure-timezone': editScheduledConfigureTimezone,
               // Where the configure operation runs (#1929). Sent verbatim, and
               // never `null` -- an explicit null is a 422 naming the field
               // (#1966), and `''` is the value that means the configuration
@@ -2827,6 +2862,9 @@ function WorkspaceDetailContent() {
         'auto-configure-enabled': editAutoConfigureEnabled,
         'configure-after-apply': editConfigureAfterApply,
         'configure-all-hosts': editConfigureAllHosts,
+        'scheduled-configure-enabled': editScheduledConfigureEnabled,
+        'scheduled-configure-cron': editScheduledConfigureCron,
+        'scheduled-configure-timezone': editScheduledConfigureTimezone,
         'config-directory': editConfigDir,
         'default-playbook': editDefaultPlaybook,
         playbooks: editPlaybooks,
@@ -2859,6 +2897,9 @@ function WorkspaceDetailContent() {
     'configure-enabled': 'fields.configureEnabledHint',
     'configure-after-apply': 'fields.configureAfterApplyHint',
     'configure-all-hosts': 'fields.configureAllHostsHint',
+    'scheduled-configure-enabled': 'fields.scheduledConfigureEnabledHint',
+    'scheduled-configure-cron': 'fields.scheduledConfigureCronTitle',
+    'scheduled-configure-timezone': 'fields.scheduledConfigureTimezoneHint',
     'config-directory': 'fields.configDirectoryTitle',
     // The ceiling (#2451). Here rather than as a `title=` on the input: at
     // 389 characters it is an explanation, and a hover is unreachable on
@@ -2937,6 +2978,9 @@ function WorkspaceDetailContent() {
     'auto-configure-enabled': (v) => setEditAutoConfigureEnabled(Boolean(v)),
     'configure-after-apply': (v) => setEditConfigureAfterApply(Boolean(v)),
     'configure-all-hosts': (v) => setEditConfigureAllHosts(Boolean(v)),
+    'scheduled-configure-enabled': (v) => setEditScheduledConfigureEnabled(Boolean(v)),
+    'scheduled-configure-cron': (v) => setEditScheduledConfigureCron(String(v)),
+    'scheduled-configure-timezone': (v) => setEditScheduledConfigureTimezone(String(v)),
     'config-directory': (v) => setEditConfigDir(String(v)),
     'default-playbook': (v) => setEditDefaultPlaybook(String(v)),
     'default-limit': (v) => setEditDefaultLimit(String(v)),
@@ -3762,6 +3806,67 @@ function WorkspaceDetailContent() {
                     display={toggleDisplay('configure-all-hosts', false)}
                     control={settingsToggle('configure-all-hosts')}
                   />
+                  {/* The schedule (#2538), beside the other two triggers
+                      rather than in the Ansible group: it says WHEN the
+                      playbook runs, where that group says what it runs
+                      against. The cron and the zone are dependents of the
+                      switch, so they render disabled-but-visible until it is
+                      on -- seeing them is how an operator learns the pair
+                      exists, and the cron's own lead says which switch makes
+                      it live rather than leaving the disabled state
+                      unexplained. */}
+                  <Field
+                    attr="scheduled-configure-enabled"
+                    ctx={settingsCtx}
+                    kind="checkbox"
+                    display={toggleDisplay('scheduled-configure-enabled', false)}
+                    control={settingsToggle('scheduled-configure-enabled')}
+                  />
+                  <Field
+                    attr="scheduled-configure-cron"
+                    ctx={settingsCtx}
+                    kind="text"
+                    placeholder={t('fields.scheduledConfigureCronPlaceholder')}
+                    display={
+                      <span data-testid="ws-scheduled-configure-cron-display">
+                        {attrs['scheduled-configure-cron'] ? (
+                          <code className="bg-slate-700 px-2 py-0.5 rounded text-xs">
+                            {attrs['scheduled-configure-cron']}
+                          </code>
+                        ) : (
+                          '—'
+                        )}
+                      </span>
+                    }
+                  />
+                  <Field
+                    attr="scheduled-configure-timezone"
+                    ctx={settingsCtx}
+                    kind="text"
+                    placeholder={t('fields.scheduledConfigureTimezonePlaceholder')}
+                  />
+                  {/* Written by the scheduler, so it is a read-only pair
+                      rather than a `Field` -- there is no attribute in the
+                      shared table for it and nothing to edit. Shown only
+                      while the schedule is on, because "Never" under a
+                      workspace that has no schedule describes nothing. The
+                      same shape the drift card uses for its own last-checked
+                      stamp. */}
+                  {Boolean(settingsValues['scheduled-configure-enabled']) && (
+                    <div className="min-w-0">
+                      <dt className="text-xs text-slate-500">
+                        {t('fields.scheduledConfigureLastAt')}
+                      </dt>
+                      <dd
+                        className="mt-1 text-sm text-slate-200 break-words"
+                        data-testid="ws-scheduled-configure-last-at"
+                      >
+                        {attrs['scheduled-configure-last-at']
+                          ? new Date(attrs['scheduled-configure-last-at']).toLocaleString()
+                          : t('common.never')}
+                      </dd>
+                    </div>
+                  )}
                   {settingsEditing && editHasNoOperations && (
                     // The server refuses this pair (#1966); Save is disabled
                     // above, and this is the sentence that says why.

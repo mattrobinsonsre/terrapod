@@ -120,6 +120,9 @@ def _mock_rule(
     r.drift_detection_enabled = True
     r.drift_detection_interval_seconds = 86400
     r.drift_ignore_rules = []
+    r.scheduled_configure_enabled = False
+    r.scheduled_configure_cron = ""
+    r.scheduled_configure_timezone = "UTC"
     r.plan_expiry_seconds = None
     r.slack_channel = ""
     r.created_at = datetime(2026, 5, 9, tzinfo=UTC)

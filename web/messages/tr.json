@@ -1337,7 +1337,8 @@
       "operationsNone": "Bu, eşleşen her çalışma alanını hiç işlemi olmadan bırakırdı. Bir çalışma alanı planlama ve uygulamayı, yapılandırmayı ya da ikisini birlikte korumalıdır.",
       "setHardLimit": "Katı limiti ayarla (boş değer üst sınırı kaldırır)",
       "setPlaybooks": "İzin verilen playbook''ları ayarla (eşleşen her çalışma alanındaki listeyi değiştirir; boş liste kısıtlamayı kaldırır)",
-      "playbooksPairWarning": "Boş olmayan bir liste, eşleşen her çalışma alanının kendi varsayılan playbook''unu içermek zorundadır; bu nedenle bu girdilerden biri değilse onu da aynı güncellemede ayarlayın."
+      "playbooksPairWarning": "Boş olmayan bir liste, eşleşen her çalışma alanının kendi varsayılan playbook''unu içermek zorundadır; bu nedenle bu girdilerden biri değilse onu da aynı güncellemede ayarlayın.",
+      "setScheduledConfigureCron": "Yapılandırma zamanlamasını ayarla (boş değer kaldırır)"
     },
     "diff": {
       "colWorkspace": "Çalışma Alanı",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Her girdi, yapılandırma dizinine göreli bir yoldur ve çalıştırma seçeneği metin kutusu yerine bunlar arasından bir seçiciye dönüşür. Varsayılan playbook girdilerden biri olmak zorundadır, çünkü yalın bir Yapılandır varsayılanı çalıştırır. Bunu, bir playbook''u asla dokunmaması gereken bir çalışma alanından uzak tutmak için kullanın — bir düğümün boşaltılması, bir veritabanı yükseltmesi — burada liste bir gelenek değil, bir denetim aracıdır.",
       "playbooksPlaceholder": "örn. release.yml",
       "playbooksAdd": "Playbook ekle",
-      "playbooksAny": "Herhangi bir playbook"
+      "playbooksAny": "Herhangi bir playbook",
+      "scheduledConfigureEnabled": "Zamanlamaya göre yapılandırma",
+      "scheduledConfigureEnabledHint": "Bir şey değişmiş olsun ya da olmasın playbook sabit bir saatte çalışır; bir filo yalnızca bir gönderimden sonra düzeltilmek yerine ancak böyle yakınsamış kalır.",
+      "scheduledConfigureCron": "Zamanlama",
+      "scheduledConfigureCronLead": "Yapılandırmanın ne zaman çalışacağı, beş alanlı bir cron ifadesi olarak. Yalnızca zamanlamaya göre yapılandırma açıkken okunur ve boş bırakmak zamanlama yok demektir.",
+      "scheduledConfigureCronTitle": "Beş alan dakika, saat, ayın günü, ay ve haftanın günüdür ve aşağıdaki saat diliminde okunur: 0 2 * * 2 her salı 02:00, 0 2 * * * ise her gün 02:00 demektir. Altı alanlı bir ifade reddedilir, çünkü saniye çözünürlüklü bir zamanlama yerine getirilemez; beş dakikadan sık tetiklenen her şey de aynı şekilde reddedilir — bir yapılandırma bir saat sürebilir ve güvenle yeniden başlatılamaz.",
+      "scheduledConfigureCronPlaceholder": "örn. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Zamanlama saat dilimi",
+      "scheduledConfigureTimezoneHint": "Zamanlamanın okunduğu IANA saat dilimi; böylece saat yaz saati uygulamasını izler — örneğin UTC, Europe/London veya America/New_York. Boş bırakmak UTC demektir.",
+      "scheduledConfigureTimezonePlaceholder": "örn. Europe/London",
+      "scheduledConfigureLastAt": "Son zamanlanmış çalıştırma"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

@@ -1337,7 +1337,8 @@
       "operationsNone": "이렇게 하면 일치하는 모든 워크스페이스에 작업이 전혀 없게 됩니다. 워크스페이스는 플랜 및 적용, 구성 또는 둘 다 중 하나를 유지해야 합니다.",
       "setHardLimit": "강제 limit 설정 (빈 값은 상한을 제거합니다)",
       "setPlaybooks": "허용된 플레이북 설정 (일치하는 모든 워크스페이스의 목록을 대체합니다. 빈 목록은 제한을 제거합니다)",
-      "playbooksPairWarning": "비어 있지 않은 목록에는 일치하는 각 워크스페이스의 기본 플레이북이 반드시 포함되어야 합니다. 아직 포함되어 있지 않다면 같은 업데이트에서 기본 플레이북도 함께 설정하십시오."
+      "playbooksPairWarning": "비어 있지 않은 목록에는 일치하는 각 워크스페이스의 기본 플레이북이 반드시 포함되어야 합니다. 아직 포함되어 있지 않다면 같은 업데이트에서 기본 플레이북도 함께 설정하십시오.",
+      "setScheduledConfigureCron": "구성 일정 설정 (빈 값은 일정을 제거)"
     },
     "diff": {
       "colWorkspace": "워크스페이스",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "각 항목은 구성 디렉터리 기준 상대 경로이며, 목록을 지정하면 실행 옵션이 텍스트 입력란 대신 목록에서 고르는 선택기가 됩니다. 옵션 없이 실행한 구성 작업은 기본 플레이북을 실행하므로, 기본 플레이북은 반드시 항목 중 하나여야 합니다. 노드 드레인이나 데이터베이스 업그레이드처럼 절대 건드려서는 안 되는 워크스페이스에서 특정 플레이북을 멀리 두는 데 사용하십시오. 그런 경우 목록은 관례가 아니라 통제 수단입니다.",
       "playbooksPlaceholder": "예: release.yml",
       "playbooksAdd": "플레이북 추가",
-      "playbooksAny": "모두 허용"
+      "playbooksAny": "모두 허용",
+      "scheduledConfigureEnabled": "일정에 따라 구성",
+      "scheduledConfigureEnabledHint": "변경 사항이 없어도 정해진 시각에 플레이북이 실행됩니다. 푸시 후에만 교정하는 대신 플릿 전체를 수렴된 상태로 유지하는 방법입니다.",
+      "scheduledConfigureCron": "일정",
+      "scheduledConfigureCronLead": "구성을 실행할 시각을 5개 필드 cron 식으로 지정합니다. 일정에 따라 구성이 켜져 있는 동안에만 읽히며, 비워 두면 일정이 없습니다.",
+      "scheduledConfigureCronTitle": "다섯 개 필드는 분, 시, 일, 월, 요일이며 아래 시간대로 해석됩니다. 0 2 * * 2는 매주 화요일 02:00, 0 2 * * *는 매일 02:00입니다. 6개 필드 식은 거부됩니다. 초 단위 일정은 지킬 수 없기 때문입니다. 5분보다 자주 실행되는 식도 같은 이유로 거부됩니다. 구성은 한 시간까지 걸릴 수 있고 안전하게 다시 시작할 수 없습니다.",
+      "scheduledConfigureCronPlaceholder": "예: 0 2 * * 2",
+      "scheduledConfigureTimezone": "일정 시간대",
+      "scheduledConfigureTimezoneHint": "일정을 해석하는 IANA 시간대이며, 따라서 시각이 서머타임을 따릅니다. 예: UTC, Europe/London, America/New_York. 비워 두면 UTC입니다.",
+      "scheduledConfigureTimezonePlaceholder": "예: Europe/London",
+      "scheduledConfigureLastAt": "마지막 예약 실행"
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",

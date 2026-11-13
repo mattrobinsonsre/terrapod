@@ -1337,7 +1337,8 @@
       "operationsNone": "Tím by každý odpovídající pracovní prostor zůstal vůbec bez operací. Pracovní prostor si musí ponechat plánování a použití, konfiguraci nebo obojí.",
       "setHardLimit": "Nastavit pevný limit (prázdná hodnota strop odstraní)",
       "setPlaybooks": "Nastavit povolené playbooky (nahradí seznam v každém odpovídajícím pracovním prostoru; prázdný seznam odstraní omezení)",
-      "playbooksPairWarning": "Neprázdný seznam musí obsahovat vlastní výchozí playbook každého odpovídajícího pracovního prostoru, takže jej nastavte ve stejné aktualizaci, pokud ještě není jednou z těchto položek."
+      "playbooksPairWarning": "Neprázdný seznam musí obsahovat vlastní výchozí playbook každého odpovídajícího pracovního prostoru, takže jej nastavte ve stejné aktualizaci, pokud ještě není jednou z těchto položek.",
+      "setScheduledConfigureCron": "Nastavit plán konfigurace (prázdná hodnota jej odebere)"
     },
     "diff": {
       "colWorkspace": "Pracovní prostor",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Každá položka je cesta relativně ke konfiguračnímu adresáři a volba běhu se místo textového pole změní na výběr z nich. Výchozí playbook musí být jednou z položek, protože samotné Konfigurovat spustí právě ten výchozí. Použijte to, abyste playbook nepustili do pracovního prostoru, kterého se nikdy nesmí dotknout — vyřazení uzlu z provozu, aktualizace databáze — kde je seznam nástrojem kontroly, a ne konvencí.",
       "playbooksPlaceholder": "např. release.yml",
       "playbooksAdd": "Přidat playbook",
-      "playbooksAny": "Jakýkoli"
+      "playbooksAny": "Jakýkoli",
+      "scheduledConfigureEnabled": "Konfigurace podle plánu",
+      "scheduledConfigureEnabledHint": "Playbook běží v pevně daný čas bez ohledu na to, zda se něco změnilo — tak flotila zůstává sjednocená, místo aby se opravovala až po pushnutí.",
+      "scheduledConfigureCron": "Plán",
+      "scheduledConfigureCronLead": "Kdy konfigurace běží, jako cron výraz o pěti polích. Čte se jen tehdy, když je konfigurace podle plánu zapnutá, a ponechání prázdného pole znamená žádný plán.",
+      "scheduledConfigureCronTitle": "Pět polí je minuta, hodina, den v měsíci, měsíc a den v týdnu, čtená v časovém pásmu níže: 0 2 * * 2 je 02:00 každé úterý a 0 2 * * * je 02:00 každý den. Výraz o šesti polích je odmítnut, protože plán s přesností na sekundy nelze dodržet; totéž platí pro cokoli, co se spouští častěji než každých pět minut — konfigurace může běžet hodinu a nelze ji bezpečně restartovat.",
+      "scheduledConfigureCronPlaceholder": "např. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Časové pásmo plánu",
+      "scheduledConfigureTimezoneHint": "Pásmo IANA, ve kterém se plán čte, aby hodina sledovala letní čas — například UTC, Europe/London nebo America/New_York. Prázdné znamená UTC.",
+      "scheduledConfigureTimezonePlaceholder": "např. Europe/London",
+      "scheduledConfigureLastAt": "Poslední naplánovaný běh"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

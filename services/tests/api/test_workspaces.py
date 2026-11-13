@@ -149,6 +149,10 @@ def _mock_workspace(
     ws.var_files = []
     ws.trigger_prefixes = []
     ws.drift_ignore_rules = []
+    ws.scheduled_configure_enabled = False
+    ws.scheduled_configure_cron = ""
+    ws.scheduled_configure_timezone = "UTC"
+    ws.scheduled_configure_last_at = None
     ws.drift_detection_enabled = False
     ws.drift_detection_interval_seconds = 86400
     ws.security_scan_enforcement = "advisory"

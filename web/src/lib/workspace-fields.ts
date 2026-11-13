@@ -251,6 +251,33 @@ export const FIELDS: readonly FieldSpec[] = [
     group: 'operations',
     dependsOn: 'configure-enabled',
   },
+  // The third way a configure starts (#2538), beside the other two rather
+  // than in `ansible`: it is a TRIGGER -- when the playbook runs -- where that
+  // group holds what a configure runs against. The cron and the zone are
+  // dependents of the switch for the same reason `auto-merge-strategy` is a
+  // dependent of `auto-merge`: an expression with no schedule to belong to is
+  // a box that does nothing.
+  {
+    attr: 'scheduled-configure-enabled',
+    id: 'ws-scheduled-configure-enabled',
+    group: 'operations',
+    dependsOn: 'configure-enabled',
+  },
+  {
+    attr: 'scheduled-configure-cron',
+    id: 'ws-scheduled-configure-cron',
+    group: 'operations',
+    dependsOn: 'scheduled-configure-enabled',
+  },
+  // Its own field rather than a second half of the cron box: the server
+  // validates the two separately and answers a 422 naming one of them, so a
+  // single control would attach one refusal to two values.
+  {
+    attr: 'scheduled-configure-timezone',
+    id: 'ws-scheduled-configure-timezone',
+    group: 'operations',
+    dependsOn: 'scheduled-configure-enabled',
+  },
 
   // --- ansible ----------------------------------------------------------
   { attr: 'config-directory', id: 'ws-config-dir', group: 'ansible', dependsOn: 'configure-enabled' },
@@ -595,6 +622,9 @@ export const LABEL_KEY: Record<string, string> = {
   'auto-configure-enabled': 'fields.autoConfigureEnabled',
   'configure-after-apply': 'fields.configureAfterApply',
   'configure-all-hosts': 'fields.configureAllHosts',
+  'scheduled-configure-enabled': 'fields.scheduledConfigureEnabled',
+  'scheduled-configure-cron': 'fields.scheduledConfigureCron',
+  'scheduled-configure-timezone': 'fields.scheduledConfigureTimezone',
   // ansible
   'config-directory': 'fields.configDirectory',
   'default-playbook': 'fields.defaultPlaybook',

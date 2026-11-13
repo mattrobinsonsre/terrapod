@@ -1337,7 +1337,8 @@
       "operationsNone": "Isso deixaria cada espaço de trabalho correspondente sem nenhuma operação. Um espaço de trabalho precisa manter planejar e aplicar, ou configurar, ou ambas.",
       "setHardLimit": "Definir o limite rígido (um valor vazio remove o teto)",
       "setPlaybooks": "Definir os playbooks permitidos (substitui a lista em cada workspace correspondente; uma lista vazia remove a restrição)",
-      "playbooksPairWarning": "Uma lista não vazia tem de conter o playbook padrão de cada workspace correspondente, então defina-o na mesma atualização se ele ainda não for um destes."
+      "playbooksPairWarning": "Uma lista não vazia tem de conter o playbook padrão de cada workspace correspondente, então defina-o na mesma atualização se ele ainda não for um destes.",
+      "setScheduledConfigureCron": "Definir a agenda da configuração (um valor vazio a remove)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Cada entrada é um caminho relativo ao diretório de configuração, e a opção de execução passa a ser um seletor entre elas em vez de uma caixa de texto. O playbook padrão tem de ser uma das entradas, porque um Configurar sem mais nada executa o padrão. Use isso para manter um playbook longe de um workspace que ele nunca deve tocar — a drenagem de um nó, a atualização de um banco de dados —, onde uma lista é um controle e não uma convenção.",
       "playbooksPlaceholder": "ex.: release.yml",
       "playbooksAdd": "Adicionar playbook",
-      "playbooksAny": "Qualquer"
+      "playbooksAny": "Qualquer",
+      "scheduledConfigureEnabled": "Configurar em uma agenda",
+      "scheduledConfigureEnabledHint": "O playbook é executado em um horário fixo, tenha algo mudado ou não, que é como uma frota permanece convergida em vez de ser corrigida apenas após um push.",
+      "scheduledConfigureCron": "Agenda",
+      "scheduledConfigureCronLead": "Quando a configuração é executada, como uma expressão cron de cinco campos. Ela só é lida enquanto Configurar em uma agenda estiver ativo, e deixá-la vazia significa nenhuma agenda.",
+      "scheduledConfigureCronTitle": "Os cinco campos são minuto, hora, dia do mês, mês e dia da semana, lidos no fuso horário abaixo: 0 2 * * 2 é 02:00 de toda terça-feira e 0 2 * * * é 02:00 de todo dia. Uma expressão de seis campos é recusada, porque uma agenda com resolução de segundos não pode ser honrada, e o mesmo vale para qualquer coisa que dispare com mais frequência que a cada cinco minutos — uma configuração pode durar uma hora e não é reiniciável com segurança.",
+      "scheduledConfigureCronPlaceholder": "ex.: 0 2 * * 2",
+      "scheduledConfigureTimezone": "Fuso horário da agenda",
+      "scheduledConfigureTimezoneHint": "O fuso IANA em que a agenda é lida, para que a hora acompanhe o horário de verão — por exemplo UTC, Europe/London ou America/New_York. Vazio significa UTC.",
+      "scheduledConfigureTimezonePlaceholder": "ex.: Europe/London",
+      "scheduledConfigureLastAt": "Última execução agendada"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

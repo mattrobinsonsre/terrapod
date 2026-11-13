@@ -1337,7 +1337,8 @@
       "operationsNone": "Qumwo''mey rurbogh Hoch pagh Qu'' ghajmoH. nab ''ej lo'', ghap Qum, ghap cha'' Hoch polnIS Qumwo''.",
       "setHardLimit": "veH let choq (valur chIm veH teq)",
       "setPlaybooks": "chaw''lu''bogh Qu'' paqmey choq (Hoch rurbogh Qumwo''Daq tetlh qa''; tetlh chIm vaj Hoch chaw''lu'')",
-      "playbooksPairWarning": "tetlh chImbe'' Hoch rurbogh Qumwo'' Qu'' paq motlh ngaSnIS; vaj tetlhvamDaq tu''be''lu''chugh, rapbogh choHDaq ''oH choq."
+      "playbooksPairWarning": "tetlh chImbe'' Hoch rurbogh Qumwo'' Qu'' paq motlh ngaSnIS; vaj tetlhvamDaq tu''be''lu''chugh, rapbogh choHDaq ''oH choq.",
+      "setScheduledConfigureCron": "Qum poH tetlh yIcher (chImchugh, teqlu'')"
     },
     "diff": {
       "colWorkspace": "Qumwo'",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Hoch tetlh Doch ''oH He, Qum tetlh-vo''. Qu'' wIv ghItlhmeH Daq moj''be''; wIvmeH tetlh moj. Qu'' paq motlh tetlhvamDaq tu''nISlu'', Qum neH Qu'' paq motlh vumqu''mo''. Qumwo'' pagh ghoblu''nISbogh Qu'' paq teqmeH yIlo'' — De''wI'' nganmey teqlu'', De''wI'' qawHaq chu''moHlu'' — pa'' tetlh ''oH SeH, tIgh ''oHbe''.",
       "playbooksPlaceholder": "Da release.yml",
       "playbooksAdd": "Qu'' paq chel",
-      "playbooksAny": "vay''"
+      "playbooksAny": "vay''",
+      "scheduledConfigureEnabled": "poH tetlh Qum",
+      "scheduledConfigureEnabledHint": "De'' choHlu''pu''chugh ghap choHlu''be''pu''chugh ghap, poH pIHlu''bogh qaSmoHlu'' Qu'' paq. chumlu''DI'' neH lughmoHlu''be''; ghomHom naQ lughmoHtaHmeH He ''oH.",
+      "scheduledConfigureCron": "poH tetlh",
+      "scheduledConfigureCronLead": "nuqDaq Qum qaS, vagh yav cron mu''tlhegh. poH tetlh Qum chu''lu''taHvIS neH laDlu''; chImchugh, poH tetlh tu''lu''be''.",
+      "scheduledConfigureCronTitle": "vagh yav bIH: tup, rep, jar jaj, jar, je Hogh jaj. bIngDaq poH Daq laDlu''. 0 2 * * 2 ''oH Hoch povqu'' jaj 02:00''e''; 0 2 * * * ''oH Hoch jaj 02:00''e''. jav yav mu''tlhegh lajQo''lu'', qaSmoHlaHbe''lu''mo'' lup poH tetlh; vagh tup puS qaSbogh Hoch je lajQo''lu'' — rep wa'' qaSlaH Qum ''ej QIt tagh''eghmoHlaHbe''.",
+      "scheduledConfigureCronPlaceholder": "Da 0 2 * * 2",
+      "scheduledConfigureTimezone": "poH tetlh poH Daq",
+      "scheduledConfigureTimezoneHint": "poH tetlh laDlu''bogh IANA poH Daq; vaj jajlo'' poH tlha'' rep. Da UTC, Europe/London, America/New_York. chImchugh, UTC ''oH.",
+      "scheduledConfigureTimezonePlaceholder": "Da Europe/London",
+      "scheduledConfigureLastAt": "poH tetlh Qu'' Qav"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

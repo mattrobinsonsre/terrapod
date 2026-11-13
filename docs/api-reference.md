@@ -667,8 +667,13 @@ and neither means anything without `configure-enabled` — see
 | `dynamic-inventory-enabled` | bool | `false` | An inventory **plugin configuration** in the repository — a file with a top-level `plugin:` key — is resolved on the **runner** rather than refused. The API never runs one whatever this says. Turning it on makes the API's own resolution explicitly *partial*, and a configure stops being narrowed. See [Inventory plugins are refused](ansible-inventory.md#inventory-plugins-are-refused) |
 | `inventory-scripts-enabled` | bool | `false` | An **executable** inventory source is resolved on the runner rather than refused, on the same terms. Note a committed inventory script could never resolve in the API at all — with it, the refusal names the file instead of arriving as ansible's own parse error |
 
-There is deliberately **no scheduled configure**. An operator who wants one
-drives `POST /api/v1/runs` from their own scheduler.
+A configure can run on a **cron schedule** —
+`scheduled-configure-enabled`, `scheduled-configure-cron` (five-field),
+`scheduled-configure-timezone` (IANA, `UTC` by default) and the read-only
+`scheduled-configure-last-at`. A bad expression, a six-field one, a schedule
+firing more often than every 300s, or a non-IANA zone is a 422 naming the field;
+an accepted expression is stored verbatim. See
+[Running a Configure](ansible-configure.md).
 
 **The defaults are the compatibility story.** Plan/apply on and configure off
 means every workspace that predates these attributes behaves exactly as it did,

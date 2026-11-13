@@ -68,6 +68,10 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.vcs_connection = None
     ws.labels = {}
     ws.owner_email = "test@example.com"
+    ws.scheduled_configure_enabled = False
+    ws.scheduled_configure_cron = ""
+    ws.scheduled_configure_timezone = "UTC"
+    ws.scheduled_configure_last_at = None
     ws.drift_detection_enabled = overrides.get("drift_detection_enabled", False)
     ws.drift_detection_interval_seconds = overrides.get("drift_detection_interval_seconds", 86400)
     ws.security_scan_enforcement = overrides.get("security_scan_enforcement", "advisory")

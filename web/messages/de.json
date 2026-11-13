@@ -1337,7 +1337,8 @@
       "operationsNone": "Dies würde jeden passenden Workspace ohne jede Operation zurücklassen. Ein Workspace muss Planen und Anwenden oder Konfigurieren oder beides behalten.",
       "setHardLimit": "Hartes Limit setzen (ein leerer Wert entfernt die Obergrenze)",
       "setPlaybooks": "Erlaubte Playbooks setzen (ersetzt die Liste in jedem passenden Workspace; eine leere Liste hebt die Einschränkung auf)",
-      "playbooksPairWarning": "Eine nicht leere Liste muss das jeweilige Standard-Playbook jedes passenden Workspace enthalten; setzen Sie dieses also in derselben Aktualisierung, wenn es nicht schon eines davon ist."
+      "playbooksPairWarning": "Eine nicht leere Liste muss das jeweilige Standard-Playbook jedes passenden Workspace enthalten; setzen Sie dieses also in derselben Aktualisierung, wenn es nicht schon eines davon ist.",
+      "setScheduledConfigureCron": "Zeitplan der Konfiguration setzen (ein leerer Wert entfernt ihn)"
     },
     "diff": {
       "colWorkspace": "Arbeitsbereich",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Jeder Eintrag ist ein Pfad relativ zum Konfigurationsverzeichnis, und aus der Ausführungsoption wird eine Auswahlliste darüber statt eines Textfelds. Das Standard-Playbook muss einer der Einträge sein, denn ein bloßes Konfigurieren führt die Vorgabe aus. Damit halten Sie ein Playbook von einem Workspace fern, den es niemals berühren darf — ein Node-Drain, ein Datenbank-Upgrade — wo eine Liste eine Kontrolle und keine Konvention ist.",
       "playbooksPlaceholder": "z. B. release.yml",
       "playbooksAdd": "Playbook hinzufügen",
-      "playbooksAny": "Beliebig"
+      "playbooksAny": "Beliebig",
+      "scheduledConfigureEnabled": "Konfigurieren nach Zeitplan",
+      "scheduledConfigureEnabledHint": "Das Playbook läuft zu einer festen Zeit, unabhängig davon, ob sich etwas geändert hat — so bleibt eine Flotte konvergent, statt erst nach einem Push korrigiert zu werden.",
+      "scheduledConfigureCron": "Zeitplan",
+      "scheduledConfigureCronLead": "Wann die Konfiguration läuft, als fünfstelliger Cron-Ausdruck. Er wird nur gelesen, solange Konfigurieren nach Zeitplan aktiv ist; leer bedeutet kein Zeitplan.",
+      "scheduledConfigureCronTitle": "Die fünf Felder sind Minute, Stunde, Tag des Monats, Monat und Wochentag, gelesen in der Zeitzone unten: 0 2 * * 2 ist 02:00 Uhr jeden Dienstag und 0 2 * * * ist 02:00 Uhr täglich. Ein sechsstelliger Ausdruck wird abgelehnt, weil ein Zeitplan mit Sekundenauflösung nicht eingehalten werden kann, ebenso alles, was häufiger als alle fünf Minuten auslöst — eine Konfiguration kann eine Stunde dauern und lässt sich nicht gefahrlos neu starten.",
+      "scheduledConfigureCronPlaceholder": "z. B. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Zeitzone des Zeitplans",
+      "scheduledConfigureTimezoneHint": "Die IANA-Zone, in der der Zeitplan gelesen wird, damit die Stunde der Sommerzeit folgt — zum Beispiel UTC, Europe/London oder America/New_York. Leer bedeutet UTC.",
+      "scheduledConfigureTimezonePlaceholder": "z. B. Europe/London",
+      "scheduledConfigureLastAt": "Letzter geplanter Lauf"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

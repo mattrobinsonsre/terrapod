@@ -489,6 +489,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Queue a configure for workspaces whose declared inventory changed",
     )
 
+    # Scheduled configure runs (#2538). Registered unconditionally for the same
+    # reason as its neighbour above: the `scheduled_configure_enabled` filter is
+    # one indexed SELECT, and a config key whose only job is to skip it is not
+    # worth the three legs of the config-channel contract.
+    #
+    # The interval is cron's own resolution. Ticking slower would make
+    # `0 2 * * *` fire at some point after 02:00 rather than at it; ticking
+    # faster would buy nothing a cron expression can express.
+    from terrapod.services.scheduled_configure_service import (
+        CYCLE_INTERVAL_SECONDS,
+        scheduled_configure_cycle,
+    )
+
+    register_periodic_task(
+        "scheduled_configure",
+        interval_seconds=CYCLE_INTERVAL_SECONDS,
+        handler=scheduled_configure_cycle,
+        description="Queue a configure for workspaces whose schedule has come round",
+    )
+
     # AI plan summariser (#401). Always registered when feature is enabled
     # — runs that don't qualify (workspace disabled, budget exhausted) are
     # handled inside the handler so the trigger queue is uniform.

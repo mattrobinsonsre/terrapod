@@ -1337,7 +1337,8 @@
       "operationsNone": "Esto dejaría cada espacio de trabajo coincidente sin ninguna operación. Un espacio de trabajo debe conservar planificar y aplicar, o configurar, o ambas.",
       "setHardLimit": "Establecer el límite estricto (un valor vacío elimina el techo)",
       "setPlaybooks": "Establecer los playbooks permitidos (reemplaza la lista en cada espacio de trabajo coincidente; una lista vacía elimina la restricción)",
-      "playbooksPairWarning": "Una lista no vacía tiene que contener el playbook predeterminado propio de cada espacio de trabajo coincidente, así que establécelo en la misma actualización si todavía no es uno de estos."
+      "playbooksPairWarning": "Una lista no vacía tiene que contener el playbook predeterminado propio de cada espacio de trabajo coincidente, así que establécelo en la misma actualización si todavía no es uno de estos.",
+      "setScheduledConfigureCron": "Definir la programación de la configuración (un valor vacío la elimina)"
     },
     "diff": {
       "colWorkspace": "Espacio de trabajo",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Cada entrada es una ruta relativa al directorio de configuración, y la opción de ejecución pasa a ser un selector sobre ellas en lugar de un campo de texto. El playbook predeterminado tiene que ser una de las entradas, porque un Configurar sin más ejecuta el predeterminado. Úsalo para mantener un playbook alejado de un espacio de trabajo que nunca debe tocar —el vaciado de un nodo, la actualización de una base de datos—, donde una lista es un control y no una convención.",
       "playbooksPlaceholder": "p. ej. release.yml",
       "playbooksAdd": "Añadir playbook",
-      "playbooksAny": "Cualquiera"
+      "playbooksAny": "Cualquiera",
+      "scheduledConfigureEnabled": "Configurar según una programación",
+      "scheduledConfigureEnabledHint": "El playbook se ejecuta a una hora fija, haya cambiado algo o no, que es como una flota se mantiene convergida en lugar de corregirse solo después de un push.",
+      "scheduledConfigureCron": "Programación",
+      "scheduledConfigureCronLead": "Cuándo se ejecuta la configuración, como expresión cron de cinco campos. Solo se lee mientras Configurar según una programación está activo, y dejarla vacía significa sin programación.",
+      "scheduledConfigureCronTitle": "Los cinco campos son minuto, hora, día del mes, mes y día de la semana, leídos en la zona horaria de abajo: 0 2 * * 2 son las 02:00 de cada martes y 0 2 * * * son las 02:00 de cada día. Se rechaza una expresión de seis campos, porque no se puede respetar una programación con resolución de segundos, y también cualquiera que se dispare con más frecuencia que cada cinco minutos: una configuración puede durar una hora y no se reinicia con seguridad.",
+      "scheduledConfigureCronPlaceholder": "p. ej. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Zona horaria de la programación",
+      "scheduledConfigureTimezoneHint": "La zona IANA en la que se lee la programación, para que la hora siga el horario de verano: por ejemplo UTC, Europe/London o America/New_York. Vacío significa UTC.",
+      "scheduledConfigureTimezonePlaceholder": "p. ej. Europe/London",
+      "scheduledConfigureLastAt": "Última ejecución programada"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
