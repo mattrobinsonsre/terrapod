@@ -146,6 +146,10 @@ DOCUMENTATION = """
         - Emits one block per task per host. The block's header line carries the
           time and duration, the host, the result and the task, and everything
           else that result produced is indented beneath it (#2513).
+        - A task is announced when it starts, says that it is still running if
+          it outlives the threshold, and ends in its result block - the three
+          signals asked for in (#2532), after terraform's own
+          C(Creating... / Still creating... / Creation complete).
         - Output belonging to no single host -- the PLAY banner, the PLAY RECAP
           -- is emitted as its own block carrying a reserved marker, because it
           is context a filtered view still has to show.
@@ -156,7 +160,7 @@ DOCUMENTATION = """
       - result_format_callback
     options:
       terrapod_progress_seconds:
-        name: Still-running notice interval
+        name: Progress notice interval
         description:
           - Seconds a task may run on a host before this plugin starts saying it
             is still running, and the interval it repeats at thereafter.
@@ -166,7 +170,9 @@ DOCUMENTATION = """
             it - a 2s threshold on a 5s task reports at about 4s. That is the
             cost of one thread instead of a timer per task, and the figure the
             notice carries is the true elapsed time either way.
-          - Set to 0 to disable the notices.
+          - Set to 0 to disable the notices. That silences the task-START
+            notice as well, so one switch governs the whole progress
+            experience rather than leaving a start line nobody can turn off.
         type: int
         default: 10
         ini:
@@ -175,10 +181,11 @@ DOCUMENTATION = """
         env:
           - name: ANSIBLE_TERRAPOD_PROGRESS_SECONDS
       terrapod_progress_mode:
-        name: Still-running notice shape
+        name: Progress notice shape
         description:
-          - C(aggregated) emits one notice per task, counting the hosts still on
-            it. C(per_host) emits one per host per task.
+          - C(aggregated) emits one notice per task - one when it starts, then
+            one per interval while it runs, counting the hosts still on it.
+            C(per_host) emits one per host per task.
           - C(aggregated) is the default because C(per_host) scales with the
             inventory - on a large fleet it is a wall of text rather than a
             progress signal.
@@ -214,6 +221,17 @@ HOSTLESS = "~"
 #: says "the server's own status slug ... never derived here" -- and because
 #: `start` already established a non-terminal status in this vocabulary.
 PROGRESS_STATUS = "running"
+
+#: The status a task-START notice carries (#2532). The issue asks for three
+#: signals, like terraform's `Creating... / Still creating... / Creation
+#: complete`: a notice when a task starts, still-running notices while it runs,
+#: and the result at the end. The middle and the last existed; this is the
+#: first. It had no signal at all, because `_tp_banner` DROPS ansible's own
+#: `TASK [...]` banner -- correctly, since every result block carries the task
+#: name -- so after #2513 a task's existence was only announced once it had
+#: finished. On a task slower than the threshold the first thing a reader saw
+#: was a still-running notice for a task they had never been told had begun.
+START_STATUS = "start"
 
 #: One block header in the exact shape the grammar describes.
 #:
@@ -455,6 +473,46 @@ class CallbackModule(DefaultCallback):
             return max(0, int(self.get_option("terrapod_progress_seconds")))
         except Exception:  # noqa: BLE001
             return 10
+
+    def _tp_announce(self, label: str, host=None) -> None:
+        """Say that a task has begun, in the same vocabulary as the ticker.
+
+        Deliberately NOT ansible's own `show_per_host_start`, which was the
+        obvious lever and is the wrong one: it is per host, so a fifty-host
+        play gives fifty start lines, which is the opposite of the one-line
+        signal the issue asks for -- and it carries ansible's own
+        `[started TASK: x on web1]` body, duplicating the label beside it.
+
+        Carries no elapsed time and no host count. The count is what the ticker
+        reports because "how many are still on it" is the useful figure there;
+        at the moment a task starts nobody has finished, so a count would say
+        only how many hosts the play has, which the PLAY banner already did.
+        """
+        if self._tp_inner_display is None:
+            return
+        line = self._tp_header_line(
+            self._tp_stamp(),
+            escape_host(host) if host else HOSTLESS,
+            START_STATUS,
+            label,
+        )
+        try:
+            # The INNER display, for the reason `_tp_tick_emit` gives: the
+            # wrapper captures into `_tp_frames`, so a notice raised while a
+            # block is being assembled would be swallowed into that block.
+            self._tp_inner_display(line, color=C.COLOR_SKIP)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _tp_announce_enabled(self) -> bool:
+        """`terrapod_progress_seconds: 0` silences the start notice too.
+
+        One switch for the whole progress experience rather than two: an
+        operator who turns the notices off wants quiet, and a start line they
+        could not turn off would be a notice by another name. The option is
+        named for progress, not for the ticker, so this needs no new key.
+        """
+        return self._tp_tick_seconds() > 0
 
     def _tp_tick_mode(self) -> str:
         try:
@@ -741,16 +799,21 @@ class CallbackModule(DefaultCallback):
             super().v2_runner_on_start(host, task, *a, **k)
         finally:
             self._tp_frames.pop()
-        if not frame:
-            return None
-        # Only reached with `show_per_host_start`, which is off by default.
         try:
             name = host.get_name()
         except Exception:  # noqa: BLE001
             name = None
+        if not frame:
+            # Ansible's own per-host start is off (it produced nothing), so in
+            # `per_host` mode this is where the notice comes from. Still before
+            # the task executes: this hook runs ahead of it.
+            if self._tp_announce_enabled() and self._tp_tick_mode() == "per_host":
+                self._tp_announce(self._tp_task_label(task), host=name)
+            return None
+        # Only reached with `show_per_host_start`, which is off by default.
         self._tp_block(
             host=name,
-            status="start",
+            status=START_STATUS,
             label=self._tp_task_label(task),
             body=frame,
             color=C.COLOR_OK,
@@ -785,11 +848,19 @@ class CallbackModule(DefaultCallback):
     def v2_playbook_on_task_start(self, task, is_conditional):
         self._tp_emit_header()
         self._tp_task_at = time.monotonic()
+        # Before `super()`, so the notice precedes anything the task produces.
+        # This hook fires ONCE per task, which is what makes the aggregated
+        # notice one line; the per-host shape is served from
+        # `v2_runner_on_start`, which fires per host.
+        if self._tp_announce_enabled() and self._tp_tick_mode() == "aggregated":
+            self._tp_announce(self._tp_task_label(task))
         return super().v2_playbook_on_task_start(task, is_conditional)
 
     def v2_playbook_on_handler_task_start(self, task):
         self._tp_emit_header()
         self._tp_task_at = time.monotonic()
+        if self._tp_announce_enabled() and self._tp_tick_mode() == "aggregated":
+            self._tp_announce(self._tp_task_label(task))
         return super().v2_playbook_on_handler_task_start(task)
 
     def v2_playbook_on_stats(self, stats):
