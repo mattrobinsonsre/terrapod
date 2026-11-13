@@ -63,8 +63,23 @@ if [ "$IS_PR" = "true" ]; then
     gunzip -c "${DOWNLOAD_DIR}/${img}-${ARCH}.tar.gz" | docker load || exit 1
   done
 else
+  # --platform, because BOTH jobs run on an amd64 runner and only the TAG is
+  # per-architecture. Without it `docker pull` asks for the runner's own
+  # platform, and the arm64 tag's manifest list has no amd64 entry:
+  #
+  #   sha-eee018d-arm64: Pulling from mattrobinsonsre/terrapod-api
+  #   no matching manifest for linux/amd64 in the manifest list entries
+  #
+  # This branch runs on a PUSH only -- a pull request loads the images from
+  # build artifacts above and never pulls -- so the half exercised while the
+  # per-architecture split was under review was the half that could not fail.
+  # It had been red on every `main` push since, unseen because those runs were
+  # being cancelled to free the queue.
+  #
+  # Trivy is already told the platform below (TRIVY_PLATFORM); this is the same
+  # statement one step earlier, for the pull that puts the image on the daemon.
   for img in "${IMAGES[@]}"; do
-    docker pull "${REGISTRY}/${img}:sha-${SHA_SHORT}-${ARCH}" || exit 1
+    docker pull --platform "linux/${ARCH}" "${REGISTRY}/${img}:sha-${SHA_SHORT}-${ARCH}" || exit 1
   done
 fi
 
