@@ -364,6 +364,15 @@ jobs:
 
       - name: (docs-audit) Downloaded artifacts come from a declared dependency
         run: python3 scripts/docs-audit/check_artifact_deps.py
+
+      # Both `Scan images` jobs run on an amd64 runner and only the image TAG is
+      # per architecture, so an arch-tagged pull without `--platform` asks for
+      # linux/amd64 and the arm64 manifest list has no such entry. That branch
+      # is PUSH-ONLY -- a pull request loads the images from build artifacts --
+      # so it stayed red on `main` for several pushes without a PR ever
+      # exercising it.
+      - name: (docs-audit) An arch-tagged docker pull names its platform
+        run: python3 scripts/docs-audit/check_arch_tagged_pulls.py
       # Sits here, after `pip install pyyaml`, because it parses the workflow.
       # Every job is either gated on a derived `run_<family>` or listed as
       # always-run with a reason, the family names agree in both directions,
