@@ -1027,6 +1027,8 @@ of the line this log reshapes, it is carried rather than dropped:
 | `skipping: no hosts matched` | a host-less `skipped` block |
 | `NOTIFIED HANDLER x for y` (`-vv`) | a `notified` block for that host |
 | async progress (`poll:`) | a `polling` block for that host |
+| ` [CHECK MODE]` on a play or task banner | the same suffix on the label, on the `start` notice and on every result |
+| `DRY RUN` before the first play and after the recap | a host-less `dry-run` block at each end |
 
 **Delegation is on the label and not in the host column, deliberately.** That
 column is the key the per-host view filters on and the escaping keeps it one
@@ -1034,6 +1036,15 @@ whitespace-delimited token, so two names in it would break both. The inventory
 host stays there and the target the task actually ran on goes on the label —
 which matters for anything using `delegate_to`: a cloud API call, a monitoring
 silence, work on the runner itself.
+
+**The check-mode marks follow your own `check_mode_markers`, which ansible
+defaults to off.** Turn it on and a `--check` run is bracketed by a host-less
+`dry-run` block at each end and every task label ends ` [CHECK MODE]`; leave it
+off and neither appears, exactly as with ansible's own output. The suffix is
+decided per task rather than once for the run, so a task that forces
+`check_mode: true` inside a play that is not a check run is marked, and one that
+forces it off inside a run that is stays unmarked — which is the distinction
+worth having, since that task really did change something.
 
 A task that produces no output at all still appears, because the `start` notice
 is emitted per task rather than per result. Setting `terrapod_progress_seconds`
