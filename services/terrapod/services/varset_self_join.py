@@ -103,6 +103,10 @@ RULE_DIMENSIONS_REFUSED: dict[str, str] = {
         "exclude is not supported in assignment rules yet, because an entry may "
         "select on a dimension that is itself refused"
     ),
+    "autodiscovery_rule_id": (
+        "selecting on the autodiscovery rule that created a workspace is not offered "
+        "for assignment rules yet"
+    ),
 }
 
 
@@ -123,7 +127,9 @@ def rule_refused_dimensions(rule) -> list[str]:
     """
     if not isinstance(rule, dict):
         return []
-    return sorted(k for k in RULE_DIMENSIONS_REFUSED if k in rule)
+    # A stored rule may use the hyphenated spelling, which `parse_filter` accepts.
+    keys = {str(k).replace("-", "_") for k in rule}
+    return sorted(k for k in RULE_DIMENSIONS_REFUSED if k in keys)
 
 
 def touches_rule_selectable(attrs: dict, relationships: dict | None = None) -> bool:

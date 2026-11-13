@@ -3248,7 +3248,9 @@ dimensions are all blank -- `{"name_prefix": ""}` selects nothing meaningful and
 would otherwise match every workspace. `exclude` (the bulk-update selector's
 exclusion list) is not supported in assignment rules yet: a rule carrying it is
 a `422` reading `assignment-rule cannot select on exclude`, because an entry
-could select on a dimension a rule refuses.
+could select on a dimension a rule refuses. `autodiscovery_rule_id` (the bulk-update
+selector's autodiscovery-rule dimension) is likewise not available in assignment
+rules yet and is refused with the same `422`.
 
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
@@ -4244,12 +4246,15 @@ Resolve a structured filter to the matching workspaces — no side effects (the 
     "name-prefix": "terrapod-testing-",
     "execution-backend": "terraform",
     "agent-pool-id": "apool-...", "vcs-connection-id": "vcs-...",
+    "autodiscovery-rule-id": "<rule id>",
     "owner-email": "...", "drift-status": "...", "locked": false, "has-vcs": true,
     "workspace-ids": ["ws-..."],
     "all": false } }
 ```
 
 Dimensions are **AND-combined** (narrower = safer). An empty/omitted `filter` is a `422` (typo guard); matching the whole fleet requires explicit `"all": true`. Returns `{matched, workspaces:[...]}`.
+
+`autodiscovery-rule-id` selects the workspaces an autodiscovery rule created, by the rule's `id` as returned by the autodiscovery-rules API (a bare uuid). An id that is not a valid uuid is a `422`. It works inside `exclude` entries too, and is not available in [variable set assignment rules](#assignment-rules) yet.
 
 #### Excluding workspaces
 
