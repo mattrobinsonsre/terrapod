@@ -39,6 +39,7 @@ from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
+from tests.api.test_workspaces import _by_entity
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -100,15 +101,11 @@ def _app(user, *, admin_override=None):
 
 
 def _no_existing_workspace(db):
-    result = MagicMock()
-    result.scalar_one_or_none.return_value = None
-    db.execute = AsyncMock(return_value=result)
+    _by_entity(db, None)
 
 
 def _existing_workspace(db, ws):
-    result = MagicMock()
-    result.scalar_one_or_none.return_value = ws
-    db.execute = AsyncMock(return_value=result)
+    _by_entity(db, ws)
 
 
 def _created(db):
