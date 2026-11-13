@@ -366,13 +366,20 @@ export default function AdminCatalogPage() {
                     <label htmlFor="cat-module" className="block text-sm font-medium text-slate-300 mb-1">{t('form.module')}</label>
                     <select id="cat-module" value={f.moduleId} disabled={editId !== null}
                       onChange={(e) => setF({ ...f, moduleId: e.target.value })} required
-                      title={editId !== null ? t('form.moduleImmutable') : undefined}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="">{t('form.moduleSelect')}</option>
                       {modules.map((m) => (
                         <option key={m.id} value={m.id}>{m.attributes.name}/{m.attributes.provider}</option>
                       ))}
                     </select>
+                    {/* Why the control is disabled, rendered rather than hovered
+                        (#2557): a disabled select is not focusable, so a `title`
+                        reached neither a touch user nor the keyboard. */}
+                    {editId !== null && (
+                      <p data-testid="cat-module-immutable" className="mt-1 text-xs text-slate-400">
+                        {t('form.moduleImmutable')}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="cat-display" className="block text-sm font-medium text-slate-300 mb-1">{t('form.displayName')}</label>

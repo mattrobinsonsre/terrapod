@@ -43,11 +43,41 @@ export interface RunKindOption {
   /** Stable id, for `key` and the test id. */
   id: string
   label: string
-  /** The hover/`title` text. */
+  /** The hover/`title` text. Supplementary only -- never the sole route to anything. */
   title?: string
-  /** Why it cannot run now; renders disabled and the title says this instead. */
+  /**
+   * Why it cannot run now; renders disabled, with the reason VISIBLE in the
+   * control's own label.
+   *
+   * It used to go in `title`, which is a hover tooltip -- so on touch, a
+   * first-class target here, the reason did not exist at all, and a disabled
+   * button is not focusable so keyboard and AT users did not reach it either
+   * (#2557).
+   */
   blockedReason?: string
   run: () => void
+}
+
+/**
+ * The blocked reason, rendered inside the control rather than hovered over.
+ *
+ * One component for both call sites deliberately: they are the same statement
+ * to the same reader, and the previous arrangement had the identical
+ * `title={... ?? ...}` expression written out twice.
+ *
+ * This is the pattern the bulk Selection menu already uses -- `Apply  0 of 3
+ * eligible` -- where an unavailable action is inert AND says why, with no
+ * hover required.
+ */
+function BlockedReason({ id, reason }: { id: string; reason: string }) {
+  return (
+    <span
+      data-testid={`ws-run-${id}-blocked`}
+      className="block text-xs font-normal opacity-90"
+    >
+      {reason}
+    </span>
+  )
 }
 
 export function RunKindSplitButton({
@@ -106,10 +136,13 @@ export function RunKindSplitButton({
       data-testid={`ws-run-${primary.id}`}
       onClick={primary.run}
       disabled={busy || !!primary.blockedReason}
-      title={primary.blockedReason ?? primary.title}
+      title={primary.title}
       className={`${primaryClassName} ${rest.length > 0 ? 'rounded-s-lg' : 'rounded-lg'}`}
     >
       {busy ? busyLabel : primary.label}
+      {!busy && primary.blockedReason && (
+        <BlockedReason id={primary.id} reason={primary.blockedReason} />
+      )}
     </button>
   )
 
@@ -175,7 +208,7 @@ export function RunKindSplitButton({
               }}
               data-testid={`ws-run-${o.id}`}
               disabled={busy || !!o.blockedReason}
-              title={o.blockedReason ?? o.title}
+              title={o.title}
               onClick={() => {
                 setOpen(false)
                 o.run()
@@ -184,6 +217,7 @@ export function RunKindSplitButton({
               className="block w-full rounded px-3 py-2 text-start text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-11 sm:min-h-0"
             >
               {o.label}
+              {!busy && o.blockedReason && <BlockedReason id={o.id} reason={o.blockedReason} />}
             </button>
           ))}
         </div>

@@ -276,11 +276,17 @@ export default function VCSConnectionsPage() {
                 <label htmlFor="vcs-provider" className="block text-sm font-medium text-slate-300 mb-1">{t('form.provider')}</label>
                 <select id="vcs-provider" value={provider} disabled={editId !== null}
                   onChange={(e) => setProvider(e.target.value as 'github' | 'gitlab')}
-                  title={editId !== null ? t('form.providerImmutable') : undefined}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                   <option value="github">GitHub</option>
                   <option value="gitlab">GitLab</option>
                 </select>
+                {/* Why the control is disabled, rendered rather than hovered
+                    (#2557). */}
+                {editId !== null && (
+                  <p data-testid="vcs-provider-immutable" className="mt-1 text-xs text-slate-400">
+                    {t('form.providerImmutable')}
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="vcs-url" className="block text-sm font-medium text-slate-300 mb-1">{t('form.serverUrl')}</label>
