@@ -546,6 +546,47 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('a blocked run kind says WHY, visibly rather than on hover (#2557)', async ({
+    page,
+  }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eresp-blocked'))
+    // A lock blocks every run kind with one reason, which is the case an
+    // operator actually meets -- and the one the defect was found in.
+    await lockWorkspace(token, wsId, 'held for the #2557 guard')
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`)
+
+    const primary = page.getByTestId('ws-run-planApply')
+    await expect(primary).toBeVisible()
+    await expect(primary).toBeDisabled()
+
+    // VISIBLE, not merely present in the DOM. That distinction IS this test:
+    // the reason used to live in a `title` attribute, which a presence check
+    // passes happily and a phone cannot reach at all, which is how it survived
+    // for as long as it did.
+    const reason = page.getByTestId('ws-run-planApply-blocked')
+    await expect(reason).toBeVisible()
+    await expect(reason).toHaveText(/locked/i)
+
+    // And it is no longer ALSO on hover. Without this, reverting to
+    // `title={blockedReason ?? title}` while keeping the span would leave the
+    // test green over a half-fix; with it, the title may carry only
+    // supplementary prose.
+    await expect(primary).not.toHaveAttribute('title', /locked/i)
+
+    // Each menu option carries its own reason, for the same reason: a per-kind
+    // block (a VCS ref in the way) is not the same sentence for every kind.
+    await page.getByTestId('ws-run-more').click()
+    await expect(page.getByTestId('ws-run-menu')).toBeVisible()
+    await expect(page.getByTestId('ws-run-plan-blocked')).toBeVisible()
+
+    // The reason is a second line inside the control, so it makes the button
+    // taller and the row more likely to wrap -- which is exactly the thing a
+    // phone-width guard exists to catch.
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('the Configure button and its options are reachable at phone width (#1974)', async ({
     page,
   }) => {

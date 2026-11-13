@@ -4642,9 +4642,21 @@ function WorkspaceDetailContent() {
                       onClick={handleCheckDriftNow}
                       disabled={checkingDrift || attrs.locked}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-600/80 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                      title={attrs.locked ? t('common.workspaceLocked') : phaseWord('driftCheckNowTitle')}
+                      title={phaseWord('driftCheckNowTitle')}
                     >
                       {checkingDrift ? t('actions.queuing') : t('drift.checkNow')}
+                      {/* Visible, not a `title`. Found by #2557's sweep rather
+                          than named in it: the reason sat in the hover branch of
+                          a conditional title on a button disabled for exactly
+                          that reason. */}
+                      {attrs.locked && !checkingDrift && (
+                        <span
+                          data-testid="ws-drift-check-blocked"
+                          className="block text-xs font-normal opacity-90"
+                        >
+                          {t('common.workspaceLocked')}
+                        </span>
+                      )}
                     </button>
                   </div>
                 )}
@@ -5433,9 +5445,18 @@ function WorkspaceDetailContent() {
                       onClick={() => setShowDestroyConfirm(true)}
                       disabled={queueingDestroy || attrs.locked}
                       className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
-                      title={attrs.locked ? t('common.workspaceLocked') : phaseWord('queueDestroyTitle')}
+                      title={phaseWord('queueDestroyTitle')}
                     >
                       {t('runs.queueDestroy')}
+                      {/* Visible, not hovered (#2557). */}
+                      {attrs.locked && !queueingDestroy && (
+                        <span
+                          data-testid="ws-queue-destroy-blocked"
+                          className="block text-xs font-normal opacity-90"
+                        >
+                          {t('common.workspaceLocked')}
+                        </span>
+                      )}
                     </button>
                   ) : (
                     <div className="flex items-center gap-2">
