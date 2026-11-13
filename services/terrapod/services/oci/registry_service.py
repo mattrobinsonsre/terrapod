@@ -43,6 +43,7 @@ import json
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import OCIBlob, OCIManifest, OCIRepository, OCIRepositoryBlob, OCITag
@@ -228,16 +229,16 @@ async def store_manifest(
     manifest, and because the same image may legitimately be pushed twice. The
     bytes are identical by definition — the digest is computed from them — so an
     existing row is returned rather than treated as a conflict.
-    """
-    existing = await db.execute(
-        select(OCIManifest).where(
-            OCIManifest.repository_id == repository.id, OCIManifest.digest == digest
-        )
-    )
-    found = existing.scalar_one_or_none()
-    if found is not None:
-        return found
 
+    Concurrently as well as sequentially. The check that used to sit above the
+    insert was idempotent only one request at a time, and a client re-pushing a
+    manifest while another push of the same image was in flight raced between
+    the two statements -- see `upload_service._upsert_blob` (#2562).
+
+    The storage write stays ahead of the row deliberately: it is
+    content-addressed, so writing the same bytes twice is a no-op, and a row
+    without its object would be a manifest the registry cannot serve.
+    """
     from terrapod.services.oci.names import parse_digest
     from terrapod.storage import keys
 
@@ -246,19 +247,28 @@ async def store_manifest(
 
     subject_digest, artifact_type, annotations = referrer_metadata(body)
 
-    manifest = OCIManifest(
-        repository_id=repository.id,
-        digest=digest,
-        media_type=media_type,
-        size=len(body),
-        storage_key=storage_key,
-        subject_digest=subject_digest,
-        artifact_type=artifact_type,
-        annotations=annotations,
+    await db.execute(
+        postgresql.insert(OCIManifest)
+        .values(
+            repository_id=repository.id,
+            digest=digest,
+            media_type=media_type,
+            size=len(body),
+            storage_key=storage_key,
+            subject_digest=subject_digest,
+            artifact_type=artifact_type,
+            annotations=annotations,
+        )
+        .on_conflict_do_nothing(constraint="uq_oci_manifest_repo_digest")
     )
-    db.add(manifest)
-    await db.flush()
-    return manifest
+    # Re-read rather than trusting RETURNING: on conflict the insert returns
+    # nothing, and the row wanted is the one already there.
+    result = await db.execute(
+        select(OCIManifest).where(
+            OCIManifest.repository_id == repository.id, OCIManifest.digest == digest
+        )
+    )
+    return result.scalar_one()
 
 
 async def set_tag(
@@ -285,27 +295,38 @@ async def set_tag(
 
     Stamping it at fetch time also starts the freshness window at the moment the
     content was actually confirmed, rather than at the next read.
-    """
-    result = await db.execute(
-        select(OCITag).where(OCITag.repository_id == repository.id, OCITag.name == name)
-    )
-    tag = result.scalar_one_or_none()
-    if tag is not None:
-        tag.manifest_id = manifest.id
-        if from_upstream:
-            tag.revalidated_at = datetime.now(UTC)
-        await db.flush()
-        return tag
 
-    tag = OCITag(
-        repository_id=repository.id,
-        name=name,
-        manifest_id=manifest.id,
-        revalidated_at=datetime.now(UTC) if from_upstream else None,
+    DO UPDATE rather than DO NOTHING, because a tag moves. The check-then-act
+    form this replaces lost that race when two pushes set one tag at once, and
+    the loser raised the very unique violation the docstring above says it
+    exists to avoid -- which reached a container client as `unknown error`
+    (#2562). The `revalidated_at` rule survives it exactly: the update touches
+    that column only on an upstream revalidation, so a local push still leaves
+    it alone.
+    """
+    now = datetime.now(UTC) if from_upstream else None
+    update: dict = {"manifest_id": manifest.id}
+    if from_upstream:
+        update["revalidated_at"] = now
+    await db.execute(
+        postgresql.insert(OCITag)
+        .values(
+            repository_id=repository.id,
+            name=name,
+            manifest_id=manifest.id,
+            revalidated_at=now,
+        )
+        .on_conflict_do_update(constraint="uq_oci_tag_repo_name", set_=update)
     )
-    db.add(tag)
-    await db.flush()
-    return tag
+    # `populate_existing`, because the ORM knows nothing of a core upsert: an
+    # identity-map copy loaded earlier in this transaction would otherwise come
+    # back carrying the OLD manifest_id.
+    result = await db.execute(
+        select(OCITag)
+        .where(OCITag.repository_id == repository.id, OCITag.name == name)
+        .execution_options(populate_existing=True)
+    )
+    return result.scalar_one()
 
 
 def referrer_metadata(body: bytes) -> tuple[str | None, str | None, dict | None]:

@@ -87,6 +87,18 @@ NOT_ALLOWED = OCIErrorCode(
 UNSUPPORTED = OCIErrorCode(
     "UNSUPPORTED", status.HTTP_400_BAD_REQUEST, "the operation is unsupported"
 )
+#: A server-side fault, for which the spec's normative table has no code -- it
+#: enumerates what a CLIENT got wrong. The spec permits additional codes and
+#: `UNKNOWN` is what registries use, so this follows that rather than borrowing
+#: a client-fault code and lying about whose fault it was.
+#:
+#: What matters more than the code is that the ENVELOPE parses at all: the
+#: module docstring above predicts the symptom, and it is exactly what #2562
+#: produced -- a generic JSON:API 409 leaked onto `/v2/` from an app-wide
+#: handler and `docker push` reported `unknown error`, which is what docker
+#: prints when it cannot read the body. With the envelope right it prints the
+#: message instead.
+UNKNOWN = OCIErrorCode("UNKNOWN", status.HTTP_500_INTERNAL_SERVER_ERROR, "unknown error")
 
 
 class OCIError(Exception):
