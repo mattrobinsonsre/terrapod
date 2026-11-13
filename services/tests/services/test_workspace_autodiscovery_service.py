@@ -13,7 +13,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from terrapod.config import S3Config, StorageBackend, StorageLocationConfig, settings
 from terrapod.services.workspace_autodiscovery_service import (
+    AutodiscoveryUnusableLocation,
     _is_terraform_file,
     _match_glob,
     autodiscover_for_paths,
@@ -44,6 +46,7 @@ def _rule(
     # "pulumi", so the rule would claim nothing and every assertion here would
     # fail for a reason unrelated to what it is testing.
     r.engine = engine
+    r.storage_location = None
     return r
 
 
@@ -394,6 +397,7 @@ def _materialise_rule(**overrides):
         "resource_cpu": "1",
         "parallelism": 10,
         "configure_parallelism": 50,
+        "storage_location": None,
         "resource_memory": "2Gi",
         "ee_resource_cpu": "",
         "ee_resource_memory": "",
@@ -485,6 +489,103 @@ class TestMaterialisationInheritsTheRule:
         ws, _ = await find_or_autocreate_workspace(db, rule, "accounts/legacy/vpc")
 
         assert ws.auto_apply_mode == "never"
+
+
+class TestMaterialisationCarriesTheStorageLocation:
+    @pytest.fixture(autouse=True)
+    def _locations(self, monkeypatch):
+        eu = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu-bucket"))
+        monkeypatch.setattr(settings.storage, "locations", {"eu-west": eu})
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("location", "expected"),
+        [("eu-west", "eu-west"), (None, None), ("default", None)],
+    )
+    async def test_the_rules_location_reaches_the_workspace(self, location, expected):
+        from terrapod.services.workspace_autodiscovery_service import (
+            find_or_autocreate_workspace,
+        )
+
+        rule = _materialise_rule(storage_location=location)
+
+        ws, created = await find_or_autocreate_workspace(
+            _autocreate_db(), rule, "accounts/prod/vpc"
+        )
+
+        assert created is True
+        assert ws.storage_location == expected
+
+    @pytest.mark.asyncio
+    async def test_a_location_removed_since_the_rule_was_saved_creates_nothing(self):
+        from terrapod.services.workspace_autodiscovery_service import (
+            find_or_autocreate_workspace,
+        )
+
+        rule = _materialise_rule(storage_location="removed-location")
+        db = _autocreate_db()
+
+        with patch("terrapod.services.workspace_autodiscovery_service.logger") as log:
+            with pytest.raises(AutodiscoveryUnusableLocation):
+                await find_or_autocreate_workspace(db, rule, "accounts/prod/vpc")
+
+        db.add.assert_not_called()
+        log.warning.assert_called_once()
+        assert log.warning.call_args.kwargs["storage_location"] == "removed-location"
+
+    @pytest.mark.asyncio
+    async def test_the_scan_skips_that_directory_and_carries_on(self):
+        stale = _materialise_rule(storage_location="removed-location", pattern="a/**/*.tf")
+        good = _materialise_rule(storage_location="eu-west", pattern="b/**/*.tf")
+        db = _autocreate_db()
+
+        created = await autodiscover_for_paths(db, [stale, good], ["a/x/main.tf", "b/y/main.tf"])
+
+        assert [w.working_directory for w in created] == ["b/y"]
+
+    @pytest.mark.asyncio
+    async def test_an_existing_workspace_is_still_reused_whatever_the_rule_says(self):
+        from terrapod.services.workspace_autodiscovery_service import (
+            find_or_autocreate_workspace,
+        )
+
+        rule = _materialise_rule(storage_location="removed-location")
+        found = MagicMock()
+        found.scalar_one_or_none = MagicMock(return_value=MagicMock())
+        db = _autocreate_db()
+        db.execute = AsyncMock(return_value=found)
+
+        _, created = await find_or_autocreate_workspace(db, rule, "accounts/prod/vpc")
+
+        assert created is False
+
+    @pytest.mark.asyncio
+    async def test_a_reused_workspace_keeps_its_own_location(self):
+        from terrapod.db.models import Workspace
+        from terrapod.services.workspace_autodiscovery_service import (
+            find_or_autocreate_workspace,
+        )
+
+        existing = Workspace(name="vpc", storage_location=None)
+        found = MagicMock()
+        found.scalar_one_or_none = MagicMock(return_value=existing)
+        db = _autocreate_db()
+        db.execute = AsyncMock(return_value=found)
+
+        ws, created = await find_or_autocreate_workspace(
+            db, _materialise_rule(storage_location="eu-west"), "accounts/prod/vpc"
+        )
+
+        assert ws is existing and created is False
+        assert ws.storage_location is None
+
+    @pytest.mark.asyncio
+    async def test_the_preview_does_not_promise_a_workspace_it_cannot_create(self):
+        rule = _rule(pattern="accounts/*/**/*.tf")
+        rule.storage_location = "removed-location"
+        preview = await preview_for_paths(_preview_db(), rule, ["accounts/alpha/network/main.tf"])
+
+        assert preview[0]["collision"] is True
 
 
 class TestEveryTemplatedSettingReachesTheWorkspace:
@@ -587,6 +688,9 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "ee_resource_memory",
         "parallelism",
         "configure_parallelism",
+        # Where the workspace's objects live. Fixed at creation, so the rule is
+        # the only place a fleet can choose it.
+        "storage_location",
         "auto_apply_mode",
         "labels",
         "owner_email",

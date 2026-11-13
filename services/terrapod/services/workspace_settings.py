@@ -74,6 +74,18 @@ def validate_ansible_version(raw: object) -> str:
     return value
 
 
+def validate_storage_location(raw: object) -> str | None:
+    """A configured location name, or None for `default` (stored as NULL)."""
+    from terrapod.config import DEFAULT_STORAGE_LOCATION, settings
+
+    if raw is None or raw == DEFAULT_STORAGE_LOCATION:
+        return None
+    if not isinstance(raw, str) or raw not in settings.storage.locations:
+        configured = ", ".join([DEFAULT_STORAGE_LOCATION, *sorted(settings.storage.locations)])
+        raise ValueError(f"storage-location {raw!r} is not a configured location ({configured})")
+    return raw
+
+
 #: A fleet standardising on a handful of internal collections, not a lockfile.
 #: Past this the declaration has stopped being configuration and the
 #: configuration's own `requirements.yml` is the right home.

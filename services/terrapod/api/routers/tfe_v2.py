@@ -78,6 +78,7 @@ from terrapod.api.serialization import engine_version_attr as _engine_version_at
 from terrapod.auth import capabilities as cap
 from terrapod.auth import capability_urls
 from terrapod.auth.capabilities import has_capability
+from terrapod.config import DEFAULT_STORAGE_LOCATION
 from terrapod.db.models import (
     DEFAULT_ANSIBLE_LINE,
     AuditLog,
@@ -369,6 +370,14 @@ def _validate_configure_parallelism(raw: object) -> int | None:
     """HTTP wrapper over the configure phase's rule (#2499)."""
     try:
         return validate_configure_parallelism(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _validate_storage_location(raw: object) -> str | None:
+    """HTTP wrapper over the storage-location rule."""
+    try:
+        return workspace_settings.validate_storage_location(raw)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -1106,6 +1115,7 @@ def _workspace_json(
                 "resource-cpu": ws.resource_cpu,
                 "parallelism": ws.parallelism,
                 "configure-parallelism": ws.configure_parallelism,
+                "storage-location": ws.storage_location,
                 "resource-memory": ws.resource_memory,
                 # The EE sidecar's own pair (#2154). Returned UNRESOLVED -- `""`
                 # means "the deployment default" and must not be substituted
@@ -1319,6 +1329,9 @@ def _workspace_json(
             # `terraform` and `tofu` have no run button, so it could only ever
             # be noise on this wire.
             "default-run-kind",
+            # Where objects are stored is a Terrapod deployment concept that no
+            # `terraform`/`tofu`/`tfci` invocation reads.
+            "storage-location",
         ):
             payload["data"]["attributes"].pop(_native_only, None)
     else:
@@ -2091,6 +2104,8 @@ async def _create_workspace_impl(
         # every new workspace pin a configure concurrency nobody chose, and
         # would make the inherit unreachable.
         configure_parallelism=_validate_configure_parallelism(attrs.get("configure-parallelism")),
+        # `default` and absent both store NULL, so the column has one spelling of it.
+        storage_location=_validate_storage_location(attrs.get("storage-location")),
         pulumi_bind_plan=_validate_pulumi_bind_plan(attrs.get("pulumi-bind-plan", False), engine),
         resource_memory=_422(
             workspace_settings.validate_resource_quantity,
@@ -2981,6 +2996,17 @@ async def update_workspace(
     # #2010 shape, where an empty value is a value rather than an absence.
     if "configure-parallelism" in attrs:
         ws.configure_parallelism = _validate_configure_parallelism(attrs["configure-parallelism"])
+    # Compared before it is validated, so a workspace whose location has since
+    # left the config can still be re-sent unchanged.
+    if "storage-location" in attrs:
+        sent = attrs["storage-location"]
+        if sent in (None, DEFAULT_STORAGE_LOCATION):
+            sent = None
+        if sent != ws.storage_location:
+            raise HTTPException(
+                status_code=422,
+                detail="storage-location cannot be changed after the workspace is created",
+            )
     if "pulumi-bind-plan" in attrs:
         ws.pulumi_bind_plan = _validate_pulumi_bind_plan(attrs["pulumi-bind-plan"], ws.engine)
     for key, column in (

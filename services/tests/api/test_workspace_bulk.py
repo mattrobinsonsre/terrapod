@@ -434,6 +434,22 @@ class TestBulkUpdateValidation:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_a_storage_location_is_never_written_in_bulk(self, *_mocks):
+        from terrapod.api.routers.workspace_bulk import _validate_update_fields_for_test
+
+        body = {"filter": {"all": True}, "update": {"storage-location": "eu-west"}}
+        resp, db = await self._post(body)
+        assert resp.status_code == 422
+        assert "no recognised keys" in resp.json()["detail"]
+        db.commit.assert_not_awaited()
+        fields = _validate_update_fields_for_test(
+            {"storage-location": "eu-west", "debug-mode": True}
+        )
+        assert "storage_location" not in fields
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_unknown_filter_422(self, *_mocks):
         body = {
             "filter": {"bogus-selector": "x"},

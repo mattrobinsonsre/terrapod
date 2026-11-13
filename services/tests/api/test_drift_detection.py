@@ -60,6 +60,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.resource_cpu = "1"
     ws.parallelism = 10
     ws.configure_parallelism = None
+    ws.storage_location = None
     ws.resource_memory = "2Gi"
     ws.ee_resource_cpu = ""
     ws.ee_resource_memory = ""

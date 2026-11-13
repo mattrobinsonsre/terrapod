@@ -10,6 +10,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
+from terrapod.config import S3Config, StorageBackend, StorageLocationConfig, settings
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -91,6 +92,7 @@ def _mock_rule(
     r.resource_cpu = "1"
     r.parallelism = 10
     r.configure_parallelism = None
+    r.storage_location = None
     r.resource_memory = "2Gi"
     r.ee_resource_cpu = ""
     r.ee_resource_memory = ""
@@ -1832,3 +1834,111 @@ class TestARuleCannotPreferARunKindItsWorkspacesWouldNotHave:
             )
         assert resp.status_code == 422, resp.text
         assert "configure-enabled" in resp.json()["detail"]
+
+
+_EU = {"eu-west": StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu-bucket"))}
+
+
+class TestTheRuleCarriesAStorageLocation:
+    """`storage-location` on a rule templates future workspaces, so PATCH may change it."""
+
+    @pytest.fixture(autouse=True)
+    def _wiring(self):
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+        ):
+            yield
+
+    def _body(self, conn_id, **attrs):
+        return {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    **attrs,
+                }
+            }
+        }
+
+    async def _create(self, **attrs):
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        added: list = []
+        db.add = added.append
+        with patch.object(settings.storage, "locations", _EU):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/autodiscovery-rules",
+                    json=self._body(conn_id, **attrs),
+                    headers=_AUTH,
+                )
+        return resp, added
+
+    async def test_create_stores_a_configured_location(self):
+        resp, added = await self._create(**{"storage-location": "eu-west"})
+        assert resp.status_code == 201, resp.text
+        assert added[0].storage_location == "eu-west"
+        assert resp.json()["data"]["attributes"]["storage-location"] == "eu-west"
+
+    @pytest.mark.parametrize(
+        "attrs", [{}, {"storage-location": None}, {"storage-location": "default"}]
+    )
+    async def test_create_without_one_or_with_default_stores_null(self, attrs):
+        resp, added = await self._create(**attrs)
+        assert resp.status_code == 201, resp.text
+        assert added[0].storage_location is None
+        assert resp.json()["data"]["attributes"]["storage-location"] is None
+
+    async def test_create_with_an_unconfigured_name_is_422(self):
+        resp, added = await self._create(**{"storage-location": "nowhere"})
+        assert resp.status_code == 422, resp.text
+        assert "storage-location" in resp.json()["detail"]
+        assert not added
+
+    async def test_patch_may_change_it(self):
+        rule = _mock_rule()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        with patch.object(settings.storage, "locations", _EU):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(
+                    f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                    json={"data": {"attributes": {"storage-location": "eu-west"}}},
+                    headers=_AUTH,
+                )
+                assert resp.status_code == 200, resp.text
+                assert rule.storage_location == "eu-west"
+
+                resp = await c.patch(
+                    f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                    json={"data": {"attributes": {"storage-location": None}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 200, resp.text
+        assert rule.storage_location is None
+
+    async def test_patch_with_an_unconfigured_name_is_422(self):
+        rule = _mock_rule()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        with patch.object(settings.storage, "locations", _EU):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(
+                    f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                    json={"data": {"attributes": {"storage-location": "nowhere"}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 422, resp.text
+        assert rule.storage_location is None
+        db.commit.assert_not_awaited()
