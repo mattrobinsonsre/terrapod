@@ -307,7 +307,21 @@ def _blocks(text: str) -> list[Block]:
 
 
 def _for(blocks: list[Block], host: str, label_contains: str) -> list[Block]:
-    return [b for b in blocks if b.host == host and label_contains in b.label]
+    """The RESULT blocks for one task on one host.
+
+    Excludes the START notice explicitly. It used to be excluded by accident:
+    the notice was host-less while `aggregated` was the default, so "has a
+    host" doubled as "is a result". `per_host` became the default in #2575 and
+    every caller here started matching a task's start notice as well as its
+    result -- which is a different thing with a different header (a wall-clock
+    stamp rather than a duration) and a label that deliberately carries no
+    item and no delegation.
+    """
+    return [
+        b
+        for b in blocks
+        if b.host == host and label_contains in b.label and b.status != START_STATUS
+    ]
 
 
 def _callback_complaints(text: str) -> list[str]:
@@ -395,7 +409,11 @@ class TestWhatAnsiblePrintsThroughIt:
         """The four fields the issue asks every block to be guaranteed to have."""
         blocks = _blocks(framed)
         assert blocks, framed[:2000]
-        results = [b for b in blocks if b.host is not None]
+        # RESULTS, not every host-bearing block: a START notice is per host in
+        # the default mode and carries a wall-clock stamp rather than a
+        # duration, deliberately -- nothing has elapsed yet when one is
+        # emitted. `TestTaskStartNotices` is what covers those.
+        results = [b for b in blocks if b.host is not None and b.status != START_STATUS]
         assert results, "no block was attributed to a host"
         for block in results:
             assert block.status, block.header
@@ -713,11 +731,156 @@ class TestStillRunningNotices:
         )
         assert _running(out) == [], f"notice before the threshold:\n{out}"
 
-    def test_aggregated_counts_the_hosts_and_is_host_less(self, tmp_path):
-        """One notice per TASK, carrying the host count -- not one per host.
+    def test_an_include_is_not_announced_after_it_has_been_included(self, tmp_path):
+        """#2575: the reported defect, and the one an operator met.
 
-        This is the shape decision: `per_host` scales with the inventory, so on
-        a large fleet it is a wall rather than a progress signal.
+        A dynamic include produces no block -- `default` declines to speak for
+        a `TaskInclude` -- so the entry it left in the still-running set was
+        never cleared, and every tick re-announced every include seen so far
+        with an ever-growing elapsed time. On a real run that was 604 of 1,308
+        log lines, 21 of the 22 notices in one tick naming tasks that had
+        finished minutes earlier.
+        """
+        (tmp_path / "inc.yml").write_text(
+            textwrap.dedent(
+                """
+                - name: an included task
+                  ansible.builtin.debug:
+                    msg: included
+                """
+            ).strip()
+        )
+        play = textwrap.dedent(
+            """
+            - name: slow
+              hosts: all
+              gather_facts: false
+              tasks:
+                - name: "include a file"
+                  ansible.builtin.include_tasks: inc.yml
+                - name: "include a role"
+                  ansible.builtin.include_role:
+                    name: platform
+                - name: "a slow task"
+                  ansible.builtin.command: "sleep 5"
+                  changed_when: false
+            """
+        ).strip()
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=play,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
+        )
+        notices = _running(out)
+        assert notices, f"the slow task produced no notice; test is not measuring:\n{out}"
+        assert all("a slow task" in b.label for b in notices), (
+            "a finished include is still being announced as running: "
+            f"{sorted({b.label for b in notices})}"
+        )
+
+    def test_a_result_the_log_declines_to_print_still_ends_the_task(self, tmp_path):
+        """The CLASS, which is wider than the includes it was reported as.
+
+        An include leaks because its frame is EMPTY, not because it is an
+        include -- `v2_runner_on_ok` fires for every include shape measured.
+        The same empty frame arrives whenever `default` declines to speak, and
+        under `display_ok_hosts: false` that is EVERY ok task: without the
+        fix, a play of quick tasks has the ticker announcing all of them for
+        the rest of the run.
+
+        Fixing only the include shape leaves this one, which is why it is
+        asserted separately rather than folded into the test above.
+        """
+        play = textwrap.dedent(
+            """
+            - name: slow
+              hosts: all
+              gather_facts: false
+              tasks:
+                - name: "a quiet task"
+                  ansible.builtin.debug:
+                    msg: quiet
+                - name: "another quiet task"
+                  ansible.builtin.debug:
+                    msg: quiet
+                - name: "a slow task"
+                  ansible.builtin.command: "sleep 5"
+                  changed_when: false
+            """
+        ).strip()
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=play,
+            tagged=True,
+            extra_env={
+                "ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1",
+                "ANSIBLE_DISPLAY_OK_HOSTS": "false",
+            },
+        )
+        notices = _running(out)
+        assert notices, f"the slow task produced no notice; test is not measuring:\n{out}"
+        assert all("a slow task" in b.label for b in notices), (
+            "a finished task whose result was not printed is still being "
+            f"announced as running: {sorted({b.label for b in notices})}"
+        )
+
+    def test_a_loop_is_still_announced_after_its_first_item(self, tmp_path):
+        """The mirror defect: silence while something IS running.
+
+        There is one still-running entry per (task, host) and an item hook
+        carries its PARENT's task uuid -- so clearing on an item result ends
+        the task for the ticker at the FIRST iteration and the rest of the
+        loop runs unannounced. The parent's own result is what ends it.
+
+        Asserted on ORDER rather than on a count: notices before the first
+        item are emitted either way, so only a notice AFTER one distinguishes
+        the two.
+        """
+        play = textwrap.dedent(
+            """
+            - name: slow
+              hosts: all
+              gather_facts: false
+              tasks:
+                - name: "a slow task"
+                  ansible.builtin.command: "sleep 3"
+                  changed_when: false
+                  loop: [1, 2, 3]
+            """
+        ).strip()
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=play,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
+        )
+        blocks = _blocks(out)
+        first_item = next(
+            (i for i, b in enumerate(blocks) if "(item=1)" in b.label),
+            None,
+        )
+        assert first_item is not None, f"the loop reported no first item:\n{out}"
+        after = [b for b in blocks[first_item + 1 :] if b.status == PROGRESS_STATUS]
+        assert after, (
+            "the ticker went silent after the loop's first item, so the "
+            f"remaining iterations ran unannounced:\n{out}"
+        )
+
+    def test_per_host_is_the_default_shape(self, tmp_path):
+        """The DEFAULT, driven rather than read off the DOCUMENTATION.
+
+        `aggregated` was the default until #2575. The notice is the one line
+        that answers "what is this run waiting on?", and aggregated is the
+        only line in the log whose host column is `~` -- a count without names
+        gives no way to tell WHICH hosts are holding a task up, which is the
+        main reason to watch the notices.
+
+        No `ANSIBLE_TERRAPOD_PROGRESS_MODE` here, deliberately: the explicit
+        tests above and below would both pass on either default.
         """
         out = _run(
             tmp_path,
@@ -725,6 +888,36 @@ class TestStillRunningNotices:
             play=_SLOW_PLAY,
             tagged=True,
             extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
+        )
+        notices = _running(out)
+        assert notices, f"no still-running notice at all:\n{out}"
+        assert all(b.host is not None for b in notices), (
+            "a default-mode notice is host-less, so the default is still "
+            f"`aggregated`: {[(b.host, b.label) for b in notices]}"
+        )
+        assert {b.host for b in notices} <= {"web1", "web2"}, [b.host for b in notices]
+        starts = _starts(out)
+        assert starts and all(b.host is not None for b in starts), (
+            f"the START notice is not per host either: {[(b.host, b.label) for b in starts]}"
+        )
+
+    def test_aggregated_counts_the_hosts_and_is_host_less(self, tmp_path):
+        """One notice per TASK carrying the host count, for anyone who asks.
+
+        No longer the default (#2575), and still the right shape for an
+        operator who wants one line per task rather than one per slow host
+        -- so the mode is set EXPLICITLY here. It was not, which made this
+        a test of the default wearing the name of a test of the mode.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={
+                "ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1",
+                "ANSIBLE_TERRAPOD_PROGRESS_MODE": "aggregated",
+            },
         )
         notices = _running(out)
         assert notices, out
@@ -846,6 +1039,385 @@ class TestStillRunningNotices:
         assert "Failure using method" not in out, out
 
 
+class TestProgressContract:
+    """Two properties of the progress notices that no run can observe (#2575).
+
+    Structural rather than driven, deliberately: both are about agreement
+    between two places in the source, and a run exercises exactly one of each
+    pair. Neither needs ansible, so both gate on a workstation too.
+    """
+
+    @staticmethod
+    def _hooks() -> set[str]:
+        """Every method name `_tp_result` is handed, read from the plugin.
+
+        DERIVED rather than listed: a hand-kept copy is the thing that drifts,
+        and the point of this test is that a NEW hook cannot be added without
+        someone deciding whether it ends a task.
+        """
+        found = set(re.findall(r'_tp_result\(\s*result,\s*"(v2_[a-z_]+)"', _SRC))
+        assert len(found) >= 10, f"the matcher stopped matching: {sorted(found)}"
+        return found
+
+    @staticmethod
+    def _set(name: str) -> set[str]:
+        body = _SRC.split(f"{name} = frozenset(")[1].split(")")[0]
+        values = set(re.findall(r'"(v2_[a-z_]+)"', body))
+        assert values, f"{name} is empty or has been renamed"
+        return values
+
+    def test_every_result_hook_is_classified(self):
+        """A hook in neither set, or in both, is the defect this catches.
+
+        `_tp_result` clears the still-running entry only for a TERMINAL hook.
+        Get that wrong in one direction and the ticker announces a finished
+        task for the rest of the play (#2575's own defect); in the other and
+        it goes silent while the task is still working (the loop defect found
+        fixing it). Both are silent, so neither default is safe to inherit.
+        """
+        terminal = self._set("_TERMINAL_METHODS")
+        non_terminal = self._set("_NON_TERMINAL_METHODS")
+        assert not (terminal & non_terminal), terminal & non_terminal
+        hooks = self._hooks()
+        unclassified = hooks - terminal - non_terminal
+        assert not unclassified, (
+            f"{sorted(unclassified)} reach `_tp_result` and are in neither set. "
+            "Decide whether each means the task is OVER on that host and add it "
+            "to `_TERMINAL_METHODS` or `_NON_TERMINAL_METHODS`."
+        )
+        stale = (terminal | non_terminal) - hooks
+        assert not stale, f"{sorted(stale)} are classified but reach nothing"
+
+    def test_an_item_hook_is_never_terminal(self):
+        """The specific half, because the general gate above permits either.
+
+        An item hook carries its PARENT's task uuid, so its key is the
+        parent's: ending the task there ends it at the first iteration.
+        """
+        terminal = self._set("_TERMINAL_METHODS")
+        items = {h for h in self._hooks() if "_item_on_" in h}
+        assert items, "no item hooks found; the matcher has stopped matching"
+        assert not (items & terminal), sorted(items & terminal)
+
+    def test_the_declared_defaults_match_the_code_fallbacks(self):
+        """`get_option` can raise, and then the fallback IS the default.
+
+        Two places per option -- the DOCUMENTATION block ansible reads and the
+        `except` arm beside it -- so they can disagree, and an operator whose
+        lookup fails silently gets a cadence or a shape the plugin documents
+        nowhere. Pinned both ways round so neither can be changed alone.
+        """
+        seconds = re.search(r"terrapod_progress_seconds:.*?\n        default: (\d+)", _SRC, re.S)
+        mode = re.search(r"terrapod_progress_mode:.*?\n        default: (\w+)", _SRC, re.S)
+        assert seconds and mode, "the DOCUMENTATION defaults are no longer parseable"
+
+        seconds_fallback = re.search(
+            r'int\(self\.get_option\("terrapod_progress_seconds"\)\).*?return (\d+)',
+            _SRC,
+            re.S,
+        )
+        mode_fallback = re.search(
+            r'return mode if mode in \("aggregated", "per_host"\) else "(\w+)"', _SRC
+        )
+        assert seconds_fallback and mode_fallback, "the code fallbacks are no longer parseable"
+
+        assert seconds.group(1) == seconds_fallback.group(1), (
+            f"documented default {seconds.group(1)}s, code falls back to "
+            f"{seconds_fallback.group(1)}s"
+        )
+        assert mode.group(1) == mode_fallback.group(1), (
+            f"documented default {mode.group(1)}, code falls back to {mode_fallback.group(1)}"
+        )
+        # The values themselves, because agreeing on the wrong pair is also a
+        # way to pass: #2575 settled both, and a silent revert is the risk.
+        assert seconds.group(1) == "30", seconds.group(1)
+        assert mode.group(1) == "per_host", mode.group(1)
+
+
+_FQDN_INVENTORY = textwrap.dedent(
+    """
+    all:
+      hosts:
+        web-01.region-a.example-company.net: {ansible_connection: local}
+        db1: {ansible_connection: local}
+        another-very-long-host-name.example.net: {ansible_connection: local}
+    """
+).strip()
+
+_ALIGN_PLAY = textwrap.dedent(
+    """
+    - name: align
+      hosts: all
+      gather_facts: false
+      tasks:
+        - name: "first task"
+          ansible.builtin.debug:
+            msg: a body line
+        - name: "second task"
+          ansible.builtin.command: "sleep 1"
+          changed_when: false
+    """
+).strip()
+
+
+def _column_of(header: str, field: int) -> int:
+    """Where field `field` (0 = host, 1 = status) starts in a block header.
+
+    Measured on the rendered line rather than computed from the widths, which
+    is the whole point: `:<N` pads and never truncates, so a value wider than
+    its column silently pushes every later field right (#2574).
+    """
+    at = header.index("]") + 1
+    rest = header[at:]
+    for index in range(field + 1):
+        lead = len(rest) - len(rest.lstrip())
+        at += lead
+        rest = rest[lead:]
+        if index == field:
+            return at
+        token = rest.split(" ", 1)[0]
+        at += len(token)
+        rest = rest[len(token) :]
+    raise AssertionError(f"no field {field} in {header!r}")
+
+
+class TestColumnWidths:
+    """The two widths that are not measured from a play (#2574)."""
+
+    def test_the_indent_sits_under_the_host_column(self):
+        """A body line lines up under the HOST, for every block.
+
+        It used to line up only under a stamp carrying no date, because the
+        time column was too narrow for the dated form -- so the property the
+        constant's own comment claimed was true of some blocks and not others.
+        """
+        indent = re.search(r'^INDENT = "([^"]*)"', _SRC, re.M)
+        time_w = re.search(r"^_TIME_W = (\d+)", _SRC, re.M)
+        assert indent and time_w, "INDENT or _TIME_W is no longer parseable"
+        assert indent.group(1).strip() == "", "the indent must be whitespace"
+        assert len(indent.group(1)) == int(time_w.group(1)) + 2, (
+            f"INDENT is {len(indent.group(1))} wide against a {time_w.group(1)}-wide "
+            "time column plus its two-space separator, so a body line no longer "
+            "starts under the host"
+        )
+
+    def test_the_time_column_fits_the_dated_stamp(self):
+        """Both stamp forms pad to one width or nothing below lines up.
+
+        The dated form is the longer of the two and is what a `play`, `start`
+        or `included` line carries; at 16 it overflowed by five and pushed the
+        host, status and label right on every one of those lines.
+        """
+        time_w = int(re.search(r"^_TIME_W = (\d+)", _SRC, re.M).group(1))
+        assert len("[2026-01-01 12:00:00]") <= time_w, time_w
+        # ...and a duration stamp whose figure has grown. `format_duration`
+        # tops out at `999h59m` short of a thousand-hour run.
+        assert len("[12:00:00 +999h59m]") <= time_w, time_w
+
+    @pytest.mark.skipif(
+        importlib.util.find_spec("ansible") is None,
+        reason="needs ansible importable, not merely on PATH -- the test image has it",
+    )
+    def test_the_example_is_what_the_formatter_produces(self):
+        """The tie the example's own comment claims and did not have.
+
+        `EXAMPLE_BLOCK` is read out of this file by the viewer's TypeScript
+        parser and by the API, each proving its own parser accepts it. Nothing
+        tied it to the formatter, so a column width could move and leave all
+        three agreeing on a shape the plugin no longer emits -- which is what
+        a width change (#2574) does.
+        """
+        spec = importlib.util.spec_from_file_location("terrapod_stdout_under_test", _PLUGIN)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        produced = module.CallbackModule()._tp_header_line(
+            "[10:28:30 +2.9s]", "web1", "changed", "platform : Deploy"
+        )
+        assert produced == module.EXAMPLE_BLOCK, (
+            f"the example is {module.EXAMPLE_BLOCK!r} and the formatter produces {produced!r}"
+        )
+
+
+@needs_ansible
+class TestColumnAlignment:
+    """Every block header puts its fields in the same columns (#2574).
+
+    The widths are pad-to-at-least, so a value wider than its column pushes
+    every later field right on that line alone -- and with ordinary FQDN host
+    names almost no two consecutive lines lined up, which is what makes a log
+    hard to read down a column.
+    """
+
+    def test_every_header_puts_its_host_and_status_in_the_same_column(self, tmp_path):
+        """On the inventory from the report: two FQDNs and a short name.
+
+        Asserted across EVERY block, so it covers the three shapes that
+        differ: a dated `play` / `start` stamp, a result's duration stamp, and
+        the host-less `~` lines.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_FQDN_INVENTORY,
+            play=_ALIGN_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        blocks = _blocks(out)
+        assert len(blocks) > 5, f"too few blocks to be measuring anything:\n{out}"
+        hosts = {_column_of(b.header, 0) for b in blocks}
+        statuses = {_column_of(b.header, 1) for b in blocks}
+        assert len(hosts) == 1, (
+            "the host column moves between lines: "
+            f"{sorted(hosts)}\n" + "\n".join(b.header for b in blocks[:8])
+        )
+        assert len(statuses) == 1, (
+            "the status column moves between lines: "
+            f"{sorted(statuses)}\n" + "\n".join(b.header for b in blocks[:8])
+        )
+
+    def test_a_body_line_starts_under_the_host(self, tmp_path):
+        """The indent, driven rather than computed.
+
+        The MINIMUM is the property, not every line: the block's indent is a
+        prefix and the content carries its own, so ansible's pretty-printed
+        result sits four further in. What must hold is that nothing starts
+        left of the host column and something starts exactly on it.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_FQDN_INVENTORY,
+            play=_ALIGN_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        blocks = _blocks(out)
+        with_body = [b for b in blocks if b.body]
+        assert with_body, f"no block had a body:\n{out}"
+        host_at = _column_of(blocks[0].header, 0)
+        indents = [len(line) - len(line.lstrip()) for block in with_body for line in block.raw_body]
+        assert min(indents) == host_at, (
+            f"the shallowest body line starts at {min(indents)} against a host column at {host_at}"
+        )
+
+    def test_a_short_name_inventory_keeps_the_narrow_column(self, tmp_path):
+        """The floor. Sizing per play must not widen a run that does not need it.
+
+        Without this the obvious implementation -- measure the whole inventory
+        -- passes the alignment test above while making every short-name log
+        as wide as its longest name.
+        """
+        wide = _run(
+            tmp_path / "wide",
+            inventory=_FQDN_INVENTORY,
+            play=_ALIGN_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        narrow = _run(
+            tmp_path / "narrow",
+            inventory=_SLOW_INVENTORY,
+            play=_ALIGN_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        wide_at = _column_of(_blocks(wide)[0].header, 1)
+        narrow_at = _column_of(_blocks(narrow)[0].header, 1)
+        assert narrow_at < wide_at, (
+            f"a two-short-name play put its status at {narrow_at}, the same as an "
+            f"FQDN play at {wide_at} -- the column is not measured per play"
+        )
+
+    def test_a_pathological_name_is_capped(self, tmp_path):
+        """One absurd name must not push the label off every line in the log."""
+        cap = int(re.search(r"^_HOST_W_MAX = (\d+)", _SRC, re.M).group(1))
+        monster = "h" + "o" * (cap + 40) + ".example.net"
+        inventory = textwrap.dedent(
+            f"""
+            all:
+              hosts:
+                db1: {{ansible_connection: local}}
+                {monster}: {{ansible_connection: local}}
+            """
+        ).strip()
+        out = _run(
+            tmp_path,
+            inventory=inventory,
+            play=_ALIGN_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        short = [b for b in _blocks(out) if b.host == "db1"]
+        assert short, f"the short host produced no block:\n{out[:2000]}"
+        at = _column_of(short[0].header, 1)
+        assert at <= cap + 30, (
+            f"the status column is at {at} with a cap of {cap}; one long name has "
+            "widened every line in the log"
+        )
+
+    def test_a_later_play_never_narrows_the_column(self, tmp_path):
+        """Measured per play, and never lowered.
+
+        A second play over short names would otherwise shift every column
+        left half way down the log -- worse for reading down a column than a
+        width that is merely too small, because the reader's eye has already
+        settled on the first one.
+        """
+        play = textwrap.dedent(
+            """
+            - name: wide
+              hosts: all
+              gather_facts: false
+              tasks:
+                - name: "first task"
+                  ansible.builtin.ping:
+
+            - name: narrow
+              hosts: db1
+              gather_facts: false
+              tasks:
+                - name: "second task"
+                  ansible.builtin.ping:
+            """
+        ).strip()
+        out = _run(
+            tmp_path,
+            inventory=_FQDN_INVENTORY,
+            play=play,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        blocks = _blocks(out)
+        second = [b for b in blocks if "second task" in b.label]
+        assert second, f"the second play produced no block:\n{out}"
+        assert {_column_of(b.header, 1) for b in blocks} == {_column_of(blocks[0].header, 1)}, (
+            "the status column moved between plays:\n" + "\n".join(b.header for b in blocks)
+        )
+
+    def test_the_column_does_not_move_under_serial(self, tmp_path):
+        """`serial:` fires the play hook once per BATCH, not once per play.
+
+        So the obvious lookup returns only the batch's hosts and the column is
+        re-measured, and moves, on every batch -- on a `serial: 1` fleet that
+        is every few lines. Measured against ansible-core 2.21.6; the fix is
+        `ignore_restrictions=True`, and this is what catches its removal.
+        """
+        play = _ALIGN_PLAY.replace("gather_facts: false", "gather_facts: false\n  serial: 1")
+        out = _run(
+            tmp_path,
+            inventory=_FQDN_INVENTORY,
+            play=play,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        blocks = _blocks(out)
+        assert len(blocks) > 5, f"too few blocks:\n{out}"
+        statuses = {_column_of(b.header, 1) for b in blocks}
+        assert len(statuses) == 1, (
+            "the status column moves between serial batches: "
+            f"{sorted(statuses)}\n" + "\n".join(b.header for b in blocks[:10])
+        )
+
+
 @needs_ansible
 class TestTaskStartNotices:
     """A task is announced when it STARTS (#2532).
@@ -901,11 +1473,18 @@ class TestTaskStartNotices:
     def test_aggregated_announces_once_per_task_not_once_per_host(self, tmp_path):
         """The shape distinction, on a four-host inventory.
 
-        A per-host announcement would multiply by the fleet, which is exactly
-        what `terrapod_progress_mode` exists to avoid -- so this needs an
-        inventory with more than one host or it cannot tell the two apart.
+        Needs an inventory with more than one host or it cannot tell the two
+        shapes apart. The mode is set EXPLICITLY: it was not, so when
+        `per_host` became the default (#2575) this asserted the opposite of
+        what its name says.
         """
-        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
+        out = _run(
+            tmp_path,
+            inventory=_INVENTORY,
+            play=_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_MODE": "aggregated"},
+        )
         starts = _starts(out)
         assert starts, f"no announcements:\n{out}"
         assert all(b.host is None for b in starts), (
@@ -1121,10 +1700,17 @@ class TestDelegationAndHandlers:
         host stays in the column and the target goes on the label.
         """
         out = _run(tmp_path, inventory=_GAPS_INVENTORY, play=_GAPS_PLAY, tagged=True)
-        # Results only. The start notice carries the same label and cannot carry
-        # a delegation: it is emitted once per TASK, before any host has run it,
-        # and `delegate_to` is a property of the per-host result.
-        delegated = [b for b in _blocks(out) if b.host and "Start the instance" in b.label]
+        # Results only. The start notice carries the same label and deliberately
+        # no delegation: `delegate_to` may be templated per host and is resolved
+        # only in the result (`_ansible_delegated_vars`), so announcing it at
+        # start would print a template or nothing. It is excluded by STATUS
+        # rather than by having a host -- since #2575 the notice is per host in
+        # the default mode, so "has a host" no longer means "is a result".
+        delegated = [
+            b
+            for b in _blocks(out)
+            if b.host and "Start the instance" in b.label and b.status != START_STATUS
+        ]
         assert delegated, [(b.host, b.label) for b in _blocks(out)]
         for b in delegated:
             assert b.label.endswith("-> localhost"), b.label

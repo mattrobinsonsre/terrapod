@@ -173,8 +173,14 @@ DOCUMENTATION = """
           - Set to 0 to disable the notices. That silences the task-START
             notice as well, so one switch governs the whole progress
             experience rather than leaving a start line nobody can turn off.
+          - The default is 30 rather than something tighter because a notice
+            is only worth emitting for a task that is GENUINELY slow. Measured
+            on a real configure, 3 of 244 task results took 10s or more and
+            none took 30s; at 10s the notices were announcing routine tasks
+            seconds from finishing, which buries the one task that is actually
+            holding the run up.
         type: int
-        default: 10
+        default: 30
         ini:
           - key: terrapod_progress_seconds
             section: defaults
@@ -186,11 +192,20 @@ DOCUMENTATION = """
           - C(aggregated) emits one notice per task - one when it starts, then
             one per interval while it runs, counting the hosts still on it.
             C(per_host) emits one per host per task.
-          - C(aggregated) is the default because C(per_host) scales with the
-            inventory - on a large fleet it is a wall of text rather than a
-            progress signal.
+          - C(per_host) is the default because the notice is the one line
+            that answers "what is this run waiting on?", and in C(aggregated)
+            it is the only line in the log whose host column is C(~). A count
+            without names gives no way to tell WHICH hosts are the stragglers
+            holding a task up, which is the main reason to watch the notices
+            at all.
+          - C(per_host) does produce a line per slow host. That volume is
+            bounded by how many hosts are genuinely slow rather than by the
+            size of the inventory, because a notice only appears once a task
+            has passed C(terrapod_progress_seconds) on that host - and that
+            count is the figure worth seeing. C(aggregated) stays available
+            for anyone who prefers the single line.
         type: str
-        default: aggregated
+        default: per_host
         choices: [aggregated, per_host]
         ini:
           - key: terrapod_progress_mode
@@ -317,20 +332,50 @@ POLLING_STATUS = "polling"
 #: and cannot import it, so each reads this constant out of this file and
 #: proves its own parser accepts it. `test_the_example_is_what_the_formatter_
 #: produces` ties the literal back to the formatter, so the three cannot drift.
-EXAMPLE_BLOCK = "[10:28:30 +2.9s]  web1              changed  platform : Deploy"
+EXAMPLE_BLOCK = "[10:28:30 +2.9s]       web1              changed  platform : Deploy"
 
 #: Every body line carries this, and a block header never starts with a space.
 #: That is the whole discriminator -- no sentinel, nothing invisible, and a
 #: line a human would not read as belonging to the block above it cannot be
-#: attributed to it either. The width lines a body line up under the host
-#: column of a block whose stamp carries no date.
-INDENT = "                  "
+#: attributed to it either.
+#:
+#: `_TIME_W + 2`, so a body line starts under the HOST column. It used to line
+#: up only under a stamp carrying no date, because the time column was too
+#: narrow for the dated form; with one width for both (#2574) it lines up under
+#: every block. `test_the_indent_sits_under_the_host_column` pins the
+#: arithmetic -- the literal is spelled out rather than computed because both
+#: readers read it out of this file as a string.
+INDENT = "                       "
 
 #: Column widths, for readability alone. A longer value simply widens its own
 #: line; **nothing parses by column** -- the grammar is "bracketed time, then
-#: whitespace-separated fields".
-_TIME_W = 16
+#: whitespace-separated fields", and both readers split on whitespace.
+#:
+#: They are PAD-TO-AT-LEAST widths, so a value wider than its column pushes
+#: every later field right on that line alone. That is why these numbers have
+#: to cover the real values rather than the typical ones (#2574): at 16 the
+#: time column fitted `[12:00:00 +0.0s]` and nothing else -- not a duration
+#: that had reached two digits, and not the dated stamp a `play`, `start` or
+#: `included` line carries -- so almost no two consecutive lines lined up.
+#:
+#: 21 is the dated form, `[2026-01-01 12:00:00]`, which is the longest of the
+#: two. It leaves room for a 9-character duration (`[12:00:00 +` is 11, plus
+#: the closing bracket), where the longest `format_duration` produces short of
+#: a 1000-hour run is `999h59m` at 7.
+_TIME_W = 21
+
+#: The host column's FLOOR, not its width: `_tp_host_width` raises it per play
+#: to the longest name the play can reach, so an FQDN fleet lines up without a
+#: short-name run paying for the space. See that method for why it is measured
+#: there rather than fixed here.
 _HOST_W = 16
+
+#: And its ceiling. A DNS name may be 253 characters, which would push the
+#: label off the screen for every line in the log to spare one host; past this
+#: the long names overflow their column instead, which is what the rest of the
+#: grammar is built to tolerate. Well above a typical FQDN.
+_HOST_W_MAX = 48
+
 _STATUS_W = 7
 
 #: What must never appear raw in the host field. `%` is first, or escaping it
@@ -379,6 +424,48 @@ def format_duration(seconds: float) -> str:
     return f"{hours}h{minutes:02d}m"
 
 
+#: Which result hooks mean "this task is OVER on this host".
+#:
+#: `_tp_result` is shared by every result hook and tells them apart only by
+#: name, so this is the one place the distinction is written -- and it decides
+#: when the still-running ticker stops announcing a task. A hook that is not
+#: terminal must NOT clear the entry, or the task goes unannounced while it is
+#: still working; a hook that IS terminal must clear it, or the ticker goes on
+#: announcing a finished task for the rest of the play (#2575).
+#:
+#: Measured against ansible-core 2.21.6, which is why the non-terminal set is
+#: not just the loop items: `v2_runner_retry` fires once per failed attempt
+#: and is FOLLOWED by `v2_runner_on_failed`; `v2_on_file_diff` fires BEFORE
+#: the result it belongs to; an item hook carries its PARENT's task uuid, so
+#: its key is the parent's and popping it ends the task at the first iteration
+#: -- a three-item loop of four-second commands announced four seconds of work
+#: and then nothing for the remaining eight.
+#:
+#: `test_every_result_hook_is_classified` fails on a hook in neither set or in
+#: both, so a new one cannot quietly inherit whichever default happens to be
+#: wrong for it.
+_TERMINAL_METHODS = frozenset(
+    {
+        "v2_runner_on_ok",
+        "v2_runner_on_failed",
+        "v2_runner_on_skipped",
+        "v2_runner_on_unreachable",
+        "v2_runner_on_async_ok",
+        "v2_runner_on_async_failed",
+    }
+)
+_NON_TERMINAL_METHODS = frozenset(
+    {
+        "v2_runner_item_on_ok",
+        "v2_runner_item_on_failed",
+        "v2_runner_item_on_skipped",
+        "v2_runner_on_async_poll",
+        "v2_runner_retry",
+        "v2_on_file_diff",
+    }
+)
+
+
 class CallbackModule(DefaultCallback):
     """One block per task per host. Never raises into ansible."""
 
@@ -406,6 +493,10 @@ class CallbackModule(DefaultCallback):
         self._tp_tick_stop = threading.Event()
         self._tp_inner_display = None
         self._tp_inner_banner = None
+        #: The host column's current width. Raised per play by
+        #: `_tp_host_width` and NEVER lowered, so a column cannot move left
+        #: part way down a log.
+        self._tp_host_w = _HOST_W
 
     # -- the interception -------------------------------------------------
     #
@@ -511,7 +602,7 @@ class CallbackModule(DefaultCallback):
         return f"[{time.strftime('%H:%M:%S', now)} +{format_duration(elapsed)}]"
 
     def _tp_header_line(self, stamp: str, host: str, status: str, label: str) -> str:
-        head = f"{stamp:<{_TIME_W}}  {host:<{_HOST_W}}  {status:<{_STATUS_W}}  {label}"
+        head = f"{stamp:<{_TIME_W}}  {host:<{self._tp_host_w}}  {status:<{_STATUS_W}}  {label}"
         return head.rstrip()
 
     def _tp_block(self, *, host, status, label, body, color, stamp) -> None:
@@ -549,16 +640,21 @@ class CallbackModule(DefaultCallback):
         try:
             return max(0, int(self.get_option("terrapod_progress_seconds")))
         except Exception:  # noqa: BLE001
-            return 10
+            # Must equal the DOCUMENTATION default above, or an operator whose
+            # option lookup fails silently gets a different cadence from the
+            # one the plugin documents. Gated by a test that parses both.
+            return 30
 
     def _tp_announce(self, label: str, host=None) -> None:
         """Say that a task has begun, in the same vocabulary as the ticker.
 
         Deliberately NOT ansible's own `show_per_host_start`, which was the
-        obvious lever and is the wrong one: it is per host, so a fifty-host
-        play gives fifty start lines, which is the opposite of the one-line
-        signal the issue asks for -- and it carries ansible's own
+        obvious lever and is the wrong one on two counts that survive the
+        default having moved to `per_host`: it is ALWAYS per host, so it
+        cannot serve `aggregated` at all, and it carries ansible's own
         `[started TASK: x on web1]` body, duplicating the label beside it.
+        This emits in whichever shape the mode asks for, in this log's own
+        vocabulary.
 
         Carries no elapsed time and no host count. The count is what the ticker
         reports because "how many are still on it" is the useful figure there;
@@ -596,7 +692,9 @@ class CallbackModule(DefaultCallback):
             mode = str(self.get_option("terrapod_progress_mode") or "")
         except Exception:  # noqa: BLE001
             mode = ""
-        return mode if mode in ("aggregated", "per_host") else "aggregated"
+        # The fallback must equal the DOCUMENTATION default above, for the
+        # reason `_tp_tick_seconds` gives. Gated by the same test.
+        return mode if mode in ("aggregated", "per_host") else "per_host"
 
     def _tp_tick_start(self) -> None:
         """Start the ticker once, on the first task to begin.
@@ -791,14 +889,35 @@ class CallbackModule(DefaultCallback):
             getattr(super(), method)(result, *args, **kwargs)
         finally:
             self._tp_frames.pop()
+        host = self._tp_field(result, "host")
+        name = host.get_name() if host is not None else None
+        # POPPED BEFORE the early return below, because a result we decline to
+        # PRINT is still a result (#2575). Leaving the entry behind leaves the
+        # ticker announcing a finished task as still running for the rest of
+        # the play, with an ever-growing elapsed figure.
+        #
+        # Reported as an include-only defect, and it is not: `v2_runner_on_ok`
+        # fires for every include shape measured against ansible-core 2.21.6
+        # (bare, looped, `include_role`, and one that fails to load). The frame
+        # is empty because `default` declines to speak for a `TaskInclude` --
+        # so the leak belongs to the EMPTY FRAME and not to includes, and the
+        # same empty frame arrives with `display_ok_hosts: false`, where what
+        # leaks is every ok task rather than every include.
+        task = self._tp_field(result, "task")
+        key = (getattr(task, "_uuid", None), name)
+        if method in _TERMINAL_METHODS:
+            started = self._tp_started.pop(key, self._tp_task_at)
+        else:
+            # Read without clearing: the task is still going, so the ticker
+            # must keep announcing it. See `_TERMINAL_METHODS`.
+            started = self._tp_started.get(key, self._tp_task_at)
+
         # An empty frame is `default` declining to speak -- `display_ok_hosts:
         # false`, a `TaskInclude`, a loop whose items reported themselves. It
         # decides whether there is anything to say; we decide how it looks.
         if not frame:
             return None
 
-        host = self._tp_field(result, "host")
-        name = host.get_name() if host is not None else None
         item = self._tp_item_of(result)
         label = self._tp_label_of(result)
         if item:
@@ -812,9 +931,6 @@ class CallbackModule(DefaultCallback):
             if trimmed:
                 body.append(trimmed)
 
-        task = self._tp_field(result, "task")
-        key = (getattr(task, "_uuid", None), name)
-        started = self._tp_started.pop(key, self._tp_task_at)
         self._tp_block(
             host=name,
             status=status,
@@ -1014,7 +1130,41 @@ class CallbackModule(DefaultCallback):
 
     def v2_playbook_on_play_start(self, play):
         self._tp_emit_header()
+        self._tp_widen_host_column(play)
         return super().v2_playbook_on_play_start(play)
+
+    def _tp_widen_host_column(self, play) -> None:
+        """Size the host column to the longest name THIS play can reach (#2574).
+
+        Measured here rather than fixed, because the right width is a property
+        of the inventory: 16 suits `web1` and `db1` and pushes every later
+        field right on a fleet of FQDNs, where the issue was reported.
+
+        Three things about the lookup, each of which the obvious version gets
+        wrong (measured against ansible-core 2.21.6):
+
+        * `ignore_restrictions=True` is what makes the width STABLE. This hook
+          fires once per `serial:` BATCH, not once per play, and without it the
+          lookup returns only the batch -- so a `serial: 1` run over a fleet
+          sized the column from one host at a time and the columns moved on
+          every batch. With it, every batch sees the whole play.
+        * `ignore_limits` stays FALSE, so `--limit` still narrows it. A
+          configure bounded to a canary group should not pay for the width of
+          the estate it did not touch.
+        * The width is of the ESCAPED name, which is what the column actually
+          carries.
+
+        Never lowered, so a second play with shorter names cannot shift the
+        columns left half way down a log -- the one thing worse for reading
+        down a column than a width that is too small.
+        """
+        try:
+            inventory = play.get_variable_manager()._inventory
+            hosts = inventory.get_hosts(play.hosts, ignore_restrictions=True)
+            longest = max((len(escape_host(h.name)) for h in hosts), default=0)
+        except Exception:  # noqa: BLE001 - a callback that raises turns every
+            return  # task into a `[WARNING]: Failure using method` line
+        self._tp_host_w = max(self._tp_host_w, min(longest, _HOST_W_MAX))
 
     # -- what `default` prints and we used not to frame (#2565) ------------
     #
