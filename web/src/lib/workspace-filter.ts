@@ -272,6 +272,20 @@ export function toggleLabelTerm(parsed: ParsedFilter, key: string, value: string
   return { terms: [...parsed.terms, { kind: 'label', key, value }] }
 }
 
+/** How many DISTINCT values of `kind` the filter holds that `offered` lists:
+ *  what a dropdown ticks, so its badge never counts a term with no row. */
+export function countOfferedTerms(
+  parsed: ParsedFilter,
+  kind: 'status' | 'flag',
+  offered: readonly string[],
+): number {
+  const seen = new Set<string>()
+  for (const t of parsed.terms) {
+    if (t.kind === kind && offered.includes(t.value)) seen.add(t.value)
+  }
+  return seen.size
+}
+
 export interface MatchableWorkspace {
   attributes: {
     name: string

@@ -558,8 +558,8 @@ test.describe("Workspaces", () => {
   test("the dropdowns union their own selections and typed terms intersect", async ({
     page,
   }) => {
-    // Three workspaces in one name scope: two with a different condition each
-    // (no_agent_pool via agent mode with no pool), one with none.
+    // Two workspaces in one name scope: one with a condition (no_agent_pool,
+    // via agent mode with no pool), one with none.
     const prefix = uniqueName("e2e-or");
     const token = getStoredToken();
     const noPool = `${prefix}-nopool`;
@@ -601,6 +601,8 @@ test.describe("Workspaces", () => {
     await page.getByRole("menuitemcheckbox", { name: /VCS error/ }).click();
     await expect(filter).toHaveValue(/flag:drifted/);
     await expect(filter).toHaveValue(/flag:vcs-error/);
+    await expect(page.getByTestId("ws-flags-count")).toHaveText("2");
+    await expect(page.getByTestId("ws-status-count")).toHaveCount(0);
   });
 
   test("selecting workspaces offers bulk actions, and Plan runs on each one", async ({ page }) => {
