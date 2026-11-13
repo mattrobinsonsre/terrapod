@@ -765,6 +765,7 @@ api:
 | `terrapod_blob_copy_bytes_total{blob_class}` | Bytes copied, per class — "40 GB" and "40 GB of provider cache while state fell behind" are different situations |
 | `terrapod_blob_copy_failures_total{blob_class}` | Objects that could not be copied. A few are expected (deleted between listing and fetch); a rising count is not |
 | `terrapod_blob_copy_classes_stopped_early` | **Classes whose last cycle did not finish.** Non-zero means the copy is behind, however many bytes moved |
+| `terrapod_blob_copy_deferred_total{blob_class}` | Objects not copied because this node cannot yet place them in their workspace's [storage location](#storage-locations-on-a-follower). A count that keeps rising means a workspace's objects are not reaching this node |
 
 That last one is the point of the section. A cycle that stops at its budget has
 copied a great deal *and* is not finished, and only one of those shows up in a
@@ -775,6 +776,39 @@ phase exists to remove.
 The copier is registered as a scheduled task **only** when at least one class is
 set to `copy` and a peer URL is configured. On a default install it does not
 exist.
+
+### Storage locations on a follower
+
+Each workspace's objects live in its own [storage location](deployment.md#storage-locations).
+**Both nodes must configure the same locations under `api.config.storage.locations`**,
+with the same names. A copied object lands in the store its workspace's row names, so a
+follower missing a location would otherwise put that location's objects in its
+`default` bucket. These guards stop this:
+
+- The leader names its locations on every blob listing. A follower that lacks any of
+  them copies none of the workspace classes (state, configuration versions, plans,
+  logs, run artifacts) for that cycle. It counts the objects in
+  `terrapod_blob_copy_deferred_total` and logs one warning naming the classes.
+- A follower with no locations configured also refuses those classes while any
+  replicated workspace row names a location.
+- An object whose workspace row has not replicated yet is deferred, then copied on a
+  later cycle once the row arrives.
+
+Both nodes also refuse to start while any workspace names a location they do not
+configure. To fix it, add the location, then restart.
+
+A follower never asks the leader where a workspace lives. It reads the
+`storage_location` of its own replicated copy of the workspace row, and that value
+cannot change once the workspace exists. Each node also probes its own named
+locations at start-up, and again in the background every 30 seconds or so (`/ready`
+reports the last result and never waits for a probe). A location
+that does not answer is logged as an error and shown in that node's `/ready` as
+`storage_locations: unreachable: <names>`. That is detail only, so the node stays ready.
+The leader's readiness is not affected.
+
+A workspace deleted on the leader before the follower received its row is never copied.
+After a promotion it is listed as deleted, but it restores with no state on the
+promoted node.
 
 ## Performing a failover
 
