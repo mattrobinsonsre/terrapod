@@ -159,10 +159,16 @@ describe('the action list', () => {
     )
   })
 
-  it('marks only apply and discard as needing a confirmation', () => {
+  it('puts Apply, Discard and Retry in the irreversible tier, Plan and Cancel in the touch tier', () => {
     assert.deepEqual(
-      BULK_ACTIONS.filter((a) => a.confirm).map((a) => a.id),
-      ['apply', 'discard'],
+      BULK_ACTIONS.map((a) => [a.id, a.confirm]),
+      [
+        ['plan', 'touch'],
+        ['retry', 'irreversible'],
+        ['cancel', 'touch'],
+        ['apply', 'irreversible'],
+        ['discard', 'irreversible'],
+      ],
     )
   })
 })

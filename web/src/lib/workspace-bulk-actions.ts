@@ -24,16 +24,16 @@ export interface BulkWorkspace {
 
 export interface BulkAction {
   id: BulkActionId
-  /** True for the irreversible tier: prompts in BOTH pointer modes. */
-  confirm: boolean
+  /** `irreversible` prompts in both pointer modes; `touch` only on a coarse pointer. */
+  confirm: 'irreversible' | 'touch'
 }
 
 export const BULK_ACTIONS: readonly BulkAction[] = [
-  { id: 'plan', confirm: false },
-  { id: 'retry', confirm: false },
-  { id: 'cancel', confirm: false },
-  { id: 'apply', confirm: true },
-  { id: 'discard', confirm: true },
+  { id: 'plan', confirm: 'touch' },
+  { id: 'retry', confirm: 'irreversible' },
+  { id: 'cancel', confirm: 'touch' },
+  { id: 'apply', confirm: 'irreversible' },
+  { id: 'discard', confirm: 'irreversible' },
 ]
 
 function qualifies(action: BulkActionId, w: BulkWorkspace): boolean {

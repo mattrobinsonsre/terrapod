@@ -979,7 +979,7 @@ function WorkspacesPageInner() {
   // Selection is by workspace id and survives a filter or sort change, but a
   // workspace that leaves the visible list is dropped, so an action can never
   // run on something the user can no longer see.
-  const { confirmIrreversible } = useConfirm()
+  const { confirmIrreversible, confirmTouchMutation } = useConfirm()
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkRunning, setBulkRunning] = useState<{ action: BulkActionId; count: number } | null>(null)
@@ -1038,16 +1038,17 @@ function WorkspacesPageInner() {
   const runBulk = useCallback(
     async (action: BulkActionId) => {
       const meta = BULK_ACTIONS.find((a) => a.id === action)
-      // Apply and Discard are the irreversible tier, so they prompt in BOTH
-      // pointer modes, with the count and the first few names.
-      if (meta?.confirm) {
+      // Apply, Discard and Retry prompt in both pointer modes; Plan and Cancel on touch only.
+      if (meta) {
         const lines = confirmLines(selectedBulk.map((w) => w.name))
-        const text = t(action === 'apply' ? 'bulk.confirmApply' : 'bulk.confirmDiscard', {
+        const key = `bulk.confirm${action[0].toUpperCase()}${action.slice(1)}` as const
+        const text = t(key, {
           count: lines.count,
           names: lines.names.join('\n'),
           more: lines.more > 0 ? t('bulk.andMore', { count: lines.more }) : '',
         })
-        if (!confirmIrreversible(text)) return
+        const approved = meta.confirm === 'irreversible' ? confirmIrreversible : confirmTouchMutation
+        if (!approved(text)) return
       }
       setBulkBusy(true)
       setBulkRunning({ action, count: selectedBulk.length })
@@ -1066,7 +1067,7 @@ function WorkspacesPageInner() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadWorkspaces is a hoisted function
-    [selectedBulk, confirmIrreversible, t],
+    [selectedBulk, confirmIrreversible, confirmTouchMutation, t],
   )
 
   const selectionItems = useMemo<SelectionMenuItem[]>(

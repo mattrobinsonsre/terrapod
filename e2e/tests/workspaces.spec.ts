@@ -1,6 +1,31 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Route } from "@playwright/test";
 import { getStoredToken, createWorkspace, lockWorkspace, seedRun, uniqueName } from "../helpers/api";
 import { listOnly, stubLatestRun, NO_ACTIONS } from "../helpers/workspace-list";
+
+// Every action offered on one stubbed run; returns the URLs the bulk actions would POST to.
+async function stubBulkRuns(page: Page, ids: string[]) {
+  const posts: string[] = [];
+  await stubLatestRun(page, ids, (i) => ({
+    id: `run-stub-${i}`,
+    status: "errored",
+    actions: { "is-confirmable": true, "is-discardable": true, "is-cancelable": true, "is-retryable": true },
+  }));
+  const record = async (route: Route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    posts.push(route.request().url());
+    await route.fulfill({ status: 200, contentType: "application/vnd.api+json", body: "{}" });
+  };
+  await page.route("**/api/v1/runs", record);
+  await page.route("**/api/v1/runs/*/actions/*", record);
+  return posts;
+}
+
+// A completed action clears the selection, so tick the row again first.
+async function runFromMenu(page: Page, action: string) {
+  await page.getByTestId("ws-row-select").check();
+  await page.getByTestId("ws-selection").click();
+  await page.getByTestId(`ws-selection-${action}`).click();
+}
 
 test.describe("Workspaces", () => {
   test("workspace list page loads", async ({ page }) => {
@@ -676,10 +701,16 @@ test.describe("Workspaces", () => {
     await expect(apply).toContainText("0 of 2");
     await expect(apply).toHaveAttribute("aria-disabled", "true");
 
-    // Plan qualifies for both, and runs on each.
+    // Plan qualifies for both, and runs on each, with no confirm on a precise pointer.
     await expect(page.getByTestId("ws-selection-plan")).toContainText("2 of 2");
+    let dialogs = 0;
+    page.on("dialog", (d) => {
+      dialogs += 1;
+      void d.dismiss();
+    });
     await page.getByTestId("ws-selection-plan").click();
     await expect(page.getByTestId("ws-bulk-result")).toContainText("Plan: 2 of 2", { timeout: 15_000 });
+    expect(dialogs, "Plan must not prompt on a precise pointer").toBe(0);
   });
   test("a refusal from the server is reported per workspace, not hidden", async ({ page }) => {
     // A workspace with no uploaded configuration refuses a plan. The batch must
@@ -951,6 +982,67 @@ test.describe("Workspaces", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("ws-selection-menu")).toHaveCount(0);
     await expect(page.getByTestId("ws-selection")).toBeFocused();
+  });
+
+  test("on a precise pointer Plan and Cancel open no dialog, and Retry does", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-tiers");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    const posts = await stubBulkRuns(page, [id]);
+
+    await listOnly(page, prefix, 1);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(false);
+
+    const dialogs: string[] = [];
+    page.on("dialog", (d) => {
+      dialogs.push(d.message());
+      void d.dismiss();
+    });
+
+    await runFromMenu(page, "plan");
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Plan: 1 of 1", { timeout: 15_000 });
+    await runFromMenu(page, "cancel");
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Cancel run: 1 of 1", { timeout: 15_000 });
+    expect(posts).toHaveLength(2);
+    expect(dialogs, "Plan and Cancel must not prompt on a precise pointer").toEqual([]);
+
+    // Retry applies infrastructure on an auto-apply workspace, so it always asks.
+    await runFromMenu(page, "retry");
+    await expect.poll(() => dialogs.length).toBe(1);
+    expect(posts.some((u) => u.endsWith("/actions/retry"))).toBe(false);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+});
+
+test.describe("Workspaces: bulk confirmations at tablet width with a touch pointer", () => {
+  test.use({ viewport: { width: 1024, height: 768 }, hasTouch: true, isMobile: true });
+
+  test("Plan, Retry and Cancel each ask first, and send nothing when declined", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-touch");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    const posts = await stubBulkRuns(page, [id]);
+
+    await listOnly(page, prefix, 1);
+    // A pointer that is not coarse would let these pass without a dialog.
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+
+    for (const action of ["plan", "retry", "cancel"]) {
+      const seen: string[] = [];
+      page.once("dialog", (d) => {
+        seen.push(d.message());
+        void d.dismiss();
+      });
+      await runFromMenu(page, action);
+      await expect.poll(() => seen.length, { message: action }).toBe(1);
+      expect(seen[0]).toContain("(1)");
+      expect(seen[0]).toContain(`${prefix}-a`);
+    }
+    expect(posts, "declining each confirm must send nothing").toEqual([]);
+
+    page.once("dialog", (d) => void d.accept());
+    await runFromMenu(page, "plan");
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Plan: 1 of 1", { timeout: 15_000 });
+    expect(posts).toHaveLength(1);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 });
 

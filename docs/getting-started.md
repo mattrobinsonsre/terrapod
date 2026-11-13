@@ -205,17 +205,19 @@ a plan waiting".
 Once something is selected, a **Selection** menu appears next to **New Workspace**.
 It has no default action; choosing an item runs it:
 
-| Action | Applies to |
-|---|---|
-| **Plan** | a workspace with plan/apply enabled; queues a plan-only run |
-| **Retry run** | the server says the latest run can be retried; a configure run needs configure enabled and an unlocked workspace, a combined apply-and-configure run needs both enabled and an unlocked workspace, any other needs plan/apply enabled |
-| **Cancel run** | the server says the latest run can be cancelled |
-| **Apply** | the server says the latest run can be confirmed; not on a locked workspace |
-| **Discard** | the server says the latest run can be discarded, including a run held after its plan |
+| Action | Applies to | Asks first |
+|---|---|---|
+| **Plan** | a workspace with plan/apply enabled; queues a plan-only run | on a touch screen |
+| **Retry run** | the server says the latest run can be retried; a configure run needs configure enabled and an unlocked workspace, a combined apply-and-configure run needs both enabled and an unlocked workspace, any other needs plan/apply enabled | always |
+| **Cancel run** | the server says the latest run can be cancelled | on a touch screen |
+| **Apply** | the server says the latest run can be confirmed; not on a locked workspace | always |
+| **Discard** | the server says the latest run can be discarded, including a run held after its plan | always |
 
 Each item shows `N of M eligible`, and is enabled only when every selected
-workspace qualifies. **Apply** and **Discard** ask for confirmation first, showing
-the count and the first few names.
+workspace qualifies. Each asks for confirmation first, showing the count and the
+first few names: **Apply**, **Discard** and **Retry run** on every pointer (a retry
+can apply a run on an auto-apply workspace), **Plan** and **Cancel run** only on a
+touch screen.
 
 Each action is one request per workspace to the existing run endpoints, so the
 permissions are the usual per-workspace ones. A workspace the server refuses is
