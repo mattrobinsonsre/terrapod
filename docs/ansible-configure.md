@@ -935,14 +935,14 @@ The stored log carries a header, and then one **block per task per host**:
 #terrapod-host-log v2
 [2026-11-11 10:28:27]  ~                 play     PLAY [configure]
 [10:28:30 +2.9s]       web1.example.com  changed  platform : Deploy the app
-[10:28:40 +10.0s]      ~                 running  platform : Wait for the service  (2 hosts)
+[10:28:40 +10.0s]      web2.example.com  running  platform : Wait for the service
 [10:31:42 +3m12s]      web1.example.com  ok       platform : Wait for the service
 [10:31:42 +0.0s]       web2.example.com  FAILED   platform : Check the endpoint
-                  [ERROR]: Task failed: Module failed: ...
-                  {"msg": "connection refused", "rc": 7, "stderr": "..."}
-                  ...ignoring
+                       [ERROR]: Task failed: Module failed: ...
+                       {"msg": "connection refused", "rc": 7, "stderr": "..."}
+                       ...ignoring
 [2026-11-11 10:31:45]  ~                 recap    PLAY RECAP
-                  web1.example.com : ok=2 changed=1 unreachable=0 failed=0
+                       web1.example.com : ok=2 changed=1 unreachable=0 failed=0
 ```
 
 A **block header** is a bracketed time, then the host, the result and the task
@@ -952,6 +952,17 @@ and `stderr`, any `[ERROR]` block with its `Origin:`, and the `...ignoring`
 after an ignored failure. The whole block is coloured by its result, using
 ansible's own `COLOR_OK`, `COLOR_CHANGED`, `COLOR_ERROR`, `COLOR_UNREACHABLE`
 and `COLOR_SKIP`.
+
+**The columns line up, but nothing parses by them.** The grammar is a bracketed
+time and then whitespace-separated fields, so a reader splits on whitespace and
+a value wider than its column simply widens that line. The widths exist for
+reading down a column: the time column fits both stamp forms (the dated one on
+`play`, `start` and `included` lines, and the time-plus-duration on results and
+`running` lines), and **the host column is sized per play to the longest name
+the play can reach** — so an FQDN fleet lines up without a short-name run
+paying for the width. It is bounded above, so one pathological name overflows
+its own column rather than pushing the task off every line, and it is never
+narrowed by a later play.
 
 A loop reports **one block per item**, with the item in the block's label
 (`platform : Install (item=nginx)`).
@@ -973,27 +984,40 @@ in its result block — the same three signals terraform gives a resource with
 `Creating... / Still creating... / Creation complete`:
 
 ```
-[2026-11-13 10:28:30]  ~  start    platform : Wait for the service
-[10:28:40 +10.0s]      ~  running  platform : Wait for the service  (2 hosts)
-[10:28:52 +22.4s]      web1  ok    platform : Wait for the service
+[2026-11-13 10:28:30]  web1.example.com  start    platform : Wait for the service
+[10:28:40 +10.0s]      web1.example.com  running  platform : Wait for the service
+[10:28:52 +22.4s]      web1.example.com  ok       platform : Wait for the service
 ```
 
-One notice per **task**, and the still-running one counts the hosts still on it.
-That shape is deliberate: one per host would scale with the inventory, so on a
-large fleet it is a wall of text rather than a progress signal.
+**One notice per host**, which is what makes the line say *which* host a run is
+waiting on. That is the one question the notices exist to answer, and on a
+fleet a count without names cannot: it tells you two hosts are slow and not
+which two.
 
-The `start` notice carries no elapsed time and no host count. The count is
-useful on a still-running notice because it says how many hosts are *still* on
-the task; at the moment one starts nobody has finished, so a count there would
-only repeat the size of the play.
+A notice only appears once a task has been running for
+`terrapod_progress_seconds` **on that host**, so the volume is bounded by how
+many hosts are genuinely slow rather than by the size of the inventory — and
+that count is itself worth seeing.
+
+If you would rather have the single line, set `terrapod_progress_mode` to
+`aggregated` below. It emits one notice per task, host-less, counting the
+hosts still on it:
+
+```
+[10:28:40 +10.0s]      ~                 running  platform : Wait for the service  (2 hosts)
+```
+
+The `start` notice carries no elapsed time and no host count either way. At the
+moment a task starts nobody has finished, so a count there would only repeat
+the size of the play, which the `PLAY` banner has already given you.
 
 Two options tune it, and both are read from **your own `ansible.cfg`** — Terrapod
 never replaces that file:
 
 ```ini
 [defaults]
-terrapod_progress_seconds = 10      ; 0 disables every notice, start included
-terrapod_progress_mode = aggregated ; or per_host
+terrapod_progress_seconds = 30     ; 0 disables every notice, start included
+terrapod_progress_mode = per_host  ; or aggregated
 ```
 
 `terrapod_progress_seconds = 0` silences the whole set, the `start` notice as

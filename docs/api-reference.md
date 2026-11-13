@@ -1970,10 +1970,10 @@ so a viewer can show one host's output alone:
 [2026-11-11 10:28:27]  ~                 play     PLAY [configure]
 [10:28:30 +2.9s]       web1.example.com  changed  platform : Deploy the app
 [10:31:42 +0.0s]       web2.example.com  FAILED   platform : Check the endpoint
-                  [ERROR]: Task failed: Module failed: ...
-                  {"msg": "connection refused", "rc": 7}
+                       [ERROR]: Task failed: Module failed: ...
+                       {"msg": "connection refused", "rc": 7}
 [2026-11-11 10:31:45]  ~                 recap    PLAY RECAP
-                  web1.example.com : ok=2 changed=1 unreachable=0 failed=0
+                       web1.example.com : ok=2 changed=1 unreachable=0 failed=0
 ```
 
 A block header is a bracketed time (and, for a result, the duration the callback measured
@@ -1982,6 +1982,11 @@ line below it belongs to that block and that host — the module's `msg`, `stdou
 any `[ERROR]` block with its `Origin:`, and a trailing `...ignoring`. A loop reports one
 block per item, with the item in the label. The whole block is coloured by its result using
 ansible's own `COLOR_*` values.
+
+**Split on whitespace; never parse by column.** The fields are padded for reading down a
+column — the time column fits both stamp forms, and the host column is sized per play to
+the longest name that play can reach — but padding is pad-to-at-least, so a value wider
+than its column widens that line rather than being truncated.
 
 `~` marks a block belonging to no single host — the `PLAY` banner, the `PLAY RECAP`. A host
 name containing whitespace, `|`, `~` or `%` is percent-escaped in its field, so the host is
