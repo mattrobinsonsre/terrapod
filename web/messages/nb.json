@@ -1337,7 +1337,8 @@
       "operationsNone": "Dette ville etterlate hvert samsvarende arbeidsområde helt uten operasjon. Et arbeidsområde må beholde planlegg og anvend, eller konfigurer, eller begge.",
       "setHardLimit": "Sett hard grense (en tom verdi fjerner taket)",
       "setPlaybooks": "Sett tillatte playbooks (erstatter listen på hvert samsvarende arbeidsområde; en tom liste fjerner begrensningen)",
-      "playbooksPairWarning": "En ikke-tom liste må inneholde hvert samsvarende arbeidsområdes egen standard-playbook, så sett den i samme oppdatering hvis den ikke allerede er en av disse."
+      "playbooksPairWarning": "En ikke-tom liste må inneholde hvert samsvarende arbeidsområdes egen standard-playbook, så sett den i samme oppdatering hvis den ikke allerede er en av disse.",
+      "setScheduledConfigureCron": "Angi konfigurasjonens tidsplan (en tom verdi fjerner den)"
     },
     "diff": {
       "colWorkspace": "Arbeidsområde",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Hver oppføring er en sti relativt til konfigurasjonsmappen, og kjøringsalternativet blir en velger over dem i stedet for et tekstfelt. Standard-playbooken må være en av oppføringene, fordi et bart Konfigurer kjører standarden. Bruk det til å holde en playbook borte fra et arbeidsområde den aldri skal berøre — en nodedrenering, en databaseoppgradering — der en liste er en kontroll snarere enn en konvensjon.",
       "playbooksPlaceholder": "f.eks. release.yml",
       "playbooksAdd": "Legg til playbook",
-      "playbooksAny": "Alle"
+      "playbooksAny": "Alle",
+      "scheduledConfigureEnabled": "Konfigurer etter tidsplan",
+      "scheduledConfigureEnabledHint": "Playbooken kjøres på et fast tidspunkt uansett om noe har endret seg, og det er slik en flåte holdes konvergert i stedet for å bli rettet først etter en push.",
+      "scheduledConfigureCron": "Tidsplan",
+      "scheduledConfigureCronLead": "Når konfigurasjonen kjøres, som et cron-uttrykk med fem felt. Det leses bare mens Konfigurer etter tidsplan er på, og å la det stå tomt betyr ingen tidsplan.",
+      "scheduledConfigureCronTitle": "De fem feltene er minutt, time, dag i måneden, måned og ukedag, lest i tidssonen nedenfor: 0 2 * * 2 er 02:00 hver tirsdag, og 0 2 * * * er 02:00 hver dag. Et uttrykk med seks felt avvises, fordi en tidsplan med sekundoppløsning ikke kan overholdes, og det samme gjelder alt som utløses oftere enn hvert femte minutt — en konfigurasjon kan kjøre i en time og kan ikke startes trygt på nytt.",
+      "scheduledConfigureCronPlaceholder": "f.eks. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Tidsplanens tidssone",
+      "scheduledConfigureTimezoneHint": "IANA-sonen tidsplanen leses i, slik at timen følger sommertid — for eksempel UTC, Europe/London eller America/New_York. Tomt betyr UTC.",
+      "scheduledConfigureTimezonePlaceholder": "f.eks. Europe/London",
+      "scheduledConfigureLastAt": "Siste planlagte kjøring"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

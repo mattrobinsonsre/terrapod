@@ -1337,7 +1337,8 @@
       "operationsNone": "With no operation at all, every matched workspace this would leave. Plan and apply, or configure, or both, a workspace must keep.",
       "setHardLimit": "hard limit, Set (the ceiling, an empty value removes)",
       "setPlaybooks": "allowed playbooks, Set (on every matched workspace, the list replaces; the restriction, an empty list removes)",
-      "playbooksPairWarning": "Each matched workspace's own default playbook, a non-empty list has to contain, so in the same update set that, if already one of these it is not."
+      "playbooksPairWarning": "Each matched workspace's own default playbook, a non-empty list has to contain, so in the same update set that, if already one of these it is not.",
+      "setScheduledConfigureCron": "The configure schedule, set (removes it, an empty value does)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Relative to the config directory, a path each entry is, and instead of a text box, a picker over them the run option becomes. One of the entries the default playbook has to be, because the default a bare Configure runs. To keep a playbook away from a workspace it must never touch — a node drain, a database upgrade — use it, where a control a list is rather than a convention.",
       "playbooksPlaceholder": "e.g. release.yml",
       "playbooksAdd": "playbook, Add",
-      "playbooksAny": "Any, there may be"
+      "playbooksAny": "Any, there may be",
+      "scheduledConfigureEnabled": "On a schedule, configure",
+      "scheduledConfigureEnabledHint": "At a fixed time the playbook runs, whether or not changed anything has. Converged a fleet stays this way, rather than corrected only after a push.",
+      "scheduledConfigureCron": "Schedule, the",
+      "scheduledConfigureCronLead": "As a five-field cron expression, when the configure runs. Read only while Configure on a schedule is on, it is — and no schedule, leaving it empty means.",
+      "scheduledConfigureCronTitle": "Minute, hour, day-of-month, month and day-of-week the five fields are, read in the time zone below: 02:00 every Tuesday 0 2 * * 2 is, and 02:00 every day 0 2 * * * is. Refused a six-field expression is, because honoured a seconds-resolution schedule cannot be — and so is anything firing more often than every five minutes. For an hour a configure can run, and safely restartable it is not.",
+      "scheduledConfigureCronPlaceholder": "e.g. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Time zone, schedule",
+      "scheduledConfigureTimezoneHint": "In the IANA zone the schedule is read, so daylight saving the hour follows — UTC, Europe/London or America/New_York, for example. UTC, empty means.",
+      "scheduledConfigureTimezonePlaceholder": "e.g. Europe/London",
+      "scheduledConfigureLastAt": "Run, last scheduled"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

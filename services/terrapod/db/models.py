@@ -510,11 +510,58 @@ class Workspace(Base):
     #: shape -- the workspace holds the operator's intent and the run records
     #: what it was created under, so the answer survives the setting changing.
     #:
-    #: There is deliberately **no scheduled configure** (user, 2026-10-22).
-    #: An operator who wants one drives the run API from their own scheduler;
-    #: nothing here is waiting on a timer that does not exist.
+    #: A scheduled configure is a SEPARATE thing from this one and lives in the
+    #: `scheduled_configure_*` columns below (#2538): this flag is about a
+    #: configure derived from an inventory change, that one is about the
+    #: calendar.
     auto_configure_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false", default=False
+    )
+
+    #: Run a configure on a CALENDAR SCHEDULE (#2538).
+    #:
+    #: This reverses the 2026-10-22 decision that there is deliberately no
+    #: scheduled configure, and why it was reversed is worth keeping. The
+    #: original objection was to "a second scheduling vocabulary beside drift
+    #: detection's" -- a design-surface argument. What beat it is a migration
+    #: one: AWX schedules job templates as a first-class feature, so a team
+    #: moving off it arrives with schedules they depend on, and "stand up your
+    #: own cron" is a materially worse answer for them than for a greenfield
+    #: user.
+    #:
+    #: CRON rather than drift detection's interval, which is the deliberate
+    #: part. An interval cannot express "every Tuesday at 02:00" -- it drifts
+    #: against the wall clock and is anchored to whenever it was enabled. AWX
+    #: schedules are calendar-anchored, so an interval here would be the "thin
+    #: version that misses the one property a team needs" the issue warns
+    #: about: support in name only. The cost is accepted knowingly, because it
+    #: IS the second vocabulary that was objected to.
+    #:
+    #: Drift detection is NOT moved to cron with it, and that is a decision
+    #: rather than an omission. The two answer different questions: drift asks
+    #: "how stale may my view of reality be", which is a duration, and a
+    #: schedule asks "when do I want this to happen", which is a calendar.
+    scheduled_configure_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    #: A five-field cron expression, read in `scheduled_configure_timezone`.
+    #: Stored exactly as supplied -- validated, never normalised, so what an
+    #: operator reads back is what they wrote.
+    scheduled_configure_cron: Mapped[str] = mapped_column(
+        String(200), nullable=False, server_default="", default=""
+    )
+    #: The IANA zone the expression is read in. UTC by default, because a
+    #: schedule with no zone is one that moves twice a year without anybody
+    #: deciding that it should.
+    scheduled_configure_timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default="UTC", default="UTC"
+    )
+    #: When the schedule last FIRED, which the next occurrence is computed from.
+    #: Replicated with the rest of the workspace, so a promoted node does not
+    #: re-fire every schedule at once -- the argument the replication registry
+    #: already makes for `drift_status`.
+    scheduled_configure_last_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     #: Force a derived configure to target EVERY host rather than just the ones
@@ -2312,6 +2359,19 @@ class AutodiscoveryRule(Base):
     )
     drift_ignore_rules: Mapped[list[str]] = mapped_column(
         JSONB, default=list, nullable=False, server_default="[]"
+    )
+    #: Scheduled configure (#2538), templated onto every workspace the rule
+    #: materialises. Defaults OFF, unlike `drift_detection_enabled` above: a
+    #: schedule has no sensible default expression, so switching it on for a
+    #: whole monorepo would be an empty schedule that can never fire.
+    scheduled_configure_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    scheduled_configure_cron: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="", server_default=""
+    )
+    scheduled_configure_timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="UTC", server_default="UTC"
     )
     #: NULL means no expiry, matching the workspace column.
     plan_expiry_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)

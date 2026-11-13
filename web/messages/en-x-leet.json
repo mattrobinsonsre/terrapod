@@ -1337,7 +1337,8 @@
       "operationsNone": "7h15 w0uld l34v3 3v3ry m47ch3d w0rk5p4c3 w17h n0 0p3r4710n 47 4ll. 4 w0rk5p4c3 mu57 k33p pl4n 4nd 4pply, 0r c0nf1gur3, 0r b07h.",
       "setHardLimit": "537 h4rd l1m17 (4n 3mp7y v4lu3 r3m0v35 7h3 c31l1ng)",
       "setPlaybooks": "537 4ll0w3d pl4yb00k5 (r3pl4c35 7h3 l157 0n 3v3ry m47ch3d w0rk5p4c3; 4n 3mp7y l157 r3m0v35 7h3 r357r1c710n)",
-      "playbooksPairWarning": "4 n0n-3mp7y l157 h45 70 c0n741n 34ch m47ch3d w0rk5p4c3'5 0wn d3f4ul7 pl4yb00k, 50 537 7h47 1n 7h3 54m3 upd473 1f 17 15 n07 4lr34dy 0n3 0f 7h353."
+      "playbooksPairWarning": "4 n0n-3mp7y l157 h45 70 c0n741n 34ch m47ch3d w0rk5p4c3'5 0wn d3f4ul7 pl4yb00k, 50 537 7h47 1n 7h3 54m3 upd473 1f 17 15 n07 4lr34dy 0n3 0f 7h353.",
+      "setScheduledConfigureCron": "537 7h3 c0nf1gur3 5ch3dul3 (4n 3mp7y v4lu3 r3m0v35 17)"
     },
     "diff": {
       "colWorkspace": "W0rk5p4c3",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "34ch 3n7ry 15 4 p47h r3l471v3 70 7h3 c0nf1g d1r3c70ry, 4nd 7h3 run 0p710n b3c0m35 4 p1ck3r 0v3r 7h3m 1n5734d 0f 4 73x7 b0x. 7h3 d3f4ul7 pl4yb00k h45 70 b3 0n3 0f 7h3 3n7r135, b3c4u53 4 b4r3 C0nf1gur3 run5 7h3 d3f4ul7. U53 17 70 k33p 4 pl4yb00k 4w4y fr0m 4 w0rk5p4c3 17 mu57 n3v3r 70uch — 4 n0d3 dr41n, 4 d474b453 upgr4d3 — wh3r3 4 l157 15 4 c0n7r0l r47h3r 7h4n 4 c0nv3n710n.",
       "playbooksPlaceholder": "3.g. r3l3453.yml",
       "playbooksAdd": "4dd pl4yb00k",
-      "playbooksAny": "4ny"
+      "playbooksAny": "4ny",
+      "scheduledConfigureEnabled": "C0nf1gur3 0n 4 5ch3dul3",
+      "scheduledConfigureEnabledHint": "7h3 pl4yb00k run5 47 4 f1x3d 71m3 wh37h3r 0r n07 4ny7h1ng h45 ch4ng3d, wh1ch 15 h0w 4 fl337 574y5 c0nv3rg3d r47h3r 7h4n 0nly b31ng c0rr3c73d 4f73r 4 pu5h.",
+      "scheduledConfigureCron": "5ch3dul3",
+      "scheduledConfigureCronLead": "Wh3n 7h3 c0nf1gur3 run5, 45 4 f1v3-f13ld cr0n 3xpr35510n. 17 15 u53d 0nly wh1l3 C0nf1gur3 0n 4 5ch3dul3 15 0n, 4nd l34v1ng 17 3mp7y m34n5 n0 5ch3dul3.",
+      "scheduledConfigureCronTitle": "7h3 f1v3 f13ld5 4r3 m1nu73, h0ur, d4y-0f-m0n7h, m0n7h 4nd d4y-0f-w33k, r34d 1n 7h3 71m3 z0n3 b3l0w: 0 2 * * 2 15 02:00 3v3ry 7u35d4y 4nd 0 2 * * * 15 02:00 3v3ry d4y. 4 51x-f13ld 3xpr35510n 15 r3fu53d, b3c4u53 4 53c0nd5-r350lu710n 5ch3dul3 c4nn07 b3 h0n0ur3d, 4nd 50 15 4ny7h1ng f1r1ng m0r3 0f73n 7h4n 3v3ry f1v3 m1nu735 — 4 c0nf1gur3 c4n run f0r 4n h0ur 4nd 15 n07 54f3ly r3574r74bl3.",
+      "scheduledConfigureCronPlaceholder": "3.g. 0 2 * * 2",
+      "scheduledConfigureTimezone": "5ch3dul3 71m3 z0n3",
+      "scheduledConfigureTimezoneHint": "7h3 14N4 z0n3 7h3 5ch3dul3 15 r34d 1n, 50 7h3 h0ur f0ll0w5 d4yl1gh7 54v1ng — f0r 3x4mpl3 U7C, 3ur0p3/L0nd0n 0r 4m3r1c4/N3w_Y0rk. 3mp7y m34n5 U7C.",
+      "scheduledConfigureTimezonePlaceholder": "3.g. 3ur0p3/L0nd0n",
+      "scheduledConfigureLastAt": "L457 5ch3dul3d run"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

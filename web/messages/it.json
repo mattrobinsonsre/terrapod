@@ -1337,7 +1337,8 @@
       "operationsNone": "Questo lascerebbe ogni spazio di lavoro corrispondente senza alcuna operazione. Uno spazio di lavoro deve conservare pianificare e applicare, o configurare, o entrambe.",
       "setHardLimit": "Imposta il limite rigido (un valore vuoto rimuove il tetto)",
       "setPlaybooks": "Imposta i playbook consentiti (sostituisce l'elenco in ogni workspace corrispondente; un elenco vuoto rimuove la restrizione)",
-      "playbooksPairWarning": "Un elenco non vuoto deve contenere il playbook predefinito di ogni workspace corrispondente, quindi impostalo nello stesso aggiornamento se non è già uno di questi."
+      "playbooksPairWarning": "Un elenco non vuoto deve contenere il playbook predefinito di ogni workspace corrispondente, quindi impostalo nello stesso aggiornamento se non è già uno di questi.",
+      "setScheduledConfigureCron": "Imposta la pianificazione della configurazione (un valore vuoto la rimuove)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Ogni voce è un percorso relativo alla directory di configurazione, e l'opzione di esecuzione diventa un selettore tra queste invece di una casella di testo. Il playbook predefinito deve essere una delle voci, perché un Configura senza altro esegue quello predefinito. Usalo per tenere un playbook lontano da un workspace che non deve mai toccare — lo svuotamento di un nodo, l'aggiornamento di un database — dove un elenco è un controllo e non una convenzione.",
       "playbooksPlaceholder": "ad es. release.yml",
       "playbooksAdd": "Aggiungi playbook",
-      "playbooksAny": "Qualsiasi"
+      "playbooksAny": "Qualsiasi",
+      "scheduledConfigureEnabled": "Configurare secondo una pianificazione",
+      "scheduledConfigureEnabledHint": "Il playbook viene eseguito a un orario fisso, che qualcosa sia cambiato o no, ed è così che una flotta resta convergente invece di essere corretta solo dopo un push.",
+      "scheduledConfigureCron": "Pianificazione",
+      "scheduledConfigureCronLead": "Quando viene eseguita la configurazione, come espressione cron a cinque campi. Viene letta solo mentre Configurare secondo una pianificazione è attivo, e lasciarla vuota significa nessuna pianificazione.",
+      "scheduledConfigureCronTitle": "I cinque campi sono minuto, ora, giorno del mese, mese e giorno della settimana, letti nel fuso orario qui sotto: 0 2 * * 2 è le 02:00 di ogni martedì e 0 2 * * * è le 02:00 di ogni giorno. Un''espressione a sei campi viene rifiutata, perché una pianificazione al secondo non può essere rispettata, e lo stesso vale per qualunque cosa scatti più spesso di ogni cinque minuti: una configurazione può durare un''ora e non è riavviabile in sicurezza.",
+      "scheduledConfigureCronPlaceholder": "ad es. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Fuso orario della pianificazione",
+      "scheduledConfigureTimezoneHint": "Il fuso IANA in cui viene letta la pianificazione, così che l''ora segua l''ora legale: per esempio UTC, Europe/London o America/New_York. Vuoto significa UTC.",
+      "scheduledConfigureTimezonePlaceholder": "ad es. Europe/London",
+      "scheduledConfigureLastAt": "Ultima esecuzione pianificata"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",

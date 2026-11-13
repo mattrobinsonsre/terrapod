@@ -213,6 +213,10 @@ class TestMarkerContents:
         values and VCS credentials must never be in it — only the connection's
         id, which is a pointer to a row whose token stays in the database."""
         ws = MagicMock()
+        ws.scheduled_configure_enabled = False
+        ws.scheduled_configure_cron = ""
+        ws.scheduled_configure_timezone = "UTC"
+        ws.scheduled_configure_last_at = None
         ws.labels = {"env": "prod"}
         snap = dws._settings_snapshot(ws)
         banned = ("token", "secret", "password", "credential", "value")
@@ -273,9 +277,17 @@ class TestMarkerContents:
             "catalog_version_pin",
             "catalog_input_values",
             "catalog_update_block",  # Catalog publish outcome, not restorable configuration.
+            # When the schedule last FIRED, not what it is set to (#2538). The
+            # three settings beside it ARE snapshotted; this is a result, and a
+            # restore turns the schedule off regardless.
+            "scheduled_configure_last_at",
         }
 
         ws = MagicMock()
+        ws.scheduled_configure_enabled = False
+        ws.scheduled_configure_cron = ""
+        ws.scheduled_configure_timezone = "UTC"
+        ws.scheduled_configure_last_at = None
         ws.labels = {}
         snapshotted = set(dws._settings_snapshot(ws))
         columns = {c.name for c in Workspace.__table__.columns}
@@ -295,6 +307,10 @@ class TestMarkerContents:
         the setting since #2503, so it is the one key that has to be here.
         """
         ws = MagicMock()
+        ws.scheduled_configure_enabled = False
+        ws.scheduled_configure_cron = ""
+        ws.scheduled_configure_timezone = "UTC"
+        ws.scheduled_configure_last_at = None
         ws.labels = {}
         ws.auto_apply_mode = "create_update"
         snap = dws._settings_snapshot(ws)

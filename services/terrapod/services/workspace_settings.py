@@ -529,6 +529,127 @@ def validate_config_directory(raw: object) -> str:
     return _check_relative_path(raw, "config-directory")
 
 
+#: A configure can run for an hour and is not safely restartable, so a schedule
+#: firing more often than this is a mistake rather than a preference. Drift
+#: detection has the same idea in `min_workspace_interval_seconds`; this one is
+#: a constant because, unlike drift's, it is not a cost control an operator
+#: tunes -- it is a floor below which the feature cannot work at all.
+MIN_SCHEDULE_INTERVAL_SECONDS = 300
+
+#: How many occurrences the floor check looks at. Enough to cross an hour and a
+#: day boundary from any base, so a schedule whose shortest gap is not its first
+#: one is still measured. 25 covers hourly-with-minute-lists and daily alike.
+_SCHEDULE_PROBE_POINTS = 25
+
+
+def validate_schedule_timezone(raw: object) -> str:
+    """The IANA zone a scheduled configure's cron expression is read in.
+
+    `zoneinfo` resolves from the base image's own tzdata -- 486 zones in the
+    API image, measured, with no `tzdata` package installed. That is why there
+    is no dependency here; `test_a_real_zone_resolves_in_this_image` is what
+    turns a base image that stopped shipping it into a failing test rather than
+    an operator's schedule quietly running in the wrong hour.
+    """
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    # ABSENT and EXPLICITLY EMPTY are different acts, and collapsing them is a
+    # TRANSFORM of a value a Terraform provider sent. `""` planned and `"UTC"`
+    # read back is "Provider produced inconsistent result after apply" -- the
+    # v1.9.0 advisory class, and the reason the house rule is validate-never-
+    # normalise. So an omitted attribute takes the default and an explicit `""`
+    # round-trips; `""` resolves to UTC at USE time, where it costs nothing.
+    if raw is None:
+        return "UTC"
+    if not isinstance(raw, str):
+        raise ValueError("scheduled-configure-timezone must be a string")
+    value = raw.strip()
+    if not value:
+        return ""
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(
+            f"scheduled-configure-timezone {value!r} is not an IANA time zone "
+            f"(for example 'UTC', 'Europe/London', 'America/New_York')"
+        ) from exc
+    return value
+
+
+def validate_schedule_cron(raw: object, *, timezone: str = "UTC") -> str:
+    """A cron expression for a scheduled configure, or "" for none.
+
+    Stored EXACTLY as supplied beyond an outer strip. A cron expression has
+    several spellings of the same schedule and an operator reads this field
+    back in the UI and in `terraform plan`; normalising it would make the plan
+    disagree with the configuration and fail the apply, which is the v1.9.0
+    advisory class.
+
+    Two things are refused beyond "croniter can parse it":
+
+    * **a six-field expression**, which croniter reads as seconds-resolution. A
+      configure takes minutes to hours, and the scheduler ticks far slower than
+      a second, so such a schedule cannot mean what it says.
+    * **anything firing more often than `MIN_SCHEDULE_INTERVAL_SECONDS`**,
+      checked by asking for two successive occurrences rather than by parsing
+      the fields -- `*/2 * * * *` and `0,2,4,... * * * *` are the same schedule
+      and only one of them looks fast.
+    """
+    from croniter import croniter
+
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError("scheduled-configure-cron must be a string")
+    value = raw.strip()
+    if not value:
+        return ""
+
+    if len(value.split()) >= 6:
+        raise ValueError(
+            f"scheduled-configure-cron {value!r} has {len(value.split())} fields. Use the "
+            f"five-field form (minute hour day-of-month month day-of-week); a "
+            f"seconds-resolution schedule cannot be honoured, because a configure takes "
+            f"minutes to hours and the scheduler does not tick that fast."
+        )
+    if not croniter.is_valid(value):
+        raise ValueError(
+            f"scheduled-configure-cron {value!r} is not a valid cron expression. Use the "
+            f"five-field form, for example '0 2 * * *' for 02:00 daily or '0 2 * * 2' for "
+            f"02:00 every Tuesday."
+        )
+
+    # The floor, measured from the schedule itself rather than from its text.
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    try:
+        base = datetime(2024, 1, 1, tzinfo=ZoneInfo(timezone))
+    except Exception:  # noqa: BLE001 - the zone is validated separately
+        base = datetime(2024, 1, 1, tzinfo=ZoneInfo("UTC"))
+    # The MINIMUM gap across a window, not the gap between the first two.
+    # `0,1 * * * *` fires at :00 and :01 -- sixty seconds apart -- and from a
+    # base that lands on :00 the first two occurrences are :01 and the next
+    # hour's :00, which looks like 59 minutes. Sampling two points measures the
+    # base, not the schedule; this was accepted by an earlier version of this
+    # check and caught by driving it.
+    try:
+        itr = croniter(value, base)
+        points = [itr.get_next(datetime) for _ in range(_SCHEDULE_PROBE_POINTS)]
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(
+            f"scheduled-configure-cron {value!r} could not be evaluated: {exc}"
+        ) from exc
+    gap = min((b - a).total_seconds() for a, b in zip(points, points[1:], strict=False))
+    if gap < MIN_SCHEDULE_INTERVAL_SECONDS:
+        raise ValueError(
+            f"scheduled-configure-cron {value!r} fires every {int(gap)}s. A configure can "
+            f"run for an hour and is not safely restartable, so the minimum interval is "
+            f"{MIN_SCHEDULE_INTERVAL_SECONDS}s."
+        )
+    return value
+
+
 def validate_operations(*, plan_apply: bool, configure: bool) -> None:
     """Refuse a workspace that declares no operations at all (#1966).
 

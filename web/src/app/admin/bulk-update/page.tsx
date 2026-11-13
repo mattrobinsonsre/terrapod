@@ -160,6 +160,16 @@ export default function BulkUpdatePage() {
   const [uAutoConfigureEnabled, setUAutoConfigureEnabled] = useState('')
   const [uConfigureAfterApply, setUConfigureAfterApply] = useState('')
   const [uConfigureAllHosts, setUConfigureAllHosts] = useState('')
+  // The third configure trigger (#2538). The switch is tri-state like every
+  // other boolean here. The CRON is not: '' is a real value on it -- it is how
+  // a schedule is REMOVED -- so, exactly as `config-directory` below, the
+  // checkbox is what says whether to write the key at all. The ZONE needs no
+  // such checkbox: '' is substituted server-side for UTC, so there is no value
+  // an empty box could mean that typing `UTC` does not say better.
+  const [uScheduledConfigureEnabled, setUScheduledConfigureEnabled] = useState('')
+  const [uSetScheduledConfigureCron, setUSetScheduledConfigureCron] = useState(false)
+  const [uScheduledConfigureCron, setUScheduledConfigureCron] = useState('')
+  const [uScheduledConfigureTimezone, setUScheduledConfigureTimezone] = useState('')
   // Which inventory SOURCES ansible may resolve on the runner (#2033). Both
   // opt-in, both inert without `configure-enabled`, and both fleet-settable
   // for the same reason the triggers above are: an operator adopting a
@@ -334,6 +344,15 @@ export default function BulkUpdatePage() {
     if (uAutoConfigureEnabled) u['auto-configure-enabled'] = uAutoConfigureEnabled === 'true'
     if (uConfigureAfterApply) u['configure-after-apply'] = uConfigureAfterApply === 'true'
     if (uConfigureAllHosts) u['configure-all-hosts'] = uConfigureAllHosts === 'true'
+    if (uScheduledConfigureEnabled)
+      u['scheduled-configure-enabled'] = uScheduledConfigureEnabled === 'true'
+    // Trimmed, not normalised: the server stores a cron expression byte for
+    // byte so a `terraform plan` reads back what was written, and refuses one
+    // it cannot evaluate rather than rewriting it.
+    if (uSetScheduledConfigureCron)
+      u['scheduled-configure-cron'] = uScheduledConfigureCron.trim()
+    if (uScheduledConfigureTimezone.trim())
+      u['scheduled-configure-timezone'] = uScheduledConfigureTimezone.trim()
     if (uDynamicInventoryEnabled)
       u['dynamic-inventory-enabled'] = uDynamicInventoryEnabled === 'true'
     if (uInventoryScriptsEnabled)
@@ -542,6 +561,7 @@ export default function BulkUpdatePage() {
     'auto-configure-enabled': uAutoConfigureEnabled,
     'configure-after-apply': uConfigureAfterApply,
     'configure-all-hosts': uConfigureAllHosts,
+    'scheduled-configure-enabled': uScheduledConfigureEnabled,
     'dynamic-inventory-enabled': uDynamicInventoryEnabled,
     'inventory-scripts-enabled': uInventoryScriptsEnabled,
     'ansible-host-key-checking': uAnsibleHostKeyChecking,
@@ -878,6 +898,74 @@ export default function BulkUpdatePage() {
             <option value="false">{tCommon('no')}</option>
           </select>
           <p className="mt-1 text-xs text-slate-400">{tWs('fields.configureAllHostsHint')}</p>
+        </div>
+        {/* The schedule (#2538). The switch is an ordinary tri-state; the
+            cron takes the `uSet*` idiom instead, because '' is how a schedule
+            is REMOVED and there is therefore no in-band way to say "leave this
+            alone". Both of its halves carry `gateOff`, so the switch set
+            explicitly to No disables the checkbox as well as the box it
+            reveals -- a presence check on one of them is not an application
+            check on the pair. */}
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-scheduled-configure-enabled">
+            {tWs('fields.scheduledConfigureEnabled')}
+          </label>
+          <select
+            id="bu-scheduled-configure-enabled"
+            value={uScheduledConfigureEnabled}
+            onChange={(e) => setUScheduledConfigureEnabled(e.target.value)}
+            disabled={gateOff('scheduled-configure-enabled')}
+            className={inputCls}
+          >
+            <option value="">{t('unchangedOption')}</option>
+            <option value="true">{tCommon('yes')}</option>
+            <option value="false">{tCommon('no')}</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-400">
+            {tWs('fields.scheduledConfigureEnabledHint')}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+            <input
+              type="checkbox"
+              checked={uSetScheduledConfigureCron}
+              onChange={(e) => setUSetScheduledConfigureCron(e.target.checked)}
+              disabled={gateOff('scheduled-configure-cron')}
+            />
+            {t('update.setScheduledConfigureCron')}
+          </label>
+          {uSetScheduledConfigureCron && (
+            <>
+              <input
+                type="text"
+                value={uScheduledConfigureCron}
+                onChange={(e) => setUScheduledConfigureCron(e.target.value)}
+                placeholder={tWs('fields.scheduledConfigureCronPlaceholder')}
+                aria-label={tWs('fields.scheduledConfigureCron')}
+                disabled={gateOff('scheduled-configure-cron')}
+                className={inputCls}
+              />
+              {tieredHint(tWs, 'fields.scheduledConfigureCronTitle')}
+            </>
+          )}
+        </div>
+        <div className="min-w-0">
+          <label className={labelCls} htmlFor="bu-scheduled-configure-timezone">
+            {tWs('fields.scheduledConfigureTimezone')}
+          </label>
+          <input
+            id="bu-scheduled-configure-timezone"
+            type="text"
+            value={uScheduledConfigureTimezone}
+            onChange={(e) => setUScheduledConfigureTimezone(e.target.value)}
+            placeholder={tWs('fields.scheduledConfigureTimezonePlaceholder')}
+            disabled={gateOff('scheduled-configure-timezone')}
+            className={inputCls}
+          />
+          <p className="mt-1 text-xs text-slate-400">
+            {tWs('fields.scheduledConfigureTimezoneHint')}
+          </p>
         </div>
         {uWouldLeaveNoOperations && (
           /* Guaranteed 422 for every matched workspace, so both submits are

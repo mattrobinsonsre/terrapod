@@ -1337,7 +1337,8 @@
       "operationsNone": "Cela laisserait chaque espace de travail correspondant sans aucune opération. Un espace de travail doit conserver planifier et appliquer, ou configurer, ou les deux.",
       "setHardLimit": "Définir la limite stricte (une valeur vide supprime le plafond)",
       "setPlaybooks": "Définir les playbooks autorisés (remplace la liste sur chaque espace de travail correspondant ; une liste vide supprime la restriction)",
-      "playbooksPairWarning": "Une liste non vide doit contenir le playbook par défaut propre à chaque espace de travail correspondant ; définissez-le donc dans la même mise à jour s'il n'en fait pas déjà partie."
+      "playbooksPairWarning": "Une liste non vide doit contenir le playbook par défaut propre à chaque espace de travail correspondant ; définissez-le donc dans la même mise à jour s'il n'en fait pas déjà partie.",
+      "setScheduledConfigureCron": "Définir la planification de la configuration (une valeur vide la supprime)"
     },
     "diff": {
       "colWorkspace": "Espace de travail",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Chaque entrée est un chemin relatif au répertoire de configuration, et l'option d'exécution devient un sélecteur parmi elles au lieu d'un champ de texte. Le playbook par défaut doit être l'une des entrées, car un simple Configurer exécute celui par défaut. Utilisez-la pour tenir un playbook à l'écart d'un espace de travail qu'il ne doit jamais toucher — la vidange d'un nœud, la mise à niveau d'une base de données — là où une liste est un contrôle et non une convention.",
       "playbooksPlaceholder": "p. ex. release.yml",
       "playbooksAdd": "Ajouter un playbook",
-      "playbooksAny": "N'importe lequel"
+      "playbooksAny": "N'importe lequel",
+      "scheduledConfigureEnabled": "Configurer selon une planification",
+      "scheduledConfigureEnabledHint": "Le playbook s'exécute à heure fixe, que quelque chose ait changé ou non, ce qui maintient un parc convergé au lieu de le corriger seulement après un push.",
+      "scheduledConfigureCron": "Planification",
+      "scheduledConfigureCronLead": "Quand la configuration s'exécute, sous forme d'expression cron à cinq champs. Elle n'est lue que si Configurer selon une planification est actif, et la laisser vide signifie aucune planification.",
+      "scheduledConfigureCronTitle": "Les cinq champs sont la minute, l'heure, le jour du mois, le mois et le jour de la semaine, lus dans le fuseau horaire ci-dessous : 0 2 * * 2 correspond à 02:00 chaque mardi et 0 2 * * * à 02:00 chaque jour. Une expression à six champs est refusée, car une planification à la seconde ne peut pas être honorée, tout comme ce qui se déclenche plus souvent que toutes les cinq minutes : une configuration peut durer une heure et ne redémarre pas sans risque.",
+      "scheduledConfigureCronPlaceholder": "p. ex. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Fuseau horaire de la planification",
+      "scheduledConfigureTimezoneHint": "Le fuseau IANA dans lequel la planification est lue, afin que l'heure suive l'heure d'été : par exemple UTC, Europe/London ou America/New_York. Vide signifie UTC.",
+      "scheduledConfigureTimezonePlaceholder": "p. ex. Europe/London",
+      "scheduledConfigureLastAt": "Dernière exécution planifiée"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

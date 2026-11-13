@@ -1337,7 +1337,8 @@
       "operationsNone": "Byddai hyn yn gadael pob gweithle cyfatebol heb unrhyw weithrediad o gwbl. Rhaid i weithle gadw cynllunio a gweithredu, neu gyflunio, neu'r ddau.",
       "setHardLimit": "Gosod y terfyn caled (mae gwerth gwag yn tynnu''r terfyn uchaf)",
       "setPlaybooks": "Gosod y llyfrau chwarae a ganiateir (yn disodli'r rhestr ar bob gweithle sy'n cyfateb; mae rhestr wag yn tynnu'r cyfyngiad)",
-      "playbooksPairWarning": "Mae'n rhaid i restr nad yw'n wag gynnwys llyfr chwarae rhagosodedig pob gweithle sy'n cyfateb, felly gosodwch hwnnw yn yr un diweddariad os nad yw'n un o'r rhain eisoes."
+      "playbooksPairWarning": "Mae'n rhaid i restr nad yw'n wag gynnwys llyfr chwarae rhagosodedig pob gweithle sy'n cyfateb, felly gosodwch hwnnw yn yr un diweddariad os nad yw'n un o'r rhain eisoes.",
+      "setScheduledConfigureCron": "Gosod amserlen y cyflunio (mae gwerth gwag yn ei dynnu)"
     },
     "diff": {
       "colWorkspace": "Gweithfan",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Mae pob eitem yn llwybr yn gymharol i'r cyfeiriadur cyfluniad, ac mae opsiwn y rhediad yn dod yn ddewisydd drostynt yn lle blwch testun. Mae'n rhaid i'r llyfr chwarae rhagosodedig fod yn un o'r eitemau, am fod Cyflunio moel yn rhedeg y rhagosodiad. Defnyddiwch hwn i gadw llyfr chwarae i ffwrdd o weithle na ddylai byth ei gyffwrdd — draenio nod, uwchraddio cronfa ddata — lle mae rhestr yn gyfrwng rheoli yn hytrach nag yn gonfensiwn.",
       "playbooksPlaceholder": "e.e. release.yml",
       "playbooksAdd": "Ychwanegu llyfr chwarae",
-      "playbooksAny": "Unrhyw un"
+      "playbooksAny": "Unrhyw un",
+      "scheduledConfigureEnabled": "Cyflunio ar amserlen",
+      "scheduledConfigureEnabledHint": "Mae'r llyfr chwarae yn rhedeg ar amser penodol p'un a oes rhywbeth wedi newid ai peidio, sef sut mae fflyd yn aros wedi'i chydgyfeirio yn hytrach na chael ei chywiro ar ôl gwthiad yn unig.",
+      "scheduledConfigureCron": "Amserlen",
+      "scheduledConfigureCronLead": "Pryd mae'r cyflunio yn rhedeg, fel mynegiad cron pum maes. Dim ond tra bo Cyflunio ar amserlen ymlaen y caiff ei ddarllen, ac mae ei adael yn wag yn golygu dim amserlen.",
+      "scheduledConfigureCronTitle": "Y pum maes yw munud, awr, diwrnod o'r mis, mis a diwrnod o'r wythnos, wedi'u darllen yn y gylchfa amser isod: 0 2 * * 2 yw 02:00 bob dydd Mawrth a 0 2 * * * yw 02:00 bob dydd. Gwrthodir mynegiad chwe maes, am na ellir anrhydeddu amserlen i'r eiliad, ac felly hefyd unrhyw beth sy'n tanio'n amlach na bob pum munud — gall cyflunio redeg am awr ac nid yw'n ddiogel ei ailgychwyn.",
+      "scheduledConfigureCronPlaceholder": "e.e. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Cylchfa amser yr amserlen",
+      "scheduledConfigureTimezoneHint": "Y gylchfa IANA y darllenir yr amserlen ynddi, fel bod yr awr yn dilyn amser haf — er enghraifft UTC, Europe/London neu America/New_York. Mae gwag yn golygu UTC.",
+      "scheduledConfigureTimezonePlaceholder": "e.e. Europe/London",
+      "scheduledConfigureLastAt": "Rhediad amserlennedig diwethaf"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

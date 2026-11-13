@@ -576,7 +576,7 @@ PRE_EXECUTION_STATES = frozenset({"pending", "queued", "planning", "planned", "c
 #: `planned` holds the slot as firmly as `applying` -- confirming it is one
 #: click away -- and terminal states hold nothing.
 #:
-#: NOT to be merged with `inventory_auto_configure._CONFIGURE_IN_FLIGHT`,
+#: NOT to be merged with `inventory_auto_configure.CONFIGURE_IN_FLIGHT`,
 #: which answers a different question ("is an auto-configure already on its
 #: way for this workspace") and therefore counts `pending` while deliberately
 #: excluding `planned`.

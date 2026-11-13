@@ -1027,3 +1027,135 @@ func TestWorkspaceConfigureParallelism_UnsetSendsNothing(t *testing.T) {
 		t.Errorf("parallelism sent when unset: %+v", req.Data.Attributes)
 	}
 }
+
+// Scheduled configure (#2538): a cron schedule as a third configure trigger.
+// Covers the read side including the read-only `scheduled-configure-last-at`,
+// the create write side, and the update write side -- where the point is that
+// an explicit empty cron REACHES the wire, because that is how an operator
+// stops a workspace configuring on a schedule. A plain string would drop it
+// and the removal would be a silent no-op.
+func TestWorkspaceScheduledConfigure_RoundTrip(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.readHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-sched", "scheduled", map[string]any{
+			"scheduled-configure-enabled":  true,
+			"scheduled-configure-cron":     "0 2 * * 2",
+			"scheduled-configure-timezone": "Europe/London",
+			"scheduled-configure-last-at":  "2026-11-10T02:00:00Z",
+		})))
+	}
+	c := f.client()
+	ws, err := c.GetWorkspace(t.Context(), "ws-sched")
+	if err != nil {
+		t.Fatalf("GetWorkspace: %v", err)
+	}
+	if !ws.ScheduledConfigureEnabled {
+		t.Errorf("scheduled-configure-enabled not decoded: %+v", ws)
+	}
+	// The cron is compared EXACTLY: the server stores what it was given and
+	// normalises nothing, so anything that reshapes it here would hide a
+	// server-side normalisation the provider cannot survive.
+	if ws.ScheduledConfigureCron != "0 2 * * 2" {
+		t.Errorf("cron = %q, want %q", ws.ScheduledConfigureCron, "0 2 * * 2")
+	}
+	if ws.ScheduledConfigureTimezone != "Europe/London" {
+		t.Errorf("timezone = %q, want %q", ws.ScheduledConfigureTimezone, "Europe/London")
+	}
+	if ws.ScheduledConfigureLastAt != "2026-11-10T02:00:00Z" {
+		t.Errorf("last-at = %q, want %q", ws.ScheduledConfigureLastAt, "2026-11-10T02:00:00Z")
+	}
+
+	// Create: the three settable attributes reach the request body, and the
+	// read-only one does not -- it is server state, so a client that sent it
+	// would be claiming to know when the schedule last fired.
+	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-sched", "scheduled", nil)))
+	}
+	enabled := true
+	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
+		Name:                       "scheduled",
+		ScheduledConfigureEnabled:  &enabled,
+		ScheduledConfigureCron:     "0 2 * * 2",
+		ScheduledConfigureTimezone: "Europe/London",
+	}); err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	attrs := lastRequestAttrs(t, f.lastBody)
+	if attrs["scheduled-configure-enabled"] != true ||
+		attrs["scheduled-configure-cron"] != "0 2 * * 2" ||
+		attrs["scheduled-configure-timezone"] != "Europe/London" {
+		t.Errorf("scheduled-configure attrs missing from create: %+v", attrs)
+	}
+	if _, present := attrs["scheduled-configure-last-at"]; present {
+		t.Errorf("read-only last-at leaked into the create body: %+v", attrs)
+	}
+
+	// Update: an explicit empty cron is SENT, which is how the schedule is
+	// removed. The enabled flag is left alone, so it must stay absent.
+	f.updateHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-sched", "scheduled", map[string]any{
+			"scheduled-configure-cron": "",
+		})))
+	}
+	cleared := ""
+	if _, err := c.UpdateWorkspace(t.Context(), "ws-sched", UpdateWorkspaceRequest{
+		ScheduledConfigureCron: &cleared,
+	}); err != nil {
+		t.Fatalf("UpdateWorkspace: %v", err)
+	}
+	attrs = lastRequestAttrs(t, f.lastBody)
+	cron, present := attrs["scheduled-configure-cron"]
+	if !present {
+		t.Errorf("an explicit empty cron was dropped, so the schedule could never "+
+			"be removed: %+v", attrs)
+	} else if cron != "" {
+		t.Errorf("cron = %v, want the empty string", cron)
+	}
+	if _, present := attrs["scheduled-configure-enabled"]; present {
+		t.Errorf("scheduled-configure-enabled sent when nil: %+v", attrs)
+	}
+	if _, present := attrs["scheduled-configure-timezone"]; present {
+		t.Errorf("scheduled-configure-timezone sent when nil: %+v", attrs)
+	}
+}
+
+// The error path: the server refuses an unhonourable schedule with a 422, and
+// the SDK surfaces it as a *ValidationError rather than a bare transport
+// error, so a consumer can tell "you asked for something invalid" from "the
+// request did not arrive".
+func TestWorkspaceScheduledConfigure_InvalidCronIsAValidationError(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.updateHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"errors":[{"status":"422","detail":` +
+			`"scheduled-configure-cron 'every tuesday' is not a valid cron expression"}]}`))
+	}
+	c := f.client()
+	bad := "every tuesday"
+	_, err := c.UpdateWorkspace(t.Context(), "ws-sched", UpdateWorkspaceRequest{
+		ScheduledConfigureCron: &bad,
+	})
+	if !IsValidation(err) {
+		t.Fatalf("expected a *ValidationError, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "scheduled-configure-cron") {
+		t.Errorf("the server's detail did not survive: %v", err)
+	}
+}
+
+// lastRequestAttrs pulls `data.attributes` off a captured request body. The
+// surrounding tests each re-declared this struct; one helper keeps the two
+// scheduled-configure cases readable.
+func lastRequestAttrs(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		t.Fatalf("request body: %v", err)
+	}
+	return req.Data.Attributes
+}

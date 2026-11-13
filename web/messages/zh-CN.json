@@ -1337,7 +1337,8 @@
       "operationsNone": "这会让所有匹配的工作区完全没有任何操作。工作区必须保留计划与应用、配置，或两者之一。",
       "setHardLimit": "设置强制 limit（空值将移除上限）",
       "setPlaybooks": "设置允许的 playbook（替换每个匹配工作区上的列表；空列表将移除限制）",
-      "playbooksPairWarning": "非空列表必须包含每个匹配工作区各自的默认 playbook；如果其中还没有，请在同一次更新中一并设置默认 playbook。"
+      "playbooksPairWarning": "非空列表必须包含每个匹配工作区各自的默认 playbook；如果其中还没有，请在同一次更新中一并设置默认 playbook。",
+      "setScheduledConfigureCron": "设置配置计划（空值将其移除）"
     },
     "diff": {
       "colWorkspace": "工作区",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "每个条目都是相对于配置目录的路径；指定列表后，运行选项会变为从列表中选择，而不再是文本输入框。未指定任何选项的配置操作会执行默认 playbook，因此默认 playbook 必须是其中的某个条目。可以用它把某个 playbook 挡在绝不应触及的工作区之外——例如节点排空或数据库升级——在这种场合，列表是一种管控手段，而不只是约定。",
       "playbooksPlaceholder": "例如 release.yml",
       "playbooksAdd": "添加 playbook",
-      "playbooksAny": "不限"
+      "playbooksAny": "不限",
+      "scheduledConfigureEnabled": "按计划配置",
+      "scheduledConfigureEnabledHint": "无论是否有变更，Playbook 都会在固定时间运行，这样整个机群会保持收敛，而不是只在推送之后才被纠正。",
+      "scheduledConfigureCron": "计划",
+      "scheduledConfigureCronLead": "配置运行的时间，使用五字段 cron 表达式。仅在开启按计划配置时才会读取，留空表示没有计划。",
+      "scheduledConfigureCronTitle": "五个字段分别是分钟、小时、日、月和星期，按下面的时区解读：0 2 * * 2 表示每周二 02:00，0 2 * * * 表示每天 02:00。六字段表达式会被拒绝，因为秒级精度的计划无法兑现；触发间隔短于五分钟的表达式同样会被拒绝 —— 一次配置可能运行一小时，且无法安全重启。",
+      "scheduledConfigureCronPlaceholder": "例如 0 2 * * 2",
+      "scheduledConfigureTimezone": "计划时区",
+      "scheduledConfigureTimezoneHint": "解读计划所用的 IANA 时区，因此小时会跟随夏令时 —— 例如 UTC、Europe/London 或 America/New_York。留空表示 UTC。",
+      "scheduledConfigureTimezonePlaceholder": "例如 Europe/London",
+      "scheduledConfigureLastAt": "上次计划运行"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

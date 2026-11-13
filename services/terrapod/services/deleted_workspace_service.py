@@ -178,6 +178,12 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "drift_detection_enabled": ws.drift_detection_enabled,
         "drift_detection_interval_seconds": ws.drift_detection_interval_seconds,
         "drift_ignore_rules": list(ws.drift_ignore_rules or []),
+        # The schedule's CONFIGURATION (#2538). `scheduled_configure_last_at` is
+        # deliberately absent: it is when the schedule fired, which is runtime
+        # state, and the restore turns the schedule off anyway.
+        "scheduled_configure_enabled": ws.scheduled_configure_enabled,
+        "scheduled_configure_cron": ws.scheduled_configure_cron,
+        "scheduled_configure_timezone": ws.scheduled_configure_timezone,
     }
 
 
@@ -766,6 +772,10 @@ async def restore_workspace(
         auto_apply_mode="never",
         drift_detection_enabled=False,
         auto_merge=False,
+        # Constraint 2 again (#2538): a cron schedule acts entirely on its own,
+        # and a workspace restored months later would otherwise configure a
+        # fleet at its next occurrence with nobody expecting it.
+        scheduled_configure_enabled=False,
     )
     # BOTH spellings, because a marker is a stored snapshot and outlives the
     # schema that wrote it: one from before #1274 carries only the boolean, one
@@ -780,6 +790,8 @@ async def restore_workspace(
         report["suppressed"].append("auto_apply_mode")
     if settings.get("drift_detection_enabled"):
         report["suppressed"].append("drift_detection_enabled")
+    if settings.get("scheduled_configure_enabled"):
+        report["suppressed"].append("scheduled_configure_enabled")
     if settings.get("auto_merge"):
         report["suppressed"].append("auto_merge")
     # Constraint 3 — VCS is described, never re-attached.

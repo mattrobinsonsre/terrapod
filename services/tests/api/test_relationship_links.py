@@ -34,6 +34,12 @@ class TestCatalogInstance:
             # mock, so these are required rather than merely tidy (#2372).
             execution_backend="tofu",
             engine_version="1.12.4",
+            # Same reason: a SimpleNamespace raises rather than leaking a mock,
+            # so a newly serialised column has to be named here (#2538).
+            scheduled_configure_enabled=False,
+            scheduled_configure_cron="",
+            scheduled_configure_timezone="UTC",
+            scheduled_configure_last_at=None,
             # The pool set is a relationship (#1087), not a column.
             agent_pool_links=(
                 [SimpleNamespace(agent_pool_id=pool, ordinal=0, agent_pool=None)] if pool else []
@@ -100,6 +106,11 @@ class TestAutodiscoveryRule:
             playbooks=[],
             default_limit="",
             hard_limit="",
+            # The rule templates the schedule's three SETTINGS (#2538); there is
+            # no `last_at` here, because that is a result and a rule has none.
+            scheduled_configure_enabled=False,
+            scheduled_configure_cron="",
+            scheduled_configure_timezone="UTC",
             # #2033's pair. Set explicitly, both off, because these reach a
             # `bool(...)`: an auto-attribute on a MagicMock would read as TRUE,
             # and on a SimpleNamespace it raises -- which is how this failed.

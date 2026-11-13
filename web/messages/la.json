@@ -1337,7 +1337,8 @@
       "operationsNone": "Hoc omne spatium operis congruens sine ulla operatione relinqueret. Spatium operis destinare et adhibere, aut configurare, aut utrumque servare debet.",
       "setHardLimit": "Limitem firmum statuere (valor vacuus limitem supremum tollit)",
       "setPlaybooks": "Libellos ludendi permissos statuere (indicem in omni loco operis congruenti substituit; index vacuus restrictionem tollit)",
-      "playbooksPairWarning": "Index non vacuus libellum ludendi praedefinitum proprium cuiusque loci operis congruentis continere debet; itaque eum in eadem renovatione statue, nisi iam unus ex his est."
+      "playbooksPairWarning": "Index non vacuus libellum ludendi praedefinitum proprium cuiusque loci operis congruentis continere debet; itaque eum in eadem renovatione statue, nisi iam unus ex his est.",
+      "setScheduledConfigureCron": "Horarium configurationis statuere (valor vacuus illud removet)"
     },
     "diff": {
       "colWorkspace": "Locus Operis",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Quaeque vox est semita relativa ad directorium configurationis, et optio cursus fit selector inter eas pro area textus. Libellus ludendi praedefinitus una ex vocibus esse debet, quia Configurare nudum praedefinitum exsequitur. Hoc adhibe ut libellum ludendi a loco operis arceas quem numquam tangere debet — exhaustio nodi, promotio basis datorum — ubi index potestas est potius quam consuetudo.",
       "playbooksPlaceholder": "ex. gr. release.yml",
       "playbooksAdd": "Libellum ludendi addere",
-      "playbooksAny": "Quilibet"
+      "playbooksAny": "Quilibet",
+      "scheduledConfigureEnabled": "Configurare secundum horarium",
+      "scheduledConfigureEnabledHint": "Liber ludendi hora statuta exercetur, sive quid mutatum est sive non, et sic classis convergens manet potius quam post impulsum tantum corrigitur.",
+      "scheduledConfigureCron": "Horarium",
+      "scheduledConfigureCronLead": "Quando configuratio exerceatur, ut expressio cron quinque camporum. Legitur tantum dum Configurare secundum horarium accensum est, et vacuum relictum nullum horarium significat.",
+      "scheduledConfigureCronTitle": "Quinque campi sunt minutum, hora, dies mensis, mensis et dies hebdomadis, in zona temporis infra lecti: 0 2 * * 2 est hora 02:00 omni die Martis et 0 2 * * * est hora 02:00 cotidie. Expressio sex camporum reicitur, quia horarium ad secunda servari non potest, et idem valet de omni re quae saepius quam quinis minutis incipit: configuratio horam durare potest nec tuto restitui.",
+      "scheduledConfigureCronPlaceholder": "ex. gr. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Zona temporis horarii",
+      "scheduledConfigureTimezoneHint": "Zona IANA in qua horarium legitur, ut hora tempus aestivum sequatur: exempli gratia UTC, Europe/London vel America/New_York. Vacuum UTC significat.",
+      "scheduledConfigureTimezonePlaceholder": "ex. gr. Europe/London",
+      "scheduledConfigureLastAt": "Ultima executio praedestinata"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

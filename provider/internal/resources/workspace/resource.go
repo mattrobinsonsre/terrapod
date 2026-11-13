@@ -860,6 +860,62 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			// Scheduled configure (#2538): a cron schedule as a third way a
+			// configure starts, beside a push and an apply. All three are
+			// Optional+Computed with UseStateForUnknown, the shape every
+			// workspace setting beside them has: the server holds a default the
+			// configuration need not state, so omitting one means "leave alone"
+			// rather than "force null" (#684).
+			//
+			// The two strings are read back VERBATIM because the server stores
+			// them verbatim -- it validates the cron and refuses what it cannot
+			// honour, and normalises nothing. That is what makes reading the
+			// server's answer back safe here: an attribute whose value the
+			// server rewrites cannot be Optional+Computed over the rewritten
+			// value, because the plan would then disagree with the result and
+			// the apply would fail with "Provider produced inconsistent result
+			// after apply".
+			"scheduled_configure_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether this workspace runs a configure on a **cron schedule**. " +
+					"**Defaults to false.** Needs `configure_enabled`, and needs a non-empty " +
+					"`scheduled_configure_cron`; with either missing the setting is inert. " +
+					"Like a push-triggered configure the scheduled run carries no run options — " +
+					"it is `default_playbook` against `default_limit`, which is what bounds it.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"scheduled_configure_cron": schema.StringAttribute{
+				MarkdownDescription: "The schedule, as a **five-field** cron expression — " +
+					"`minute hour day-of-month month day-of-week`, for example `0 2 * * 2` for " +
+					"02:00 every Tuesday. **Defaults to the empty string, which is no schedule** " +
+					"whatever `scheduled_configure_enabled` holds.\n\n" +
+					"Stored exactly as written: a schedule has several spellings and the server " +
+					"normalises none of them, so the value reads back as the configuration set it. " +
+					"A **six-field** expression is refused rather than read as seconds-resolution, " +
+					"and so is anything firing more often than the deployment's minimum interval — " +
+					"a configure takes minutes to hours.\n\n" +
+					"Omitting this attribute leaves any existing server-side value untouched; set " +
+					"`scheduled_configure_cron = \"\"` to remove the schedule.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"scheduled_configure_timezone": schema.StringAttribute{
+				MarkdownDescription: "The IANA time zone `scheduled_configure_cron` is read in — " +
+					"`Europe/London`, `America/New_York`. **Defaults to `UTC`.** Naming a real zone " +
+					"rather than an offset is what keeps an overnight schedule overnight across a " +
+					"daylight-saving change.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"ansible_host_key_checking": schema.BoolAttribute{
 				MarkdownDescription: "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit `ansible_ssh_common_args` as a variable on the `all` group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: `known_hosts` on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures.",
 				Optional:            true,
@@ -1367,6 +1423,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "Timestamp of the last drift check. Server-volatile.",
 				Computed:    true,
 			},
+			// No UseStateForUnknown, deliberately, and for the reason the
+			// server-volatile set above gives: the scheduler moves this
+			// between plan and apply, so `(known after apply)` is the honest
+			// plan output rather than diff noise to suppress.
+			"scheduled_configure_last_at": schema.StringAttribute{
+				Description: "Timestamp of the last time the cron schedule fired, or null if it never has. It is what the next occurrence is measured from. Server-volatile.",
+				Computed:    true,
+			},
 			"drift_latest_run_id": schema.StringAttribute{
 				Description: "ID of the drift run that produced the current `drift_status`, prefixed `run-…`. Empty when drift has never run or when cleared by a successful apply. Server-volatile.",
 				Computed:    true,
@@ -1691,6 +1755,20 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
 	}
+	// Scheduled configure (#2538). The flag is a pointer for the reason its
+	// neighbours are; the two strings are plain on the CREATE request, because
+	// there empty is the server default for both -- no schedule, and UTC -- so
+	// an omitted attribute and an empty one are the same act.
+	if !m.ScheduledConfigureEnabled.IsNull() && !m.ScheduledConfigureEnabled.IsUnknown() {
+		v := m.ScheduledConfigureEnabled.ValueBool()
+		req.ScheduledConfigureEnabled = &v
+	}
+	if !m.ScheduledConfigureCron.IsNull() && !m.ScheduledConfigureCron.IsUnknown() {
+		req.ScheduledConfigureCron = m.ScheduledConfigureCron.ValueString()
+	}
+	if !m.ScheduledConfigureTimezone.IsNull() && !m.ScheduledConfigureTimezone.IsUnknown() {
+		req.ScheduledConfigureTimezone = m.ScheduledConfigureTimezone.ValueString()
+	}
 	// Host-key verification (#2318). A pointer for the reason the booleans above
 	// give, and here that reason bites hardest, because the server default is
 	// TRUE: "I did not say" and "stop verifying" have to be different requests.
@@ -1966,6 +2044,22 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ConfigureAllHosts.IsNull() && !m.ConfigureAllHosts.IsUnknown() {
 		v := m.ConfigureAllHosts.ValueBool()
 		req.ConfigureAllHosts = &v
+	}
+	// Scheduled configure (#2538). All three are POINTERS on the UPDATE
+	// request, the strings included: an empty cron is how an operator REMOVES
+	// the schedule, and a plain string would drop it, so `cron = ""` would be
+	// a silent no-op and the workspace would go on configuring every week.
+	if !m.ScheduledConfigureEnabled.IsNull() && !m.ScheduledConfigureEnabled.IsUnknown() {
+		v := m.ScheduledConfigureEnabled.ValueBool()
+		req.ScheduledConfigureEnabled = &v
+	}
+	if !m.ScheduledConfigureCron.IsNull() && !m.ScheduledConfigureCron.IsUnknown() {
+		v := m.ScheduledConfigureCron.ValueString()
+		req.ScheduledConfigureCron = &v
+	}
+	if !m.ScheduledConfigureTimezone.IsNull() && !m.ScheduledConfigureTimezone.IsUnknown() {
+		v := m.ScheduledConfigureTimezone.ValueString()
+		req.ScheduledConfigureTimezone = &v
 	}
 	// Host-key verification (#2318). A pointer for the reason the booleans above
 	// give, and here that reason bites hardest, because the server default is
@@ -2248,6 +2342,16 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	// where on a false-defaulting sibling the same bug agrees with itself and
 	// goes unnoticed.
 	m.AnsibleHostKeyChecking = types.BoolValue(ws.AnsibleHostKeyChecking)
+	// Scheduled configure (#2538), read side. Unconditional projections for
+	// the reason the lines above give: all three are Optional+Computed over
+	// non-nullable columns, so a null read-back is the inconsistent-result
+	// shape, and the empty cron is a REAL value (no schedule) rather than an
+	// absence. The strings are taken verbatim -- the server stores them that
+	// way, and reshaping either here would make a configuration's own text
+	// disagree with what comes back.
+	m.ScheduledConfigureEnabled = types.BoolValue(ws.ScheduledConfigureEnabled)
+	m.ScheduledConfigureCron = types.StringValue(ws.ScheduledConfigureCron)
+	m.ScheduledConfigureTimezone = types.StringValue(ws.ScheduledConfigureTimezone)
 	// #2033's pair, same shape: Optional+Computed over a non-nullable
 	// column the SDK holds as a plain bool, so a false survives the round
 	// trip and a null read-back is never the right answer.
@@ -2334,6 +2438,13 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.DriftLastCheckedAt = types.StringValue(ws.DriftLastCheckedAt)
 	} else {
 		m.DriftLastCheckedAt = types.StringNull()
+	}
+	// Computed-only, so null is the right answer for "it has never fired" --
+	// nothing in a configuration can disagree with it (#2538).
+	if ws.ScheduledConfigureLastAt != "" {
+		m.ScheduledConfigureLastAt = types.StringValue(ws.ScheduledConfigureLastAt)
+	} else {
+		m.ScheduledConfigureLastAt = types.StringNull()
 	}
 	if ws.DriftLatestRunID != "" {
 		m.DriftLatestRunID = types.StringValue(ws.DriftLatestRunID)

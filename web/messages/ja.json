@@ -1337,7 +1337,8 @@
       "operationsNone": "これでは一致するすべてのワークスペースに操作が一切なくなります。ワークスペースはプランと適用、構成、またはその両方のいずれかを保持する必要があります。",
       "setHardLimit": "強制 limit を設定（空の値で上限を解除）",
       "setPlaybooks": "許可するプレイブックを設定（一致したすべてのワークスペースのリストを置き換えます。空のリストで制限を解除）",
-      "playbooksPairWarning": "空でないリストには、一致した各ワークスペースのそれぞれの既定のプレイブックが含まれていなければなりません。まだ含まれていない場合は、同じ更新で既定のプレイブックも設定してください。"
+      "playbooksPairWarning": "空でないリストには、一致した各ワークスペースのそれぞれの既定のプレイブックが含まれていなければなりません。まだ含まれていない場合は、同じ更新で既定のプレイブックも設定してください。",
+      "setScheduledConfigureCron": "構成のスケジュールを設定する (空の値で削除)"
     },
     "diff": {
       "colWorkspace": "ワークスペース",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "各エントリは設定ディレクトリからの相対パスです。一覧を指定すると、実行オプションはテキスト入力ではなく一覧からの選択になります。オプションを指定しない構成操作は既定のプレイブックを実行するため、既定のプレイブックはエントリのいずれかでなければなりません。ノードの退避やデータベースのアップグレードなど、決して触れてはならないワークスペースから特定のプレイブックを遠ざけるために使用します。そこでは一覧は慣習ではなく制御手段となります。",
       "playbooksPlaceholder": "例: release.yml",
       "playbooksAdd": "プレイブックを追加",
-      "playbooksAny": "すべて許可"
+      "playbooksAny": "すべて許可",
+      "scheduledConfigureEnabled": "スケジュールで構成",
+      "scheduledConfigureEnabledHint": "何も変更がなくても決まった時刻に Playbook が実行されます。プッシュ後にだけ修正するのではなく、フリート全体を収束した状態に保つ方法です。",
+      "scheduledConfigureCron": "スケジュール",
+      "scheduledConfigureCronLead": "構成を実行する時刻を 5 フィールドの cron 式で指定します。スケジュールで構成が有効な間だけ読み取られ、空のままにするとスケジュールなしになります。",
+      "scheduledConfigureCronTitle": "5 つのフィールドは分、時、日、月、曜日で、下のタイムゾーンで解釈されます。0 2 * * 2 は毎週火曜の 02:00、0 2 * * * は毎日の 02:00 です。6 フィールドの式は拒否されます。秒単位のスケジュールは守れないからです。5 分より短い間隔で発火するものも同様に拒否されます。構成は 1 時間かかることがあり、安全に再開できないためです。",
+      "scheduledConfigureCronPlaceholder": "例: 0 2 * * 2",
+      "scheduledConfigureTimezone": "スケジュールのタイムゾーン",
+      "scheduledConfigureTimezoneHint": "スケジュールを解釈する IANA タイムゾーンです。これにより時刻は夏時間に追随します。例: UTC、Europe/London、America/New_York。空の場合は UTC です。",
+      "scheduledConfigureTimezonePlaceholder": "例: Europe/London",
+      "scheduledConfigureLastAt": "前回のスケジュール実行"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

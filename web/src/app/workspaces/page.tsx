@@ -384,6 +384,10 @@ function createDefaults(engine: string): Record<string, unknown> {
     'plan-apply-enabled': true,
     // `''` is "use the ordering", which is the column default too.
     'default-run-kind': '',
+    // The schedule's zone (#2538). Seeded rather than left empty because the
+    // column defaults to it and an empty value is substituted server-side, so
+    // an empty box would misreport what a new workspace will actually use.
+    'scheduled-configure-timezone': 'UTC',
     // ansible — verification on is ansible's own behaviour, so the column
     // defaults TRUE and the box has to show that (#2318).
     'ansible-host-key-checking': true,
@@ -1333,6 +1337,12 @@ function WorkspacesPageInner() {
         return tieredHint(tDetail, 'fields.defaultRunKindTitle')
       case 'configure-all-hosts':
         return hintText(tDetail('fields.configureAllHostsHint'))
+      case 'scheduled-configure-enabled':
+        return hintText(tDetail('fields.scheduledConfigureEnabledHint'))
+      case 'scheduled-configure-cron':
+        return tieredHint(tDetail, 'fields.scheduledConfigureCronTitle')
+      case 'scheduled-configure-timezone':
+        return hintText(tDetail('fields.scheduledConfigureTimezoneHint'))
       case 'config-directory':
         return tieredHint(tDetail, 'fields.configDirectoryTitle')
       case 'playbooks':
@@ -1655,6 +1665,23 @@ function WorkspacesPageInner() {
           ctx={createCtx}
           kind="select"
           options={defaultRunKindOptions}
+        />
+        {/* The schedule (#2538). The switch sits with the other two triggers
+            and its two dependents follow it, so the cron and the zone are
+            disabled-but-visible until the switch is on -- which is how an
+            operator learns the pair exists. */}
+        <Field attr="scheduled-configure-enabled" ctx={createCtx} kind="checkbox" />
+        <Field
+          attr="scheduled-configure-cron"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.scheduledConfigureCronPlaceholder')}
+        />
+        <Field
+          attr="scheduled-configure-timezone"
+          ctx={createCtx}
+          kind="text"
+          placeholder={tDetail('fields.scheduledConfigureTimezonePlaceholder')}
         />
       </>
     ),

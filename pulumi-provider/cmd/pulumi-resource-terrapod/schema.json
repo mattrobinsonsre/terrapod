@@ -6425,6 +6425,22 @@
                     "type": "string",
                     "description": "Memory request for runner Jobs (K8s format, e.g. '2Gi')."
                 },
+                "scheduledConfigureCron": {
+                    "type": "string",
+                    "description": "The schedule, as a **five-field** cron expression — `minute hour day-of-month month day-of-week`, for example `0 2 * * 2` for 02:00 every Tuesday. **Defaults to the empty string, which is no schedule** whatever \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureEnabled`\" pulumi-lang-dotnet=\"`ScheduledConfigureEnabled`\" pulumi-lang-go=\"`scheduledConfigureEnabled`\" pulumi-lang-python=\"`scheduled_configure_enabled`\" pulumi-lang-yaml=\"`scheduledConfigureEnabled`\" pulumi-lang-java=\"`scheduledConfigureEnabled`\" pulumi-lang-hcl=\"`scheduled_configure_enabled`\"\u003e`scheduledConfigureEnabled`\u003c/span\u003e holds.\n\nStored exactly as written: a schedule has several spellings and the server normalises none of them, so the value reads back as the configuration set it. A **six-field** expression is refused rather than read as seconds-resolution, and so is anything firing more often than the deployment's minimum interval — a configure takes minutes to hours.\n\nOmitting this attribute leaves any existing server-side value untouched; set \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron \" pulumi-lang-dotnet=\"`ScheduledConfigureCron \" pulumi-lang-go=\"`scheduledConfigureCron \" pulumi-lang-python=\"`scheduled_configure_cron \" pulumi-lang-yaml=\"`scheduledConfigureCron \" pulumi-lang-java=\"`scheduledConfigureCron \" pulumi-lang-hcl=\"`scheduled_configure_cron \"\u003e`scheduledConfigureCron \u003c/span\u003e= \"\"` to remove the schedule."
+                },
+                "scheduledConfigureEnabled": {
+                    "type": "boolean",
+                    "description": "Whether this workspace runs a configure on a **cron schedule**. **Defaults to false.** Needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e, and needs a non-empty \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e; with either missing the setting is inert. Like a push-triggered configure the scheduled run carries no run options — it is \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e against \u003cspan pulumi-lang-nodejs=\"`defaultLimit`\" pulumi-lang-dotnet=\"`DefaultLimit`\" pulumi-lang-go=\"`defaultLimit`\" pulumi-lang-python=\"`default_limit`\" pulumi-lang-yaml=\"`defaultLimit`\" pulumi-lang-java=\"`defaultLimit`\" pulumi-lang-hcl=\"`default_limit`\"\u003e`defaultLimit`\u003c/span\u003e, which is what bounds it."
+                },
+                "scheduledConfigureLastAt": {
+                    "type": "string",
+                    "description": "Timestamp of the last time the cron schedule fired, or null if it never has. It is what the next occurrence is measured from. Server-volatile."
+                },
+                "scheduledConfigureTimezone": {
+                    "type": "string",
+                    "description": "The IANA time zone \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e is read in — `Europe/London`, `America/New_York`. **Defaults to `UTC`.** Naming a real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."
+                },
                 "securityScanEnforcement": {
                     "type": "string",
                     "description": "IaC security-scan enforcement: \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e (skip), \u003cspan pulumi-lang-nodejs=\"`advisory`\" pulumi-lang-dotnet=\"`Advisory`\" pulumi-lang-go=\"`advisory`\" pulumi-lang-python=\"`advisory`\" pulumi-lang-yaml=\"`advisory`\" pulumi-lang-java=\"`advisory`\" pulumi-lang-hcl=\"`advisory`\"\u003e`advisory`\u003c/span\u003e (scan, never block — the default), or \u003cspan pulumi-lang-nodejs=\"`enforced`\" pulumi-lang-dotnet=\"`Enforced`\" pulumi-lang-go=\"`enforced`\" pulumi-lang-python=\"`enforced`\" pulumi-lang-yaml=\"`enforced`\" pulumi-lang-java=\"`enforced`\" pulumi-lang-hcl=\"`enforced`\"\u003e`enforced`\u003c/span\u003e (a failed/errored scan blocks apply until fixed or overridden)."
@@ -6581,6 +6597,10 @@
                 "remoteStateConsumers",
                 "resourceCpu",
                 "resourceMemory",
+                "scheduledConfigureCron",
+                "scheduledConfigureEnabled",
+                "scheduledConfigureLastAt",
+                "scheduledConfigureTimezone",
                 "securityScanEnforcement",
                 "securityScanEngine",
                 "securityScanSeverityThreshold",
@@ -6819,6 +6839,18 @@
                 "resourceMemory": {
                     "type": "string",
                     "description": "Memory request for runner Jobs (K8s format, e.g. '2Gi')."
+                },
+                "scheduledConfigureCron": {
+                    "type": "string",
+                    "description": "The schedule, as a **five-field** cron expression — `minute hour day-of-month month day-of-week`, for example `0 2 * * 2` for 02:00 every Tuesday. **Defaults to the empty string, which is no schedule** whatever \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureEnabled`\" pulumi-lang-dotnet=\"`ScheduledConfigureEnabled`\" pulumi-lang-go=\"`scheduledConfigureEnabled`\" pulumi-lang-python=\"`scheduled_configure_enabled`\" pulumi-lang-yaml=\"`scheduledConfigureEnabled`\" pulumi-lang-java=\"`scheduledConfigureEnabled`\" pulumi-lang-hcl=\"`scheduled_configure_enabled`\"\u003e`scheduledConfigureEnabled`\u003c/span\u003e holds.\n\nStored exactly as written: a schedule has several spellings and the server normalises none of them, so the value reads back as the configuration set it. A **six-field** expression is refused rather than read as seconds-resolution, and so is anything firing more often than the deployment's minimum interval — a configure takes minutes to hours.\n\nOmitting this attribute leaves any existing server-side value untouched; set \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron \" pulumi-lang-dotnet=\"`ScheduledConfigureCron \" pulumi-lang-go=\"`scheduledConfigureCron \" pulumi-lang-python=\"`scheduled_configure_cron \" pulumi-lang-yaml=\"`scheduledConfigureCron \" pulumi-lang-java=\"`scheduledConfigureCron \" pulumi-lang-hcl=\"`scheduled_configure_cron \"\u003e`scheduledConfigureCron \u003c/span\u003e= \"\"` to remove the schedule."
+                },
+                "scheduledConfigureEnabled": {
+                    "type": "boolean",
+                    "description": "Whether this workspace runs a configure on a **cron schedule**. **Defaults to false.** Needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e, and needs a non-empty \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e; with either missing the setting is inert. Like a push-triggered configure the scheduled run carries no run options — it is \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e against \u003cspan pulumi-lang-nodejs=\"`defaultLimit`\" pulumi-lang-dotnet=\"`DefaultLimit`\" pulumi-lang-go=\"`defaultLimit`\" pulumi-lang-python=\"`default_limit`\" pulumi-lang-yaml=\"`defaultLimit`\" pulumi-lang-java=\"`defaultLimit`\" pulumi-lang-hcl=\"`default_limit`\"\u003e`defaultLimit`\u003c/span\u003e, which is what bounds it."
+                },
+                "scheduledConfigureTimezone": {
+                    "type": "string",
+                    "description": "The IANA time zone \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e is read in — `Europe/London`, `America/New_York`. **Defaults to `UTC`.** Naming a real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."
                 },
                 "securityScanEnforcement": {
                     "type": "string",
@@ -7159,6 +7191,22 @@
                     "resourceMemory": {
                         "type": "string",
                         "description": "Memory request for runner Jobs (K8s format, e.g. '2Gi')."
+                    },
+                    "scheduledConfigureCron": {
+                        "type": "string",
+                        "description": "The schedule, as a **five-field** cron expression — `minute hour day-of-month month day-of-week`, for example `0 2 * * 2` for 02:00 every Tuesday. **Defaults to the empty string, which is no schedule** whatever \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureEnabled`\" pulumi-lang-dotnet=\"`ScheduledConfigureEnabled`\" pulumi-lang-go=\"`scheduledConfigureEnabled`\" pulumi-lang-python=\"`scheduled_configure_enabled`\" pulumi-lang-yaml=\"`scheduledConfigureEnabled`\" pulumi-lang-java=\"`scheduledConfigureEnabled`\" pulumi-lang-hcl=\"`scheduled_configure_enabled`\"\u003e`scheduledConfigureEnabled`\u003c/span\u003e holds.\n\nStored exactly as written: a schedule has several spellings and the server normalises none of them, so the value reads back as the configuration set it. A **six-field** expression is refused rather than read as seconds-resolution, and so is anything firing more often than the deployment's minimum interval — a configure takes minutes to hours.\n\nOmitting this attribute leaves any existing server-side value untouched; set \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron \" pulumi-lang-dotnet=\"`ScheduledConfigureCron \" pulumi-lang-go=\"`scheduledConfigureCron \" pulumi-lang-python=\"`scheduled_configure_cron \" pulumi-lang-yaml=\"`scheduledConfigureCron \" pulumi-lang-java=\"`scheduledConfigureCron \" pulumi-lang-hcl=\"`scheduled_configure_cron \"\u003e`scheduledConfigureCron \u003c/span\u003e= \"\"` to remove the schedule."
+                    },
+                    "scheduledConfigureEnabled": {
+                        "type": "boolean",
+                        "description": "Whether this workspace runs a configure on a **cron schedule**. **Defaults to false.** Needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e, and needs a non-empty \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e; with either missing the setting is inert. Like a push-triggered configure the scheduled run carries no run options — it is \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e against \u003cspan pulumi-lang-nodejs=\"`defaultLimit`\" pulumi-lang-dotnet=\"`DefaultLimit`\" pulumi-lang-go=\"`defaultLimit`\" pulumi-lang-python=\"`default_limit`\" pulumi-lang-yaml=\"`defaultLimit`\" pulumi-lang-java=\"`defaultLimit`\" pulumi-lang-hcl=\"`default_limit`\"\u003e`defaultLimit`\u003c/span\u003e, which is what bounds it."
+                    },
+                    "scheduledConfigureLastAt": {
+                        "type": "string",
+                        "description": "Timestamp of the last time the cron schedule fired, or null if it never has. It is what the next occurrence is measured from. Server-volatile."
+                    },
+                    "scheduledConfigureTimezone": {
+                        "type": "string",
+                        "description": "The IANA time zone \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e is read in — `Europe/London`, `America/New_York`. **Defaults to `UTC`.** Naming a real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."
                     },
                     "securityScanEnforcement": {
                         "type": "string",
@@ -8150,6 +8198,18 @@
                     "resourceMemory": {
                         "type": "string"
                     },
+                    "scheduledConfigureCron": {
+                        "type": "string"
+                    },
+                    "scheduledConfigureEnabled": {
+                        "type": "boolean"
+                    },
+                    "scheduledConfigureLastAt": {
+                        "type": "string"
+                    },
+                    "scheduledConfigureTimezone": {
+                        "type": "string"
+                    },
                     "securityScanEnforcement": {
                         "type": "string"
                     },
@@ -8281,6 +8341,10 @@
                     "pulumiBindPlan",
                     "resourceCpu",
                     "resourceMemory",
+                    "scheduledConfigureCron",
+                    "scheduledConfigureEnabled",
+                    "scheduledConfigureLastAt",
+                    "scheduledConfigureTimezone",
                     "securityScanEnforcement",
                     "securityScanEngine",
                     "securityScanSeverityThreshold",

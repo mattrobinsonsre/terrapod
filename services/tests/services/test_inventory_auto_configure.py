@@ -86,7 +86,7 @@ async def _run(workspaces, *, redis, current, in_flight=False, cv=_ABSENT):
         patch.object(iac, "get_db_session", lambda: _Session()),
         patch("terrapod.redis.client.get_redis_client", lambda: redis),
         patch.object(iac.inventory_resolve, "platform_rev", AsyncMock(return_value=current)),
-        patch.object(iac, "_configure_in_flight", AsyncMock(return_value=in_flight)),
+        patch.object(iac, "configure_in_flight", AsyncMock(return_value=in_flight)),
         patch.object(iac.run_service, "get_latest_uploaded_cv", AsyncMock(return_value=cv)),
         patch.object(iac.run_service, "create_run", created),
         patch.object(iac.run_service, "queue_run", queued),
@@ -213,7 +213,7 @@ class TestOneWorkspaceNeverKillsTheCycle:
             patch.object(iac, "get_db_session", lambda: _Session()),
             patch("terrapod.redis.client.get_redis_client", lambda: redis),
             patch.object(iac.inventory_resolve, "platform_rev", AsyncMock(return_value=_TOKEN_NEW)),
-            patch.object(iac, "_configure_in_flight", AsyncMock(return_value=False)),
+            patch.object(iac, "configure_in_flight", AsyncMock(return_value=False)),
             patch.object(
                 iac.run_service,
                 "get_latest_uploaded_cv",
@@ -249,9 +249,9 @@ class TestTheInFlightSetExcludesAwaitingConfirm:
         drift for ever, because a `planned` run awaiting an operator's confirm
         sits indefinitely. A configure has no confirm step, and this set must
         stay narrow enough that it cannot acquire one by accident."""
-        assert "planned" not in iac._CONFIGURE_IN_FLIGHT
-        assert "confirmed" not in iac._CONFIGURE_IN_FLIGHT
-        assert "configuring" in iac._CONFIGURE_IN_FLIGHT
+        assert "planned" not in iac.CONFIGURE_IN_FLIGHT
+        assert "confirmed" not in iac.CONFIGURE_IN_FLIGHT
+        assert "configuring" in iac.CONFIGURE_IN_FLIGHT
 
 
 @pytest.mark.asyncio

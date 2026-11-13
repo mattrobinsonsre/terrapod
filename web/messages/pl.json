@@ -1337,7 +1337,8 @@
       "operationsNone": "To pozostawiłoby każdą dopasowaną przestrzeń robocza w ogóle bez operacji. Przestrzeń robocza musi zachować planowanie i stosowanie, konfigurację albo oba.",
       "setHardLimit": "Ustaw sztywny limit (pusta wartość usuwa pułap)",
       "setPlaybooks": "Ustaw dozwolone playbooki (zastępuje listę w każdym dopasowanym obszarze roboczym; pusta lista usuwa ograniczenie)",
-      "playbooksPairWarning": "Niepusta lista musi zawierać własny domyślny playbook każdego dopasowanego obszaru roboczego, więc ustaw go w tej samej aktualizacji, jeśli nie jest już jednym z tych wpisów."
+      "playbooksPairWarning": "Niepusta lista musi zawierać własny domyślny playbook każdego dopasowanego obszaru roboczego, więc ustaw go w tej samej aktualizacji, jeśli nie jest już jednym z tych wpisów.",
+      "setScheduledConfigureCron": "Ustaw harmonogram konfiguracji (pusta wartość go usuwa)"
     },
     "diff": {
       "colWorkspace": "Obszar roboczy",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Każdy wpis to ścieżka względem katalogu konfiguracji, a opcja uruchomienia zmienia się z pola tekstowego w listę wyboru spośród nich. Domyślny playbook musi być jednym z wpisów, ponieważ samo kliknięcie Konfiguruj uruchamia właśnie domyślny. Użyj tego, aby nie dopuścić playbooka do obszaru roboczego, którego nigdy nie powinien dotykać — wycofanie węzła z obsługi, aktualizacja bazy danych — gdzie lista jest mechanizmem kontroli, a nie konwencją.",
       "playbooksPlaceholder": "np. release.yml",
       "playbooksAdd": "Dodaj playbook",
-      "playbooksAny": "Dowolny"
+      "playbooksAny": "Dowolny",
+      "scheduledConfigureEnabled": "Konfiguracja według harmonogramu",
+      "scheduledConfigureEnabledHint": "Playbook uruchamia się o stałej porze niezależnie od tego, czy coś się zmieniło — tak flota pozostaje zbieżna, zamiast być poprawiana dopiero po wypchnięciu.",
+      "scheduledConfigureCron": "Harmonogram",
+      "scheduledConfigureCronLead": "Kiedy uruchamia się konfiguracja, jako wyrażenie cron z pięciu pól. Jest odczytywane tylko wtedy, gdy konfiguracja według harmonogramu jest włączona, a puste pole oznacza brak harmonogramu.",
+      "scheduledConfigureCronTitle": "Pięć pól to minuta, godzina, dzień miesiąca, miesiąc i dzień tygodnia, odczytywane w strefie czasowej poniżej: 0 2 * * 2 to 02:00 w każdy wtorek, a 0 2 * * * to 02:00 każdego dnia. Wyrażenie z sześciu pól jest odrzucane, ponieważ harmonogramu z dokładnością do sekundy nie da się dotrzymać; tak samo odrzucane jest wszystko, co wyzwala się częściej niż co pięć minut — konfiguracja może trwać godzinę i nie da się jej bezpiecznie wznowić.",
+      "scheduledConfigureCronPlaceholder": "np. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Strefa czasowa harmonogramu",
+      "scheduledConfigureTimezoneHint": "Strefa IANA, w której odczytywany jest harmonogram, aby godzina podążała za czasem letnim — na przykład UTC, Europe/London lub America/New_York. Puste oznacza UTC.",
+      "scheduledConfigureTimezonePlaceholder": "np. Europe/London",
+      "scheduledConfigureLastAt": "Ostatnie uruchomienie z harmonogramu"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

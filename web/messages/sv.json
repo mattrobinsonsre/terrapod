@@ -1337,7 +1337,8 @@
       "operationsNone": "Detta skulle lämna varje matchande arbetsyta helt utan operation. En arbetsyta måste behålla planera och tillämpa, eller konfigurera, eller båda.",
       "setHardLimit": "Sätt hård gräns (ett tomt värde tar bort taket)",
       "setPlaybooks": "Sätt tillåtna playbooks (ersätter listan på varje matchad arbetsyta; en tom lista tar bort begränsningen)",
-      "playbooksPairWarning": "En icke-tom lista måste innehålla varje matchad arbetsytas egen standardplaybook, så sätt den i samma uppdatering om den inte redan är en av dessa."
+      "playbooksPairWarning": "En icke-tom lista måste innehålla varje matchad arbetsytas egen standardplaybook, så sätt den i samma uppdatering om den inte redan är en av dessa.",
+      "setScheduledConfigureCron": "Ange konfigureringens schema (ett tomt värde tar bort det)"
     },
     "diff": {
       "colWorkspace": "Arbetsyta",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Varje post är en sökväg relativt konfigurationskatalogen, och körningsalternativet blir en väljare över dem i stället för ett textfält. Standardplaybooken måste vara en av posterna, eftersom ett blankt Konfigurera kör standarden. Använd det för att hålla en playbook borta från en arbetsyta den aldrig får röra — en nodavtappning, en databasuppgradering — där en lista är en kontroll snarare än en konvention.",
       "playbooksPlaceholder": "t.ex. release.yml",
       "playbooksAdd": "Lägg till playbook",
-      "playbooksAny": "Alla"
+      "playbooksAny": "Alla",
+      "scheduledConfigureEnabled": "Konfigurera enligt schema",
+      "scheduledConfigureEnabledHint": "Playbooken körs vid en fast tidpunkt oavsett om något har ändrats, och det är så en flotta hålls konvergerad i stället för att rättas först efter en push.",
+      "scheduledConfigureCron": "Schema",
+      "scheduledConfigureCronLead": "När konfigureringen körs, som ett cron-uttryck med fem fält. Det läses bara medan Konfigurera enligt schema är på, och att lämna det tomt betyder inget schema.",
+      "scheduledConfigureCronTitle": "De fem fälten är minut, timme, dag i månaden, månad och veckodag, lästa i tidszonen nedan: 0 2 * * 2 är 02:00 varje tisdag och 0 2 * * * är 02:00 varje dag. Ett uttryck med sex fält avvisas, eftersom ett schema med sekundupplösning inte kan hållas, och detsamma gäller allt som utlöser oftare än var femte minut — en konfigurering kan pågå en timme och går inte att starta om riskfritt.",
+      "scheduledConfigureCronPlaceholder": "t.ex. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Schemats tidszon",
+      "scheduledConfigureTimezoneHint": "IANA-zonen som schemat läses i, så att timmen följer sommartid — till exempel UTC, Europe/London eller America/New_York. Tomt betyder UTC.",
+      "scheduledConfigureTimezonePlaceholder": "t.ex. Europe/London",
+      "scheduledConfigureLastAt": "Senaste schemalagda körning"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

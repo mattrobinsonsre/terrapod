@@ -1337,7 +1337,8 @@
       "applyChanges": "Apply changes",
       "setOidcAudiences": "Set OIDC run identity audiences (replaces the map on every matched workspace)",
       "operationsNone": "This would leave every matched workspace with no operation at all. A workspace must keep plan and apply, or configure, or both.",
-      "setHardLimit": "Set hard limit (an empty value removes the ceiling)"
+      "setHardLimit": "Set hard limit (an empty value removes the ceiling)",
+      "setScheduledConfigureCron": "Set the configure schedule (an empty value removes it)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -2859,6 +2860,16 @@
       "configureAfterApplyHint": "Every apply here is followed by a configure on the same run, so a CLI apply streams the playbook's output too. A destroy never configures.",
       "configureAllHosts": "Configure all hosts",
       "configureAllHostsHint": "A configure the platform starts for you targets only the hosts an inventory change touched, unless the Ansible code moved since the last one. Turn this on to always sweep the whole inventory.",
+      "scheduledConfigureEnabled": "Configure on a schedule",
+      "scheduledConfigureEnabledHint": "The playbook runs at a fixed time whether or not anything has changed, which is how a fleet stays converged rather than only being corrected after a push.",
+      "scheduledConfigureCron": "Schedule",
+      "scheduledConfigureCronLead": "When the configure runs, as a five-field cron expression. It is used only while Configure on a schedule is on, and leaving it empty means no schedule.",
+      "scheduledConfigureCronTitle": "The five fields are minute, hour, day-of-month, month and day-of-week, read in the time zone below: 0 2 * * 2 is 02:00 every Tuesday and 0 2 * * * is 02:00 every day. A six-field expression is refused, because a seconds-resolution schedule cannot be honoured, and so is anything firing more often than every five minutes — a configure can run for an hour and is not safely restartable.",
+      "scheduledConfigureCronPlaceholder": "e.g. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Schedule time zone",
+      "scheduledConfigureTimezoneHint": "The IANA zone the schedule is read in, so the hour follows daylight saving — for example UTC, Europe/London or America/New_York. Empty means UTC.",
+      "scheduledConfigureTimezonePlaceholder": "e.g. Europe/London",
+      "scheduledConfigureLastAt": "Last scheduled run",
       "eeCpuRequest": "Ansible CPU request",
       "eeMemoryRequest": "Ansible memory request",
       "terragruntEnabled": "Terragrunt",

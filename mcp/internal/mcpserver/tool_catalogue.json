@@ -2890,6 +2890,27 @@
           "description": "memory request for this workspace's runner Jobs, as a Kubernetes quantity in binary bytes (256Mi, 2Gi). Limit is 2x. Same refusals as resource_cpu",
           "type": "string"
         },
+        "scheduled_configure_cron": {
+          "description": "when the scheduled configure runs, as a FIVE-FIELD cron expression read in scheduled_configure_timezone -- for example 0 2 * * 2 for 02:00 every Tuesday. Refused (422) if it does not parse, if it has six fields (a seconds-resolution schedule cannot be honoured), or if it fires more often than every 300 seconds. Stored exactly as you write it, never reformatted. Pass an EMPTY STRING to remove the schedule; omitting the field leaves the stored value alone",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "scheduled_configure_enabled": {
+          "description": "run a configure on a CRON SCHEDULE. Distinct from auto_configure_enabled, which fires on a push to config_directory: this one is the calendar. Needs scheduled_configure_cron set to do anything. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "scheduled_configure_timezone": {
+          "description": "the IANA zone the cron expression is read in, e.g. Europe/London; UTC by default. This is what makes it a schedule rather than an interval -- 0 2 * * * in Europe/London is 02:00 there in January AND in July, which are different instants in UTC. Omit to leave the stored value alone",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "security_scan_enforcement": {
           "description": "what a security-scan finding DOES: off (do not scan at all), advisory (report and let the run continue) or enforced (hold the apply until the finding is overridden). Distinct from security_scan_severity_threshold, which decides what is REPORTED rather than what blocks. A workspace whose engine produces no Terraform plan JSON -- a pulumi one -- accepts only off, because a scanner has nothing to read there. Omit to leave the stored value alone",
           "type": "string"

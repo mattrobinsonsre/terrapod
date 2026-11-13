@@ -157,6 +157,9 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "drift-detection-enabled": rule.drift_detection_enabled,
             "drift-detection-interval-seconds": rule.drift_detection_interval_seconds,
             "drift-ignore-rules": list(rule.drift_ignore_rules or []),
+            "scheduled-configure-enabled": rule.scheduled_configure_enabled,
+            "scheduled-configure-cron": rule.scheduled_configure_cron,
+            "scheduled-configure-timezone": rule.scheduled_configure_timezone,
             "plan-expiry-seconds": rule.plan_expiry_seconds,
             "slack-channel": rule.slack_channel or "",
             "debug-mode": rule.debug_mode,
@@ -619,6 +622,20 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         ),
         ("slack-channel", "slack_channel", workspace_settings.validate_slack_channel),
         ("oidc-audiences", "oidc_audiences", workspace_settings.validate_oidc_audiences),
+        # Scheduled configure (#2538). The zone is listed FIRST so it is
+        # validated before the cron rule, whose minimum-interval probe is
+        # anchored in a zone -- though the gap between two firings is the same
+        # in any zone, so the order is tidiness rather than correctness here.
+        (
+            "scheduled-configure-timezone",
+            "scheduled_configure_timezone",
+            workspace_settings.validate_schedule_timezone,
+        ),
+        (
+            "scheduled-configure-cron",
+            "scheduled_configure_cron",
+            workspace_settings.validate_schedule_cron,
+        ),
     ):
         if key in attrs:
             try:
@@ -631,6 +648,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         ("drift-detection-enabled", "drift_detection_enabled"),
         ("debug-mode", "debug_mode"),
         ("allow-fork-pr-plans", "allow_fork_pr_plans"),
+        ("scheduled-configure-enabled", "scheduled_configure_enabled"),
     ):
         if key in attrs:
             try:

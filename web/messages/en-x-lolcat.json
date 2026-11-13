@@ -1337,7 +1337,8 @@
       "operationsNone": "Dis wud leev evry matchd werkspace wif no opurashun at all. A werkspace must keep plan an apply, or konfigur, or bof.",
       "setHardLimit": "Set hard limit (a empteh valoo remooves teh ceilin)",
       "setPlaybooks": "Set allowd playbookz (replacez teh list on every matchd werkspace; a empteh list takez teh limitz off)",
-      "playbooksPairWarning": "A list wot aint empteh gotta contain each matchd werkspace's own defawlt playbook, so set dat in teh same updayt if it aint alreddy wun ov deez. srsly"
+      "playbooksPairWarning": "A list wot aint empteh gotta contain each matchd werkspace's own defawlt playbook, so set dat in teh same updayt if it aint alreddy wun ov deez. srsly",
+      "setScheduledConfigureCron": "Set teh konfigur skedyool (an empteh valyoo removez it)"
     },
     "diff": {
       "colWorkspace": "Werkspace",
@@ -2876,7 +2877,17 @@
       "playbooksTitle": "Each entree iz a path relativ ta teh konfig direktoree, an teh run opshun turnz intoo a pickr ovr dem insted ov a text box. Teh defawlt playbook gotta be wun ov teh entreez, becuz a bare Konfigur runz teh defawlt. Use it ta keep a playbook away frum a werkspace it must nevr touch — a node drain, a databayse upgrade — wher a list iz a kontrol an not jus a habbit. srsly",
       "playbooksPlaceholder": "liek release.yml",
       "playbooksAdd": "Add playbuk",
-      "playbooksAny": "Enny"
+      "playbooksAny": "Enny",
+      "scheduledConfigureEnabled": "Konfigur on a skedyool",
+      "scheduledConfigureEnabledHint": "Teh playbook runz at a fixd time wethr or not anyfing haz changd, wich is how a fleet stayz converjd insted ov gettin fixd only aftr a push. srsly",
+      "scheduledConfigureCron": "Skedyool",
+      "scheduledConfigureCronLead": "Wen teh konfigur runz, as a five-feeld cron expreshun. It onlee getz red wile Konfigur on a skedyool is on, an leevin it empteh meenz noe skedyool.",
+      "scheduledConfigureCronTitle": "Teh five feeldz r minit, hour, day-ov-munth, munth an day-ov-week, red in teh timezoan belo: 0 2 * * 2 is 02:00 evry Toosday an 0 2 * * * is 02:00 evry day. A six-feeld expreshun getz refuzd, coz a sekindz-rezolooshun skedyool cannot be honord, an so duz anyfing firin moar oftn than evry five minits — a konfigur can run fer an hour an is not safelee restartabul. kthxbai",
+      "scheduledConfigureCronPlaceholder": "e.g. 0 2 * * 2",
+      "scheduledConfigureTimezone": "Skedyool timezoan",
+      "scheduledConfigureTimezoneHint": "Teh IANA zoan teh skedyool getz red in, so teh hour followz daylite savin — fer exampul UTC, Europe/London or America/New_York. Empteh meenz UTC.",
+      "scheduledConfigureTimezonePlaceholder": "e.g. Europe/London",
+      "scheduledConfigureLastAt": "Last skedyoold run"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

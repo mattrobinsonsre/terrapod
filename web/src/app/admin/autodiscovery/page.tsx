@@ -78,6 +78,13 @@ interface AutodiscoveryRule {
     'auto-configure-enabled'?: boolean
     'configure-after-apply'?: boolean
     'configure-all-hosts'?: boolean
+    // And the third trigger (#2538): a cron schedule read in an IANA zone,
+    // templated for the same reason the two above are -- a rule that declares
+    // a configure operation and not when it runs leaves an operator editing
+    // every materialised workspace by hand.
+    'scheduled-configure-enabled'?: boolean
+    'scheduled-configure-cron'?: string
+    'scheduled-configure-timezone'?: string
     // Which inventory sources ansible may resolve on the runner (#2033),
     // templated for the same reason the triggers above are: a rule that can
     // declare a configure operation and not say which sources it may read
@@ -275,6 +282,12 @@ export default function AutodiscoveryPage() {
   const [autoConfigureEnabled, setAutoConfigureEnabled] = useState(false)
   const [configureAfterApply, setConfigureAfterApply] = useState(false)
   const [configureAllHosts, setConfigureAllHosts] = useState(false)
+  const [scheduledConfigureEnabled, setScheduledConfigureEnabled] = useState(false)
+  const [scheduledConfigureCron, setScheduledConfigureCron] = useState('')
+  // Seeded to the column default rather than to '', which the server
+  // substitutes UTC for: an empty box would say the rule templates no zone
+  // when what it templates is UTC.
+  const [scheduledConfigureTimezone, setScheduledConfigureTimezone] = useState('UTC')
   const [dynamicInventoryEnabled, setDynamicInventoryEnabled] = useState(false)
   const [inventoryScriptsEnabled, setInventoryScriptsEnabled] = useState(false)
   const [ansibleHostKeyChecking, setAnsibleHostKeyChecking] = useState(true)
@@ -466,6 +479,9 @@ export default function AutodiscoveryPage() {
     setAutoConfigureEnabled(false)
     setConfigureAfterApply(false)
     setConfigureAllHosts(false)
+    setScheduledConfigureEnabled(false)
+    setScheduledConfigureCron('')
+    setScheduledConfigureTimezone('UTC')
     setConfigDirectory('')
     setInventoryPaths([])
     setPlaybooks([])
@@ -544,6 +560,11 @@ export default function AutodiscoveryPage() {
     setAutoConfigureEnabled(a['auto-configure-enabled'] ?? false)
     setConfigureAfterApply(a['configure-after-apply'] ?? false)
     setConfigureAllHosts(a['configure-all-hosts'] ?? false)
+    setScheduledConfigureEnabled(a['scheduled-configure-enabled'] ?? false)
+    setScheduledConfigureCron(a['scheduled-configure-cron'] ?? '')
+    // `||`, not `??`: a stored '' and a missing key both mean UTC, because
+    // that is what the server substitutes, so both seed the same box.
+    setScheduledConfigureTimezone(a['scheduled-configure-timezone'] || 'UTC')
     setDynamicInventoryEnabled(a['dynamic-inventory-enabled'] ?? false)
     setInventoryScriptsEnabled(a['inventory-scripts-enabled'] ?? false)
     setAnsibleHostKeyChecking(a['ansible-host-key-checking'] ?? true)
@@ -636,6 +657,12 @@ export default function AutodiscoveryPage() {
       'auto-configure-enabled': autoConfigureEnabled,
       'configure-after-apply': configureAfterApply,
       'configure-all-hosts': configureAllHosts,
+      // The schedule (#2538). Trimmed and otherwise verbatim: the endpoint
+      // refuses a cron it cannot evaluate and a zone that is not IANA, naming
+      // the field, so normalising here would hide the refusal.
+      'scheduled-configure-enabled': scheduledConfigureEnabled,
+      'scheduled-configure-cron': scheduledConfigureCron.trim(),
+      'scheduled-configure-timezone': scheduledConfigureTimezone.trim(),
       'dynamic-inventory-enabled': dynamicInventoryEnabled,
       'inventory-scripts-enabled': inventoryScriptsEnabled,
       'ansible-host-key-checking': ansibleHostKeyChecking,
@@ -942,6 +969,9 @@ export default function AutodiscoveryPage() {
     'auto-configure-enabled': autoConfigureEnabled,
     'configure-after-apply': configureAfterApply,
     'configure-all-hosts': configureAllHosts,
+    'scheduled-configure-enabled': scheduledConfigureEnabled,
+    'scheduled-configure-cron': scheduledConfigureCron,
+    'scheduled-configure-timezone': scheduledConfigureTimezone,
     'config-directory': configDirectory,
     'default-playbook': defaultPlaybook,
     'default-limit': defaultLimit,
@@ -1016,6 +1046,9 @@ export default function AutodiscoveryPage() {
       case 'auto-configure-enabled': setAutoConfigureEnabled(b); break
       case 'configure-after-apply': setConfigureAfterApply(b); break
       case 'configure-all-hosts': setConfigureAllHosts(b); break
+      case 'scheduled-configure-enabled': setScheduledConfigureEnabled(b); break
+      case 'scheduled-configure-cron': setScheduledConfigureCron(s); break
+      case 'scheduled-configure-timezone': setScheduledConfigureTimezone(s); break
       case 'config-directory': setConfigDirectory(s); break
       case 'default-playbook': setDefaultPlaybook(s); break
       case 'default-limit': setDefaultLimit(s); break
@@ -1141,6 +1174,12 @@ export default function AutodiscoveryPage() {
         return hintText(tWs('fields.configureAfterApplyHint'))
       case 'configure-all-hosts':
         return hintText(tWs('fields.configureAllHostsHint'))
+      case 'scheduled-configure-enabled':
+        return hintText(tWs('fields.scheduledConfigureEnabledHint'))
+      case 'scheduled-configure-cron':
+        return tieredHint(tWs, 'fields.scheduledConfigureCronTitle')
+      case 'scheduled-configure-timezone':
+        return hintText(tWs('fields.scheduledConfigureTimezoneHint'))
       case 'config-directory':
         return tieredHint(tWs, 'fields.configDirectoryTitle')
       case 'default-playbook':
@@ -1376,6 +1415,22 @@ export default function AutodiscoveryPage() {
         <RuleYesNo attr="auto-configure-enabled" ctx={ruleCtx} />
         <RuleYesNo attr="configure-after-apply" ctx={ruleCtx} />
         <RuleYesNo attr="configure-all-hosts" ctx={ruleCtx} />
+        {/* The schedule the rule templates (#2538). Its two dependents follow
+            the switch and render disabled until it is Yes, the way every
+            other dependent on this form does. */}
+        <RuleYesNo attr="scheduled-configure-enabled" ctx={ruleCtx} />
+        <Field
+          attr="scheduled-configure-cron"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={tWs('fields.scheduledConfigureCronPlaceholder')}
+        />
+        <Field
+          attr="scheduled-configure-timezone"
+          ctx={ruleCtx}
+          kind="text"
+          placeholder={tWs('fields.scheduledConfigureTimezonePlaceholder')}
+        />
       </>
     ),
 
