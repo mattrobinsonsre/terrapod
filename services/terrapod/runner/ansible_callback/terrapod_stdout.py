@@ -256,6 +256,45 @@ def _is_handler(task) -> bool:
         return False
 
 
+#: What `default` appends to a play or task banner when that play or task runs
+#: in check mode and `check_mode_markers` is on, and what it brackets the whole
+#: run with (#2532). Reproduced byte for byte: an operator who turned that
+#: option on is asking for ansible's own marker, and a second spelling is a
+#: second thing to learn from a log that exists to be read quickly.
+_CHECK_MODE_SUFFIX = " [CHECK MODE]"
+DRY_RUN_STATUS = "dry-run"
+_DRY_RUN_LABEL = "DRY RUN"
+
+
+def _is_check_mode(task) -> bool:
+    """Whether THIS task runs in check mode, asked of the task.
+
+    Not the play and not the CLI argument: `check_mode` is resolved per task by
+    the time a callback sees one, so a task that forces it on inside a play that
+    is not in check mode -- or off inside one that is -- answers for itself.
+    That is also why the suffix is per block rather than stated once at the top.
+    """
+    try:
+        return bool(task.check_mode)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _run_is_check_mode() -> bool:
+    """Whether the run as a whole was asked for with `--check`.
+
+    Read from ansible's own CLI context, which is where `default` reads it for
+    its two `DRY RUN` banners. Guarded: a callback that raised here would take
+    the play down over a cosmetic marker.
+    """
+    try:
+        from ansible import context
+
+        return bool(context.CLIARGS.get("check"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 #: The status an `include_tasks` / `include_role` expansion carries (#2565).
 #: Eight characters where `_STATUS_W` is seven, which is deliberate and costs
 #: nothing: `UNREACHABLE` is eleven and already overflows, and both readers
@@ -653,7 +692,8 @@ class CallbackModule(DefaultCallback):
     def _tp_label_of(self, result) -> str:
         """`role : task name`, which is what `Task.get_name()` already gives.
 
-        Prefixed `handler: ` for a handler. Ansible distinguishes the two in the
+        Prefixed `handler: ` for a handler and suffixed ` [CHECK MODE]` where
+        `default` would suffix it. Ansible distinguishes the first in the
         BANNER -- `RUNNING HANDLER [x]` against `TASK [x]` -- and this log drops
         banners, so without it a handler was indistinguishable from an ordinary
         task of the same name. Derived from the object rather than from a flag
@@ -666,7 +706,9 @@ class CallbackModule(DefaultCallback):
             name = task.get_name().strip()
         except Exception:  # noqa: BLE001
             return ""
-        return f"{_HANDLER_PREFIX}{name}" if _is_handler(task) else name
+        if _is_handler(task):
+            name = f"{_HANDLER_PREFIX}{name}"
+        return f"{name}{self._tp_check_suffix(task)}"
 
     def _tp_delegation(self, result, name: str | None) -> str:
         """`-> target` when the task ran somewhere other than its own host.
@@ -892,21 +934,39 @@ class CallbackModule(DefaultCallback):
         )
         return None
 
-    @staticmethod
-    def _tp_task_label(task) -> str:
-        """The task's name, prefixed for a handler.
+    def _tp_check_markers(self) -> bool:
+        """Whether the operator asked for ansible's check-mode markers.
+
+        Gated on their own `check_mode_markers`, which defaults off. We extend
+        the `default_callback` fragment, so this is the option their
+        `ansible.cfg` already sets and it means here exactly what it means to
+        every other callback -- the same promise as the rest of this file: their
+        configuration decides what is shown, we decide the format it is shown in.
+        """
+        try:
+            return bool(self.get_option("check_mode_markers"))
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _tp_check_suffix(self, task) -> str:
+        return _CHECK_MODE_SUFFIX if self._tp_check_markers() and _is_check_mode(task) else ""
+
+    def _tp_task_label(self, task) -> str:
+        """The task's name, prefixed for a handler and marked in check mode.
 
         Must agree with `_tp_label_of`: the start notice is this log's
         replacement for the `TASK [...]` / `RUNNING HANDLER [...]` banner, so if
-        the announcement did not mark a handler then the distinction would be
-        missing from the one line that exists to carry it.
+        the announcement did not carry a mark the result block carries, the
+        distinction would be missing from the one line that exists for it.
         `test_handler_marking` pins the two together.
         """
         try:
             name = task.get_name().strip()
         except Exception:  # noqa: BLE001
             return ""
-        return f"{_HANDLER_PREFIX}{name}" if _is_handler(task) else name
+        if _is_handler(task):
+            name = f"{_HANDLER_PREFIX}{name}"
+        return f"{name}{self._tp_check_suffix(task)}"
 
     # -- play-level output ------------------------------------------------
     #
@@ -919,7 +979,38 @@ class CallbackModule(DefaultCallback):
         # orchestrator's structlog lines are rolled into the same artifact
         # around it -- which is why the parser searches for it.
         self._tp_emit_header()
-        return super().v2_playbook_on_start(playbook)
+        # `default` brackets a `--check` run with a `DRY RUN` banner at each end
+        # when `check_mode_markers` is on, and this log drops banners -- so the
+        # opening one printed RAW here (no frame is open at playbook start) and
+        # the closing one vanished into the recap's frame. Framed, and restated
+        # as a block of our own, which is also where a reader looks first.
+        frame: list[str] = []
+        self._tp_frames.append(frame)
+        try:
+            out = super().v2_playbook_on_start(playbook)
+        finally:
+            self._tp_frames.pop()
+        self._tp_dry_run_block()
+        return out
+
+    def _tp_dry_run_block(self) -> None:
+        """One host-less block saying the run changes nothing.
+
+        Gated on the operator's `check_mode_markers` exactly as the per-task
+        suffix is, so a deployment that does not want ansible's markers does not
+        get ours either -- and on the run genuinely having been asked for with
+        `--check`, so it cannot appear on an ordinary run.
+        """
+        if not (self._tp_check_markers() and _run_is_check_mode()):
+            return
+        self._tp_block(
+            host=None,
+            status=DRY_RUN_STATUS,
+            label=_DRY_RUN_LABEL,
+            body=[],
+            color=C.COLOR_SKIP,
+            stamp=self._tp_stamp(),
+        )
 
     def v2_playbook_on_play_start(self, play):
         self._tp_emit_header()
@@ -1099,3 +1190,8 @@ class CallbackModule(DefaultCallback):
             color=None,
             stamp=self._tp_stamp(),
         )
+        # The closing half of the bracket, after the recap exactly as `default`
+        # prints it: the recap of a check run reports what WOULD have changed,
+        # and a reader who scrolled past the opening block needs telling again
+        # before they act on those counts.
+        self._tp_dry_run_block()

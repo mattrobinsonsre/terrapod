@@ -67,6 +67,8 @@ HOSTLESS = _literal("HOSTLESS")
 PROGRESS_STATUS = _literal("PROGRESS_STATUS")
 START_STATUS = _literal("START_STATUS")
 INCLUDED_STATUS = _literal("INCLUDED_STATUS")
+DRY_RUN_STATUS = _literal("DRY_RUN_STATUS")
+CHECK_MODE_SUFFIX = _literal("_CHECK_MODE_SUFFIX")
 HANDLER_PREFIX = _literal("_HANDLER_PREFIX")
 INDENT = _literal("INDENT")
 EXAMPLE_BLOCK = _literal("EXAMPLE_BLOCK")
@@ -189,6 +191,7 @@ def _run(
     free: bool = False,
     color: bool = False,
     extra_env: dict[str, str] | None = None,
+    cli_args: tuple[str, ...] = (),
 ) -> str:
     """Drive ansible once and return its combined output.
 
@@ -223,7 +226,7 @@ def _run(
         env["ANSIBLE_STDOUT_CALLBACK"] = "terrapod_stdout"
     env.update(extra_env or {})
     completed = subprocess.run(  # noqa: S603
-        [str(ANSIBLE), "-i", "inventory.yml", "site.yml"],
+        [str(ANSIBLE), "-i", "inventory.yml", *cli_args, "site.yml"],
         cwd=root,
         env=env,
         capture_output=True,
@@ -1163,3 +1166,156 @@ class TestDelegationAndHandlers:
         assert all(not b.label.startswith(HANDLER_PREFIX) for b in ordinary), [
             b.label for b in ordinary
         ]
+
+
+@pytest.fixture(scope="module")
+def marked(tmp_path_factory) -> str:
+    """A `--check` run with the operator's markers turned on."""
+    root = tmp_path_factory.mktemp("checkmode-on")
+    return _run(
+        root,
+        inventory=_INVENTORY,
+        play=_PLAY,
+        tagged=True,
+        cli_args=("--check",),
+        extra_env={"ANSIBLE_CHECK_MODE_MARKERS": "True"},
+    )
+
+
+@pytest.fixture(scope="module")
+def markers_but_not_a_check_run(tmp_path_factory) -> str:
+    """Markers on, no `--check`. The pair that separates the two guards.
+
+    Without this the `_run_is_check_mode()` guard is untestable: the ordinary
+    control run has the option OFF, so the option guard alone already suppresses
+    the bracket and removing the check-run guard changes nothing anyone can see.
+    """
+    root = tmp_path_factory.mktemp("checkmode-markers-only")
+    return _run(
+        root,
+        inventory=_INVENTORY,
+        play=_PLAY,
+        tagged=True,
+        extra_env={"ANSIBLE_CHECK_MODE_MARKERS": "True"},
+    )
+
+
+@pytest.fixture(scope="module")
+def unmarked(tmp_path_factory) -> str:
+    """The same run with ansible's own default for the option: off."""
+    root = tmp_path_factory.mktemp("checkmode-default")
+    return _run(root, inventory=_INVENTORY, play=_PLAY, tagged=True, cli_args=("--check",))
+
+
+@needs_ansible
+class TestCheckModeIsVisible:
+    """A dry run says so, in the operator's own vocabulary (#2532).
+
+    `default` marks a check run twice over -- a `DRY RUN` banner at each end of
+    the playbook, and a ` [CHECK MODE]` suffix on every play and task banner --
+    and gates both on `check_mode_markers`, which defaults off. This log drops
+    banners and rebuilds every label from `Task.get_name()`, so both marks were
+    lost: the opening banner printed RAW (no frame is open at playbook start,
+    so the display wrapper falls through to the real display), the closing one
+    vanished into the recap's frame, and no block said a task had changed
+    nothing because it was not allowed to.
+
+    The gating is honoured rather than reimplemented. An operator who has not
+    asked ansible for these markers does not get ours either.
+    """
+
+    #: A block reporting what happened to one host, as against a start notice,
+    #: a ticker line, an include or the recap. The distinction is load-bearing
+    #: here: the notice and the result take their label from DIFFERENT builders
+    #: (`_tp_task_label` and `_tp_label_of`), so a test that accepts either can
+    #: pass with one of the two unmarked -- which is the asymmetry
+    #: `test_handler_marking` exists to stop and this would have reintroduced.
+    _RESULTS = ("ok", "changed", "skipped", "FAILED")
+
+    def test_a_result_block_carries_the_marker(self, marked):
+        results = [b for b in _blocks(marked) if b.status in self._RESULTS and b.label]
+        assert results, "no result blocks at all -- the run did not happen"
+        assert [b for b in results if b.label.endswith(CHECK_MODE_SUFFIX.strip())], (
+            "no result says the run changed nothing. `_tp_label_of` rebuilds the "
+            "label from `Task.get_name()`, which drops the suffix `default` "
+            f"appends. Saw: {sorted({b.label for b in results})[:5]}"
+        )
+
+    def test_the_start_notice_carries_it_too(self, marked):
+        """The notice is this log's replacement for the `TASK [...]` banner, so
+        a mark on the result and not on the announcement puts the two lines at
+        odds about the same task."""
+        starts = [b for b in _starts(marked) if b.label]
+        assert starts, "no start notices in the run"
+        assert any(b.label.endswith("[CHECK MODE]") for b in starts), (
+            f"the announcement disagrees with the result blocks. Saw: "
+            f"{sorted({b.label for b in starts})[:5]}"
+        )
+
+    def test_the_run_is_bracketed_at_both_ends(self, marked):
+        """`default` prints `DRY RUN` before the first play and after the recap.
+        A reader who scrolled past the first needs the second before acting on
+        the recap's counts, which report what WOULD have changed."""
+        blocks = _blocks(marked)
+        brackets = [i for i, b in enumerate(blocks) if b.status == DRY_RUN_STATUS]
+        assert len(brackets) == 2, f"expected a DRY RUN block at each end, found {len(brackets)}"
+        recap = [i for i, b in enumerate(blocks) if b.status == "recap"]
+        assert recap, "no PLAY RECAP block"
+        assert brackets[0] < recap[0] < brackets[1]
+
+    def test_the_brackets_are_host_less(self, marked):
+        """It is a property of the run, not of any one host, so it must not be
+        filtered away by the host picker #2513 added."""
+        for b in _blocks(marked):
+            if b.status == DRY_RUN_STATUS:
+                assert b.host is None, f"a DRY RUN block attributed to {b.host!r}"
+
+    def test_nothing_about_it_bypasses_the_formatter(self, marked):
+        """The opening banner is the one that printed raw: at playbook start no
+        frame is open, so the display wrapper falls through to the real
+        display."""
+        stray = [
+            line
+            for line in marked.splitlines()
+            if line.strip().startswith("DRY RUN") or _BANNER.match(line.strip())
+        ]
+        assert not stray, f"ansible's own banner reached the log unframed: {stray[:3]}"
+
+    def test_the_operators_own_setting_decides(self, unmarked):
+        """`check_mode_markers` defaults off, and a deployment that has not
+        turned it on must see no marker from us either -- the same promise the
+        rest of this callback makes about their `ansible.cfg`."""
+        blocks = _blocks(unmarked)
+        assert not [b for b in blocks if b.status == DRY_RUN_STATUS], (
+            "a DRY RUN block appeared although `check_mode_markers` is off"
+        )
+        assert not [b for b in blocks if b.label.endswith("[CHECK MODE]")], (
+            "a task was marked although `check_mode_markers` is off"
+        )
+        assert [b for b in blocks if b.status == "recap"], (
+            "the control run did not happen, so it proves nothing"
+        )
+
+    def test_markers_alone_do_not_mark_an_ordinary_run(self, markers_but_not_a_check_run):
+        """`check_mode_markers` says "show the markers when there are any to
+        show". An operator who sets it globally must not get a `DRY RUN` block
+        on every ordinary run, nor a suffix on a task that really did change
+        something -- which would be a false statement about the run, not noise.
+        """
+        blocks = _blocks(markers_but_not_a_check_run)
+        assert [b for b in blocks if b.status == "recap"], (
+            "the run did not happen, so it proves nothing"
+        )
+        assert not [b for b in blocks if b.status == DRY_RUN_STATUS], (
+            "a DRY RUN block on a run that was not a check run"
+        )
+        assert not [b for b in blocks if b.label.endswith(CHECK_MODE_SUFFIX.strip())], (
+            "a task marked as check mode on a run that really applied changes"
+        )
+
+    def test_an_ordinary_run_is_never_marked(self, framed):
+        """The other direction, against the suite's own ordinary run: the marker
+        must key on the run being a check run, not merely on the option."""
+        blocks = _blocks(framed)
+        assert not [b for b in blocks if b.status == DRY_RUN_STATUS]
+        assert not [b for b in blocks if b.label.endswith("[CHECK MODE]")]
