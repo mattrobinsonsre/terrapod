@@ -766,8 +766,7 @@ function WorkspacesPageInner() {
 
   type WsSortKey = 'name' | 'mode' | 'pool' | 'resources' | 'status' | 'created'
 
-  // resolveStatus + WORKSPACE_STATUSES are imported from workspace-status.ts
-  // — single source of truth for both the row pill and the filter dropdown.
+  // The row pill reads `resolveStatus`; the Status dropdown and `status:` read `RUN_STATUSES`.
 
   // Per-status counts on the unfiltered workspace list, memoised so the
   // dropdown render is a constant lookup. Recomputes only when the

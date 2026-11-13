@@ -1,10 +1,13 @@
 // Pure helpers for the workspace-list filter input.
 //
 // The input is a single text box that mixes name substrings, label predicates,
-// and status predicates separated by whitespace. Each token is either:
+// and status, flag and lock predicates separated by whitespace. Each token is
+// either:
 //
 //   - bare word          → name substring match (case-insensitive)
-//   - "status:value"     → status predicate (resolved-status exact match)
+//   - "status:value"     → the latest run's own status, exact match
+//   - "flag:value"       → a health condition (see below)
+//   - "locked:true|false" → the manual state lock
 //   - "key:value"        → label predicate (case-sensitive exact match)
 //   - "key=value"        → same as key:value
 //   - "key:" / "key="    → label key-only predicate (any value, including empty)
@@ -24,21 +27,11 @@
 //   - Everything else intersects: name terms, label terms (so `env:prod
 //     env:staging` still matches nothing), and each group against the others.
 //
-// Why `status:` used to carry `locked` and `unhealthy` and no longer does.
-// Both rode the already-reserved `status` key because reserving a new key takes
-// the word away from every operator using it as a label. The cost was that
-// `status:` stopped being one mutually exclusive set, so "two values of one
-// field" was not safe to treat as a union: `status:locked status:errored` meant
-// locked AND errored. They are `locked:true` and the `flag:` terms now, `flag`
-// and `locked` are reserved label keys (see RESERVED_LABEL_KEYS), and `status:`
-// has thirteen values, one per workspace.
+// The old `status:locked`, `status:unhealthy` and workspace-level spellings are
+// carried onto `locked:` and `flag:` on load by `migrateLegacyFilter`.
 //
-// `flag:` is matched against the `health-conditions` array rather than against
-// `resolveStatus`, which is the authoritative source. `resolveStatus` ranks
-// `needs-confirm` above every workspace-level signal, so a diverged workspace
-// awaiting confirmation shows `needs-confirm` and a status-based filter would
-// miss it; it also treats `drift-status: drifted` as drifted without checking
-// that drift detection is enabled, which the condition does.
+// `flag:` reads the server's `health-conditions`, not the pill, which hides a
+// condition behind `needs-confirm` and shows drift without checking detection.
 //
 // `status`, `flag` and `locked` are the keys THIS PARSER special-cases, so a
 // literal label of any of those names would make the filter ambiguous; all three
@@ -93,7 +86,8 @@ export const FLAG_CODES: readonly string[] = [
 /** `state_diverged` -> `state-diverged`. */
 export const flagValueForCode = (code: string): string => code.replaceAll('_', '-')
 
-/** The `flag:` values, in the order the server defines the conditions. */
+/** The `flag:` values, in `FLAG_CODES` order: how the Flags dropdown and the
+ *  Health Issues expansion list them. */
 export const FLAG_VALUES: readonly string[] = FLAG_CODES.map(flagValueForCode)
 
 export type FilterTerm = NameTerm | LabelTerm | StatusTerm | FlagTerm | LockedTerm
@@ -143,10 +137,8 @@ const LEGACY_STATUS_TERMS: ReadonlyMap<string, readonly string[]> = new Map([
 const termKey = (t: FilterTerm): string | null =>
   t.kind === 'flag' || t.kind === 'locked' ? `${t.kind}:${t.value}` : null
 
-/** Rewrite the removed `status:` spellings (`locked`, `unhealthy`, `drifted`,
- *  `state-diverged`, `vcs-error`) into the terms that replaced them, leaving
- *  every other token as written and skipping any term already present. Returns
- *  `text` itself when there is nothing to rewrite. */
+/** Rewrite the removed `status:` spellings into `locked:` and `flag:` terms,
+ *  keeping other tokens and terms already present; returns `text` if none. */
 export function migrateLegacyFilter(text: string): string {
   const parts = text.split(/(\s+)/) // tokens at even indices, whitespace between
   const have = new Set<string>()
@@ -307,11 +299,8 @@ function conditionCodes(ws: MatchableWorkspace): Set<string> {
   return out
 }
 
-/**
- * @param runStatus  The workspace's latest run's own status (`runStatusOf`),
- *   not the badge's resolved one. Only consulted when the filter contains
- *   `status:` terms; undefined, for a workspace with no run, matches none.
- */
+/** @param runStatus  The latest run's own status (`runStatusOf`), not the pill's;
+ *  only `status:` terms read it, and undefined (no run) matches none. */
 export function matchWorkspace(
   ws: MatchableWorkspace,
   parsed: ParsedFilter,
