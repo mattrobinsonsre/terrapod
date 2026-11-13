@@ -46,9 +46,9 @@ export function Checkbox({
         data-testid={testId}
         className={
           'peer h-[18px] w-[18px] cursor-pointer appearance-none rounded-[5px] border ' +
-          'border-slate-600 bg-slate-800/60 transition-colors ' +
-          'hover:border-slate-500 hover:bg-slate-700/60 ' +
-          'light:border-slate-500/35 light:hover:border-slate-500/55 ' +
+          'border-slate-500 bg-slate-800/60 transition-colors ' +
+          'hover:border-slate-400 hover:bg-slate-700/60 ' +
+          'light:border-slate-500/55 light:hover:border-slate-500/75 ' +
           'checked:border-brand-500 checked:bg-brand-600 ' +
           'indeterminate:border-brand-500 indeterminate:bg-brand-600 ' +
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 ' +

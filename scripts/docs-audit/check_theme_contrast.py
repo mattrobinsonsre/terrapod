@@ -25,6 +25,9 @@ STDLIB ONLY, AND NO node_modules. The light values are read out of `globals.css`
 itself, where they are literal hexes -- so this runs in the `python-checks` job
 with nothing installed, and it cannot disagree with the stylesheet the app
 serves because it IS the stylesheet it reads.
+
+It also holds the checkbox outline to 3:1 (WCAG 1.4.11), reading the classes out
+of `checkbox.tsx`; the dark theme's half is `web/tests/theme-contrast-dark.test.ts`.
 """
 
 from __future__ import annotations
@@ -37,8 +40,10 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CSS = ROOT / "web" / "src" / "app" / "globals.css"
 SRC = ROOT / "web" / "src"
+CHECKBOX = SRC / "components" / "checkbox.tsx"
 
 AA = 4.5  # WCAG AA for normal-size text
+NON_TEXT = 3.0  # WCAG 1.4.11: a control's outline against what it sits on
 MIN_BARE_INKS = 4  # neutral ink stops used with no fill; a floor so a
 #: broken matcher fails here instead of passing on nothing
 FILL_FLOOR = 1.10  # a badge fill must be distinguishable from its card.
@@ -268,6 +273,62 @@ def light_palette() -> dict[str, dict[int, tuple[int, int, int]]]:
     return pal
 
 
+def checkbox_outline_problems(pal: dict[str, dict[int, tuple[int, int, int]]]) -> list[str]:
+    """The outline in `checkbox.tsx` against its own fill and the surfaces behind it.
+    Hovering the box also hovers its row, so that state is measured on a hovered row."""
+    m = re.search(r"className=\{([^}]*appearance-none[^}]*)\}", CHECKBOX.read_text())
+    if not m:
+        return [
+            f"{CHECKBOX.relative_to(ROOT)}: no className with `appearance-none`; the outline check cannot read it"
+        ]
+    toks = " ".join(re.findall(r"'([^']*)'", m.group(1))).split()
+
+    def paint(variant: str, prop: str):
+        """`<variant><prop>-<family>-<stop>[/<alpha>]`, the light override first."""
+        for pre in (f"light:{variant}", variant):
+            for t in toks:
+                mm = re.fullmatch(rf"{re.escape(pre)}{prop}-([a-z]+)-(\d+)(?:/(\d+))?", t)
+                if mm and int(mm[2]) in pal.get(mm[1], {}):
+                    return pal[mm[1]][int(mm[2])], int(mm[3] or 100) / 100, t
+        return None
+
+    page = pal["slate"][900]
+    panel = composite(pal["slate"][800], 0.5, page)
+    row = composite(pal["slate"][700], 0.2, panel)
+    base_fill, hov_fill = paint("", "bg"), paint("hover:", "bg")
+    base_edge, hov_edge = paint("", "border"), paint("hover:", "border")
+    chk_edge = paint("checked:", "border")
+    if not (base_fill and hov_fill and base_edge and hov_edge and chk_edge):
+        return [
+            f"{CHECKBOX.relative_to(ROOT)}: a base, hover or checked border or fill class is missing"
+        ]
+
+    states = [
+        (f"on the {n}", bd, base_fill, base_edge)
+        for n, bd in (("page", page), ("panel", panel), ("hovered row", row))
+    ]
+    states.append(("hovered, on a hovered row", row, hov_fill, hov_edge))
+    out: list[str] = []
+    for name, backdrop, fill, edge in states:
+        under = composite(fill[0], fill[1], backdrop)
+        painted = composite(edge[0], edge[1], under)
+        for what, other in (("its own fill", under), ("the surface behind it", backdrop)):
+            c = contrast(painted, other)
+            if c < NON_TEXT:
+                out.append(
+                    f"{c:5.2f}:1  checkbox outline `{edge[2]}` {name}, against {what} "
+                    f"(needs {NON_TEXT}:1; {CHECKBOX.relative_to(ROOT)})"
+                )
+    for name, backdrop in (("page", page), ("panel", panel), ("hovered row", row)):
+        c = contrast(chk_edge[0], backdrop)
+        if c < NON_TEXT:
+            out.append(
+                f"{c:5.2f}:1  checkbox checked outline `{chk_edge[2]}` on the {name} "
+                f"(needs {NON_TEXT}:1; {CHECKBOX.relative_to(ROOT)})"
+            )
+    return out
+
+
 def main() -> int:
     broken = self_test()
     if broken:
@@ -422,6 +483,7 @@ def main() -> int:
                                 worst[key] = (low, where, str(path.relative_to(ROOT)))
 
     problems = []
+    problems.extend(checkbox_outline_problems(pal))
     if len(worst) < MIN_PAIRS:
         problems.append(
             f"only {len(worst)} bg/text pairs matched, below the floor of "
@@ -511,7 +573,8 @@ def main() -> int:
 
     print(
         f"check_theme_contrast: OK -- {len(worst)} bg/text pairs, "
-        f"all >= {AA}:1, all badge fills >= {FILL_FLOOR}:1 against the card"
+        f"all >= {AA}:1, all badge fills >= {FILL_FLOOR}:1 against the card, "
+        f"checkbox outline >= {NON_TEXT}:1"
     )
     return 0
 
