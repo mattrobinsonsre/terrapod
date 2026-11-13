@@ -886,6 +886,7 @@ The stored log carries a header, and then one **block per task per host**:
 #terrapod-host-log v2
 [2026-11-11 10:28:27]  ~                 play     PLAY [configure]
 [10:28:30 +2.9s]       web1.example.com  changed  platform : Deploy the app
+[10:28:40 +10.0s]      ~                 running  platform : Wait for the service  (2 hosts)
 [10:31:42 +3m12s]      web1.example.com  ok       platform : Wait for the service
 [10:31:42 +0.0s]       web2.example.com  FAILED   platform : Check the endpoint
                   [ERROR]: Task failed: Module failed: ...
@@ -912,9 +913,44 @@ do not need `ansible.posix.profile_tasks` to get it — and if you run it anyway
 its lines are passed through untouched.
 
 `~` marks a block belonging to no single host: the `PLAY` banner, the
-`PLAY RECAP`. A host name containing whitespace, `|`, `~` or `%` is
-percent-escaped in its field, so the host is always one whitespace-delimited
-token — an ordinary name is untouched.
+`PLAY RECAP`, and the still-running notices below. A host name containing
+whitespace, `|`, `~` or `%` is percent-escaped in its field, so the host is
+always one whitespace-delimited token — an ordinary name is untouched.
+
+### Still-running notices
+
+A long task says so while it is running, rather than going quiet until it
+finishes:
+
+```
+[10:28:40 +10.0s]  ~  running  platform : Wait for the service  (2 hosts)
+```
+
+One notice per **task**, counting the hosts still on it, repeating while it
+runs. That shape is deliberate: one per host would scale with the inventory, so
+on a large fleet it is a wall of text rather than a progress signal.
+
+Two options tune it, and both are read from **your own `ansible.cfg`** — Terrapod
+never replaces that file:
+
+```ini
+[defaults]
+terrapod_progress_seconds = 10      ; 0 disables the notices
+terrapod_progress_mode = aggregated ; or per_host
+```
+
+`terrapod_progress_seconds` is both how long a task may run before the first
+notice and the interval it repeats at. One ticker serves every task, so it is
+phase-anchored to its own start rather than to each task's: a notice appears
+within one further interval of the threshold rather than exactly on it, and the
+elapsed figure it carries is the true time either way.
+
+The equivalent `ANSIBLE_TERRAPOD_PROGRESS_*` environment variables exist, but
+the runner strips every inherited `ANSIBLE_*` before it starts ansible, so they
+do not reach a configure — the `ansible.cfg` entries are the ones that work.
+
+`running` is a block status like any other, so a tool reading the log can filter
+it out and see exactly what it saw before.
 
 `TASK [...]` banners are not emitted. Their whole content is the task name,
 which every block carries in its label.

@@ -63,6 +63,7 @@ def _literal(name: str) -> str:
 
 HEADER = _literal("HEADER")
 HOSTLESS = _literal("HOSTLESS")
+PROGRESS_STATUS = _literal("PROGRESS_STATUS")
 INDENT = _literal("INDENT")
 EXAMPLE_BLOCK = _literal("EXAMPLE_BLOCK")
 
@@ -615,3 +616,219 @@ class TestWhatAnsiblePrintsThroughIt:
         # And it does not become a block, nor get absorbed into the one above.
         assert all(marker not in b.header for b in _blocks(out))
         assert all(marker not in "\n".join(b.body) for b in _blocks(out))
+
+
+#: A play whose one task is slow enough to outlive a short notice threshold.
+#: `command: sleep` rather than `pause`, because `pause` is a controller-side
+#: action plugin that opens no connection and so is never "running on a host".
+_SLOW_PLAY = textwrap.dedent(
+    """
+    - name: slow
+      hosts: all
+      gather_facts: false
+      tasks:
+        - name: a slow task
+          ansible.builtin.command: "sleep 3"
+          changed_when: false
+    """
+).strip()
+
+_SLOW_INVENTORY = textwrap.dedent(
+    """
+    all:
+      hosts:
+        web1: {ansible_connection: local}
+        web2: {ansible_connection: local}
+    """
+).strip()
+
+
+def _running(text: str) -> list[Block]:
+    """Every still-running notice, in order."""
+    return [b for b in _blocks(text) if b.status == PROGRESS_STATUS]
+
+
+@needs_ansible
+class TestStillRunningNotices:
+    """The progress signal (#2532).
+
+    Driven through real ansible rather than asserted on the formatter, because
+    the property is about WHEN something is emitted relative to work happening
+    on another thread -- which a unit test of the line builder cannot see at
+    all. The plugin's own recorded trap is the same shape: a callback whose
+    options are not declared loads, runs, and emits nothing but warnings.
+    """
+
+    def test_a_slow_task_says_it_is_still_running(self, tmp_path):
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
+        )
+        notices = _running(out)
+        assert notices, f"a 3s task produced no still-running notice:\n{out}"
+        assert all("a slow task" in b.label for b in notices), [b.label for b in notices]
+
+    def test_disabling_it_produces_none(self, tmp_path):
+        """The control. Without this, the test above passes on a plugin that
+        emits a notice unconditionally, which is not the feature."""
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        assert _running(out) == [], f"notices emitted while disabled:\n{out}"
+
+    def test_a_threshold_longer_than_the_task_produces_none(self, tmp_path):
+        """No spurious notice on a play shorter than the threshold.
+
+        This does NOT establish that the threshold COMPARISON is honoured, and
+        the mutation proves it: dropping the comparison entirely leaves this
+        green, because the threshold doubles as the tick interval, so at 30s the
+        ticker never wakes inside a 4s play at all. The comparison is pinned by
+        `test_a_notice_never_reports_less_than_the_threshold` instead.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "30"},
+        )
+        assert _running(out) == [], f"notice before the threshold:\n{out}"
+
+    def test_aggregated_counts_the_hosts_and_is_host_less(self, tmp_path):
+        """One notice per TASK, carrying the host count -- not one per host.
+
+        This is the shape decision: `per_host` scales with the inventory, so on
+        a large fleet it is a wall rather than a progress signal.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
+        )
+        notices = _running(out)
+        assert notices, out
+        assert all(b.host is None for b in notices), [b.host for b in notices]
+        assert any("(2 hosts)" in b.label for b in notices), [b.label for b in notices]
+
+    def test_per_host_mode_names_each_host_instead(self, tmp_path):
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={
+                "ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1",
+                "ANSIBLE_TERRAPOD_PROGRESS_MODE": "per_host",
+            },
+        )
+        notices = _running(out)
+        assert notices, out
+        assert {b.host for b in notices} <= {"web1", "web2"}, [b.host for b in notices]
+        assert all(b.host is not None for b in notices), [b.host for b in notices]
+        assert not any("host)" in b.label or "hosts)" in b.label for b in notices)
+
+    def test_no_notice_follows_the_recap(self, tmp_path):
+        """The ticker is stopped and WAITED FOR before the recap is written.
+
+        Without the join, a notice can be printed after the play has finished,
+        saying a task is in flight on a play that is over.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
+        )
+        statuses = [b.status for b in _blocks(out)]
+        assert "recap" in statuses, out
+        assert PROGRESS_STATUS not in statuses[statuses.index("recap") :], statuses
+
+    def test_a_notice_never_reports_less_than_the_threshold(self, tmp_path):
+        """The threshold comparison itself, asserted on the figure emitted.
+
+        A task that starts AFTER the ticker has is the only case where the
+        comparison is observable from outside -- the fast task below pushes the
+        slow one past the ticker's own phase -- and the elapsed figure in the
+        header is the direct evidence. Dropping the comparison lets a notice
+        report a task that has barely begun, which this catches and a count of
+        notices does not.
+        """
+        # The FIRST task is slow too, deliberately. A quick one leaves the
+        # second starting ~0.05s after the ticker, so a notice that ignored the
+        # threshold would report ~1.95s -- which `f"{seconds:.1f}s"` rounds to
+        # "2.0s" and the assertion below cannot tell from a legitimate one.
+        # Three seconds of task A puts task B a clear ~1.0s into a tick.
+        play = textwrap.dedent(
+            """
+            - name: slow
+              hosts: all
+              gather_facts: false
+              tasks:
+                - name: "the first slow task"
+                  ansible.builtin.command: "sleep 3"
+                  changed_when: false
+                - name: "a slow task"
+                  ansible.builtin.command: "sleep 5"
+                  changed_when: false
+            """
+        ).strip()
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=play,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "2"},
+        )
+        notices = _running(out)
+        assert notices, out
+        seen = []
+        for block in notices:
+            found = re.search(r"\+([0-9.]+)s\]", block.header)
+            assert found, block.header
+            seen.append(float(found.group(1)))
+        assert all(v >= 2.0 for v in seen), f"a notice reported under the threshold: {seen}"
+
+    def test_a_notice_is_written_through_the_unwrapped_display(self):
+        """Structural, because the race it guards cannot be forced from outside.
+
+        `_tp_install` replaces `self._display.display` with a wrapper that
+        CAPTURES into `_tp_frames` so a block can be assembled from what ansible
+        printed. A notice raised while a frame is open would therefore be
+        swallowed INTO that block rather than printed. `_tp_frames` is only
+        non-empty during a hook, so whether a given notice collides is a race --
+        driving it proves nothing either way, which the mutation confirmed by
+        surviving a full run. So the property is asserted on the source.
+        """
+        body = _SRC.split("def _tp_tick_emit")[1].split("\n    def ")[0]
+        assert "self._tp_inner_display(" in body, body
+        assert "self._display.display(" not in body, (
+            "a still-running notice goes through the WRAPPED display, so it will "
+            "be captured into whatever block is open instead of being printed"
+        )
+
+    def test_the_options_load_without_warnings(self, tmp_path):
+        """A subclass inherits the CODE and not the OPTIONS.
+
+        The recorded failure: a `default`-subclassing callback with options it
+        has not declared loads, runs, and turns every hook into a
+        `[WARNING]: Failure using method ...` line with no task output at all.
+        Declaring two new options is exactly the change that can reintroduce it.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
+        )
+        assert "Failure using method" not in out, out
