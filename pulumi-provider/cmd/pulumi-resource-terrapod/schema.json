@@ -1399,6 +1399,18 @@
                     },
                     "description": "Run task definitions auto-applied to workspaces created by this rule."
                 },
+                "scheduledConfigureCron": {
+                    "type": "string",
+                    "description": "The schedule templated onto workspaces this rule creates, as a five-field cron expression — `minute hour day-of-month month day-of-week`, for example `0 2 * * 2` for 02:00 every Tuesday. Defaults to the empty string, which is no schedule whatever \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureEnabled`\" pulumi-lang-dotnet=\"`ScheduledConfigureEnabled`\" pulumi-lang-go=\"`scheduledConfigureEnabled`\" pulumi-lang-python=\"`scheduled_configure_enabled`\" pulumi-lang-yaml=\"`scheduledConfigureEnabled`\" pulumi-lang-java=\"`scheduledConfigureEnabled`\" pulumi-lang-hcl=\"`scheduled_configure_enabled`\"\u003e`scheduledConfigureEnabled`\u003c/span\u003e holds. Stored exactly as written. A six-field expression is refused rather than read as seconds-resolution, and so is anything firing more often than the deployment's minimum interval. Omitting this attribute leaves the rule's existing value untouched; set \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron \" pulumi-lang-dotnet=\"`ScheduledConfigureCron \" pulumi-lang-go=\"`scheduledConfigureCron \" pulumi-lang-python=\"`scheduled_configure_cron \" pulumi-lang-yaml=\"`scheduledConfigureCron \" pulumi-lang-java=\"`scheduledConfigureCron \" pulumi-lang-hcl=\"`scheduled_configure_cron \"\u003e`scheduledConfigureCron \u003c/span\u003e= \"\"` to remove the schedule."
+                },
+                "scheduledConfigureEnabled": {
+                    "type": "boolean",
+                    "description": "Whether workspaces this rule creates run a configure on a cron schedule. Defaults to false. Needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e, and needs a non-empty \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e; with either missing the setting is inert."
+                },
+                "scheduledConfigureTimezone": {
+                    "type": "string",
+                    "description": "The IANA time zone \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e is read in on workspaces this rule creates — `Europe/London`, `America/New_York`. Defaults to `UTC`. Naming a real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."
+                },
                 "securityScanEnforcement": {
                     "type": "string",
                     "description": "IaC security-scan enforcement for workspaces this rule creates: \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e (skip), \u003cspan pulumi-lang-nodejs=\"`advisory`\" pulumi-lang-dotnet=\"`Advisory`\" pulumi-lang-go=\"`advisory`\" pulumi-lang-python=\"`advisory`\" pulumi-lang-yaml=\"`advisory`\" pulumi-lang-java=\"`advisory`\" pulumi-lang-hcl=\"`advisory`\"\u003e`advisory`\u003c/span\u003e (scan, never block — the default), or \u003cspan pulumi-lang-nodejs=\"`enforced`\" pulumi-lang-dotnet=\"`Enforced`\" pulumi-lang-go=\"`enforced`\" pulumi-lang-python=\"`enforced`\" pulumi-lang-yaml=\"`enforced`\" pulumi-lang-java=\"`enforced`\" pulumi-lang-hcl=\"`enforced`\"\u003e`enforced`\u003c/span\u003e (a failed/errored scan blocks apply until fixed or overridden)."
@@ -1497,6 +1509,9 @@
                 "repoUrl",
                 "resourceCpu",
                 "resourceMemory",
+                "scheduledConfigureCron",
+                "scheduledConfigureEnabled",
+                "scheduledConfigureTimezone",
                 "securityScanEnforcement",
                 "securityScanEngine",
                 "securityScanSeverityThreshold",
@@ -1737,6 +1752,18 @@
                         "$ref": "#/types/terrapod:index/AutodiscoveryRuleRunTaskTemplate:AutodiscoveryRuleRunTaskTemplate"
                     },
                     "description": "Run task definitions auto-applied to workspaces created by this rule."
+                },
+                "scheduledConfigureCron": {
+                    "type": "string",
+                    "description": "The schedule templated onto workspaces this rule creates, as a five-field cron expression — `minute hour day-of-month month day-of-week`, for example `0 2 * * 2` for 02:00 every Tuesday. Defaults to the empty string, which is no schedule whatever \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureEnabled`\" pulumi-lang-dotnet=\"`ScheduledConfigureEnabled`\" pulumi-lang-go=\"`scheduledConfigureEnabled`\" pulumi-lang-python=\"`scheduled_configure_enabled`\" pulumi-lang-yaml=\"`scheduledConfigureEnabled`\" pulumi-lang-java=\"`scheduledConfigureEnabled`\" pulumi-lang-hcl=\"`scheduled_configure_enabled`\"\u003e`scheduledConfigureEnabled`\u003c/span\u003e holds. Stored exactly as written. A six-field expression is refused rather than read as seconds-resolution, and so is anything firing more often than the deployment's minimum interval. Omitting this attribute leaves the rule's existing value untouched; set \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron \" pulumi-lang-dotnet=\"`ScheduledConfigureCron \" pulumi-lang-go=\"`scheduledConfigureCron \" pulumi-lang-python=\"`scheduled_configure_cron \" pulumi-lang-yaml=\"`scheduledConfigureCron \" pulumi-lang-java=\"`scheduledConfigureCron \" pulumi-lang-hcl=\"`scheduled_configure_cron \"\u003e`scheduledConfigureCron \u003c/span\u003e= \"\"` to remove the schedule."
+                },
+                "scheduledConfigureEnabled": {
+                    "type": "boolean",
+                    "description": "Whether workspaces this rule creates run a configure on a cron schedule. Defaults to false. Needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e, and needs a non-empty \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e; with either missing the setting is inert."
+                },
+                "scheduledConfigureTimezone": {
+                    "type": "string",
+                    "description": "The IANA time zone \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e is read in on workspaces this rule creates — `Europe/London`, `America/New_York`. Defaults to `UTC`. Naming a real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."
                 },
                 "securityScanEnforcement": {
                     "type": "string",
@@ -2030,6 +2057,18 @@
                             "$ref": "#/types/terrapod:index/AutodiscoveryRuleRunTaskTemplate:AutodiscoveryRuleRunTaskTemplate"
                         },
                         "description": "Run task definitions auto-applied to workspaces created by this rule."
+                    },
+                    "scheduledConfigureCron": {
+                        "type": "string",
+                        "description": "The schedule templated onto workspaces this rule creates, as a five-field cron expression — `minute hour day-of-month month day-of-week`, for example `0 2 * * 2` for 02:00 every Tuesday. Defaults to the empty string, which is no schedule whatever \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureEnabled`\" pulumi-lang-dotnet=\"`ScheduledConfigureEnabled`\" pulumi-lang-go=\"`scheduledConfigureEnabled`\" pulumi-lang-python=\"`scheduled_configure_enabled`\" pulumi-lang-yaml=\"`scheduledConfigureEnabled`\" pulumi-lang-java=\"`scheduledConfigureEnabled`\" pulumi-lang-hcl=\"`scheduled_configure_enabled`\"\u003e`scheduledConfigureEnabled`\u003c/span\u003e holds. Stored exactly as written. A six-field expression is refused rather than read as seconds-resolution, and so is anything firing more often than the deployment's minimum interval. Omitting this attribute leaves the rule's existing value untouched; set \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron \" pulumi-lang-dotnet=\"`ScheduledConfigureCron \" pulumi-lang-go=\"`scheduledConfigureCron \" pulumi-lang-python=\"`scheduled_configure_cron \" pulumi-lang-yaml=\"`scheduledConfigureCron \" pulumi-lang-java=\"`scheduledConfigureCron \" pulumi-lang-hcl=\"`scheduled_configure_cron \"\u003e`scheduledConfigureCron \u003c/span\u003e= \"\"` to remove the schedule."
+                    },
+                    "scheduledConfigureEnabled": {
+                        "type": "boolean",
+                        "description": "Whether workspaces this rule creates run a configure on a cron schedule. Defaults to false. Needs \u003cspan pulumi-lang-nodejs=\"`configureEnabled`\" pulumi-lang-dotnet=\"`ConfigureEnabled`\" pulumi-lang-go=\"`configureEnabled`\" pulumi-lang-python=\"`configure_enabled`\" pulumi-lang-yaml=\"`configureEnabled`\" pulumi-lang-java=\"`configureEnabled`\" pulumi-lang-hcl=\"`configure_enabled`\"\u003e`configureEnabled`\u003c/span\u003e, and needs a non-empty \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e; with either missing the setting is inert."
+                    },
+                    "scheduledConfigureTimezone": {
+                        "type": "string",
+                        "description": "The IANA time zone \u003cspan pulumi-lang-nodejs=\"`scheduledConfigureCron`\" pulumi-lang-dotnet=\"`ScheduledConfigureCron`\" pulumi-lang-go=\"`scheduledConfigureCron`\" pulumi-lang-python=\"`scheduled_configure_cron`\" pulumi-lang-yaml=\"`scheduledConfigureCron`\" pulumi-lang-java=\"`scheduledConfigureCron`\" pulumi-lang-hcl=\"`scheduled_configure_cron`\"\u003e`scheduledConfigureCron`\u003c/span\u003e is read in on workspaces this rule creates — `Europe/London`, `America/New_York`. Defaults to `UTC`. Naming a real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."
                     },
                     "securityScanEnforcement": {
                         "type": "string",
