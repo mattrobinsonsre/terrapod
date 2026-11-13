@@ -33,6 +33,7 @@ which is the whole argument for a callback rather than a parser:
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import pathlib
 import re
@@ -65,6 +66,8 @@ HEADER = _literal("HEADER")
 HOSTLESS = _literal("HOSTLESS")
 PROGRESS_STATUS = _literal("PROGRESS_STATUS")
 START_STATUS = _literal("START_STATUS")
+INCLUDED_STATUS = _literal("INCLUDED_STATUS")
+HANDLER_PREFIX = _literal("_HANDLER_PREFIX")
 INDENT = _literal("INDENT")
 EXAMPLE_BLOCK = _literal("EXAMPLE_BLOCK")
 
@@ -984,3 +987,179 @@ class TestTaskStartNotices:
         statuses = [b.status for b in _blocks(out)]
         assert "recap" in statuses, f"no recap block:\n{out}"
         assert START_STATUS not in statuses[statuses.index("recap") :], statuses
+
+
+_GAPS_INVENTORY = textwrap.dedent(
+    """
+    all:
+      hosts:
+        dev-1: {ansible_connection: local}
+        dev-2: {ansible_connection: local}
+    """
+).strip()
+
+#: Delegation, a handler, an include and a play matching no hosts -- the four
+#: things the #2532 review found leaving the log, in one play.
+_GAPS_PLAY = textwrap.dedent(
+    """
+    - name: gaps
+      hosts: all
+      gather_facts: false
+      tasks:
+        - name: Start the instance if it is stopped
+          ansible.builtin.command: "true"
+          delegate_to: localhost
+          changed_when: true
+          notify: a handler
+      handlers:
+        - name: a handler
+          ansible.builtin.debug: {msg: from the handler}
+    - name: no hosts
+      hosts: nonexistent
+      gather_facts: false
+      tasks:
+        - name: never
+          ansible.builtin.debug: {msg: x}
+    """
+).strip()
+
+
+@needs_ansible
+class TestNothingBypassesTheFormatting:
+    """Every line `default` prints becomes a block (#2565, #2532 review).
+
+    Five hooks were left to `super()`. The display wrapper falls THROUGH to the
+    real display when no frame is open, so their lines printed verbatim -- no
+    time, no host column, no colour. Worse than cosmetic: the viewer treats a
+    line that is neither a header nor an indented body as belonging to no host
+    AND as closing the open block, so one `included:` line detaches everything
+    around it from the per-host filter that #2513 exists to provide.
+    """
+
+    def test_an_include_is_one_block_per_host(self, tmp_path):
+        inv = textwrap.dedent(
+            """
+            all:
+              hosts:
+                dev-1: {ansible_connection: local}
+                dev-2: {ansible_connection: local}
+            """
+        ).strip()
+        play = textwrap.dedent(
+            """
+            - name: inc
+              hosts: all
+              gather_facts: false
+              tasks:
+                - name: Includes a file
+                  ansible.builtin.include_tasks: inc.yml
+            """
+        ).strip()
+        (tmp_path / "inc.yml").write_text(
+            "- name: An included task\n  ansible.builtin.debug: {msg: included}\n"
+        )
+        out = _run(tmp_path, inventory=inv, play=play, tagged=True)
+        inc = [b for b in _blocks(out) if b.status == INCLUDED_STATUS]
+        assert {b.host for b in inc} == {"dev-1", "dev-2"}, [(b.host, b.label) for b in inc]
+        assert all("inc.yml" in b.label for b in inc), [b.label for b in inc]
+        # And the raw form is gone: an `included:` line of ansible's own would
+        # be a body-less, header-less line, which is what detaches the filter.
+        assert "\nincluded: " not in out, out
+
+    def test_a_play_matching_no_hosts_is_a_host_less_block(self, tmp_path):
+        out = _run(tmp_path, inventory=_GAPS_INVENTORY, play=_GAPS_PLAY, tagged=True)
+        blocks = [b for b in _blocks(out) if b.label == "no hosts matched"]
+        assert len(blocks) == 1, [b.label for b in _blocks(out)]
+        assert blocks[0].host is None, blocks[0].host
+        assert "\nskipping: no hosts matched" not in out, out
+
+    @pytest.mark.skipif(
+        importlib.util.find_spec("ansible") is None,
+        reason="needs ansible importable, not merely on PATH -- the test image has it",
+    )
+    def test_every_printing_hook_default_overrides_is_overridden_here(self):
+        """DERIVED, so a future ansible-core cannot add one unnoticed.
+
+        The reported symptom was one hook; the defect was the hook SET. Pinning
+        the five by name would have been a record of this fix rather than a
+        guard, and the next ansible-core to add a printing hook would reopen it
+        silently.
+        """
+        import inspect
+
+        from ansible.plugins.callback import CallbackBase
+        from ansible.plugins.callback.default import CallbackModule
+
+        theirs = {
+            n
+            for n, _ in inspect.getmembers(CallbackModule, inspect.isfunction)
+            if n.startswith("v2_")
+            and getattr(CallbackModule, n) is not getattr(CallbackBase, n, None)
+        }
+        assert len(theirs) >= 20, f"only found {len(theirs)} overridden hooks -- wrong class?"
+        ours = set(re.findall(r"^    def (v2_\w+)", _SRC, re.M))
+        missing = sorted(theirs - ours)
+        assert not missing, (
+            "these hooks print through `default` and are not framed here, so their "
+            f"lines reach the log unformatted and close the open block: {missing}"
+        )
+
+
+@needs_ansible
+class TestDelegationAndHandlers:
+    """Two things ansible says in parts of the line this log reshapes."""
+
+    def test_a_delegated_task_names_where_it_actually_ran(self, tmp_path):
+        """`delegate_to` ran the task somewhere else entirely.
+
+        Ansible reports it in the host part (`changed: [dev-2 -> localhost]`)
+        and this log cannot: the host field is the per-host filter's key, so two
+        names in it would break the filter and the escaping both. The inventory
+        host stays in the column and the target goes on the label.
+        """
+        out = _run(tmp_path, inventory=_GAPS_INVENTORY, play=_GAPS_PLAY, tagged=True)
+        # Results only. The start notice carries the same label and cannot carry
+        # a delegation: it is emitted once per TASK, before any host has run it,
+        # and `delegate_to` is a property of the per-host result.
+        delegated = [b for b in _blocks(out) if b.host and "Start the instance" in b.label]
+        assert delegated, [(b.host, b.label) for b in _blocks(out)]
+        for b in delegated:
+            assert b.label.endswith("-> localhost"), b.label
+            # The column keeps ONE name, or the filter cannot key on it.
+            assert b.host in ("dev-1", "dev-2"), b.host
+            assert "->" not in (b.host or ""), b.host
+
+    def test_an_undelegated_task_gains_no_arrow(self, tmp_path):
+        """The control. Without it the assertion above is satisfied by a label
+        that appends an arrow to everything."""
+        out = _run(tmp_path, inventory=_GAPS_INVENTORY, play=_GAPS_PLAY, tagged=True)
+        plain = [b for b in _blocks(out) if b.host and "handler" in b.label]
+        assert plain, [b.label for b in _blocks(out)]
+        assert all("->" not in b.label for b in plain), [b.label for b in plain]
+
+    def test_a_handler_is_marked_as_one(self, tmp_path):
+        """Ansible marks it in the banner, which this log drops."""
+        out = _run(tmp_path, inventory=_GAPS_INVENTORY, play=_GAPS_PLAY, tagged=True)
+        marked = [b for b in _blocks(out) if b.label.startswith(HANDLER_PREFIX)]
+        assert marked, [b.label for b in _blocks(out)]
+        assert {b.status for b in marked} >= {"ok"}, [(b.status, b.label) for b in marked]
+
+    def test_the_announcement_marks_it_too(self, tmp_path):
+        """The start notice is this log's replacement for the banner.
+
+        If only the results carried the marker, the one line that exists to
+        replace `RUNNING HANDLER [x]` would be the line that does not say so.
+        """
+        out = _run(tmp_path, inventory=_GAPS_INVENTORY, play=_GAPS_PLAY, tagged=True)
+        starts = [b for b in _blocks(out) if b.status == START_STATUS]
+        assert any(b.label.startswith(HANDLER_PREFIX) for b in starts), [b.label for b in starts]
+
+    def test_an_ordinary_task_is_not_marked(self, tmp_path):
+        """The control for the marker, so it cannot be satisfied by prefixing
+        every label."""
+        out = _run(tmp_path, inventory=_GAPS_INVENTORY, play=_GAPS_PLAY, tagged=True)
+        ordinary = [b for b in _blocks(out) if b.host and "Start the instance" in b.label]
+        assert ordinary
+        assert all(not b.label.startswith(HANDLER_PREFIX) for b in ordinary), [
+            b.label for b in ordinary
+        ]

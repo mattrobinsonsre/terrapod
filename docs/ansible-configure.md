@@ -1014,6 +1014,31 @@ log can filter them out and see exactly what it saw before.
 which every block carries in its label — and the `start` notice is what
 announces a task now, in this log's own vocabulary rather than ansible's.
 
+### Everything ansible prints is a block
+
+Nothing is left unformatted. Where ansible's own output puts something in a part
+of the line this log reshapes, it is carried rather than dropped:
+
+| ansible prints | here |
+|---|---|
+| `included: <file> for host-a, host-b` | one `included` block **per host**, so an include can be read in a per-host view like any other event |
+| `RUNNING HANDLER [restart nginx]` | the label is prefixed `handler: `, on the `start` notice and on every result |
+| `changed: [dev-2 -> localhost]` | the host column keeps `dev-2` and the label gains ` -> localhost` |
+| `skipping: no hosts matched` | a host-less `skipped` block |
+| `NOTIFIED HANDLER x for y` (`-vv`) | a `notified` block for that host |
+| async progress (`poll:`) | a `polling` block for that host |
+
+**Delegation is on the label and not in the host column, deliberately.** That
+column is the key the per-host view filters on and the escaping keeps it one
+whitespace-delimited token, so two names in it would break both. The inventory
+host stays there and the target the task actually ran on goes on the label —
+which matters for anything using `delegate_to`: a cloud API call, a monitoring
+silence, work on the runner itself.
+
+A task that produces no output at all still appears, because the `start` notice
+is emitted per task rather than per result. Setting `terrapod_progress_seconds`
+to `0` silences the notices, and with them that trace.
+
 **`format=plain` gives you the same blocks with the header and the colour
 removed**, which is what the Go SDK's `Plain` option and the `terrapod_run_logs`
 MCP tool send:
