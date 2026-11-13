@@ -72,7 +72,7 @@ first — most rows do not apply to most deployments.
 |---|---|---|
 | Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
 | Move automation off the shapes that change: [a `status == "planning"` branch](#a-run-held-after-its-plan-reports-terraform-enterprises-statuses), [`ListRunPolicyEvaluations` and `IsBlocking()`](#policyevaluation-becomes-policycheck-in-the-go-sdk), and [a literal `queued` or `canceling` read from `/api/tfe/v2`](#a-runs-status-on-apitfev2-is-always-one-go-tfe-defines) | you have scripts or Go programs that read a run's status or its policy results | each is silent: a branch that no longer fires, a `switch` that falls through every case. The first two can be tried ahead of time on your current release |
-| [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status), and move bookmarked `status:locked` / `status:unhealthy` filters | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked`, or you share filter URLs | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then |
+| [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status) | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked` | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then. Bookmarked and shared filters need nothing: the page [rewrites them when it loads](#old-filters-are-rewritten-when-the-page-loads) |
 | [Check your own EE images can function as uid 1000](#an-execution-environment-must-run-as-uid-1000) | you set `api.config.ansible.execution_environments`. Terrapod's own published images need nothing | the sidecar's startup probe asserts it, so a non-conforming image fails at pod start — which is better than mid-playbook, but it is still every configure on that workspace |
 | [Grant module `registry:read`](#downloading-a-protected-configuration-version-archive-needs-module-registryread-too) | anyone downloads configuration-version archives from workspaces provisioned by a **self-contained** catalog item | the grant exists on your current release, so doing it first means nobody meets the new `403` |
 | [Point consumers at the catalog surface](#a-human-read-of-a-catalog-instances-variables-no-longer-returns-their-values) | a script or an agent reads `/variables` on a catalog-provisioned workspace and uses the values | the route, the attribute names and the status code are all unchanged — only the content becomes `null`, so nothing reports it |
@@ -407,9 +407,10 @@ are both still answered next to the thing you did, without a comment per push.
 ### The workspace filter has `flag:` and `locked:`, and `status:` is only the run's status
 
 **Affects:** anyone who bookmarks or shares a Workspaces filter containing
-`status:locked` or `status:unhealthy`, and any deployment that uses `flag` or
-`locked` as a **label key**. It does not change the HTTP API, and it changes no
-stored data.
+`status:locked`, `status:unhealthy`, `status:drifted`, `status:state-diverged` or
+`status:vcs-error` (the page carries these over, with a few differences below),
+and any deployment that uses `flag` or `locked` as a **label key**. It does not
+change the HTTP API, and it changes no stored data.
 
 `status:` used to carry two values that were not statuses at all. `status:locked`
 matched a workspace's manual lock, and `status:unhealthy` matched "has at least
@@ -420,17 +421,60 @@ impossible to let two `status:` terms mean "either": `status:locked status:error
 was "locked **and** errored".
 
 They are gone from `status:`, which now means only the run's status (thirteen
-values, exactly one per workspace):
+values, at most one per workspace; a workspace with no run matches none of them).
+`needs-confirm` is a run that has planned and is not plan-only, so it is waiting
+for someone to confirm it, and `planned` is a plan-only run that has planned:
 
 | Before | Now |
 |---|---|
 | `status:locked` | `locked:true` (and `locked:false` comes with it) |
-| `status:unhealthy` | `flag:state-diverged flag:no-agent-pool flag:no-live-agent-pool flag:vcs-error flag:run-errored flag:drifted flag:drift-errored` |
+| `status:unhealthy` | `flag:state-diverged flag:no-agent-pool flag:no-live-agent-pool flag:vcs-error flag:run-errored flag:drifted flag:drift-errored` (all **seven** health conditions) |
+| `status:drifted` | `flag:drifted` |
+| `status:state-diverged` | `flag:state-diverged` |
+| `status:vcs-error` | `flag:vcs-error` |
 
 The **Health Issues** and **Locked** indicators on the workspace list insert
 exactly these, so clicking one shows what it means and lets you delete a condition
 from it. The `flag:` terms union, so the result is the set `status:unhealthy`
 matched.
+
+#### Old filters are rewritten when the page loads
+
+A filter opened from a bookmark, a shared link or the tab's stored filter is
+rewritten once, on load, using the table above, and the address bar then shows the
+new form. Every other term is kept as written, a replacement term the filter
+already has is not added twice, and a filter with none of these spellings is not
+changed by the rewrite. Only load rewrites: a `status:drifted` typed by hand
+afterwards is not carried over, and matches nothing (see the last point below).
+Four things are not the same as before:
+
+- **The three drift spellings are not an exact identity.** `status:` used to match
+  the status the pill shows, and `flag:` reads the server's health condition. So
+  `status:drifted` missed a drifted workspace whose pill showed `needs-confirm`,
+  `state-diverged` or `vcs-error`, and matched a stale `drift-status` with drift
+  detection off. After the rewrite it finds the first and no longer matches the
+  second, which is the correction the Flags dropdown already made.
+- **Two rewritten terms now mean "either".** `status:` terms used to intersect, and
+  a workspace has one pill, so `status:drifted status:vcs-error` matched nothing;
+  it becomes `flag:drifted flag:vcs-error`, which is drifted **or** VCS error.
+  `status:unhealthy status:drifted` was "unhealthy and showing drifted" and is now
+  every health condition, which is the same set as `status:unhealthy` alone. A
+  rewritten term next to a run status still intersects, so
+  `status:drifted status:errored` is now a drifted workspace whose latest run
+  errored, where it used to match nothing, and `status:locked status:errored` and
+  `status:unhealthy status:errored` keep their meaning.
+- **`status:` is the run's own status, whatever the pill shows.** `status:errored`
+  used to miss an errored run on a workspace whose pill showed `drifted`,
+  `state-diverged`, `vcs-error` or `needs-confirm`; it now finds it. The Status
+  dropdown counts use the same rule, so the number beside a row is what ticking it
+  matches.
+- **A `status:` or `flag:` value its dropdown does not offer matches nothing.**
+  That is a typo such as `status:erored`, and also a removed spelling typed by hand
+  after the page has loaded. A `status:` typo used to be ignored whenever another
+  `status:` term was present, which widened `status:erored status:applied` to every
+  applied workspace; now the list is empty and the term is in the filter bar, and
+  `flag:nope flag:drifted` is empty too rather than every drifted workspace. The
+  Status and Flags badges count only the distinct values their own dropdown offers.
 
 **Two label keys become reserved.** `flag` and `locked` can no longer be used as
 label keys, for the same reason `status` and `owner` cannot. `locked` was released
