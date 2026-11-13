@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Aucun pool d’agents actif",
       "vcs-error": "Erreur VCS",
       "drifted": "Dérive détectée",
-      "drift-errored": "Échec de la détection de dérive"
+      "drift-errored": "Échec de la détection de dérive",
+      "run-errored": "Échec de la dernière exécution"
     }
   },
   "status": {

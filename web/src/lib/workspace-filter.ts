@@ -83,6 +83,7 @@ export const FLAG_CODES: readonly string[] = [
   'no_agent_pool',
   'no_live_agent_pool',
   'vcs_error',
+  'run_errored',
   'drifted',
   'drift_errored',
 ]

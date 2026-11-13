@@ -181,7 +181,8 @@
       "no-live-agent-pool": "활성 에이전트 풀 없음",
       "vcs-error": "VCS 오류",
       "drifted": "드리프트됨",
-      "drift-errored": "드리프트 감지 실패"
+      "drift-errored": "드리프트 감지 실패",
+      "run-errored": "마지막 실행 실패"
     }
   },
   "status": {

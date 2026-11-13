@@ -747,6 +747,7 @@ async def create_project_unsupported(
 def _compute_health_conditions(
     ws: Workspace,
     live_pool_ids: frozenset[uuid.UUID] | None = None,
+    latest_run: Run | None = None,
 ) -> list[dict]:
     """Compute all active health conditions from workspace DB fields.
 
@@ -756,6 +757,20 @@ def _compute_health_conditions(
     information available, and the liveness condition is skipped rather than
     guessed — a false "no runner" banner is worse than a missing one.
 
+    ``latest_run`` is the workspace's newest PRIMARY run — the same one the
+    status pill resolves from, already loaded by every caller, so this costs no
+    query. Until it was passed, every condition here came from a persistent
+    workspace column and none of them read a run, so a workspace whose last
+    plan or apply FAILED reported no condition at all: the status column said
+    `errored` while the Health count said the estate was fine, and the Health
+    filter could not find it.
+
+    That was incoherent rather than merely incomplete, because `drift_errored`
+    below is itself a failed run — drift detection is just a kind of run — so
+    "a run failed" already counted, for exactly one kind of run. And
+    `_primary_run_filter`, which decides what `latest_run` is, says in its own
+    docstring that it exists to exclude runs "that should not affect workspace
+    health": something was always meant to read runs here.
     """
     conditions: list[dict] = []
 
@@ -829,6 +844,32 @@ def _compute_health_conditions(
                 "title": "Infrastructure drift detected",
                 "detail": "A drift detection run found changes between the stored state "
                 "and the actual infrastructure.",
+            }
+        )
+
+    if latest_run is not None and latest_run.status == "errored":
+        # Deliberately not narrowed to plan/apply. A drift run erroring is
+        # ALREADY meant to be caught by `drift_errored` above, and that reads
+        # `drift_status` — a column written by a separate triggered handler, so
+        # when that handler does not run the workspace reports nothing while its
+        # newest run sits errored. Deriving this from the run itself needs no
+        # second write to have happened, which is the point: a failed run is a
+        # fact about the run, and the condition should not depend on anything
+        # else having recorded it. A workspace where both are true reports both,
+        # which is accurate rather than noisy.
+        conditions.append(
+            {
+                "code": "run_errored",
+                "severity": "error",
+                "title": "Last run errored",
+                # The run's own message, following `vcs_error` above rather than
+                # a generic sentence: an operator opening the expansion wants to
+                # know WHAT failed, and "check the run output" sends them to a
+                # page to read the thing we already have.
+                "detail": (
+                    latest_run.error_message
+                    or "The most recent run failed. Check the run output for details."
+                ),
             }
         )
 
@@ -1115,7 +1156,7 @@ def _workspace_json(
                 "state-diverged": ws.state_diverged,
                 "lifecycle-state": ws.lifecycle_state,
                 "lifecycle-reason": ws.lifecycle_reason,
-                "health-conditions": _compute_health_conditions(ws, live_pool_ids),
+                "health-conditions": _compute_health_conditions(ws, live_pool_ids, latest_run),
                 "vcs-last-polled-at": _rfc3339(ws.vcs_last_polled_at),
                 # Advances on every poll ATTEMPT, where `vcs-last-polled-at`
                 # advances only on success. The gap between the two is what

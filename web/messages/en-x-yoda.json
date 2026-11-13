@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Pool of agents, none alive",
       "vcs-error": "Error, VCS",
       "drifted": "Drifted",
-      "drift-errored": "Failed, drift detection"
+      "drift-errored": "Failed, drift detection",
+      "run-errored": "Errored, last run"
     }
   },
   "status": {

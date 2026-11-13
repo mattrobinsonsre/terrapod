@@ -181,7 +181,8 @@
       "no-live-agent-pool": "No live marklar marklar",
       "vcs-error": "Marklar Marklar",
       "drifted": "Drifted",
-      "drift-errored": "Marklar marklar failed"
+      "drift-errored": "Marklar marklar failed",
+      "run-errored": "Last marklar errored"
     }
   },
   "status": {

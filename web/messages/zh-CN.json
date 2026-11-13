@@ -181,7 +181,8 @@
       "no-live-agent-pool": "无活动代理池",
       "vcs-error": "VCS 错误",
       "drifted": "已漂移",
-      "drift-errored": "漂移检测失败"
+      "drift-errored": "漂移检测失败",
+      "run-errored": "最近一次运行失败"
     }
   },
   "status": {

@@ -576,7 +576,7 @@ A small set of label keys are reserved as **virtual filter fields** in the works
 | Reserved key | Maps to | Why it is reserved |
 |---|---|---|
 | `status` | the run's status (`errored`, `needs-confirm`, `applied`, …), exactly one per workspace | **Parsing** — a built-in filter term, so a literal `status` label would make `status:errored` ambiguous |
-| `flag` | one health condition per value: `state-diverged`, `no-agent-pool`, `no-live-agent-pool`, `vcs-error`, `drifted`, `drift-errored` | **Parsing** — a built-in filter term |
+| `flag` | one health condition per value: `state-diverged`, `no-agent-pool`, `no-live-agent-pool`, `vcs-error`, `run-errored`, `drifted`, `drift-errored` | **Parsing** — a built-in filter term |
 | `locked` | the manual state lock, `locked:true` or `locked:false` | **Parsing** — a built-in filter term |
 | `owner` | `owner_email`, which grants workspace **admin** | **Authorization** — a label `owner: alice` grants alice nothing, and believing otherwise is a security-shaped mistake |
 
@@ -593,7 +593,7 @@ A small set of label keys are reserved as **virtual filter fields** in the works
 
 Ticking two rows of a dropdown means "either", and typing another term means "and also". A workspace can carry several health conditions at once, and `flag:a flag:b` is "either", so asking for two conditions *together* is not possible.
 
-`status:` is only the run's status. It used to carry two further values, `status:locked` and `status:unhealthy`, which are now `locked:true` and the six `flag:` terms. The **Health Issues** indicator on the workspace list inserts all six `flag:` terms, so the filter bar shows what "unhealthy" means. They are matched against the server's `health-conditions` array, which is the same source the indicator counts, so the filter cannot drift from it. See [Upgrading to 2.0](upgrading-to-2.0.md#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status).
+`status:` is only the run's status. It used to carry two further values, `status:locked` and `status:unhealthy`, which are now `locked:true` and the `flag:` terms. The **Health Issues** indicator on the workspace list inserts every `flag:` term, so the filter bar shows what "unhealthy" means. They are matched against the server's `health-conditions` array, which is the same source the indicator counts, so the filter cannot drift from it. See [Upgrading to 2.0](upgrading-to-2.0.md#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status).
 
 **This set was narrowed from ten keys to two in v1.6.0, and `flag` and `locked` joined it in 2.0.** A key is now reserved only when using it as a label would **mislead about a decision Terrapod actually makes** — parsing (`status`, `flag`, `locked`) or authorization (`owner`). Descriptive overlap with a workspace field is not enough on its own.
 

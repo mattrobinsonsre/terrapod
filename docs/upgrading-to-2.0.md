@@ -425,11 +425,11 @@ values, exactly one per workspace):
 | Before | Now |
 |---|---|
 | `status:locked` | `locked:true` (and `locked:false` comes with it) |
-| `status:unhealthy` | `flag:state-diverged flag:no-agent-pool flag:no-live-agent-pool flag:vcs-error flag:drifted flag:drift-errored` |
+| `status:unhealthy` | `flag:state-diverged flag:no-agent-pool flag:no-live-agent-pool flag:vcs-error flag:run-errored flag:drifted flag:drift-errored` |
 
 The **Health Issues** and **Locked** indicators on the workspace list insert
 exactly these, so clicking one shows what it means and lets you delete a condition
-from it. The six `flag:` terms union, so the result is the set `status:unhealthy`
+from it. The `flag:` terms union, so the result is the set `status:unhealthy`
 matched.
 
 **Two label keys become reserved.** `flag` and `locked` can no longer be used as

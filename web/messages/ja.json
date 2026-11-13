@@ -181,7 +181,8 @@
       "no-live-agent-pool": "稼働中のエージェントプールなし",
       "vcs-error": "VCSエラー",
       "drifted": "ドリフト",
-      "drift-errored": "ドリフト検出に失敗"
+      "drift-errored": "ドリフト検出に失敗",
+      "run-errored": "直近の実行が失敗"
     }
   },
   "status": {

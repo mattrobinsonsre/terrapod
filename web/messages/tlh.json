@@ -181,7 +181,8 @@
       "no-live-agent-pool": "jan wIv natlh Daq yIn tu'lu'be'",
       "vcs-error": "VCS Qagh",
       "drifted": "tlhotlhpu'",
-      "drift-errored": "tlhotlh Sovmey Qagh"
+      "drift-errored": "tlhotlh Sovmey Qagh",
+      "run-errored": "vum Qav Qagh"
     }
   },
   "status": {

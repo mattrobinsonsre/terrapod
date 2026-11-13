@@ -181,7 +181,8 @@
       "no-live-agent-pool": "بدون استخر عامل فعال",
       "vcs-error": "خطای VCS",
       "drifted": "منحرف‌شده",
-      "drift-errored": "تشخیص انحراف ناموفق بود"
+      "drift-errored": "تشخیص انحراف ناموفق بود",
+      "run-errored": "آخرین اجرا ناموفق بود"
     }
   },
   "status": {

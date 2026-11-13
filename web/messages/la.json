@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Nulla piscina agentium viva",
       "vcs-error": "Error VCS",
       "drifted": "Aberratum",
-      "drift-errored": "Deprehensio aberrationis defecit"
+      "drift-errored": "Deprehensio aberrationis defecit",
+      "run-errored": "Ultima executio defecit"
     }
   },
   "status": {

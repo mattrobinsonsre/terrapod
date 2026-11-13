@@ -181,7 +181,8 @@
       "no-live-agent-pool": "אין מאגר סוכנים פעיל",
       "vcs-error": "שגיאת VCS",
       "drifted": "סטה",
-      "drift-errored": "זיהוי הסטייה נכשל"
+      "drift-errored": "זיהוי הסטייה נכשל",
+      "run-errored": "ההרצה האחרונה נכשלה"
     }
   },
   "status": {

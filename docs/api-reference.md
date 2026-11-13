@@ -1224,6 +1224,7 @@ a person and may be reworded. `severity` is `error` or `warning`.
 | `no_agent_pool` | `warning` | The workspace is in agent execution mode with no agent pool assigned, so runs queue indefinitely |
 | `no_live_agent_pool` | `error` | The workspace is in agent execution mode and none of its assigned pools currently has a listener sending heartbeats. Skipped rather than guessed when liveness cannot be determined — a false "no runner" banner is worse than a missing one |
 | `vcs_error` | `error` | The most recent VCS poll failed; `detail` is the error itself. Cleared by the next successful poll — see [VCS Polling Health Attributes](#vcs-polling-health-attributes) |
+| `run_errored` | `error` | The workspace's most recent primary run errored; `detail` is the run's own error message. Derived from the run itself rather than from a stored column, so it does not depend on any other handler having recorded the failure. Speculative pull-request plans and module-test runs are not primary and never raise it |
 | `drifted` | `warning` | Drift detection is enabled and the last drift run found changes between the stored state and the real infrastructure |
 | `drift_errored` | `warning` | Drift detection is enabled and the last drift run failed |
 
