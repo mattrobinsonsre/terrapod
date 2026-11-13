@@ -749,7 +749,11 @@ def _compute_health_conditions(
     live_pool_ids: frozenset[uuid.UUID] | None = None,
     latest_run: Run | None = None,
 ) -> list[dict]:
-    """Compute all active health conditions from workspace DB fields.
+    """Compute all active health conditions for a workspace.
+
+    Columns plus ``latest_run``: it stopped being a pure function of workspace
+    fields when ``run_errored`` was added (#2563), which is why every caller
+    has to supply the run.
 
     ``live_pool_ids`` is the set of agent pools that currently have a live
     listener, resolved **once per request** by the caller (see
@@ -758,8 +762,10 @@ def _compute_health_conditions(
     guessed — a false "no runner" banner is worse than a missing one.
 
     ``latest_run`` is the workspace's newest PRIMARY run — the same one the
-    status pill resolves from, already loaded by every caller, so this costs no
-    query. Until it was passed, every condition here came from a persistent
+    status pill resolves from. The list and read paths already hold it, so it
+    costs them nothing; the PATCH and the three lock endpoints load it through
+    ``_latest_run_for``, one query each, because omitting it made this response
+    disagree with the GET that followed about the same workspace. Until it was passed, every condition here came from a persistent
     workspace column and none of them read a run, so a workspace whose last
     plan or apply FAILED reported no condition at all: the status column said
     `errored` while the Health count said the estate was fine, and the Health
@@ -1401,6 +1407,32 @@ async def _latest_runs_for(ws_ids: list, db: AsyncSession) -> dict:
         for run in run_result.scalars().all():
             latest_runs[run.workspace_id] = run
     return latest_runs
+
+
+async def _latest_run_for(ws, db: AsyncSession, *, scoped: bool):
+    """The workspace's newest primary run, or None.
+
+    The single-workspace counterpart of `_latest_runs_for`. It exists because
+    `health-conditions` stopped being a pure function of workspace columns when
+    `run_errored` was added (#2563): a caller that does not supply `latest_run`
+    silently drops that one condition, so the same workspace reported a
+    different health on the mutation responses than on the GET that followed.
+    Saving the settings form made the banner disappear until the next read.
+
+    `scoped` matches the caller's surface for the reason the primary GET gives:
+    the engine filter is redundant on the TFE side and wrong on the native one.
+    """
+    result = await db.execute(
+        select(Run)
+        .where(
+            Run.workspace_id == ws.id,
+            _primary_run_filter(),
+            _engine_filter(Run) if scoped else True,
+        )
+        .order_by(Run.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 @router.get("/organizations/default/workspaces")
@@ -3056,14 +3088,12 @@ async def update_workspace(
             timezone=ws.scheduled_configure_timezone,
         )
     if "scheduled-configure-enabled" in attrs:
-        was_on = ws.scheduled_configure_enabled
-        ws.scheduled_configure_enabled = attrs["scheduled-configure-enabled"]
-        if ws.scheduled_configure_enabled and not was_on:
-            # Turning it ON stamps now, so the first run is the next occurrence
-            # rather than one fired immediately. Without this, enabling "02:00
-            # daily" at 14:00 computes the next occurrence from `created_at` --
-            # long past -- and configures the fleet on the spot.
-            ws.scheduled_configure_last_at = now_utc()
+        # Not a plain assignment: turning it ON stamps the baseline, or the next
+        # occurrence is computed from `created_at` and the workspace is due on
+        # the spot. See workspace_settings.set_scheduled_configure_enabled --
+        # shared with the bulk update, which reaches a hundred workspaces at a
+        # time and had the plain assignment.
+        workspace_settings.set_scheduled_configure_enabled(ws, attrs["scheduled-configure-enabled"])
     if "drift-detection-enabled" in attrs:
         ws.drift_detection_enabled = attrs["drift-detection-enabled"]
         # Reset drift status when disabling drift detection
@@ -3238,6 +3268,7 @@ async def update_workspace(
         content=_workspace_json(
             ws,
             old_caps,
+            latest_run=await _latest_run_for(ws, db, scoped=tfe),
             live_pool_ids=await _resolve_live_pools([ws]),
             tfe=tfe,
         ),
@@ -4114,7 +4145,12 @@ async def lock_workspace(
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": True})
 
     return JSONResponse(
-        content=_workspace_json(ws, caps, tfe=is_tfe_path(request.url.path)),
+        content=_workspace_json(
+            ws,
+            caps,
+            latest_run=await _latest_run_for(ws, db, scoped=is_tfe_path(request.url.path)),
+            tfe=is_tfe_path(request.url.path),
+        ),
         headers=_tfe_headers(),
     )
 
@@ -4158,7 +4194,12 @@ async def unlock_workspace(
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
     return JSONResponse(
-        content=_workspace_json(ws, caps, tfe=is_tfe_path(request.url.path)),
+        content=_workspace_json(
+            ws,
+            caps,
+            latest_run=await _latest_run_for(ws, db, scoped=is_tfe_path(request.url.path)),
+            tfe=is_tfe_path(request.url.path),
+        ),
         headers=_tfe_headers(),
     )
 
@@ -4201,6 +4242,11 @@ async def force_unlock_workspace(
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
     return JSONResponse(
-        content=_workspace_json(ws, caps, tfe=is_tfe_path(request.url.path)),
+        content=_workspace_json(
+            ws,
+            caps,
+            latest_run=await _latest_run_for(ws, db, scoped=is_tfe_path(request.url.path)),
+            tfe=is_tfe_path(request.url.path),
+        ),
         headers=_tfe_headers(),
     )

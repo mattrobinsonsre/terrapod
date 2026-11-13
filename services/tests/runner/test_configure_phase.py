@@ -247,11 +247,10 @@ class TestTheConfigureFlowIsWired:
 
     def _function(self):
         import ast
-        import pathlib
 
         from terrapod.runner import job_entrypoint
 
-        tree = ast.parse(pathlib.Path(job_entrypoint.__file__).read_text())
+        tree = ast.parse(Path(job_entrypoint.__file__).read_text())
         found = [
             n
             for n in ast.walk(tree)
@@ -741,11 +740,10 @@ class TestTheGateActuallyBlocks:
         omission -- and the three sites' answers are pinned here because the
         right answer is a property of the phase, not of OPA."""
         import ast
-        import pathlib
 
         from terrapod.runner import job_entrypoint
 
-        tree = ast.parse(pathlib.Path(job_entrypoint.__file__).read_text())
+        tree = ast.parse(Path(job_entrypoint.__file__).read_text())
         answers = []
         for node in ast.walk(tree):
             if (

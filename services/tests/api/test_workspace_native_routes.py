@@ -32,10 +32,27 @@ def _pulumi(**kw):
 
 def _db(ws) -> AsyncMock:
     db = AsyncMock()
-    result = MagicMock()
-    result.scalar_one_or_none.return_value = ws
-    result.scalars.return_value.all.return_value = [ws] if ws is not None else []
-    db.execute.return_value = result
+
+    def _answer(stmt, *_a, **_k):
+        """Answer workspace queries with ``ws`` and run queries with nothing.
+
+        The PATCH response loads the workspace's latest run for
+        ``health-conditions`` (#2563). Answering that query with the workspace
+        too hands the serialiser a workspace where a ``Run`` belongs, and the
+        response dies on ``TypeError: Object of type MagicMock is not JSON
+        serializable`` -- naming neither the query nor the handler that gained
+        it. Keyed on the statement rather than on call ORDER, so a handler
+        gaining or losing a query does not break this again.
+        """
+        result = MagicMock()
+        is_run = "FROM runs" in str(stmt)
+        result.scalar_one_or_none.return_value = None if is_run else ws
+        result.scalars.return_value.all.return_value = (
+            [] if is_run else ([ws] if ws is not None else [])
+        )
+        return result
+
+    db.execute = AsyncMock(side_effect=_answer)
     db.add = MagicMock()
     return db
 

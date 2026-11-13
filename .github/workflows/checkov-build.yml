@@ -53,17 +53,26 @@ permissions:
   contents: write # publish the built binaries
 
 env:
-  # Upstream's own build interpreter, pinned to bookworm rather than the
-  # floating `3.9` tag. THIS IS THE ONE DEVIATION from upstream's recipe and it
-  # is not cosmetic: PyInstaller bundles the interpreter and its extension
-  # modules but NOT libc, so the build host's glibc is a hard floor for every
-  # image that has to execute the result. `arm64v8/python:3.9` now resolves to
-  # Debian 13 (glibc 2.41), and a bundle built there refuses to start on any
-  # runner image older than trixie. Bookworm drops the floor to the architecture
-  # baseline — measured at GLIBC_2.17 on aarch64 — so the bundle runs on every
-  # runner image we have published and on anything an operator plausibly runs.
+  # THE ONE DEVIATION from upstream's recipe is the DEBIAN release, not the
+  # Python one, and it is not cosmetic: PyInstaller bundles the interpreter and
+  # its extension modules but NOT libc, so the build host's glibc is a hard
+  # floor for every image that has to execute the result. A floating
+  # `arm64v8/python:3.X` now resolves to Debian 13 (glibc 2.41), and a bundle
+  # built there refuses to start on any runner image older than trixie.
+  # Bookworm drops the floor to the architecture baseline — measured at
+  # GLIBC_2.17 on aarch64 — so the bundle runs on every runner image we have
+  # published and on anything an operator plausibly runs.
   # Only ever move this towards an OLDER Debian.
-  BUILD_IMAGE_TAG: "3.9-bookworm"
+  #
+  # The PYTHON half is upstream's, read per version off that version's own
+  # Pipfile in `plan`. It was a fixed `3.9` in three places until 3.4.5 raised
+  # `python_version` to 3.10 and every build of it died in `pipenv sync` with
+  # "Python 3.10 was not found on your system" — an error naming neither the
+  # pin nor the version that moved. One fixed interpreter cannot be right
+  # across that move in either direction, and the candidate set straddles it
+  # whenever upstream raises its floor, so deriving is both the fix and the
+  # more faithful reading of "run THEIR recipe".
+  BUILD_IMAGE_DEBIAN: bookworm
   UPSTREAM: bridgecrewio/checkov
 
 jobs:
@@ -190,7 +199,38 @@ jobs:
             fi
           done < candidates.txt
 
-          JSON=$(jq -R . < need.txt | jq -sc .)
+          # Each entry carries the interpreter that version's own Pipfile asks
+          # for. Fail CLOSED when it cannot be read: guessing the interpreter is
+          # exactly how this broke, and a wrong guess fails deep inside
+          # `pipenv sync` where the message names neither the pin nor the
+          # version.
+          : > withpy.txt
+          while IFS= read -r V; do
+            [ -n "${V}" ] || continue
+            # `|| true` so a 404 reaches the explicit check below rather than
+            # killing the step under `set -e` with a bare `curl: (56)` that
+            # names neither the version nor what was being read.
+            PY=$(curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors \
+                   "https://raw.githubusercontent.com/${UPSTREAM}/${V}/Pipfile" 2>/dev/null \
+                   | sed -n 's/^python_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+                   | head -1 || true)
+            if [ -z "${PY}" ]; then
+              echo "::error::could not read python_version from ${UPSTREAM}@${V} Pipfile — refusing to guess the build interpreter."
+              exit 1
+            fi
+            echo "  ${V} — builds on python ${PY}"
+            printf '%s\t%s\n' "${V}" "${PY}" >> withpy.txt
+          done < need.txt
+
+          # The Debian release rides along in each entry rather than being read
+          # from `env` where it is used. A job's `container:` cannot see the
+          # `env` context at all -- GitHub refuses the whole workflow with
+          # "Unrecognized named-value: 'env'" -- and the alternative, repeating
+          # the literal in both `include` entries, is the second copy this
+          # commit exists to remove.
+          JSON=$(jq -Rsc --arg deb "${BUILD_IMAGE_DEBIAN}" \
+                   'split("\n") | map(select(length > 0) | split("\t") | {v: .[0], py: .[1], deb: $deb})' \
+                   < withpy.txt)
           echo "versions=${JSON}" >> "$GITHUB_OUTPUT"
           if [ "${JSON}" = "[]" ]; then
             echo "any=false" >> "$GITHUB_OUTPUT"
@@ -205,7 +245,7 @@ jobs:
   # `runner/phases/security_scan.py::_run_checkov` uses. A 60 MB bundle that was
   # never run is not an artifact, it is a guess.
   build:
-    name: Build checkov ${{ matrix.version }} (${{ matrix.arch }})
+    name: Build checkov ${{ matrix.version.v }} (${{ matrix.arch }})
     needs: plan
     if: needs.plan.outputs.any == 'true'
     strategy:
@@ -218,15 +258,15 @@ jobs:
         include:
           - arch: amd64
             runs_on: ubuntu-latest
-            image: python:3.9-bookworm
+            image_prefix: python
             asset: checkov_linux_X86_64.zip
           - arch: arm64
             runs_on: ubuntu-24.04-arm
-            image: arm64v8/python:3.9-bookworm
+            image_prefix: arm64v8/python
             asset: checkov_linux_arm64.zip
     runs-on: ${{ matrix.runs_on }}
     container:
-      image: ${{ matrix.image }}
+      image: ${{ matrix.image_prefix }}:${{ matrix.version.py }}-${{ matrix.version.deb }}
     # A CONTAINER job's default shell is `sh`, not bash, so `set -o pipefail`
     # is an illegal option and the step dies with exit 2 before running
     # anything. It killed all eight builds after the checkout was already
@@ -240,7 +280,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: bridgecrewio/checkov
-          ref: ${{ matrix.version }}
+          ref: ${{ matrix.version.v }}
           fetch-depth: 0
 
       # The job runs in a container as root while the workspace belongs to the
@@ -340,13 +380,13 @@ jobs:
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: checkov-${{ matrix.version }}-${{ matrix.arch }}
+          name: checkov-${{ matrix.version.v }}-${{ matrix.arch }}
           path: ${{ matrix.asset }}
           retention-days: 1
           if-no-files-found: error
 
   publish:
-    name: Publish checkov ${{ matrix.version }}
+    name: Publish checkov ${{ matrix.version.v }}
     needs: [plan, build]
     if: needs.plan.outputs.any == 'true'
     strategy:
@@ -365,7 +405,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          pattern: checkov-${{ matrix.version }}-*
+          pattern: checkov-${{ matrix.version.v }}-*
           merge-multiple: true
 
       - name: Attest what we built
@@ -376,7 +416,9 @@ jobs:
       - name: Publish the built binaries
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          V: ${{ matrix.version }}
+          V: ${{ matrix.version.v }}
+          PY: ${{ matrix.version.py }}
+          DEB: ${{ matrix.version.deb }}
         run: |
           set -euo pipefail
           {
@@ -385,7 +427,7 @@ jobs:
             echo "Upstream stopped publishing \`checkov_linux_arm64.zip\` at 3.3.21 (${UPSTREAM}#7729), which"
             echo "made every security scan on an arm64 agent pool record \`errored\`. These are built from"
             echo "upstream's own release tag, its committed \`Pipfile.lock\` and its committed \`checkov.spec\`,"
-            echo "on \`python:${BUILD_IMAGE_TAG}\` — the same recipe as its own \`nightly.yml\`, pinned to an"
+            echo "on \`python:${PY}-${DEB}\` — the same recipe as its own \`nightly.yml\`, pinned to an"
             echo "older glibc so the bundle runs on every runner image."
             echo
             echo "Each linux asset was executed before publication: upstream's own smoke test, plus the exact"

@@ -29,7 +29,6 @@ from terrapod.services import cache_inventory as ci
 from terrapod.storage import get_storage
 
 _BASE = "http://test"
-_AUTH = {"Authorization": "Bearer dummy"}
 
 #: Every route this file covers, with the method it answers. Derived subjects
 #: beat a list, but there is nothing to derive from for "which routes exist" —

@@ -98,7 +98,6 @@ class TestTheResourceListResolverIsPhaseBlindToo:
         shape used here, so look for either spelling rather than passing
         vacuously because the Name-only walk above finds nothing."""
         import ast
-        import pathlib
 
         from terrapod.services import plan_resource_list
 

@@ -16,7 +16,7 @@ object — so it has a run id, a log, a status, notifications, an audit trail an
 a cancel button, exactly as a plan or an apply does. `applied` means applied
 **and** configured.
 
-Four routes start one. The manual route needs only the operation declared; every
+Five routes start one. The manual route needs only the operation declared; every
 automatic one is off until you turn it on:
 
 | Route | What triggers it | What it runs |
@@ -25,6 +25,7 @@ automatic one is off until you turn it on:
 | **On push** (`auto-configure-enabled`) | a commit that changes a file under the workspace's `config-directory` | the declared defaults — a push carries no run options |
 | **After an apply** (`configure-after-apply`) | every apply on this workspace, on the **same run** — or one apply, when a run asks for it (below) | the declared defaults |
 | **On an inventory change** (the same `auto-configure-enabled`) | any change to the declared inventory that did **not** arrive through git — a host, group, membership or variable written through the API, the MCP tools, the UI, or by a Terraform apply declaring `terrapod_inventory_*` rows | the declared defaults |
+| **On a cron schedule** (`scheduled-configure-enabled`) | the workspace's own `scheduled-configure-cron` in its `scheduled-configure-timezone`, firing once per occurrence and never catching up | the declared defaults |
 
 ### Asking for one apply-then-configure, or declining one
 
@@ -1028,7 +1029,7 @@ of the line this log reshapes, it is carried rather than dropped:
 | `NOTIFIED HANDLER x for y` (`-vv`) | a `notified` block for that host |
 | async progress (`poll:`) | a `polling` block for that host |
 | ` [CHECK MODE]` on a play or task banner | the same suffix on the label, on the `start` notice and on every result |
-| `DRY RUN` before the first play and after the recap | a host-less `dry-run` block at each end |
+| `DRY RUN` before the first play and after the recap | a host-less `dry-run` block at each end — see the note below on when ansible prints it |
 
 **Delegation is on the label and not in the host column, deliberately.** That
 column is the key the per-host view filters on and the escaping keeps it one
@@ -1038,9 +1039,21 @@ which matters for anything using `delegate_to`: a cloud API call, a monitoring
 silence, work on the runner itself.
 
 **The check-mode marks follow your own `check_mode_markers`, which ansible
-defaults to off.** Turn it on and a `--check` run is bracketed by a host-less
-`dry-run` block at each end and every task label ends ` [CHECK MODE]`; leave it
-off and neither appears, exactly as with ansible's own output. The suffix is
+defaults to off.** Turn it on and every task running in check mode has its label
+suffixed ` [CHECK MODE]`; leave it off and nothing is marked, exactly as with
+ansible's own output.
+
+**Terrapod never passes `--check`, so the `DRY RUN` bracket does not appear on a
+configure run.** That is not a gap in this log — ansible gates those two banners
+on the CLI flag rather than on the play, so `ansible-playbook` itself prints
+neither for a play-level `check_mode: true`, and the block is rendered here only
+to stay faithful to what ansible would print if it were invoked that way.
+Terrapod has no `--check` dry run by design: check
+mode is unreliable per module, is not a diff, and misleads on anything gated by
+`when: changed`.
+
+**What you can reach is the per-task suffix**, by writing `check_mode: true` on
+a play or a task in your own playbook. The suffix is
 decided per task rather than once for the run, so a task that forces
 `check_mode: true` inside a play that is not a check run is marked, and one that
 forces it off inside a run that is stays unmarked — which is the distinction

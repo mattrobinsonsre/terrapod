@@ -21,6 +21,7 @@ from terrapod.auth.capabilities import caps_for_level
 from tests.api.test_workspaces import (
     _AUTH,
     _BASE,
+    _by_entity,
     _make_app,
     _mock_workspace,
     _no_inert_vars,
@@ -37,9 +38,7 @@ INIT = (
 
 def _app_for_create():
     app, db = _make_app(_user(roles=["admin"]))
-    result = MagicMock()
-    result.scalar_one_or_none.return_value = None
-    db.execute.return_value = result
+    _by_entity(db, None)
     db.refresh = AsyncMock()
     added: list = []
     db.add = added.append
@@ -48,9 +47,7 @@ def _app_for_create():
 
 def _app_for_patch(ws):
     app, db = _make_app(_user(roles=["admin"]))
-    result = MagicMock()
-    result.scalar_one_or_none.return_value = ws
-    db.execute.return_value = result
+    _by_entity(db, ws)
     db.refresh = AsyncMock()
     return app
 

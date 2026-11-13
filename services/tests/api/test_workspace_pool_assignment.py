@@ -135,6 +135,28 @@ def _make_app(user, mock_db=None):
     return app, mock_db
 
 
+def _by_entity(db, ws):
+    """Answer workspace queries with ``ws`` and run queries with ``None``.
+
+    The mutation call sites of ``_workspace_json`` load the workspace's latest
+    run, because ``health-conditions`` stopped being a pure function of
+    workspace columns when ``run_errored`` was added (#2563). A mock that
+    answers EVERY query with the workspace therefore hands the serialiser a
+    workspace where a ``Run`` belongs, and the response dies on
+    ``TypeError: Object of type MagicMock is not JSON serializable``.
+
+    Keyed on the compiled statement rather than on call ORDER, so it does not
+    break again the next time a handler gains or loses a query.
+    """
+
+    def _answer(stmt, *_a, **_k):
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None if "FROM runs" in str(stmt) else ws
+        return result
+
+    db.execute = AsyncMock(side_effect=_answer)
+
+
 class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -163,9 +185,7 @@ class TestWorkspacePoolAssignment:
         app, mock_db = _make_app(user)
 
         # Mock workspace lookup
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 
@@ -210,9 +230,7 @@ class TestWorkspacePoolAssignment:
 
         app, mock_db = _make_app(user)
 
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
@@ -246,9 +264,7 @@ class TestWorkspacePoolAssignment:
 
         app, mock_db = _make_app(user)
 
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 
@@ -293,9 +309,7 @@ class TestWorkspacePoolAssignment:
 
         app, mock_db = _make_app(user)
 
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 
@@ -340,9 +354,7 @@ class TestWorkspacePoolSet:
         mock_pool_perm.return_value = caps_for_level("write")
 
         app, mock_db = _make_app(user)
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 
@@ -405,9 +417,7 @@ class TestWorkspacePoolSet:
         )
 
         app, mock_db = _make_app(user)
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
@@ -439,9 +449,7 @@ class TestWorkspacePoolSet:
         mock_ws_perm.return_value = caps_for_level("admin")
 
         app, mock_db = _make_app(user)
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
@@ -489,9 +497,7 @@ class TestWorkspacePoolSet:
         mock_pool_perm.return_value = caps_for_level("write")
 
         app, mock_db = _make_app(user)
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 
@@ -520,9 +526,7 @@ class TestWorkspacePoolSet:
         mock_ws_perm.return_value = caps_for_level("admin")
 
         app, mock_db = _make_app(user)
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 

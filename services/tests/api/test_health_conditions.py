@@ -306,6 +306,65 @@ class TestTheCallSitePassesIt:
                 f"silently skipped: {ast.unparse(call)}"
             )
 
+    def test_every_caller_of_workspace_json_passes_it_too(self):
+        """One level further out, which is where the real gap was.
+
+        The gate above stops at `_workspace_json`, so it is satisfied while four
+        of its ten callers omit `latest_run` -- the PATCH and the three lock
+        endpoints. `health-conditions` was a pure function of workspace columns
+        until `run_errored` was added, so those responses silently dropped one
+        condition and the same workspace reported a different health depending
+        on which endpoint answered: saving the settings form made the banner go
+        away until the next GET brought it back.
+
+        Create is the one legitimate omission -- a workspace with no runs yet --
+        and it is named rather than inferred, so a second omission has to be
+        argued for here instead of passing quietly.
+        """
+        import ast
+        import inspect
+
+        from terrapod.api.routers import tfe_v2
+
+        #: Functions that may call `_workspace_json` without a latest run, with
+        #: the reason. Each needs one.
+        EXEMPT = {
+            "_create_workspace_impl": "a workspace being created has no runs",
+        }
+
+        src = inspect.getsource(tfe_v2)
+        tree = ast.parse(src)
+        offenders = []
+        seen = 0
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            if fn.name in ("_workspace_json",):
+                continue
+            for call in ast.walk(fn):
+                if not (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id == "_workspace_json"
+                ):
+                    continue
+                seen += 1
+                if any(k.arg == "latest_run" for k in call.keywords):
+                    continue
+                if fn.name in EXEMPT:
+                    continue
+                offenders.append(f"{fn.name}: {ast.unparse(call)[:90]}")
+
+        assert seen >= 8, (
+            f"only {seen} calls to _workspace_json were inspected -- the matcher has "
+            "stopped matching, so this gate is passing on nothing"
+        )
+        assert not offenders, (
+            "these callers omit `latest_run`, so `health-conditions` is endpoint-"
+            "dependent and `run_errored` disappears from their responses:\n  "
+            + "\n  ".join(offenders)
+        )
+
     def test_the_serialised_conditions_include_it_end_to_end(self):
         """Through `_workspace_json` rather than the helper, so the wiring above
         is proven by behaviour as well as by structure."""

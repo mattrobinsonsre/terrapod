@@ -59,7 +59,9 @@ COPY --from=builder /app/public ./public
 #
 # PKG_REFRESH exists for the `apk upgrade` above it, for the same reason the
 # Debian images carry one: this layer caches, so without something that changes
-# the upgrade silently stops upgrading. CI passes today's date (#1177).
+# the upgrade silently stops upgrading. CI passes today's date plus
+# `PKG_REFRESH_SERIAL`, which is bumped by hand for an out-of-cycle refresh
+# (#1177).
 ARG PKG_REFRESH=2026-08-17
 RUN echo "pkg-refresh=${PKG_REFRESH}" \
     && apk upgrade --no-cache \

@@ -194,6 +194,31 @@ def _make_app(user, mock_db=None):
 # ── Create Workspace ────────────────────────────────────────────────────
 
 
+def _by_entity(db, ws):
+    """Answer workspace queries with ``ws`` and run queries with ``None``.
+
+    The mutation call sites of ``_workspace_json`` -- the PATCH and the three
+    lock endpoints -- load the workspace's latest run, because
+    ``health-conditions`` stopped being a pure function of workspace columns
+    when ``run_errored`` was added (#2563). A mock answering EVERY query with
+    the workspace therefore hands the serialiser a workspace where a ``Run``
+    belongs, and the response dies on ``TypeError: Object of type MagicMock is
+    not JSON serializable`` -- a message naming neither the query nor the
+    handler that gained it.
+
+    Keyed on the compiled statement rather than on call ORDER, so it does not
+    break again the next time a handler gains or loses a query. Shared with
+    ``_mock_workspace`` by the other api tests that drive these routes.
+    """
+
+    def _answer(stmt, *_a, **_k):
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None if "FROM runs" in str(stmt) else ws
+        return result
+
+    db.execute = AsyncMock(side_effect=_answer)
+
+
 class TestCreateWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -206,9 +231,7 @@ class TestCreateWorkspace:
         user = _user(roles=["admin"])
         app, mock_db = _make_app(user)
         # No existing workspace
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -297,9 +320,7 @@ class TestShowWorkspace:
         mock_resolve.return_value = caps_for_level(None)
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
@@ -313,9 +334,7 @@ class TestShowWorkspace:
     @patch("terrapod.api.app.init_db")
     async def test_show_not_found_returns_404(self, *mocks):
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
@@ -358,9 +377,7 @@ class TestShowWorkspaceById:
         mock_resolve.return_value = caps_for_level(None)
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -379,9 +396,7 @@ class TestUpdateWorkspace:
         mock_resolve.return_value = caps_for_level("write")  # not admin
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -402,9 +417,7 @@ class TestUpdateWorkspace:
         # User is workspace admin via ownership but NOT platform admin
         user = _user(email="old@test.com", roles=["everyone"])
         app, mock_db = _make_app(user)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -435,9 +448,7 @@ class TestVCSConnectionAcceptedAsAttribute:
         ws = _mock_workspace()
         ws.vcs_connection_id = None
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         conn_id = uuid.uuid4()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -461,9 +472,7 @@ class TestVCSConnectionAcceptedAsAttribute:
         ws = _mock_workspace()
         ws.vcs_connection_id = None
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         conn_id = uuid.uuid4()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -485,9 +494,7 @@ class TestVCSConnectionAcceptedAsAttribute:
         ws = _mock_workspace()
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -508,9 +515,7 @@ class TestVCSConnectionAcceptedAsAttribute:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -533,9 +538,7 @@ class TestDeleteWorkspace:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"/api/terrapod/v1/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -551,9 +554,7 @@ class TestDeleteWorkspace:
         mock_resolve.return_value = caps_for_level("write")
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"/api/terrapod/v1/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -570,9 +571,7 @@ class TestDeleteWorkspace:
         ws = _mock_workspace()
         ws.catalog_item_id = uuid.uuid4()  # catalog-managed
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"/api/terrapod/v1/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -594,9 +593,7 @@ class TestLockWorkspace:
         ws = _mock_workspace(locked=False)
         user = _user()
         app, mock_db = _make_app(user)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -614,9 +611,7 @@ class TestLockWorkspace:
         mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace(locked=True, lock_id="lock-other@test.com")
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -633,9 +628,7 @@ class TestLockWorkspace:
         mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -655,9 +648,7 @@ class TestUnlockWorkspace:
         ws = _mock_workspace(locked=True, lock_id="lock-test@example.com")
         user = _user(email="test@example.com")
         app, mock_db = _make_app(user)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -676,9 +667,7 @@ class TestUnlockWorkspace:
         mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace(locked=True, lock_id="lock-other@test.com")
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -695,9 +684,7 @@ class TestUnlockWorkspace:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(locked=True, lock_id="lock-other@test.com")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -725,9 +712,7 @@ class TestForceUnlockWorkspace:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(locked=True, lock_id="default/some-workspace")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -748,9 +733,7 @@ class TestForceUnlockWorkspace:
         mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace(locked=True, lock_id="default/some-workspace")
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -780,9 +763,7 @@ async def _post_action(ws, action, caps_level, *, body=None, user=None):
     ):
         mock_resolve.return_value = caps_for_level(caps_level)
         app, mock_db = _make_app(user or _user(email="ops@example.com"))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             kwargs = {"headers": _AUTH}
@@ -1094,9 +1075,7 @@ class TestWorkspaceTagBindings:
         mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace(labels={"repo": "infra-core", "env": "dev"})
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/tag-bindings", headers=_AUTH)
@@ -1123,9 +1102,7 @@ class TestWorkspaceTagBindings:
         mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace(labels={})
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/tag-bindings", headers=_AUTH)
@@ -1142,9 +1119,7 @@ class TestWorkspaceTagBindings:
         mock_resolve.return_value = caps_for_level(None)
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/tag-bindings", headers=_AUTH)
@@ -1161,9 +1136,7 @@ class TestWorkspaceTagBindings:
         mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace(labels={"repo": "infra-core"})
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
@@ -1349,9 +1322,7 @@ class TestVcsWorkflowAttributes:
         ws = _mock_workspace()
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1370,9 +1341,7 @@ class TestVcsWorkflowAttributes:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()  # no VCS connection
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1392,9 +1361,7 @@ class TestVcsWorkflowAttributes:
         ws = _mock_workspace(auto_apply_mode="always")
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1427,9 +1394,7 @@ class TestVcsWorkflowAttributes:
         ws.vcs_workflow = "apply_then_merge"
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1455,9 +1420,7 @@ class TestVcsWorkflowAttributes:
         ws.vcs_workflow = "apply_then_merge"
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1479,9 +1442,7 @@ class TestVcsWorkflowAttributes:
         ws.vcs_workflow = "apply_then_merge"
         ws.vcs_connection_id = uuid.uuid4()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1509,7 +1470,13 @@ class TestVcsWorkflowAttributes:
         # No active PR runs.
         active_result = MagicMock()
         active_result.all.return_value = []
-        mock_db.execute.side_effect = [mock_result, active_result, _no_inert_vars()]
+        # Measured rather than guessed: the PATCH issues the workspace lookup,
+        # the active-PR-runs check, then the latest run its response loads for
+        # `health-conditions` (#2563). The inert-vars entry is slack this path
+        # never reaches.
+        no_run = MagicMock()
+        no_run.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [mock_result, active_result, no_run, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1566,9 +1533,7 @@ class TestVcsWorkflowAttributes:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1587,9 +1552,7 @@ class TestVcsWorkflowAttributes:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -1863,9 +1826,7 @@ class TestAutoApplyModeOnTheWorkspaceEndpoints:
     async def _create(self, attrs):
         user = _user(roles=["admin"])
         app, mock_db = _make_app(user)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -1878,9 +1839,7 @@ class TestAutoApplyModeOnTheWorkspaceEndpoints:
     async def _patch(self, attrs, ws=None):
         ws = ws or _mock_workspace()
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
                 f"/api/v2/workspaces/ws-{ws.id}",
@@ -2052,9 +2011,7 @@ class TestCreateHonoursTheAISummaryOptIn1763:
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_the_requested_mode_and_context_are_stored(self, _pub, *_mocks):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.add = MagicMock()
         mock_db.refresh = AsyncMock()
 
@@ -2085,9 +2042,7 @@ class TestCreateHonoursTheAISummaryOptIn1763:
     async def test_an_unset_mode_still_defaults(self, _pub, *_mocks):
         """The fix must not change what a create that says nothing produces."""
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.add = MagicMock()
         mock_db.refresh = AsyncMock()
 
@@ -2108,9 +2063,7 @@ class TestCreateHonoursTheAISummaryOptIn1763:
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_a_bad_mode_is_refused_rather_than_ignored(self, _pub, *_mocks):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.commit = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -2147,9 +2100,7 @@ class TestCreateHonoursTheVCSWorkflowSettings1763:
 
     def _app(self):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.add = MagicMock()
         mock_db.refresh = AsyncMock()
         mock_db.commit = AsyncMock()
@@ -2241,9 +2192,7 @@ class TestNamingAVcsConnectionIsAuthorized:
     def _app(self):
         user = _user(roles=["everyone"])
         app, db = _make_app(user)
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = None
-        db.execute.return_value = result
+        _by_entity(db, None)
         db.refresh = AsyncMock()
         return app, db
 
@@ -2412,9 +2361,7 @@ class TestTheRoutesTranslateAConstraintViolationNotJustTheHelper:
         """The pre-insert SELECT finds nothing — two creates racing — and the flush is
         where the database first disagrees."""
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, None)
         mock_db.flush = AsyncMock(side_effect=self._integrity("23505"))
         mock_db.rollback = AsyncMock()
 
@@ -2433,9 +2380,7 @@ class TestTheRoutesTranslateAConstraintViolationNotJustTheHelper:
     @patch("terrapod.api.app.init_db")
     async def test_an_unknown_referenced_id_on_create_is_422(self, *_mocks):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, None)
         mock_db.flush = AsyncMock(side_effect=self._integrity("23503"))
         mock_db.rollback = AsyncMock()
 
@@ -2454,9 +2399,7 @@ class TestTheRoutesTranslateAConstraintViolationNotJustTheHelper:
         """Guessing a 4xx for an unexpected SQLSTATE would hide a server-side bug
         behind a message blaming the caller."""
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, None)
         mock_db.flush = AsyncMock(side_effect=self._integrity("23502"))
         mock_db.rollback = AsyncMock()
 
@@ -2545,9 +2488,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
     ):
 
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
 
         with patch("terrapod.api.routers.tfe_v2.DEFAULT_ANSIBLE_LINE", "2.20"):
@@ -2571,9 +2512,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         from terrapod.config import settings
 
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
 
         with patch.object(settings.registry.binary_cache, "allow_prerelease", "none"):
@@ -2596,9 +2535,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         default, or there would be no way to say "follow the deployment"."""
 
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
 
         with patch("terrapod.api.routers.tfe_v2.DEFAULT_ANSIBLE_LINE", "2.20"):
@@ -2620,9 +2557,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(ansible_version="2.19.3")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -2645,9 +2580,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(ansible_version="2.19.3")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -2669,9 +2602,7 @@ class TestAnsibleVersionOnTheWorkspaceRoutes:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(ansible_version="2.19.3")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
 
         with patch.object(settings.registry.binary_cache, "allow_prerelease", "none"):
             async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -2705,9 +2636,7 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_stores_all_six(self, _mock_publish, *mocks):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
 
         added: list = []
@@ -2752,9 +2681,7 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
         deployment an Ansible root it never asked for.
         """
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
         added: list = []
         mock_db.add = added.append
@@ -2780,9 +2707,7 @@ class TestTheConfigureAttributesOnTheWorkspaceRoutes:
     async def test_create_accepts_an_explicit_empty_config_directory(self, _mock_publish, *mocks):
         """`""` is the repository root, and must survive as itself."""
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
         added: list = []
         mock_db.add = added.append
@@ -2979,9 +2904,7 @@ class TestAutoApplyIsCompatibilityOnlyOnTheWire:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(name="cfg-ws")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3010,9 +2933,7 @@ class TestAutoApplyIsCompatibilityOnlyOnTheWire:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(name="cfg-ws")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3036,9 +2957,7 @@ class TestAutoApplyIsCompatibilityOnlyOnTheWire:
         ws = _mock_workspace(name="cfg-ws")
         ws.config_directory = "ansible"
         app, mock_db = _make_app(_user(roles=["admin"]))
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3099,9 +3018,7 @@ class TestAutoApplyIsCompatibilityOnlyOnTheWire:
         provider sent makes the plan disagree with the result.
         """
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3131,9 +3048,7 @@ class TestThePlaybookAllowListOnTheWorkspaceRoutes:
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_stores_a_consistent_pair(self, _pub, *mocks):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
         added: list = []
         mock_db.add = added.append
@@ -3170,9 +3085,7 @@ class TestThePlaybookAllowListOnTheWorkspaceRoutes:
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_refuses_a_default_outside_the_list(self, _pub, *mocks):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
         mock_db.add = MagicMock()
 
@@ -3213,9 +3126,7 @@ class TestThePlaybookAllowListOnTheWorkspaceRoutes:
         ws = _mock_workspace(name="pb-ws")
         ws.default_playbook = "release.yml"
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3245,9 +3156,7 @@ class TestThePlaybookAllowListOnTheWorkspaceRoutes:
         ws = _mock_workspace(name="pb-ws")
         ws.default_playbook = "release.yml"
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3286,9 +3195,7 @@ class TestThePlaybookAllowListOnTheWorkspaceRoutes:
         ws.playbooks = ["release.yml"]
         ws.default_playbook = ""  # the pair a re-validation would reject
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3317,9 +3224,7 @@ class TestThePlaybookAllowListOnTheWorkspaceRoutes:
         ws.playbooks = ["release.yml"]
         ws.default_playbook = "release.yml"
         app, mock_db = _make_app(_user(roles=["admin"]))
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3400,9 +3305,7 @@ class TestAWorkspaceMustHaveAtLeastOneOperation:
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_refuses_both_false(self, _mock_publish, *mocks):
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
         added: list = []
         mock_db.add = added.append
@@ -3441,9 +3344,7 @@ class TestAWorkspaceMustHaveAtLeastOneOperation:
         patching, cert rotation, ordered restarts -- often has no apply at all.
         """
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, None)
         mock_db.refresh = AsyncMock()
         added: list = []
         mock_db.add = added.append
@@ -3493,9 +3394,7 @@ class TestAWorkspaceMustHaveAtLeastOneOperation:
         ws.plan_apply_enabled = True
         ws.configure_enabled = True
         app, mock_db = _make_app(_user(roles=["admin"]))
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -3512,9 +3411,7 @@ class TestAWorkspaceMustHaveAtLeastOneOperation:
         ws2.plan_apply_enabled = True
         ws2.configure_enabled = False
         app2, mock_db2 = _make_app(_user(roles=["admin"]))
-        ws2_result = MagicMock()
-        ws2_result.scalar_one_or_none.return_value = ws2
-        mock_db2.execute.return_value = ws2_result
+        _by_entity(mock_db2, ws2)
         mock_db2.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app2), base_url=_BASE) as c:
@@ -3545,9 +3442,7 @@ class TestAWorkspaceMustHaveAtLeastOneOperation:
         mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(name="cfg-ws")
         app, mock_db = _make_app(_user(roles=["admin"]))
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:

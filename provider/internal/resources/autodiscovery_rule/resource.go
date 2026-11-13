@@ -161,6 +161,13 @@ type autodiscoveryRuleModel struct {
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	SlackChannel                  types.String `tfsdk:"slack_channel"`
+	// Scheduled configure (#2538), templated like every setting above it.
+	// The rule carries the three columns the workspace does and no
+	// fourth: `scheduled-configure-last-at` is runtime state a workspace
+	// accrues, not something a rule can template.
+	ScheduledConfigureEnabled  types.Bool   `tfsdk:"scheduled_configure_enabled"`
+	ScheduledConfigureCron     types.String `tfsdk:"scheduled_configure_cron"`
+	ScheduledConfigureTimezone types.String `tfsdk:"scheduled_configure_timezone"`
 
 	VarFiles               types.List `tfsdk:"var_files"`
 	RunTaskTemplates       types.List `tfsdk:"run_task_templates"`
@@ -802,6 +809,53 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			// Scheduled configure (#2538), templated onto every workspace this
+			// rule materialises. Optional+Computed with UseStateForUnknown,
+			// matching `terrapod_workspace`'s own three and every templated
+			// setting above: the server holds a default the configuration need
+			// not state, so omitting one means "leave alone" rather than "force
+			// null" (#684).
+			//
+			// The two strings read back VERBATIM because the server stores them
+			// verbatim -- it validates the zone and the cron and refuses what it
+			// cannot honour, and normalises neither. That is what makes reading
+			// the server's answer back safe over a configured value.
+			"scheduled_configure_enabled": schema.BoolAttribute{
+				Description: "Whether workspaces this rule creates run a configure on a cron schedule. " +
+					"Defaults to false. Needs `configure_enabled`, and needs a non-empty " +
+					"`scheduled_configure_cron`; with either missing the setting is inert.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"scheduled_configure_cron": schema.StringAttribute{
+				Description: "The schedule templated onto workspaces this rule creates, as a five-field " +
+					"cron expression — `minute hour day-of-month month day-of-week`, for example " +
+					"`0 2 * * 2` for 02:00 every Tuesday. Defaults to the empty string, which is no " +
+					"schedule whatever `scheduled_configure_enabled` holds. Stored exactly as written. " +
+					"A six-field expression is refused rather than read as seconds-resolution, and so " +
+					"is anything firing more often than the deployment's minimum interval. Omitting " +
+					"this attribute leaves the rule's existing value untouched; set " +
+					"`scheduled_configure_cron = \"\"` to remove the schedule.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"scheduled_configure_timezone": schema.StringAttribute{
+				Description: "The IANA time zone `scheduled_configure_cron` is read in on workspaces this " +
+					"rule creates — `Europe/London`, `America/New_York`. Defaults to `UTC`. Naming a " +
+					"real zone rather than an offset is what keeps an overnight schedule overnight " +
+					"across a daylight-saving change.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"run_task_templates": schema.ListNestedAttribute{
 				Description: "Run task definitions auto-applied to workspaces created by this rule.",
 				Optional:    true,
@@ -1200,6 +1254,12 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		{"vcs-workflow", m.VCSWorkflow},
 		{"auto-merge-strategy", m.AutoMergeStrategy},
 		{"slack-channel", m.SlackChannel},
+		// Scheduled configure (#2538). Present whenever KNOWN, including
+		// empty: the server membership-tests the key, and "" is a real value
+		// on the cron -- it is how a schedule is removed. A truthiness guard
+		// here would leave no way to say it.
+		{"scheduled-configure-cron", m.ScheduledConfigureCron},
+		{"scheduled-configure-timezone", m.ScheduledConfigureTimezone},
 	} {
 		if !f.val.IsNull() && !f.val.IsUnknown() {
 			attrs[f.key] = f.val.ValueString()
@@ -1270,6 +1330,7 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		{"terragrunt-enabled", m.TerragruntEnabled},
 		{"auto-merge", m.AutoMerge},
 		{"drift-detection-enabled", m.DriftDetectionEnabled},
+		{"scheduled-configure-enabled", m.ScheduledConfigureEnabled},
 	} {
 		if !f.val.IsNull() && !f.val.IsUnknown() {
 			attrs[f.key] = f.val.ValueBool()
@@ -1516,6 +1577,19 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.VCSWorkflow = types.StringValue(terrapod.GetStringAttr(res, "vcs-workflow"))
 	m.AutoMergeStrategy = types.StringValue(terrapod.GetStringAttr(res, "auto-merge-strategy"))
 	m.SlackChannel = types.StringValue(terrapod.GetStringAttr(res, "slack-channel"))
+	// Scheduled configure (#2538). Unconditional projections: the server
+	// answers with a concrete value for all three on every read, and the
+	// two strings are stored verbatim, so reading them back cannot
+	// disagree with a configured value.
+	m.ScheduledConfigureEnabled = types.BoolValue(
+		terrapod.GetBoolAttr(res, "scheduled-configure-enabled"),
+	)
+	m.ScheduledConfigureCron = types.StringValue(
+		terrapod.GetStringAttr(res, "scheduled-configure-cron"),
+	)
+	m.ScheduledConfigureTimezone = types.StringValue(
+		terrapod.GetStringAttr(res, "scheduled-configure-timezone"),
+	)
 	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
 	m.AllowForkPRPlans = types.BoolValue(terrapod.GetBoolAttr(res, "allow-fork-pr-plans"))
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))

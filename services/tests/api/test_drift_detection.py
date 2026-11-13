@@ -11,6 +11,7 @@ from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
+from tests.api.test_workspaces import _by_entity
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -159,9 +160,7 @@ class TestWorkspaceDriftAttributes:
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -191,9 +190,7 @@ class TestWorkspaceDriftAttributes:
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        _by_entity(mock_db, ws)
         mock_db.refresh = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -343,9 +340,7 @@ class TestDismissDriftAction:
         )
 
         app, mock_db = _make_app(_user())
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -373,9 +368,7 @@ class TestDismissDriftAction:
         ws = _mock_workspace(drift_status="drifted")
 
         app, mock_db = _make_app(_user())
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -401,9 +394,7 @@ class TestDismissDriftAction:
         )
 
         app, mock_db = _make_app(_user())
-        ws_result = MagicMock()
-        ws_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = ws_result
+        _by_entity(mock_db, ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(

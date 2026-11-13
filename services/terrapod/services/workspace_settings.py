@@ -23,6 +23,9 @@ from __future__ import annotations
 
 import re
 
+# The function only, not the model: this module stays free of the ORM so a
+# non-HTTP caller can use its rules without one.
+from terrapod.db.models import now_utc
 from terrapod.services.cloud_identity_resolver import unsafe_target_reason
 
 SCAN_ENFORCEMENTS = frozenset({"off", "advisory", "enforced"})
@@ -591,9 +594,11 @@ def validate_schedule_cron(raw: object, *, timezone: str = "UTC") -> str:
       configure takes minutes to hours, and the scheduler ticks far slower than
       a second, so such a schedule cannot mean what it says.
     * **anything firing more often than `MIN_SCHEDULE_INTERVAL_SECONDS`**,
-      checked by asking for two successive occurrences rather than by parsing
-      the fields -- `*/2 * * * *` and `0,2,4,... * * * *` are the same schedule
-      and only one of them looks fast.
+      checked by SAMPLING occurrences and taking the SMALLEST gap, rather than
+      by parsing the fields -- `*/2 * * * *` and `0,2,4,... * * * *` are the
+      same schedule and only one of them looks fast. Two points would measure
+      the base rather than the schedule, which an earlier version of this check
+      did and which was caught by driving it; see `_SCHEDULE_PROBE_POINTS`.
     """
     from croniter import croniter
 
@@ -1451,3 +1456,30 @@ def set_auto_configure_enabled(ws, value: bool) -> None:  # type: ignore[no-unty
     ws.auto_configure_enabled = value
     if not value:
         ws.auto_configure_inventory_stamp = None
+
+
+def set_scheduled_configure_enabled(ws, value: bool) -> None:  # type: ignore[no-untyped-def]
+    """Set the cron trigger and, when it goes ON, stamp the baseline.
+
+    `is_due` falls back to `created_at` when `scheduled_configure_last_at` is
+    NULL, so without the stamp, enabling "02:00 daily" at 14:00 computes the
+    next occurrence from a date long past and the workspace is due immediately.
+    The reconciler runs every 60 seconds, so "immediately" is not a figure of
+    speech.
+
+    One producer, because the flag has three update paths -- the
+    single-workspace PATCH, the bulk update, and the autodiscovery materialiser
+    -- and the bulk one is how a hundred workspaces are reached in a single
+    request. It had the plain `setattr` and therefore fired a configure across
+    the whole match set, which is the same shape, the same surface and the same
+    blast radius as `set_auto_configure_enabled` above; that one was already
+    special-cased in the bulk apply loop and this one was not.
+
+    Create and the materialiser need nothing from the ON branch -- they build a
+    row whose flag was never off, and the materialiser stamps its own baseline
+    at the point it decides the schedule -- but they may call this safely.
+    """
+    was_on = ws.scheduled_configure_enabled
+    ws.scheduled_configure_enabled = value
+    if value and not was_on:
+        ws.scheduled_configure_last_at = now_utc()
