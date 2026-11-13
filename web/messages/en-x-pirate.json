@@ -118,7 +118,7 @@
       "confirmApply": "Apply th' charted runs on th' chosen workspaces ({count})?\n\n{names}{more}\n\nThis changes real infrastructure an' cannot be undone, matey.",
       "confirmDiscard": "Discard th' charted runs on th' chosen workspaces ({count})?\n\n{names}{more}\n\nTh' charts be thrown overboard an' cannot be recovered.",
       "confirmPlan": "Queue a plan-only run on th' chosen workspaces ({count})?\n\n{names}{more}",
-      "confirmRetry": "Try th' latest run again on th' chosen workspaces ({count})?\n\n{names}{more}",
+      "confirmRetry": "Try th' latest run again on th' chosen workspaces ({count})?\n\n{names}{more}\n\nOn a workspace wi' auto-apply, a retry can apply changes, matey.",
       "confirmCancel": "Cancel th' latest run on th' chosen workspaces ({count})?\n\n{names}{more}",
       "andMore": "\n…an' {count} more",
       "running": "Runnin' {action} on th' chosen workspaces ({count})…",

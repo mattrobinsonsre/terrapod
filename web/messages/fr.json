@@ -118,7 +118,7 @@
       "confirmApply": "Appliquer les exécutions planifiées sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}\n\nCela modifie une infrastructure réelle et ne peut pas être annulé.",
       "confirmDiscard": "Abandonner les exécutions planifiées sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}\n\nLes plans sont abandonnés et ne peuvent pas être récupérés.",
       "confirmPlan": "Mettre en file d'attente une exécution de plan seul sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}",
-      "confirmRetry": "Réexécuter la dernière exécution sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}",
+      "confirmRetry": "Réexécuter la dernière exécution sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}\n\nSur un espace de travail avec application automatique, une nouvelle exécution peut appliquer des modifications.",
       "confirmCancel": "Annuler la dernière exécution sur les espaces de travail sélectionnés ({count}) ?\n\n{names}{more}",
       "andMore": "\n…et {count} de plus",
       "running": "Exécution de {action} sur les espaces de travail sélectionnés ({count})…",

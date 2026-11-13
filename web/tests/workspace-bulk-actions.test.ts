@@ -1,6 +1,7 @@
 // The server's answer decides eligibility; the lib adds only the lock and the declared operations.
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import {
   BULK_ACTIONS,
@@ -170,5 +171,23 @@ describe('the action list', () => {
         ['discard', 'irreversible'],
       ],
     )
+  })
+})
+
+describe('the confirmation text', () => {
+  const page = readFileSync(new URL('../src/app/workspaces/page.tsx', import.meta.url), 'utf8')
+  const en = JSON.parse(readFileSync(new URL('../messages/en.json', import.meta.url), 'utf8'))
+
+  // A literal `t('bulk.confirmX')` is what the key-resolve gate can see; a built key is skipped.
+  it('has a literal key in the page and a string in en.json for every action', () => {
+    for (const { id } of BULK_ACTIONS) {
+      const key = `bulk.confirm${id[0].toUpperCase()}${id.slice(1)}`
+      assert.ok(page.includes(`t('${key}'`), `${key} is not requested as a literal`)
+      assert.equal(typeof en.workspaces.bulk[key.slice('bulk.'.length)], 'string', `${key} missing from en.json`)
+    }
+  })
+
+  it('does not build a key at runtime', () => {
+    assert.ok(!page.includes('`bulk.confirm'))
   })
 })

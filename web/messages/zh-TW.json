@@ -118,7 +118,7 @@
       "confirmApply": "要在所選工作區（{count}）上套用已規劃的執行嗎？\n\n{names}{more}\n\n這會變更真實的基礎設施，且無法復原。",
       "confirmDiscard": "要捨棄所選工作區（{count}）上已規劃的執行嗎？\n\n{names}{more}\n\n計畫將被捨棄且無法復原。",
       "confirmPlan": "要在所選工作區（{count}）上將僅計畫的執行加入佇列嗎？\n\n{names}{more}",
-      "confirmRetry": "要重試所選工作區（{count}）上的最新執行嗎？\n\n{names}{more}",
+      "confirmRetry": "要重試所選工作區（{count}）上的最新執行嗎？\n\n{names}{more}\n\n在啟用自動套用的工作區上，重試可能會套用變更。",
       "confirmCancel": "要取消所選工作區（{count}）上的最新執行嗎？\n\n{names}{more}",
       "andMore": "\n…以及另外 {count} 個",
       "running": "正在所選工作區（{count}）上執行{action}…",

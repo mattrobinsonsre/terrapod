@@ -118,7 +118,7 @@
       "confirmApply": "Die geplanten Läufe auf den ausgewählten Workspaces anwenden ({count})?\n\n{names}{more}\n\nDies ändert echte Infrastruktur und kann nicht rückgängig gemacht werden.",
       "confirmDiscard": "Die geplanten Läufe auf den ausgewählten Workspaces verwerfen ({count})?\n\n{names}{more}\n\nDie Pläne werden verworfen und können nicht wiederhergestellt werden.",
       "confirmPlan": "Eine reine Plan-Ausführung auf den ausgewählten Workspaces in die Warteschlange stellen ({count})?\n\n{names}{more}",
-      "confirmRetry": "Die letzte Ausführung auf den ausgewählten Workspaces wiederholen ({count})?\n\n{names}{more}",
+      "confirmRetry": "Die letzte Ausführung auf den ausgewählten Workspaces wiederholen ({count})?\n\n{names}{more}\n\nAuf einem Workspace mit automatischem Anwenden kann eine Wiederholung Änderungen anwenden.",
       "confirmCancel": "Die letzte Ausführung auf den ausgewählten Workspaces abbrechen ({count})?\n\n{names}{more}",
       "andMore": "\n…und {count} weitere",
       "running": "{action} wird auf den ausgewählten Workspaces ausgeführt ({count})…",

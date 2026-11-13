@@ -1005,9 +1005,12 @@ test.describe("Workspaces", () => {
     expect(posts).toHaveLength(2);
     expect(dialogs, "Plan and Cancel must not prompt on a precise pointer").toEqual([]);
 
-    // Retry applies infrastructure on an auto-apply workspace, so it always asks.
+    // Retry can apply infrastructure on an auto-apply workspace, so it always asks.
     await runFromMenu(page, "retry");
     await expect.poll(() => dialogs.length).toBe(1);
+    // Requests reach the route in order, so once this one is recorded any retry sent before it is too.
+    await page.evaluate(() => fetch("/api/v1/runs/settle/actions/settle", { method: "POST" }));
+    await expect.poll(() => posts.some((u) => u.endsWith("/actions/settle"))).toBe(true);
     expect(posts.some((u) => u.endsWith("/actions/retry"))).toBe(false);
     await page.unrouteAll({ behavior: "ignoreErrors" });
   });
@@ -1035,7 +1038,7 @@ test.describe("Workspaces", () => {
     await expect(result).toContainText("Retry run: 0 of 2", { timeout: 15_000 });
     await expect(result).toContainText(`${prefix}-a: Could not reach the server`);
     await expect(result).toContainText(`${prefix}-b: Request failed (500)`);
-    await page.unrouteAll({ behavior: "wait" });
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 });
 

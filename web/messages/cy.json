@@ -118,7 +118,7 @@
       "confirmApply": "Cymhwyso’r rhediadau arfaethedig ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}\n\nMae hyn yn newid seilwaith go iawn ac ni ellir ei ddadwneud.",
       "confirmDiscard": "Taflu’r rhediadau arfaethedig ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}\n\nMae’r cynlluniau’n cael eu taflu ac ni ellir eu hadfer.",
       "confirmPlan": "Ciwio rhediad cynllun yn unig ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}",
-      "confirmRetry": "Ailgeisio'r rhediad diweddaraf ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}",
+      "confirmRetry": "Ailgeisio'r rhediad diweddaraf ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}\n\nAr weithle â hunan-gymhwyso, gall ailgeisio gymhwyso newidiadau.",
       "confirmCancel": "Canslo'r rhediad diweddaraf ar y gweithleoedd a ddewiswyd ({count})?\n\n{names}{more}",
       "andMore": "\n…a {count} arall",
       "running": "Yn rhedeg {action} ar y gweithleoedd a ddewiswyd ({count})…",

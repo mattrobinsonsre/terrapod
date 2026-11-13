@@ -118,7 +118,7 @@
       "confirmApply": "Tillämpa de planerade körningarna på de valda arbetsytorna ({count})?\n\n{names}{more}\n\nDetta ändrar verklig infrastruktur och kan inte ångras.",
       "confirmDiscard": "Förkasta de planerade körningarna på de valda arbetsytorna ({count})?\n\n{names}{more}\n\nPlanerna förkastas och kan inte återställas.",
       "confirmPlan": "Köa en körning med endast plan på de valda arbetsytorna ({count})?\n\n{names}{more}",
-      "confirmRetry": "Köra den senaste körningen igen på de valda arbetsytorna ({count})?\n\n{names}{more}",
+      "confirmRetry": "Köra den senaste körningen igen på de valda arbetsytorna ({count})?\n\n{names}{more}\n\nPå en arbetsyta med automatisk tillämpning kan en ny körning tillämpa ändringar.",
       "confirmCancel": "Avbryta den senaste körningen på de valda arbetsytorna ({count})?\n\n{names}{more}",
       "andMore": "\n…och {count} till",
       "running": "Kör {action} på de valda arbetsytorna ({count})…",

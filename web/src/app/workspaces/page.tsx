@@ -988,8 +988,8 @@ function WorkspacesPageInner() {
   // whole filtered set: a collapsed group renders neither its own rows nor its
   // subtree, and that state is persisted in `localStorage`. Deriving this from
   // `sortedWorkspaces` let select-all tick -- and a bulk action act on --
-  // workspaces the operator could not see (#2551). Plan, Retry and Cancel carry
-  // no confirm, so there was no dialog naming them either.
+  // workspaces the operator could not see (#2551). Plan and Cancel prompt only on
+  // touch, so a precise pointer got no dialog naming them either.
   const visibleIds = useMemo(() => {
     if (groupMode === 'flat' || workspaceTree.length === 0) {
       return sortedWorkspaces.map((w) => w.id)
@@ -1041,12 +1041,20 @@ function WorkspacesPageInner() {
       // Apply, Discard and Retry prompt in both pointer modes; Plan and Cancel on touch only.
       if (meta) {
         const lines = confirmLines(selectedBulk.map((w) => w.name))
-        const key = `bulk.confirm${action[0].toUpperCase()}${action.slice(1)}` as const
-        const text = t(key, {
+        const values = {
           count: lines.count,
           names: lines.names.join('\n'),
           more: lines.more > 0 ? t('bulk.andMore', { count: lines.more }) : '',
-        })
+        }
+        // Literal keys, so the key-resolve gate sees every one.
+        const confirmText: Record<BulkActionId, () => string> = {
+          plan: () => t('bulk.confirmPlan', values),
+          retry: () => t('bulk.confirmRetry', values),
+          cancel: () => t('bulk.confirmCancel', values),
+          apply: () => t('bulk.confirmApply', values),
+          discard: () => t('bulk.confirmDiscard', values),
+        }
+        const text = confirmText[action]()
         const approved = meta.confirm === 'irreversible' ? confirmIrreversible : confirmTouchMutation
         if (!approved(text)) return
       }

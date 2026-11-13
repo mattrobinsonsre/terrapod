@@ -118,7 +118,7 @@
       "confirmApply": "要在所选工作区（{count}）上应用已规划的运行吗？\n\n{names}{more}\n\n这会更改真实的基础设施，且无法撤销。",
       "confirmDiscard": "要放弃所选工作区（{count}）上已规划的运行吗？\n\n{names}{more}\n\n计划将被丢弃且无法恢复。",
       "confirmPlan": "要在所选工作区（{count}）上将仅计划的运行加入队列吗？\n\n{names}{more}",
-      "confirmRetry": "要重试所选工作区（{count}）上的最新运行吗？\n\n{names}{more}",
+      "confirmRetry": "要重试所选工作区（{count}）上的最新运行吗？\n\n{names}{more}\n\n在启用自动应用的工作区上，重试可能会应用更改。",
       "confirmCancel": "要取消所选工作区（{count}）上的最新运行吗？\n\n{names}{more}",
       "andMore": "\n…以及另外 {count} 个",
       "running": "正在所选工作区（{count}）上执行{action}…",
