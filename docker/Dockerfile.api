@@ -84,8 +84,11 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 # unchanged RUN keeps whatever package versions were current when the cache entry
 # was written. PKG_REFRESH is what invalidates it.
 #
-# CI passes today's date, so the upgrade re-runs on the first build of each day
-# with nobody needing to remember anything. The default below is for local
+# CI passes the current UTC HOUR, so the upgrade re-runs on the first build of
+# each hour with nobody needing to remember anything. It was the date until a
+# Debian postgresql release landed mid-afternoon and every build for the rest of
+# that day reused a layer written before the fix existed -- the image scan then
+# failed, correctly, on 34 HIGH CVEs that were already installable. The default below is for local
 # builds and is deliberately NOT what keeps CI current — a hand-bumped constant
 # works only until someone forgets, which is how five already-patched libexpat
 # CVEs stayed in the images for 18 days (#1177).
