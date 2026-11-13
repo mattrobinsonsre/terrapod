@@ -1145,6 +1145,31 @@ def create_application() -> FastAPI:
         the caller nothing and looks like a fault rather than a refusal."""
         return jsonapi_error_response(str(exc), 403)
 
+    def _registry_surface(request: Request) -> bool:
+        """True for the OCI registry's own paths.
+
+        Every handler below answers in the house JSON:API envelope, which is
+        correct everywhere except here: `/v2/` is one of the three surfaces
+        deliberately exempt from it (with the runner protocol and the OAuth
+        token endpoints), because an unchangeable client dictates the shape.
+        A container client that gets `{"errors": [{"detail": ...}]}` where it
+        expects `{"errors": [{"code": ...}]}` cannot read it, and `docker push`
+        prints a bare `unknown error` -- which `services/oci/errors.py` predicts
+        in its own module docstring and is exactly what #2562 produced.
+
+        `OCIError` already renders correctly through the router's own handler.
+        This is for the app-wide nets BELOW it, which no route raises on purpose
+        and which therefore nobody noticed were leaking the wrong envelope.
+        """
+        path = request.url.path
+        return path == "/v2" or path.startswith("/v2/")
+
+    def _registry_error(error, message: str) -> JSONResponse:
+        from terrapod.api.routers.oci import API_VERSION_HEADER
+        from terrapod.services.oci.errors import oci_error_response
+
+        return oci_error_response(error, message=message, headers=dict(API_VERSION_HEADER))
+
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
         logger.warning(
@@ -1152,6 +1177,15 @@ def create_application() -> FastAPI:
             path=str(request.url.path),
             error=str(getattr(exc, "orig", exc)),
         )
+        if _registry_surface(request):
+            # A 500, not the 409 served elsewhere, and deliberately: every write
+            # on the registry surface is conflict-tolerant at the DATABASE (#2562
+            # replaced four check-then-act guards with `ON CONFLICT`), so an
+            # integrity violation reaching here is our bug rather than the
+            # client's request. A 409 would tell the client its push was wrong.
+            from terrapod.services.oci.errors import UNKNOWN
+
+            return _registry_error(UNKNOWN, "the registry could not complete the write")
         return jsonapi_error_response("Resource already exists or violates a constraint", 409)
 
     @app.exception_handler(DataError)
@@ -1223,6 +1257,10 @@ def create_application() -> FastAPI:
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """Global exception handler for unhandled errors."""
         logger.error("Unhandled exception", exc_info=exc, path=str(request.url.path))
+        if _registry_surface(request):
+            from terrapod.services.oci.errors import UNKNOWN
+
+            return _registry_error(UNKNOWN, "internal server error")
         return jsonapi_error_response("Internal server error", 500)
 
     # ── API prefix conventions ──────────────────────────────────────

@@ -961,34 +961,44 @@ do not need `ansible.posix.profile_tasks` to get it — and if you run it anyway
 its lines are passed through untouched.
 
 `~` marks a block belonging to no single host: the `PLAY` banner, the
-`PLAY RECAP`, and the still-running notices below. A host name containing
+`PLAY RECAP`, and the progress notices below. A host name containing
 whitespace, `|`, `~` or `%` is percent-escaped in its field, so the host is
 always one whitespace-delimited token — an ordinary name is untouched.
 
-### Still-running notices
+### Progress notices
 
-A long task says so while it is running, rather than going quiet until it
-finishes:
+A task says that it has begun, says so again while it is still going, and ends
+in its result block — the same three signals terraform gives a resource with
+`Creating... / Still creating... / Creation complete`:
 
 ```
-[10:28:40 +10.0s]  ~  running  platform : Wait for the service  (2 hosts)
+[2026-11-13 10:28:30]  ~  start    platform : Wait for the service
+[10:28:40 +10.0s]      ~  running  platform : Wait for the service  (2 hosts)
+[10:28:52 +22.4s]      web1  ok    platform : Wait for the service
 ```
 
-One notice per **task**, counting the hosts still on it, repeating while it
-runs. That shape is deliberate: one per host would scale with the inventory, so
-on a large fleet it is a wall of text rather than a progress signal.
+One notice per **task**, and the still-running one counts the hosts still on it.
+That shape is deliberate: one per host would scale with the inventory, so on a
+large fleet it is a wall of text rather than a progress signal.
+
+The `start` notice carries no elapsed time and no host count. The count is
+useful on a still-running notice because it says how many hosts are *still* on
+the task; at the moment one starts nobody has finished, so a count there would
+only repeat the size of the play.
 
 Two options tune it, and both are read from **your own `ansible.cfg`** — Terrapod
 never replaces that file:
 
 ```ini
 [defaults]
-terrapod_progress_seconds = 10      ; 0 disables the notices
+terrapod_progress_seconds = 10      ; 0 disables every notice, start included
 terrapod_progress_mode = aggregated ; or per_host
 ```
 
-`terrapod_progress_seconds` is both how long a task may run before the first
-notice and the interval it repeats at. One ticker serves every task, so it is
+`terrapod_progress_seconds = 0` silences the whole set, the `start` notice as
+well as the still-running ones — one switch, because a start line you could not
+turn off would be a notice by another name. Otherwise it is both how long a task
+may run before the first still-running notice and the interval it repeats at. One ticker serves every task, so it is
 phase-anchored to its own start rather than to each task's: a notice appears
 within one further interval of the threshold rather than exactly on it, and the
 elapsed figure it carries is the true time either way.
@@ -997,11 +1007,12 @@ The equivalent `ANSIBLE_TERRAPOD_PROGRESS_*` environment variables exist, but
 the runner strips every inherited `ANSIBLE_*` before it starts ansible, so they
 do not reach a configure — the `ansible.cfg` entries are the ones that work.
 
-`running` is a block status like any other, so a tool reading the log can filter
-it out and see exactly what it saw before.
+`running` and `start` are block statuses like any other, so a tool reading the
+log can filter them out and see exactly what it saw before.
 
 `TASK [...]` banners are not emitted. Their whole content is the task name,
-which every block carries in its label.
+which every block carries in its label — and the `start` notice is what
+announces a task now, in this log's own vocabulary rather than ansible's.
 
 **`format=plain` gives you the same blocks with the header and the colour
 removed**, which is what the Go SDK's `Plain` option and the `terrapod_run_logs`

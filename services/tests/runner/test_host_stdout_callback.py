@@ -64,6 +64,7 @@ def _literal(name: str) -> str:
 HEADER = _literal("HEADER")
 HOSTLESS = _literal("HOSTLESS")
 PROGRESS_STATUS = _literal("PROGRESS_STATUS")
+START_STATUS = _literal("START_STATUS")
 INDENT = _literal("INDENT")
 EXAMPLE_BLOCK = _literal("EXAMPLE_BLOCK")
 
@@ -648,6 +649,11 @@ def _running(text: str) -> list[Block]:
     return [b for b in _blocks(text) if b.status == PROGRESS_STATUS]
 
 
+def _starts(text: str) -> list[Block]:
+    """Every task-START notice, in order."""
+    return [b for b in _blocks(text) if b.status == START_STATUS]
+
+
 @needs_ansible
 class TestStillRunningNotices:
     """The progress signal (#2532).
@@ -832,3 +838,149 @@ class TestStillRunningNotices:
             extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "1"},
         )
         assert "Failure using method" not in out, out
+
+
+@needs_ansible
+class TestTaskStartNotices:
+    """A task is announced when it STARTS (#2532).
+
+    The third of the issue's three signals, and the one that was missing:
+    `_tp_banner` drops ansible's own `TASK [...]` banner -- correctly, since
+    every result block carries the task name -- so after #2513 nothing said a
+    task had begun. On a task slower than the threshold the first line a
+    reader saw was a still-running notice for a task they had never been told
+    had started; on a quicker one, nothing at all until it was over.
+
+    Driven through real ansible for the same reason the still-running class
+    is: the property is about WHEN a line is emitted relative to the work,
+    which no assertion on the line builder can see.
+    """
+
+    def test_every_task_is_announced_when_it_starts(self, tmp_path):
+        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
+        starts = _starts(out)
+        assert starts, f"no task was announced at all:\n{out}"
+        announced = {b.label for b in starts}
+        for name in ("skip on db1", "a loop", "a changed result", "unreachable survives"):
+            assert name in announced, f"{name!r} was never announced: {sorted(announced)}"
+
+    def test_the_announcement_precedes_that_task_s_own_results(self, tmp_path):
+        """The whole point: terraform says `Creating...` BEFORE it works.
+
+        A notice that arrived after the result would be strictly worse than
+        none, so the ordering is the property rather than the presence.
+        """
+        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
+        blocks = _blocks(out)
+        for label in ("a changed result", "unreachable survives"):
+            first_start = next(
+                (i for i, b in enumerate(blocks) if b.status == START_STATUS and b.label == label),
+                None,
+            )
+            assert first_start is not None, f"{label!r} not announced"
+            first_result = next(
+                (
+                    i
+                    for i, b in enumerate(blocks)
+                    if b.host is not None and b.status != START_STATUS and b.label == label
+                ),
+                None,
+            )
+            assert first_result is not None, f"{label!r} produced no result block"
+            assert first_start < first_result, (
+                f"{label!r} was announced at block {first_start}, AFTER its first "
+                f"result at {first_result} -- the notice is useless behind the work"
+            )
+
+    def test_aggregated_announces_once_per_task_not_once_per_host(self, tmp_path):
+        """The shape distinction, on a four-host inventory.
+
+        A per-host announcement would multiply by the fleet, which is exactly
+        what `terrapod_progress_mode` exists to avoid -- so this needs an
+        inventory with more than one host or it cannot tell the two apart.
+        """
+        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
+        starts = _starts(out)
+        assert starts, f"no announcements:\n{out}"
+        assert all(b.host is None for b in starts), (
+            "an aggregated announcement carries a host, so it is per-host in "
+            f"all but name: {[(b.host, b.label) for b in starts if b.host]}"
+        )
+        for label in {b.label for b in starts}:
+            n = len([b for b in starts if b.label == label])
+            assert n == 1, f"{label!r} announced {n} times in aggregated mode"
+
+    def test_per_host_announces_once_per_host(self, tmp_path):
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_MODE": "per_host"},
+        )
+        starts = _starts(out)
+        assert {b.host for b in starts} == {"web1", "web2"}, (
+            f"per_host did not announce each host once: {[(b.host, b.label) for b in starts]}"
+        )
+
+    def test_a_task_quicker_than_the_threshold_is_still_announced(self, tmp_path):
+        """The property that separates a START notice from the ticker.
+
+        With a threshold longer than the whole play the ticker never fires, so
+        a start notice gated on elapsed time would produce nothing -- which is
+        precisely the gap this closes: a quick task used to be invisible until
+        it had finished.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_INVENTORY,
+            play=_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "300"},
+        )
+        assert _running(out) == [], "the threshold was somehow reached; test is not measuring"
+        assert _starts(out), f"a quick task was never announced:\n{out}"
+
+    def test_disabling_the_notices_silences_the_start_too(self, tmp_path):
+        """One switch for the whole progress experience.
+
+        A start line an operator could not turn off would be a notice by
+        another name, so `terrapod_progress_seconds: 0` governs both.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={"ANSIBLE_TERRAPOD_PROGRESS_SECONDS": "0"},
+        )
+        assert _starts(out) == [], f"announced while disabled:\n{out}"
+        assert _running(out) == [], f"still-running notices while disabled:\n{out}"
+
+    def test_ansibles_own_per_host_start_is_not_doubled(self, tmp_path):
+        """`show_per_host_start` already renders a start block per host.
+
+        Announcing on top of it would print each host twice. The guard is that
+        our notice only fires when ansible's own produced nothing.
+        """
+        out = _run(
+            tmp_path,
+            inventory=_SLOW_INVENTORY,
+            play=_SLOW_PLAY,
+            tagged=True,
+            extra_env={
+                "ANSIBLE_TERRAPOD_PROGRESS_MODE": "per_host",
+                "ANSIBLE_SHOW_PER_HOST_START": "True",
+            },
+        )
+        starts = _starts(out)
+        assert len(starts) == 2, (
+            f"expected one start per host, got {len(starts)}: {[(b.host, b.label) for b in starts]}"
+        )
+
+    def test_a_start_notice_never_follows_the_recap(self, tmp_path):
+        """Mirrors the still-running rule: nothing trails the summary."""
+        out = _run(tmp_path, inventory=_INVENTORY, play=_PLAY, tagged=True)
+        statuses = [b.status for b in _blocks(out)]
+        assert "recap" in statuses, f"no recap block:\n{out}"
+        assert START_STATUS not in statuses[statuses.index("recap") :], statuses

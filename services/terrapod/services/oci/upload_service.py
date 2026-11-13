@@ -29,6 +29,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import OCIBlob, OCIRepository, OCIRepositoryBlob, OCIUploadSession, now_utc
@@ -155,16 +156,25 @@ async def _upsert_blob(db: AsyncSession, digest: str, size: int, storage_key: st
     obviously — is normal rather than exceptional, and the bytes are identical
     by definition because the digest matched. So an existing row is reused
     rather than treated as a conflict.
-    """
-    result = await db.execute(select(OCIBlob).where(OCIBlob.digest == digest))
-    existing = result.scalar_one_or_none()
-    if existing is not None:
-        return existing
 
-    blob = OCIBlob(digest=digest, size=size, storage_key=storage_key)
-    db.add(blob)
-    await db.flush()
-    return blob
+    The tolerance is the DATABASE'S, not a check above the insert. This was
+    `SELECT` then `INSERT`, which is idempotent only SEQUENTIALLY: `docker push`
+    sends blobs concurrently, so two requests for one digest both saw no row and
+    both inserted, and the loser raised a unique violation on `digest`. That
+    reached the generic handler as a JSON:API 409, which a container client
+    cannot parse and reports as `unknown error` (#2562). `ON CONFLICT DO
+    NOTHING` cannot race, and it never raises, so the transaction is not
+    poisoned either.
+    """
+    await db.execute(
+        postgresql.insert(OCIBlob)
+        .values(digest=digest, size=size, storage_key=storage_key)
+        .on_conflict_do_nothing(index_elements=["digest"])
+    )
+    # Always re-read rather than trusting RETURNING: on conflict the insert
+    # returns nothing, and the row we want is the one already there.
+    result = await db.execute(select(OCIBlob).where(OCIBlob.digest == digest))
+    return result.scalar_one()
 
 
 async def link_blob(db: AsyncSession, repository: OCIRepository, blob: OCIBlob) -> None:
@@ -173,17 +183,15 @@ async def link_blob(db: AsyncSession, repository: OCIRepository, blob: OCIBlob) 
     Idempotent: re-pushing content a repository already holds is a no-op rather
     than a unique-constraint violation, which is what a client retrying an
     interrupted push will do.
+
+    Concurrently as well as sequentially, which the check-then-act form this
+    replaces was not — see `_upsert_blob` for the race and what it cost.
     """
-    result = await db.execute(
-        select(OCIRepositoryBlob).where(
-            OCIRepositoryBlob.repository_id == repository.id,
-            OCIRepositoryBlob.blob_id == blob.id,
-        )
+    await db.execute(
+        postgresql.insert(OCIRepositoryBlob)
+        .values(repository_id=repository.id, blob_id=blob.id)
+        .on_conflict_do_nothing(constraint="uq_oci_repo_blob")
     )
-    if result.scalar_one_or_none() is not None:
-        return
-    db.add(OCIRepositoryBlob(repository_id=repository.id, blob_id=blob.id))
-    await db.flush()
 
 
 async def mount_blob(

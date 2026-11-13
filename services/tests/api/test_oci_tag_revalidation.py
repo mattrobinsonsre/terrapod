@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from terrapod.api.routers.oci import _revalidate_tag
 
@@ -363,32 +364,72 @@ class TestProvenanceIsRecorded:
     the bug this feature exists to fix, restored without a single test going red.
     """
 
-    async def test_a_mirrored_tag_is_stamped(self) -> None:
+    #: Asserted on the STATEMENT rather than on the returned object, because
+    #: `set_tag` no longer constructs the row -- #2562 made it an `ON CONFLICT
+    #: DO UPDATE` upsert, so the database decides what comes back and a mocked
+    #: session can only answer with a MagicMock. The property is unchanged and
+    #: the statement is where it now lives: what gets WRITTEN, on both the
+    #: insert and the conflict paths.
+
+    @staticmethod
+    async def _upsert(from_upstream: bool):
+        """Drive `set_tag` and return its upsert, compiled and as parameters."""
         from terrapod.services.oci import registry_service
 
-        db = AsyncMock()
-        db.add = MagicMock()  # sync on a real Session; AsyncMock leaves a stray coroutine
-        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=None))
-        manifest = MagicMock(id=uuid.uuid4())
+        seen: list = []
 
-        tag = await registry_service.set_tag(
-            db, _repository(), "latest", manifest, from_upstream=True
+        async def execute(statement, *a, **k):
+            seen.append(statement)
+            return MagicMock(
+                scalar_one=MagicMock(return_value=MagicMock()),
+                scalar_one_or_none=MagicMock(return_value=None),
+            )
+
+        db = AsyncMock()
+        db.add = MagicMock()
+        db.execute = execute
+        await registry_service.set_tag(
+            db, _repository(), "latest", MagicMock(id=uuid.uuid4()), from_upstream=from_upstream
+        )
+        upserts = [
+            st
+            for st in seen
+            if "ON CONFLICT" in str(st.compile(dialect=postgresql.dialect())).upper()
+        ]
+        assert upserts, f"set_tag issued no upsert at all: {seen}"
+        compiled = upserts[0].compile(dialect=postgresql.dialect())
+        return str(compiled), compiled.params
+
+    async def test_a_mirrored_tag_is_stamped(self) -> None:
+        sql, params = await self._upsert(from_upstream=True)
+
+        stamp = params.get("revalidated_at")
+        assert stamp is not None, f"the mirror path wrote no stamp: {params}"
+        assert stamp > datetime.now(UTC) - timedelta(seconds=30), stamp
+        # And on the conflict path too: re-fetching an existing mirrored tag must
+        # move the stamp, or the freshness window never advances and the tag is
+        # revalidated on every single read.
+        after = sql.upper().split("DO UPDATE SET", 1)
+        assert len(after) == 2, f"not a DO UPDATE upsert: {sql}"
+        assert "REVALIDATED_AT" in after[1], (
+            f"an upstream revalidation does not advance the stamp: {sql}"
         )
 
-        assert tag.revalidated_at is not None
-        assert tag.revalidated_at > datetime.now(UTC) - timedelta(seconds=30)
-
     async def test_a_pushed_tag_is_not_stamped(self) -> None:
-        from terrapod.services.oci import registry_service
+        sql, params = await self._upsert(from_upstream=False)
 
-        db = AsyncMock()
-        db.add = MagicMock()  # sync on a real Session; AsyncMock leaves a stray coroutine
-        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=None))
-        manifest = MagicMock(id=uuid.uuid4())
-
-        tag = await registry_service.set_tag(db, _repository(), "mine", manifest)
-
-        assert tag.revalidated_at is None
+        assert params.get("revalidated_at") is None, (
+            f"a local push stamped the tag, so it reads as mirrored: {params}"
+        )
+        # The half that matters most, and the one the upsert could have lost:
+        # a local push over an EXISTING mirrored tag must leave the stamp where
+        # it is. Naming the column in the DO UPDATE set would overwrite it with
+        # NULL, and the tag would silently stop being revalidated.
+        after = sql.upper().split("DO UPDATE SET", 1)
+        assert len(after) == 2, f"not a DO UPDATE upsert: {sql}"
+        assert "REVALIDATED_AT" not in after[1], (
+            f"a local push clears an existing mirrored tag's stamp: {sql}"
+        )
 
     async def test_the_mirror_path_asks_for_the_stamp(self) -> None:
         """Proves the caller passes it, not merely that the parameter exists."""

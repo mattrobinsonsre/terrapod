@@ -971,6 +971,44 @@ What follows from this, in rough order of how much it saves:
 Stacked PRs are not the answer here, for the reasons already given: a stacked PR
 shows a reviewer the wrong baseline and breaks when its base merges.
 
+## `runs-on` tracks `ubuntu-latest` — fix forward, never pin back
+
+Every job runs on `ubuntu-latest`, and GitHub moves what that resolves to. The
+rollout is **gradual**, so during one the same commit takes a different image
+from one run to the next: a job can pass on `main` and fail on a branch cut from
+that exact commit, which reads as "my change broke it" and is not.
+
+Diagnose it before anything else when a job fails for a reason your diff cannot
+reach, and compare the images rather than guessing:
+
+```sh
+gh api "repos/$R/actions/jobs/$JOB_ID/logs" --allow-escape-sequences \
+  | sed 's/\x1b\[[0-9;]*m//g' | grep -E 'Image: ubuntu|Image Release'
+```
+
+**Then fix forward. Do not pin to the older image.** The failures a new image
+exposes are, in this repository's experience, our own latent defects rather than
+incompatibilities — one migration surfaced three at once, and every one was
+wrong on the old image too:
+
+- a CA generated with `basicConstraints` and no `keyUsage`, which the newer
+  OpenSSL correctly refuses to verify through;
+- a Pulumi install that took one binary out of a tarball shipping twelve, so the
+  language plugins the next step shells out to were on no search path;
+- four registry writes that promised idempotency and implemented it as a
+  `SELECT` above an `INSERT`, which a concurrent client raced.
+
+Each fix is right on both images, which is the test to apply: if the change you
+are about to make would be wrong on the older runner, it is a workaround rather
+than a fix. Pinning defers that work and parks the repository on an image that
+stops getting security updates, and the longer the pin lasts the larger the
+eventual jump — so the one thing it reliably buys is a worse version of the same
+afternoon, later.
+
+Pinning is for buying time you will actually spend: a genuine upstream
+regression, or a migration too large to absorb in the PR that happened to meet
+it. Record why, and open the issue that removes it.
+
 ## Every minor release reviews the platform-tool versions
 
 `opa`, `trivy` and `checkov` are not baked into Terrapod's images — they are
