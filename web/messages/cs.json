@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Žádný živý pool agentů",
       "vcs-error": "Chyba VCS",
       "drifted": "Odchýleno",
-      "drift-errored": "Detekce odchylek selhala"
+      "drift-errored": "Detekce odchylek selhala",
+      "run-errored": "Poslední běh selhal"
     }
   },
   "status": {

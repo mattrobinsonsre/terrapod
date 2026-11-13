@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Ingen aktiv agentpool",
       "vcs-error": "VCS-fel",
       "drifted": "Drift",
-      "drift-errored": "Driftdetektering misslyckades"
+      "drift-errored": "Driftdetektering misslyckades",
+      "run-errored": "Senaste körningen misslyckades"
     }
   },
   "status": {

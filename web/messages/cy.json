@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Dim pwl asiantiaid byw",
       "vcs-error": "Gwall VCS",
       "drifted": "Wedi Drifftio",
-      "drift-errored": "Canfod drifft wedi methu"
+      "drift-errored": "Canfod drifft wedi methu",
+      "run-errored": "Methodd y rhediad diwethaf"
     }
   },
   "status": {

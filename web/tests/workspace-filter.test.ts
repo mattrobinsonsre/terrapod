@@ -9,6 +9,9 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   FLAG_CODES,
@@ -78,15 +81,46 @@ describe('flag terms union', () => {
     assert.equal(flagValueForCode('drift_errored'), 'drift-errored')
   })
 
-  it('knows the six conditions the server emits, in one list', () => {
-    assert.deepEqual([...FLAG_CODES].sort(), [
-      'drift_errored',
-      'drifted',
-      'no_agent_pool',
-      'no_live_agent_pool',
-      'state_diverged',
-      'vcs_error',
-    ])
+  // DERIVED FROM THE SERVER, not written down twice. `FLAG_CODES` describes
+  // itself as "the health-condition codes the server emits in
+  // `_compute_health_conditions`", and until this read that function the claim
+  // was a ledger with nothing keeping it true: a condition added server-side
+  // was simply absent from the `flag:` values, the Flags dropdown and the
+  // Health Issues expansion, all three of which derive from this one list.
+  //
+  // That is not hypothetical -- `run_errored` was added to the server and the
+  // only thing that noticed was the hand-written list below, which had to be
+  // edited by hand to agree again. Deriving it means the next one cannot be
+  // forgotten, and the failure names the missing code rather than a count.
+  const serverConditionCodes = (): string[] => {
+    const here = path.dirname(fileURLToPath(import.meta.url))
+    const src = readFileSync(
+      path.join(here, '..', '..', 'services', 'terrapod', 'api', 'routers', 'tfe_v2.py'),
+      'utf8',
+    )
+    // Python bodies are indentation-delimited, so the function runs to the next
+    // line that starts a top-level `def`. Slicing rather than scanning the whole
+    // file matters: `tfe_v2.py` carries `"code":` keys for other things too.
+    const start = src.indexOf('def _compute_health_conditions(')
+    assert.ok(start > 0, '_compute_health_conditions is gone from tfe_v2.py — has it moved?')
+    const after = src.slice(start + 1)
+    const end = after.search(/\ndef /)
+    const body = end < 0 ? after : after.slice(0, end)
+    const codes = [...body.matchAll(/"code":\s*"([a-z_]+)"/g)].map(m => m[1])
+    return [...new Set(codes)].sort()
+  }
+
+  it('reads a real function, so it cannot pass on an empty subject', () => {
+    // The floor the slice needs: a matcher that stops matching would otherwise
+    // make both sides empty and agree perfectly.
+    assert.ok(
+      serverConditionCodes().length >= 6,
+      `only found ${serverConditionCodes().length} codes in _compute_health_conditions`,
+    )
+  })
+
+  it('carries exactly the conditions the server emits', () => {
+    assert.deepEqual([...FLAG_CODES].sort(), serverConditionCodes())
   })
 
   it('every condition code is reachable by its derived value', () => {

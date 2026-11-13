@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Kein aktiver Agent-Pool",
       "vcs-error": "VCS-Fehler",
       "drifted": "Abgedriftet",
-      "drift-errored": "Drift-Erkennung fehlgeschlagen"
+      "drift-errored": "Drift-Erkennung fehlgeschlagen",
+      "run-errored": "Letzter Lauf fehlgeschlagen"
     }
   },
   "status": {

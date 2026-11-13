@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Sem pool de agentes ativo",
       "vcs-error": "Erro de VCS",
       "drifted": "Com Drift",
-      "drift-errored": "Falha na detecção de drift"
+      "drift-errored": "Falha na detecção de drift",
+      "run-errored": "Última execução falhou"
     }
   },
   "status": {

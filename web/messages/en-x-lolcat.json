@@ -181,7 +181,8 @@
       "no-live-agent-pool": "No Livez Agent Pul",
       "vcs-error": "VCS Errur",
       "drifted": "Driftd",
-      "drift-errored": "Drift Detekshun Faild"
+      "drift-errored": "Drift Detekshun Faild",
+      "run-errored": "Last Run Faild"
     }
   },
   "status": {

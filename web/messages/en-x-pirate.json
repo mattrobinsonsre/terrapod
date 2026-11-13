@@ -181,7 +181,8 @@
       "no-live-agent-pool": "No Crew Muster Aboard",
       "vcs-error": "VCS Squall",
       "drifted": "Adrift",
-      "drift-errored": "Drift Spyglass Failed"
+      "drift-errored": "Drift Spyglass Failed",
+      "run-errored": "Last Voyage Foundered"
     }
   },
   "status": {

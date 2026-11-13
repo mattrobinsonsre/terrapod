@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Brak aktywnej puli agentów",
       "vcs-error": "Błąd VCS",
       "drifted": "Dryf",
-      "drift-errored": "Wykrywanie dryfu nie powiodło się"
+      "drift-errored": "Wykrywanie dryfu nie powiodło się",
+      "run-errored": "Ostatnie uruchomienie nie powiodło się"
     }
   },
   "status": {

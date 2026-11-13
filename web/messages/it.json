@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Nessun pool di agenti attivo",
       "vcs-error": "Errore VCS",
       "drifted": "In deriva",
-      "drift-errored": "Rilevamento della deriva non riuscito"
+      "drift-errored": "Rilevamento della deriva non riuscito",
+      "run-errored": "Ultima esecuzione fallita"
     }
   },
   "status": {

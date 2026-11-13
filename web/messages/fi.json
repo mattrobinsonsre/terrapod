@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Ei aktiivista agenttipoolia",
       "vcs-error": "VCS-virhe",
       "drifted": "Ajautunut",
-      "drift-errored": "Ajautumisen tunnistus epäonnistui"
+      "drift-errored": "Ajautumisen tunnistus epäonnistui",
+      "run-errored": "Viimeisin ajo epäonnistui"
     }
   },
   "status": {

@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Ingen aktiv agentpulje",
       "vcs-error": "VCS-feil",
       "drifted": "Avdriftet",
-      "drift-errored": "Driftdeteksjon feilet"
+      "drift-errored": "Driftdeteksjon feilet",
+      "run-errored": "Siste kjøring feilet"
     }
   },
   "status": {

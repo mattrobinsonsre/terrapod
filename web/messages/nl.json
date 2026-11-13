@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Geen actieve agentpool",
       "vcs-error": "VCS-fout",
       "drifted": "Afgedreven",
-      "drift-errored": "Driftdetectie mislukt"
+      "drift-errored": "Driftdetectie mislukt",
+      "run-errored": "Laatste run mislukt"
     }
   },
   "status": {

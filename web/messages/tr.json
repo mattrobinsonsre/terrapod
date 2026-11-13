@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Etkin aracı havuzu yok",
       "vcs-error": "VCS Hatası",
       "drifted": "Sürüklendi",
-      "drift-errored": "Sapma algılama başarısız"
+      "drift-errored": "Sapma algılama başarısız",
+      "run-errored": "Son çalıştırma başarısız"
     }
   },
   "status": {

@@ -181,7 +181,8 @@
       "no-live-agent-pool": "لا يوجد تجمّع وكلاء نشط",
       "vcs-error": "خطأ في نظام التحكم في الإصدارات",
       "drifted": "منحرف",
-      "drift-errored": "فشل اكتشاف الانحراف"
+      "drift-errored": "فشل اكتشاف الانحراف",
+      "run-errored": "فشل آخر تشغيل"
     }
   },
   "status": {

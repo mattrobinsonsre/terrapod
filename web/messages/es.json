@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Sin pool de agentes activo",
       "vcs-error": "Error de VCS",
       "drifted": "Con desviación",
-      "drift-errored": "Falló la detección de desviaciones"
+      "drift-errored": "Falló la detección de desviaciones",
+      "run-errored": "Error en la última ejecución"
     }
   },
   "status": {

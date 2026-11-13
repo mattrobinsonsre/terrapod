@@ -181,7 +181,8 @@
       "no-live-agent-pool": "Ingen aktiv agent-pulje",
       "vcs-error": "VCS-fejl",
       "drifted": "Afdriftet",
-      "drift-errored": "Afdriftsregistrering fejlede"
+      "drift-errored": "Afdriftsregistrering fejlede",
+      "run-errored": "Seneste kørsel fejlede"
     }
   },
   "status": {
