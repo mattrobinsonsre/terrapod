@@ -2,7 +2,7 @@
 """A `docker pull` of an ARCH-TAGGED image must name the platform.
 
 Both `Scan images` jobs run on an amd64 runner; only the image TAG is per
-architecture. So `docker pull .../terrapod-api:sha-abc123-arm64` without
+architecture. So `docker pull .../terrapod-api:sha-<short>-arm64` without
 `--platform` asks for the runner's own platform, the arm64 tag's manifest list
 has no amd64 entry, and the pull fails:
 
