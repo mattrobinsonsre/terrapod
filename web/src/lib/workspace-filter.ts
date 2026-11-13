@@ -48,6 +48,8 @@
 // admin); it parses here as an ordinary label term. See `docs/rbac.md`
 // § Reserved label keys.
 
+import { RUN_STATUSES } from './workspace-status.ts'
+
 export interface NameTerm {
   kind: 'name'
   value: string
@@ -102,6 +104,8 @@ export interface ParsedFilter {
 
 const SEPARATOR = /[:=]/
 
+const RUN_STATUS_VALUES: ReadonlySet<string> = new Set(RUN_STATUSES.map(s => s.filter))
+
 export function parseFilterQuery(input: string): ParsedFilter {
   const terms: FilterTerm[] = []
   for (const raw of input.split(/\s+/)) {
@@ -125,6 +129,58 @@ export function parseFilterQuery(input: string): ParsedFilter {
     terms.push({ kind: 'label', key, value: rest === '' ? null : rest })
   }
   return { terms }
+}
+
+// Spellings `status:` used to accept, and the terms that now carry them.
+const LEGACY_STATUS_TERMS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['locked', ['locked:true']],
+  ['unhealthy', FLAG_VALUES.map(v => `flag:${v}`)],
+  ['drifted', ['flag:drifted']],
+  ['state-diverged', ['flag:state-diverged']],
+  ['vcs-error', ['flag:vcs-error']],
+])
+
+const termKey = (t: FilterTerm): string | null =>
+  t.kind === 'flag' || t.kind === 'locked' ? `${t.kind}:${t.value}` : null
+
+/** Rewrite the removed `status:` spellings (`locked`, `unhealthy`, `drifted`,
+ *  `state-diverged`, `vcs-error`) into the terms that replaced them, leaving
+ *  every other token as written and skipping any term already present. Returns
+ *  `text` itself when there is nothing to rewrite. */
+export function migrateLegacyFilter(text: string): string {
+  const parts = text.split(/(\s+)/) // tokens at even indices, whitespace between
+  const have = new Set<string>()
+  for (const t of parseFilterQuery(text).terms) {
+    const k = termKey(t)
+    if (k) have.add(k)
+  }
+  let changed = false
+  for (let i = 0; i < parts.length; i += 2) {
+    const token = parts[i]
+    const sep = token.search(SEPARATOR)
+    if (sep < 0 || token.slice(0, sep) !== 'status') continue
+    const replacement = LEGACY_STATUS_TERMS.get(token.slice(sep + 1))
+    if (!replacement) continue
+    const fresh = replacement.filter(k => !have.has(k))
+    fresh.forEach(k => have.add(k))
+    changed = true
+    if (fresh.length > 0) {
+      parts[i] = fresh.join(' ')
+    } else {
+      parts[i] = ''
+      if (i + 1 < parts.length) parts[i + 1] = ''
+      else {
+        // Last token: drop the nearest whitespace still left before it.
+        for (let j = i - 1; j > 0; j -= 2) {
+          if (parts[j] !== '') {
+            parts[j] = ''
+            break
+          }
+        }
+      }
+    }
+  }
+  return changed ? parts.join('') : text
 }
 
 export function serializeFilter(parsed: ParsedFilter): string {
@@ -273,10 +329,15 @@ export function matchWorkspace(
     }
   }
 
-  // The two dropdown groups union within themselves and intersect with the rest.
-  if (statuses.length > 0 && !statuses.some(v => v === resolvedStatus)) return false
+  // The two dropdown groups union within themselves and intersect with the rest;
+  // an unrecognised value in either matches nothing rather than dropping out.
+  if (statuses.length > 0) {
+    if (statuses.some(v => !RUN_STATUS_VALUES.has(v))) return false
+    if (!statuses.some(v => v === resolvedStatus)) return false
+  }
   if (flags.length > 0) {
     const codes = conditionCodes(ws)
+    if (flags.some(v => !FLAG_VALUES.includes(v))) return false
     if (!flags.some(v => FLAG_CODES.some(c => flagValueForCode(c) === v && codes.has(c)))) return false
   }
   return true
