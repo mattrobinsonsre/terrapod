@@ -1,9 +1,4 @@
-"""`run_actions` is the one answer to "what can be done to this run".
-
-The run document and the workspace's `latest-run` both publish it, so the
-predicates live here once. Real `Run` rows, not stubs: the answer reads several
-columns and a stub listing them breaks the next time one is added.
-"""
+"""`run_actions` is the one answer to what can be done to a run, on real `Run` rows."""
 
 from __future__ import annotations
 

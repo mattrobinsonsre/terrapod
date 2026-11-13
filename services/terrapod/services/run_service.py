@@ -990,16 +990,8 @@ class RunActions:
 
 
 def run_actions(run: Run) -> RunActions:
-    """The one answer to what a run offers, shared by every surface that publishes it.
-
-    Confirm and Discard need an apply-capable plan with work to apply; a plan
-    with `has_changes=False` is a no-op. Confirm is also hidden when the
-    resolved auto-apply mode is `always`, since such a run applies itself. The
-    test is on the mode, not `Run.auto_apply`, which is set for every non-`never`
-    mode and would hide Confirm on a conditional run that was held. A run held
-    at a post-plan gate is discardable too. Cancel is for in-progress states
-    only, and a plan-only run that has planned can only be retried.
-    """
+    """What a run offers right now: the one producer behind `_run_json` and `latest-run`."""
+    # Keyed on the resolved mode, not `Run.auto_apply`, which is set for every non-`never` mode.
     applicable = run.status == "planned" and not run.plan_only and run.has_changes is not False
     return RunActions(
         confirmable=applicable and resolve_auto_apply_mode(run) != "always",

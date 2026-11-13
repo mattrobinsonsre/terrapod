@@ -1,13 +1,4 @@
-"""`latest-run` carries the run's own `actions` and `run-kind`.
-
-A client cannot rebuild the answer from what the workspace document publishes
-(`has_changes`, the resolved auto-apply mode and `plan_finished_at` are all
-absent), so the document mirrors the answer rather than its inputs. It is the
-same `run_actions` the run document uses, under the same wire names, on both
-surfaces.
-
-Real ORM rows, as in `test_latest_run_phase_starts.py`.
-"""
+"""`latest-run` mirrors the run document's `actions` and `run-kind`, on both surfaces."""
 
 from __future__ import annotations
 

@@ -47,10 +47,20 @@ _ROUTERS_DIR = Path(_routers_pkg.__file__).resolve().parent
 _SNAPSHOT = Path(__file__).parent / "api_attribute_contract.json"
 
 
+def _own_nodes(fn: ast.AST):
+    """Nodes of ``fn``'s own body, not descending into nested defs, lambdas or classes."""
+    stack = list(ast.iter_child_nodes(fn))
+    while stack:
+        node = stack.pop()
+        yield node
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda | ast.ClassDef):
+            stack.extend(ast.iter_child_nodes(node))
+
+
 def _local_dict_nodes(fn: ast.AST) -> dict[str, list[ast.Dict]]:
-    """Map local var name -> the dict literals assigned to it in the function."""
+    """Map local var name -> the dict literals assigned to it in the function's own body."""
     nodes: dict[str, list[ast.Dict]] = {}
-    for node in ast.walk(fn):
+    for node in _own_nodes(fn):
         if isinstance(node, ast.Assign) and len(node.targets) == 1:
             target, value = node.targets[0], node.value
         elif isinstance(node, ast.AnnAssign):
@@ -79,9 +89,7 @@ def _dict_literal_keys(
     removing one makes a button silently vanish while a flat gate stays green
     (#1344).
 
-    A nested value that is a bare name bound to a dict literal in the same
-    function (``inner = {...}; {"x": inner}``) is followed through ``_locals``,
-    so ``x.<leaf>`` is frozen too.
+    A nested bare name bound to a local dict literal is followed via ``_locals``.
     """
     keys: set[str] = set()
     # A `**spread` contributes a None key; skip it rather than treating it as a name.
@@ -375,6 +383,16 @@ def test_a_nested_local_dict_is_followed_in_the_variable_form_and_when_defined_l
         "    return {'attributes': attrs}\n"
     ).body[0]
     assert _attributes_of_function(fn) == {"x", "x.a"}
+
+
+def test_a_dict_in_a_nested_function_is_not_followed() -> None:
+    fn = ast.parse(
+        "def s(x):\n"
+        "    def helper():\n"
+        "        inner = {'a': 1}\n"
+        "    return {'attributes': {'x': inner}}\n"
+    ).body[0]
+    assert _attributes_of_function(fn) == {"x"}
 
 
 def test_a_self_referencing_local_does_not_loop() -> None:
