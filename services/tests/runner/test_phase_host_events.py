@@ -295,7 +295,21 @@ class TestThePluginStaysShippableIntoAnyExecutionEnvironment:
             "ansible nor the standard library — the EE ships an operator's own "
             "image and owes us nothing"
         )
-        allowed = {"datetime", "json", "os", "re", "time", "ansible", "__future__"}
+        # `threading` added for #2532's still-running ticker. Checked rather
+        # than recognised, which is what this clause asks for: `docker run
+        # --entrypoint python3 ghcr.io/mattrobinsonsre/terrapod-ee:2.12` reports
+        # Python 3.10.22 with both `threading.Thread` and `threading.Event`,
+        # the two names the plugin uses.
+        allowed = {
+            "datetime",
+            "json",
+            "os",
+            "re",
+            "threading",
+            "time",
+            "ansible",
+            "__future__",
+        }
         assert imported <= allowed, (
             f"{sorted(imported - allowed)} is new here. It must exist on Python 3.10, "
             "the oldest published EE line (#2154) — check, then add it above"

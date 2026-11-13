@@ -121,6 +121,7 @@ items" complaint v2 exists to fix.
 from __future__ import annotations
 
 import re
+import threading
 import time
 
 from ansible import constants as C
@@ -153,7 +154,49 @@ DOCUMENTATION = """
     extends_documentation_fragment:
       - default_callback
       - result_format_callback
+    options:
+      terrapod_progress_seconds:
+        name: Still-running notice interval
+        description:
+          - Seconds a task may run on a host before this plugin starts saying it
+            is still running, and the interval it repeats at thereafter.
+          - One shared ticker serves every task, so it is phase-anchored to its
+            own start rather than to each task's. A notice therefore appears
+            within ONE further interval of the threshold rather than exactly on
+            it - a 2s threshold on a 5s task reports at about 4s. That is the
+            cost of one thread instead of a timer per task, and the figure the
+            notice carries is the true elapsed time either way.
+          - Set to 0 to disable the notices.
+        type: int
+        default: 10
+        ini:
+          - key: terrapod_progress_seconds
+            section: defaults
+        env:
+          - name: ANSIBLE_TERRAPOD_PROGRESS_SECONDS
+      terrapod_progress_mode:
+        name: Still-running notice shape
+        description:
+          - C(aggregated) emits one notice per task, counting the hosts still on
+            it. C(per_host) emits one per host per task.
+          - C(aggregated) is the default because C(per_host) scales with the
+            inventory - on a large fleet it is a wall of text rather than a
+            progress signal.
+        type: str
+        default: aggregated
+        choices: [aggregated, per_host]
+        ini:
+          - key: terrapod_progress_mode
+            section: defaults
+        env:
+          - name: ANSIBLE_TERRAPOD_PROGRESS_MODE
 """
+
+#: Both options carry an `env:` entry for completeness, and the INI one is what
+#: actually reaches an operator. The runner's `configure._forced_env` strips
+#: every inherited `ANSIBLE_*` before setting its own, deliberately (#2035), so
+#: a variable set around the run never arrives. Their own `ansible.cfg` IS read
+#: -- Terrapod never replaces it -- which makes that the live channel.
 
 #: Emitted once, before anything this plugin writes. A viewer keys the per-host
 #: switch on finding it: an older runner image emits ansible's plain output, so
@@ -164,6 +207,13 @@ HEADER = "#terrapod-host-log v2"
 
 #: Lines that belong to no single host.
 HOSTLESS = "~"
+
+#: The status a still-running notice carries (#2532). Seven characters, which is
+#: exactly `_STATUS_W`, so it needs no column change. Safe to add because the
+#: status field is an OPAQUE STRING to both readers -- `web/src/lib/host-log.ts`
+#: says "the server's own status slug ... never derived here" -- and because
+#: `start` already established a non-terminal status in this vocabulary.
+PROGRESS_STATUS = "running"
 
 #: One block header in the exact shape the grammar describes.
 #:
@@ -253,7 +303,12 @@ class CallbackModule(DefaultCallback):
         #: time on this task and stays right under `strategy: free`, where
         #: several tasks are in flight at once.
         self._tp_started: dict[tuple, float] = {}
+        #: `task uuid -> label`. `_tp_started` alone cannot give this: its key
+        #: carries the uuid, and a notice has to name the task a human reads.
+        self._tp_labels: dict[object, str] = {}
         self._tp_task_at = time.monotonic()
+        self._tp_tick: threading.Thread | None = None
+        self._tp_tick_stop = threading.Event()
         self._tp_inner_display = None
         self._tp_inner_banner = None
 
@@ -379,6 +434,114 @@ class CallbackModule(DefaultCallback):
             # One call: ansible's `stringc` wraps each line in its own SGR pair,
             # so a filter that drops a block cannot unbalance the colour.
             self._tp_inner_display("\n".join(lines), color=color)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # -- the still-running ticker (#2532) ---------------------------------
+    #
+    # A THREAD, because ansible has no periodic hook. Of the 26 hooks on
+    # `CallbackBase` the only time-shaped one is `v2_runner_on_async_poll`, and
+    # its own docstring says the interval is "the value of the `poll` keyword in
+    # the task" -- so it fires only for a task the PLAYBOOK AUTHOR marked
+    # `async:`, at a cadence they chose. Twice unusable as a general progress
+    # signal. Measured against ansible-core 2.21.6.
+    #
+    # What makes the thread cheap is that the state already exists:
+    # `_tp_started` is written on `v2_runner_on_start` and POPPED on completion,
+    # so its live contents already ARE "what is still running". Nothing is
+    # tracked twice.
+    def _tp_tick_seconds(self) -> int:
+        try:
+            return max(0, int(self.get_option("terrapod_progress_seconds")))
+        except Exception:  # noqa: BLE001
+            return 10
+
+    def _tp_tick_mode(self) -> str:
+        try:
+            mode = str(self.get_option("terrapod_progress_mode") or "")
+        except Exception:  # noqa: BLE001
+            mode = ""
+        return mode if mode in ("aggregated", "per_host") else "aggregated"
+
+    def _tp_tick_start(self) -> None:
+        """Start the ticker once, on the first task to begin.
+
+        Lazily rather than in `__init__`: ansible sets a plugin's options after
+        construction, so a thread started there would read the defaults it was
+        configured not to use.
+        """
+        if self._tp_tick is not None or self._tp_tick_stop.is_set():
+            return
+        every = self._tp_tick_seconds()
+        if every <= 0:
+            # Disabled. Latched, so the option is not re-read once per task.
+            self._tp_tick_stop.set()
+            return
+        self._tp_tick = threading.Thread(
+            target=self._tp_tick_loop,
+            args=(every,),
+            name="terrapod-progress",
+            daemon=True,
+        )
+        self._tp_tick.start()
+
+    def _tp_tick_halt(self) -> None:
+        """Stop the ticker and wait for it, so no notice follows the recap."""
+        self._tp_tick_stop.set()
+        thread, self._tp_tick = self._tp_tick, None
+        if thread is not None:
+            try:
+                thread.join(timeout=2.0)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _tp_tick_loop(self, every: int) -> None:
+        # `wait` returns True when stopped, so a halt ends the loop immediately
+        # rather than after serving out one more sleep.
+        while not self._tp_tick_stop.wait(every):
+            try:
+                self._tp_tick_once(every)
+            except Exception:  # noqa: BLE001 - a callback that raises turns
+                pass  # every task into a `[WARNING]: Failure using method` line
+
+    def _tp_tick_once(self, threshold: int) -> None:
+        now = time.monotonic()
+        # ONE C-level call. Iterating the live dict could raise while the main
+        # thread pops a finished task out from under it.
+        live = list(self._tp_started.items())
+        due = [(key, now - at) for key, at in live if now - at >= threshold]
+        if not due:
+            return
+        if self._tp_tick_mode() == "per_host":
+            for (task_uuid, host), elapsed in sorted(due, key=lambda d: -d[1]):
+                self._tp_tick_emit(host, self._tp_labels.get(task_uuid, ""), elapsed, None)
+            return
+        by_task: dict[object, list[float]] = {}
+        for (task_uuid, _host), elapsed in due:
+            by_task.setdefault(task_uuid, []).append(elapsed)
+        for task_uuid, elapsed in by_task.items():
+            # The OLDEST, because the useful figure is how long this has been
+            # going, not how long the luckiest host has.
+            self._tp_tick_emit(None, self._tp_labels.get(task_uuid, ""), max(elapsed), len(elapsed))
+
+    def _tp_tick_emit(self, host, label: str, elapsed: float, hosts: int | None) -> None:
+        if self._tp_inner_display is None:
+            return
+        tail = f"  ({hosts} host{'' if hosts == 1 else 's'})" if hosts else ""
+        stamp = f"[{time.strftime('%H:%M:%S', time.gmtime())} +{format_duration(elapsed)}]"
+        line = self._tp_header_line(
+            stamp,
+            escape_host(host) if host else HOSTLESS,
+            PROGRESS_STATUS,
+            f"{label}{tail}".strip(),
+        )
+        try:
+            # The INNER display, NEVER `self._display.display`. The wrapper
+            # captures into `_tp_frames`, so a notice raised while a block is
+            # being assembled would be swallowed INTO that block rather than
+            # printed. And one call, which ansible's `Display.display` holds its
+            # own lock around, so a notice cannot land inside a block's write.
+            self._tp_inner_display(line, color=C.COLOR_SKIP)
         except Exception:  # noqa: BLE001
             pass
 
@@ -565,9 +728,13 @@ class CallbackModule(DefaultCallback):
         """
         try:
             self._tp_started[(getattr(task, "_uuid", None), host.get_name())] = time.monotonic()
+            self._tp_labels[getattr(task, "_uuid", None)] = self._tp_task_label(task)
         except Exception:  # noqa: BLE001
             pass
         self._tp_emit_header()
+        # After the header, so `_tp_install` has run and `_tp_inner_display` --
+        # the only stream a notice may use -- exists.
+        self._tp_tick_start()
         frame: list[str] = []
         self._tp_frames.append(frame)
         try:
@@ -632,6 +799,9 @@ class CallbackModule(DefaultCallback):
         the banner itself is dropped by the frame rule and reinstated as the
         block's own label, which is why this does not go through `_tp_banner`.
         """
+        # First, and it waits: a still-running notice printed after the recap
+        # would say a task is in flight on a play that has finished.
+        self._tp_tick_halt()
         self._tp_emit_header()
         frame: list[str] = []
         self._tp_frames.append(frame)
