@@ -69,7 +69,7 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `labels` | map | no | Inherited by created workspaces — feeds Terrapod's label-based RBAC and filtering. Reserved keys (`status`, `flag`, `locked`, `owner`) are rejected with `422` at rule create/update — they are virtual filter terms and would otherwise produce workspaces that can't be saved. |
 | `owner-email` | string | no | Inherited by created workspaces; if unset, created workspaces have no owner and label-RBAC alone determines access. |
 | `var-files` | list | no | Var-file paths set on every created workspace. |
-| `run-task-templates` | list | no | Run-task specs (`{name, url, hmac-key?, stage, enforcement-level?, enabled?}`) materialised onto every created workspace — same shape as the bulk-update `run-tasks`. Define a policy gate once; it auto-applies to all future workspaces (#318). |
+| `run-task-templates` | list | no | Run-task specs (`{name, url, hmac-key?, stage, enforcement-level?, enabled?}`) materialised onto every created workspace — same shape as the bulk-update `run-tasks`. Define a policy gate once; it auto-applies to all future workspaces, and to existing ones only when an edit [asks for it](#updating-a-rule-and-rolling-it-out-to-existing-workspaces) (#318). |
 | `notification-templates` | list | no | Notification specs (`{name, destination-type, url?, token?, triggers?, email-addresses?, enabled?}`) materialised onto every created workspace. |
 | `execution-hook-templates` | list | no | [Execution hook](execution-hooks.md) ids (`hook-<uuid>`) associated with every created workspace, so discovered workspaces inherit their hooks automatically (#672). Ids that no longer exist are skipped at creation. |
 | `security-scan-enforcement` | string | no | [Security-scan](security-scanning.md) enforcement on every created workspace: `off`, `advisory` (default), or `enforced`. Accepted on a Terraform/OpenTofu rule, which is what can be scanned. On a **Pulumi** rule it is refused outright with `422`, as is `security-scan-engine` -- a Pulumi run is not security-scanned, so a scan setting on the template would never apply. That is stricter than a workspace, which accepts `off` on a Pulumi workspace rather than refusing the attribute (#1763, #1570). |
@@ -195,8 +195,78 @@ A workspace created by a rule:
 - Has `trigger-prefixes` set to `[working_directory]` so subsequent PRs that touch the same dir route to the same workspace via the regular PR-scan path (not via re-running autodiscovery).
 - Tracks `autodiscovery-rule-id` so you can audit which rule created it.
 - Is seeded with the **tracked-branch HEAD** as its last-seen commit (`vcs-last-commit-sha`). Autodiscovery is PR-driven — the matched directory exists on the PR branch but not yet on the tracked branch — so without this baseline the next branch poll would fire a full plan+apply against a branch where the directory doesn't exist, which errors. With the baseline, the speculative plan-only run for the open PR still happens, and the first real plan+apply fires when the tracked branch actually advances (typically the PR merge).
+- Is **not** changed when you later edit the rule — unless that one edit asks for it; see [Updating a rule](#updating-a-rule-and-rolling-it-out-to-existing-workspaces).
 
 If you delete the rule later, existing workspaces keep working — the foreign key sets to NULL on cascade.
+
+## Updating a rule and rolling it out to existing workspaces
+
+Editing a rule changes what **future** workspaces get. By default it touches no existing workspace. To roll an edit out to the workspaces the rule already created, ask for it in that one request: `PATCH /api/v1/autodiscovery-rules/{id}` takes two options, beside `data` in the body.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `propagate` | `false` | Also apply the fields **this update changes** to the workspaces the rule created. |
+| `dry_run` | `false` | Preview what `propagate` would do and persist **nothing** — neither the rule edit nor any workspace change. Requires `propagate`; on its own it is refused with `422`. |
+
+```json
+{
+  "data": {"type": "autodiscovery-rules", "attributes": {"engine-version": "1.14"}},
+  "propagate": true,
+  "dry_run": true
+}
+```
+
+Both are per-request, and there is deliberately **no persistent rule attribute** for them. A change that writes across a fleet should be a deliberate act with a blast radius you can see before it happens; a standing setting would turn every later edit of the rule into a fleet write. For the same reason the OpenTofu/Terraform provider has no attribute for it. Run a `dry_run` first: it reports what the request would do to the workspaces as they are now, then rolls back. The real request re-judges the workspaces when it applies, so one edited in between can land differently.
+
+In Go, `UpdateAutodiscoveryRuleWithPropagation` in go-terrapod sends `propagate` (and `dry_run` via `PropagateOptions`) and returns the rule with its `Propagation`; `UpdateAutodiscoveryRule` is unchanged and never propagates.
+
+### What is updated
+
+- **Only fields this update changes.** A field you resend unchanged, or spell as another form of "unset" (`null` for `""`, `[]` for no list), is not a change and touches nothing.
+- **Only where the workspace still matches the rule.** A workspace's value is replaced only if it **equals the rule's previous value** — it has not been edited since the rule set it. Otherwise someone chose that value on purpose, and it is skipped (reported as `customised`). A workspace that already equals the **new** value is `unchanged`. Each field is judged on its own, so one workspace can be updated for one field and customised for another.
+- **The whole value is compared; values are never merged.** This matters most for `labels`, which drive access: a workspace whose labels are not exactly the rule's previous labels is customised, never given the new labels on top of its own. Lists (`var-files`, `ansible-collections`, `playbooks`, …) work the same way.
+- **Run tasks and notifications** (`run-task-templates`, `notification-templates`) are compared per name: a name that is **new to the rule** (not in its previous list) and absent from the workspace is inserted; a name the workspace has is updated if it equals the rule's previous spec, left alone if it already equals the new one, and customised and skipped otherwise. A name the rule **already had** but the workspace lacks is treated as a deliberate removal: it is reported as customised and is not re-created. So a workspace that predates a template the rule gained earlier without propagation does not receive it from a later edit. One customised name skips that whole template field for that workspace. Removing an entry from the rule's list does **not** remove it from workspaces.
+- **Only active workspaces.** Archived and pending-deletion workspaces are skipped and counted in `skipped_lifecycle`.
+- **No runs are triggered.** It is a settings write; each workspace picks the change up on its next normal run. One qualification, for `oidc-audiences` only: a run already in `planned` on an updated workspace is auto-discarded at its next confirm, as with [bulk update](api-reference.md#bulk-update).
+
+Every templated setting in the [rule schema](#rule-schema) propagates except the following, which are never touched on an existing workspace:
+
+| Rule field | Why |
+|---|---|
+| `id`, `created-at`, `updated-at`, `first-scan-at` | the rule's own bookkeeping |
+| `name` | the rule's own name; each workspace's name was derived at creation |
+| `name-template` | applies only to names derived at creation; existing workspaces keep theirs |
+| `vcs-connection-id`, `repo-url`, `branch` | the rule's own connection, repository and branch; changing them does not re-home a workspace |
+| `pattern`, `ignore-patterns` | decide which directories are discovered, not a workspace setting |
+| `enabled` | turns the rule's discovery on or off, not a workspace setting |
+| `on-directory-delete` | the rule's own lifecycle policy, read at discovery time |
+| `engine` | pins what the rule discovers; an existing workspace's engine is never changed |
+| `owner-email` | never bulk-settable: setting an owner can grant admin on the workspace |
+| `storage-location` | fixed when a workspace is created: its objects live there, so it is never changed |
+| `execution-hook-templates` | no bulk-update support yet |
+
+A workspace's working directory and trigger prefixes are per-workspace identity and are not rule fields.
+
+### Safety
+
+- **All or nothing.** The rule edit and every workspace change commit together or not at all. Propagation applies the same checks as [bulk update](api-reference.md#bulk-update), judged against the workspaces the update would change; a refusal (for example `security-scan-enforcement: enforced` reaching a Pulumi workspace) refuses the **whole** request with `422` and leaves the rule unchanged.
+- **A customised run kind is never overwritten.** If the update changes `default-run-kind`, a workspace with its own different kind is skipped for that field. If the same update also changes `plan-apply-enabled` or `configure-enabled` in a way that would drop that workspace's kind, the whole request is refused with `422` naming the workspaces — set their `default-run-kind` first, or leave the operation flags alone. Where the update does not name a kind and a flag change drops a workspace's stored kind (as editing the workspace would), the change is applied and shown in the preview as a `default_run_kind` entry in that workspace's `diff`.
+- **Admin only**, like the rest of the rule API.
+- **Two secret keys are redacted in the preview.** In `meta.propagation`, a run task's `hmac-key` and a notification's `token` appear as `<set>` or `<unset>`. Every other spec key is shown as it is stored in `customised` — including a notification's destination `url`, which for a chat webhook is itself a credential. `would_change` lists template names only. The rule in `data` carries its templates exactly as Show returns them, secrets included.
+
+### Reading the result
+
+The response is the updated rule in `data` — on a `dry_run`, the rule as it would be with the unsaved edit applied — plus `meta.propagation`, which sorts every matched workspace into:
+
+- `would_change` — updated (or, on a `dry_run`, would be), with the same per-workspace `diff` bulk update reports. On a real request this key lists what **was** changed.
+- `customised` — skipped for the listed fields, each with the workspace's `current` value, the rule's `previous` one and the `new` one.
+- `unchanged` — already at the new value.
+
+A workspace customised on one field and updated on another is in both lists. An update that changes no propagated field (say, only `pattern`) leaves every active workspace under `unchanged`. The full shape is in the [API reference](api-reference.md#update-rule).
+
+### Auditing a rollout
+
+Each workspace a request changes gets one `workspace.rule_propagate` [audit-log](api-reference.md#list-audit-log-entries) row. Its `detail` names the rule and the changed fields, and its `request-id` is the `PATCH`'s own. The `PATCH` also writes its usual request-level row (action `PATCH`) under the same `request-id`; a `dry_run` writes that row too, but no `workspace.rule_propagate` rows. List with `filter[action]=workspace.rule_propagate` and group on `request-id` to answer "what did that rule change do".
 
 ## Lifecycle: rename / delete / orphan (#314)
 
@@ -324,6 +394,8 @@ GET    /api/v1/autodiscovery-rules/{id}
 PATCH  /api/v1/autodiscovery-rules/{id}
 DELETE /api/v1/autodiscovery-rules/{id}
 ```
+
+`PATCH` also takes the per-request `propagate` and `dry_run` options that [roll an edit out to existing workspaces](#updating-a-rule-and-rolling-it-out-to-existing-workspaces). Without them it changes the rule alone.
 
 ### Preview and on-demand scan
 

@@ -4051,7 +4051,74 @@ GET /api/v1/autodiscovery-rules/{id}
 PATCH /api/v1/autodiscovery-rules/{id}
 ```
 
-Same body shape as create; only the attributes you include are updated.
+Same `data` body as create; only the attributes you include are updated. **Without the options below nothing else changes** — the rule is saved and no existing workspace is touched.
+
+Two optional **top-level** booleans, beside `data`, roll the change out to the workspaces the rule created ([how it works](autodiscovery.md#updating-a-rule-and-rolling-it-out-to-existing-workspaces)):
+
+| Option | Default | Meaning |
+|---|---|---|
+| `propagate` | `false` | Also apply the fields this update **changes** to the rule's active workspaces. A field is replaced on a workspace only where its current value equals the rule's previous value. |
+| `dry_run` | `false` | With `propagate`, report what it would do and persist **neither** the rule nor any workspace. Without `propagate` ⇒ `422`. |
+
+```json
+{
+  "data": {
+    "type": "autodiscovery-rules",
+    "attributes": {"engine-version": "1.14"}
+  },
+  "propagate": true,
+  "dry_run": true
+}
+```
+
+With `propagate`, the response carries the updated rule in `data` and the outcome in `meta.propagation`:
+
+```json
+{
+  "data": {"id": "019e0e7b-...", "type": "autodiscovery-rules", "attributes": {"engine-version": "1.14"}},
+  "meta": {
+    "propagation": {
+      "dry_run": true,
+      "matched": 3,
+      "would_change": [
+        {"id": "ws-019e1a2c-...", "name": "payments-dev",
+         "diff": {"engine_version": {"from": "1.13", "to": "1.14"}}}
+      ],
+      "customised": [
+        {"id": "ws-019e1a2d-...", "name": "payments-prod",
+         "fields": {"engine-version": {"current": "1.12", "previous": "1.13", "new": "1.14"}}}
+      ],
+      "unchanged": [
+        {"id": "ws-019e1a2e-...", "name": "search-dev"}
+      ],
+      "skipped_lifecycle": 1
+    }
+  }
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `dry_run` | Echoes the option. |
+| `matched` | Active workspaces the rule created. |
+| `would_change` | Workspaces updated — or, on a `dry_run`, that would be. Entries are the same `{id, name, diff}` as [Bulk Update](#bulk-update)'s `would_change`; run-task and notification fields list the names written, and a run kind dropped by an operation-flag change shows as `default_run_kind: {from, to}`. On a real request the list is what was changed. |
+| `customised` | Workspaces skipped for the listed fields because their value is not the rule's previous one, with `current`, `previous` and `new` per field. The comparison is on the whole value (labels and lists are never merged). A run-task or notification field shows name-to-spec maps; one customised name skips the whole field for that workspace. A template the rule already had that the workspace lacks counts as a deliberate removal: it is customised (it shows under `previous` but not `current`) and is not re-created, so a workspace that predates a template the rule gained earlier without propagation does not receive it from a later edit. Only names new to the rule are inserted. A workspace customised on one field and updated on another is in both lists. |
+| `unchanged` | `{id, name}` of workspaces already at the new value, or untouched because the update changed no propagated field. |
+| `skipped_lifecycle` | Archived and pending-deletion workspaces, which are never touched. |
+
+In `meta.propagation`, a run task's `hmac-key` and a notification's `token` show as `<set>` or `<unset>`; every other spec key, including a notification's destination `url` (a credential for a chat webhook), is shown as stored in `customised`. `data` carries the rule's templates as [Show Rule](#show-rule) does. On a `dry_run`, `data` is the rule as it would be with the unsaved edit applied. A `dry_run` reports against the workspaces as they are now and rolls back; the real request re-judges them when it applies.
+
+No runs are triggered. One qualification, for `oidc-audiences` only: a run already in `planned` on an updated workspace is auto-discarded at its next confirm, as under [Bulk Update](#bulk-update).
+
+**Not propagated** (never applied to an existing workspace): `name`, `name-template`, `vcs-connection-id`, `repo-url`, `branch`, `pattern`, `ignore-patterns`, `enabled`, `on-directory-delete`, `engine`, `owner-email` (setting an owner can grant admin), `execution-hook-templates` (no bulk-update support yet) and `storage-location` (fixed at creation: the workspace's objects live there), plus the rule's own bookkeeping (`id`, `created-at`, `updated-at`, `first-scan-at`).
+
+All-or-nothing: the rule and every workspace change commit in one transaction, and a `dry_run` rolls it back. Errors:
+
+- `422` — `dry_run only applies with propagate`; `propagate` or `dry_run` not a boolean; an invalid attribute; a bulk-update check refusing the workspaces the update would change (for example `security-scan-enforcement` on a Pulumi workspace); or `the operation flags in this rule update would change the customised default-run-kind of N workspace(s): … Set their default-run-kind first, or leave the operation flags unchanged.` — the same update changes `default-run-kind`, a workspace has its own different kind, and the update's `plan-apply-enabled` / `configure-enabled` change would drop it. Where the update does not change `default-run-kind`, such a drop is applied and shown as `default_run_kind` in `diff`. A `422` refuses the **whole** request and leaves the rule unchanged.
+- `409` — a rule with that name already exists for the connection.
+- `404` — no such rule.
+
+Admin only. Each workspace changed gets one `workspace.rule_propagate` [audit-log](#list-audit-log-entries) row carrying the `PATCH`'s `request-id` (a `dry_run` writes none); the `PATCH` writes its own request-level row as usual, `dry_run` included.
 
 ### Delete Rule
 
@@ -4098,7 +4165,7 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 - `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
 - `allow-fork-pr-plans` — let a pull request opened from a fork plan on every created workspace. Defaults **false**, matching the workspace column rather than overriding it the way `drift-detection-enabled` does: an operator who decides fork pull requests should plan has to say so, and a rule is how they say it once for every directory the repository grows later. Without it, enabling the setting in bulk holds only until autodiscovery creates the next workspace — which reads as the setting not working. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks).
 
-These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
+These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). A template edit reaches workspaces the rule already created only when that `PATCH` asks for it — see [Update Rule](#update-rule). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 
 ---
 
@@ -6010,7 +6077,7 @@ GET /api/v1/admin/audit-log
 |---|---|---|
 | `filter[actor]` | string | Filter by actor email |
 | `filter[resource-type]` | string | Filter by resource type (e.g. `workspaces`, `runs`) |
-| `filter[action]` | string | Filter by HTTP method (GET, POST, PATCH, DELETE) |
+| `filter[action]` | string | Filter by action: an HTTP method (GET, POST, PATCH, DELETE) or a system-event verb such as `vault.read` |
 | `filter[since]` | datetime | Only entries after this timestamp (RFC3339) |
 | `filter[until]` | datetime | Only entries before this timestamp (RFC3339) |
 | `page[number]` | integer | Page number (default: 1) |
@@ -6024,6 +6091,8 @@ Every OpenBao/Vault read Terrapod makes for a run is one `vault.read` row
 mount, path, engine, phase and outcome (`ok`, `denied`, `missing`, `transient`,
 `error`), never a value. Filter with `filter[action]=vault.read`. See
 [OpenBao/Vault → The audit trail](vault.md#the-audit-trail).
+
+Each workspace changed by a [rule update that propagates](#update-rule) is one `workspace.rule_propagate` row (`resource-type` `workspace`) whose `detail` names the rule and the changed fields and whose `request-id` is the `PATCH`'s.
 
 **Example:**
 

@@ -100,9 +100,8 @@ type Propagation struct {
 	SkippedLifecycle int                   `json:"skipped_lifecycle"`
 }
 
-// UpdateAutodiscoveryRuleWithPropagation patches a rule and applies the
-// changed fields to its existing workspaces. An older server that does not
-// report the propagation returns the rule with an error.
+// UpdateAutodiscoveryRuleWithPropagation patches a rule and rolls its changed fields out to existing workspaces;
+// a server that omits the report returns the rule with an error.
 func (c *Client) UpdateAutodiscoveryRuleWithPropagation(ctx context.Context, id string, attrs map[string]any, opts PropagateOptions) (*AutodiscoveryRule, *Propagation, error) {
 	resource, err := MarshalResourceWithID(id, "autodiscovery-rules", attrs)
 	if err != nil {
