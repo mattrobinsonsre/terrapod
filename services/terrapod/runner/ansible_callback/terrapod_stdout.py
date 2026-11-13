@@ -233,6 +233,44 @@ PROGRESS_STATUS = "running"
 #: was a still-running notice for a task they had never been told had begun.
 START_STATUS = "start"
 
+#: What marks a handler's label, because this log drops the banner that is how
+#: ansible marks one (#2532 review). A prefix rather than a status, because a
+#: handler still succeeds or fails like any task and the status column has to go
+#: on saying which.
+_HANDLER_PREFIX = "handler: "
+
+
+def _is_handler(task) -> bool:
+    """True for a handler, from the object rather than from a flag.
+
+    `Handler` is a `Task` subclass, so `isinstance` is the whole test. Imported
+    lazily and guarded because this plugin loads inside whatever execution
+    environment the workspace chose, and an ansible-core old enough not to have
+    the module should degrade to "not a handler" rather than failing the play.
+    """
+    try:
+        from ansible.playbook.handler import Handler
+
+        return isinstance(task, Handler)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+#: The status an `include_tasks` / `include_role` expansion carries (#2565).
+#: Eight characters where `_STATUS_W` is seven, which is deliberate and costs
+#: nothing: `UNREACHABLE` is eleven and already overflows, and both readers
+#: match the status as one whitespace-delimited token rather than by column, so
+#: the field is padded-to-at-least rather than fixed.
+INCLUDED_STATUS = "included"
+
+#: `-vv` only, and per host, so it is framed rather than left bare like the
+#: three statuses above it were.
+NOTIFIED_STATUS = "notified"
+
+#: An async job's progress poll. Per host, and the only one of these whose
+#: cadence an operator chose (`poll:`), so it reads as a progress notice.
+POLLING_STATUS = "polling"
+
 #: One block header in the exact shape the grammar describes.
 #:
 #: It is a LITERAL rather than a call to `_tp_header_line`, deliberately: the
@@ -613,12 +651,44 @@ class CallbackModule(DefaultCallback):
             return getattr(result, "_" + name, None)
 
     def _tp_label_of(self, result) -> str:
-        """`role : task name`, which is what `Task.get_name()` already gives."""
+        """`role : task name`, which is what `Task.get_name()` already gives.
+
+        Prefixed `handler: ` for a handler. Ansible distinguishes the two in the
+        BANNER -- `RUNNING HANDLER [x]` against `TASK [x]` -- and this log drops
+        banners, so without it a handler was indistinguishable from an ordinary
+        task of the same name. Derived from the object rather than from a flag
+        set at handler-start: `Handler` is a `Task` subclass, so the result
+        itself knows, and a flag would have to be right about ordering under
+        `strategy: free` as well as about the handler flush.
+        """
         task = self._tp_field(result, "task")
         try:
-            return task.get_name().strip()
+            name = task.get_name().strip()
         except Exception:  # noqa: BLE001
             return ""
+        return f"{_HANDLER_PREFIX}{name}" if _is_handler(task) else name
+
+    def _tp_delegation(self, result, name: str | None) -> str:
+        """`-> target` when the task ran somewhere other than its own host.
+
+        Ansible reports this in the host part -- `changed: [dev-2 -> localhost]`
+        -- and this log cannot: the host field is the key the per-host view
+        filters on, so putting two names in it would break both the filter and
+        the escaping that keeps the field one token. So the inventory host stays
+        in the column and the delegation goes on the label.
+
+        It matters more than it looks. Anything with `delegate_to` runs
+        somewhere else entirely -- a cloud API call, a monitoring silence, work
+        on the runner itself -- and the log said only the inventory host, so
+        `-> localhost` appeared nowhere at all. `host_label` was already
+        computed here and used only to trim `default`'s own status line out of
+        the body.
+        """
+        label = self._tp_host_label(result)
+        if not label or not name:
+            return ""
+        prefix = f"{name} -> "
+        return f" -> {label[len(prefix) :]}" if label.startswith(prefix) else ""
 
     def _tp_host_label(self, result) -> str:
         """Ansible's own label, which carries `host -> delegated` when delegating."""
@@ -691,6 +761,7 @@ class CallbackModule(DefaultCallback):
         label = self._tp_label_of(result)
         if item:
             label = f"{label} (item={item})"
+        label = f"{label}{self._tp_delegation(result, name)}"
         host_label = self._tp_host_label(result)
 
         body = []
@@ -823,10 +894,19 @@ class CallbackModule(DefaultCallback):
 
     @staticmethod
     def _tp_task_label(task) -> str:
+        """The task's name, prefixed for a handler.
+
+        Must agree with `_tp_label_of`: the start notice is this log's
+        replacement for the `TASK [...]` / `RUNNING HANDLER [...]` banner, so if
+        the announcement did not mark a handler then the distinction would be
+        missing from the one line that exists to carry it.
+        `test_handler_marking` pins the two together.
+        """
         try:
-            return task.get_name().strip()
+            name = task.get_name().strip()
         except Exception:  # noqa: BLE001
             return ""
+        return f"{_HANDLER_PREFIX}{name}" if _is_handler(task) else name
 
     # -- play-level output ------------------------------------------------
     #
@@ -844,6 +924,137 @@ class CallbackModule(DefaultCallback):
     def v2_playbook_on_play_start(self, play):
         self._tp_emit_header()
         return super().v2_playbook_on_play_start(play)
+
+    # -- what `default` prints and we used not to frame (#2565) ------------
+    #
+    # Five hooks were left to `super()`, and the display wrapper falls THROUGH
+    # to the real display when no frame is open -- so their lines were printed
+    # verbatim, with no time, no host column and no colour. That is worse than
+    # cosmetic: `web/src/lib/host-log.ts` treats a line that is neither a block
+    # header nor an indented body as belonging to no host AND as CLOSING the
+    # open block, so one `included:` line in the middle of a play detaches
+    # everything around it from the host filter that #2513 exists to provide.
+    #
+    # On a role-heavy single-host run, 16 of ~320 lines were `included:`.
+    #
+    # All five are framed here rather than only the one that was reported,
+    # because the gap is the hook set and not the symptom: `NO MORE HOSTS LEFT`
+    # already became a host-less block through `_tp_banner`, while `notify`
+    # (`-vv`) and `async_poll` (`async:`) were latent rather than fixed.
+
+    def v2_playbook_on_include(self, included_file) -> None:
+        """One block per host, rather than one line naming them all.
+
+        `default` prints `included: <file> for host-a, host-b, host-c` -- a
+        single line whose hosts are free text at the end, which is exactly the
+        shape a per-host view cannot use. An include IS a per-host event and the
+        hook carries both halves, so it is reported as one.
+        """
+        self._tp_emit_header()
+        # `super()` would emit the combined line; it is captured and dropped
+        # because the per-host blocks below carry everything it said.
+        frame: list[str] = []
+        self._tp_frames.append(frame)
+        try:
+            super().v2_playbook_on_include(included_file)
+        finally:
+            self._tp_frames.pop()
+        if not frame:
+            # `display_included_hosts` is off, so `default` said nothing and
+            # neither do we -- the option is the operator's to set.
+            return None
+        try:
+            name = getattr(included_file, "_filename", "") or ""
+            hosts = [h.name for h in (getattr(included_file, "_hosts", None) or [])]
+            label = self._tp_include_label(included_file, name)
+        except Exception:  # noqa: BLE001
+            return None
+        for host in hosts or [None]:
+            self._tp_block(
+                host=host,
+                status=INCLUDED_STATUS,
+                label=label,
+                body=(),
+                color=C.COLOR_SKIP,
+                stamp=self._tp_stamp(),
+            )
+        return None
+
+    def _tp_include_label(self, included_file, name: str) -> str:
+        """The included file, with the loop item when there is one.
+
+        `default` appends ` => (item=x)` for an include in a loop, and that is
+        the only thing distinguishing one iteration from the next -- so a label
+        without it would report the same include several times identically.
+        """
+        label = name
+        try:
+            item = self._get_item_label(getattr(included_file, "_vars", {}) or {})
+        except Exception:  # noqa: BLE001
+            item = None
+        if item:
+            label = f"{label} (item={item})"
+        return label
+
+    def v2_playbook_on_no_hosts_matched(self) -> None:
+        """`skipping: no hosts matched` -- true of the play, not of a host."""
+        self._tp_emit_header()
+        frame: list[str] = []
+        self._tp_frames.append(frame)
+        try:
+            super().v2_playbook_on_no_hosts_matched()
+        finally:
+            self._tp_frames.pop()
+        self._tp_block(
+            host=None,
+            status="skipped",
+            label="no hosts matched",
+            body=(),
+            color=C.COLOR_SKIP,
+            stamp=self._tp_stamp(),
+        )
+        return None
+
+    def v2_playbook_on_no_hosts_remaining(self) -> None:
+        """Already a host-less block, via `_tp_banner`'s NO MORE HOSTS LEFT.
+
+        Overridden anyway so the set is closed: left to `super()` it depended on
+        that banner branch continuing to exist, which is the kind of thing a
+        later edit removes without noticing. The frame keeps the banner where it
+        already goes and this adds nothing.
+        """
+        self._tp_emit_header()
+        return super().v2_playbook_on_no_hosts_remaining()
+
+    def v2_playbook_on_notify(self, handler, host) -> None:
+        """`-vv` only, and it names a host, so it is framed per host."""
+        self._tp_emit_header()
+        frame: list[str] = []
+        self._tp_frames.append(frame)
+        try:
+            super().v2_playbook_on_notify(handler, host)
+        finally:
+            self._tp_frames.pop()
+        if not frame:
+            # Below the verbosity threshold, so `default` printed nothing.
+            return None
+        try:
+            name = handler.get_name()
+        except Exception:  # noqa: BLE001
+            name = ""
+        self._tp_block(
+            host=str(host) if host is not None else None,
+            status=NOTIFIED_STATUS,
+            label=name,
+            body=(),
+            color=C.COLOR_SKIP,
+            stamp=self._tp_stamp(),
+        )
+        return None
+
+    def v2_runner_on_async_poll(self, result) -> None:
+        """An async job's progress, which carries a host and a task."""
+        return self._tp_result(result, "v2_runner_on_async_poll", POLLING_STATUS, C.COLOR_SKIP)
 
     def v2_playbook_on_task_start(self, task, is_conditional):
         self._tp_emit_header()
