@@ -65,6 +65,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await init_storage()
     logger.info("Storage initialized")
 
+    # A node that cannot keep each workspace's objects in its own location must not run.
+    from terrapod.storage.location_resolver import check_locations_at_startup
+
+    await check_locations_at_startup()
+
     # Replication outbox hooks (#960 phase 3, #1110). Installed before any DB
     # write so no change can slip past unrecorded — but ONLY when this node is
     # actually part of a pair (#1117).

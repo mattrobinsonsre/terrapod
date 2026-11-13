@@ -7,9 +7,14 @@ get_storage() as a FastAPI dependency.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from terrapod.config import StorageBackend, StorageConfig, StorageLocationConfig, settings
 from terrapod.logging_config import get_logger
 from terrapod.storage.protocol import InstrumentedStore, ObjectStore
+
+if TYPE_CHECKING:
+    from terrapod.storage.routing import LocationResolver
 
 logger = get_logger(__name__)
 
@@ -71,10 +76,10 @@ def _build_cloud_store(
             raise ValueError(f"unsupported storage backend: {cfg.backend}")
 
 
-async def init_storage() -> None:
+async def init_storage(resolver: LocationResolver | None = None) -> None:
     """Initialize the storage backend based on configuration.
 
-    Called during app startup (lifespan).
+    Called during app startup (lifespan). `resolver` overrides the database-backed one.
     """
     global _store  # noqa: PLW0603
     cfg = settings.storage
@@ -101,15 +106,20 @@ async def init_storage() -> None:
 
     from terrapod.storage.routing import RoutingStore, StaticDefaultResolver
 
+    if resolver is None:
+        from terrapod.storage.location_resolver import DbLocationResolver
+
+        resolver = DbLocationResolver()
     locations = {
         name: _instrumented(_build_cloud_store(location, location=name))
         for name, location in cfg.locations.items()
     }
-    _store = RoutingStore(default, locations, StaticDefaultResolver())
-    logger.warning(
-        "Storage locations are configured but no workspace is assigned to one yet",
-        locations=sorted(locations),
-    )
+    _store = RoutingStore(default, locations, resolver)
+    if isinstance(resolver, StaticDefaultResolver):
+        logger.warning(
+            "Storage locations are configured but no workspace is assigned to one yet",
+            locations=sorted(locations),
+        )
 
 
 async def close_storage() -> None:

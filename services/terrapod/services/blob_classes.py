@@ -80,6 +80,15 @@ COPY = "copy"
 
 MODES = BLOB_MODES
 
+#: Response header on a blob listing naming the leader's configured storage locations.
+STORAGE_LOCATIONS_HEADER = "X-Terrapod-Storage-Locations"
+
+
+def holds_workspace_objects(cls: BlobClass) -> bool:
+    """Whether a class's objects are routed by their workspace's storage location."""
+    return any(keys.prefix_may_hold_workspace_keys(p) for p in cls.prefixes)
+
+
 #: Resolvers return ``(total_rows, keys_to_check)``. The split is load-bearing: a
 #: class can hold ten thousand rows and be sampled to twenty-five keys, and a
 #: report that carries only one of those numbers cannot say how much of the class

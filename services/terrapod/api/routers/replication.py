@@ -14,7 +14,7 @@ deliberately not expressible as a set of roles somebody could be granted.
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -143,6 +143,7 @@ async def backfill(
 
 @router.get("/blobs/{blob_class}")
 async def list_blobs(
+    response: Response,
     blob_class: str,
     after: str = Query(default="", description="Last key already consumed"),
     limit: int = Query(default=500, ge=1, le=2000),
@@ -185,8 +186,13 @@ async def list_blobs(
             ),
         )
 
+    from terrapod.config import settings
     from terrapod.storage import get_storage
 
+    # Config only: a follower refuses workspace classes when it lacks one of these.
+    response.headers[blob_classes.STORAGE_LOCATIONS_HEADER] = ",".join(
+        sorted(settings.storage.locations)
+    )
     store = get_storage()
     raw = await store.list_prefix(cls.prefixes[0], after=after, limit=limit)
     entries = [

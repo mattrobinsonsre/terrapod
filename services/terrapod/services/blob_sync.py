@@ -26,7 +26,9 @@ that too — a silent cap reads as "finished", which is the one thing it must no
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
+import uuid
 from dataclasses import dataclass, field
 
 import httpx
@@ -37,6 +39,8 @@ from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services import blob_classes
 from terrapod.services.blob_classes import COPY, IRREPLACEABLE
+from terrapod.storage.keys import workspace_id_of_key
+from terrapod.storage.routing import UnknownWorkspaceLocationError
 
 logger = structlog.get_logger(__name__)
 
@@ -64,6 +68,9 @@ class ClassResult:
     skipped_present: int = 0
     bytes_copied: int = 0
     failed: int = 0
+    #: Objects whose workspace this node does not know yet, retried next cycle.
+    deferred: int = 0
+    deferred_workspaces: set[str] = field(default_factory=set)
     #: Set when the class stopped before it was finished, with the reason. The
     #: field exists so "we ran out of budget" can never be reported as "done".
     stopped_early: str | None = None
@@ -82,6 +89,10 @@ class SyncResult:
     @property
     def objects_copied(self) -> int:
         return sum(c.copied for c in self.classes)
+
+    @property
+    def objects_deferred(self) -> int:
+        return sum(c.deferred for c in self.classes)
 
     @property
     def stopped_early(self) -> list[str]:
@@ -226,6 +237,10 @@ async def _sync_class(
         body = resp.json()
         page = body["data"]
         result.examined += len(page)
+        if missing := _leader_locations_missing_here(cls, resp):
+            result.deferred += len(page)
+            result.stopped_early = f"{LEADER_LOCATIONS_MISSING}: {missing}"
+            return result
 
         wanted: list[tuple[str, int]] = []
         for entry in page:
@@ -245,6 +260,14 @@ async def _sync_class(
                     return
                 try:
                     written = await _copy_one(client, token, base, cls.name, key, size)
+                except UnknownWorkspaceLocationError:
+                    # The workspace row has not replicated here yet; the next cycle retries it.
+                    # A follower must configure the same storage locations as the leader.
+                    result.deferred += 1
+                    if workspace_id := workspace_id_of_key(key):
+                        result.deferred_workspaces.add(workspace_id)
+                    logger.info("blob copy deferred until its workspace replicates", key=key)
+                    return
                 except Exception:
                     # One unreadable object must not abandon the class: the rest
                     # of the estate is still worth copying, and the next cycle
@@ -273,10 +296,12 @@ async def sync_cycle() -> None:
     if result.skipped_reason:
         return
 
-    log = logger.info if result.objects_copied or result.stopped_early else logger.debug
+    busy = result.objects_copied or result.objects_deferred or result.stopped_early
+    log = logger.info if busy else logger.debug
     log(
         "blob copy cycle",
         objects_copied=result.objects_copied,
+        objects_deferred=result.objects_deferred,
         bytes_copied=result.bytes_copied,
         duration_ms=result.duration_ms,
         # Named rather than left to be inferred from the totals: a cycle that
@@ -323,7 +348,15 @@ async def run_cycle() -> SyncResult:
             logger.warning("Could not authenticate to peer for blob copy", exc_info=True)
             return SyncResult(skipped_reason="peer authentication failed")
 
+        refused = await _unhonoured_locations()
         for cls in copy_classes:
+            if refused and blob_classes.holds_workspace_objects(cls):
+                result.classes.append(
+                    ClassResult(
+                        name=cls.name, tier=blob_classes.effective_tier(cls), stopped_early=refused
+                    )
+                )
+                continue
             try:
                 result.classes.append(await _sync_class(client, token, base, cls, throttle))
             except Exception:
@@ -339,14 +372,108 @@ async def run_cycle() -> SyncResult:
                     )
                 )
 
+    leader_gaps = [
+        c.name
+        for c in result.classes
+        if (c.stopped_early or "").startswith(LEADER_LOCATIONS_MISSING)
+    ]
+    if leader_gaps:
+        logger.warning(
+            "the leader has storage locations this node does not configure; "
+            "not copying workspace objects",
+            classes=leader_gaps,
+        )
+    await _warn_if_rows_still_missing(result)
     result.duration_ms = int((time.monotonic() - started) * 1000)
     _refresh_metrics(result)
     return result
 
 
+#: The stopped-early reason when the leader names a storage location this node lacks.
+LEADER_LOCATIONS_MISSING = "the leader's storage locations are not configured here"
+
+
+def _leader_locations_missing_here(cls: blob_classes.BlobClass, resp: httpx.Response) -> str:
+    """The leader's locations this node lacks, for a class routed by location; "" if none."""
+    header = resp.headers.get(blob_classes.STORAGE_LOCATIONS_HEADER)
+    # No header: a leader predating storage locations keeps every object on default.
+    if not header or not blob_classes.holds_workspace_objects(cls):
+        return ""
+    leader = {name for name in header.split(",") if name}
+    return ", ".join(sorted(leader - set(settings.storage.locations)))
+
+
+async def _rows_naming_a_location() -> int:
+    """How many workspace rows name a storage location; one cheap probe when there are none."""
+    from sqlalchemy import func, select
+
+    from terrapod.db.models import Workspace
+    from terrapod.db.session import get_db_session
+
+    named = Workspace.storage_location.is_not(None)
+    async with get_db_session() as db:
+        if (await db.execute(select(Workspace.id).where(named).limit(1))).first() is None:
+            return 0
+        return (
+            await db.execute(select(func.count()).select_from(Workspace).where(named))
+        ).scalar_one()
+
+
+async def _unhonoured_locations() -> str | None:
+    """Why workspace classes must not be copied this cycle: rows name locations this node lacks."""
+    if settings.storage.locations:
+        return None
+    try:
+        rows = await _rows_naming_a_location()
+    except Exception:
+        logger.warning(
+            "could not check workspace storage locations; not copying workspace objects",
+            exc_info=True,
+        )
+        return "workspace storage locations could not be checked"
+    if not rows:
+        return None
+    logger.warning(
+        "workspaces reference storage locations but none are configured; "
+        "not copying workspace objects",
+        workspaces=rows,
+    )
+    return "workspaces reference storage locations but none are configured"
+
+
+async def _warn_if_rows_still_missing(result: SyncResult) -> None:
+    """One warning per cycle for deferred copies whose workspace rows have still not arrived."""
+    wanted = set().union(*(c.deferred_workspaces for c in result.classes))
+    if not wanted:
+        return
+    from sqlalchemy import select
+
+    from terrapod.db.models import Workspace
+    from terrapod.db.session import get_db_session
+
+    ids = []
+    for workspace_id in wanted:
+        with contextlib.suppress(ValueError):
+            ids.append(uuid.UUID(workspace_id))
+    try:
+        async with get_db_session() as db:
+            rows = await db.execute(select(Workspace.id).where(Workspace.id.in_(ids)))
+            present = {str(i) for i in rows.scalars()}
+    except Exception:
+        return
+    if missing := wanted - present:
+        # A deleted workspace's state is never copied here, so it restores empty after promotion.
+        logger.warning(
+            "blob copies deferred for workspaces this node has no row for",
+            workspaces=len(missing),
+            objects=result.objects_deferred,
+        )
+
+
 def _refresh_metrics(result: SyncResult) -> None:
     from terrapod.api.metrics import (
         BLOB_COPY_BYTES,
+        BLOB_COPY_DEFERRED,
         BLOB_COPY_FAILURES,
         BLOB_COPY_OBJECTS,
         BLOB_COPY_STOPPED_EARLY,
@@ -359,6 +486,8 @@ def _refresh_metrics(result: SyncResult) -> None:
             BLOB_COPY_BYTES.labels(blob_class=cls.name).inc(cls.bytes_copied)
         if cls.failed:
             BLOB_COPY_FAILURES.labels(blob_class=cls.name).inc(cls.failed)
+        if cls.deferred:
+            BLOB_COPY_DEFERRED.labels(blob_class=cls.name).inc(cls.deferred)
 
     BLOB_COPY_STOPPED_EARLY.set(len(result.stopped_early))
 

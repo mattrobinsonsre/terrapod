@@ -545,6 +545,13 @@ BLOB_COPY_FAILURES = Counter(
     ["blob_class"],
 )
 
+BLOB_COPY_DEFERRED = Counter(
+    "terrapod_blob_copy_deferred_total",
+    "Objects not copied because this node has no row for their workspace yet, or lacks a "
+    "storage location the leader has, by object-store class. A count that keeps rising needs a look",
+    ["blob_class"],
+)
+
 BLOB_COPY_STOPPED_EARLY = Gauge(
     "terrapod_blob_copy_classes_stopped_early",
     "Classes whose last copy cycle did NOT finish — hit the byte cap, or could "
