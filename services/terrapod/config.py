@@ -1394,7 +1394,7 @@ class PlatformToolsConfig(BaseModel):
         "(only fetched when trivy is the selected engine). Exact version.",
     )
     checkov_version: str = Field(
-        default="3.4.3",
+        default="3.4.5",
         description="Checkov version used for IaC security scanning on the runner "
         "(the default engine). Exact version.",
     )
