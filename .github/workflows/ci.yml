@@ -487,6 +487,13 @@ jobs:
       - name: (docs-audit) The docs quote the real promoted-log notice
         run: python3 scripts/docs-audit/check_log_tail_notice.py
 
+      # The health-condition codes are restated by hand in the web filter, the
+      # flag-name catalogue and two docs tables; an eighth server condition
+      # fails none of their tests. Here because the test image sees only
+      # `services/`.
+      - name: (docs-audit) The flag codes match the server's health conditions
+        run: python3 scripts/docs-audit/check_health_flag_codes.py
+
       # A LOCAL composite action's required inputs, read out of its own
       # `action.yml`. `ssh-target-gate` and `git-source-gate` both called
       # `./.github/actions/ghcr-login` with no `with:` block at all, so
