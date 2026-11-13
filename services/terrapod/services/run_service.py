@@ -979,6 +979,36 @@ def is_discardable_hold(run: Run) -> bool:
     return is_held_at_gate(run) and not run.plan_only
 
 
+@dataclass(frozen=True)
+class RunActions:
+    """What can be done to a run right now. See `run_actions`."""
+
+    confirmable: bool
+    discardable: bool
+    cancelable: bool
+    retryable: bool
+
+
+def run_actions(run: Run) -> RunActions:
+    """The one answer to what a run offers, shared by every surface that publishes it.
+
+    Confirm and Discard need an apply-capable plan with work to apply; a plan
+    with `has_changes=False` is a no-op. Confirm is also hidden when the
+    resolved auto-apply mode is `always`, since such a run applies itself. The
+    test is on the mode, not `Run.auto_apply`, which is set for every non-`never`
+    mode and would hide Confirm on a conditional run that was held. A run held
+    at a post-plan gate is discardable too. Cancel is for in-progress states
+    only, and a plan-only run that has planned can only be retried.
+    """
+    applicable = run.status == "planned" and not run.plan_only and run.has_changes is not False
+    return RunActions(
+        confirmable=applicable and resolve_auto_apply_mode(run) != "always",
+        discardable=applicable or is_discardable_hold(run),
+        cancelable=run.status in CANCELABLE_STATES,
+        retryable=run.status in TERMINAL_STATES or (run.plan_only and run.status == "planned"),
+    )
+
+
 # Terraform Enterprise's statuses for a run stopped after its plan (#1704).
 # Terrapod stores such a run as `planning`; these are only ever reported, to a
 # client that asked for them, never written to the database.
