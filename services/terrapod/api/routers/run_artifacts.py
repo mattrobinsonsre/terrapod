@@ -144,6 +144,8 @@ async def _plan_resources(run: Run, db: AsyncSession, tmp_path: str) -> dict | N
     and would here mean "record the list with the backstop silently missing". It
     resolves phase-blind (#2189), as the summariser's does.
     """
+    if run.vcs_pull_request_number is None and not run.vcs_commit_sha:
+        return None  # Neither a PR number nor a commit, so no pull request can show it.
     try:
         # A savepoint, so a database error here rolls back only the lookup and
         # the session the upload commits on stays usable.
