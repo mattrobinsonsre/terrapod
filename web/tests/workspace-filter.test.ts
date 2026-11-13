@@ -17,6 +17,7 @@ import { RUN_STATUSES } from '../src/lib/workspace-status.ts'
 import {
   FLAG_CODES,
   FLAG_VALUES,
+  countOfferedTerms,
   flagValueForCode,
   matchWorkspace,
   migrateLegacyFilter,
@@ -341,5 +342,33 @@ describe('migrateLegacyFilter', () => {
     const parsed = parseFilterQuery(migrateLegacyFilter('status:drifted'))
     assert.equal(matchWorkspace(ws('a', { conditions: ['drifted'] }), parsed, 'needs-confirm'), true)
     assert.equal(matchWorkspace(ws('a'), parsed, 'applied'), false)
+  })
+})
+
+describe('countOfferedTerms', () => {
+  const statuses = RUN_STATUSES.map(s => s.filter)
+  const count = (q: string, kind: 'status' | 'flag') =>
+    countOfferedTerms(parseFilterQuery(q), kind, kind === 'status' ? statuses : FLAG_VALUES)
+
+  it('counts distinct offered values, not every term', () => {
+    assert.equal(count('status:errored status:typo status:errored', 'status'), 1)
+    assert.equal(count('flag:drifted flag:nope', 'flag'), 1)
+    assert.equal(count('flag:drifted flag=drifted', 'flag'), 1)
+  })
+
+  it('counts only terms of its own kind', () => {
+    assert.equal(count('status:errored flag:drifted locked:true env:prod', 'status'), 1)
+    assert.equal(count('status:errored flag:drifted locked:true env:prod', 'flag'), 1)
+  })
+
+  it('is 0 for an empty filter, and for a legacy spelling the dropdown no longer offers', () => {
+    assert.equal(count('', 'status'), 0)
+    assert.equal(count('', 'flag'), 0)
+    assert.equal(count('status:locked status:drifted', 'status'), 0)
+  })
+
+  it('counts all seven flags when every one is ticked', () => {
+    assert.equal(FLAG_VALUES.length, 7)
+    assert.equal(count(FLAG_VALUES.map(v => `flag:${v}`).join(' '), 'flag'), 7)
   })
 })

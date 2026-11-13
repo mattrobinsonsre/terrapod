@@ -38,6 +38,7 @@ import {
   hasLockedTerm,
   hasStatusTerm,
   FLAG_VALUES,
+  countOfferedTerms,
   flagValueForCode,
   matchWorkspace,
   migrateLegacyFilter,
@@ -2200,8 +2201,8 @@ function WorkspacesPageInner() {
           const locked = workspaces.filter(ws => ws.attributes.locked).length
           // Each dropdown's badge counts only its own terms, so it never shows a
           // number with no matching checked row inside.
-          const activeStatusCount = parsedFilter.terms.filter(t => t.kind === 'status').length
-          const activeFlagCount = parsedFilter.terms.filter(t => t.kind === 'flag').length
+          const activeStatusCount = countOfferedTerms(parsedFilter, 'status', RUN_STATUSES.map(s => s.filter))
+          const activeFlagCount = countOfferedTerms(parsedFilter, 'flag', FLAG_VALUES)
           const healthLabel = healthFilterActive
             ? t('stats.clearHealthFilter')
             : t('stats.filterHealth')
@@ -2350,7 +2351,7 @@ function WorkspacesPageInner() {
                   >
                     <span>{t('filter.status')}</span>
                     {activeStatusCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                      <span data-testid="ws-status-count" className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                         {activeStatusCount}
                       </span>
                     )}
@@ -2411,7 +2412,7 @@ function WorkspacesPageInner() {
                   >
                     <span>{t('filter.flags')}</span>
                     {activeFlagCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                      <span data-testid="ws-flags-count" className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                         {activeFlagCount}
                       </span>
                     )}
