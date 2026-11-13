@@ -32,7 +32,16 @@ WORKFLOWS = pathlib.Path(__file__).resolve().parents[2] / ".github" / "workflows
 
 #: A floor, so a parser that stops matching fails instead of passing on nothing
 #: -- the failure mode every derived gate here is written against.
-MIN_DOWNLOADS = 4
+#:
+#: It counts every download STEP the parser finds, resolvable or not, rather
+#: than only the ones whose artifact name is a literal. Those two numbers move
+#: for different reasons: the literal count is a property of how the workflows
+#: happen to be written and fell from 5 to 1 the day the image jobs stopped
+#: downloading their binaries (#2572), while the step count answers the
+#: question the floor is actually asking -- did the matcher find any downloads
+#: at all. Flooring on the narrower number would have meant lowering it to 1
+#: and calling that a guard.
+MIN_DOWNLOAD_STEPS = 5
 
 _MATRIX_REF = re.compile(r"\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}")
 
@@ -129,6 +138,7 @@ def main() -> int:
     offenders: list[str] = []
     unresolved: list[str] = []
     downloads = 0
+    steps_seen = 0
 
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
         doc = yaml.safe_load(path.read_text())
@@ -147,6 +157,7 @@ def main() -> int:
         for job_id, job in jobs.items():
             deps = _closure(job_id, jobs)
             for step_name, name in _artifact_steps(job, "download"):
+                steps_seen += 1
                 if not name:
                     unresolved.append(f"{path.name}:{job_id}: {step_name} (no literal name)")
                     continue
@@ -172,10 +183,10 @@ def main() -> int:
     for line in unresolved:
         print(f"  note: {line}")
 
-    if downloads < MIN_DOWNLOADS:
+    if steps_seen < MIN_DOWNLOAD_STEPS:
         print(
-            f"FAIL — only {downloads} artifact download(s) inspected; the parser has "
-            f"stopped matching (floor is {MIN_DOWNLOADS})"
+            f"FAIL — only {steps_seen} artifact download step(s) found; the parser has "
+            f"stopped matching (floor is {MIN_DOWNLOAD_STEPS})"
         )
         return 1
 
