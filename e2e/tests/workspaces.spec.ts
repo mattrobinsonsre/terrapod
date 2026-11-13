@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { getStoredToken, createWorkspace, seedRun, uniqueName } from "../helpers/api";
+import { getStoredToken, createWorkspace, lockWorkspace, seedRun, uniqueName } from "../helpers/api";
 
 // Scope the list to one test's own rows. On a busy list the table can keep rows the
 // filter excludes (it does on upstream main too: "Showing 2 of N" above more than
@@ -218,6 +218,44 @@ test.describe("Workspaces", () => {
     // The same tab still holds "status:errored", so the two disagree here.
     await page.goto("/workspaces?q=status:applied");
     await expect(filter).toHaveValue("status:applied");
+  });
+
+  test("an old status: bookmark is rewritten once on load and keeps its meaning", async ({ page }) => {
+    // Agent mode with no pool carries a `no_agent_pool` condition, so it is "unhealthy".
+    const prefix = uniqueName("e2e-legacy");
+    const token = getStoredToken();
+    const lockedUnhealthy = `${prefix}-locked-bad`;
+    const unlockedUnhealthy = `${prefix}-open-bad`;
+    const lockedPlain = `${prefix}-locked-ok`;
+    const bad = await createWorkspace(token, lockedUnhealthy, { "execution-mode": "agent" });
+    await createWorkspace(token, unlockedUnhealthy, { "execution-mode": "agent" });
+    const ok = await createWorkspace(token, lockedPlain);
+    await lockWorkspace(token, bad);
+    await lockWorkspace(token, ok);
+
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto(`/workspaces?q=${encodeURIComponent(`${prefix} status:locked status:unhealthy`)}`);
+
+    await expect(page.getByRole("link", { name: lockedUnhealthy })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("link", { name: unlockedUnhealthy })).toBeHidden();
+    await expect(page.getByRole("link", { name: lockedPlain })).toBeHidden();
+
+    await expect(filter).toHaveValue(/locked:true/);
+    await expect(filter).toHaveValue(/flag:no-agent-pool/);
+    await expect(filter).not.toHaveValue(/status:/);
+    await expect.poll(() => new URL(page.url()).searchParams.get("q") ?? "").not.toContain("status:");
+    expect(new URL(page.url()).searchParams.get("q")).toContain("locked:true");
+  });
+
+  test("an old status: filter held in the tab is rewritten on load", async ({ page }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/settings/tokens");
+    await page.evaluate(() => sessionStorage.setItem("terrapod:workspace-filter", "status:locked"));
+    await page.goto("/workspaces");
+    await expect(filter).toHaveValue("locked:true");
+    await expect
+      .poll(() => page.evaluate(() => sessionStorage.getItem("terrapod:workspace-filter")))
+      .toBe("locked:true");
   });
 
   // A refusal takes the not-ok branch; a body that is not JSON takes the catch. Neither may drop

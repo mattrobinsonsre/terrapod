@@ -40,6 +40,7 @@ import {
   FLAG_VALUES,
   flagValueForCode,
   matchWorkspace,
+  migrateLegacyFilter,
   parseFilterQuery,
   removeTerm,
   serializeFilter,
@@ -461,9 +462,11 @@ function WorkspacesPageInner() {
   // label exactly, and `key:` / `key=` matches any workspace that has the
   // label key set. Mirrored to the URL via ?q=… so refresh + share work.
   const [filterInput, setFilterInput] = useState(() =>
-    resolveInitial(
-      searchParams.get('q'),
-      typeof window !== 'undefined' ? readPref(window.sessionStorage, FILTER_KEY) : null,
+    migrateLegacyFilter(
+      resolveInitial(
+        searchParams.get('q'),
+        typeof window !== 'undefined' ? readPref(window.sessionStorage, FILTER_KEY) : null,
+      ),
     ),
   )
   const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
