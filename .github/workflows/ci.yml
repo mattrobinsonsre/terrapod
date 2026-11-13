@@ -6511,8 +6511,23 @@ jobs:
           curl --retry 6 --retry-delay 4 --retry-all-errors -fsSL -o pulumi.tar.gz \
             "https://github.com/pulumi/pulumi/releases/download/v${version}/pulumi-v${version}-linux-x64.tar.gz"
           tar -xzf pulumi.tar.gz
-          sudo install -m 0755 pulumi/pulumi /usr/local/bin/pulumi
+          # EVERY binary the tarball ships, not just the CLI. `pulumi package
+          # gen-sdk <lang>` shells out to a LANGUAGE PLUGIN -- the archive
+          # carries `pulumi-language-{go,nodejs,python,dotnet}` beside `pulumi`
+          # -- and installing the CLI alone left them in the extraction
+          # directory, on no search path. That was latent: it worked while
+          # `ubuntu-latest` resolved to ubuntu-24.04 and broke the moment it
+          # began resolving to ubuntu-26.04, with all four languages failing
+          # `no language plugin 'pulumi-language-go' found ... on your $PATH`.
+          # Correct on both, because the step needs the plugins either way.
+          sudo install -m 0755 pulumi/* /usr/local/bin/
           pulumi version
+          # Assert the plugins arrived rather than discovering it four steps
+          # later as a gen-sdk failure that names a $PATH rather than this step.
+          for lang in go nodejs python dotnet; do
+            command -v "pulumi-language-$lang" >/dev/null \
+              || { echo "::error::pulumi-language-$lang is not on PATH after install"; exit 1; }
+          done
 
       - name: Generate all four SDKs from the committed schema
         run: |
