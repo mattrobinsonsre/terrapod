@@ -47,7 +47,28 @@ _ROUTERS_DIR = Path(_routers_pkg.__file__).resolve().parent
 _SNAPSHOT = Path(__file__).parent / "api_attribute_contract.json"
 
 
-def _dict_literal_keys(d: ast.Dict, *, _prefix: str = "") -> set[str]:
+def _local_dict_nodes(fn: ast.AST) -> dict[str, list[ast.Dict]]:
+    """Map local var name -> the dict literals assigned to it in the function."""
+    nodes: dict[str, list[ast.Dict]] = {}
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target, value = node.targets[0], node.value
+        elif isinstance(node, ast.AnnAssign):
+            target, value = node.target, node.value
+        else:
+            continue
+        if isinstance(target, ast.Name) and isinstance(value, ast.Dict):
+            nodes.setdefault(target.id, []).append(value)
+    return nodes
+
+
+def _dict_literal_keys(
+    d: ast.Dict,
+    *,
+    _prefix: str = "",
+    _locals: dict[str, list[ast.Dict]] | None = None,
+    _seen: frozenset[str] = frozenset(),
+) -> set[str]:
     """String keys of a dict literal, including dotted paths into nested literals.
 
     Both the container and its leaves are recorded — `permissions` *and*
@@ -57,6 +78,10 @@ def _dict_literal_keys(d: ast.Dict, *, _prefix: str = "") -> set[str]:
     and `actions.is-confirmable` to decide whether to render a control, so
     removing one makes a button silently vanish while a flat gate stays green
     (#1344).
+
+    A nested value that is a bare name bound to a dict literal in the same
+    function (``inner = {...}; {"x": inner}``) is followed through ``_locals``,
+    so ``x.<leaf>`` is frozen too.
     """
     keys: set[str] = set()
     # A `**spread` contributes a None key; skip it rather than treating it as a name.
@@ -66,7 +91,17 @@ def _dict_literal_keys(d: ast.Dict, *, _prefix: str = "") -> set[str]:
         path = f"{_prefix}{key.value}"
         keys.add(path)
         if isinstance(value, ast.Dict):
-            keys |= _dict_literal_keys(value, _prefix=f"{path}.")
+            keys |= _dict_literal_keys(value, _prefix=f"{path}.", _locals=_locals, _seen=_seen)
+        elif (
+            isinstance(value, ast.Name)
+            and _locals is not None
+            and value.id in _locals
+            and value.id not in _seen
+        ):
+            for inner in _locals[value.id]:
+                keys |= _dict_literal_keys(
+                    inner, _prefix=f"{path}.", _locals=_locals, _seen=_seen | {value.id}
+                )
     return keys
 
 
@@ -74,6 +109,7 @@ def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
     """Map local var name -> string keys, from ``name = {literal}`` assignments and
     later ``name["key"] = ...`` subscript additions in the function."""
     var_keys: dict[str, set[str]] = {}
+    local_nodes = _local_dict_nodes(fn)
     for node in ast.walk(fn):
         # name = {dict literal}  (plain and annotated: `attrs: dict = {...}`)
         if isinstance(node, ast.Assign):
@@ -85,7 +121,9 @@ def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
         else:
             continue
         if isinstance(value, ast.Dict) and len(targets) == 1 and isinstance(targets[0], ast.Name):
-            var_keys.setdefault(targets[0].id, set()).update(_dict_literal_keys(value))
+            var_keys.setdefault(targets[0].id, set()).update(
+                _dict_literal_keys(value, _locals=local_nodes, _seen=frozenset({targets[0].id}))
+            )
         # name["literal key"] = ...
         for tgt in targets:
             if (
@@ -100,7 +138,7 @@ def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
                 # `attrs["permissions"] = {...}` hides leaves too, same as the
                 # inline form.
                 if isinstance(value, ast.Dict):
-                    keys |= _dict_literal_keys(value, _prefix=f"{path}.")
+                    keys |= _dict_literal_keys(value, _prefix=f"{path}.", _locals=local_nodes)
     return var_keys
 
 
@@ -154,6 +192,7 @@ def _block_of_function(fn: ast.AST, block: str) -> set[str] | None:
     (``attrs = {...}; "attributes": attrs``), or through a subscript chain into
     an already-built document — or None if it has no such block."""
     var_keys = _local_dict_keys(fn)
+    local_nodes = _local_dict_nodes(fn)
     chained = _chain_block_keys(fn, block)
     for node in ast.walk(fn):
         if not isinstance(node, ast.Dict):
@@ -162,7 +201,7 @@ def _block_of_function(fn: ast.AST, block: str) -> set[str] | None:
             if not (isinstance(key, ast.Constant) and key.value == block):
                 continue
             if isinstance(value, ast.Dict):
-                return _dict_literal_keys(value) | chained
+                return _dict_literal_keys(value, _locals=local_nodes) | chained
             if isinstance(value, ast.Name) and value.id in var_keys:
                 return var_keys[value.id] | chained
     # A function that only INJECTS into a document another function built has
@@ -290,6 +329,7 @@ def test_nested_objects_are_guarded_not_just_their_container() -> None:
     assert "permissions" in ws, "the container must stay — dropping it would be a breaking regen"
     assert "permissions.can-queue-apply" in ws
     assert "permissions.can-queue-run" in ws
+    assert "latest-run.status" in ws, "a nested local dict's leaves are frozen too"
 
     run = contract["runs._run_json"]
     assert "actions.is-confirmable" in run
@@ -317,6 +357,29 @@ def test_nested_extraction_covers_the_variable_form() -> None:
     ).body[0]
     keys = _attributes_of_function(fn)
     assert keys == {"a", "nested", "nested.leaf", "later", "later.also"}
+
+
+def test_a_nested_local_dict_is_followed_with_its_dotted_prefix() -> None:
+    """``inner = {...}; {"x": inner}`` freezes ``x.a`` and deeper, not only ``x``."""
+    fn = ast.parse(
+        "def s(x):\n    inner = {'a': 1, 'b': {'c': 2}}\n    return {'attributes': {'x': inner}}\n"
+    ).body[0]
+    assert _attributes_of_function(fn) == {"x", "x.a", "x.b", "x.b.c"}
+
+
+def test_a_nested_local_dict_is_followed_in_the_variable_form_and_when_defined_later() -> None:
+    fn = ast.parse(
+        "def s(x):\n"
+        "    attrs = {'x': inner}\n"
+        "    inner = {'a': 1}\n"
+        "    return {'attributes': attrs}\n"
+    ).body[0]
+    assert _attributes_of_function(fn) == {"x", "x.a"}
+
+
+def test_a_self_referencing_local_does_not_loop() -> None:
+    fn = ast.parse("def s(x):\n    d = {'a': d}\n    return {'attributes': {'k': d}}\n").body[0]
+    assert _attributes_of_function(fn) == {"k", "k.a"}
 
 
 def test_a_subscript_chain_into_an_existing_document_is_extracted() -> None:
