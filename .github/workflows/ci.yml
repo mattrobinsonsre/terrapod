@@ -64,6 +64,12 @@ concurrency:
 env:
   REGISTRY: ghcr.io/mattrobinsonsre
 
+  # Bump this to force the images' apt/apk upgrade layer to rebuild WITHIN a
+  # day, for a distro fix published after that day's layer was written. Any new
+  # value works; the date in front of it is what keeps the ordinary cadence
+  # daily. Normally untouched -- see the `pkg_refresh` comment in `prepare`.
+  PKG_REFRESH_SERIAL: pg-17.12
+
   # Third-party images, pulled from our GHCR mirror rather than Docker Hub,
   # whose anonymous pull limit is shared across GitHub runners and turned four
   # unrelated PRs red in one morning (#1186). Every consuming script and
@@ -137,21 +143,20 @@ jobs:
           # meant the layer stayed cached from whenever a human last bumped it,
           # and the upgrade silently stopped upgrading (#1177).
           #
-          # HOURLY rather than per-run: $GITHUB_RUN_ID would rebuild every image
-          # on every build and throw the cache away entirely, which is the
-          # trade the daily form was reaching for. Daily was too coarse, and it
-          # failed exactly as a 24-hour window predicts: Debian published
-          # postgresql 17.12-0+deb13u1 mid-afternoon, fixing 34 HIGH CVEs in
-          # `libpq5` and `postgresql-client-17`, and every build for the rest of
-          # that day reused a layer written before the fix existed -- so the
-          # image scan correctly failed on a patch that was already installable.
-          # Waiting for the date to roll is not a remedy when the gate is
-          # blocking a release.
+          # Daily rather than per-run deliberately: $GITHUB_RUN_ID would rebuild
+          # every image on every build and throw the cache away entirely.
           #
-          # The cost is bounded by how many DISTINCT hours CI builds in, not by
-          # how many builds it runs: pushes inside one hour still share the
-          # layer, and a quiet day still rebuilds once.
-          echo "pkg_refresh=$(date -u +%Y-%m-%dT%H)" >> "$GITHUB_OUTPUT"
+          # `PKG_REFRESH_SERIAL` is the out-of-cycle escape hatch, and it does
+          # NOT change the cadence: whatever it is set to, the value still moves
+          # once a day and no more often, so the cache behaves exactly as it
+          # always has. Bumping it is how you force a refresh WITHIN a day,
+          # which is needed when a distro publishes a fix after that day's layer
+          # was already written -- Debian's postgresql 17.12-0+deb13u1 landed
+          # mid-afternoon, and until the serial moved every build reused a layer
+          # carrying 34 HIGH CVEs that were already installable. Waiting for the
+          # date to roll is not a remedy when a gate is blocking a release, and
+          # suppressing an available fix in the accepted-risk register is worse.
+          echo "pkg_refresh=$(date -u +%Y-%m-%d)-${PKG_REFRESH_SERIAL}" >> "$GITHUB_OUTPUT"
 
           is_tag=false
           is_pr=false
