@@ -791,6 +791,7 @@ test.describe("Workspaces", () => {
     await page.keyboard.press("Home");
     await expect(page.getByTestId("ws-selection-plan")).toBeFocused();
     await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("ws-selection-retry")).toBeFocused();
     await page.keyboard.press("End");
     await expect(page.getByTestId("ws-selection-discard")).toBeFocused();
     // Escape and the arrows are unchanged: it still closes and returns to the trigger.
