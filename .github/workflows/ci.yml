@@ -487,10 +487,8 @@ jobs:
       - name: (docs-audit) The docs quote the real promoted-log notice
         run: python3 scripts/docs-audit/check_log_tail_notice.py
 
-      # The health-condition codes are restated by hand in the web filter, the
-      # flag-name catalogue and two docs tables; an eighth server condition
-      # fails none of their tests. Here because the test image sees only
-      # `services/`.
+      # Hand-kept copies of the health-condition codes (web filter, flag names,
+      # two docs tables) must equal the server's; the test image can't see them.
       - name: (docs-audit) The flag codes match the server's health conditions
         run: python3 scripts/docs-audit/check_health_flag_codes.py
 
