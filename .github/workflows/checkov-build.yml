@@ -210,7 +210,8 @@ jobs:
             # `|| true` so a 404 reaches the explicit check below rather than
             # killing the step under `set -e` with a bare `curl: (56)` that
             # names neither the version nor what was being read.
-            PY=$(curl -fsSL "https://raw.githubusercontent.com/${UPSTREAM}/${V}/Pipfile" 2>/dev/null \
+            PY=$(curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors \
+                   "https://raw.githubusercontent.com/${UPSTREAM}/${V}/Pipfile" 2>/dev/null \
                    | sed -n 's/^python_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
                    | head -1 || true)
             if [ -z "${PY}" ]; then
