@@ -91,7 +91,11 @@ class TestTheRevocationMarker:
         redis = _FakeRedis()
         with patch("terrapod.redis.client.get_redis_client", return_value=redis):
             await rts.revoke_run_tokens(run_id)
-        assert redis.store[f"tp:runtok_state:{run_id}"] == "revoked"
+        # The value carries `revoked:<unix seconds>` since #2564 -- the stamp is
+        # what bounds the end-of-phase upload grace. Everything that reads this
+        # marker to refuse a token keys on the head, which is what the next test
+        # but one pins; this one is about the TTL.
+        assert redis.store[f"tp:runtok_state:{run_id}"].split(":", 1)[0] == "revoked"
         (_key, _value, ex) = redis.sets[0]
         # Longer than the maximum life of any token for that run, or the marker
         # could lapse while a token it revokes is still signature-valid.

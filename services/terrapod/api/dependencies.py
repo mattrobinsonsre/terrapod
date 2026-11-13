@@ -269,6 +269,30 @@ def _drop_roles_requiring_external_sso(
     return kept
 
 
+async def _end_of_phase_upload_allowed(request, run_id: str) -> bool:
+    """The narrow reprieve a runner needs to finish its own uploads (#2564).
+
+    Three conditions, all of them: the method writes, the path is one of the
+    four the runner uses at exit, and the run went terminal within the grace.
+    Anything else -- a read, another route, an older run -- is refused exactly
+    as before, so what this widens is "may finish writing its own log", not
+    "may act".
+
+    Consulted only AFTER `is_run_token_usable` has refused, so the ordinary
+    path is unchanged and costs nothing: a live run never reaches here.
+    """
+    from terrapod.auth.runner_token_state import (
+        path_is_grace_eligible,
+        terminal_upload_grace_active,
+    )
+
+    if request.method not in ("PUT", "POST"):
+        return False
+    if not path_is_grace_eligible(request.url.path):
+        return False
+    return await terminal_upload_grace_active(run_id)
+
+
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
@@ -298,7 +322,9 @@ async def get_current_user(
                 # credential (GHSA-xmrf-hxq9-m59m). Checked here rather than per
                 # endpoint so it covers everything a runner reaches — the binary
                 # cache and provider mirror as much as the artifact routes.
-                if not await is_run_token_usable(claims.run_id, db):
+                if not await is_run_token_usable(claims.run_id, db) and not (
+                    await _end_of_phase_upload_allowed(request, claims.run_id)
+                ):
                     AUTH_FAILURES.labels(method="runner_token", reason="run_not_active").inc()
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
