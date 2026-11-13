@@ -276,6 +276,19 @@ test.describe("Workspaces", () => {
     });
   }
 
+  test("changing the grouping keeps the engine and the filter in the URL", async ({ page }) => {
+    await page.goto("/workspaces?q=env%3Aprod&engine=terraform");
+    await expect(page.locator('input[aria-label="Filter workspaces"]')).toHaveValue("env:prod");
+
+    await page.getByRole("button", { name: "Group", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: "Repository", exact: true }).click();
+
+    await expect.poll(() => new URL(page.url()).searchParams.get("group")).toBe("repo");
+    const params = new URL(page.url()).searchParams;
+    expect(params.get("engine")).toBe("terraform");
+    expect(params.get("q")).toBe("env:prod");
+  });
+
   test("a second tab does not inherit or overwrite the first tab's filter", async ({ page, context }) => {
     const filter = page.locator('input[aria-label="Filter workspaces"]');
     await page.goto("/workspaces");

@@ -94,6 +94,7 @@ import {
   readPref,
   resolveInitial,
   usableEngine,
+  workspacesHref,
   writePref,
 } from '@/lib/view-prefs'
 
@@ -529,13 +530,8 @@ function WorkspacesPageInner() {
       if (serialized) localStorage.setItem('terrapod:workspace-group', serialized)
       else localStorage.removeItem('terrapod:workspace-group')
     }
-    const q = serializeFilter(parsedFilter)
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    if (serialized) params.set('group', serialized)
-    const qs = params.toString()
-    router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
-  }, [parsedFilter, router, setCollapsedGroups])
+    router.replace(workspacesHref(serializeFilter(parsedFilter), engineFilter, serialized), { scroll: false })
+  }, [parsedFilter, engineFilter, router, setCollapsedGroups])
 
   // Group by dropdown — same outside-click + Escape pattern as Status/Label.
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
@@ -685,13 +681,7 @@ function WorkspacesPageInner() {
     if (lastSyncedQueryRef.current === syncKey) return
     const timer = setTimeout(() => {
       lastSyncedQueryRef.current = syncKey
-      const params = new URLSearchParams()
-      if (serialized) params.set('q', serialized)
-      if (engineFilter) params.set('engine', engineFilter)
-      const groupSerialized = serializeGroupParam(groupMode)
-      if (groupSerialized) params.set('group', groupSerialized)
-      const qs = params.toString()
-      router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
+      router.replace(workspacesHref(serialized, engineFilter, serializeGroupParam(groupMode)), { scroll: false })
     }, 250)
     return () => clearTimeout(timer)
   }, [parsedFilter, engineFilter, groupMode, router])
