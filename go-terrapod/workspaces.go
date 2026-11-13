@@ -370,8 +370,24 @@ type Workspace struct {
 	// SlackChannel is the opt-in Slack channel this workspace's run
 	// notifications post to (#556). Empty means the workspace is silent.
 	SlackChannel string `json:"slack-channel,omitempty"`
-	CreatedAt    string `json:"created-at,omitempty"`
-	UpdatedAt    string `json:"updated-at,omitempty"`
+	// LatestRun is the newest primary run, or nil when there is none. Read-only.
+	LatestRun *WorkspaceLatestRun `json:"latest-run,omitempty"`
+	CreatedAt string              `json:"created-at,omitempty"`
+	UpdatedAt string              `json:"updated-at,omitempty"`
+}
+
+// WorkspaceLatestRun is the `latest-run` block on a workspace. Actions is the
+// run document's own answer; a server that predates it leaves every flag false.
+type WorkspaceLatestRun struct {
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	PlanOnly bool   `json:"plan-only"`
+	// CreatedAt is RFC3339.
+	CreatedAt string `json:"created-at"`
+	// RunKind is "plan_apply", "configure" or "full".
+	RunKind        string            `json:"run-kind"`
+	PhaseStartedAt map[string]string `json:"phase-started-at,omitempty"`
+	Actions        RunActions        `json:"actions"`
 }
 
 // CreateWorkspaceRequest is the input shape for Client.CreateWorkspace.
@@ -1574,6 +1590,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		CreatedAt:                     GetStringAttr(res, "created-at"),
 		UpdatedAt:                     GetStringAttr(res, "updated-at"),
 	}
+	unmarshalAttr(res, "latest-run", &ws.LatestRun)
 	if v := GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
 		ws.DriftDetectionIntervalSeconds = &v
 	}

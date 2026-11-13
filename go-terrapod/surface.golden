@@ -1631,6 +1631,7 @@ field Workspace.ID string `json:"id"`
 field Workspace.InventoryPaths []string `json:"inventory-paths,omitempty"`
 field Workspace.InventoryScriptsEnabled bool `json:"inventory-scripts-enabled"`
 field Workspace.Labels map[string]string `json:"labels,omitempty"`
+field Workspace.LatestRun *WorkspaceLatestRun `json:"latest-run,omitempty"`
 field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`
 field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`
 field Workspace.LockReason string `json:"lock-reason,omitempty"`
@@ -1708,6 +1709,13 @@ field WorkspaceFilter.OwnerEmail string `json:"owner_email,omitempty"`
 field WorkspaceFilter.TerraformVersion string `json:"terraform_version,omitempty"`
 field WorkspaceFilter.VCSConnectionID string `json:"vcs_connection_id,omitempty"`
 field WorkspaceFilter.WorkspaceIDs []string `json:"workspace_ids,omitempty"`
+field WorkspaceLatestRun.Actions RunActions `json:"actions"`
+field WorkspaceLatestRun.CreatedAt string `json:"created-at"`
+field WorkspaceLatestRun.ID string `json:"id"`
+field WorkspaceLatestRun.PhaseStartedAt map[string]string `json:"phase-started-at,omitempty"`
+field WorkspaceLatestRun.PlanOnly bool `json:"plan-only"`
+field WorkspaceLatestRun.RunKind string `json:"run-kind"`
+field WorkspaceLatestRun.Status string `json:"status"`
 field WorkspaceList.CurrentPage int
 field WorkspaceList.Items []Workspace
 field WorkspaceList.PageSize int
@@ -2321,6 +2329,7 @@ type WorkspaceComplianceReport struct
 type WorkspaceComplianceSummary struct
 type WorkspaceCostEstimate struct
 type WorkspaceFilter struct
+type WorkspaceLatestRun struct
 type WorkspaceList struct
 type WorkspaceListOptions struct
 type WorkspaceSummary struct

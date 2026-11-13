@@ -570,6 +570,66 @@ func TestWorkspaceFromResource_DriftFields(t *testing.T) {
 	}
 }
 
+func TestWorkspaceFromResource_LatestRun(t *testing.T) {
+	body := `{"data": {
+	  "id": "ws-aaa",
+	  "type": "workspaces",
+	  "attributes": {
+	    "name": "api",
+	    "latest-run": {
+	      "id": "run-abc",
+	      "status": "planned",
+	      "plan-only": false,
+	      "created-at": "2026-01-02T03:04:05Z",
+	      "run-kind": "configure",
+	      "phase-started-at": {"planning-at": "2026-01-02T03:04:06Z"},
+	      "actions": {"is-confirmable": true, "is-discardable": true, "is-cancelable": false, "is-retryable": false}
+	    }
+	  }
+	}}`
+	ws, err := parseWorkspace([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lr := ws.LatestRun
+	if lr == nil {
+		t.Fatal("LatestRun is nil")
+	}
+	if lr.ID != "run-abc" || lr.Status != "planned" || lr.RunKind != "configure" {
+		t.Errorf("latest run: %+v", lr)
+	}
+	if !lr.Actions.IsConfirmable || !lr.Actions.IsDiscardable || lr.Actions.IsCancelable || lr.Actions.IsRetryable {
+		t.Errorf("actions: %+v", lr.Actions)
+	}
+	if lr.PhaseStartedAt["planning-at"] != "2026-01-02T03:04:06Z" {
+		t.Errorf("phase-started-at: %v", lr.PhaseStartedAt)
+	}
+}
+
+func TestWorkspaceFromResource_LatestRunNullOrAbsent(t *testing.T) {
+	for _, attrs := range []string{`"name": "api", "latest-run": null`, `"name": "api"`} {
+		ws, err := parseWorkspace([]byte(`{"data": {"id": "ws-aaa", "type": "workspaces", "attributes": {` + attrs + `}}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ws.LatestRun != nil {
+			t.Errorf("%s: LatestRun = %+v, want nil", attrs, ws.LatestRun)
+		}
+	}
+}
+
+// An older server publishes latest-run without actions: it decodes to all false.
+func TestWorkspaceFromResource_LatestRunWithoutActions(t *testing.T) {
+	ws, err := parseWorkspace([]byte(`{"data": {"id": "ws-aaa", "type": "workspaces", "attributes": {
+	  "name": "api", "latest-run": {"id": "run-abc", "status": "planned"}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.LatestRun == nil || ws.LatestRun.Actions != (RunActions{}) {
+		t.Errorf("LatestRun = %+v", ws.LatestRun)
+	}
+}
+
 // TestWorkspaceFromResource_ContractParity pins the read-side of the
 // API↔SDK contract for workspace attributes that were silently missing
 // before #480. Adding a new server attribute → extending the SDK
