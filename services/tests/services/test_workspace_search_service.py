@@ -79,9 +79,9 @@ class TestBuildQueryGuard:
         with pytest.raises(WorkspaceFilterError):
             build_workspace_query(WorkspaceFilter(labels={}, workspace_ids=[]))
 
-    def test_all_true_short_circuits_no_error(self):
-        """`all: true` returns the base query and never raises, even with
-        no other dimension set."""
+    def test_all_true_without_exclude_matches_everything(self):
+        """`all: true` with no exclusions returns the base query and never
+        raises, even with no other dimension set."""
         q = build_workspace_query(WorkspaceFilter(all=True))
         # Base query: SELECT over workspaces, ordered by name, no WHERE.
         assert q.whereclause is None
@@ -90,9 +90,158 @@ class TestBuildQueryGuard:
         assert "ORDER BY" in compiled.upper()
 
     def test_all_true_ignores_other_dimensions(self):
-        """`all` short-circuits before any dimension is appended."""
+        """`all` ignores the positive dimensions; only `exclude` narrows it."""
         q = build_workspace_query(WorkspaceFilter(all=True, name_prefix="prod-", locked=True))
         assert q.whereclause is None
+
+    def test_all_true_still_applies_exclude(self):
+        q = build_workspace_query(
+            WorkspaceFilter(all=True, exclude=[WorkspaceFilter(name_glob="*-keep")])
+        )
+        assert q.whereclause is not None
+        assert "NOT" in str(q.whereclause)
+
+    def test_exclude_alone_is_not_a_selector(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            build_workspace_query(WorkspaceFilter(exclude=[WorkspaceFilter(name_glob="*-keep")]))
+        assert "at least one selector" in str(e.value)
+
+    def test_exclude_alone_via_parse_filter_raises(self):
+        wf = parse_filter({"exclude": [{"name-glob": "*-keep"}]})
+        with pytest.raises(WorkspaceFilterError) as e:
+            build_workspace_query(wf)
+        assert "at least one selector" in str(e.value)
+
+
+# ── exclude ──────────────────────────────────────────────────────────────
+
+
+class TestExclude:
+    def test_exclude_adds_not_clause(self):
+        q = build_workspace_query(
+            WorkspaceFilter(
+                labels={"team": "platform"}, exclude=[WorkspaceFilter(name_glob="*-keep")]
+            )
+        )
+        compiled = str(q)
+        assert "workspaces.labels" in compiled
+        assert "NOT" in compiled
+
+    def test_exclude_entries_are_ored_and_entry_dimensions_anded(self):
+        q = build_workspace_query(
+            WorkspaceFilter(
+                labels={"team": "platform"},
+                exclude=[
+                    WorkspaceFilter(name_glob="a*", locked=True),
+                    WorkspaceFilter(execution_backend="pulumi"),
+                ],
+            )
+        )
+        compiled = str(q.whereclause)
+        assert " OR " in compiled
+        assert "workspaces.locked" in compiled
+        assert "workspaces.execution_backend" in compiled
+
+    def test_exclude_is_null_safe_for_nullable_columns(self):
+        """A NULL vcs_connection_id must not be dropped by `NOT (col = x)`."""
+        cid = uuid.uuid4()
+        q = build_workspace_query(
+            WorkspaceFilter(locked=False, exclude=[WorkspaceFilter(vcs_connection_id=f"vcs-{cid}")])
+        )
+        assert "IS NOT true" in str(q.whereclause)
+
+    def test_exclude_bad_uuid_raises(self):
+        with pytest.raises(WorkspaceFilterError):
+            build_workspace_query(
+                WorkspaceFilter(
+                    locked=True, exclude=[WorkspaceFilter(workspace_ids=["ws-not-a-uuid"])]
+                )
+            )
+
+    def test_empty_entry_raises(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            build_workspace_query(WorkspaceFilter(locked=True, exclude=[WorkspaceFilter()]))
+        assert "exclude[0] sets no selector" in str(e.value)
+
+    def test_nested_entry_raises(self):
+        nested = WorkspaceFilter(name_glob="x*", exclude=[WorkspaceFilter(locked=True)])
+        with pytest.raises(WorkspaceFilterError):
+            build_workspace_query(WorkspaceFilter(locked=True, exclude=[nested]))
+        with pytest.raises(WorkspaceFilterError):
+            build_workspace_query(
+                WorkspaceFilter(locked=True, exclude=[WorkspaceFilter(name_glob="x*", all=True)])
+            )
+
+    def test_explicit_dimensions_ignore_exclude(self):
+        wf = WorkspaceFilter(exclude=[WorkspaceFilter(locked=True)])
+        assert wf._explicit_dimensions() == []
+
+
+class TestParseExclude:
+    def test_parses_entries(self):
+        wf = parse_filter(
+            {
+                "labels": {"team": "platform"},
+                "exclude": [{"name-glob": "x*", "terraform_version": "1.5"}, {"locked": True}],
+            }
+        )
+        assert [e.name_glob for e in wf.exclude] == ["x*", None]
+        assert wf.exclude[0].engine_version == "1.5"
+        assert wf.exclude[1].locked is True
+
+    def test_default_is_empty(self):
+        assert parse_filter({"locked": True}).exclude == []
+
+    def test_empty_entry_raises(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            parse_filter({"locked": True, "exclude": [{}]})
+        assert "exclude[0] sets no selector" in str(e.value)
+
+    def test_blank_name_prefix_entry_raises(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            parse_filter({"locked": True, "exclude": [{"name_prefix": ""}]})
+        assert "exclude[0] sets no selector" in str(e.value)
+
+    def test_blank_owner_email_entry_is_valid(self):
+        wf = parse_filter({"locked": True, "exclude": [{"owner_email": ""}]})
+        assert wf.exclude[0].owner_email == ""
+
+    def test_nested_exclude_raises(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            parse_filter({"locked": True, "exclude": [{"name-glob": "x*", "exclude": [{}]}]})
+        assert "exclude[0]" in str(e.value)
+
+    def test_all_in_entry_raises(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            parse_filter({"locked": True, "exclude": [{"name-glob": "x*", "all": True}]})
+        assert "exclude[0]" in str(e.value)
+
+    def test_unknown_key_in_entry_names_it(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            parse_filter({"locked": True, "exclude": [{"bogus-key": "x"}]})
+        assert "bogus_key" in str(e.value)
+        assert "exclude[0]" in str(e.value)
+
+    def test_non_list_exclude_raises(self):
+        with pytest.raises(WorkspaceFilterError):
+            parse_filter({"locked": True, "exclude": {"name-glob": "x*"}})
+
+    @pytest.mark.parametrize("bad", ["", {}, 0, False])
+    def test_falsy_non_list_exclude_raises(self, bad):
+        with pytest.raises(WorkspaceFilterError, match="'exclude' must be a list"):
+            parse_filter({"locked": True, "exclude": bad})
+
+    @pytest.mark.parametrize("empty", [None, []])
+    def test_null_or_empty_exclude_means_no_exclusion(self, empty):
+        assert parse_filter({"locked": True, "exclude": empty}).exclude == []
+
+    def test_non_dict_entry_raises(self):
+        with pytest.raises(WorkspaceFilterError):
+            parse_filter({"locked": True, "exclude": ["x*"]})
+
+    def test_bad_type_in_entry_raises_filter_error(self):
+        with pytest.raises(WorkspaceFilterError):
+            parse_filter({"locked": True, "exclude": [{"locked": "definitely-not-a-bool"}]})
 
 
 # ── build_workspace_query — per-dimension WHERE ──────────────────────────

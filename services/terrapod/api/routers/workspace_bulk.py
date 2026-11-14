@@ -49,8 +49,11 @@ from terrapod.services.notification_service import VALID_TRIGGERS
 from terrapod.services.parallelism import validate_configure_parallelism, validate_parallelism
 from terrapod.services.run_task_service import VALID_ENFORCEMENT_LEVELS, VALID_STAGES
 from terrapod.services.workspace_search_service import (
+    ExclusionReport,
+    WorkspaceFilter,
     WorkspaceFilterError,
     build_workspace_query,
+    exclusion_report,
     parse_filter,
 )
 
@@ -945,6 +948,28 @@ async def _validate_update(
     return {"fields": fields, "run_tasks": run_tasks, "notifications": notifications}
 
 
+def _exclusion_fields(report: ExclusionReport) -> dict[str, Any]:
+    return {"excluded": report.excluded, "exclude_empty": report.empty}
+
+
+def _refusal_detail(report: ExclusionReport) -> str:
+    """The 422 text naming every exclude entry that protects nothing."""
+    plain = [i for i in report.empty if i not in report.missing_ids]
+    parts = []
+    if plain:
+        names = ", ".join(f"exclude[{i}]" for i in plain)
+        parts.append(f"{names} {'matches' if len(plain) == 1 else 'match'} no workspace")
+    parts += [
+        f"exclude[{i}] names workspace ids that do not exist: {', '.join(ids)}"
+        for i, ids in sorted(report.missing_ids.items())
+    ]
+    return "; ".join(parts) + "; an exclusion that matches nothing protects nothing"
+
+
+async def _report_exclusions(db: AsyncSession, wf: WorkspaceFilter) -> ExclusionReport | None:
+    return await exclusion_report(db, wf) if wf.exclude else None
+
+
 @router.post("/workspaces/actions/search")
 async def search_workspaces(
     body: dict = Body(...),
@@ -960,9 +985,10 @@ async def search_workspaces(
     except WorkspaceFilterError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     rows = (await db.execute(query)).scalars().all()
-    return JSONResponse(
-        content={"matched": len(rows), "workspaces": [_ws_summary(w) for w in rows]}
-    )
+    content: dict[str, Any] = {"matched": len(rows), "workspaces": [_ws_summary(w) for w in rows]}
+    if report := await _report_exclusions(db, wf):
+        content.update(_exclusion_fields(report))
+    return JSONResponse(content=content)
 
 
 def _diff_for(ws: Workspace, plan: dict[str, Any]) -> dict[str, Any]:
@@ -1139,6 +1165,10 @@ async def bulk_update_workspaces(
     # Up-front validation — 422 here means zero mutation.
     plan = await _validate_update(body.get("update", {}), db, user)
 
+    report = await _report_exclusions(db, wf)
+    if report and report.empty and not dry_run:
+        raise HTTPException(status_code=422, detail=_refusal_detail(report))
+
     workspaces = list((await db.execute(query)).scalars().all())
     _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
     _reject_leaving_a_workspace_with_no_operations(plan["fields"], workspaces)
@@ -1153,14 +1183,15 @@ async def bulk_update_workspaces(
         changed, unchanged = await _apply(db, workspaces, plan, user.email)
         if dry_run:
             await db.rollback()
-            return JSONResponse(
-                content={
-                    "dry_run": True,
-                    "matched": len(workspaces),
-                    "would_change": changed,
-                    "unchanged": unchanged,
-                }
-            )
+            preview: dict[str, Any] = {
+                "dry_run": True,
+                "matched": len(workspaces),
+                "would_change": changed,
+                "unchanged": unchanged,
+            }
+            if report:
+                preview.update(_exclusion_fields(report))
+            return JSONResponse(content=preview)
         await db.commit()
     except HTTPException:
         await db.rollback()
@@ -1177,15 +1208,17 @@ async def bulk_update_workspaces(
         "bulk-update applied",
         matched=len(workspaces),
         changed=len(changed),
+        excluded=report.excluded if report else 0,
         actor=user.email,
     )
-    return JSONResponse(
-        content={
-            "dry_run": False,
-            "matched": len(workspaces),
-            "applied": len(changed),
-            "changes": changed,
-            "unchanged": unchanged,
-            "errors": [],
-        }
-    )
+    result: dict[str, Any] = {
+        "dry_run": False,
+        "matched": len(workspaces),
+        "applied": len(changed),
+        "changes": changed,
+        "unchanged": unchanged,
+        "errors": [],
+    }
+    if report:
+        result.update(_exclusion_fields(report))
+    return JSONResponse(content=result)

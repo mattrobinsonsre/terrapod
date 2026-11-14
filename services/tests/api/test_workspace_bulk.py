@@ -18,6 +18,7 @@ from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
+from terrapod.services.workspace_search_service import ExclusionReport
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -1491,3 +1492,170 @@ class TestBulkUpdateRefusesAnUnofferableRunKind:
         )
         assert resp.status_code == 200, resp.text
         db.commit.assert_awaited()
+
+
+# ── exclude ──────────────────────────────────────────────────────────────
+
+_REPORT = "terrapod.api.routers.workspace_bulk.exclusion_report"
+_SEARCH = "/api/terrapod/v1/workspaces/actions/search"
+_BULK = "/api/terrapod/v1/workspaces/actions/bulk-update"
+_EXCLUDE_FILTER = {"all": True, "exclude": [{"labels": {"env": "dev"}}]}
+
+
+class TestExcludeReporting:
+    async def _post(self, path, body, report=None, workspaces=None):
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result(workspaces or [_mock_ws(name="w1")]))
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.rollback = AsyncMock()
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch(_REPORT, new_callable=AsyncMock, return_value=report) as rep,
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(path, json=body, headers=_AUTH)
+        return resp, db, rep
+
+    async def test_search_with_exclude_reports_the_carve_out(self):
+        resp, _db, _rep = await self._post(
+            _SEARCH, {"filter": _EXCLUDE_FILTER}, ExclusionReport(excluded=3, empty=[1])
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["excluded"] == 3
+        assert data["exclude_empty"] == [1]
+
+    async def test_search_without_exclude_has_no_new_keys(self):
+        resp, _db, rep = await self._post(_SEARCH, {"filter": {"all": True}})
+        assert resp.status_code == 200, resp.text
+        assert set(resp.json()) == {"matched", "workspaces"}
+        rep.assert_not_awaited()
+
+    async def test_dry_run_with_exclude_reports_the_carve_out(self):
+        resp, db, _rep = await self._post(
+            _BULK,
+            {"filter": _EXCLUDE_FILTER, "update": {"execution-backend": "tofu"}},
+            ExclusionReport(excluded=2, empty=[0]),
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["dry_run"] is True
+        assert data["excluded"] == 2
+        assert data["exclude_empty"] == [0]
+        db.commit.assert_not_awaited()
+
+    async def test_dry_run_without_exclude_has_no_new_keys(self):
+        resp, _db, rep = await self._post(
+            _BULK, {"filter": {"all": True}, "update": {"execution-backend": "tofu"}}
+        )
+        assert resp.status_code == 200, resp.text
+        assert set(resp.json()) == {"dry_run", "matched", "would_change", "unchanged"}
+        rep.assert_not_awaited()
+
+    async def test_apply_with_an_empty_entry_is_refused_and_writes_nothing(self):
+        ws = _mock_ws(name="w1", execution_backend="terraform")
+        resp, db, _rep = await self._post(
+            _BULK,
+            {
+                "filter": {
+                    "all": True,
+                    "exclude": [{"labels": {"a": "b"}}, {"labels": {"x": "y"}}],
+                },
+                "update": {"execution-backend": "tofu"},
+                "dry_run": False,
+            },
+            ExclusionReport(excluded=0, empty=[1]),
+            [ws],
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == (
+            "exclude[1] matches no workspace; an exclusion that matches nothing protects nothing"
+        )
+        assert ws.execution_backend == "terraform"
+        db.commit.assert_not_awaited()
+        db.add.assert_not_called()
+
+    async def test_apply_with_matching_exclude_commits_and_adds_no_new_keys(self):
+        ws = _mock_ws(name="w1", execution_backend="terraform")
+        resp, db, _rep = await self._post(
+            _BULK,
+            {
+                "filter": _EXCLUDE_FILTER,
+                "update": {"execution-backend": "tofu"},
+                "dry_run": False,
+            },
+            ExclusionReport(excluded=1, empty=[]),
+            [ws],
+        )
+        assert resp.status_code == 200, resp.text
+        assert set(resp.json()) == {
+            "dry_run",
+            "matched",
+            "applied",
+            "changes",
+            "unchanged",
+            "errors",
+            "excluded",
+            "exclude_empty",
+        }
+        assert resp.json()["excluded"] == 1
+        assert resp.json()["exclude_empty"] == []
+        assert ws.execution_backend == "tofu"
+        db.commit.assert_awaited_once()
+
+    async def test_apply_without_exclude_has_no_new_keys(self):
+        resp, _db, rep = await self._post(
+            _BULK,
+            {
+                "filter": {"all": True},
+                "update": {"execution-backend": "tofu"},
+                "dry_run": False,
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert set(resp.json()) == {
+            "dry_run",
+            "matched",
+            "applied",
+            "changes",
+            "unchanged",
+            "errors",
+        }
+        rep.assert_not_awaited()
+
+    async def test_apply_names_every_empty_entry(self):
+        resp, db, _rep = await self._post(
+            _BULK,
+            {
+                "filter": _EXCLUDE_FILTER,
+                "update": {"execution-backend": "tofu"},
+                "dry_run": False,
+            },
+            ExclusionReport(excluded=0, empty=[0, 2]),
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == (
+            "exclude[0], exclude[2] match no workspace; "
+            "an exclusion that matches nothing protects nothing"
+        )
+        db.commit.assert_not_awaited()
+
+    async def test_apply_names_the_missing_workspace_ids(self):
+        resp, db, _rep = await self._post(
+            _BULK,
+            {
+                "filter": _EXCLUDE_FILTER,
+                "update": {"execution-backend": "tofu"},
+                "dry_run": False,
+            },
+            ExclusionReport(excluded=1, empty=[1], missing_ids={1: ["ws-x", "ws-y"]}),
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == (
+            "exclude[1] names workspace ids that do not exist: ws-x, ws-y; "
+            "an exclusion that matches nothing protects nothing"
+        )
+        db.commit.assert_not_awaited()

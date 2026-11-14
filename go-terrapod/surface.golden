@@ -145,6 +145,8 @@ field BulkUpdateResult.Applied int `json:"applied"`
 field BulkUpdateResult.Changes []WorkspaceChange `json:"changes,omitempty"`
 field BulkUpdateResult.DryRun bool `json:"dry_run"`
 field BulkUpdateResult.Errors []string `json:"errors,omitempty"`
+field BulkUpdateResult.ExcludeEmpty []int `json:"exclude_empty,omitempty"`
+field BulkUpdateResult.Excluded int `json:"excluded,omitempty"`
 field BulkUpdateResult.Matched int `json:"matched"`
 field BulkUpdateResult.Unchanged []WorkspaceChange `json:"unchanged,omitempty"`
 field BulkUpdateResult.WouldChange []WorkspaceChange `json:"would_change,omitempty"`
@@ -1161,6 +1163,8 @@ field RunTrigger.SourceID string `json:"sourceable-id"`
 field RunTrigger.SourceableName string `json:"sourceable-name"`
 field RunTrigger.WorkspaceID string `json:"workspace-id"`
 field RunTrigger.WorkspaceName string `json:"workspace-name"`
+field SearchWorkspacesResult.ExcludeEmpty []int `json:"exclude_empty,omitempty"`
+field SearchWorkspacesResult.Excluded int `json:"excluded,omitempty"`
 field SearchWorkspacesResult.Matched int `json:"matched"`
 field SearchWorkspacesResult.Workspaces []WorkspaceSummary `json:"workspaces"`
 field SecurityScan.CreatedAt string `json:"created-at,omitempty"`
@@ -1697,6 +1701,7 @@ field WorkspaceFilter.AgentPoolID string `json:"agent_pool_id,omitempty"`
 field WorkspaceFilter.All bool `json:"all,omitempty"`
 field WorkspaceFilter.DriftStatus string `json:"drift_status,omitempty"`
 field WorkspaceFilter.EngineVersion string `json:"engine_version,omitempty"`
+field WorkspaceFilter.Exclude []WorkspaceFilter `json:"exclude,omitempty"`
 field WorkspaceFilter.ExecutionBackend string `json:"execution_backend,omitempty"`
 field WorkspaceFilter.ExecutionMode string `json:"execution_mode,omitempty"`
 field WorkspaceFilter.HasVCS *bool `json:"has_vcs,omitempty"`
