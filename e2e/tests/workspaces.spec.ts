@@ -730,6 +730,75 @@ test.describe("Workspaces", () => {
     // letting any running callback finish.
     await page.unrouteAll({ behavior: "wait" });
   });
+
+  // One selected row, with where Tab and Shift+Tab lead from the closed trigger
+  // marked, and a trail of every element that takes focus from here on.
+  async function selectionKeyboard(page: Page) {
+    const prefix = uniqueName("e2e-sel-keys");
+    await createWorkspace(getStoredToken(), `${prefix}-a`);
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    const trigger = page.getByTestId("ws-selection");
+    const mark = async (key: string, attr: string) => {
+      await trigger.focus();
+      await page.keyboard.press(key);
+      const body = await page.evaluate((a) => {
+        const el = document.activeElement;
+        el?.setAttribute(a, "1");
+        return el === document.body;
+      }, attr);
+      expect(body, `${key} from the closed trigger must land on an element`).toBe(false);
+    };
+    await mark("Tab", "data-e2e-after");
+    await mark("Shift+Tab", "data-e2e-before");
+    await page.evaluate(() => {
+      const w = window as unknown as { __trail: string[] };
+      w.__trail = [];
+      document.addEventListener("focusin", (e) => {
+        const el = e.target as HTMLElement;
+        w.__trail.push(
+          el.hasAttribute("data-e2e-after") ? "after" : el.hasAttribute("data-e2e-before") ? "before" : (el.dataset.testid ?? el.tagName),
+        );
+      });
+    });
+    await trigger.click();
+    await expect(page.getByTestId("ws-selection-plan")).toBeFocused();
+    await page.evaluate(() => ((window as unknown as { __trail: string[] }).__trail = []));
+    return () => page.evaluate(() => (window as unknown as { __trail: string[] }).__trail);
+  }
+
+  test("Tab leaves the Selection menu through the trigger, to the next control", async ({ page }) => {
+    const trail = await selectionKeyboard(page);
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("ws-selection-menu")).toHaveCount(0);
+    await expect(page.locator("[data-e2e-after]")).toBeFocused();
+    // Focus passes through the trigger, so it never drops to the body.
+    expect(await trail()).toEqual(["ws-selection", "after"]);
+  });
+
+  test("Shift+Tab leaves the Selection menu through the trigger, to the previous control", async ({ page }) => {
+    const trail = await selectionKeyboard(page);
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("ws-selection-menu")).toHaveCount(0);
+    await expect(page.locator("[data-e2e-before]")).toBeFocused();
+    expect(await trail()).toEqual(["ws-selection", "before"]);
+  });
+
+  test("Home and End move to the first and last item of the Selection menu", async ({ page }) => {
+    await selectionKeyboard(page);
+    await page.keyboard.press("End");
+    await expect(page.getByTestId("ws-selection-discard")).toBeFocused();
+    await page.keyboard.press("Home");
+    await expect(page.getByTestId("ws-selection-plan")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("ws-selection-retry")).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(page.getByTestId("ws-selection-discard")).toBeFocused();
+    // Escape and the arrows are unchanged: it still closes and returns to the trigger.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("ws-selection-menu")).toHaveCount(0);
+    await expect(page.getByTestId("ws-selection")).toBeFocused();
+  });
 });
 
 test.describe("Workspace access tab (#1456)", () => {

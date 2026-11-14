@@ -241,6 +241,61 @@ describe('the dark theme is checked too', () => {
     assert.ok(stock >= MIN_STOCK, `only ${stock} stock stops parsed from theme.css`)
   })
 
+  it('the checkbox outline clears 3:1 on dark (WCAG 1.4.11)', () => {
+    // Classes are read from checkbox.tsx; each state is measured against the box's
+    // own fill and the surface behind it (hovering the box also hovers its row).
+    const file = path.join(WEB, 'src', 'components', 'checkbox.tsx')
+    const m = readFileSync(file, 'utf8').match(/className=\{([^}]*appearance-none[^}]*)\}/)
+    assert.ok(m, 'checkbox.tsx: no className with `appearance-none`')
+    const toks = [...m[1].matchAll(/'([^']*)'/g)].flatMap((q) => q[1].split(/\s+/)).filter(Boolean)
+    // Unprefixed or `hover:`/`checked:` only: `light:` classes are the light gate's.
+    const paint = (variant: string, prop: string): [RGB, number, string] | null => {
+      for (const t of toks) {
+        const k = t.match(/^(?:([a-z]+:))?(bg|border)-([a-z]+-\d+)(?:\/(\d+))?$/)
+        if (!k || (k[1] ?? '') !== variant || k[2] !== prop || !pal[k[3]]) continue
+        return [pal[k[3]], k[4] === undefined ? 1 : +k[4] / 100, t]
+      }
+      return null
+    }
+    const page = pal['slate-900']
+    const panel = composite(pal['slate-800'], 0.5, page)
+    const row = composite(pal['slate-700'], 0.2, panel)
+    const baseFill = paint('', 'bg')
+    const hovFill = paint('hover:', 'bg')
+    const baseEdge = paint('', 'border')
+    const hovEdge = paint('hover:', 'border')
+    const chkEdge = paint('checked:', 'border')
+    assert.ok(
+      baseFill && hovFill && baseEdge && hovEdge && chkEdge,
+      'checkbox.tsx: a base, hover or checked border or fill class is missing',
+    )
+    const states: [string, RGB, [RGB, number, string], [RGB, number, string]][] = [
+      ['on the page', page, baseFill, baseEdge],
+      ['on the panel', panel, baseFill, baseEdge],
+      ['on a hovered row', row, baseFill, baseEdge],
+      ['hovered, on a hovered row', row, hovFill, hovEdge],
+    ]
+    const NON_TEXT = 3
+    const offenders: string[] = []
+    for (const [name, backdrop, fill, edge] of states) {
+      const under = composite(fill[0], fill[1], backdrop)
+      const painted = composite(edge[0], edge[1], under)
+      for (const [what, other] of [['its own fill', under], ['the surface behind it', backdrop]] as [string, RGB][]) {
+        const c = contrast(painted, other)
+        if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  \`${edge[2]}\` ${name}, against ${what}`)
+      }
+    }
+    for (const [name, backdrop] of [['the page', page], ['the panel', panel], ['a hovered row', row]] as [string, RGB][]) {
+      const c = contrast(chkEdge[0], backdrop)
+      if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  checked \`${chkEdge[2]}\` on ${name}`)
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `checkbox.tsx outline needs ${NON_TEXT}:1 (WCAG 1.4.11):\n  ${offenders.join('\n  ')}`,
+    )
+  })
+
   it('every chromatic fill clears AA on dark against its declared ink', () => {
     // The three surfaces the app puts a button on, matching the Python gate's
     // own ("ground", 900), ("card", 800), ("input", 700).
