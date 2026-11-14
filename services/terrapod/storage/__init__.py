@@ -26,7 +26,6 @@ def _build_cloud_store(
     cfg: StorageConfig | StorageLocationConfig, **log_fields: str
 ) -> ObjectStore:
     """Build an s3, azure or gcs store from a backend definition."""
-    store: ObjectStore
     match cfg.backend:
         case StorageBackend.S3:
             from terrapod.storage.s3 import S3Store
@@ -39,6 +38,7 @@ def _build_cloud_store(
                 presigned_url_expiry_seconds=cfg.s3.presigned_url_expiry_seconds,
             )
             logger.info("Storage initialized", backend="s3", bucket=cfg.s3.bucket, **log_fields)
+            return store
 
         case StorageBackend.AZURE:
             from terrapod.storage.azure import AzureStore
@@ -52,6 +52,7 @@ def _build_cloud_store(
             logger.info(
                 "Storage initialized", backend="azure", account=cfg.azure.account_name, **log_fields
             )
+            return store
 
         case StorageBackend.GCS:
             from terrapod.storage.gcs import GCSStore
@@ -64,10 +65,10 @@ def _build_cloud_store(
                 presigned_url_expiry_seconds=cfg.gcs.presigned_url_expiry_seconds,
             )
             logger.info("Storage initialized", backend="gcs", bucket=cfg.gcs.bucket, **log_fields)
+            return store
 
         case _:
             raise ValueError(f"unsupported storage backend: {cfg.backend}")
-    return store
 
 
 async def init_storage() -> None:
