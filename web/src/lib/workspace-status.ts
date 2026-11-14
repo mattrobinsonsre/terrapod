@@ -1,15 +1,10 @@
 // Single source of truth for workspace status definitions.
 //
-// Both the workspace-row status pill and the status filter dropdown derive
-// their lists from `WORKSPACE_STATUSES`. Adding a new status only requires
-// editing this file — `resolveStatus` produces the right pill, the dropdown
-// auto-renders the new option, and the kebab-case `filter` value is
-// authoritative for `status:value` predicates in the workspace filter.
+// `WORKSPACE_STATUSES` feeds the status pill via `resolveStatus`; the Status
+// dropdown and `status:` use `RUN_STATUSES`, its run-level subset.
 //
-// Order matters for the filter dropdown — most operationally interesting
-// statuses surface at the top. `resolveStatus` doesn't read this order
-// directly; see its docstring for the actual precedence rules
-// (`needs-confirm` wins over every workspace-level condition).
+// The dropdown lists them most interesting first; `resolveStatus` ignores that
+// order and has its own precedence (see its docstring).
 
 export type StatusColor = 'red' | 'amber' | 'blue' | 'green' | 'slate' | 'gray'
 
@@ -58,15 +53,13 @@ export const WORKSPACE_STATUSES: ReadonlyArray<WorkspaceStatusDef> = [
   { filter: 'discarded', label: 'Discarded', color: 'slate', dot: 'bg-slate-500', priority: 8 },
 ]
 
-/** The statuses `status:` filters on and the Status dropdown offers: the run's
- *  own status, one per workspace. The workspace-level conditions
- *  (`state-diverged`, `vcs-error`, `drifted`) are health conditions, filtered
- *  with `flag:` against the server's authoritative `health-conditions` array,
- *  so they are not here. The status PILL still resolves all of them, with its
- *  own precedence, because a pill has one slot and a filter does not. */
+/** The run's own statuses: what `status:` filters on and the dropdown offers.
+ *  The workspace-level ones are `flag:` conditions; only the pill resolves them. */
 export const RUN_STATUSES: ReadonlyArray<WorkspaceStatusDef> = WORKSPACE_STATUSES.filter(
   s => !s.isWorkspaceLevel,
 )
+
+const RUN_FILTERS: ReadonlySet<string> = new Set(RUN_STATUSES.map(s => s.filter))
 
 const STATUS_BY_FILTER: ReadonlyMap<string, WorkspaceStatusDef> = new Map(
   WORKSPACE_STATUSES.map(s => [s.filter, s] as const),
@@ -106,6 +99,21 @@ export interface ResolvedStatus {
   phaseStarts: Record<string, unknown> | null
 }
 
+// A planned run that is not plan-only waits for someone to confirm it.
+const awaitsConfirmation = (run: { status: string; 'plan-only': boolean }): boolean =>
+  run.status === 'planned' && !run['plan-only']
+
+/** The `status:` value for a workspace: its latest run's own status, one of
+ *  `RUN_STATUSES`, or undefined with no run. Conditions play no part. */
+export function runStatusOf(ws: {
+  attributes: { 'latest-run': { status: string; 'plan-only': boolean } | null }
+}): string | undefined {
+  const run = ws.attributes['latest-run']
+  if (!run) return undefined
+  const status = awaitsConfirmation(run) ? 'needs-confirm' : run.status
+  return RUN_FILTERS.has(status) ? status : undefined
+}
+
 /** Resolve a workspace's effective status from its signals.
  *
  * A planned non-plan-only run awaiting confirmation (`needs-confirm`) wins
@@ -126,7 +134,7 @@ export function resolveStatus(ws: ResolveInput): ResolvedStatus {
   const a = ws.attributes
   const run = a['latest-run']
   // needs-confirm wins — actionable beats alarm.
-  if (run && run.status === 'planned' && !run['plan-only']) {
+  if (run && awaitsConfirmation(run)) {
     return {
       def: STATUS_BY_FILTER.get('needs-confirm') ?? null,
       runId: run.id,

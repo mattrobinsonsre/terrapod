@@ -38,8 +38,10 @@ import {
   hasLockedTerm,
   hasStatusTerm,
   FLAG_VALUES,
+  countOfferedTerms,
   flagValueForCode,
   matchWorkspace,
+  migrateLegacyFilter,
   parseFilterQuery,
   removeTerm,
   serializeFilter,
@@ -49,7 +51,7 @@ import {
   toggleLockedTerm,
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
-import { RUN_STATUSES, resolveStatus } from '@/lib/workspace-status'
+import { RUN_STATUSES, resolveStatus, runStatusOf } from '@/lib/workspace-status'
 import { defaultEngineVersion, versionToolFor } from '@/lib/engine-version'
 import {
   CREATE_INPUT,
@@ -92,6 +94,7 @@ import {
   readPref,
   resolveInitial,
   usableEngine,
+  workspacesHref,
   writePref,
 } from '@/lib/view-prefs'
 
@@ -461,9 +464,11 @@ function WorkspacesPageInner() {
   // label exactly, and `key:` / `key=` matches any workspace that has the
   // label key set. Mirrored to the URL via ?q=… so refresh + share work.
   const [filterInput, setFilterInput] = useState(() =>
-    resolveInitial(
-      searchParams.get('q'),
-      typeof window !== 'undefined' ? readPref(window.sessionStorage, FILTER_KEY) : null,
+    migrateLegacyFilter(
+      resolveInitial(
+        searchParams.get('q'),
+        typeof window !== 'undefined' ? readPref(window.sessionStorage, FILTER_KEY) : null,
+      ),
     ),
   )
   const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
@@ -525,13 +530,8 @@ function WorkspacesPageInner() {
       if (serialized) localStorage.setItem('terrapod:workspace-group', serialized)
       else localStorage.removeItem('terrapod:workspace-group')
     }
-    const q = serializeFilter(parsedFilter)
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    if (serialized) params.set('group', serialized)
-    const qs = params.toString()
-    router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
-  }, [parsedFilter, router, setCollapsedGroups])
+    router.replace(workspacesHref(serializeFilter(parsedFilter), engineFilter, serialized), { scroll: false })
+  }, [parsedFilter, engineFilter, router, setCollapsedGroups])
 
   // Group by dropdown — same outside-click + Escape pattern as Status/Label.
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
@@ -681,13 +681,7 @@ function WorkspacesPageInner() {
     if (lastSyncedQueryRef.current === syncKey) return
     const timer = setTimeout(() => {
       lastSyncedQueryRef.current = syncKey
-      const params = new URLSearchParams()
-      if (serialized) params.set('q', serialized)
-      if (engineFilter) params.set('engine', engineFilter)
-      const groupSerialized = serializeGroupParam(groupMode)
-      if (groupSerialized) params.set('group', groupSerialized)
-      const qs = params.toString()
-      router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
+      router.replace(workspacesHref(serialized, engineFilter, serializeGroupParam(groupMode)), { scroll: false })
     }, 250)
     return () => clearTimeout(timer)
   }, [parsedFilter, engineFilter, groupMode, router])
@@ -698,10 +692,7 @@ function WorkspacesPageInner() {
       : workspaces
     if (parsedFilter.terms.length === 0) return byEngine
     return byEngine.filter(ws => {
-      // Status terms need the resolved status; pass it conditionally so
-      // workspaces without a status (— display) don't accidentally match
-      // an empty `status:` predicate.
-      return matchWorkspace(ws, parsedFilter, resolveStatus(ws).def?.filter ?? undefined)
+      return matchWorkspace(ws, parsedFilter, runStatusOf(ws))
     })
   }, [workspaces, parsedFilter, engineFilter])
 
@@ -775,8 +766,7 @@ function WorkspacesPageInner() {
 
   type WsSortKey = 'name' | 'mode' | 'pool' | 'resources' | 'status' | 'created'
 
-  // resolveStatus + WORKSPACE_STATUSES are imported from workspace-status.ts
-  // — single source of truth for both the row pill and the filter dropdown.
+  // The row pill reads `resolveStatus`; the Status dropdown and `status:` read `RUN_STATUSES`.
 
   // Per-status counts on the unfiltered workspace list, memoised so the
   // dropdown render is a constant lookup. Recomputes only when the
@@ -784,7 +774,7 @@ function WorkspacesPageInner() {
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const ws of workspaces) {
-      const f = resolveStatus(ws).def?.filter
+      const f = runStatusOf(ws)
       if (f) counts[f] = (counts[f] || 0) + 1
     }
     return counts
@@ -2200,8 +2190,8 @@ function WorkspacesPageInner() {
           const locked = workspaces.filter(ws => ws.attributes.locked).length
           // Each dropdown's badge counts only its own terms, so it never shows a
           // number with no matching checked row inside.
-          const activeStatusCount = parsedFilter.terms.filter(t => t.kind === 'status').length
-          const activeFlagCount = parsedFilter.terms.filter(t => t.kind === 'flag').length
+          const activeStatusCount = countOfferedTerms(parsedFilter, 'status', RUN_STATUSES.map(s => s.filter))
+          const activeFlagCount = countOfferedTerms(parsedFilter, 'flag', FLAG_VALUES)
           const healthLabel = healthFilterActive
             ? t('stats.clearHealthFilter')
             : t('stats.filterHealth')
@@ -2350,7 +2340,7 @@ function WorkspacesPageInner() {
                   >
                     <span>{t('filter.status')}</span>
                     {activeStatusCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                      <span data-testid="ws-status-count" className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                         {activeStatusCount}
                       </span>
                     )}
@@ -2411,7 +2401,7 @@ function WorkspacesPageInner() {
                   >
                     <span>{t('filter.flags')}</span>
                     {activeFlagCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                      <span data-testid="ws-flags-count" className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                         {activeFlagCount}
                       </span>
                     )}

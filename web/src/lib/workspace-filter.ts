@@ -1,10 +1,13 @@
 // Pure helpers for the workspace-list filter input.
 //
 // The input is a single text box that mixes name substrings, label predicates,
-// and status predicates separated by whitespace. Each token is either:
+// and status, flag and lock predicates separated by whitespace. Each token is
+// either:
 //
 //   - bare word          → name substring match (case-insensitive)
-//   - "status:value"     → status predicate (resolved-status exact match)
+//   - "status:value"     → the latest run's own status, exact match
+//   - "flag:value"       → a health condition (see below)
+//   - "locked:true|false" → the manual state lock
 //   - "key:value"        → label predicate (case-sensitive exact match)
 //   - "key=value"        → same as key:value
 //   - "key:" / "key="    → label key-only predicate (any value, including empty)
@@ -24,21 +27,11 @@
 //   - Everything else intersects: name terms, label terms (so `env:prod
 //     env:staging` still matches nothing), and each group against the others.
 //
-// Why `status:` used to carry `locked` and `unhealthy` and no longer does.
-// Both rode the already-reserved `status` key because reserving a new key takes
-// the word away from every operator using it as a label. The cost was that
-// `status:` stopped being one mutually exclusive set, so "two values of one
-// field" was not safe to treat as a union: `status:locked status:errored` meant
-// locked AND errored. They are `locked:true` and the `flag:` terms now, `flag`
-// and `locked` are reserved label keys (see RESERVED_LABEL_KEYS), and `status:`
-// has thirteen values, one per workspace.
+// The old `status:locked`, `status:unhealthy` and workspace-level spellings are
+// carried onto `locked:` and `flag:` on load by `migrateLegacyFilter`.
 //
-// `flag:` is matched against the `health-conditions` array rather than against
-// `resolveStatus`, which is the authoritative source. `resolveStatus` ranks
-// `needs-confirm` above every workspace-level signal, so a diverged workspace
-// awaiting confirmation shows `needs-confirm` and a status-based filter would
-// miss it; it also treats `drift-status: drifted` as drifted without checking
-// that drift detection is enabled, which the condition does.
+// `flag:` reads the server's `health-conditions`, not the pill, which hides a
+// condition behind `needs-confirm` and shows drift without checking detection.
 //
 // `status`, `flag` and `locked` are the keys THIS PARSER special-cases, so a
 // literal label of any of those names would make the filter ambiguous; all three
@@ -47,6 +40,8 @@
 // but for an unrelated reason (it maps to `owner_email`, which grants workspace
 // admin); it parses here as an ordinary label term. See `docs/rbac.md`
 // § Reserved label keys.
+
+import { RUN_STATUSES } from './workspace-status.ts'
 
 export interface NameTerm {
   kind: 'name'
@@ -91,7 +86,8 @@ export const FLAG_CODES: readonly string[] = [
 /** `state_diverged` -> `state-diverged`. */
 export const flagValueForCode = (code: string): string => code.replaceAll('_', '-')
 
-/** The `flag:` values, in the order the server defines the conditions. */
+/** The `flag:` values, in `FLAG_CODES` order: how the Flags dropdown and the
+ *  Health Issues expansion list them. */
 export const FLAG_VALUES: readonly string[] = FLAG_CODES.map(flagValueForCode)
 
 export type FilterTerm = NameTerm | LabelTerm | StatusTerm | FlagTerm | LockedTerm
@@ -101,6 +97,8 @@ export interface ParsedFilter {
 }
 
 const SEPARATOR = /[:=]/
+
+const RUN_STATUS_VALUES: ReadonlySet<string> = new Set(RUN_STATUSES.map(s => s.filter))
 
 export function parseFilterQuery(input: string): ParsedFilter {
   const terms: FilterTerm[] = []
@@ -125,6 +123,56 @@ export function parseFilterQuery(input: string): ParsedFilter {
     terms.push({ kind: 'label', key, value: rest === '' ? null : rest })
   }
   return { terms }
+}
+
+// Spellings `status:` used to accept, and the terms that now carry them.
+const LEGACY_STATUS_TERMS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['locked', ['locked:true']],
+  ['unhealthy', FLAG_VALUES.map(v => `flag:${v}`)],
+  ['drifted', ['flag:drifted']],
+  ['state-diverged', ['flag:state-diverged']],
+  ['vcs-error', ['flag:vcs-error']],
+])
+
+const termKey = (t: FilterTerm): string | null =>
+  t.kind === 'flag' || t.kind === 'locked' ? `${t.kind}:${t.value}` : null
+
+/** Rewrite the removed `status:` spellings into `locked:` and `flag:` terms,
+ *  keeping other tokens and terms already present; returns `text` if none. */
+export function migrateLegacyFilter(text: string): string {
+  const parts = text.split(/(\s+)/) // tokens at even indices, whitespace between
+  const have = new Set<string>()
+  for (const t of parseFilterQuery(text).terms) {
+    const k = termKey(t)
+    if (k) have.add(k)
+  }
+  let changed = false
+  for (let i = 0; i < parts.length; i += 2) {
+    const token = parts[i]
+    const sep = token.search(SEPARATOR)
+    if (sep < 0 || token.slice(0, sep) !== 'status') continue
+    const replacement = LEGACY_STATUS_TERMS.get(token.slice(sep + 1))
+    if (!replacement) continue
+    const fresh = replacement.filter(k => !have.has(k))
+    fresh.forEach(k => have.add(k))
+    changed = true
+    if (fresh.length > 0) {
+      parts[i] = fresh.join(' ')
+    } else {
+      parts[i] = ''
+      if (i + 1 < parts.length) parts[i + 1] = ''
+      else {
+        // Last token: drop the nearest whitespace still left before it.
+        for (let j = i - 1; j > 0; j -= 2) {
+          if (parts[j] !== '') {
+            parts[j] = ''
+            break
+          }
+        }
+      }
+    }
+  }
+  return changed ? parts.join('') : text
 }
 
 export function serializeFilter(parsed: ParsedFilter): string {
@@ -216,6 +264,20 @@ export function toggleLabelTerm(parsed: ParsedFilter, key: string, value: string
   return { terms: [...parsed.terms, { kind: 'label', key, value }] }
 }
 
+/** How many DISTINCT values of `kind` the filter holds that `offered` lists:
+ *  what a dropdown ticks, so its badge never counts a term with no row. */
+export function countOfferedTerms(
+  parsed: ParsedFilter,
+  kind: 'status' | 'flag',
+  offered: readonly string[],
+): number {
+  const seen = new Set<string>()
+  for (const t of parsed.terms) {
+    if (t.kind === kind && offered.includes(t.value)) seen.add(t.value)
+  }
+  return seen.size
+}
+
 export interface MatchableWorkspace {
   attributes: {
     name: string
@@ -237,17 +299,12 @@ function conditionCodes(ws: MatchableWorkspace): Set<string> {
   return out
 }
 
-/**
- * @param resolvedStatus  Caller-resolved status string for this workspace
- *   (e.g. "errored", "needs-confirm"). Only consulted when the filter
- *   contains `status:` terms; safe to omit otherwise. The page resolves it
- *   from `latest-run` + drift / divergence / VCS-error signals via the
- *   `resolveStatus` helper, so this module stays UI-agnostic.
- */
+/** @param runStatus  The latest run's own status (`runStatusOf`), not the pill's;
+ *  only `status:` terms read it, and undefined (no run) matches none. */
 export function matchWorkspace(
   ws: MatchableWorkspace,
   parsed: ParsedFilter,
-  resolvedStatus?: string,
+  runStatus?: string,
 ): boolean {
   const name = ws.attributes.name.toLowerCase()
   const labels = ws.attributes.labels || {}
@@ -273,10 +330,15 @@ export function matchWorkspace(
     }
   }
 
-  // The two dropdown groups union within themselves and intersect with the rest.
-  if (statuses.length > 0 && !statuses.some(v => v === resolvedStatus)) return false
+  // The two dropdown groups union within themselves and intersect with the rest;
+  // an unrecognised value in either matches nothing rather than dropping out.
+  if (statuses.length > 0) {
+    if (statuses.some(v => !RUN_STATUS_VALUES.has(v))) return false
+    if (!statuses.some(v => v === runStatus)) return false
+  }
   if (flags.length > 0) {
     const codes = conditionCodes(ws)
+    if (flags.some(v => !FLAG_VALUES.includes(v))) return false
     if (!flags.some(v => FLAG_CODES.some(c => flagValueForCode(c) === v && codes.has(c)))) return false
   }
   return true

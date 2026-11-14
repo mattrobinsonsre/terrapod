@@ -13,10 +13,14 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { RUN_STATUSES } from '../src/lib/workspace-status.ts'
 import {
   FLAG_CODES,
+  FLAG_VALUES,
+  countOfferedTerms,
   flagValueForCode,
   matchWorkspace,
+  migrateLegacyFilter,
   parseFilterQuery,
   serializeFilter,
   toggleFlagTerm,
@@ -58,6 +62,45 @@ describe('status terms union', () => {
     // Neither spelling is special any more, so each is just an unknown status.
     assert.equal(match('status:locked', ws('a', { locked: true }), 'applied'), false)
     assert.equal(match('status:unhealthy', ws('a', { conditions: ['drifted'] }), 'applied'), false)
+  })
+})
+
+describe('an unrecognised status value matches nothing', () => {
+  it('a typo next to a valid status does not widen to that status', () => {
+    assert.equal(match('status:erored status:applied', ws('a'), 'applied'), false)
+    assert.equal(match('status:applied status:erored', ws('a'), 'applied'), false)
+    assert.equal(match('status:erored', ws('a'), 'errored'), false)
+  })
+
+  it('the removed spellings are unknown values when typed by hand', () => {
+    assert.equal(match('status:locked status:applied', ws('a', { locked: true }), 'applied'), false)
+    assert.equal(match('status:unhealthy status:applied', ws('a', { conditions: ['drifted'] }), 'applied'), false)
+    assert.equal(match('status:drifted status:applied', ws('a', { conditions: ['drifted'] }), 'applied'), false)
+  })
+
+  it('every value the dropdown offers still matches', () => {
+    for (const s of RUN_STATUSES) assert.equal(match(`status:${s.filter}`, ws('a'), s.filter), true, s.filter)
+  })
+})
+
+describe('an unrecognised flag value matches nothing', () => {
+  it('a typo alone matches nothing, even on a workspace with a condition', () => {
+    assert.equal(match('flag:nope', ws('a', { conditions: ['drifted'] })), false)
+  })
+
+  it('a typo next to a valid flag does not drop out of the either-set', () => {
+    const drifted = ws('a', { conditions: ['drifted'] })
+    assert.equal(match('flag:nope flag:drifted', drifted), false)
+    assert.equal(match('flag:drifted flag:nope', drifted), false)
+  })
+
+  it('two valid flags still union', () => {
+    assert.equal(match('flag:drifted flag:vcs-error', ws('a', { conditions: ['vcs_error'] })), true)
+  })
+
+  it('every value in the flag list is recognised, and a removed spelling is not', () => {
+    for (const v of FLAG_VALUES) assert.equal(match(`flag:${v}`, ws('a', { conditions: [v.replaceAll('-', '_')] })), true, v)
+    assert.equal(match('flag:unhealthy', ws('a', { conditions: ['drifted'] })), false)
   })
 })
 
@@ -208,5 +251,124 @@ describe('toggle helpers', () => {
   it('toggleStatusTerm still works for a run status', () => {
     const on = toggleStatusTerm(parseFilterQuery(''), 'planned')
     assert.equal(serializeFilter(on), 'status:planned')
+  })
+})
+
+describe('migrateLegacyFilter', () => {
+  const allFlags = FLAG_VALUES.map(v => `flag:${v}`).join(' ')
+
+  it('rewrites each removed status spelling', () => {
+    assert.equal(migrateLegacyFilter('status:locked'), 'locked:true')
+    assert.equal(migrateLegacyFilter('status:unhealthy'), allFlags)
+    assert.equal(migrateLegacyFilter('status:drifted'), 'flag:drifted')
+    assert.equal(migrateLegacyFilter('status:state-diverged'), 'flag:state-diverged')
+    assert.equal(migrateLegacyFilter('status:vcs-error'), 'flag:vcs-error')
+  })
+
+  it('treats = like :', () => {
+    assert.equal(migrateLegacyFilter('status=locked'), 'locked:true')
+    assert.equal(migrateLegacyFilter('status=drifted'), 'flag:drifted')
+    assert.equal(migrateLegacyFilter('status=unhealthy'), allFlags)
+  })
+
+  it('keeps every other token exactly, in place', () => {
+    assert.equal(migrateLegacyFilter('env:prod status:unhealthy eu1'), `env:prod ${allFlags} eu1`)
+    assert.equal(migrateLegacyFilter('env=prod  status:locked\teu1'), 'env=prod  locked:true\teu1')
+    assert.equal(migrateLegacyFilter(' status:locked status:errored '), ' locked:true status:errored ')
+  })
+
+  it('returns the identical string when nothing is legacy', () => {
+    for (const q of [
+      '',
+      '   ',
+      'env=prod',
+      'env:prod  eu1 ',
+      'status:errored status:planned',
+      'locked:true flag:drifted',
+      'status:typo',
+      'status:',
+    ]) {
+      assert.equal(migrateLegacyFilter(q), q, JSON.stringify(q))
+    }
+  })
+
+  it('matches case and quoting the way the parser does', () => {
+    // The parser reads `status` and its values case-sensitively and has no quoting.
+    for (const q of ['Status:locked', 'status:Locked', 'STATUS:UNHEALTHY', '"status:locked"', 'status:locked,', 'status:locked:x', 'status:constructor', 'status:toString']) {
+      assert.equal(migrateLegacyFilter(q), q, q)
+    }
+  })
+
+  it('adds no term the filter already has', () => {
+    assert.equal(migrateLegacyFilter('status:locked locked:true'), 'locked:true')
+    assert.equal(migrateLegacyFilter('locked:true status:locked'), 'locked:true')
+    assert.equal(migrateLegacyFilter('locked=true status:locked eu1'), 'locked=true eu1')
+    assert.equal(migrateLegacyFilter('status:locked status:locked'), 'locked:true')
+    const others = FLAG_VALUES.filter(v => v !== 'drifted').map(v => `flag:${v}`).join(' ')
+    assert.equal(migrateLegacyFilter('status:unhealthy flag:drifted'), `${others} flag:drifted`)
+    assert.equal(migrateLegacyFilter('status:drifted flag=drifted'), 'flag=drifted')
+    assert.equal(migrateLegacyFilter('status:drifted status:unhealthy'), `flag:drifted ${others}`)
+  })
+
+  it('leaves no stray whitespace when a term is dropped as a duplicate', () => {
+    assert.equal(migrateLegacyFilter('locked:true status:locked status:locked'), 'locked:true')
+    assert.equal(migrateLegacyFilter('locked:true status:locked'), 'locked:true')
+    assert.equal(migrateLegacyFilter('eu1 locked:true status:locked'), 'eu1 locked:true')
+    assert.equal(migrateLegacyFilter('status:locked locked:true eu1'), 'locked:true eu1')
+    assert.equal(migrateLegacyFilter('eu1  status:locked locked:true  '), 'eu1  locked:true  ')
+  })
+
+  it('keeps status:locked status:errored meaning locked AND errored', () => {
+    const q = migrateLegacyFilter('status:locked status:errored')
+    assert.equal(q, 'locked:true status:errored')
+    const parsed = parseFilterQuery(q)
+    assert.equal(matchWorkspace(ws('a', { locked: true }), parsed, 'errored'), true)
+    assert.equal(matchWorkspace(ws('a', { locked: false }), parsed, 'errored'), false)
+    assert.equal(matchWorkspace(ws('a', { locked: true }), parsed, 'applied'), false)
+  })
+
+  it('keeps status:unhealthy status:errored meaning unhealthy AND errored', () => {
+    const q = migrateLegacyFilter('status:unhealthy status:errored')
+    assert.equal(q, `${allFlags} status:errored`)
+    const parsed = parseFilterQuery(q)
+    for (const code of FLAG_CODES) {
+      assert.equal(matchWorkspace(ws('a', { conditions: [code] }), parsed, 'errored'), true, code)
+    }
+    assert.equal(matchWorkspace(ws('a'), parsed, 'errored'), false)
+    assert.equal(matchWorkspace(ws('a', { conditions: ['drifted'] }), parsed, 'applied'), false)
+  })
+
+  it('maps status:drifted onto the server condition, not the badge', () => {
+    const parsed = parseFilterQuery(migrateLegacyFilter('status:drifted'))
+    assert.equal(matchWorkspace(ws('a', { conditions: ['drifted'] }), parsed, 'needs-confirm'), true)
+    assert.equal(matchWorkspace(ws('a'), parsed, 'applied'), false)
+  })
+})
+
+describe('countOfferedTerms', () => {
+  const statuses = RUN_STATUSES.map(s => s.filter)
+  const count = (q: string, kind: 'status' | 'flag') =>
+    countOfferedTerms(parseFilterQuery(q), kind, kind === 'status' ? statuses : FLAG_VALUES)
+
+  it('counts distinct offered values, not every term', () => {
+    assert.equal(count('status:errored status:typo status:errored', 'status'), 1)
+    assert.equal(count('flag:drifted flag:nope', 'flag'), 1)
+    assert.equal(count('flag:drifted flag=drifted', 'flag'), 1)
+  })
+
+  it('counts only terms of its own kind', () => {
+    assert.equal(count('status:errored flag:drifted locked:true env:prod', 'status'), 1)
+    assert.equal(count('status:errored flag:drifted locked:true env:prod', 'flag'), 1)
+  })
+
+  it('is 0 for an empty filter, and for a legacy spelling the dropdown no longer offers', () => {
+    assert.equal(count('', 'status'), 0)
+    assert.equal(count('', 'flag'), 0)
+    assert.equal(count('status:locked status:drifted', 'status'), 0)
+  })
+
+  it('counts all seven flags when every one is ticked', () => {
+    assert.equal(FLAG_VALUES.length, 7)
+    assert.equal(count(FLAG_VALUES.map(v => `flag:${v}`).join(' '), 'flag'), 7)
   })
 })

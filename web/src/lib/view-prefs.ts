@@ -47,6 +47,16 @@ export function usableEngine(engine: string, offered: readonly string[]): string
   return offered.length > 1 && offered.includes(engine) ? engine : ''
 }
 
+// The list's address for a filter, engine and grouping; empty parts are left out.
+export function workspacesHref(q: string, engine: string, group: string | null): string {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (engine) params.set('engine', engine)
+  if (group) params.set('group', group)
+  const qs = params.toString()
+  return qs ? `/workspaces?${qs}` : '/workspaces'
+}
+
 export interface SortPref<K extends string> {
   key: K
   direction: 'asc' | 'desc'
