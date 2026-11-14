@@ -282,6 +282,60 @@ class TestOneCommentHasOneBudget:
         fits = out[out.index("ws-fits</code>") :].split("</details>")[0]
         assert "aws_instance.srv_0" in fits and "see the run" not in fits
 
+    def test_noop_rows_carrying_a_gate_do_not_take_the_busy_rows_share(self):
+        busy = _big_list()
+        first = busy["entries"][0]["address"]
+        gate = (GateVerdict("policy", "guardrails", True, "mandatory"),)
+        for n_noop in (0, 2):
+            rows = [_row(name="ws-busy", resource_list=busy)] + [
+                _row(
+                    name=f"ws-noop-{i}",
+                    resource_list={"entries": [], "omitted": 0},
+                    gates=gate,
+                )
+                for i in range(n_noop)
+            ]
+            out = render_comment(rows)
+            assert first in out, n_noop
+            assert "see the run" not in out, n_noop
+
+    def test_noop_rows_before_the_busy_row_do_not_take_its_share_either(self):
+        busy = _big_list()
+        first = busy["entries"][0]["address"]
+        gate = (GateVerdict("policy", "guardrails", True, "mandatory"),)
+        rows = [
+            _row(name=f"ws-noop-{i}", resource_list={"entries": [], "omitted": 0}, gates=gate)
+            for i in range(3)
+        ] + [_row(name="ws-busy", resource_list=busy)]
+        out = render_comment(rows)
+        assert first in out
+        assert "see the run" not in out
+        assert len(out) <= COMMENT_MAX_CHARS
+
+    def test_the_list_never_pushes_the_comment_past_the_budget(self):
+        for n in (10, 100, 300):
+            bare = render_comment([_row(name=f"ws-{i}") for i in range(n)])
+            assert len(bare) <= COMMENT_MAX_CHARS, f"n={n} cannot fit even without lists"
+            rows = [_row(name=f"ws-{i}", resource_list=_big_list()) for i in range(n)]
+            out = render_comment(rows)
+            assert len(out) <= COMMENT_MAX_CHARS, f"n={n}: {len(out)}"
+            assert len(out) <= 65_536
+            for i in range(n):
+                assert f"`ws-{i}`" in out, f"n={n}: workspace {i} lost its table row"
+
+    def test_the_gate_blocks_stay_when_the_lists_are_dropped_for_the_budget(self):
+        gate = (GateVerdict("policy", "guardrails", False, "mandatory"),)
+        n = 100
+        bare = render_comment([_row(name=f"ws-{i}", gates=gate) for i in range(n)])
+        assert len(bare) <= COMMENT_MAX_CHARS
+        rows = [_row(name=f"ws-{i}", resource_list=_big_list(), gates=gate) for i in range(n)]
+        out = render_comment(rows)
+        assert len(out) <= COMMENT_MAX_CHARS
+        assert len(out) <= 65_536
+        for i in range(n):
+            section = out[out.index(f"<code>ws-{i}</code>") :].split("</details>")[0]
+            assert "guardrails" in section, f"workspace {i} lost its gate block"
+
     def test_realistic_plans_are_not_degraded(self):
         """40 workspaces of 5 small resources, or 5 of 10, are ordinary PRs."""
         for n_ws, n_ent, attrs in [(40, 5, 2), (5, 10, 3), (1, 25, 8)]:
