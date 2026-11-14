@@ -668,11 +668,11 @@ def render_comment(rows: list[_Row]) -> str:
     if len(pending_apply) == 1:
         tail = ["", f"Comment `terrapod apply` to apply `{_escape(pending_apply[0])}`."]
     elif pending_apply:
-        tail = [
-            "",
+        hint = (
             "Comment `terrapod apply` to apply all pending workspaces, "
-            "or `terrapod apply -W <workspace>` for one at a time.",
-        ]
+            "or `terrapod apply -W <workspace>` for one at a time."
+        )
+        tail = ["", hint]
     # Staleness signal, in the format `vcs_status_dispatcher` already uses on
     # its sibling comment. It carries more weight here: this comment is edited
     # as three separate runner uploads land, and every refresh is best-effort
