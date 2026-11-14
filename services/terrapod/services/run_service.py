@@ -979,6 +979,28 @@ def is_discardable_hold(run: Run) -> bool:
     return is_held_at_gate(run) and not run.plan_only
 
 
+@dataclass(frozen=True)
+class RunActions:
+    """What can be done to a run right now. See `run_actions`."""
+
+    confirmable: bool
+    discardable: bool
+    cancelable: bool
+    retryable: bool
+
+
+def run_actions(run: Run) -> RunActions:
+    """What a run offers right now: the one producer behind `_run_json` and `latest-run`."""
+    # Keyed on the resolved mode, not `Run.auto_apply`, which is set for every non-`never` mode.
+    applicable = run.status == "planned" and not run.plan_only and run.has_changes is not False
+    return RunActions(
+        confirmable=applicable and resolve_auto_apply_mode(run) != "always",
+        discardable=applicable or is_discardable_hold(run),
+        cancelable=run.status in CANCELABLE_STATES,
+        retryable=run.status in TERMINAL_STATES or (run.plan_only and run.status == "planned"),
+    )
+
+
 # Terraform Enterprise's statuses for a run stopped after its plan (#1704).
 # Terrapod stores such a run as `planning`; these are only ever reported, to a
 # client that asked for them, never written to the database.

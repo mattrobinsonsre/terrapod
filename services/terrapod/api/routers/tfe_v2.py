@@ -948,11 +948,20 @@ def _workspace_json(
 
     latest_run_attr = None
     if latest_run is not None:
+        acts = run_service.run_actions(latest_run)
         latest_run_attr = {
             "id": f"run-{latest_run.id}",
             "status": latest_run.status,
             "plan-only": latest_run.plan_only,
             "created-at": _rfc3339(latest_run.created_at),
+            "run-kind": run_service.run_kind(latest_run),
+            # The run document's own `actions`, so a client need not re-derive it.
+            "actions": {
+                "is-confirmable": acts.confirmable,
+                "is-discardable": acts.discardable,
+                "is-cancelable": acts.cancelable,
+                "is-retryable": acts.retryable,
+            },
             # The three PHASE-START times, so a status badge can link to the
             # view that explains the status it is showing (#2413 F16).
             #
