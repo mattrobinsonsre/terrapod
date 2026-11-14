@@ -379,6 +379,7 @@
   "storage.gcs.presigned_url_expiry_seconds",
   "storage.gcs.project_id",
   "storage.gcs.service_account_email",
+  "storage.locations",
   "storage.s3.bucket",
   "storage.s3.endpoint_url",
   "storage.s3.prefix",

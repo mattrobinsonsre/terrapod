@@ -286,6 +286,10 @@ api:
         presigned_url_expiry_seconds: 3600
         base_url: ""  # Auto-detected from ingress hostname if empty
 
+      # Named storage locations (s3 | azure | gcs), keyed by name; `default` is reserved.
+      # Takes effect once workspaces carry a storage location; empty = a single store.
+      locations: {}
+
     # Authentication
     auth:
       local_enabled: true
