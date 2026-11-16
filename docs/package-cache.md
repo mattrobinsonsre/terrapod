@@ -359,17 +359,43 @@ never sees the bytes a client is served:
   recorded digest to verify against. Nothing is repaired or evicted either way:
   what to do about a mismatch is yours to decide.
 
-### What an upload does not supply
+### Uploading an index document
 
-The artifact's **bytes**. For npm, Galaxy and NuGet a sealed node also needs the
-cached index document to advertise the version at all — npm's packument carries
-the dependency ranges and exists nowhere else — and an artifact upload does not
-supply one. Today those come from a warm, which needs egress, so plan on
-seeding the index documents before sealing even where every artifact is uploaded.
+An artifact upload supplies **bytes**, and for three of the six caches that is not
+enough to make the artifact reachable. A sealed node answers "what versions exist"
+from a cached index document and nowhere else, so a vetted artifact with no document
+beside it is present, recorded, and unresolvable — the install is told the package is
+not cached. npm is the clearest case: the dependency ranges live in the packument and
+in no other file.
 
-PyPI needs nothing extra: a sealed node builds the simple index from the
-artifacts it holds. Pulumi plugins are addressed by filename with no index at
-all.
+So each of those three takes a document too, at the same admin gate, with the same
+provenance and the same deliberate-replacement rule:
+
+| cache | route | form fields |
+|---|---|---|
+| npm | `POST /api/v1/admin/package-cache/npm/index` | `name`, `file` (the packument) |
+| Galaxy | `POST /api/v1/admin/package-cache/galaxy/index` | `namespace`, `name`, `document` (`collection` or `versions`), `file` |
+| NuGet | `POST /api/v1/admin/package-cache/nuget/index` | `package_id`, `file` |
+| Go | `POST /api/v1/admin/package-cache/go/index` | `module`, `document` (`list` or `latest`), `file` |
+
+Galaxy needs **two** — a sealed node reads the collection record and the version list
+from separate documents, so one without the other leaves half the path still
+answering 404.
+
+**Go is the one you may not need.** Its documents are required only to *discover* a
+version: `go get module` with no version, or `go list -m -versions`. A pinned
+`go mod download` asks for `.info`, `.mod` and `.zip` directly and never consults
+them, so a deployment that pins everything can skip it.
+
+A JSON document that does not parse is **refused at upload** rather than stored,
+because a sealed node parses it on every read — one that does not parse would fail
+every subsequent resolution rather than this one request. Go's `@v/list` is a
+newline-separated list rather than JSON and is correctly exempt.
+
+**PyPI and Pulumi need nothing extra.** PyPI builds its sealed simple index from the
+artifacts it holds, so an upload is advertised the moment it exists; Pulumi plugins
+are addressed by filename with no index at all. Neither has a route here, and that
+absence is deliberate rather than unfinished.
 
 **An uploaded artifact is not re-fetchable from anywhere.** For a sealed
 deployment that makes storage-layer replication of this cache's objects a

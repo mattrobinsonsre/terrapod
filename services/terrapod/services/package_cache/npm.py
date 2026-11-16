@@ -160,6 +160,29 @@ _NAME = re.compile(r"^(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+$")
 _VERSION = re.compile(r"^[0-9][A-Za-z0-9._+-]*$")
 
 
+def index_coordinates(name: str) -> Coordinates:
+    """Where an operator-uploaded PACKUMENT is served from.
+
+    Uploading the tarball is not enough for npm, and this is the gap that made it
+    not enough: a sealed node answers `/npm/{package}` from the cached packument and
+    nowhere else, because the dependency ranges live in it. Without one, a tarball an
+    operator uploaded is present, vetted, and unresolvable -- `npm install` gets a
+    404 saying the package is not cached.
+
+    PyPI needs no equivalent: its sealed index is built from the rows it holds, so an
+    uploaded artifact is advertised the moment it exists.
+    """
+    name = normalise(name or "")
+    if not _NAME.match(name) or ".." in name:
+        raise CoordinateError(f"name {name!r} is not an npm package name (`pkg` or `@scope/pkg`)")
+    return Coordinates(
+        name=name,
+        version="",
+        filename=PACKUMENT_FILENAME,
+        content_type="application/json",
+    )
+
+
 def upload_coordinates(name: str, version: str) -> Coordinates:
     """Where an operator-uploaded tarball is served from.
 

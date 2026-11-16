@@ -660,3 +660,154 @@ class TestTheVerifyRoute:
             resp = await c.post("/api/v1/admin/package-cache/nope/verify")
 
         assert resp.status_code == 404
+
+
+#: The index-document routes, with a form each ecosystem accepts. An artifact
+#: upload supplies BYTES; three of the six ecosystems answer "what versions
+#: exist" from a cached document and nowhere else, so without one a vetted
+#: artifact is present and unresolvable on the sealed node this feature exists
+#: for. Keyed by the ecosystem the route must pass to `admit`, as FORMS is.
+INDEX_FORMS: dict[str, tuple[str, dict[str, str]]] = {
+    "npm": ("/api/v1/admin/package-cache/npm/index", {"name": "@scope/pkg"}),
+    "nuget": ("/api/v1/admin/package-cache/nuget/index", {"package_id": "Newtonsoft.Json"}),
+    "go": (
+        "/api/v1/admin/package-cache/go/index",
+        {"module": "github.com/foo/bar", "document": "latest"},
+    ),
+    "galaxy": (
+        "/api/v1/admin/package-cache/galaxy/index",
+        {"namespace": "community", "name": "general", "document": "versions"},
+    ),
+}
+
+#: Where each index document must land. The filename is what the SEALED read asks
+#: for, so a document stored elsewhere is present and never found -- written out
+#: rather than read off `index_coordinates`, which would assert only that the
+#: function agrees with itself.
+EXPECTED_INDEX_KEY: dict[str, tuple[str, str]] = {
+    "npm": ("@scope/pkg", "packument.json"),
+    "nuget": ("newtonsoft.json", "index.json"),
+    "go": ("github.com/foo/bar", "@latest"),
+    "galaxy": ("community.general", "versions.json"),
+}
+
+INDEX_BODY = b'{"versions": {"1.3.0": {"dist": {"tarball": "x"}}}}'
+
+
+class TestIndexDocumentUploads:
+    """The upload that makes an uploaded ARTIFACT reachable.
+
+    A sealed node resolves npm from a cached packument, Galaxy from its two
+    collection documents and NuGet from a versions index. PyPI builds its sealed
+    index from the rows it holds and Pulumi plugins are filename-addressed, so
+    neither has a route here -- asserted in the coordinates tests rather than
+    assumed.
+    """
+
+    @pytest.mark.parametrize("ecosystem", sorted(INDEX_FORMS))
+    async def test_the_document_lands_where_the_sealed_read_looks(self, ecosystem: str) -> None:
+        path, fields = INDEX_FORMS[ecosystem]
+        app, _, _ = _make_app(user=_user())
+
+        with patch.object(uploads, "admit", new_callable=AsyncMock) as admit:
+            admit.return_value = uploads.Admission(record=_row())
+            resp = await _upload(app, path, fields, body=INDEX_BODY)
+
+        assert resp.status_code == 201, resp.text
+        assert admit.await_args.kwargs["ecosystem"] == ecosystem
+        coords = admit.await_args.kwargs["coordinates"]
+        assert (coords.name, coords.filename) == EXPECTED_INDEX_KEY[ecosystem], (
+            "stored at a key the sealed read does not ask for, so the document "
+            "would be present and never found"
+        )
+
+    @pytest.mark.parametrize("ecosystem", sorted(INDEX_FORMS))
+    async def test_an_unparseable_document_is_refused_rather_than_stored(
+        self, ecosystem: str
+    ) -> None:
+        """A sealed node PARSES these to answer what versions exist, so storing one
+        that does not parse would fail every read rather than this upload.
+
+        `go`'s `latest` is JSON like the others; its `list` is text and exempt, which
+        the next test covers.
+        """
+        path, fields = INDEX_FORMS[ecosystem]
+        app, _, store = _make_app(user=_user())
+
+        with patch.object(uploads, "admit", new_callable=AsyncMock) as admit:
+            resp = await _upload(app, path, fields, body=b"this is not json {")
+
+        assert resp.status_code == 422, resp.text
+        assert "not valid JSON" in resp.json()["detail"]
+        assert admit.await_count == 0, "refused after admitting it, so the bytes are stored"
+        assert store.put == [], "wrote the object despite refusing the upload"
+
+    async def test_gos_version_list_is_text_and_is_NOT_parsed_as_json(self) -> None:
+        """`@v/list` is newline-separated versions. Parsing it as JSON would refuse a
+        correct document, so the gate keys on the coordinates' own content type."""
+        app, _, _ = _make_app(user=_user())
+
+        with patch.object(uploads, "admit", new_callable=AsyncMock) as admit:
+            admit.return_value = uploads.Admission(record=_row())
+            resp = await _upload(
+                app,
+                "/api/v1/admin/package-cache/go/index",
+                {"module": "github.com/foo/bar", "document": "list"},
+                body=b"v1.0.0\nv1.2.3\n",
+            )
+
+        assert resp.status_code == 201, resp.text
+        assert admit.await_args.kwargs["coordinates"].content_type.startswith("text/plain")
+
+    async def test_an_artifact_upload_is_never_parsed_as_json(self) -> None:
+        """The gate is keyed on the content type the COORDINATES carry, not on the
+        route, so a tarball -- which is not JSON and must not be -- is unaffected."""
+        app, _, _ = _make_app(user=_user())
+
+        with patch.object(uploads, "admit", new_callable=AsyncMock) as admit:
+            admit.return_value = uploads.Admission(record=_row())
+            resp = await _upload(app, *FORMS["npm"], body=b"\x1f\x8b\x08 not json at all")
+
+        assert resp.status_code == 201, resp.text
+
+    @pytest.mark.parametrize("ecosystem", sorted(INDEX_FORMS))
+    async def test_a_non_admin_is_refused(self, ecosystem: str) -> None:
+        """Who may put bytes into what this deployment serves is a deployment-wide
+        trust assertion, so an index document is held to the same gate as an
+        artifact."""
+        path, fields = INDEX_FORMS[ecosystem]
+        app, _, store = _make_app(user=_user(email="dev@example.com", roles=["everyone"]))
+
+        with patch.object(uploads, "admit", new_callable=AsyncMock) as admit:
+            resp = await _upload(app, path, fields, body=INDEX_BODY)
+
+        assert resp.status_code == 403, resp.text
+        assert admit.await_count == 0
+        assert store.put == []
+
+    @pytest.mark.parametrize(
+        ("path", "fields"),
+        [
+            (
+                "/api/v1/admin/package-cache/galaxy/index",
+                {"namespace": "community", "name": "general", "document": "nope"},
+            ),
+            (
+                "/api/v1/admin/package-cache/go/index",
+                {"module": "github.com/foo/bar", "document": "nope"},
+            ),
+        ],
+    )
+    async def test_an_unknown_document_name_is_422_naming_the_valid_ones(
+        self, path: str, fields: dict[str, str]
+    ) -> None:
+        """422 rather than 404: the request is well-formed and the document is not one
+        this ecosystem has. A 404 would imply we had looked somewhere for it."""
+        app, _, _ = _make_app(user=_user())
+
+        with patch.object(uploads, "admit", new_callable=AsyncMock):
+            resp = await _upload(app, path, fields, body=INDEX_BODY)
+
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "is not a" in detail and "valid values are" in detail, detail

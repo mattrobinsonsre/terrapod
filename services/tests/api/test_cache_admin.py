@@ -49,6 +49,15 @@ ROUTES: tuple[tuple[str, str], ...] = (
     # below -- which is what the two loops in `TestTheAdminGate` assert for each
     # of them in turn.
     ("POST", "/api/v1/admin/package-cache/pypi/artifacts"),
+    # Index documents (#2599). An artifact upload supplies BYTES; three of the six
+    # ecosystems answer "what versions exist" from a cached document and nowhere
+    # else, so without one a vetted artifact is present and unresolvable on the
+    # sealed node the feature exists for. PyPI builds its sealed index from rows and
+    # Pulumi is filename-addressed, so neither has one.
+    ("POST", "/api/v1/admin/package-cache/npm/index"),
+    ("POST", "/api/v1/admin/package-cache/nuget/index"),
+    ("POST", "/api/v1/admin/package-cache/go/index"),
+    ("POST", "/api/v1/admin/package-cache/galaxy/index"),
     ("POST", "/api/v1/admin/package-cache/npm/artifacts"),
     ("POST", "/api/v1/admin/package-cache/nuget/artifacts"),
     ("POST", "/api/v1/admin/package-cache/go/artifacts"),

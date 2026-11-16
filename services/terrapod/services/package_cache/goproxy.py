@@ -138,6 +138,41 @@ def artifact_for(module: str, version: str, suffix: str, *, base: str | None = N
     )
 
 
+#: The documents an operator may upload. `@v/list` is what `go list -m -versions`
+#: and an unpinned `go get` read; `@latest` is what `go get module` with no version
+#: resolves through.
+INDEX_DOCUMENTS = {"list": LIST_DOC, "latest": LATEST_DOC}
+
+
+def index_coordinates(module: str, document: str) -> Coordinates:
+    """Where an operator-uploaded module index document is served from.
+
+    Unlike the other three this is not required for a PINNED install: `go mod
+    download` of an exact version asks for `.info`/`.mod`/`.zip` directly and never
+    consults the list. It is required for anything that has to DISCOVER a version --
+    `go get module` with no version, or `go list -m -versions`.
+
+    Served as `text/plain` for `@v/list`, which is a newline-separated list rather
+    than JSON, and as JSON for `@latest`.
+    """
+    name = cache_name(module or "")
+    if not valid_module(module or ""):
+        raise CoordinateError(f"module {module!r} is not a module path the proxy addresses")
+    key = (document or "").strip().lower()
+    filename = INDEX_DOCUMENTS.get(key)
+    if filename is None:
+        raise CoordinateError(
+            f"document {document!r} is not a module index document; "
+            f"valid values are {', '.join(sorted(INDEX_DOCUMENTS))}"
+        )
+    return Coordinates(
+        name=name,
+        version="",
+        filename=filename,
+        content_type="text/plain; charset=UTF-8" if key == "list" else "application/json",
+    )
+
+
 def upload_coordinates(module: str, version: str, suffix: str) -> Coordinates:
     """Where one operator-uploaded module file is served from.
 

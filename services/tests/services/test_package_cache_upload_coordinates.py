@@ -234,3 +234,124 @@ class TestConveniencesThatMustNotChangeTheKey:
 
     def test_nuget_lowercases_the_id_the_way_the_protocol_addresses_it(self) -> None:
         assert nuget.upload_coordinates("Newtonsoft.Json", "13.0.3").name == "newtonsoft.json"
+
+
+class TestIndexDocumentCoordinates:
+    """An artifact upload supplies BYTES; three ecosystems need a document too.
+
+    A sealed node answers "what versions exist" from a cached index document and
+    nowhere else, so without one a vetted artifact is present, recorded, and
+    unresolvable -- the install is told the package is not cached. These coordinates
+    are what an operator-supplied document is stored under, and the property that
+    matters is that they are the SAME key the serve path reads back.
+    """
+
+    def test_npm_matches_the_filename_the_sealed_packument_read_uses(self):
+        from terrapod.services.package_cache import npm
+
+        c = npm.index_coordinates("@scope/pkg")
+        assert c.filename == npm.PACKUMENT_FILENAME, (
+            "stored under a filename the sealed read does not ask for, so the "
+            "document would be present and never found"
+        )
+        assert c.name == npm.normalise("@scope/pkg")
+        assert c.content_type == "application/json"
+
+    def test_galaxy_covers_BOTH_documents_a_sealed_node_reads(self):
+        """Two documents, so this one names which -- and both must be reachable or
+        half the sealed collection path still 404s."""
+        from terrapod.services.package_cache import galaxy
+
+        collection = galaxy.index_coordinates("community", "aws", "collection")
+        versions = galaxy.index_coordinates("community", "aws", "versions")
+        assert collection.filename == galaxy.COLLECTION_DOC
+        assert versions.filename == galaxy.VERSIONS_DOC
+        # Same collection key as the fetch path, or the documents land beside the
+        # artifacts rather than with them.
+        assert collection.name == versions.name == galaxy.collection_key("community", "aws")
+
+    def test_nuget_normalises_case_the_way_the_serve_path_does(self):
+        """NuGet addresses packages case-insensitively and the serve path lowercases
+        before reading, so a document stored under the given case is one no restore
+        ever asks for."""
+        from terrapod.services.package_cache import nuget
+
+        c = nuget.index_coordinates("Newtonsoft.Json")
+        assert c.name == "newtonsoft.json"
+        assert c.filename == nuget.VERSIONS_DOC
+
+    def test_go_serves_the_version_list_as_TEXT_not_json(self):
+        """`@v/list` is newline-separated versions, not JSON. Serving it as JSON
+        would be wrong, and -- because the upload route's JSON gate keys on the
+        content type -- would also refuse a correct document."""
+        from terrapod.services.package_cache import goproxy
+
+        listing = goproxy.index_coordinates("example.com/m", "list")
+        latest = goproxy.index_coordinates("example.com/m", "latest")
+        assert listing.filename == goproxy.LIST_DOC
+        assert listing.content_type.startswith("text/plain")
+        assert latest.filename == goproxy.LATEST_DOC
+        assert latest.content_type == "application/json"
+
+    @pytest.mark.parametrize(
+        "call",
+        [
+            pytest.param(
+                lambda: __import__(
+                    "terrapod.services.package_cache.galaxy", fromlist=["x"]
+                ).index_coordinates("a", "b", "nope"),
+                id="galaxy-unknown-document",
+            ),
+            pytest.param(
+                lambda: __import__(
+                    "terrapod.services.package_cache.goproxy", fromlist=["x"]
+                ).index_coordinates("example.com/m", "nope"),
+                id="go-unknown-document",
+            ),
+            pytest.param(
+                lambda: __import__(
+                    "terrapod.services.package_cache.nuget", fromlist=["x"]
+                ).index_coordinates("../etc/passwd"),
+                id="nuget-traversal",
+            ),
+            pytest.param(
+                lambda: __import__(
+                    "terrapod.services.package_cache.npm", fromlist=["x"]
+                ).index_coordinates("../etc/passwd"),
+                id="npm-traversal",
+            ),
+        ],
+    )
+    def test_coordinates_it_cannot_address_are_refused(self, call):
+        """Refused by the module's own validator, not by a central one -- the naming
+        rules already live per ecosystem and a second copy is how they diverge."""
+        from terrapod.services.package_cache.substrate import CoordinateError
+
+        with pytest.raises(CoordinateError):
+            call()
+
+    def test_the_ecosystems_WITHOUT_an_index_upload_do_not_offer_one(self):
+        """PyPI builds its sealed index from the rows it holds and Pulumi plugins are
+        filename-addressed, so neither needs a document -- and offering one would
+        imply a sealed read that consults it, which there is none of.
+
+        Derived rather than listed: a future module gaining `index_coordinates`
+        should be a deliberate act, and this is where it is noticed.
+        """
+        from terrapod.services.package_cache import (
+            galaxy,
+            goproxy,
+            npm,
+            nuget,
+            pulumi_plugins,
+            pypi,
+        )
+
+        have = {
+            m.ECOSYSTEM for m in (npm, galaxy, nuget, goproxy) if hasattr(m, "index_coordinates")
+        }
+        havent = {
+            m.ECOSYSTEM for m in (pypi, pulumi_plugins) if not hasattr(m, "index_coordinates")
+        }
+        assert have == {"npm", "galaxy", "nuget", "go"}, have
+        assert havent == {"pypi", "pulumi"}, havent

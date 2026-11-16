@@ -263,6 +263,32 @@ def artifact_for(namespace: str, name: str, version: str, detail: dict) -> Artif
     )
 
 
+#: The index documents an operator may upload, and the only ones a sealed node reads
+#: back for a collection. `version-{version}.json` is deliberately absent: it is
+#: keyed per version and `galaxy.version_doc` derives it, so it is uploaded by naming
+#: the version rather than by naming a document.
+INDEX_DOCUMENTS = {"collection": COLLECTION_DOC, "versions": VERSIONS_DOC}
+
+
+def index_coordinates(namespace: str, name: str, document: str) -> Coordinates:
+    """Where an operator-uploaded collection index document is served from.
+
+    Galaxy needs TWO, which is why this takes a document name where npm's does not:
+    a sealed node answers the collection record from `collection.json` and the
+    version list from `versions.json`, each from its own cached document. An
+    uploaded collection tarball with neither is present and unresolvable --
+    `ansible-galaxy install` is told the collection is not cached.
+    """
+    key = collection_key(namespace, name)
+    filename = INDEX_DOCUMENTS.get((document or "").strip().lower())
+    if filename is None:
+        raise CoordinateError(
+            f"document {document!r} is not a collection index document; "
+            f"valid values are {', '.join(sorted(INDEX_DOCUMENTS))}"
+        )
+    return Coordinates(name=key, version="", filename=filename, content_type="application/json")
+
+
 def upload_coordinates(namespace: str, name: str, version: str) -> Coordinates:
     """Where an operator-uploaded collection tarball is served from.
 

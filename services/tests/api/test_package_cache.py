@@ -496,6 +496,27 @@ class TestAuthenticationIsRequired:
             "/api/v1/admin/package-cache/pypi/artifacts",
             None,
         ),
+        # Index documents (#2599) -- the same auth gate as the artifact routes.
+        "/api/v1/admin/package-cache/npm/index": (
+            "POST",
+            "/api/v1/admin/package-cache/npm/index",
+            None,
+        ),
+        "/api/v1/admin/package-cache/nuget/index": (
+            "POST",
+            "/api/v1/admin/package-cache/nuget/index",
+            None,
+        ),
+        "/api/v1/admin/package-cache/go/index": (
+            "POST",
+            "/api/v1/admin/package-cache/go/index",
+            None,
+        ),
+        "/api/v1/admin/package-cache/galaxy/index": (
+            "POST",
+            "/api/v1/admin/package-cache/galaxy/index",
+            None,
+        ),
         "/api/v1/admin/package-cache/npm/artifacts": (
             "POST",
             "/api/v1/admin/package-cache/npm/artifacts",

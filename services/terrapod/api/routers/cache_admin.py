@@ -420,6 +420,35 @@ async def evict_package_cache(
 # somewhere to put a PyPI artifact it would never serve.
 
 
+async def _refuse_unparseable_json(tmp_path: str) -> None:
+    """Refuse an index document that is not JSON, naming the parse error.
+
+    Read in full rather than streamed: these are index documents, bounded by what a
+    registry publishes for one package, where the artifacts this module also admits
+    are not. `json.loads` on a multi-megabyte packument is still well inside what
+    rule 13 tolerates for an async handler, but it is run in a thread for the same
+    reason the digest is.
+    """
+    import asyncio
+    import json
+
+    def _parse() -> None:
+        with open(tmp_path, "rb") as fh:
+            json.loads(fh.read())
+
+    try:
+        await asyncio.to_thread(_parse)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"The index document is not valid JSON ({exc}). A sealed node PARSES "
+                "this to answer what versions exist, so one that does not parse would "
+                "fail every read rather than this upload."
+            ),
+        ) from exc
+
+
 async def _upload_artifact(
     *,
     ecosystem: str,
@@ -463,6 +492,13 @@ async def _upload_artifact(
                     "the coordinates are the other form fields."
                 ),
             )
+        if coordinates.content_type == "application/json":
+            # An index document is PARSED by the serve path, so one that does not
+            # parse is a 500 on every subsequent read rather than a bad upload. The
+            # check is keyed on the coordinates' own content type so an artifact
+            # upload -- a tarball, a wheel, a nupkg -- is never parsed as JSON, and
+            # go's `@v/list` is text and correctly exempt.
+            await _refuse_unparseable_json(tmp_path)
         try:
             admission = await uploads.admit(
                 db,
@@ -915,4 +951,135 @@ async def evict_vcs_archive_cache(
             "next-cursor": result.cursor,
             **_sealed_note(),
         }
+    )
+
+
+# ── Index documents ───────────────────────────────────────────────────
+#
+# An artifact upload supplies BYTES. For three of the six ecosystems that is not
+# enough to make the artifact reachable on the sealed node this feature exists for,
+# because a sealed node answers "what versions exist" from a cached index document
+# and nowhere else -- so a vetted artifact would be present, recorded, and
+# unresolvable, with the install told it is not cached.
+#
+# PyPI needs none of this: its sealed index is built from the rows it holds
+# (`pypi.index_from_cache`), so an upload is advertised the moment it exists. Pulumi
+# plugins are filename-addressed with no index at all. Go needs one only to DISCOVER
+# a version; a pinned `go mod download` asks for the three files directly.
+#
+# These share `_upload_artifact`, so provenance, the replace rule, the size cap and
+# the sealed-note behaviour are the same as for an artifact -- an index document an
+# operator curated is an assertion in exactly the same sense.
+
+
+@npm_upload_router.post("/admin/package-cache/npm/index", status_code=201)
+async def upload_npm_index(
+    name: str = Form(..., description="The package name, scope and all (`@scope/pkg`)."),
+    file: UploadFile = File(..., description="The packument JSON."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted npm packument, so a sealed node can resolve the package.
+
+    npm reads dependency RANGES from this document and from nowhere else, so without
+    one an uploaded tarball cannot be installed even though it is present: the sealed
+    index answers 404 saying the package is not cached.
+    """
+    return await _upload_artifact(
+        ecosystem=npm.ECOSYSTEM,
+        build=lambda: npm.index_coordinates(name),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@galaxy_upload_router.post("/admin/package-cache/galaxy/index", status_code=201)
+async def upload_galaxy_index(
+    namespace: str = Form(..., description="The collection namespace."),
+    name: str = Form(..., description="The collection name."),
+    document: str = Form(..., description="Which document: `collection` or `versions`."),
+    file: UploadFile = File(..., description="The document's JSON."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted collection index document.
+
+    Galaxy needs TWO, which is why this names one: a sealed node answers the
+    collection record from `collection.json` and the version list from
+    `versions.json`, each from its own cached document.
+    """
+    return await _upload_artifact(
+        ecosystem=galaxy.ECOSYSTEM,
+        build=lambda: galaxy.index_coordinates(namespace, name, document),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@nuget_upload_router.post("/admin/package-cache/nuget/index", status_code=201)
+async def upload_nuget_index(
+    package_id: str = Form(..., description="The package id; case is normalised."),
+    file: UploadFile = File(..., description="The versions index JSON."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted NuGet versions index, so a sealed node can restore the package."""
+    return await _upload_artifact(
+        ecosystem=nuget.ECOSYSTEM,
+        build=lambda: nuget.index_coordinates(package_id),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@go_upload_router.post("/admin/package-cache/go/index", status_code=201)
+async def upload_go_index(
+    module: str = Form(..., description="The module path, in its escaped form."),
+    document: str = Form(..., description="Which document: `list` or `latest`."),
+    file: UploadFile = File(..., description="The document's bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted module index document.
+
+    Needed only to DISCOVER a version -- `go get module` with no version, or
+    `go list -m -versions`. A pinned `go mod download` asks for `.info`, `.mod` and
+    `.zip` directly and never consults these, so a deployment that pins everything
+    needs neither.
+
+    `list` is a newline-separated version list served as text; `latest` is JSON.
+    """
+    return await _upload_artifact(
+        ecosystem=goproxy.ECOSYSTEM,
+        build=lambda: goproxy.index_coordinates(module, document),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
     )
