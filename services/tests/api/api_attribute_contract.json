@@ -30,6 +30,26 @@
     "token",
     "use-count"
   ],
+  "agent_pools.list_listener_cas": [
+    "algorithm",
+    "created-at",
+    "expires-at",
+    "fingerprint",
+    "signing"
+  ],
+  "agent_pools.list_listener_cas:meta": [
+    "rotation-in-progress"
+  ],
+  "agent_pools.rotate_listener_ca": [
+    "algorithm",
+    "created-at",
+    "expires-at",
+    "fingerprint",
+    "signing"
+  ],
+  "agent_pools.rotate_listener_ca:meta": [
+    "trusted-count"
+  ],
   "ai_policy._evaluation_json": [
     "created-at",
     "enforcement-level",

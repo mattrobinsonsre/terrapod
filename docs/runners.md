@@ -1193,6 +1193,35 @@ the private key the CA issues at join:
 | `X-Terrapod-Listener-Nonce` | single-use random value, remembered for 120s |
 | `X-Terrapod-Listener-Signature` | Ed25519 over `v1\n<METHOD>\n<path>\n<timestamp>\n<nonce>` |
 
+### Rotating the listener CA
+
+The CA that issues listener certificates can be replaced without taking the pool
+offline:
+
+```sh
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  https://terrapod.example.com/api/v1/listener-ca/actions/rotate
+```
+
+The new CA signs from that moment and **the previous one stays trusted for one
+`listener_cert_ttl_seconds`** — exactly as long as a certificate it issued can still
+be live. Listeners renew at half that, so the whole pool is on the new chain within
+about half a certificate lifetime, with no re-join and no restart. `GET
+/api/v1/listener-ca` lists the trust set, says which CA is signing, and reports
+`meta.rotation-in-progress`.
+
+Both are admin-only: the trust set is deployment-wide, not workspace-scoped.
+
+Two things worth knowing. **Capability URLs minted before the rotation stop verifying
+once the window closes**, because that signing key is derived from the CA private key
+— so a log being streamed across a rotation may need re-opening. And **the CA is
+node-local**, so in an HA pair you rotate each node and the two legitimately report
+different fingerprints ([HA](high-availability.md)).
+
+This is also how a deployment moves to a post-quantum CA, since
+`api.config.agent_pools.ca_algorithm` is read only when a CA is generated — see
+[post-quantum readiness](post-quantum.md).
+
 ### Identifying by fingerprint rather than by certificate
 
 A listener sends **one** of the first two headers. The fingerprint is preferred and is

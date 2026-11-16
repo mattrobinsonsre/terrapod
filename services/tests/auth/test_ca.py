@@ -318,3 +318,136 @@ class TestASelectableAlgorithm:
             assert type(leaf_key) is type(pq.ca_key)
         finally:
             settings.agent_pools.ca_algorithm = old
+
+
+class TestDualTrustAcrossARotation:
+    """#2602 (c): a rotation must not take the fleet offline.
+
+    The property is a RELATIONSHIP between two CAs -- the new one signs while the old
+    one is still accepted -- so every fixture here instantiates BOTH. A fixture with
+    one CA cannot tell a working trust set from a single-CA path, which is the whole
+    question.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _isolated(self):
+        """Own the module trust set for the duration, and put it back.
+
+        The session conftest installs one CA for capability signing; these tests
+        replace the whole list, so they restore it rather than appending.
+        """
+        from terrapod.auth import ca as ca_module
+
+        before = list(ca_module._cas)
+        yield
+        ca_module._cas = before
+
+    @staticmethod
+    def _install(*cas):
+        from terrapod.auth import ca as ca_module
+
+        ca_module._cas = list(cas)
+
+    def test_a_certificate_from_the_PREVIOUS_ca_still_verifies(self):
+        """The failure this exists to prevent: rotate, and every listener in the fleet
+        is refused until it happens to re-join."""
+        from terrapod.auth.ca import trusted_cas
+
+        old = CertificateAuthority.generate()
+        old_cert, _ = old.issue_listener_certificate("listener-1", "pool-1")
+        new = CertificateAuthority.generate()
+        self._install(new, old)
+
+        cas = trusted_cas()
+        assert len(cas) == 2, "the previous CA is not trusted, so a rotation is an outage"
+        assert any(self._verifies(ca, old_cert) for ca in cas), (
+            "a certificate the previous CA issued is refused"
+        )
+
+    def test_the_NEW_ca_is_the_one_that_signs(self):
+        old = CertificateAuthority.generate()
+        new = CertificateAuthority.generate()
+        self._install(new, old)
+        from terrapod.auth.ca import get_ca, trusted_cas
+
+        assert get_ca() is new
+        assert trusted_cas()[0] is new, "the signer must be first; callers issue with it"
+
+    def test_the_window_CLOSES_so_a_rotation_is_not_permanent_trust(self):
+        """Trusting every CA a deployment ever had would make rotation pointless -- a
+        compromised key would go on being accepted for ever, which is the thing a
+        rotation exists to stop.
+
+        The window is derived from the signer's `not_valid_before`, so an OLD signer
+        means the window has already closed. No clock mocking needed.
+        """
+        import datetime as _dt
+        from unittest.mock import patch
+
+        from terrapod.auth.ca import trusted_cas
+
+        old = CertificateAuthority.generate()
+        new = CertificateAuthority.generate()
+        self._install(new, old)
+
+        # A signer created longer ago than one certificate lifetime.
+        far_past = _dt.datetime.now(_dt.UTC) - _dt.timedelta(days=2)
+        with patch.object(
+            type(new.ca_cert), "not_valid_before_utc", property(lambda _self: far_past)
+        ):
+            cas = trusted_cas()
+        assert len(cas) == 1, "the window never closes, so a rotated-away CA is trusted for ever"
+        assert cas[0] is new
+
+    def test_an_unreadable_ttl_narrows_rather_than_raises(self):
+        """This runs on an authentication path, so it must not raise -- and when it
+        cannot tell how wide the window is, the safe answer is the signer alone."""
+        from unittest.mock import patch
+
+        from terrapod.auth.ca import trusted_cas
+
+        self._install(CertificateAuthority.generate(), CertificateAuthority.generate())
+        with patch("terrapod.config.settings") as st:
+            st.agent_pools.listener_cert_ttl_seconds = "not a number"
+            cas = trusted_cas()
+        assert len(cas) == 1
+
+    def test_a_CROSS_ALGORITHM_rotation_works(self):
+        """The case the whole feature exists for, and the one a naive loop breaks.
+
+        An Ed25519 CA verifying an ML-DSA-signed certificate raises
+        `InvalidSignature`; the reverse can raise something else entirely. So a
+        verification loop must treat ANY failure as "not this CA" and try the next --
+        treating only `InvalidSignature` that way would refuse every certificate
+        issued before the rotation.
+        """
+        from terrapod.auth.ca import trusted_cas
+
+        old = CertificateAuthority.generate(algorithm="ed25519")
+        old_cert, _ = old.issue_listener_certificate("listener-1", "pool-1")
+        new = CertificateAuthority.generate(algorithm="mldsa65")
+        new_cert, _ = new.issue_listener_certificate("listener-2", "pool-1")
+        self._install(new, old)
+
+        cas = trusted_cas()
+        assert any(self._verifies(ca, old_cert) for ca in cas), "the pre-rotation cert is refused"
+        assert any(self._verifies(ca, new_cert) for ca in cas), "the post-rotation cert is refused"
+
+    def test_a_certificate_from_a_CA_OUTSIDE_the_set_is_refused(self):
+        """The trust set must be a set, not an invitation. Without this the tests
+        above would pass over a verifier that accepted anything."""
+        from terrapod.auth.ca import trusted_cas
+
+        stranger = CertificateAuthority.generate()
+        stranger_cert, _ = stranger.issue_listener_certificate("listener-x", "pool-1")
+        self._install(CertificateAuthority.generate(), CertificateAuthority.generate())
+
+        assert not any(self._verifies(ca, stranger_cert) for ca in trusted_cas())
+
+    @staticmethod
+    def _verifies(ca, cert) -> bool:
+        try:
+            ca.ca_cert.public_key().verify(cert.signature, cert.tbs_certificate_bytes)
+            return True
+        except Exception:
+            return False
