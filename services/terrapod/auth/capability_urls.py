@@ -70,17 +70,50 @@ KIND_SV_UPLOAD = "sv-upload"
 DEFAULT_TTL_SECONDS = 25 * 60 * 60
 
 
-def _signing_key() -> bytes:
-    """Per-deployment key derived from the CA private key. See the module docstring."""
-    from terrapod.auth.ca import get_ca
+def _key_from(ca) -> bytes:
+    """Derive this deployment's capability key from one CA. See the module docstring.
 
-    ca = get_ca()
+    `Encoding.Raw` is why the permitted CA key types are closed to Edwards and ML-DSA
+    (`auth.ca._ALGORITHMS`): RSA and ECDSA do not expose it, so admitting one would
+    break this derivation rather than merely be untested.
+    """
     raw = ca.ca_key.private_bytes(
         encoding=serialization.Encoding.Raw,
         format=serialization.PrivateFormat.Raw,
         encryption_algorithm=serialization.NoEncryption(),
     )
     return hashlib.blake2b(raw, person=_HKDF_LABEL[:16], digest_size=32).digest()
+
+
+def _signing_key() -> bytes:
+    """The key new capabilities are MINTED with: the current CA's."""
+    from terrapod.auth.ca import get_ca
+
+    return _key_from(get_ca())
+
+
+def _verification_keys() -> list[bytes]:
+    """Every key a capability may have been minted under, newest first.
+
+    **This is dual-trust for a non-certificate reason, and it is easy to miss.** The
+    capability key is derived from the CA private key, so rotating the CA changes it
+    and every outstanding capability URL stops verifying. `DEFAULT_TTL_SECONDS` is 25
+    HOURS and `LogReader` never re-reads its URL, so a plan log streaming across a
+    rotation would freeze with no way to renew -- for a reason having nothing to do
+    with listener certificates, which is why the certificate path's trust set alone
+    would not have covered it.
+
+    The window is the certificate one, from `trusted_cas`, which is far shorter than
+    the capability TTL. That is deliberate rather than an oversight: matching the
+    capability TTL would keep a rotated-away key usable for a day, and the point of
+    rotating is that the old key stops being accepted. A capability minted before the
+    rotation and presented more than one certificate lifetime after it is refused,
+    and an operator rotating a CA should expect in-flight log streams to need
+    re-opening.
+    """
+    from terrapod.auth.ca import trusted_cas
+
+    return [_key_from(ca) for ca in trusted_cas()]
 
 
 def _sign(payload: str) -> str:
@@ -151,7 +184,20 @@ def verify(segment: str, *, expect_kind: str) -> str | None:
         expires = int(expires_s)
     except (ValueError, UnicodeDecodeError):
         return None
-    if not hmac.compare_digest(sig, _sign(payload)):
+    # Against every key in the trust set, not only the current one -- see
+    # `_verification_keys`. `compare_digest` on each, so the comparison stays
+    # constant-time per candidate; the number of candidates is not secret.
+    if not any(
+        hmac.compare_digest(
+            sig,
+            base64.urlsafe_b64encode(
+                hmac.new(key, payload.encode("utf-8"), hashlib.sha256).digest()
+            )
+            .decode("ascii")
+            .rstrip("="),
+        )
+        for key in _verification_keys()
+    ):
         return None
     if kind != expect_kind:
         return None

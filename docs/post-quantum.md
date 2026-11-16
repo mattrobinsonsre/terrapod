@@ -136,6 +136,38 @@ listener certificates.
 **Nothing forces this.** Given the mitigations above, the realistic reason to set it
 is an organisational post-quantum mandate rather than a present threat.
 
+### Moving an existing deployment: rotate the CA
+
+The setting is read only when a CA is *generated*, so an existing deployment keeps
+signing with the CA it has. To move it:
+
+```sh
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  https://terrapod.example.com/api/v1/listener-ca/actions/rotate
+```
+
+The new CA takes over signing immediately and **the previous one stays trusted for
+one listener-certificate lifetime** — exactly as long as anything it issued can still
+be live. Listeners pick up a certificate from the new chain on their own renewal
+cycle, at half that. **No re-join, no restart, and no window where the fleet is
+refused.** `GET /api/v1/listener-ca` shows the trust set and which CA is signing;
+`meta.rotation-in-progress` is true while more than one is trusted.
+
+Three things to know before you rotate:
+
+- **Capability URLs minted before the rotation stop verifying once the window
+  closes.** The capability signing key is derived from the CA private key, so a
+  rotation changes it. They are accepted *during* the window, which is far shorter
+  than their own 25-hour lifetime — so a plan or apply log being streamed across a
+  rotation may need re-opening. That is the intended trade: matching the capability
+  lifetime would keep a rotated-away key usable for a day, and the point of rotating
+  is that the old key stops being accepted.
+- **It is per node.** The CA is deliberately node-local and not replicated
+  ([HA](high-availability.md)), so each node in an HA pair has its own and you rotate
+  each one. The two legitimately report different fingerprints.
+- **The window closes by the clock**, derived from the new CA certificate's own
+  validity start. There is no retirement job to run and nothing to go stale.
+
 ## What would change this
 
 Each row above moves when the ecosystem that constrains it does: when a cloud's

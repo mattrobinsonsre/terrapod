@@ -524,6 +524,41 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
     )
 
 
+def _require_signed_by_a_trusted_ca(cert) -> None:
+    """Refuse a certificate no CA this node trusts signed (#2602).
+
+    ONE function called from both auth paths, for the reason `_enforce_listener_pop`
+    gives: a check that lives in one entry point and not its sibling is enforced only
+    where someone happens to be looking. These two blocks were already identical
+    copies, which is how they would have come to disagree about a trust SET.
+
+    Tries each trusted CA in turn and accepts the first that verifies. Outside a
+    rotation window there is exactly one, so the common path is a single verify.
+
+    **A failure for any reason means "not this CA", not "stop."** The breadth is
+    belt-and-braces rather than load-bearing, and the measurement is worth recording
+    because the obvious guess is wrong: a cross-algorithm mismatch raises
+    `InvalidSignature` in BOTH directions -- an ML-DSA CA against an Ed25519
+    certificate and the reverse -- so narrowing this to `InvalidSignature` would work
+    for a rotation between algorithms. What the breadth covers is the unmeasured
+    rest: a malformed certificate, a key type a future build does not expect. Those
+    mean "this CA did not sign it", which is the same answer, and letting one
+    propagate would turn a 401 into a 500 on an authentication path.
+    """
+    from terrapod.auth.ca import trusted_cas
+
+    for candidate in trusted_cas():
+        try:
+            candidate.ca_cert.public_key().verify(cert.signature, cert.tbs_certificate_bytes)
+            return
+        except Exception:  # noqa: S112 - see the docstring: this means "not this CA"
+            continue
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Certificate not signed by this CA",
+    )
+
+
 async def _enforce_listener_pop(request: "Request", cert=None, *, public_key=None) -> None:
     """Require the caller to hold the private key behind `cert` or `public_key`.
 
@@ -670,9 +705,8 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
     import datetime as dt
 
     from cryptography import x509
-    from cryptography.exceptions import InvalidSignature
 
-    from terrapod.auth.ca import get_ca, get_certificate_fingerprint
+    from terrapod.auth.ca import get_certificate_fingerprint
     from terrapod.services import agent_pool_service
 
     fingerprint_header = request.headers.get(FINGERPRINT_HEADER.lower())
@@ -695,15 +729,9 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
             detail="Invalid certificate encoding",
         ) from None
 
-    # Verify CA signature
-    ca = get_ca()
-    try:
-        ca.ca_cert.public_key().verify(cert.signature, cert.tbs_certificate_bytes)
-    except (InvalidSignature, Exception):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Certificate not signed by this CA",
-        ) from None
+    # Verify the signature against every CA this node trusts -- one outside a
+    # rotation window, two while a rotation is in flight.
+    _require_signed_by_a_trusted_ca(cert)
 
     # Check expiry
     now = dt.datetime.now(dt.UTC)
@@ -938,9 +966,8 @@ async def get_listener_identity(
     import base64
 
     from cryptography import x509
-    from cryptography.exceptions import InvalidSignature
 
-    from terrapod.auth.ca import get_ca, get_certificate_fingerprint
+    from terrapod.auth.ca import get_certificate_fingerprint
     from terrapod.services import agent_pool_service
 
     try:
@@ -952,18 +979,8 @@ async def get_listener_identity(
             detail="Invalid certificate encoding",
         ) from None
 
-    # Verify CA signature
-    ca = get_ca()
-    try:
-        ca.ca_cert.public_key().verify(
-            cert.signature,
-            cert.tbs_certificate_bytes,
-        )
-    except (InvalidSignature, Exception):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Certificate not signed by this CA",
-        ) from None
+    # See the sibling path: one shared check, against the whole trust set.
+    _require_signed_by_a_trusted_ca(cert)
 
     # Check expiry
     import datetime as dt
