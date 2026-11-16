@@ -725,10 +725,17 @@ test.describe("Workspaces", () => {
     expect(posts.filter((u) => u.endsWith("/actions/discard"))).toHaveLength(2);
 
     // The page reloads the list after an action (and on SSE), and each reload runs
-    // the stubbed `route.fetch()` above. One still in flight when the test ends
-    // fails with "browser has been closed", so end by removing the stubs and
-    // letting any running callback finish.
-    await page.unrouteAll({ behavior: "wait" });
+    // the stubbed `route.fetch()` above, so one is always in flight when the test
+    // ends. `ignoreErrors` is what drops whatever that handler then throws; it is
+    // NOT interchangeable with `wait`, which this line used to pass and which is
+    // why the spec failed intermittently on main with "Route is already handled!"
+    // reported against the `fulfill` above. Measured against playwright 1.58:
+    // `wait` awaits the in-flight handlers and still PROPAGATES an exception from
+    // one, failing the test; `ignoreErrors` sets the flag that swallows it (see
+    // `RouteHandler.stop` in playwright-core). Every assertion has already run by
+    // here, so a stub failing during teardown must not fail the test — which is
+    // what playwright's own message recommends, and what log-reserve.spec.ts does.
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 });
 
