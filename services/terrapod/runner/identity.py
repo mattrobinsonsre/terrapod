@@ -84,6 +84,17 @@ class ListenerIdentity:
     private_key_pem: str
     ca_cert_pem: str
     secret_resource_version: str | None = None
+    #: What the API asked us to send on subsequent requests (#2602). Empty means
+    #: "send the certificate", which is what an API that does not advertise a mode
+    #: wants and what every API accepts.
+    #:
+    #: Deliberately NOT persisted in the credentials Secret. That Secret's write
+    #: path is split-brain-safe CAS over a fixed set of keys, and this value is
+    #: cheap to re-learn: a restarted pod sends certificates until its next renewal
+    #: -- at most half the certificate TTL -- which the API still accepts. Adding a
+    #: key to that Secret to save thirty minutes of larger headers would be trading
+    #: a real risk for a small one.
+    cert_header_mode: str = ""
 
 
 # ── Public entry point ──────────────────────────────────────────────
@@ -225,6 +236,7 @@ async def rejoin_identity(
         certificate_pem=data["certificate"],
         private_key_pem=data["private_key"],
         ca_cert_pem=data["ca_certificate"],
+        cert_header_mode=str(data.get("cert_header_mode", "")),
         secret_resource_version=written.metadata.resource_version,
     )
     logger.info(
@@ -478,6 +490,7 @@ async def _bootstrap_via_join_token(
             api_url=api_url,
             certificate_pem=data["certificate"],
             private_key_pem=data["private_key"],
+            cert_header_mode=str(data.get("cert_header_mode", "")),
             ca_cert_pem=data["ca_certificate"],
             secret_resource_version=secret.metadata.resource_version,
         )
@@ -714,6 +727,40 @@ async def _call_join(api_url: str, join_token: str, name: str) -> dict:
     return r.json()["data"]
 
 
+def certificate_fingerprint(cert_pem: str) -> str:
+    """SHA-256 of the certificate's DER, hex — the server's own fingerprint form.
+
+    Must agree exactly with `auth.ca.get_certificate_fingerprint`, which is
+    `cert.fingerprint(hashes.SHA256()).hex()`. Returns "" on an unparseable PEM so a
+    caller can fall back to sending the certificate, which every API accepts; raising
+    here would take down a long-lived loop over a header choice.
+    """
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+
+        return x509.load_pem_x509_certificate(cert_pem.encode()).fingerprint(hashes.SHA256()).hex()
+    except Exception:
+        return ""
+
+
+def auth_identity_header(identity: ListenerIdentity) -> dict[str, str]:
+    """The one header that says who we are: a fingerprint if the API asked, else the cert.
+
+    Shared by the renew call here and by the listener's own request signing, because
+    two copies of "which identity header do we send" is how the renewal path comes to
+    disagree with every other request — and renewal is the one call that must work, or
+    the listener falls back to a join token and re-registers under a fresh name.
+    """
+    if not identity.certificate_pem:
+        return {}
+    if getattr(identity, "cert_header_mode", "") == "fingerprint":
+        fp = certificate_fingerprint(identity.certificate_pem)
+        if fp:
+            return {"X-Terrapod-Client-Cert-Fingerprint": fp}
+    return {"X-Terrapod-Client-Cert": base64.b64encode(identity.certificate_pem.encode()).decode()}
+
+
 async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
     """Try `/listeners/{id}/renew` up to 3 times with backoff.
 
@@ -731,7 +778,7 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
     """
     import httpx
 
-    cert_b64 = base64.b64encode(identity.certificate_pem.encode()).decode()
+    identity_header = auth_identity_header(identity)
     renew_path = f"/api/terrapod/v1/listeners/listener-{identity.listener_id}/renew"
     backoff = 1.0
     for attempt in range(3):
@@ -740,7 +787,7 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
         # be quiet and bad — a 401 here is deliberately not retried and returns
         # None, so the caller falls back to the join token and the listener
         # re-registers under a fresh name on every renewal cycle.
-        headers = {"X-Terrapod-Client-Cert": cert_b64}
+        headers = dict(identity_header)
         key_pem = getattr(identity, "private_key_pem", "")
         if key_pem:
             import secrets as _secrets

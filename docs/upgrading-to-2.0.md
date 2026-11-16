@@ -1127,6 +1127,36 @@ prefixes is ignored rather than taken as a role name. That is what the setting
 always read as, and it narrows rather than widens — but if you relied on the
 pass-through, those roles stop arriving.
 
+### Listeners identify by certificate fingerprint, not by sending the certificate
+
+**Affects:** nobody, in the sense that there is nothing to do. Recorded because it
+changes what is on the wire.
+
+A listener used to send its whole certificate, base64-encoded, in
+`X-Terrapod-Client-Cert` on **every** request. It now sends the certificate's SHA-256
+fingerprint in `X-Terrapod-Client-Cert-Fingerprint` instead. The API issued that
+certificate, so at issuance it records the public key and the expiry against the
+fingerprint — which is everything the certificate was being used to carry.
+
+**No configuration, and no upgrade order.** A listener learns which form to send from
+the join and renew responses that already give it its identity. An older API does not
+ask, so an older or newer listener talking to it keeps sending certificates; a newer API
+still accepts certificates, so an older listener works unchanged. A mixed pool is fine
+in either direction.
+
+**Nothing is weakened.** Expiry is still checked against the recorded value by the same
+clock rather than left to a cache TTL, and proof of possession is enforced identically —
+a fingerprint is public material on every request, exactly as replayable as the
+certificate it replaces. What goes away is X.509 parsing of attacker-supplied bytes in
+the authentication path.
+
+**Why it was worth doing**: it is what makes a post-quantum CA possible. An ML-DSA-65
+certificate is ~10 KB base64-encoded, over nginx's default 8 KB per-header buffer, and
+ML-DSA-87 with its signature header exceeds Node's 16 KiB total. With only the signature
+header left, every ML-DSA size fits. See
+[post-quantum readiness](post-quantum.md) and
+[runners.md](runners.md#identifying-by-fingerprint-rather-than-by-certificate).
+
 ### Listeners must prove they hold their certificate's private key
 
 **Affects:** any pool still running a listener image older than 2.0.
