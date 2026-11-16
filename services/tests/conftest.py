@@ -111,13 +111,13 @@ def pytest_collection_modifyitems(config, items):
 def _capability_signing_ca():
     from terrapod.auth import ca as ca_module
 
-    previous = ca_module._ca
-    if previous is None:
-        ca_module._ca = ca_module.CertificateAuthority.generate()
+    previous = list(ca_module._cas)
+    if not previous:
+        ca_module._cas = [ca_module.CertificateAuthority.generate()]
     try:
         yield
     finally:
-        ca_module._ca = previous
+        ca_module._cas = previous
 
 
 # The token signing key is no longer derived lazily from the database URL — it is
