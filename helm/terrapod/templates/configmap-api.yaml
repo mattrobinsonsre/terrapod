@@ -650,6 +650,7 @@ data:
     {{- if .Values.api.config.agent_pools }}
     agent_pools:
       listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | int64 }}
+      ca_algorithm: {{ .Values.api.config.agent_pools.ca_algorithm | default "ed25519" | quote }}
       {{- with .Values.api.config.agent_pools.default_join_token_max_uses }}
       default_join_token_max_uses: {{ . | int64 }}
       {{- end }}

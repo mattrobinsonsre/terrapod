@@ -524,44 +524,140 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
     )
 
 
-async def _enforce_listener_pop(request: "Request", cert) -> None:
-    """Require the caller to hold the private key behind `cert`.
+async def _enforce_listener_pop(request: "Request", cert=None, *, public_key=None) -> None:
+    """Require the caller to hold the private key behind `cert` or `public_key`.
 
     Called from BOTH listener auth paths — `authenticate_listener` (the SSE one,
     which cannot use yield-dependencies) and `get_listener_identity` (everything
-    else). It is one function on purpose: every check those two perform before
-    this point is satisfied by a COPY of the certificate, which is public and is
-    sent on every request, so a path that skipped this would accept a replayed
-    header indefinitely while looking fully authenticated. A guard that lives in
-    one entry point and not its sibling is enforced only where someone happens to
-    be looking.
+    else) — and from `_identity_from_fingerprint`, which both of those delegate to.
+    It is one function on purpose: every check those paths perform before this point
+    is satisfied by material that is PUBLIC and travels on the request, so a path
+    that skipped this would accept a replayed header indefinitely while looking
+    fully authenticated. A guard that lives in one entry point and not its sibling
+    is enforced only where someone happens to be looking.
+
+    It takes either form rather than being split in two **for that same reason**.
+    A request authenticating on a fingerprint (#2602) carries no certificate, so it
+    has only the key the API recorded at issuance; giving that path its own gate
+    would be the drift this function exists to prevent, one name later.
     """
     from terrapod.auth.listener_pop import (
         NONCE_HEADER,
         SIGNATURE_HEADER,
         TIMESTAMP_HEADER,
         ProofOfPossessionError,
-        verify_request,
+        verify_request_with_key,
     )
     from terrapod.config import settings
 
+    if (cert is None) == (public_key is None):
+        # Not reachable from either caller, and a programming error rather than a
+        # request problem -- so it raises rather than refusing a caller who did
+        # nothing wrong. Both-or-neither would otherwise silently verify against
+        # whichever happened to be set.
+        raise ValueError("_enforce_listener_pop takes exactly one of cert, public_key")
     if not settings.agent_pools.require_listener_proof_of_possession:
         return
     h = request.headers
     try:
-        await verify_request(
-            cert,
+        await verify_request_with_key(
+            cert.public_key() if cert is not None else public_key,
             method=request.method,
             path=request.url.path,
             timestamp=h.get(TIMESTAMP_HEADER.lower(), ""),
             nonce=h.get(NONCE_HEADER.lower(), ""),
             signature=h.get(SIGNATURE_HEADER.lower(), ""),
+            subject="this certificate" if cert is not None else "the registered key",
         )
     except ProofOfPossessionError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Listener proof of possession failed: {exc}",
         ) from None
+
+
+#: The header a listener may send INSTEAD of its whole certificate (#2602).
+#:
+#: The certificate was doing three jobs at once: naming the principal through its
+#: Subject CN, being the credential by having a registered fingerprint, and carrying
+#: the public key proof-of-possession verifies against. The API issued it and can
+#: record all three, so none of them needs the certificate itself on the wire — and
+#: at ~10 KB for an ML-DSA-65 certificate, sending it on every request is what stands
+#: between Terrapod and a post-quantum CA (nginx's default per-header buffer is 8 KB).
+FINGERPRINT_HEADER = "X-Terrapod-Client-Cert-Fingerprint"
+
+
+async def _identity_from_fingerprint(request: "Request", fingerprint: str) -> "ListenerIdentity":
+    """Authenticate on a fingerprint alone, against what we recorded at issuance.
+
+    Shared by both auth paths rather than written in each, for the reason given on
+    `_enforce_listener_pop`.
+
+    What this does NOT do, and why it is not a weakening: it never verifies a CA
+    signature, because there is no certificate in the request to verify and the
+    record exists only because THIS API issued one. Checking our own signature over
+    material we are holding would be checking our own arithmetic. It also never
+    parses X.509 from the request at all, which removes attacker-supplied ASN.1 from
+    the authentication path — a narrowing, not a widening.
+
+    What it keeps: expiry is checked against the recorded `not_after` by the same
+    clock the certificate path uses, rather than being left to the Redis TTL. The TTL
+    carries 60s of deliberate slack for clock skew, so leaning on it would make the
+    auth boundary a property of the cache instead of the certificate.
+    """
+    import base64 as _b64
+    import datetime as dt
+
+    from cryptography.hazmat.primitives.serialization import load_der_public_key
+
+    from terrapod.services import agent_pool_service
+
+    record = await agent_pool_service.lookup_certificate(fingerprint)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate fingerprint not registered",
+        )
+
+    try:
+        not_after = dt.datetime.fromisoformat(record["not_after"])
+    except (KeyError, ValueError):
+        # A record we wrote is unreadable, so we cannot say when it stops being
+        # valid. Refusing is the only safe reading of that.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate record is unreadable",
+        ) from None
+    if dt.datetime.now(dt.UTC) > not_after:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate expired or not yet valid",
+        )
+
+    listener = await agent_pool_service.get_listener(uuid.UUID(record["listener_id"]))
+    if listener is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No listener registered for this certificate",
+        )
+
+    try:
+        public_key = load_der_public_key(_b64.b64decode(record["public_key"]))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate record is unreadable",
+        ) from None
+
+    await _enforce_listener_pop(request, public_key=public_key)
+
+    return ListenerIdentity(
+        listener_id=uuid.UUID(record["listener_id"]),
+        name=listener.get("name", ""),
+        pool_id=uuid.UUID(listener["pool_id"]),
+        certificate_fingerprint=fingerprint,
+        certificate_expires_at=None,  # not needed for auth
+    )
 
 
 async def authenticate_listener(request: Request) -> "ListenerIdentity":
@@ -579,11 +675,15 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
     from terrapod.auth.ca import get_ca, get_certificate_fingerprint
     from terrapod.services import agent_pool_service
 
+    fingerprint_header = request.headers.get(FINGERPRINT_HEADER.lower())
+    if fingerprint_header:
+        return await _identity_from_fingerprint(request, fingerprint_header.strip())
+
     cert_header = request.headers.get("x-terrapod-client-cert")
     if not cert_header:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="X-Terrapod-Client-Cert header required",
+            detail=f"{FINGERPRINT_HEADER} or X-Terrapod-Client-Cert header required",
         )
 
     try:
@@ -798,20 +898,41 @@ class ListenerIdentity:
 async def get_listener_identity(
     request: Request,
     x_terrapod_client_cert: str = Header(None),
+    x_terrapod_client_cert_fingerprint: str = Header(None),
 ) -> ListenerIdentity:
-    """Authenticate a runner listener via X-Terrapod-Client-Cert header.
+    """Authenticate a runner listener, by fingerprint or by certificate.
 
-    The header contains a base64-encoded PEM certificate. We:
+    **Preferred: `X-Terrapod-Client-Cert-Fingerprint`** (#2602). The API issued the
+    certificate and recorded its public key and expiry, so a fingerprint is enough to
+    resolve the principal and verify proof of possession — see
+    `_identity_from_fingerprint`.
+
+    **Still accepted: `X-Terrapod-Client-Cert`**, the base64 PEM certificate, which is
+    what a listener older than the fingerprint support sends. We then:
     1. Decode and parse the certificate
     2. Verify it was signed by our CA
     3. Check it hasn't expired
     4. Extract the CN and look up the listener in Redis
     5. Verify the certificate fingerprint matches
+
+    Both are accepted for as long as the support window requires, because there is no
+    capability negotiation in the listener protocol to switch on. A listener learns
+    which form to send from the join and renew responses, so the choice travels with
+    the identity rather than needing an upgrade order.
     """
+    # isinstance, not truthiness: called through FastAPI the default is None, but
+    # called DIRECTLY -- which the tests and any internal caller do -- an unsupplied
+    # `Header(None)` parameter is the `Header` SENTINEL OBJECT, which is truthy and
+    # has no `.strip`. Truthiness here turns every such call into an AttributeError
+    # raised from inside the authentication path.
+    fp_header = x_terrapod_client_cert_fingerprint
+    if isinstance(fp_header, str) and fp_header.strip():
+        return await _identity_from_fingerprint(request, fp_header.strip())
+
     if not x_terrapod_client_cert:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="X-Terrapod-Client-Cert header required",
+            detail=f"{FINGERPRINT_HEADER} or X-Terrapod-Client-Cert header required",
         )
 
     import base64

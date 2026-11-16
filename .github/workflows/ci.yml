@@ -1704,6 +1704,42 @@ jobs:
           echo "all third-party images are overridable, and every mirror ref is listed"
 
 
+      - name: (helm-smoke) The CA algorithm reaches the pod, and only the permitted values do
+        run: |
+          # #2602. Three legs of the config-channel contract, and the third is the one
+          # that goes wrong silently: a values.yaml entry and a schema entry with no
+          # ConfigMap render line means the operator sets it, it never reaches the pod,
+          # and the code default wins. So this asserts the RENDERED output rather than
+          # the template text.
+          #
+          # One function per case with helm's exit status checked, for the reason the
+          # step below gives: a render that errors leaves empty output, and `grep -c`
+          # on nothing is a zero that passes an assertion for the wrong reason.
+          renders_algorithm () {
+            want="$1"; shift
+            out=$(helm template tp ./helm/terrapod "$@") \
+              || { echo "render failed for: $*"; exit 1; }
+            n=$(printf '%s' "$out" | grep -c "ca_algorithm: \"$want\"" || true)
+            [ "$n" = "1" ] \
+              || { echo "expected ca_algorithm: \"$want\" once for ($*), got $n"; exit 1; }
+          }
+          # The default must be Ed25519 on every profile -- a chart that silently moved
+          # an existing deployment to a post-quantum CA would invalidate nothing today
+          # but would be a change nobody asked for.
+          renders_algorithm ed25519
+          renders_algorithm ed25519 -f helm/terrapod/values-local.yaml
+          renders_algorithm ed25519 -f helm/terrapod/values-eval.yaml
+          # And a set value reaches the pod, which is the leg that is easy to miss.
+          renders_algorithm mldsa65 --set api.config.agent_pools.ca_algorithm=mldsa65
+
+          # The schema's enum is what stops a typo becoming a startup failure, so
+          # assert the refusal rather than trusting the enum is present.
+          if helm template tp ./helm/terrapod \
+               --set api.config.agent_pools.ca_algorithm=dilithium3 >/dev/null 2>&1; then
+            echo "an unknown ca_algorithm rendered; the schema enum is not binding"
+            exit 1
+          fi
+
       - name: (helm-smoke) The chart never mints a token signing key, and yields to a supplied one
         run: |
           # GHSA-hc47-q72v-4vcm, #1994. The chart used to generate this key, which

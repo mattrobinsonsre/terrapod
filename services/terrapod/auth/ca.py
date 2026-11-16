@@ -1,7 +1,7 @@
 """Certificate Authority module for Terrapod.
 
 Handles generation of:
-- CA certificate and key (Ed25519)
+- CA certificate and key (Ed25519 by default; ML-DSA selectable, see `_ALGORITHMS`)
 - Listener certificates (1 year default) — for runner listener identity
 
 Handles Terrapod's runner-only certificate needs.
@@ -11,7 +11,7 @@ import datetime
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.asymmetric import ed25519, mldsa
 from cryptography.x509.oid import NameOID
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,8 +20,67 @@ from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+#: The key types a Terrapod CA may use, and the ONLY ones (#2602).
+#:
+#: Ed25519 is the default and what every deployment has today. The ML-DSA sizes are
+#: the NIST post-quantum signature standard, offered because this CA is the one
+#: signature path Terrapod controls at both ends -- everything else is pinned by an
+#: external verifier (see docs/post-quantum.md).
+#:
+#: RSA and ECDSA are deliberately absent, and not merely untested. The
+#: capability-URL signing key is derived from this key's RAW private bytes
+#: (`auth/capability_urls.py`), an encoding only Edwards and ML-DSA keys expose, so
+#: admitting one of those would break a path with nothing to do with listener
+#: certificates. Keeping the set closed is what keeps that derivation sound.
+_ALGORITHMS: dict[str, type] = {
+    "ed25519": ed25519.Ed25519PrivateKey,
+    "mldsa44": mldsa.MLDSA44PrivateKey,
+    "mldsa65": mldsa.MLDSA65PrivateKey,
+    "mldsa87": mldsa.MLDSA87PrivateKey,
+}
+
+#: Any key type a CA may hold. Used for the isinstance gate and the type hints, so
+#: the permitted set has exactly one definition.
+CAPrivateKey = (
+    ed25519.Ed25519PrivateKey
+    | mldsa.MLDSA44PrivateKey
+    | mldsa.MLDSA65PrivateKey
+    | mldsa.MLDSA87PrivateKey
+)
+
 # Module-level CA singleton, initialized in lifespan
 _ca: "CertificateAuthority | None" = None
+
+
+def _generate_key(algorithm: str | None = None):
+    """A new CA or leaf private key of the configured (or named) algorithm.
+
+    One producer, so the permitted set is enforced in a single place and an unknown
+    name fails here with the valid ones listed rather than somewhere downstream.
+    """
+    from terrapod.config import settings
+
+    name = (algorithm or settings.agent_pools.ca_algorithm or "ed25519").strip().lower()
+    key_type = _ALGORITHMS.get(name)
+    if key_type is None:
+        raise ValueError(
+            f"unknown CA algorithm {name!r}; valid values are {', '.join(_ALGORITHMS)}"
+        )
+    return key_type.generate()
+
+
+def _algorithm_name(key) -> str:
+    """The `_ALGORITHMS` name for a key we are holding.
+
+    Derived from the key's own type rather than from configuration, because an
+    existing CA's algorithm is a property of the stored key: a deployment that
+    changes the setting keeps signing with what it has until the CA is rotated, and
+    the leaf must follow the CA rather than the setting.
+    """
+    for name, key_type in _ALGORITHMS.items():
+        if isinstance(key, key_type):
+            return name
+    raise TypeError(f"not a permitted CA key type: {type(key).__name__}")
 
 
 class CertificateAuthority:
@@ -30,7 +89,7 @@ class CertificateAuthority:
     def __init__(
         self,
         ca_cert: x509.Certificate,
-        ca_key: ed25519.Ed25519PrivateKey,
+        ca_key: CAPrivateKey,
     ):
         self._ca_cert = ca_cert
         self._ca_key = ca_key
@@ -40,7 +99,7 @@ class CertificateAuthority:
         return self._ca_cert
 
     @property
-    def ca_key(self) -> ed25519.Ed25519PrivateKey:
+    def ca_key(self) -> CAPrivateKey:
         return self._ca_key
 
     @property
@@ -53,9 +112,20 @@ class CertificateAuthority:
         cls,
         common_name: str = "Terrapod Certificate Authority",
         validity_days: int = 3650,
+        algorithm: str | None = None,
     ) -> "CertificateAuthority":
-        """Generate a new CA certificate and Ed25519 key pair."""
-        private_key = ed25519.Ed25519PrivateKey.generate()
+        """Generate a new CA certificate and key pair.
+
+        `algorithm` is one of `_ALGORITHMS`; None reads
+        `settings.agent_pools.ca_algorithm`, which defaults to `ed25519`. It is read
+        here rather than at the call site so every path that creates a CA -- startup,
+        a test, a future rotation -- honours the setting without having to remember to.
+
+        A certificate is signed with `.sign(key, None)` for every permitted type:
+        Ed25519 and ML-DSA both carry their hash internally, which is why the
+        algorithm is selectable without touching the builder or any verifier.
+        """
+        private_key = _generate_key(algorithm)
         public_key = private_key.public_key()
 
         subject = issuer = x509.Name(
@@ -97,7 +167,7 @@ class CertificateAuthority:
                 x509.SubjectKeyIdentifier.from_public_key(public_key),
                 critical=False,
             )
-            .sign(private_key, None)  # Ed25519 doesn't use a hash algorithm
+            .sign(private_key, None)  # Ed25519 and ML-DSA both carry their own hash
         )
 
         logger.info(
@@ -113,8 +183,12 @@ class CertificateAuthority:
         """Load CA from PEM-encoded certificate and key."""
         cert = x509.load_pem_x509_certificate(cert_pem)
         key = serialization.load_pem_private_key(key_pem, password=None)
-        if not isinstance(key, ed25519.Ed25519PrivateKey):
-            raise TypeError(f"Expected Ed25519 private key, got {type(key).__name__}")
+        if not isinstance(key, tuple(_ALGORITHMS.values())):
+            raise TypeError(
+                f"Expected one of {', '.join(_ALGORITHMS)}, got {type(key).__name__}. "
+                "RSA and ECDSA are not supported: the capability-URL signing key is "
+                "derived from this key's raw private bytes, which they do not expose."
+            )
         return cls(ca_cert=cert, ca_key=key)
 
     def issue_listener_certificate(
@@ -122,7 +196,7 @@ class CertificateAuthority:
         name: str,
         pool_name: str,
         ttl_seconds: int = 3600,
-    ) -> tuple[x509.Certificate, ed25519.Ed25519PrivateKey]:
+    ) -> tuple[x509.Certificate, CAPrivateKey]:
         """Issue a certificate for a runner listener.
 
         Args:
@@ -136,7 +210,11 @@ class CertificateAuthority:
         Returns:
             Tuple of (certificate, private_key).
         """
-        private_key = ed25519.Ed25519PrivateKey.generate()
+        # The leaf follows the CA's own algorithm. A post-quantum CA issuing Ed25519
+        # leaves would leave the signature a listener actually proves possession with
+        # classical, which is most of what the change was for -- and the two are
+        # independently expressible, so this is a decision rather than a consequence.
+        private_key = _generate_key(_algorithm_name(self._ca_key))
         public_key = private_key.public_key()
 
         subject = x509.Name(
@@ -210,7 +288,7 @@ def serialize_certificate(cert: x509.Certificate) -> bytes:
 
 
 def serialize_private_key(
-    key: ed25519.Ed25519PrivateKey,
+    key: CAPrivateKey,
     password: bytes | None = None,
 ) -> bytes:
     """Serialize private key to PEM format."""

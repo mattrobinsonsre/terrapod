@@ -2423,6 +2423,10 @@
               "type": "integer",
               "minimum": 60
             },
+            "ca_algorithm": {
+              "type": "string",
+              "enum": ["ed25519", "mldsa44", "mldsa65", "mldsa87"]
+            },
             "default_join_token_max_uses": {
               "oneOf": [
                 {

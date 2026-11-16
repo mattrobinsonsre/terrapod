@@ -1187,10 +1187,47 @@ the private key the CA issues at join:
 
 | header | contents |
 |---|---|
-| `X-Terrapod-Client-Cert` | the certificate, base64 PEM (unchanged) |
+| `X-Terrapod-Client-Cert-Fingerprint` | the certificate's SHA-256 fingerprint, hex — **preferred** |
+| `X-Terrapod-Client-Cert` | the certificate, base64 PEM — still accepted |
 | `X-Terrapod-Listener-Timestamp` | unix seconds, accepted within 60s of the API's clock |
 | `X-Terrapod-Listener-Nonce` | single-use random value, remembered for 120s |
 | `X-Terrapod-Listener-Signature` | Ed25519 over `v1\n<METHOD>\n<path>\n<timestamp>\n<nonce>` |
+
+### Identifying by fingerprint rather than by certificate
+
+A listener sends **one** of the first two headers. The fingerprint is preferred and is
+what a current listener sends; the certificate form is still accepted and is what an
+older one sends, so a mixed pool works either way.
+
+The API issued that certificate, so it already holds everything the certificate was
+being used to carry. At issuance it records the public key and the expiry against the
+fingerprint, which means a fingerprint alone identifies the listener, proves the
+certificate is one we issued, and gives proof-of-possession a key to verify against.
+Sending the certificate as well adds nothing.
+
+**Nothing is weakened by the shorter form.** Expiry is still checked against the
+recorded `not_after`, by the same clock, rather than being left to the cache's TTL —
+that TTL carries 60 seconds of deliberate clock-skew slack, so relying on it would make
+the boundary a property of the cache instead of the certificate. Proof of possession is
+enforced identically, because a fingerprint is public material travelling on every
+request and is replayable in exactly the way a certificate is. What the shorter form
+*removes* is X.509 parsing of attacker-supplied bytes in the authentication path.
+
+**There is nothing to configure and no upgrade order.** A listener learns which form to
+send from the same join and renew responses that give it its identity (`cert_header_mode`
+in the response body). An API that does not send that field — anything older — is simply
+not asking, so the listener keeps sending its certificate. A listener that does not
+understand the field ignores it, and the API still accepts certificates. After a restart
+a listener sends certificates again until its next renewal, at most half the certificate
+TTL, because the mode is deliberately not persisted in the credentials Secret.
+
+**Why it matters beyond the saving.** With an Ed25519 CA this trades a 584-byte header
+for a 64-character one. The reason it is load-bearing is post-quantum readiness: an
+ML-DSA-65 certificate is roughly 10 KB once base64-encoded, which exceeds nginx's
+default 8 KB per-header buffer, and ML-DSA-87 together with its signature header exceeds
+Node's 16 KiB total. Sending the fingerprint leaves only the signature header, which
+fits comfortably at every ML-DSA size — so this is what makes a post-quantum CA possible
+at all. See [post-quantum readiness](post-quantum.md).
 
 The signature binds the request to one method and one path, so a captured
 signature cannot be pointed at a different endpoint, and the nonce means it

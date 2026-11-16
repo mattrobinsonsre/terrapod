@@ -375,7 +375,13 @@ class RateLimitMiddleware:
         # sends Bearer tokens from localStorage; listener pods send
         # X-Terrapod-Client-Cert with their X.509 cert; there is no
         # session cookie in Terrapod.)
-        listener_cert = request.headers.get("x-terrapod-client-cert", "")
+        # Either listener form counts: the fingerprint header replaces the
+        # certificate one (#2602), so reading only the certificate would drop every
+        # listener on a current build back to the UNAUTHENTICATED tier -- a far
+        # tighter bucket, silently, for the fleet's own traffic.
+        listener_cert = request.headers.get("x-terrapod-client-cert", "") or request.headers.get(
+            "x-terrapod-client-cert-fingerprint", ""
+        )
         is_authenticated = bool(auth_header) or bool(listener_cert)
 
         # A UUID-scoped log/json-output reader authenticates by the path
