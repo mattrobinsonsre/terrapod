@@ -24,6 +24,7 @@ from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db_session
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    DigestMismatch,
     NotFoundUpstream,
     SealedError,
     UpstreamError,
@@ -31,7 +32,7 @@ from terrapod.services.package_cache.substrate import (
     get_or_fetch,
     lookup,
 )
-from terrapod.storage import get_storage
+from terrapod.storage import get_storage, keys
 
 pytestmark = pytest.mark.asyncio
 
@@ -86,7 +87,8 @@ class TestFetchAndCache:
 
         assert len(calls) == 1
         assert record.size == len(WHEEL)
-        # The digest is upstream's, recorded as published rather than recomputed.
+        # Recomputed and COMPARED before storing (see TestVerification), then
+        # recorded in upstream's own published form rather than ours.
         assert record.digest == f"sha256:{WHEEL_SHA}"
         assert await storage.get(record.storage_key) == WHEEL
 
@@ -292,3 +294,115 @@ class TestRetention:
         async with get_db_session() as db:
             assert await db.get(CachedPackageFile, fresh_id) is not None
             assert await db.get(CachedPackageFile, stale_id) is None
+
+
+class TestVerification:
+    """The digest gate (#2589). Upstream's published digest is checked against the
+    bytes upstream served, before anything is stored.
+
+    These drive the real path with real storage, because the property that matters
+    is not "it raises" but "it raises AND nothing was cached" -- and only real
+    storage can answer the second half.
+    """
+
+    async def test_matching_bytes_are_cached(self, app) -> None:
+        """The control. Without it a gate that refused everything would pass the
+        three tests below and look correct."""
+        calls: list[str] = []
+        storage = get_storage()
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, _artifact(), client=client)
+
+        assert await storage.get(record.storage_key) == WHEEL
+
+    async def test_mismatched_bytes_are_refused_and_nothing_is_stored(self, app) -> None:
+        """Upstream serves bytes that are not what it published a digest for.
+
+        Either a corrupted transfer or a substituted artifact, and there is no way
+        to tell which from here -- so the artifact must not be cached, and must not
+        be half-stored for some later reader to find.
+        """
+        calls: list[str] = []
+        storage = get_storage()
+        artifact = _artifact("flask-3.0.0-mismatch.whl")
+
+        async with (
+            get_db_session() as db,
+            _fake_upstream(calls=calls, body=b"other bytes") as client,
+        ):
+            with pytest.raises(DigestMismatch, match="published sha256:"):
+                await fetch_and_cache(db, storage, artifact, client=client)
+
+        async with get_db_session() as db:
+            assert await lookup(db, "pypi", "flask", "flask-3.0.0-mismatch.whl") is None
+        assert not await storage.exists(
+            keys.package_cache_key("pypi", "flask", "flask-3.0.0-mismatch.whl")
+        )
+
+    async def test_an_absent_digest_is_refused_for_an_ecosystem_that_always_publishes_one(
+        self, app
+    ) -> None:
+        """PyPI always publishes a sha256. An artifact arriving without one means
+        the index was not the one we expect, which is a reason to stop rather than
+        a reason to cache it unverified."""
+        calls: list[str] = []
+        storage = get_storage()
+        artifact = Artifact(
+            ecosystem="pypi",
+            name="flask",
+            version="3.0.0",
+            filename="flask-3.0.0-nodigest.whl",
+            upstream_url="https://upstream.test/flask-3.0.0-nodigest.whl",
+            digest="",
+        )
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            with pytest.raises(DigestMismatch, match="published no digest"):
+                await fetch_and_cache(db, storage, artifact, client=client)
+
+        async with get_db_session() as db:
+            assert await lookup(db, "pypi", "flask", "flask-3.0.0-nodigest.whl") is None
+
+    async def test_npms_sri_integrity_is_understood(self, app) -> None:
+        """The form a parser splitting on `:` alone cannot see at all."""
+        import base64 as _b64
+
+        calls: list[str] = []
+        storage = get_storage()
+        sri = "sha512-" + _b64.b64encode(hashlib.sha512(WHEEL).digest()).decode()
+        artifact = Artifact(
+            ecosystem="npm",
+            name="left-pad",
+            version="1.3.0",
+            filename="left-pad-1.3.0.tgz",
+            upstream_url="https://upstream.test/left-pad-1.3.0.tgz",
+            digest=sri,
+        )
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert record.digest == sri
+        assert await storage.get(record.storage_key) == WHEEL
+
+    async def test_an_ecosystem_with_no_published_digest_still_caches(self, app) -> None:
+        """goproxy, nuget and pulumi_plugins are deliberately outside
+        `_DIGEST_REQUIRED` -- their material lives at a separate upstream. Until
+        that is wired they must keep working, or the gate takes the cache down
+        rather than making it safer."""
+        calls: list[str] = []
+        storage = get_storage()
+        artifact = Artifact(
+            ecosystem="goproxy",
+            name="example.com/m",
+            version="v1.0.0",
+            filename="v1.0.0.zip",
+            upstream_url="https://upstream.test/v1.0.0.zip",
+            digest="",
+        )
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert await storage.get(record.storage_key) == WHEEL

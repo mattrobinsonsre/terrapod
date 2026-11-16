@@ -97,9 +97,10 @@ async def fetch_index(
 def _digest_of(file_entry: dict) -> str:
     """Upstream's digest for a file, as `sha256:...`, or empty.
 
-    Recorded, not enforced — see the package docstring. `hashes` is a mapping of
-    algorithm to hex digest; sha256 is what every index publishes and what pip
-    checks.
+    Verified by the substrate before the file is stored — see the package
+    docstring. `hashes` is a mapping of algorithm to hex digest; sha256 is what
+    every index publishes, and what `pip` checks only when it was given
+    `--require-hashes` or a hash-pinned lock, which is why ours is not redundant.
     """
     hashes = file_entry.get("hashes")
     if isinstance(hashes, dict):

@@ -2191,6 +2191,9 @@
                         "type": "string",
                         "format": "uri"
                       }
+                    },
+                    "registration_upstream": {
+                      "type": "string"
                     }
                   }
                 },

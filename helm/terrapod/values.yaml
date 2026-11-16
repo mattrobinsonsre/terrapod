@@ -703,6 +703,12 @@ api:
         nuget:
           enabled: true
           upstream: https://api.nuget.org/v3-flatcontainer
+          # Where NuGet publishes `packageHash` -- the only digest it publishes
+          # anywhere, and so what a cached package is verified against. A second
+          # upstream because the flat container above does not serve it. An
+          # internal-mirror deployment must point this somewhere reachable too,
+          # exactly as checkov_checksum_api_url goes with checkov_mirror_url.
+          registration_upstream: https://api.nuget.org/v3/registration5-gz-semver2
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
         # Ansible Galaxy v3 (collections). Point ansible-galaxy at it with a

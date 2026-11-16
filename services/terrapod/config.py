@@ -1644,6 +1644,32 @@ class PulumiPluginCacheConfig(PackageEcosystemConfig):
     )
 
 
+class NuGetCacheConfig(PackageEcosystemConfig):
+    """The NuGet proxy, which needs a second upstream to verify a package.
+
+    A subclass rather than a field on `PackageEcosystemConfig`, for the reason
+    `PulumiPluginCacheConfig` gives: the key means nothing for the ecosystems that
+    publish a digest in the index their download URL came from.
+
+    NuGet does not. The flat container serves the `.nupkg` and publishes no digest
+    beside it (`<id>.<version>.nupkg.sha512` is a 404); `packageHash` lives on the
+    registration index's `catalogEntry`, which is a different resource on a
+    different base. So verifying a package costs one extra request, on a miss.
+    """
+
+    registration_upstream: str = Field(
+        default="https://api.nuget.org/v3/registration5-gz-semver2",
+        description="Base URL of the registration index, which is where NuGet "
+        "publishes `packageHash` -- the only digest it publishes anywhere, and "
+        "therefore what a cached package is verified against. Separate from "
+        "`upstream` because the flat container that serves packages does not serve "
+        "this. An internal-mirror deployment must point this at something reachable "
+        "too, exactly as `platform_tools.checkov_checksum_api_url` has to be pointed "
+        "alongside `checkov_mirror_url`: a mirror of the downloads alone leaves the "
+        "digest source unreachable, and verification is not optional.",
+    )
+
+
 class PackageCacheConfig(BaseModel):
     """Pull-through caching for language package registries (#1417).
 
@@ -1683,10 +1709,8 @@ class PackageCacheConfig(BaseModel):
         "`go mod download` then resolves without reaching proxy.golang.org. Serves "
         "Pulumi programs written in Go.",
     )
-    nuget: PackageEcosystemConfig = Field(
-        default_factory=lambda: PackageEcosystemConfig(
-            upstream="https://api.nuget.org/v3-flatcontainer"
-        ),
+    nuget: NuGetCacheConfig = Field(
+        default_factory=lambda: NuGetCacheConfig(upstream="https://api.nuget.org/v3-flatcontainer"),
         description="NuGet V3 flat container. Point a nuget.config packageSource at this "
         "proxy's index.json; `dotnet restore` then resolves without reaching nuget.org. "
         "Serves Pulumi programs written in C#.",
