@@ -90,4 +90,4 @@ class TestTheRequiredSet:
         and removing one silently stops requiring verification -- both directions
         matter, so a subset check would miss the one that loses a control.
         """
-        assert _DIGEST_REQUIRED == frozenset({"pypi", "npm", "galaxy"})
+        assert _DIGEST_REQUIRED == frozenset({"pypi", "npm", "galaxy", "nuget"})

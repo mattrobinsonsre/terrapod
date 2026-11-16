@@ -191,5 +191,127 @@ class TestNuGetPaths:
     def test_an_unusable_version_is_refused(self, bad: str) -> None:
         assert not nuget.valid_version(bad)
 
-    def test_no_digest_is_claimed(self) -> None:
-        assert nuget.package_artifact("A", "1.0.0").digest == ""
+    def test_no_digest_is_carried_but_one_is_resolvable(self) -> None:
+        """The flat container publishes none, so the Artifact carries none -- and a
+        resolver is attached to fetch it from the registration index on a miss.
+
+        Both halves matter: carrying one would mean an upstream round-trip during
+        construction, which happens on every request including a cache hit, and
+        attaching none would mean the package is cached unverified.
+        """
+        artifact = nuget.package_artifact("A", "1.0.0")
+        assert artifact.digest == ""
+        assert artifact.digest_resolver is not None
+
+
+class TestNuGetDigestResolution:
+    """`resolve_digest`: two hops to the only digest NuGet publishes.
+
+    Shapes taken from a real `api.nuget.org` response rather than documentation:
+    the gz-semver2 registration leaf gives `catalogEntry` as a URL, and the digest
+    on it is base64 with `packageHashAlgorithm` naming SHA512.
+    """
+
+    @staticmethod
+    def _client(handler):
+        import httpx
+
+        return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+    async def test_a_url_catalog_entry_is_followed(self) -> None:
+        import httpx
+
+        seen: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(str(request.url))
+            if request.url.path.endswith("/1.0.0.json"):
+                return httpx.Response(200, json={"catalogEntry": "https://catalog.test/a.json"})
+            return httpx.Response(
+                200, json={"packageHash": "YWJjZA==", "packageHashAlgorithm": "SHA512"}
+            )
+
+        async with self._client(handler) as client:
+            got = await nuget.resolve_digest("A", "1.0.0", client)
+
+        assert got == "sha512-YWJjZA=="
+        assert len(seen) == 2, seen
+
+    async def test_an_inline_catalog_entry_needs_no_second_hop(self) -> None:
+        """Some registrations inline it. Handled rather than assumed away."""
+        import httpx
+
+        seen: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(str(request.url))
+            return httpx.Response(
+                200,
+                json={
+                    "catalogEntry": {
+                        "packageHash": "YWJjZA==",
+                        "packageHashAlgorithm": "SHA512",
+                    }
+                },
+            )
+
+        async with self._client(handler) as client:
+            got = await nuget.resolve_digest("A", "1.0.0", client)
+
+        assert got == "sha512-YWJjZA=="
+        assert len(seen) == 1, seen
+
+    async def test_the_published_algorithm_is_used_rather_than_assumed(self) -> None:
+        """Guessing SHA-512 would compare it against a SHA-256 computation and
+        refuse every package, which is a total outage wearing a verification
+        failure's clothes."""
+        import httpx
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "catalogEntry": {
+                        "packageHash": "YWJjZA==",
+                        "packageHashAlgorithm": "SHA256",
+                    }
+                },
+            )
+
+        async with self._client(handler) as client:
+            assert await nuget.resolve_digest("A", "1.0.0", client) == "sha256-YWJjZA=="
+
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            {"catalogEntry": {"packageHashAlgorithm": "SHA512"}},
+            {"catalogEntry": {"packageHash": "YWJjZA=="}},
+            {"catalogEntry": None},
+            {},
+        ],
+    )
+    async def test_anything_unreadable_fails_closed(self, entry: dict) -> None:
+        """An empty return would read as "nothing published", which for NuGet is
+        never true -- so it must raise rather than let the package through."""
+        import httpx
+
+        from terrapod.services.package_cache.substrate import UpstreamError
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=entry)
+
+        async with self._client(handler) as client:
+            with pytest.raises(UpstreamError):
+                await nuget.resolve_digest("A", "1.0.0", client)
+
+    async def test_a_missing_package_is_not_found_rather_than_an_error(self) -> None:
+        import httpx
+
+        from terrapod.services.package_cache.substrate import NotFoundUpstream
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(404)
+
+        async with self._client(handler) as client:
+            with pytest.raises(NotFoundUpstream):
+                await nuget.resolve_digest("A", "1.0.0", client)

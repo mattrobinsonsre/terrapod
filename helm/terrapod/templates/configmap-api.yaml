@@ -362,6 +362,7 @@ data:
         nuget:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          registration_upstream: {{ .registration_upstream | quote }}
           {{- with .mirrors }}
           mirrors:
             {{- toYaml . | nindent 12 }}

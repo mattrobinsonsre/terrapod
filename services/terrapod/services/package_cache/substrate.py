@@ -25,7 +25,7 @@ import binascii
 import hashlib
 import os
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -73,6 +73,12 @@ class DigestMismatch(RuntimeError):
     """
 
 
+#: Resolves upstream's published digest on a miss. Takes the client already open
+#: for the download so an ecosystem's extra request shares its connection pool and
+#: its retry policy rather than opening a second one.
+DigestResolver = Callable[[httpx.AsyncClient], Awaitable[str]]
+
+
 @dataclass(frozen=True)
 class Artifact:
     """What an ecosystem hands the substrate to fetch and cache.
@@ -95,6 +101,19 @@ class Artifact:
     upstream_url: str
     digest: str = ""
     content_type: str = "application/octet-stream"
+    #: Fetch upstream's digest, for an ecosystem that publishes it somewhere other
+    #: than the index the download URL came from -- NuGet's `catalogEntry`, Go's
+    #: checksum database, a Pulumi provider's release checksums.
+    #:
+    #: Called ONLY from `fetch_and_cache`, which is the miss path, and only when
+    #: `digest` is empty. That placement is the whole of the design: an Artifact is
+    #: constructed on EVERY request including a cache hit, so resolving a digest
+    #: during construction would put an upstream round-trip on the hit path and
+    #: break `cache_only` outright -- a sealed node serves hits with no egress at
+    #: all. On the miss path there is no such tension, because a miss already
+    #: requires egress and `fetch_and_cache` refuses before anything else when
+    #: sealed.
+    digest_resolver: DigestResolver | None = None
 
 
 def sealed() -> bool:
@@ -123,10 +142,6 @@ _ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
 #: ecosystem has had its upstream measured and the reason is recorded in its own
 #: module:
 #:
-#:   nuget            the flat container publishes nothing beside the package
-#:                    (`.nupkg.sha512` is 404). `packageHash` -- base64 SHA-512
-#:                    -- is on the registration index's `catalogEntry`, which is
-#:                    a DIFFERENT upstream from the download base.
 #:   goproxy          the module proxy serves no digest at all (`.ziphash` and
 #:                    `.zip.sha256` are both 404). The authoritative hash is the
 #:                    checksum database's, which is also a different upstream,
@@ -138,17 +153,18 @@ _ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
 #:                    -- a different upstream again, and only derivable for
 #:                    official `pulumi/pulumi-<name>` repositories.
 #:
-#: All three share one shape and one unresolved question, recorded on #2589:
-#: their material lives at a SEPARATE upstream, so a sealed deployment cannot
-#: reach it even though it can reach the artifact. Wiring them means either
-#: refusing to cache when the digest source is unreachable (which makes those
-#: ecosystems unusable while sealed) or requiring the operator to mirror the
-#: digest source too -- the `checkov_checksum_api_url` precedent. That is an
-#: operator-facing decision, not one to settle in a commit.
+#: Both keep their material at a SEPARATE upstream, which is not the obstacle it
+#: first looks like: `digest_resolver` fetches it on the MISS path, where egress is
+#: already required, so there is no case of reaching the artifact and not its
+#: digest -- a sealed node fetches neither. NuGet is wired exactly that way. What
+#: these two still need is per-ecosystem work rather than a decision: Go's hash is
+#: a `dirhash` over the zip's sorted contents rather than a digest of the file, and
+#: a Pulumi plugin's checksums live on its provider repository's release, which is
+#: only derivable for the official `pulumi/pulumi-<name>` set.
 #:
 #: Adding an ecosystem here without wiring its digest breaks that ecosystem
 #: loudly, which is the intended direction.
-_DIGEST_REQUIRED = frozenset({"pypi", "npm", "galaxy"})
+_DIGEST_REQUIRED = frozenset({"pypi", "npm", "galaxy", "nuget"})
 
 
 def _parse_digest(declared: str) -> tuple[str, str] | None:
@@ -343,7 +359,14 @@ async def fetch_and_cache(
         # written from here -- but a half-stored object is still a thing a future
         # bug or a manual read could serve, and the cost of not storing it is one
         # re-fetch.
-        expected = _parse_digest(artifact.digest)
+        declared = artifact.digest
+        if not declared and artifact.digest_resolver is not None:
+            # One extra request, on a miss only. If the digest source is
+            # unreachable while the artifact source is up we fail closed below --
+            # a transient, and `arequest_with_retry` has already had its go at it.
+            declared = await artifact.digest_resolver(client)
+
+        expected = _parse_digest(declared)
         if expected is None and artifact.ecosystem in _DIGEST_REQUIRED:
             raise DigestMismatch(
                 f"{artifact.ecosystem} published no digest for {artifact.name} "
@@ -379,7 +402,9 @@ async def fetch_and_cache(
         filename=artifact.filename,
         storage_key=key,
         size=size,
-        digest=artifact.digest,
+        # What was VERIFIED, which for a resolved digest is not what the
+        # Artifact was constructed with.
+        digest=declared,
     )
     db.add(record)
     try:
