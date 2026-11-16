@@ -4,10 +4,12 @@ An npm client fetches a *packument* — one JSON document describing every versi
 of a package — and then fetches each version's tarball from the `dist.tarball`
 URL inside it. Only that URL is rewritten.
 
-**`dist.integrity` is left exactly as published**, and that is what makes the
-proxy safe rather than merely convenient: npm checks the tarball it receives
-against upstream's own sha512 SRI, so a substituted artifact fails in the client.
-We are a cache, not a trust boundary.
+**`dist.integrity` is left exactly as published**, and it is checked twice. The
+substrate verifies the tarball against that SRI before caching it, and leaving the
+value untouched in the rewritten packument means npm verifies it again on receipt
+against the upstream author's own sha512 rather than against an assertion of ours.
+A substituted artifact fails at admission; if anything ever got past that, it
+fails again in the client.
 
 **The abbreviated form matters.** With `Accept: application/vnd.npm.install-v1+json`
 a registry returns a much smaller document — `react`'s full packument is several

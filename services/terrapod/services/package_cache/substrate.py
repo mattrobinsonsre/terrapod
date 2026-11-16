@@ -20,6 +20,8 @@ Three constraints shape the code more than the protocol does:
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hashlib
 import os
 import tempfile
@@ -62,13 +64,28 @@ class NotFoundUpstream(RuntimeError):
     """Upstream says this artifact does not exist."""
 
 
+class DigestMismatch(RuntimeError):
+    """The bytes upstream served are not the bytes upstream published a digest for.
+
+    Fail-closed and never cached: a mismatch is either a corrupted transfer or a
+    substituted artifact, and there is no way to tell which from here. The one
+    thing that must not happen is serving it to a runner and finding out later.
+    """
+
+
 @dataclass(frozen=True)
 class Artifact:
     """What an ecosystem hands the substrate to fetch and cache.
 
-    `digest` is upstream's own, in the form the ecosystem publishes it, and is
-    recorded rather than verified here — the client checks it, and that is the
-    point (see the package docstring).
+    `digest` is upstream's own, in the form the ecosystem publishes it
+    (``<algo>:<hex>`` or SRI ``<algo>-<base64>``), and it is **verified** here
+    before the artifact is stored — see `_parse_digest` and `_DIGEST_REQUIRED`.
+
+    It used to be recorded and not checked, on the grounds that the client checks
+    it. That was only ever half true: `pip install` verifies nothing without
+    `--require-hashes` or a hash-pinned lock, so for the commonest case in the
+    commonest ecosystem there was no check anywhere. Validating what we cache is
+    the job (#2589).
     """
 
     ecosystem: str
@@ -93,9 +110,97 @@ def _resolve_tmpdir() -> str | None:
     return None
 
 
-def _digest_file(path: str) -> tuple[int, str]:
-    """Size and sha256 of a file on disk. Runs in a thread — never inline."""
-    hasher = hashlib.sha256()
+#: Digest algorithms we will check, mapped to their hashlib names. An algorithm
+#: an ecosystem publishes that is NOT here is refused rather than skipped: a
+#: digest we cannot compute is not a weaker check, it is no check, and treating
+#: it as the latter is how an unverified artifact gets cached quietly.
+_ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
+
+#: Ecosystems whose upstream publishes a per-file digest, so an artifact arriving
+#: WITHOUT one is refused rather than cached unverified.
+#:
+#: Absence from this set is a declaration, not an oversight. Each absent
+#: ecosystem has had its upstream measured and the reason is recorded in its own
+#: module:
+#:
+#:   nuget            the flat container publishes nothing beside the package
+#:                    (`.nupkg.sha512` is 404). `packageHash` -- base64 SHA-512
+#:                    -- is on the registration index's `catalogEntry`, which is
+#:                    a DIFFERENT upstream from the download base.
+#:   goproxy          the module proxy serves no digest at all (`.ziphash` and
+#:                    `.zip.sha256` are both 404). The authoritative hash is the
+#:                    checksum database's, which is also a different upstream,
+#:                    and it is a `dirhash` over the zip's sorted contents
+#:                    rather than a digest of the file.
+#:   pulumi_plugins   get.pulumi.com publishes nothing beside the tarball (403
+#:                    for `.sha256` and `SHA256SUMS`). The provider's own GitHub
+#:                    release does publish `pulumi-<name>_<ver>_checksums.txt`
+#:                    -- a different upstream again, and only derivable for
+#:                    official `pulumi/pulumi-<name>` repositories.
+#:
+#: All three share one shape and one unresolved question, recorded on #2589:
+#: their material lives at a SEPARATE upstream, so a sealed deployment cannot
+#: reach it even though it can reach the artifact. Wiring them means either
+#: refusing to cache when the digest source is unreachable (which makes those
+#: ecosystems unusable while sealed) or requiring the operator to mirror the
+#: digest source too -- the `checkov_checksum_api_url` precedent. That is an
+#: operator-facing decision, not one to settle in a commit.
+#:
+#: Adding an ecosystem here without wiring its digest breaks that ecosystem
+#: loudly, which is the intended direction.
+_DIGEST_REQUIRED = frozenset({"pypi", "npm", "galaxy"})
+
+
+def _parse_digest(declared: str) -> tuple[str, str] | None:
+    """`(hashlib algorithm, lowercase hex)` from upstream's published form.
+
+    Two forms, because the ecosystems genuinely differ and normalising them in
+    one place beats four partial parsers:
+
+    * ``<algo>:<hex>`` — PyPI and Galaxy, and npm's legacy `shasum`.
+    * ``<algo>-<base64>`` — Subresource Integrity, which is what npm's
+      `integrity` is. Note the separator is a DASH, so a parser that splits on
+      ``:`` alone silently sees no digest at all for every npm package.
+
+    Returns None when there is nothing to parse. Raises when there is something
+    and we cannot read it — an unparseable digest is a reason to stop, not to
+    proceed unverified.
+    """
+    declared = (declared or "").strip()
+    if not declared:
+        return None
+
+    if ":" in declared:
+        algo, _, value = declared.partition(":")
+        try:
+            raw = bytes.fromhex(value.strip())
+        except ValueError as exc:
+            raise DigestMismatch(f"digest {declared!r} is not hex") from exc
+    elif "-" in declared:
+        algo, _, value = declared.partition("-")
+        try:
+            raw = base64.b64decode(value.strip(), validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise DigestMismatch(f"digest {declared!r} is not base64") from exc
+    else:
+        raise DigestMismatch(f"digest {declared!r} is in no form we recognise")
+
+    name = _ALGOS.get(algo.strip().lower())
+    if name is None:
+        raise DigestMismatch(
+            f"digest {declared!r} uses algorithm {algo!r}, which we do not compute"
+        )
+    if len(raw) != hashlib.new(name).digest_size:
+        raise DigestMismatch(
+            f"digest {declared!r} is {len(raw)} bytes, not the "
+            f"{hashlib.new(name).digest_size} a {name} digest is"
+        )
+    return name, raw.hex()
+
+
+def _digest_file(path: str, algorithm: str = "sha256") -> tuple[int, str]:
+    """Size and digest of a file on disk. Runs in a thread — never inline."""
+    hasher = hashlib.new(algorithm)
     size = 0
     with open(path, "rb") as handle:
         while chunk := handle.read(_CHUNK):
@@ -233,7 +338,29 @@ async def fetch_and_cache(
         except httpx.HTTPError as exc:
             raise UpstreamError(f"could not reach {artifact.upstream_url}: {exc}") from exc
 
-        size, _sha256 = await asyncio.to_thread(_digest_file, tmp_path)
+        # Verify BEFORE storing. An artifact that fails must never reach the
+        # object store, because `lookup` gates serving on the row and the row is
+        # written from here -- but a half-stored object is still a thing a future
+        # bug or a manual read could serve, and the cost of not storing it is one
+        # re-fetch.
+        expected = _parse_digest(artifact.digest)
+        if expected is None and artifact.ecosystem in _DIGEST_REQUIRED:
+            raise DigestMismatch(
+                f"{artifact.ecosystem} published no digest for {artifact.name} "
+                f"{artifact.filename}, and this ecosystem's upstream always does. "
+                "Refusing to cache it: an absent digest here means the index was "
+                "not the one we expect, not that the artifact is fine."
+            )
+
+        algorithm = expected[0] if expected else "sha256"
+        size, computed = await asyncio.to_thread(_digest_file, tmp_path, algorithm)
+        if expected is not None and computed != expected[1]:
+            raise DigestMismatch(
+                f"{artifact.ecosystem} {artifact.name} {artifact.filename}: upstream "
+                f"published {algorithm}:{expected[1]} and served bytes whose "
+                f"{algorithm} is {computed}. Not cached."
+            )
+
         await storage.put_stream(key, _file_chunks(tmp_path), content_type=artifact.content_type)
     finally:
         # The PVC is shared and finite; a failed fetch must not leave its partial
