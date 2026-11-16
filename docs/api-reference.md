@@ -3285,6 +3285,9 @@ The rule accepts the workspace bulk-update selector's *attribute* dimensions --
 `labels`, `name_prefix`, `name_glob`, `execution_backend`,
 `execution_mode`, `terraform_version`, `agent_pool_id`, `vcs_connection_id`,
 `owner_email`, `drift_status`, `locked`, `has_vcs` -- all AND-combined.
+(`drift_status` and `locked` are refused, below.) An `exclude` list of the same
+selectors removes workspaces from the match: a workspace matching **any** entry is
+not reached, e.g. `{"labels": {"env": "prod"}, "exclude": [{"labels": {"tier": "frozen"}}]}`.
 Membership is re-evaluated on every run, so a workspace that later matches picks
 the set up without being touched, and one that stops matching stops receiving it.
 
@@ -3293,14 +3296,26 @@ Rejected with `422`: an unparseable rule; a non-object rule; `all: true` (use
 explicit assignment, and would produce a rule whose membership never
 re-evaluates); a rule on a set that is already `global`; and a rule whose
 dimensions are all blank -- `{"name_prefix": ""}` selects nothing meaningful and
-would otherwise match every workspace. `exclude` (the bulk-update selector's
-exclusion list) is not supported in assignment rules yet: a rule carrying it is
-a `422` reading `assignment-rule cannot select on exclude`, because an entry
-could select on a dimension a rule refuses.
+would otherwise match every workspace. `exclude` is refused when it has more than 20 entries (each costs a count query when an
+exclusion is reported; a stored rule over the cap matches nothing), when it is not a list
+(`[]` and `null` mean no exclusion and are not stored), alone without a positive
+selector, or when an entry is empty, sets `all`, nests `exclude`, or names
+`workspace_ids`, even as `null` (an exclusion by id never re-evaluates either), or
+when an entry's `labels` use a reserved key (`locked`, `status`, `flag`, `owner`):
+no workspace can carry one, so the entry could never match. `drift_status` and
+`locked` are refused inside an `exclude` entry exactly as they are at the top level,
+with the same reason, because a workspace's own owner can move both and could
+otherwise opt itself out of the set (`assignment-rule cannot select on locked`).
+
+Unlike a bulk update, saving a rule does **not** require every `exclude` entry to
+match a workspace today: a rule is standing, so an entry matching nothing yet is
+accepted. The varset's [association view](#association-views) reports `meta.exclusion` (how many workspaces were excluded and which entries match nothing) so a mistyped entry is visible after saving.
 
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
-credential set to the whole estate.
+credential set to the whole estate. That includes an `exclude` that cannot be
+parsed: dropping it would widen the match to the workspaces it protected, so the
+whole rule matches nothing.
 
 <a id="labels-are-not-a-credential-trust-boundary"></a>
 
@@ -3349,6 +3364,8 @@ GET /api/v1/workspaces/{workspace_id}/varsets
 `workspace-count` on the variable set itself counts only explicitly-assigned
 workspaces; for a global or rule-based set it is not the whole answer, and these
 views are.
+
+When the set's rule has an `exclude`, the varset-side view's `meta` also carries `exclusion`: `{"excluded": N, "empty": [i, ...]}`, the number of workspaces the exclusion removed from the rule's match and the indexes of `exclude` entries that match no workspace fleet-wide (usually a typo that protects nothing). It is absent when the rule has no `exclude`, or when the rule is unusable and matches nothing.
 
 **Required permission:** platform `admin` for the varset-side view;
 `workspace:read` for the workspace-side view.
@@ -4317,6 +4334,7 @@ Refused with `422`:
 - `exclude` with no positive dimension and no `"all": true` — it is never a selector on its own.
 - an entry that sets no selector: it is empty, or only a blank `name_prefix`/`name_glob` (`exclude[N] sets no selector`). `{"owner_email": ""}` is a valid selector (unowned workspaces).
 - an entry that sets `all` or nests `exclude` (`exclude[N]: 'all' and 'exclude' are not allowed in an exclude entry`).
+- an `exclude` with more than 20 entries.
 - an `exclude` that is not a list, or an entry that is not an object. `[]` and `null` both mean "no exclusion".
 
 When the filter has an `exclude`, the response also carries:

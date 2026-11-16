@@ -352,9 +352,7 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
         from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
         from terrapod.services.workspace_search_service import WorkspaceFilter
 
-        # `exclude` is refused until a later PR recurses into its entries through
-        # the same predicate.
-        assert set(RULE_DIMENSIONS_REFUSED) == {"drift_status", "locked", "exclude"}
+        assert set(RULE_DIMENSIONS_REFUSED) == {"drift_status", "locked"}
         for dim in RULE_DIMENSIONS_REFUSED:
             assert dim in WorkspaceFilter.model_fields, (
                 f"{dim} is refused but is no longer a filter dimension — the refusal "
@@ -382,7 +380,7 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
         assert resp.status_code == 422, resp.text
         assert "drift_status" in resp.text
 
-        # `exclude` can carry a refused dimension in an entry; refused until recursion.
+        # An exclusion entry is refused on the same dimensions and for the same reason.
         resp = await client.post(
             VARSETS,
             json={
@@ -401,7 +399,7 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
             headers=AUTH,
         )
         assert resp.status_code == 422, resp.text
-        assert "exclude" in resp.text
+        assert "cannot select on locked" in resp.text
 
     async def test_a_stored_rule_naming_one_matches_nothing(self, db_session=None):
         """A deployment that already has such a rule must stop honouring it, not keep
@@ -530,3 +528,61 @@ class TestOnlySetsHoldingSecretsAreRefused:
         set_auth(app, regular_user(f"probe-{tag}@test.com"))
         resp = await _create_ws(client, f"mine-{tag}", labels={"team": tag})
         assert resp.status_code == 403, resp.text
+
+
+class TestRemovingAnExclusionLabelIsGrowth:
+    """An exclusion is an opt-out, so dropping the label it selects on opts the
+    workspace IN. That is growth for the self-join guard like any other, found by
+    the generic before/after check rather than anything exclusion-specific."""
+
+    async def _owner_with_labels(self, app, client, tag, labels):
+        user = regular_user(f"probe-{tag}@test.com")
+        set_auth(app, user)
+        resp = await _create_ws(client, f"mine-{tag}", labels=labels)
+        assert resp.status_code == 201, resp.text
+        return user, resp.json()["data"]["id"]
+
+    async def _drop(self, client, ws_id, labels):
+        return await client.patch(
+            f"/api/v2/workspaces/{ws_id}",
+            json={"data": {"attributes": {"labels": labels}}},
+            headers=AUTH,
+        )
+
+    async def test_removing_the_excluding_label_is_refused_for_a_secret_set(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        user, ws_id = await self._owner_with_labels(
+            app, client, tag, {"team": tag, "tier": "frozen"}
+        )
+        set_auth(app, admin_user())
+        rule = {"labels": {"team": tag}, "exclude": [{"labels": {"tier": "frozen"}}]}
+        await _varset(client, f"excl-{tag}", rule=rule, secret=True)
+
+        set_auth(app, user)
+        resp = await self._drop(client, ws_id, {"team": tag})
+        assert resp.status_code == 403, resp.text
+        assert f"excl-{tag}" in resp.text
+
+    async def test_opting_out_by_adding_the_label_is_allowed(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        user, ws_id = await self._owner_with_labels(app, client, tag, {"team": tag})
+        set_auth(app, admin_user())
+        rule = {"labels": {"team": tag}, "exclude": [{"labels": {"tier": "frozen"}}]}
+        await _varset(client, f"excl-{tag}", rule=rule, secret=True)
+
+        set_auth(app, user)
+        resp = await self._drop(client, ws_id, {"team": tag, "tier": "frozen"})
+        assert resp.status_code == 200, resp.text
+
+    async def test_a_set_of_plain_configuration_is_not_guarded(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        user, ws_id = await self._owner_with_labels(
+            app, client, tag, {"team": tag, "tier": "frozen"}
+        )
+        set_auth(app, admin_user())
+        rule = {"labels": {"team": tag}, "exclude": [{"labels": {"tier": "frozen"}}]}
+        await _varset(client, f"excl-{tag}", rule=rule, secret=False)
+
+        set_auth(app, user)
+        resp = await self._drop(client, ws_id, {"team": tag})
+        assert resp.status_code == 200, resp.text

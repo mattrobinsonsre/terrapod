@@ -1526,6 +1526,9 @@
     "assignment-source",
     "name"
   ],
+  "variables.list_varset_workspaces:meta": [
+    "exclusion"
+  ],
   "variables.list_workspace_varsets": [
     "assignment-source",
     "name",

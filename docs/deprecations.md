@@ -264,8 +264,9 @@ variable set **carrying a sensitive or broker-resolved variable** is refused for
 anyone who is not a platform admin. Sets of plain configuration still join
 automatically, and shrinking the set that reaches a workspace is always allowed.
 `drift_status` and `locked` are no longer usable as rule selectors at all, because
-a workspace's own owner can move both; a rule naming one is rejected with `422` and
-a stored rule naming one matches nothing.
+a workspace's own owner can move both, in an `exclude` entry as much as at the top
+level; a rule naming one is rejected with `422` and a stored rule naming one matches
+nothing.
 ([`GHSA-49q6-pm68-3xgw`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-49q6-pm68-3xgw).)
 
 ### Using a VCS connection requires a claim to it, and may be scoped to repositories
