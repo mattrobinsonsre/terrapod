@@ -87,7 +87,7 @@ first — most rows do not apply to most deployments.
 | Decide | Why it is a decision rather than a step |
 |---|---|
 | [How many API replicas to run through the rollout](#two-columns-are-renamed-so-the-api-rollout-has-a-brief-window-of-errors) | two columns are renamed in place, so between the pre-upgrade migration hook and the last old pod being replaced there are replicas selecting a column that is gone. It is seconds to a couple of minutes and it self-heals — but the mitigation is to scale the API to **one** replica, and a single replica is replaced rather than overlapped, so there is no window at all. That has to be chosen before you begin, not after you notice |
-| [Whether `require_strong_secrets` stays on](#terrapod-owns-the-token-signing-key-and-a-used-deployment-adopts-its-old-one) | a deployment that has executed runs **adopts** its old derived signing key, and that switch now fires on an adopted key — which is exactly the state the upgrade lands in. So either supply `api.tokenSigningKey` at the same time as the upgrade, or leave the switch off until you have |
+| [Expect runs in flight to fail across the restart](#terrapod-owns-the-token-signing-key-and-a-derived-one-is-replaced-rather-than-adopted) | this deployment has ever executed a run | a signing key derived from the database URL is now **replaced** on startup rather than adopted, which is what lets `require_strong_secrets` default on. The four token families that share it are all short-lived, so what breaks is bounded — runs executing across the restart fail their API calls and need re-running, and a run task answered after the upgrade fails its callback. Nothing stored is affected. There is nothing to do beforehand except choose when to take the restart |
 | [Whether you may need to roll back](#a-variable-is-identified-by-its-category-and-key-together) | the downgrade removes variables a 1.x schema cannot represent — the surplus when one key is held in two categories — keeping the oldest row per key and printing each removal. It is a rollback that costs something rather than one that refuses, which is the right trade and worth knowing in advance |
 
 ### Only possible after the upgrade
@@ -97,7 +97,7 @@ first — most rows do not apply to most deployments.
 | [Find the API tokens with no recorded provider and re-mint them](#an-api-tokens-roles-are-resolved-against-the-provider-it-was-minted-under) | that entry's `SELECT` reads `api_tokens.identity_provider`, and the column is **added by a 2.0 migration** — so the query cannot run until the migration has. Until they are re-minted, automation using one resolves to no roles and gets `403` |
 | Confirm an SSO login works, then [remove the old callback URLs from your IdP](#sso-callback-urls-move-to-apiv1--re-register-them-with-your-idp-first) | with both values registered the upgrade is a no-op at the IdP, and the old ones are what a fallback to `legacy_callback_url: true` would need. Removing them is the last step, and it is optional |
 | [Remove `require_listener_proof_of_possession: false`](#listeners-must-prove-they-hold-their-certificates-private-key) once every pool is on a 2.0 listener | it is a relaxation held open for the rollout, and it is the kind that stays set for a year if nobody writes it down |
-| [Delete the old `<release>-token-signing` Secret](#terrapod-owns-the-token-signing-key-and-a-used-deployment-adopts-its-old-one) — **only after confirming you do not reference it** from `api.tokenSigningKey.existingSecret` | Helm leaves it behind on purpose (`helm.sh/resource-policy: keep`). It is inert once you are on 2.0 **unless it is the key you supply**, in which case it is live |
+| [Delete the old `<release>-token-signing` Secret](#terrapod-owns-the-token-signing-key-and-a-derived-one-is-replaced-rather-than-adopted) — **only after confirming you do not reference it** from `api.tokenSigningKey.existingSecret` | Helm leaves it behind on purpose (`helm.sh/resource-policy: keep`). It is inert once you are on 2.0 **unless it is the key you supply**, in which case it is live |
 
 Two things to expect rather than do: [sessions open across the upgrade are capped
 from their own sign-in
@@ -1274,7 +1274,7 @@ than clearing it. Set it on one of them, or on all of them to the same value.
 The UI shows a pin read-only. A `sub` is an opaque provider-issued string, so it is
 set as code or through the API rather than typed into a form.
 
-### Terrapod owns the token signing key, and a used deployment adopts its old one
+### Terrapod owns the token signing key, and a derived one is replaced rather than adopted
 
 **Affects:** every deployment. Most need to do nothing before upgrading.
 
@@ -1294,12 +1294,28 @@ from the database URL, so **startup warns until you replace it**. A deployment
 that has never executed a run has nothing in flight and generates a strong key
 immediately.
 
-**What to do before upgrading:** nothing, unless you set
-`api.config.require_strong_secrets`. That switch used to fire whenever no key
-was *configured*; it now fires on an adopted key, which is the state an upgrade
-of a used deployment lands in. So either supply a key at the same time as the
-upgrade, or leave the switch off until you have. An unset `api.tokenSigningKey`
-is the normal, strong case from here on and the switch does not object to it.
+**What to do before upgrading: nothing.** `api.config.require_strong_secrets` is
+on by default from 2.0, and it is safe to be, because the case that used to make
+it unsafe is gone. A key derived from the database URL is now **replaced with a
+generated one on the first startup** rather than adopted, so no deployment is left
+holding one for the switch to object to. An unset `api.tokenSigningKey` is the
+normal, strong case and is not reported at all.
+
+**What that restart costs**, so it is not a surprise: replacing the key
+invalidates every token minted under the old one. Four short-lived families share
+it — runner tokens, run-task callback tokens, download tickets and Slack link
+tokens — so **runs executing across the restart fail their API calls and need
+re-running**, and a run task dispatched before the upgrade and answered after it
+fails its HMAC. Download tickets and Slack links are minutes-long and will simply
+be re-issued. **Nothing stored is affected**: this key protects no data at rest.
+The row holding it is itself an encrypted column, so it is protected *by* the
+encryption key rather than the other way round, and no other encrypted column is
+touched.
+
+If you would rather control the key yourself, supplying `api.tokenSigningKey`
+still wins on every startup and is never copied into Terrapod's own store — then
+the replacement above never happens, because a configured key is read before the
+table is.
 
 **If you already supply `api.tokenSigningKey.existingSecret`, nothing changes.**
 A supplied key still wins, on every startup, and Terrapod does not read its
