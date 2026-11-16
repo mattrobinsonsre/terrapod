@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 
 import httpx
 
@@ -29,6 +30,8 @@ from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    CoordinateError,
+    Coordinates,
     NotFoundUpstream,
     UpstreamError,
 )
@@ -143,6 +146,64 @@ def artifact_for(name: str, version: str, entry: dict) -> Artifact:
         # `shasum` for packages published before integrity existed.
         digest=dist.get("integrity") or (f"sha1:{dist['shasum']}" if dist.get("shasum") else ""),
         content_type="application/octet-stream",
+    )
+
+
+#: A package name, scope and all. npm's own rule, minus the parts that only
+#: matter at publish time: an unscoped name is `[a-z0-9._~-]+` and a scoped one
+#: prefixes it with `@scope/`. Mixed case is allowed because older registries
+#: carry mixed-case names and they are distinct from their lowercase spelling.
+_NAME = re.compile(r"^(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+$")
+
+#: A semver-ish version. Permissive about pre-release and build metadata and
+#: strict about anything that could escape a path.
+_VERSION = re.compile(r"^[0-9][A-Za-z0-9._+-]*$")
+
+
+def index_coordinates(name: str) -> Coordinates:
+    """Where an operator-uploaded PACKUMENT is served from.
+
+    Uploading the tarball is not enough for npm, and this is the gap that made it
+    not enough: a sealed node answers `/npm/{package}` from the cached packument and
+    nowhere else, because the dependency ranges live in it. Without one, a tarball an
+    operator uploaded is present, vetted, and unresolvable -- `npm install` gets a
+    404 saying the package is not cached.
+
+    PyPI needs no equivalent: its sealed index is built from the rows it holds, so an
+    uploaded artifact is advertised the moment it exists.
+    """
+    name = normalise(name or "")
+    if not _NAME.match(name) or ".." in name:
+        raise CoordinateError(f"name {name!r} is not an npm package name (`pkg` or `@scope/pkg`)")
+    return Coordinates(
+        name=name,
+        version="",
+        filename=PACKUMENT_FILENAME,
+        content_type="application/json",
+    )
+
+
+def upload_coordinates(name: str, version: str) -> Coordinates:
+    """Where an operator-uploaded tarball is served from.
+
+    The filename is DERIVED (`tarball_filename`) rather than supplied, because
+    npm's own registry derives it and `find_version` on the fetch path matches on
+    the derived form: a caller-supplied filename that differed would be cached at
+    a key no install ever asks for.
+
+    **Not checked against the registry** (#2599) — an internal package or a
+    patched build of a public one is exactly what an operator uploads here.
+    """
+    name = normalise(name or "")
+    version = (version or "").strip()
+    if not _NAME.match(name) or ".." in name:
+        raise CoordinateError(f"name {name!r} is not an npm package name (`pkg` or `@scope/pkg`)")
+    if not _VERSION.match(version) or ".." in version:
+        raise CoordinateError(f"version {version!r} is not a version npm would address")
+    return Coordinates(
+        name=name,
+        version=version,
+        filename=tarball_filename(name, version),
     )
 
 

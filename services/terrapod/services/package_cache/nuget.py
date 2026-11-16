@@ -31,6 +31,8 @@ from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    CoordinateError,
+    Coordinates,
     NotFoundUpstream,
     UpstreamError,
 )
@@ -129,6 +131,50 @@ def versions_artifact(package_id: str) -> Artifact:
         filename=VERSIONS_DOC,
         upstream_url="",
         content_type="application/json",
+    )
+
+
+def index_coordinates(package_id: str) -> Coordinates:
+    """Where an operator-uploaded NuGet versions index is served from.
+
+    A sealed node answers the flat container's version list from this document, so an
+    uploaded `.nupkg` without one is present and unresolvable -- `dotnet restore` is
+    told the package is not cached.
+
+    The name is normalised the same way the serve path normalises it, because NuGet
+    addresses packages case-insensitively and a document stored under a different
+    case is one no restore ever asks for.
+    """
+    lower = normalise(package_id or "")
+    if not valid_id(lower):
+        raise CoordinateError(f"package id {package_id!r} is not one NuGet would address")
+    return Coordinates(
+        name=lower, version="", filename=VERSIONS_DOC, content_type="application/json"
+    )
+
+
+def upload_coordinates(package_id: str, version: str) -> Coordinates:
+    """Where an operator-uploaded `.nupkg` is served from.
+
+    The filename is derived the same way `package_artifact` derives it, so an
+    upload and a fetch of the same package land on the same row. Validated with
+    this module's own `valid_id` / `valid_version` and **never against the
+    upstream flat container** (#2599): an internal package is the normal case
+    for an uploaded NuGet artifact.
+    """
+    package_id = (package_id or "").strip()
+    version = (version or "").strip()
+    if not valid_id(package_id):
+        raise CoordinateError(
+            f"package id {package_id!r} is not a NuGet id (letters, digits, '.', '-' and '_')"
+        )
+    if not valid_version(version):
+        raise CoordinateError(f"version {version!r} is not a NuGet version")
+    lower = normalise(package_id)
+    return Coordinates(
+        name=lower,
+        version=version,
+        filename=f"{lower}.{version}.nupkg",
     )
 
 

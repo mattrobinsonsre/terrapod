@@ -41,6 +41,8 @@ from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    CoordinateError,
+    Coordinates,
     NotFoundUpstream,
     UpstreamError,
 )
@@ -132,6 +134,75 @@ def artifact_for(module: str, version: str, suffix: str, *, base: str | None = N
         # leaving the reason out would let a later reader read a measured
         # decision as an oversight and go looking for a sumdb client to write.
         digest="",
+        content_type=_CONTENT_TYPES[suffix],
+    )
+
+
+#: The documents an operator may upload. `@v/list` is what `go list -m -versions`
+#: and an unpinned `go get` read; `@latest` is what `go get module` with no version
+#: resolves through.
+INDEX_DOCUMENTS = {"list": LIST_DOC, "latest": LATEST_DOC}
+
+
+def index_coordinates(module: str, document: str) -> Coordinates:
+    """Where an operator-uploaded module index document is served from.
+
+    Unlike the other three this is not required for a PINNED install: `go mod
+    download` of an exact version asks for `.info`/`.mod`/`.zip` directly and never
+    consults the list. It is required for anything that has to DISCOVER a version --
+    `go get module` with no version, or `go list -m -versions`.
+
+    Served as `text/plain` for `@v/list`, which is a newline-separated list rather
+    than JSON, and as JSON for `@latest`.
+    """
+    name = cache_name(module or "")
+    if not valid_module(module or ""):
+        raise CoordinateError(f"module {module!r} is not a module path the proxy addresses")
+    key = (document or "").strip().lower()
+    filename = INDEX_DOCUMENTS.get(key)
+    if filename is None:
+        raise CoordinateError(
+            f"document {document!r} is not a module index document; "
+            f"valid values are {', '.join(sorted(INDEX_DOCUMENTS))}"
+        )
+    return Coordinates(
+        name=name,
+        version="",
+        filename=filename,
+        content_type="text/plain; charset=UTF-8" if key == "list" else "application/json",
+    )
+
+
+def upload_coordinates(module: str, version: str, suffix: str) -> Coordinates:
+    """Where one operator-uploaded module file is served from.
+
+    A module version is **three** files to the proxy protocol — `.info`, `.mod`
+    and `.zip` — and they are separate artifacts with separate bytes, so each is
+    uploaded in its own right exactly as each is fetched in its own right. An
+    upload of the `.zip` alone will not satisfy `go mod download`.
+
+    Validated with this module's own `valid_module` / `valid_version`, which
+    already refuse a path that climbs, and **never against the upstream proxy**
+    (#2599): a module from an internal host is the normal case here.
+    """
+    module = (module or "").strip()
+    version = (version or "").strip()
+    suffix = (suffix or "").strip()
+    if not valid_module(module):
+        raise CoordinateError(
+            f"module {module!r} is not a module path the proxy protocol addresses"
+        )
+    if not valid_version(version):
+        raise CoordinateError(f"version {version!r} is not a module version (it starts 'v')")
+    if suffix not in _CONTENT_TYPES:
+        raise CoordinateError(
+            f"suffix {suffix!r} is not one of the files a module version has: "
+            f"{', '.join(sorted(_CONTENT_TYPES))}"
+        )
+    return Coordinates(
+        name=cache_name(module),
+        version=version,
+        filename=f"{version}{suffix}",
         content_type=_CONTENT_TYPES[suffix],
     )
 

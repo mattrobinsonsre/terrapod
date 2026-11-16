@@ -717,6 +717,15 @@ a package-cache eviction as a deletion: confirm you can re-warm it (with
 is itself refused on a sealed node — so "I will re-warm it afterwards" is only a
 plan if you unseal first.
 
+**One exception, and it is the only way to put a package-cache artifact back
+without unsealing: an operator can UPLOAD it.** Uploading is not an upstream
+fetch, so it is not refused while sealed — see
+[Uploading a vetted artifact](package-cache.md#uploading-a-vetted-artifact). It
+is a different claim from a warm rather than a convenient substitute: the record
+says the artifact was vetted and supplied by a named person rather than fetched
+and verified against what a registry published. It does not apply to the binary
+or provider caches, which have no upload path.
+
 The VCS archive cache is unaffected. Sealing forbids reaching a package registry,
 not reaching your own VCS, so an evicted archive is re-fetched by the next poll
 or run as normal.
@@ -735,5 +744,7 @@ or run as normal.
   path narrowing decides which workspaces share an entry.
 - [Container registry](oci-registry.md) — the one that is a store as well as a
   mirror, and is garbage-collected rather than evicted.
-- [API Reference](api-reference.md#cache-administration) — the eight routes with
-  their request and response shapes.
+- [API Reference](api-reference.md#cache-administration) — every route on this
+  surface with its request and response shapes, including the per-cache
+  [upload](api-reference.md#upload-a-vetted-artifact-admin) and
+  [verify](api-reference.md#verify-a-cached-artifact-admin) endpoints.

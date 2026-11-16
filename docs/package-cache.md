@@ -238,6 +238,178 @@ Container images warm the same way through `POST /api/v1/admin/oci/warm`
 with `{"images": ["quay.io/ansible/awx-ee:24.6.1"]}`, pulling the manifest and
 every blob it references.
 
+### Seed-then-seal
+
+Warming and sealing are one procedure rather than two features, and the whole
+sequence is: run or submit the warms you expect to need while egress exists,
+check the per-item outcomes, then set `registry.cache_only: true`. From that
+point the deployment serves what it holds and reaches nothing.
+
+The warm is the *seed*; `cache_only` is the *seal*. A warm submitted after the
+seal is refused with a 409 naming the setting, which is why the order matters and
+why the per-item outcomes are worth reading before you take the second step
+rather than after.
+
+## Uploading a vetted artifact
+
+Seed-then-seal pulls from a registry and trusts what it published. Some
+organisations have the opposite rule: **nothing runs here that we have not vetted
+ourselves.** For those, an operator uploads the artifact — having unpacked it,
+reviewed it and run it through their own approval process — and the sealed
+deployment serves that and nothing else.
+
+This is a different trust model rather than a weaker one. Verification at
+admission answers *"did this come from the publisher it claims?"*. An operator
+who has already approved an artifact is asserting something else: *"this exact
+byte sequence is the one we approved"*. That is a **digest**, not a signature, and
+their process is the authority — which is why no publisher signature is required
+and why requiring one would defeat the feature. The likeliest thing uploaded here
+is something built, patched or re-packaged in-house, which no upstream key covers.
+
+What stands in for the signature is **provenance**, and in an audit it is the
+stronger claim: a named person in your own organisation put these bytes here, on
+this date, against your own approval record.
+
+### One endpoint per cache
+
+Each ecosystem takes its own coordinates, because each already computes its cache
+key from exactly those fields — an upload is the same cache key arrived at from
+the other direction. Every one is `multipart/form-data` with the bytes in a
+`file` part, so a browser form drives it unchanged.
+
+| Route (all `POST`) | Coordinates |
+|---|---|
+| `/api/v1/admin/package-cache/pypi/artifacts` | `project`, `filename` |
+| `/api/v1/admin/package-cache/npm/artifacts` | `name`, `version` |
+| `/api/v1/admin/package-cache/nuget/artifacts` | `package_id`, `version` |
+| `/api/v1/admin/package-cache/go/artifacts` | `module`, `version`, `suffix` (`.info`, `.mod` or `.zip`) |
+| `/api/v1/admin/package-cache/galaxy/artifacts` | `namespace`, `name`, `version` |
+| `/api/v1/admin/package-cache/pulumi/artifacts` | `kind`, `name`, `version`, `os`, `arch` |
+
+Every route also takes `reference` — free text, your own ticket or approval
+record — and `replace`, which is discussed below.
+
+```sh
+curl -X POST -H "$AUTH" \
+  https://terrapod.example.com/api/v1/admin/package-cache/pypi/artifacts \
+  -F project=requests \
+  -F filename=requests-2.32.3-py3-none-any.whl \
+  -F reference=CHG-4471 \
+  -F file=@requests-2.32.3-py3-none-any.whl
+```
+
+**Uploading requires the `admin` platform role.** Who may put bytes into what a
+deployment serves is a deployment-wide trust assertion, not a per-workspace one.
+
+**This works while sealed**, which is the point: every other write to these
+caches is an upstream fetch, so without it a `cache_only` deployment would have
+no way to get an artifact in at all.
+
+**The coordinates are never checked against an upstream index.** A patched
+version, an internal package, a rebuilt binary — none of them exist upstream, and
+those are the cases this exists for. They are checked only against the
+ecosystem's own naming rules, because they become a cache key and a storage path.
+
+### The record says uploaded by
+
+An uploaded artifact is never indistinguishable from a fetched one.
+`GET /api/v1/admin/package-cache` reports, per artifact:
+
+| Attribute | For an upload |
+|---|---|
+| `attestation` | `operator-upload` — against `upstream-digest` for a verified fetch, or `none-published` where upstream publishes no digest |
+| `uploaded-by` | the admin who uploaded it |
+| `upload-reference` | whatever `reference` was given, or null |
+| `digest` | the digest computed **on receipt**; for a fetch this is upstream's own |
+| `cached-at` | when it was uploaded |
+
+### Replacing one is deliberate
+
+An upload at coordinates already held is **refused with 409**, naming the digest
+that is there and how it was admitted. What you would be overwriting may be
+exactly what a run already depends on, so it is never silent.
+
+Pass `replace=true` to go ahead. The displaced digest is written to the row as
+`replaced-digest`, with `replaced-at`, so the change is on the record rather than
+only in the audit log. On a sealed node the response says plainly that the bytes
+you replaced cannot be fetched back.
+
+Re-uploading the **identical** artifact is not a replacement and is not refused:
+you are re-asserting what is already recorded. It also re-writes the object, which
+is the one repair available for an uploaded artifact whose bytes have gone from
+storage — nothing can re-fetch it.
+
+### Checking an upload later
+
+A fetched artifact can be re-verified at any time, because the publisher's
+material is still upstream. An uploaded one cannot be re-verified against
+anything except the digest recorded when it arrived — so that digest is the whole
+of its integrity story, and this is the part that must not become "we never look
+at it again".
+
+Two checks, because a cache read is a redirect to object storage and the API
+never sees the bytes a client is served:
+
+* **on every serve**, an uploaded artifact's stored object is compared against
+  the size on its row. A mismatch refuses the request rather than reporting a
+  cache miss — a miss would be filled from upstream, silently replacing vetted
+  content with unvetted under the coordinates you curated;
+* **on demand**, `POST /api/v1/admin/package-cache/{id}/verify` re-reads the
+  object and re-hashes it. `ok` is `true`, `false`, or `null` where there was no
+  recorded digest to verify against. Nothing is repaired or evicted either way:
+  what to do about a mismatch is yours to decide.
+
+### Uploading an index document
+
+An artifact upload supplies **bytes**, and for three of the six caches that is not
+enough to make the artifact reachable. A sealed node answers "what versions exist"
+from a cached index document and nowhere else, so a vetted artifact with no document
+beside it is present, recorded, and unresolvable — the install is told the package is
+not cached. npm is the clearest case: the dependency ranges live in the packument and
+in no other file.
+
+So each of those three takes a document too, at the same admin gate, with the same
+provenance and the same deliberate-replacement rule:
+
+| cache | route | form fields |
+|---|---|---|
+| npm | `POST /api/v1/admin/package-cache/npm/index` | `name`, `file` (the packument) |
+| Galaxy | `POST /api/v1/admin/package-cache/galaxy/index` | `namespace`, `name`, `document` (`collection` or `versions`), `file` |
+| NuGet | `POST /api/v1/admin/package-cache/nuget/index` | `package_id`, `file` |
+| Go | `POST /api/v1/admin/package-cache/go/index` | `module`, `document` (`list` or `latest`), `file` |
+
+Galaxy needs **two** — a sealed node reads the collection record and the version list
+from separate documents, so one without the other leaves half the path still
+answering 404.
+
+**Go is the one you may not need.** Its documents are required only to *discover* a
+version: `go get module` with no version, or `go list -m -versions`. A pinned
+`go mod download` asks for `.info`, `.mod` and `.zip` directly and never consults
+them, so a deployment that pins everything can skip it.
+
+A JSON document that does not parse is **refused at upload** rather than stored,
+because a sealed node parses it on every read — one that does not parse would fail
+every subsequent resolution rather than this one request. Go's `@v/list` is a
+newline-separated list rather than JSON and is correctly exempt.
+
+**PyPI and Pulumi need nothing extra.** PyPI builds its sealed simple index from the
+artifacts it holds, so an upload is advertised the moment it exists; Pulumi plugins
+are addressed by filename with no index at all. Neither has a route here, and that
+absence is deliberate rather than unfinished.
+
+**An uploaded artifact is not re-fetchable from anywhere.** For a sealed
+deployment that makes storage-layer replication of this cache's objects a
+requirement rather than a choice: a failover onto a follower whose blob store was
+not replicated leaves it holding a complete record of what should be there and
+unable to serve any of it, and the only recovery is re-uploading the whole
+curated set.
+
+**An upload is never gated on a scan of ours.** Terrapod does not scan
+package-cache artifacts at all today — not uploaded ones and not fetched ones —
+and the settled position is that if it ever does, a finding on an upload is
+reported rather than enforced: gating on our own scan would second-guess the
+attestor we have just said we trust.
+
 
 ## Ansible Galaxy
 
@@ -605,6 +777,11 @@ flags are the only thing that decides whether a proxy serves.
 
 Setting one to `false` means the routes are **never registered** — the proxy is
 absent from the API and from the OpenAPI schema, not mounted and answering 404.
+**That includes that ecosystem's [upload](#uploading-a-vetted-artifact) route**,
+which goes with its own flag rather than with the cache's: there is no point
+offering somewhere to put an artifact this deployment will not serve. The shared
+routes — the listing, the totals, the evictions and verify — are about the cache
+rather than about an ecosystem, so they stay.
 A surface that refuses every request is still a surface: it sits in the schema,
 carries its dependencies, and reads to anyone auditing the deployment as
 something you do.

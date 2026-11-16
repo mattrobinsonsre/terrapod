@@ -84,6 +84,19 @@ type packageCacheFileOut struct {
 	// LastAccessedAt is the field age-based eviction reads and the sort key of
 	// the listing, so it is what an operator deciding what to evict looks at.
 	LastAccessedAt string `json:"last_accessed_at,omitempty"`
+	// Attestation says HOW the artifact was admitted, and is the field to read
+	// when the question is whether anything here is unverified. EMPTY means a
+	// build that recorded nothing rather than "unverified" -- such a row is
+	// re-fetched on the next request rather than served.
+	Attestation string `json:"attestation,omitempty"`
+	// UploadedBy, UploadReference and the Replaced* pair are the provenance of
+	// an operator upload -- the audit answer to "who put this here, on whose
+	// authority, and what did it displace". Empty for anything that came from
+	// upstream.
+	UploadedBy      string `json:"uploaded_by,omitempty"`
+	UploadReference string `json:"upload_reference,omitempty"`
+	ReplacedAt      string `json:"replaced_at,omitempty"`
+	ReplacedDigest  string `json:"replaced_digest,omitempty"`
 }
 
 type packageCacheTotalOut struct {
@@ -124,7 +137,7 @@ func registerPackageCacheRead(s *mcp.Server, c *terrapod.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_package_cache_list",
-		Description: "List what Terrapod has cached from the package ecosystems its runs pull through -- galaxy (Ansible collections and roles), pypi, npm, go, nuget and pulumi -- with per-ecosystem and whole-cache totals. This is the tool for \"why is the configure slow\" and \"what is filling the object store\": a cache miss means the run fetches from the upstream registry instead, so an artifact's ABSENCE here is the finding, and `size` against `bytes` is where the storage went. Each artifact reports `digest`, which is UPSTREAM's own digest as that ecosystem expresses it rather than one of Terrapod's, so it can be matched against what the registry published. Read `last_accessed_at` rather than `cached_at` when judging what is dead weight: the listing is sorted newest-accessed first and that field is the one age-based eviction uses, because an artifact every run pulls would otherwise be evicted merely for being old and re-fetched immediately. `totals` are aggregated server-side over the whole cache and are NOT filtered by `ecosystem`/`name` or limited by the page, so they stay correct when the page is short. THIS TOOL ONLY READS, and the eviction is a tool too: `terrapod_package_cache_delete` removes one artifact and `terrapod_package_cache_evict` removes an ecosystem or everything past an age. Both are annotated destructive so a host asks first, which is where that question belongs -- the cost of an eviction is a slower run minutes or hours later for somebody who did not ask, so say what you found and what you propose rather than purging on your own initiative. Nothing is corrupted by one, because every artifact here is re-fetchable from the registry it came from -- EXCEPT when `totals.sealed` is true, which means this node cannot re-fetch anything and an eviction is a permanent deletion. Read `totals.sealed` before recommending one. Read-only; requires platform admin.",
+		Description: "List what Terrapod has cached from the package ecosystems its runs pull through -- galaxy (Ansible collections and roles), pypi, npm, go, nuget and pulumi -- with per-ecosystem and whole-cache totals. This is the tool for \"why is the configure slow\" and \"what is filling the object store\": a cache miss means the run fetches from the upstream registry instead, so an artifact's ABSENCE here is the finding, and `size` against `bytes` is where the storage went. Each artifact reports `digest`, which is UPSTREAM's own digest as that ecosystem expresses it rather than one of Terrapod's, so it can be matched against what the registry published. Read `last_accessed_at` rather than `cached_at` when judging what is dead weight: the listing is sorted newest-accessed first and that field is the one age-based eviction uses, because an artifact every run pulls would otherwise be evicted merely for being old and re-fetched immediately. `totals` are aggregated server-side over the whole cache and are NOT filtered by `ecosystem`/`name` or limited by the page, so they stay correct when the page is short. THIS TOOL ONLY READS, and the eviction is a tool too: `terrapod_package_cache_delete` removes one artifact and `terrapod_package_cache_evict` removes an ecosystem or everything past an age. Both are annotated destructive so a host asks first, which is where that question belongs -- the cost of an eviction is a slower run minutes or hours later for somebody who did not ask, so say what you found and what you propose rather than purging on your own initiative. Nothing is corrupted by one, because every artifact here is re-fetchable from the registry it came from -- TWO EXCEPTIONS, and both make an eviction permanent. When `totals.sealed` is true this node cannot re-fetch anything at all. And an artifact whose `attestation` is `operator-upload` was put here BY HAND and exists upstream nowhere, so evicting it destroys the only copy however unsealed the node is -- read that field before recommending an eviction, not just `totals.sealed`. `attestation` is also the answer to \"is anything here unverified\": `upstream-digest` means the bytes were checked against the digest the registry published, `none-published` means that ecosystem publishes nothing to check against and says so honestly rather than implying a check, `operator-upload` means somebody vouched for it instead -- with `uploaded_by`, `upload_reference` and, where it displaced something, `replaced_at` and `replaced_digest` as the audit trail. EMPTY is none of those: it is a row written before this was recorded, which is re-fetched and re-verified on the next request rather than served, so it is not a finding. Read-only; requires platform admin.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in packageCacheListIn) (*mcp.CallToolResult, packageCacheListOut, error) {
 		size := in.PageSize
@@ -164,6 +177,9 @@ func registerPackageCacheRead(s *mcp.Server, c *terrapod.Client) {
 				ID: f.ID, Ecosystem: f.Ecosystem, Name: f.Name, Version: f.Version,
 				Filename: f.Filename, Size: f.Size, Digest: f.Digest,
 				CachedAt: f.CachedAt, LastAccessedAt: f.LastAccessedAt,
+				Attestation: f.Attestation, UploadedBy: f.UploadedBy,
+				UploadReference: f.UploadReference,
+				ReplacedAt:      f.ReplacedAt, ReplacedDigest: f.ReplacedDigest,
 			})
 		}
 		for _, t := range totals {

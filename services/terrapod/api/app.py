@@ -1083,6 +1083,7 @@ def create_application() -> FastAPI:
 
     from terrapod.api.errors import jsonapi_error_response
     from terrapod.services.ha_role import NotLeaderError
+    from terrapod.services.package_cache.substrate import UploadedArtifactUnavailable
     from terrapod.services.role_reach_service import ViewerNotPermitted
 
     # JSON:API house style (#1063): every error body carries a JSON:API
@@ -1144,6 +1145,35 @@ def create_application() -> FastAPI:
         generic handler and became a 500 "Internal server error", which tells
         the caller nothing and looks like a fault rather than a refusal."""
         return jsonapi_error_response(str(exc), 403)
+
+    @app.exception_handler(UploadedArtifactUnavailable)
+    async def uploaded_artifact_unavailable_handler(
+        request: Request, exc: UploadedArtifactUnavailable
+    ) -> JSONResponse:
+        """An operator-uploaded cached artifact's object is gone, or is not what
+        was recorded for it (#2599).
+
+        **503 with the artifact named**, and here rather than in an `except` on
+        each serve route: `substrate.lookup_present` is called from several of
+        them, in some cases above any `try`, so a per-route translation is a
+        predicate written six times with one of them eventually missed. Without
+        a handler at all it falls through to the generic net and becomes a 500
+        "Internal server error", which tells an installing client nothing and
+        reads as a fault in Terrapod rather than as missing bytes somebody has
+        to put back.
+
+        503 rather than 404 for the same reason sealing answers 503: the
+        artifact is not absent, it is unservable, and telling a developer the
+        package does not exist sends them to look in the wrong place entirely.
+        The message names what to do, because nothing automatic can -- an
+        uploaded artifact has no upstream to re-fetch it from.
+        """
+        logger.warning(
+            "Refusing to serve an uploaded artifact that does not match its record",
+            path=request.url.path,
+            reason=str(exc),
+        )
+        return jsonapi_error_response(str(exc), 503)
 
     def _registry_surface(request: Request) -> bool:
         """True for the OCI registry's own paths.
@@ -1517,6 +1547,17 @@ def create_application() -> FastAPI:
 
     if settings.registry.package_cache.enabled:
         include_terrapod(cache_admin_package_router)
+        # The operator-upload routes are gated FINER than the rest of that
+        # namespace (#2599): one per ecosystem, with that ecosystem's own flag,
+        # because an upload is for one cache and offering a way to put an artifact
+        # into a cache this deployment will not serve is the half-present surface
+        # the comment above is about. `build_upload_router` returns None when no
+        # ecosystem is on, so nothing is mounted rather than an empty router.
+        from terrapod.api.routers.cache_admin import build_upload_router
+
+        upload_router = build_upload_router()
+        if upload_router is not None:
+            include_terrapod(upload_router)
     include_terrapod(cache_admin_router)
 
     # Language package proxies — PyPI and npm (#1417). Native surface rather than

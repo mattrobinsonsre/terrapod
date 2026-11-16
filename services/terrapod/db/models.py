@@ -1826,9 +1826,23 @@ class CachedPackageFile(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
     size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-    #: Upstream's own digest, stored as the ecosystem expresses it
-    #: ("sha256:..." or an SRI "sha512-..."). Empty when upstream published none.
+    #: The digest these bytes were admitted against, in the form its SOURCE
+    #: expresses it ("sha256:..." or an SRI "sha512-..."). For a fetched row that
+    #: is upstream's own, which is why it is not re-derived: it is what a client
+    #: checks our bytes against. For an **operator upload** (#2599) there is no
+    #: upstream to publish one, so it is the digest computed on receipt -- which
+    #: is then the whole of that artifact's integrity story, because nothing
+    #: exists to re-verify it against.
+    #:
+    #: `attestation` says which of the two it is, so no second column is needed
+    #: to tell them apart and every surface that already shows a digest shows the
+    #: right one. Empty only when the source published none and the ecosystem
+    #: does not require one.
     digest: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    #: When this row's bytes were written, and therefore when an uploaded
+    #: artifact was uploaded. Deliberately NOT paired with an `uploaded_at`:
+    #: nothing rewrites this for an artifact row, so a second column meaning the
+    #: same thing would only be a second thing to keep in step.
     cached_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -1837,6 +1851,25 @@ class CachedPackageFile(Base):
     last_accessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
+    #: The admin principal who uploaded this artifact, for a row admitted by an
+    #: operator rather than fetched (#2599). NULL for a fetched row, which has no
+    #: uploader -- and that asymmetry is the point: a ledger that cannot name the
+    #: attestor is not the audit trail this posture exists for.
+    uploaded_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    #: Free text an uploader may attach -- their own ticket or approval record.
+    #: Optional, because an operator who runs no ticketing process is still the
+    #: attestor; never interpreted, only stored and shown.
+    upload_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: The digest that was at these coordinates before the last replacement, and
+    #: when it was displaced. A replacement must be asked for explicitly (the
+    #: upload route refuses one that was not) and recorded, because what is being
+    #: overwritten may be what a run already depends on -- and without the
+    #: previous digest that fact is gone the instant the row is rewritten.
+    #:
+    #: The IMMEDIATELY previous admission, not a history: a full one is the
+    #: artifact ledger's job (#2589), which this column set is the first part of.
+    replaced_digest: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    replaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         sa.UniqueConstraint("ecosystem", "name", "filename", name="uq_cached_package_files"),
