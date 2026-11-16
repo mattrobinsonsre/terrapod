@@ -41,7 +41,7 @@
 // admin); it parses here as an ordinary label term. See `docs/rbac.md`
 // § Reserved label keys.
 
-import { RUN_STATUSES } from './workspace-status.ts'
+import { RUN_STATUSES, runStatusOf } from './workspace-status.ts'
 
 export interface NameTerm {
   kind: 'name'
@@ -287,6 +287,8 @@ export interface MatchableWorkspace {
     'health-conditions'?: { code?: string }[] | unknown[] | null
     // Manual state lock. Only consulted by `locked:` terms.
     locked?: boolean | null
+    // Latest run. Only consulted by `status:` terms, through `runStatusOf`.
+    'latest-run'?: { status: string; 'plan-only': boolean } | null
   }
 }
 
@@ -299,13 +301,9 @@ function conditionCodes(ws: MatchableWorkspace): Set<string> {
   return out
 }
 
-/** @param runStatus  The latest run's own status (`runStatusOf`), not the pill's;
- *  only `status:` terms read it, and undefined (no run) matches none. */
-export function matchWorkspace(
-  ws: MatchableWorkspace,
-  parsed: ParsedFilter,
-  runStatus?: string,
-): boolean {
+/** `status:` terms match the workspace's latest run (`runStatusOf`), never the
+ *  status pill; a workspace with no run matches none. */
+export function matchWorkspace(ws: MatchableWorkspace, parsed: ParsedFilter): boolean {
   const name = ws.attributes.name.toLowerCase()
   const labels = ws.attributes.labels || {}
 
@@ -334,7 +332,7 @@ export function matchWorkspace(
   // an unrecognised value in either matches nothing rather than dropping out.
   if (statuses.length > 0) {
     if (statuses.some(v => !RUN_STATUS_VALUES.has(v))) return false
-    if (!statuses.some(v => v === runStatus)) return false
+    if (!statuses.some(v => v === runStatusOf(ws))) return false
   }
   if (flags.length > 0) {
     const codes = conditionCodes(ws)

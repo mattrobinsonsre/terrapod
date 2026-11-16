@@ -4,20 +4,23 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-import { RUN_STATUSES, resolveStatus, runStatusOf } from '../src/lib/workspace-status.ts'
+import { RUN_STATUSES, resolveStatus, runStatusCounts, runStatusOf } from '../src/lib/workspace-status.ts'
 import { matchWorkspace, parseFilterQuery } from '../src/lib/workspace-filter.ts'
 
 function wsWith(
   run: { status: string; 'plan-only'?: boolean } | null,
   extra: { diverged?: boolean; vcsError?: string | null; drift?: string } = {},
 ) {
+  const conditions = [
+    extra.diverged ? 'state_diverged' : null,
+    extra.vcsError ? 'vcs_error' : null,
+    extra.drift === 'drifted' ? 'drifted' : null,
+  ].filter((code) => code !== null)
   return {
     attributes: {
       name: 'a',
+      'health-conditions': conditions.map((code) => ({ code })),
       'state-diverged': extra.diverged ?? false,
       'vcs-last-error': extra.vcsError ?? null,
       'drift-status': extra.drift ?? '',
@@ -26,8 +29,7 @@ function wsWith(
   }
 }
 
-const matches = (q: string, w: ReturnType<typeof wsWith>) =>
-  matchWorkspace(w, parseFilterQuery(q), runStatusOf(w))
+const matches = (q: string, w: ReturnType<typeof wsWith>) => matchWorkspace(w, parseFilterQuery(q))
 
 describe('runStatusOf', () => {
   it('is the latest run status for every run status the dropdown offers', () => {
@@ -55,38 +57,62 @@ describe('runStatusOf', () => {
 })
 
 describe('status: against the run, not the badge', () => {
+  // Each workspace here shows a pill that is NOT its run's status, so a matcher
+  // fed the pill (`resolveStatus`) answers differently and these fail.
   it('status:errored finds an errored run on a drifted, diverged or VCS-error workspace', () => {
     for (const extra of [{ drift: 'drifted' }, { diverged: true }, { vcsError: 'boom' }]) {
       const w = wsWith({ status: 'errored' }, extra)
+      assert.notEqual(resolveStatus(w).def?.filter, 'errored', JSON.stringify(extra))
       assert.equal(matches('status:errored', w), true, JSON.stringify(extra))
+      assert.equal(matches('status:applied', w), false, JSON.stringify(extra))
     }
   })
 
-  it('the condition no longer reads as a status: status:drifted is not a run status', () => {
-    const w = wsWith({ status: 'errored' }, { drift: 'drifted' })
+  it('the pill\'s own value is not a status: the condition is flag:\'s', () => {
+    const w = wsWith({ status: 'errored' }, { drift: 'drifted', diverged: true })
+    assert.equal(resolveStatus(w).def?.filter, 'state-diverged')
+    assert.equal(matches('status:state-diverged', w), false)
     assert.equal(matches('status:drifted', w), false)
+    assert.equal(matches('flag:drifted flag:state-diverged', w), true)
   })
 
-  it('status:needs-confirm finds a planned run awaiting confirmation', () => {
-    assert.equal(matches('status:needs-confirm', wsWith({ status: 'planned' })), true)
-    assert.equal(matches('status:planned', wsWith({ status: 'planned' })), false)
+  it('a plan-only planned run on a drifted workspace is planned, not needs-confirm', () => {
+    const w = wsWith({ status: 'planned', 'plan-only': true }, { drift: 'drifted' })
+    assert.equal(resolveStatus(w).def?.filter, 'drifted')
+    assert.equal(matches('status:planned', w), true)
+    assert.equal(matches('status:needs-confirm', w), false)
   })
 
-  it('a workspace with no latest run matches no status: value', () => {
-    const w = wsWith(null, { drift: 'drifted' })
+  it('status:needs-confirm matches only a planned run that is not plan-only', () => {
+    const awaiting = wsWith({ status: 'planned' }, { diverged: true })
+    assert.equal(resolveStatus(awaiting).def?.filter, 'needs-confirm')
+    assert.equal(matches('status:needs-confirm', awaiting), true)
+    assert.equal(matches('status:planned', awaiting), false)
+    assert.equal(matches('status:needs-confirm', wsWith({ status: 'planned', 'plan-only': true })), false)
+    assert.equal(matches('status:needs-confirm', wsWith({ status: 'applied' })), false)
+  })
+
+  it('a workspace with no latest run matches no status: value, whatever its pill shows', () => {
+    const w = wsWith(null, { drift: 'drifted', diverged: true })
+    assert.equal(resolveStatus(w).def?.filter, 'state-diverged')
     for (const s of RUN_STATUSES) assert.equal(matches(`status:${s.filter}`, w), false, s.filter)
     assert.equal(matches('status:errored status:applied', w), false)
   })
 })
 
-describe('the page feeds the matcher and the dropdown counts from the same function', () => {
-  const src = readFileSync(
-    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'app', 'workspaces', 'page.tsx'),
-    'utf8',
-  )
-
-  it('no status: call site reads the badge', () => {
-    assert.doesNotMatch(src, /resolveStatus\([^)]*\)\.def\?\.filter/)
-    assert.equal((src.match(/runStatusOf\(ws\)/g) ?? []).length >= 2, true)
+describe('runStatusCounts', () => {
+  it('counts the run statuses the matcher matches, not the pills', () => {
+    const list = [
+      wsWith({ status: 'errored' }, { drift: 'drifted' }),
+      wsWith({ status: 'errored' }, { diverged: true }),
+      wsWith({ status: 'planned' }),
+      wsWith({ status: 'planned', 'plan-only': true }),
+      wsWith(null, { drift: 'drifted' }),
+    ]
+    assert.deepEqual(runStatusCounts(list), { errored: 2, 'needs-confirm': 1, planned: 1 })
+    for (const [status, n] of Object.entries(runStatusCounts(list))) {
+      const matched = list.filter((w) => matches(`status:${status}`, w)).length
+      assert.equal(matched, n, status)
+    }
   })
 })

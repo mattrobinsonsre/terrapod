@@ -106,12 +106,22 @@ const awaitsConfirmation = (run: { status: string; 'plan-only': boolean }): bool
 /** The `status:` value for a workspace: its latest run's own status, one of
  *  `RUN_STATUSES`, or undefined with no run. Conditions play no part. */
 export function runStatusOf(ws: {
-  attributes: { 'latest-run': { status: string; 'plan-only': boolean } | null }
+  attributes: { 'latest-run'?: { status: string; 'plan-only': boolean } | null }
 }): string | undefined {
   const run = ws.attributes['latest-run']
   if (!run) return undefined
   const status = awaitsConfirmation(run) ? 'needs-confirm' : run.status
   return RUN_FILTERS.has(status) ? status : undefined
+}
+
+/** How many workspaces hold each `status:` value, by `runStatusOf`. */
+export function runStatusCounts(workspaces: Parameters<typeof runStatusOf>[0][]): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const ws of workspaces) {
+    const f = runStatusOf(ws)
+    if (f) counts[f] = (counts[f] || 0) + 1
+  }
+  return counts
 }
 
 /** Resolve a workspace's effective status from its signals.

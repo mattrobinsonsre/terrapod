@@ -51,7 +51,7 @@ import {
   toggleLockedTerm,
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
-import { RUN_STATUSES, resolveStatus, runStatusOf } from '@/lib/workspace-status'
+import { RUN_STATUSES, resolveStatus, runStatusCounts } from '@/lib/workspace-status'
 import { defaultEngineVersion, versionToolFor } from '@/lib/engine-version'
 import {
   CREATE_INPUT,
@@ -692,7 +692,7 @@ function WorkspacesPageInner() {
       : workspaces
     if (parsedFilter.terms.length === 0) return byEngine
     return byEngine.filter(ws => {
-      return matchWorkspace(ws, parsedFilter, runStatusOf(ws))
+      return matchWorkspace(ws, parsedFilter)
     })
   }, [workspaces, parsedFilter, engineFilter])
 
@@ -771,14 +771,7 @@ function WorkspacesPageInner() {
   // Per-status counts on the unfiltered workspace list, memoised so the
   // dropdown render is a constant lookup. Recomputes only when the
   // workspace data changes.
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const ws of workspaces) {
-      const f = runStatusOf(ws)
-      if (f) counts[f] = (counts[f] || 0) + 1
-    }
-    return counts
-  }, [workspaces])
+  const statusCounts = useMemo(() => runStatusCounts(workspaces), [workspaces])
 
   // Per-flag counts on the unfiltered list, for the Flags dropdown rows. Keyed
   // by the `flag:` value, derived from the server's condition codes.

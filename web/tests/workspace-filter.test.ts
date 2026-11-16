@@ -30,7 +30,7 @@ import {
 
 function ws(
   name: string,
-  opts: { labels?: Record<string, string>; conditions?: string[]; locked?: boolean } = {},
+  opts: { labels?: Record<string, string>; conditions?: string[]; locked?: boolean; run?: string } = {},
 ) {
   return {
     attributes: {
@@ -38,48 +38,56 @@ function ws(
       labels: opts.labels ?? {},
       'health-conditions': (opts.conditions ?? []).map((code) => ({ code })),
       locked: opts.locked ?? false,
+      // The latest run's status; `needs-confirm` is a planned run that is not plan-only.
+      'latest-run': opts.run
+        ? {
+            id: 'run-1',
+            status: opts.run === 'needs-confirm' ? 'planned' : opts.run,
+            'plan-only': opts.run !== 'needs-confirm',
+          }
+        : null,
     },
   }
 }
 
-function match(query: string, w: ReturnType<typeof ws>, status?: string) {
-  return matchWorkspace(w, parseFilterQuery(query), status)
+function match(query: string, w: ReturnType<typeof ws>) {
+  return matchWorkspace(w, parseFilterQuery(query))
 }
 
 describe('status terms union', () => {
   it('status:planned status:applied is planned OR applied', () => {
-    assert.equal(match('status:planned status:applied', ws('a'), 'planned'), true)
-    assert.equal(match('status:planned status:applied', ws('a'), 'applied'), true)
-    assert.equal(match('status:planned status:applied', ws('a'), 'errored'), false)
+    assert.equal(match('status:planned status:applied', ws('a', { run: 'planned' })), true)
+    assert.equal(match('status:planned status:applied', ws('a', { run: 'applied' })), true)
+    assert.equal(match('status:planned status:applied', ws('a', { run: 'errored' })), false)
   })
 
   it('a single status behaves as before', () => {
-    assert.equal(match('status:errored', ws('a'), 'errored'), true)
-    assert.equal(match('status:errored', ws('a'), 'applied'), false)
+    assert.equal(match('status:errored', ws('a', { run: 'errored' })), true)
+    assert.equal(match('status:errored', ws('a', { run: 'applied' })), false)
   })
 
   it('status is only the run status: locked and unhealthy are no longer values of it', () => {
     // Neither spelling is special any more, so each is just an unknown status.
-    assert.equal(match('status:locked', ws('a', { locked: true }), 'applied'), false)
-    assert.equal(match('status:unhealthy', ws('a', { conditions: ['drifted'] }), 'applied'), false)
+    assert.equal(match('status:locked', ws('a', { run: 'applied', locked: true })), false)
+    assert.equal(match('status:unhealthy', ws('a', { run: 'applied', conditions: ['drifted'] })), false)
   })
 })
 
 describe('an unrecognised status value matches nothing', () => {
   it('a typo next to a valid status does not widen to that status', () => {
-    assert.equal(match('status:erored status:applied', ws('a'), 'applied'), false)
-    assert.equal(match('status:applied status:erored', ws('a'), 'applied'), false)
-    assert.equal(match('status:erored', ws('a'), 'errored'), false)
+    assert.equal(match('status:erored status:applied', ws('a', { run: 'applied' })), false)
+    assert.equal(match('status:applied status:erored', ws('a', { run: 'applied' })), false)
+    assert.equal(match('status:erored', ws('a', { run: 'errored' })), false)
   })
 
   it('the removed spellings are unknown values when typed by hand', () => {
-    assert.equal(match('status:locked status:applied', ws('a', { locked: true }), 'applied'), false)
-    assert.equal(match('status:unhealthy status:applied', ws('a', { conditions: ['drifted'] }), 'applied'), false)
-    assert.equal(match('status:drifted status:applied', ws('a', { conditions: ['drifted'] }), 'applied'), false)
+    assert.equal(match('status:locked status:applied', ws('a', { run: 'applied', locked: true })), false)
+    assert.equal(match('status:unhealthy status:applied', ws('a', { run: 'applied', conditions: ['drifted'] })), false)
+    assert.equal(match('status:drifted status:applied', ws('a', { run: 'applied', conditions: ['drifted'] })), false)
   })
 
   it('every value the dropdown offers still matches', () => {
-    for (const s of RUN_STATUSES) assert.equal(match(`status:${s.filter}`, ws('a'), s.filter), true, s.filter)
+    for (const s of RUN_STATUSES) assert.equal(match(`status:${s.filter}`, ws('a', { run: s.filter })), true, s.filter)
   })
 })
 
@@ -186,8 +194,8 @@ describe('locked is its own key', () => {
     assert.equal(match('locked:true flag:drifted', lockedDrifted), true)
     assert.equal(match('locked:true flag:drifted', ws('a', { conditions: ['drifted'] })), false)
     assert.equal(match('locked:true flag:drifted', ws('a', { locked: true })), false)
-    assert.equal(match('locked:true status:errored', ws('a', { locked: true }), 'errored'), true)
-    assert.equal(match('locked:true status:errored', ws('a', { locked: false }), 'errored'), false)
+    assert.equal(match('locked:true status:errored', ws('a', { run: 'errored', locked: true })), true)
+    assert.equal(match('locked:true status:errored', ws('a', { run: 'errored', locked: false })), false)
   })
 
   it('treats an unrecognised value as matching nothing, not everything', () => {
@@ -197,9 +205,9 @@ describe('locked is its own key', () => {
 
 describe('typed terms still intersect', () => {
   it('status AND a label: status:errored env:prod', () => {
-    assert.equal(match('status:errored env:prod', ws('a', { labels: { env: 'prod' } }), 'errored'), true)
-    assert.equal(match('status:errored env:prod', ws('a', { labels: { env: 'dev' } }), 'errored'), false)
-    assert.equal(match('status:errored env:prod', ws('a', { labels: { env: 'prod' } }), 'applied'), false)
+    assert.equal(match('status:errored env:prod', ws('a', { run: 'errored', labels: { env: 'prod' } })), true)
+    assert.equal(match('status:errored env:prod', ws('a', { run: 'errored', labels: { env: 'dev' } })), false)
+    assert.equal(match('status:errored env:prod', ws('a', { run: 'applied', labels: { env: 'prod' } })), false)
   })
 
   it('label terms still AND: env:prod env:staging matches nothing, unchanged', () => {
@@ -213,10 +221,10 @@ describe('typed terms still intersect', () => {
   })
 
   it('an OR-ed status group ANDs with a name, a label and a flag', () => {
-    const w = ws('eu1-net', { labels: { env: 'prod' }, conditions: ['drifted'] })
-    assert.equal(match('eu1 env:prod flag:drifted status:planned status:applied', w, 'applied'), true)
-    assert.equal(match('eu1 env:prod flag:drifted status:planned status:applied', w, 'errored'), false)
-    assert.equal(match('us1 env:prod flag:drifted status:planned status:applied', w, 'applied'), false)
+    const on = (run: string) => ws('eu1-net', { labels: { env: 'prod' }, conditions: ['drifted'], run })
+    assert.equal(match('eu1 env:prod flag:drifted status:planned status:applied', on('applied')), true)
+    assert.equal(match('eu1 env:prod flag:drifted status:planned status:applied', on('errored')), false)
+    assert.equal(match('us1 env:prod flag:drifted status:planned status:applied', on('applied')), false)
   })
 
   it('matches everything for an empty filter', () => {
@@ -322,9 +330,9 @@ describe('migrateLegacyFilter', () => {
     const q = migrateLegacyFilter('status:locked status:errored')
     assert.equal(q, 'locked:true status:errored')
     const parsed = parseFilterQuery(q)
-    assert.equal(matchWorkspace(ws('a', { locked: true }), parsed, 'errored'), true)
-    assert.equal(matchWorkspace(ws('a', { locked: false }), parsed, 'errored'), false)
-    assert.equal(matchWorkspace(ws('a', { locked: true }), parsed, 'applied'), false)
+    assert.equal(matchWorkspace(ws('a', { run: 'errored', locked: true }), parsed), true)
+    assert.equal(matchWorkspace(ws('a', { run: 'errored', locked: false }), parsed), false)
+    assert.equal(matchWorkspace(ws('a', { run: 'applied', locked: true }), parsed), false)
   })
 
   it('keeps status:unhealthy status:errored meaning unhealthy AND errored', () => {
@@ -332,16 +340,16 @@ describe('migrateLegacyFilter', () => {
     assert.equal(q, `${allFlags} status:errored`)
     const parsed = parseFilterQuery(q)
     for (const code of FLAG_CODES) {
-      assert.equal(matchWorkspace(ws('a', { conditions: [code] }), parsed, 'errored'), true, code)
+      assert.equal(matchWorkspace(ws('a', { run: 'errored', conditions: [code] }), parsed), true, code)
     }
-    assert.equal(matchWorkspace(ws('a'), parsed, 'errored'), false)
-    assert.equal(matchWorkspace(ws('a', { conditions: ['drifted'] }), parsed, 'applied'), false)
+    assert.equal(matchWorkspace(ws('a', { run: 'errored' }), parsed), false)
+    assert.equal(matchWorkspace(ws('a', { run: 'applied', conditions: ['drifted'] }), parsed), false)
   })
 
   it('maps status:drifted onto the server condition, not the badge', () => {
     const parsed = parseFilterQuery(migrateLegacyFilter('status:drifted'))
-    assert.equal(matchWorkspace(ws('a', { conditions: ['drifted'] }), parsed, 'needs-confirm'), true)
-    assert.equal(matchWorkspace(ws('a'), parsed, 'applied'), false)
+    assert.equal(matchWorkspace(ws('a', { run: 'needs-confirm', conditions: ['drifted'] }), parsed), true)
+    assert.equal(matchWorkspace(ws('a', { run: 'applied' }), parsed), false)
   })
 })
 
