@@ -136,7 +136,7 @@ class TestReady:
                 raise verdict["value"]
             return verdict["value"]
 
-        monkeypatch.setattr(lr, "_unconfigured_locations", unconfigured)
+        monkeypatch.setattr(lr, "_location_counts", unconfigured)
         verdict["value"] = OSError("still down")
         async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
             held = await c.get("/ready")
@@ -146,6 +146,27 @@ class TestReady:
         assert held.json()["checks"]["storage_locations"].startswith("unchecked")
         assert passed.status_code == 200
         assert passed.json()["checks"]["storage_locations"] == "healthy"
+
+    @patch("terrapod.api.health.schema_is_current", new_callable=AsyncMock)
+    @patch("terrapod.api.health.get_storage_or_none")
+    @patch("terrapod.api.health.get_redis_health", new_callable=AsyncMock)
+    @patch("terrapod.api.health.get_db_health", new_callable=AsyncMock)
+    async def test_an_unreachable_location_is_a_detail_not_a_failure(
+        self, mock_db, mock_redis, mock_storage, mock_schema, monkeypatch
+    ):
+        from terrapod.storage import location_resolver as lr
+
+        mock_db.return_value = mock_redis.return_value = True
+        mock_storage.return_value = object()
+        mock_schema.return_value = (True, "abc123")
+        monkeypatch.setattr(lr, "_unchecked", None)
+        monkeypatch.setattr(lr, "_unreachable", {"eu-west": "OSError: refused"})
+        monkeypatch.setattr(lr, "_probed_at", lr.time.monotonic())
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.get("/ready")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ready"
+        assert resp.json()["checks"]["storage_locations"] == "unreachable: eu-west"
 
 
 class TestHealth:

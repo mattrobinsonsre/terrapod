@@ -217,6 +217,10 @@ HAND_BUILT_SITES: dict[tuple[str, str], tuple[int, str]] = {
     ("services/artifact_retention_service.py", "f'state/{ws_id}/'"): (1, _WS_LIST),
     ("services/artifact_retention_service.py", "'state/'"): (3, _STATE_SCAN),
     ("cli/restore_verify.py", "'state/'"): (1, "scans the whole state/ prefix for state versions"),
+    ("storage/location_resolver.py", "'state/'"): (
+        1,
+        "reachability probe: lists one key under a prefix every location serves",
+    ),
     ("services/blob_classes.py", "'state/'"): (1, "blob class prefix table, not a workspace key"),
     ("services/blob_classes.py", "'state/index.yaml'"): (1, "blob class prefix table"),
     ("services/blob_classes.py", "'config/'"): (1, "blob class prefix table"),

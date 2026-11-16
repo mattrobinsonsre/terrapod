@@ -552,6 +552,13 @@ BLOB_COPY_DEFERRED = Counter(
     ["blob_class"],
 )
 
+STORAGE_LOCATION_REACHABLE = Gauge(
+    "terrapod_storage_location_reachable",
+    "1 when a named storage location answered this node's latest read-only probe "
+    "(at start-up, then in the background every 30s or so), 0 when it did not",
+    ["location"],
+)
+
 BLOB_COPY_STOPPED_EARLY = Gauge(
     "terrapod_blob_copy_classes_stopped_early",
     "Classes whose last copy cycle did NOT finish — hit the byte cap, or could "

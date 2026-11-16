@@ -54,10 +54,13 @@ async def ready(response: Response) -> dict[str, str | dict[str, str]]:
     if checks["database"] == "healthy":
         schema_ok, schema_detail = await schema_is_current()
         checks["migrations"] = "healthy" if schema_ok else f"skew: {schema_detail}"
-        # A storage location check that could not run at startup is retried here until it passes.
-        checks["storage_locations"] = await locations_readiness()
+        # A failed start-up check holds readiness; an unreachable location is detail only.
+        locations_ok, checks["storage_locations"] = await locations_readiness()
+    else:
+        locations_ok = True
 
-    all_healthy = all(v == "healthy" for v in checks.values())
+    others = (v for k, v in checks.items() if k != "storage_locations")
+    all_healthy = locations_ok and all(v == "healthy" for v in others)
 
     if not all_healthy:
         logger.warning("Readiness check failed", checks=checks)

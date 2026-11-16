@@ -319,3 +319,151 @@ class TestAgainstPostgres:
             async with get_db_session() as db:
                 await db.execute(text(sql))
         assert _is_pre_migration(caught.value)
+
+
+class TestAFollowerResolvesLocallyFromItsReplicatedRow:
+    async def test_a_replicated_row_routes_without_asking_the_leader(
+        self, app, buckets, monkeypatch
+    ):
+        import httpx
+
+        from terrapod.db.models import Workspace
+        from terrapod.services import replication, replication_registry
+
+        spec = replication_registry.WORKSPACES
+        [ws_id] = await _rows("eu-west")
+        async with get_db_session() as db:
+            row = await db.get(Workspace, uuid.UUID(ws_id))
+            payload = replication.serialize_row(spec, row)
+            await db.delete(row)
+        assert payload["storage_location"] == "eu-west"
+        async with get_db_session() as db:
+            await replication.apply_upsert(db, spec, payload)
+
+        async def no_network(*_a, **_kw):
+            raise AssertionError("resolving a location must not call another node")
+
+        monkeypatch.setattr(httpx.AsyncClient, "send", no_network)
+        get_storage().resolver._known.clear()
+        key = keys.state_key(ws_id, str(uuid.uuid4()))
+        await get_storage().put(key, b"{}")
+
+        assert key in await _keys(buckets["eu-west"])
+        assert key not in await _keys(buckets["us-east"])
+
+
+class TestALocationCannotChangeUnderAWorkspace:
+    async def test_an_orm_write_that_changes_it_is_refused(self, app):
+        from terrapod.db.models import Workspace
+
+        [eu, home] = await _rows("eu-west", None)
+        for ws_id, other in ((eu, "us-east"), (eu, None), (home, "eu-west")):
+            async with get_db_session() as db:
+                ws = await db.get(Workspace, uuid.UUID(ws_id))
+                with pytest.raises(ValueError, match="cannot be changed"):
+                    ws.storage_location = other
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, uuid.UUID(home))
+            ws.storage_location = "default"
+            ws = await db.get(Workspace, uuid.UUID(eu))
+            ws.storage_location = "eu-west"
+
+    async def test_an_expired_location_cannot_be_overwritten_unseen(self, app):
+        from terrapod.db.models import Workspace
+
+        [eu] = await _rows("eu-west")
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, uuid.UUID(eu))
+            db.expire(ws, ["storage_location"])
+            with pytest.raises(ValueError, match="cannot be changed"):
+                ws.storage_location = "us-east"
+        async with get_db_session() as db:
+            assert (await db.get(Workspace, uuid.UUID(eu))).storage_location == "eu-west"
+
+    async def test_a_deferred_or_refreshed_location_cannot_be_overwritten_unseen(self, app):
+        from sqlalchemy import select
+        from sqlalchemy.orm import load_only
+
+        from terrapod.db.models import Workspace
+
+        [eu] = await _rows("eu-west")
+        async with get_db_session() as db:
+            ws = (
+                await db.execute(
+                    select(Workspace)
+                    .where(Workspace.id == uuid.UUID(eu))
+                    .options(load_only(Workspace.name))
+                )
+            ).scalar_one()
+            with pytest.raises(ValueError, match="cannot be changed"):
+                ws.storage_location = "us-east"
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, uuid.UUID(eu))
+            await db.refresh(ws, attribute_names=["storage_location"])
+            with pytest.raises(ValueError, match="cannot be changed"):
+                ws.storage_location = "us-east"
+            ws.storage_location = "eu-west"
+            db.expire(ws)
+            await db.refresh(ws, attribute_names=["name"])
+            with pytest.raises(ValueError, match="cannot be changed"):
+                ws.storage_location = None
+
+    async def test_a_new_or_pending_workspace_takes_any_location(self, app):
+        from terrapod.db.models import Workspace
+
+        async with get_db_session() as db:
+            ws = Workspace(name=f"new-{uuid.uuid4().hex[:8]}", storage_location="eu-west")
+            ws.storage_location = "us-east"
+            db.add(ws)
+            ws.storage_location = "eu-west"
+        async with get_db_session() as db:
+            assert (await db.get(Workspace, ws.id)).storage_location == "eu-west"
+
+    async def test_replication_cannot_move_a_workspace_either(self, app):
+        from terrapod.db.models import Workspace
+        from terrapod.services import replication, replication_registry
+
+        [eu] = await _rows("eu-west")
+        spec = replication_registry.WORKSPACES
+        async with get_db_session() as db:
+            payload = replication.serialize_row(spec, await db.get(Workspace, uuid.UUID(eu)))
+        payload["storage_location"] = "us-east"
+        with pytest.raises(ValueError, match="cannot be changed"):
+            async with get_db_session() as db:
+                await replication.apply_upsert(db, spec, payload)
+
+
+class TestTheReachabilityProbeAgainstS3:
+    async def test_an_unreachable_location_in_use_is_reported_at_startup(self, app, monkeypatch):
+        from terrapod.storage import close_storage, init_storage
+        from terrapod.storage import location_resolver as lr
+
+        bogus_bucket = _s3(f"probe-{uuid.uuid4().hex[:8]}")
+        bogus_bucket.bucket = f"terrapod-no-such-bucket-{uuid.uuid4().hex[:8]}"
+        no_endpoint = _s3("probe")
+        no_endpoint.endpoint_url = "http://127.0.0.1:9"
+        monkeypatch.setattr(
+            settings.storage,
+            "locations",
+            {
+                **settings.storage.locations,
+                "missing-bucket": StorageLocationConfig(backend=StorageBackend.S3, s3=bogus_bucket),
+                "no-endpoint": StorageLocationConfig(backend=StorageBackend.S3, s3=no_endpoint),
+            },
+        )
+        monkeypatch.setattr(lr, "_unchecked", None)
+        monkeypatch.setattr(lr, "_unreachable", {})
+        monkeypatch.setattr(lr, "_probed_at", None)
+        monkeypatch.setattr(lr, "_PROBE_TIMEOUT_SECONDS", 3.0)
+        await close_storage()
+        await init_storage()
+        await _rows("missing-bucket")
+
+        await lr.check_locations_at_startup()
+
+        assert set(lr._unreachable) == {"missing-bucket", "no-endpoint"}
+        assert "NoSuchBucket" in lr._unreachable["missing-bucket"]
+        assert await lr.locations_readiness() == (
+            True,
+            "unreachable: missing-bucket, no-endpoint",
+        )

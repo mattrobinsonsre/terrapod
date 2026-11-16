@@ -872,6 +872,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     # Shutdown
     logger.info("Shutting down Terrapod API server")
+    from terrapod.storage.location_resolver import stop_probing
+
+    await stop_probing()
     await close_storage()
     await close_redis()
     await close_db()
