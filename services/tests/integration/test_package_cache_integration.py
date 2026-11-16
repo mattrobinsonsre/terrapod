@@ -602,27 +602,39 @@ class TestPulumiPluginVerification:
         assert await storage.get(record.storage_key) == self.PLUGIN_BODY
         assert any(url.endswith("_SHA256SUMS") for url in calls), calls
 
-    async def test_an_absent_manifest_REFUSES_the_first_party_plugin(self, app) -> None:
-        """Nothing cached and nothing recorded. The alternative -- admit it as
-        `none-published` -- would mean a broken release of ours was
-        indistinguishable in the ledger from an upstream that ships no digests.
+    async def test_an_absent_manifest_CACHES_the_plugin_as_unverified(self, app) -> None:
+        """Cached, and recorded honestly as `none-published`.
+
+        This asserted a refusal until 2026-11-16, on the reasoning that a broken
+        release of ours should not look like an upstream that ships no digests. It
+        broke a supported configuration: an operator who has pointed
+        `first_party_url` at an internal mirror holding only the tarballs would have
+        had these plugins refused on upgrade, under config they already had. The
+        absence is logged at WARNING instead, and the integrity check that matters --
+        bytes against a manifest that IS there -- is unaffected.
         """
         filename = "pulumi-resource-terrapod-v8.1.1-linux-amd64.tar.gz"
         calls: list[str] = []
         storage = get_storage()
 
         async with get_db_session() as db, self._client(calls, manifest=None) as client:
-            with pytest.raises(UpstreamError, match="no readable checksums manifest"):
-                await fetch_and_cache(db, storage, self._artifact(filename), client=client)
+            record = await fetch_and_cache(db, storage, self._artifact(filename), client=client)
 
-        async with get_db_session() as db:
-            assert await lookup(db, "pulumi", "pulumi-resource-terrapod", filename) is None
-        assert not await storage.exists(
+        assert record.attestation == "none-published"
+        assert record.digest == ""
+        assert await storage.exists(
             keys.package_cache_key("pulumi", "pulumi-resource-terrapod", filename)
         )
 
-    async def test_a_manifest_NOT_LISTING_this_platform_REFUSES_it(self, app) -> None:
-        """A partial release: the manifest is there and this asset is not in it."""
+    async def test_a_manifest_NOT_LISTING_this_platform_caches_it_unverified(self, app) -> None:
+        """A partial release, or a mirror carrying a subset of platforms: the manifest
+        is there and this asset is not in it.
+
+        What must NOT happen is verifying these bytes against the OTHER platform's
+        digest, which would refuse a perfectly good download and read as corruption.
+        So the absence is recorded rather than a digest invented -- see
+        `test_it_NEVER_INVENTS_a_digest` for the unit-level form.
+        """
         filename = "pulumi-resource-terrapod-v8.1.2-windows-arm64.tar.gz"
         other = "pulumi-resource-terrapod-v8.1.2-linux-amd64.tar.gz"
         calls: list[str] = []
@@ -632,11 +644,9 @@ class TestPulumiPluginVerification:
             get_db_session() as db,
             self._client(calls, manifest=f"{self.PLUGIN_SHA}  {other}\n") as client,
         ):
-            with pytest.raises(UpstreamError, match="is not listed in the checksums manifest"):
-                await fetch_and_cache(db, storage, self._artifact(filename), client=client)
+            record = await fetch_and_cache(db, storage, self._artifact(filename), client=client)
 
-        async with get_db_session() as db:
-            assert await lookup(db, "pulumi", "pulumi-resource-terrapod", filename) is None
+        assert record.attestation == "none-published"
 
     async def test_BYTES_THAT_DO_NOT_MATCH_the_manifest_are_refused_and_not_stored(
         self, app

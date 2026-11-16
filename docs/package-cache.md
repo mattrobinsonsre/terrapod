@@ -163,7 +163,7 @@ off — pointing at an internal mirror if you have one — then seal.
 | `api.config.registry.package_cache.npm.upstream` | `https://registry.npmjs.org` | As above. |
 | `api.config.registry.package_cache.galaxy.upstream` | `https://galaxy.ansible.com` | As above. |
 | `api.config.registry.package_cache.pulumi.upstream` | `https://get.pulumi.com/releases/plugins` | As above. Where **Pulumi's** plugins come from. |
-| `api.config.registry.package_cache.pulumi.first_party_url` | `https://github.com/mattrobinsonsre/terrapod/releases/download` | Where **Terrapod's own** bridged Pulumi provider plugin is published. Separate from `upstream` deliberately: pointing that one here would send every other plugin to a host which does not have it. **The `SHA256SUMS` manifest is fetched from here too** — a mirror holding only the tarballs will refuse them, because that plugin's digest is required rather than best effort. |
+| `api.config.registry.package_cache.pulumi.first_party_url` | `https://github.com/mattrobinsonsre/terrapod/releases/download` | Where **Terrapod's own** bridged Pulumi provider plugin is published. Separate from `upstream` deliberately: pointing that one here would send every other plugin to a host which does not have it. **The `SHA256SUMS` manifest is fetched from here too**, so a mirror that carries it gets verified plugins. One holding only the tarballs still works: the absence is logged and the row records `none-published`, rather than refusing a plugin under configuration you already have. |
 | `api.config.registry.package_cache.go.upstream` | `https://proxy.golang.org` | As above. |
 | `api.config.registry.package_cache.nuget.upstream` | `https://api.nuget.org/v3-flatcontainer` | As above. |
 | `api.config.artifact_retention.package_cache_retention_days` | `30` | Days since **last access** before an artifact is eligible for cleanup. Skipped entirely on a sealed node, where an evicted artifact cannot be re-fetched — note the [manual eviction routes](caches.md#sealed-deployments) are not, so on a sealed node they are a deletion. |
@@ -476,20 +476,34 @@ to look verified. That is weaker than the PyPI, npm, Galaxy and NuGet proxies,
 where Terrapod verifies our bytes against a published digest before caching
 them.
 
-**Terrapod's own bridged plugin is verified, and required to be.** We publish it,
-so its release carries a `SHA256SUMS` manifest beside the tarballs: on a miss
-Terrapod fetches that manifest from the same release, finds the line for the exact
-asset it is about to cache, and **refuses the plugin** if the manifest is absent,
-unreadable, or does not list it. There is no setting for this — an absent manifest
-is a statement about *our* release rather than about an upstream that ships no
-digests, so admitting it would make a broken release of ours indistinguishable in
-the ledger from Pulumi's deliberate silence.
+**Terrapod's own bridged plugin is verified, best effort.** We publish it, so its
+release carries a `SHA256SUMS` manifest beside the tarballs: on a miss Terrapod
+fetches that manifest from the same release, finds the line for the exact asset it is
+about to cache, and verifies the bytes against it. The row records `upstream-digest`.
+
+The split between what refuses and what does not is the part worth understanding:
+
+| what happens | result |
+|---|---|
+| the manifest lists this asset and the bytes **match** | cached, recorded `upstream-digest` |
+| the manifest lists this asset and the bytes **do not match** | **refused** — nothing stored, nothing recorded |
+| the manifest names this asset against something that is not a sha256 | **refused** — it is making a claim we cannot read |
+| the manifest is absent, unreachable, empty, or does not list this asset | **cached**, recorded `none-published`, and logged at `WARNING` |
+
+The last row is deliberate and was the other way round until 2026-11-16. Requiring
+the manifest reads as the stricter choice, and it breaks a supported configuration:
+an operator whose `first_party_url` points at an internal mirror holding only the
+tarballs would have those plugins refused on upgrade, under configuration they
+already had, with no warning. The integrity check that actually matters — do these
+bytes match what was published — is unaffected by admitting an absence, so the
+absence is logged rather than fatal.
 
 Two consequences worth knowing before you point `first_party_url` somewhere else:
 
-- **An internal mirror of our release must carry the `SHA256SUMS` manifest too**,
-  not just the tarballs. It is fetched from the same base, under the same
-  `v{version}/` path segment. A mirror holding only the tarballs will refuse them.
+- **An internal mirror of our release should carry the `SHA256SUMS` manifest too**,
+  not just the tarballs, if you want those plugins verified. It is fetched from the
+  same base, under the same `v{version}/` path segment. A mirror holding only the
+  tarballs still serves them; they are recorded `none-published`.
 - **`source` on a warm request is unaffected.** A warm from a named mirror
   replaces the whole upstream flat, with no version path segment, so there is no
   manifest to derive and that path is admitted and recorded `none-published`

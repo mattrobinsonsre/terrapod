@@ -39,11 +39,14 @@ import httpx
 
 from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
+from terrapod.logging_config import get_logger
 from terrapod.services.package_cache.substrate import (
     Artifact,
     DigestResolver,
     UpstreamError,
 )
+
+logger = get_logger(__name__)
 
 ECOSYSTEM = "pulumi"
 
@@ -132,13 +135,22 @@ _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 async def resolve_first_party_digest(version: str, asset: str, client: httpx.AsyncClient) -> str:
     """The sha256 our own release published for one plugin asset, as `sha256:<hex>`.
 
-    **Required, not best effort**, and that is the whole difference between this
-    plugin and every other one this proxy serves. We are the publisher, so an
-    absent, unreadable or incomplete manifest is a statement about our own
-    release rather than about an ecosystem that publishes nothing. Every failure
-    path here RAISES: returning `""` would route the tarball into the
-    `none-published` branch and record a verifiable artifact as unverifiable,
-    which is worse than never having looked.
+    **Best effort, and that distinction is deliberate.** An ABSENT manifest returns
+    `""`, which routes the tarball into the `none-published` branch: admitted, and
+    recorded honestly as unverified. A manifest that IS there and disagrees with the
+    bytes is a different matter entirely and refuses the fetch, in `substrate`.
+
+    The case that decides this is an operator who has pointed `first_party_url` at an
+    internal mirror holding only the tarballs -- a supported, documented thing to do
+    for a restricted network. Requiring the manifest would refuse those plugins on
+    upgrade, under configuration they already have, with no warning. Breaking a
+    working install to tighten a control on one plugin is the wrong trade: the
+    integrity check that matters is "do these bytes match what was published", and
+    that one is unaffected by admitting an absence.
+
+    So an absence is logged at WARNING rather than swallowed, because for a release
+    this project publishes it does suggest something is wrong -- it is just not worth
+    refusing an artifact over.
 
     `pulumi` is deliberately NOT added to `substrate._DIGEST_REQUIRED` for this.
     That set matches on `Artifact.ecosystem`, so joining it would demand a digest
@@ -153,15 +165,25 @@ async def resolve_first_party_digest(version: str, asset: str, client: httpx.Asy
     try:
         response = await arequest_with_retry(client, "GET", url)
     except httpx.HTTPError as exc:
-        raise UpstreamError(f"could not reach the checksums manifest at {url}: {exc}") from exc
+        logger.warning(
+            "Could not reach the first-party checksums manifest; caching the plugin "
+            "unverified and recording it as such",
+            url=url,
+            asset=asset,
+            error=str(exc),
+        )
+        return ""
 
     if response.status_code >= 400:
-        raise UpstreamError(
-            f"the first-party release published no readable checksums manifest for "
-            f"{asset} (HTTP {response.status_code} for {url}). Refusing to cache a "
-            f"plugin whose publisher is this project and whose digest is therefore "
-            f"expected to be there."
+        logger.warning(
+            "The first-party release published no readable checksums manifest; caching "
+            "the plugin unverified and recording it as such. An internal mirror that "
+            "carries only the tarballs is the expected reason.",
+            url=url,
+            asset=asset,
+            status=response.status_code,
         )
+        return ""
 
     for line in response.text.splitlines():
         fields = line.split()
@@ -170,16 +192,23 @@ async def resolve_first_party_digest(version: str, asset: str, client: httpx.Asy
         if len(fields) >= 2 and fields[1].lstrip("*") == asset:
             digest = fields[0].strip().lower()
             if not _SHA256_HEX.match(digest):
+                # Still a refusal. The manifest is present and IS making a claim
+                # about this asset; one we cannot parse is a broken statement rather
+                # than an absent one, and admitting it would mean ignoring a digest
+                # that exists.
                 raise UpstreamError(
                     f"the checksums manifest at {url} lists {asset} against "
                     f"{digest!r}, which is not a sha256"
                 )
             return f"sha256:{digest}"
 
-    raise UpstreamError(
-        f"{asset} is not listed in the checksums manifest at {url}, so there is "
-        f"nothing to verify it against"
+    logger.warning(
+        "The asset is not listed in the first-party checksums manifest; caching the "
+        "plugin unverified and recording it as such",
+        url=url,
+        asset=asset,
     )
+    return ""
 
 
 def artifact_for(filename: str, parts: dict[str, str], *, base: str | None = None) -> Artifact:

@@ -394,12 +394,20 @@ class TestTheFirstPartyChecksumsManifestURL:
 
 
 class TestResolvingTheFirstPartyDigest:
-    """Required rather than best effort, because we are the publisher.
+    """Best effort, and the split is the point.
 
-    Every failure here must RAISE. Returning `""` would route the tarball into
-    the `none-published` branch and record a verifiable artifact as unverifiable,
-    which is a worse outcome than never having looked -- an operator reading the
-    ledger could not tell the two apart.
+    An ABSENT manifest returns `""`, which routes the tarball into the
+    `none-published` branch: admitted, recorded honestly as unverified, and logged.
+    A manifest that IS there and makes a claim we cannot read, or that disagrees
+    with the bytes, REFUSES.
+
+    These tests asserted a refusal in every case until 2026-11-16, on the reasoning
+    that we are the publisher so an absence is a statement about our own release.
+    Sound as far as it goes, and it broke a supported configuration: an operator who
+    has pointed `first_party_url` at an internal mirror carrying only the tarballs
+    would have had those plugins refused on upgrade, under config they already had,
+    with no warning. The integrity check that matters -- do these bytes match what
+    was published -- is unaffected by admitting an absence.
     """
 
     @pytest.fixture(autouse=True)
@@ -441,30 +449,34 @@ class TestResolvingTheFirstPartyDigest:
             )
         assert got == f"sha256:{LINUX_AMD64_SHA}"
 
-    async def test_an_asset_absent_from_the_manifest_is_REFUSED(self) -> None:
-        """The case a partial release produces: the manifest is there and does
-        not list this platform. There is nothing to verify against, so there is
-        nothing to admit."""
+    async def test_an_asset_absent_from_the_manifest_is_ADMITTED_unverified(self) -> None:
+        """The manifest is there and does not list this platform -- a partial release,
+        or a mirror that carries a subset. Nothing to verify against, so nothing is
+        claimed: `""` routes it to `none-published` rather than refusing it."""
         async with _serving(MANIFEST) as client:
-            with pytest.raises(UpstreamError, match="is not listed in the checksums manifest"):
-                await pulumi_plugins.resolve_first_party_digest(
-                    "2.0.0-beta.2",
-                    "pulumi-resource-terrapod-v2.0.0-beta.2-windows-arm64.tar.gz",
-                    client,
-                )
+            got = await pulumi_plugins.resolve_first_party_digest(
+                "2.0.0-beta.2",
+                "pulumi-resource-terrapod-v2.0.0-beta.2-windows-arm64.tar.gz",
+                client,
+            )
+        assert got == ""
 
-    async def test_an_absent_manifest_is_REFUSED(self) -> None:
-        """A 404 is the typo case as well as the never-published case, and both
-        want the same answer. Admitting here would mean a misspelled manifest
-        name silently downgraded every first-party plugin to unverified."""
+    async def test_an_absent_manifest_is_ADMITTED_unverified(self) -> None:
+        """A 404 is an internal mirror holding only tarballs as well as a typo, and
+        the mirror is a supported, documented configuration. Refusing would break it
+        on upgrade; the row records `none-published` and the absence is logged."""
         async with _serving("Not Found", status=404) as client:
-            with pytest.raises(UpstreamError, match="no readable checksums manifest"):
-                await pulumi_plugins.resolve_first_party_digest("2.0.0-beta.2", LINUX_AMD64, client)
+            got = await pulumi_plugins.resolve_first_party_digest(
+                "2.0.0-beta.2", LINUX_AMD64, client
+            )
+        assert got == ""
 
-    async def test_an_empty_manifest_is_REFUSED(self) -> None:
+    async def test_an_empty_manifest_is_ADMITTED_unverified(self) -> None:
         async with _serving("") as client:
-            with pytest.raises(UpstreamError, match="is not listed in the checksums manifest"):
-                await pulumi_plugins.resolve_first_party_digest("2.0.0-beta.2", LINUX_AMD64, client)
+            got = await pulumi_plugins.resolve_first_party_digest(
+                "2.0.0-beta.2", LINUX_AMD64, client
+            )
+        assert got == ""
 
     async def test_a_line_that_is_not_a_sha256_is_REFUSED(self) -> None:
         """Named here rather than left to `substrate._parse_digest`, which would
@@ -482,38 +494,57 @@ class TestResolvingTheFirstPartyDigest:
             with pytest.raises(UpstreamError, match="which is not a sha256"):
                 await pulumi_plugins.resolve_first_party_digest("2.0.0-beta.2", LINUX_AMD64, client)
 
-    async def test_a_transport_failure_is_REFUSED(self, zero_retry_delay) -> None:
-        """Fail closed on a transient too. The alternative -- admit it because the
-        digest source happened to be unreachable while the artifact source was up
-        -- makes verification depend on the weather."""
+    async def test_a_transport_failure_is_ADMITTED_unverified(self, zero_retry_delay) -> None:
+        """An unreachable digest source is indistinguishable from an absent one from
+        here, and both get the same answer: admit, record `none-published`, log it.
+
+        This does mean verification depends on the weather, which is a real cost and
+        the reason the absence is logged at WARNING rather than swallowed. The
+        alternative costs more: a plugin pull that fails because a manifest host
+        blipped, on a path where the bytes themselves were fine."""
 
         def handler(request: httpx.Request) -> httpx.Response:
             raise httpx.ConnectError("no route", request=request)
 
         async with _client(handler) as client:
-            with pytest.raises(UpstreamError, match="could not reach the checksums manifest"):
-                await pulumi_plugins.resolve_first_party_digest("2.0.0-beta.2", LINUX_AMD64, client)
+            got = await pulumi_plugins.resolve_first_party_digest(
+                "2.0.0-beta.2", LINUX_AMD64, client
+            )
+        assert got == ""
 
-    async def test_a_persistent_5xx_is_REFUSED(self, zero_retry_delay) -> None:
+    async def test_a_persistent_5xx_is_RETRIED_then_admitted_unverified(
+        self, zero_retry_delay
+    ) -> None:
+        """The retry still matters: giving up on the first 5xx would downgrade a
+        plugin to unverified over one blip, where a retry usually recovers the
+        manifest and verifies it properly."""
         seen: list[str] = []
         async with _serving("boom", status=503, seen=seen) as client:
-            with pytest.raises(UpstreamError, match="no readable checksums manifest"):
-                await pulumi_plugins.resolve_first_party_digest("2.0.0-beta.2", LINUX_AMD64, client)
-        assert len(seen) > 1, "a 5xx should have been retried before being refused"
+            got = await pulumi_plugins.resolve_first_party_digest(
+                "2.0.0-beta.2", LINUX_AMD64, client
+            )
+        assert got == ""
+        assert len(seen) > 1, "a 5xx should have been retried before giving up"
 
-    async def test_it_never_returns_an_EMPTY_digest(self) -> None:
-        """The property every test above is an instance of, asserted as itself.
+    async def test_it_NEVER_INVENTS_a_digest(self) -> None:
+        """The property every test above is an instance of, asserted as itself, and
+        the inverse of what this test asserted before 2026-11-16.
 
-        An empty return is indistinguishable from "this ecosystem publishes
-        nothing" one layer up, so the resolver has no non-raising failure mode.
+        The resolver may return a digest it read, or `""` to say it has none. What it
+        must never do is return something for an asset the manifest does not cover:
+        that would verify one artifact's bytes against another's hash, which refuses
+        a perfectly good download and reads as corruption.
         """
-        bodies = [MANIFEST, "", "garbage", f"zz  {LINUX_AMD64}\n"]
+        bodies = [MANIFEST, "", "garbage"]
         for body in bodies:
             async with _serving(body) as client:
-                try:
-                    got = await pulumi_plugins.resolve_first_party_digest(
-                        "2.0.0-beta.2", "pulumi-resource-terrapod-v9.9.9-aix-ppc.tar.gz", client
-                    )
-                except UpstreamError:
-                    continue
-                raise AssertionError(f"returned {got!r} for {body!r} instead of raising")
+                got = await pulumi_plugins.resolve_first_party_digest(
+                    "2.0.0-beta.2", "pulumi-resource-terrapod-v9.9.9-aix-ppc.tar.gz", client
+                )
+            assert got == "", f"invented {got!r} for an asset absent from {body!r}"
+
+        # And a manifest that DOES name the asset against an unreadable digest is a
+        # refusal, not an absence -- it is making a claim we cannot parse.
+        async with _serving(f"zz  {LINUX_AMD64}\n") as client:
+            with pytest.raises(UpstreamError, match="which is not a sha256"):
+                await pulumi_plugins.resolve_first_party_digest("2.0.0-beta.2", LINUX_AMD64, client)
