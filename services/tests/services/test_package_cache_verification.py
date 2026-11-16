@@ -36,7 +36,13 @@ class TestTheFormsEachEcosystemPublishes:
         assert _parse_digest(sri) == ("sha512", raw.hex())
 
     def test_npms_legacy_sha1_shasum_fallback(self) -> None:
-        want = hashlib.sha1(BODY).hexdigest()  # noqa: S324 - upstream's choice, not ours
+        """A literal rather than a computed digest, deliberately.
+
+        What is under test is the FORM -- `sha1:<40 hex>` -- not sha1 itself, so
+        computing one would pull an insecure primitive into the test suite to prove
+        something about string parsing. The length is what `_parse_digest` checks.
+        """
+        want = "a" * 40
         assert _parse_digest(f"sha1:{want}") == ("sha1", want)
 
     def test_uppercase_hex_and_mixed_case_algorithm_normalise(self) -> None:
