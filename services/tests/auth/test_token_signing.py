@@ -14,6 +14,7 @@ than the rest and each has its own section below:
 """
 
 import hashlib
+import secrets
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -44,9 +45,8 @@ class _FakeSession:
     itself produced, and would keep passing if the code queried the wrong table.
     """
 
-    def __init__(self, *, key_row=None, has_runs=False):
+    def __init__(self, *, key_row=None):
         self._key_row = key_row
-        self._has_runs = has_runs
         self.lock_keys: list[int] = []
         self.added: list[object] = []
         self.commits = 0
@@ -61,8 +61,10 @@ class _FakeSession:
         result = MagicMock()
         if "token_signing_keys" in text:
             result.scalar_one_or_none.return_value = self._key_row
-        elif "runs" in text:
-            result.scalar_one_or_none.return_value = "a-run-id" if self._has_runs else None
+        # A `runs` branch used to live here, for the has-this-deployment-executed-a-run
+        # question that decided whether to adopt a derived key. Nothing asks it any
+        # more -- every deployment generates (#2589) -- and leaving the branch would
+        # let a future test pass `has_runs=True` and believe it meant something.
         else:  # pragma: no cover - a query this fake was not told about
             raise AssertionError(f"unexpected statement: {text}")
         return result
@@ -119,7 +121,7 @@ class TestASuppliedKeyWinsAndTheTableIsNotRead:
         assert key != bytes.fromhex("11" * 32)
 
     async def test_whitespace_only_is_treated_as_unset(self):
-        db = _FakeSession(has_runs=False)
+        db = _FakeSession()
         with patch("terrapod.config.settings", _settings("   ")):
             await token_signing.init_token_signing_key(db)
         assert token_signing.get_provenance() == token_signing.PROVENANCE_GENERATED
@@ -139,14 +141,14 @@ class TestASuppliedKeyWinsAndTheTableIsNotRead:
 # ── Generate or adopt ────────────────────────────────────────────────────────
 
 
-class TestAFreshDeploymentGeneratesAndAUsedOneAdopts:
+class TestEveryDeploymentGeneratesAndADerivedKeyIsRotated:
     async def test_no_runs_generates_a_strong_key(self):
         """Without this branch every fresh 2.0 install would start DSN-derived.
 
         That would be a regression against the chart-generated key of 1.7.7
         onwards, so the branch is load-bearing rather than a nicety.
         """
-        db = _FakeSession(has_runs=False)
+        db = _FakeSession()
         with patch("terrapod.config.settings", _settings("")):
             key = await token_signing.init_token_signing_key(db)
         assert len(key) == 32
@@ -156,18 +158,25 @@ class TestAFreshDeploymentGeneratesAndAUsedOneAdopts:
         assert db.added[0].provenance == token_signing.PROVENANCE_GENERATED
         assert db.added[0].key == key.hex()
 
-    async def test_existing_runs_adopt_the_exact_pre_2_0_key(self):
-        """Pinned against the literal formula, not against the implementation.
+    async def test_a_used_deployment_generates_too_rather_than_adopting(self):
+        """The inverse of what this asserted before 2.0, and still pinned against
+        the literal formula -- because the formula is what must NOT appear.
 
-        An apply that succeeds and then cannot upload its state flags the
-        workspace as diverged, so a key change at upgrade is not cosmetic.
+        It used to adopt `sha256(database_url)` here so that tokens in flight
+        across the upgrade kept verifying. The cost was that the deployment went
+        on holding a key derived from a credential every client of that database
+        holds (GHSA-hc47-q72v-4vcm), and `require_strong_secrets` could not
+        default on, because it fires on exactly that key. 2.0 takes the other
+        trade: what breaks is four families of short-lived token, and nothing
+        stored.
         """
-        db = _FakeSession(has_runs=True)
+        db = _FakeSession()
         with patch("terrapod.config.settings", _settings("")):
             key = await token_signing.init_token_signing_key(db)
-        assert key == _PRE_2_0_KEY
-        assert token_signing.get_provenance() == token_signing.PROVENANCE_DATABASE_URL
-        assert db.added[0].key == _PRE_2_0_KEY.hex()
+        assert key != _PRE_2_0_KEY
+        assert len(key) == 32
+        assert token_signing.get_provenance() == token_signing.PROVENANCE_GENERATED
+        assert db.added[0].key == key.hex()
 
     async def test_a_stored_key_is_loaded_rather_than_replaced(self):
         row = TokenSigningKey(key=("ab" * 32), provenance=token_signing.PROVENANCE_GENERATED)
@@ -185,7 +194,7 @@ class TestAFreshDeploymentGeneratesAndAUsedOneAdopts:
         lock actually serializes; this proves it is asked for, and asked for
         first.
         """
-        db = _FakeSession(has_runs=False)
+        db = _FakeSession()
         with patch("terrapod.config.settings", _settings("")):
             await token_signing.init_token_signing_key(db)
         assert db.lock_keys == [token_signing._INIT_ADVISORY_LOCK]
@@ -236,7 +245,15 @@ class TestFailingClosed:
         happily on a key this function refused. Publishing the globals only after
         the check is what guarantees that.
         """
-        db = _FakeSession(has_runs=True)
+        # A stored row whose provenance this build does not know. Before 2.0 this
+        # case was reached with `has_runs=True`, because a used deployment adopted
+        # a derived key and strict mode refused it; a derived key is now replaced
+        # rather than adopted, so the stored path needs a different trigger. The
+        # supplied-key path is covered by the sibling test below, and this one
+        # exists to cover the TABLE path separately.
+        db = _FakeSession(
+            key_row=TokenSigningKey(key=secrets.token_bytes(32).hex(), provenance="from-the-future")
+        )
         with patch("terrapod.config.settings", _settings("", strict=True)):
             with pytest.raises(ValueError):
                 await token_signing.init_token_signing_key(db)
@@ -301,11 +318,24 @@ class TestWhatTheOperatorIsTold:
         problem = token_signing.describe_live_key_problem(configured="", provenance="future")
         assert problem is not None and "provenance" in problem
 
-    async def test_strict_makes_an_adopted_key_fatal(self):
-        db = _FakeSession(has_runs=True)
+    async def test_strict_does_not_object_to_a_rotated_key(self):
+        """What makes `require_strong_secrets` safe to default on in 2.0.
+
+        It used to fire on an adopted key, which is the state an upgrade of a used
+        deployment landed in -- so defaulting it on would have refused startup for
+        precisely the deployments that had adopted one, which is most of them.
+        Replacing such a key on sight is what removes that, and strict mode must
+        be satisfied by the replacement rather than by the row it replaced.
+        """
+        db = _FakeSession(
+            key_row=TokenSigningKey(
+                key=_PRE_2_0_KEY.hex(), provenance=token_signing.PROVENANCE_DATABASE_URL
+            )
+        )
         with patch("terrapod.config.settings", _settings("", strict=True)):
-            with pytest.raises(ValueError, match="database URL"):
-                await token_signing.init_token_signing_key(db)
+            key = await token_signing.init_token_signing_key(db)
+        assert key != _PRE_2_0_KEY
+        assert token_signing.get_provenance() == token_signing.PROVENANCE_GENERATED
 
     async def test_strict_does_not_object_to_a_generated_key(self):
         """`require_strong_secrets` used to be fatal whenever no key was CONFIGURED.
@@ -314,7 +344,7 @@ class TestWhatTheOperatorIsTold:
         strong case, so that would now fail every hardened deployment for doing
         the right thing.
         """
-        db = _FakeSession(has_runs=False)
+        db = _FakeSession()
         with patch("terrapod.config.settings", _settings("", strict=True)):
             key = await token_signing.init_token_signing_key(db)
         assert len(key) == 32
@@ -327,8 +357,89 @@ class TestWhatTheOperatorIsTold:
 
 
 async def test_the_key_is_cached_for_the_process():
-    db = _FakeSession(has_runs=False)
+    db = _FakeSession()
     with patch("terrapod.config.settings", _settings("")):
         first = await token_signing.init_token_signing_key(db)
     # No settings patch and no session: the getter must not re-derive anything.
     assert token_signing.get_token_signing_key() == first
+
+
+class TestRotatingAStoredDerivedKey:
+    """The branch that makes `require_strong_secrets` safe to default on.
+
+    Changing the no-stored-key path alone would not have been enough: a
+    deployment that upgraded under the old rule has a `database-url` row in the
+    table, and that row would be LOADED on every later startup -- so the
+    exposure persists and strict mode refuses to start. Replacing it on sight is
+    what ends with no deployment holding a derived key.
+    """
+
+    async def test_a_stored_derived_key_is_replaced_not_loaded(self):
+        db = _FakeSession(
+            key_row=TokenSigningKey(
+                key=_PRE_2_0_KEY.hex(), provenance=token_signing.PROVENANCE_DATABASE_URL
+            )
+        )
+        with patch("terrapod.config.settings", _settings("")):
+            key = await token_signing.init_token_signing_key(db)
+
+        assert key != _PRE_2_0_KEY, "the derived key was loaded rather than replaced"
+        assert len(key) == 32
+        assert token_signing.get_provenance() == token_signing.PROVENANCE_GENERATED
+        assert len(db.added) == 1, "the replacement was not persisted"
+        assert db.added[0].key == key.hex()
+        assert db.added[0].provenance == token_signing.PROVENANCE_GENERATED
+
+    async def test_the_replacement_is_persisted_so_it_happens_once(self):
+        """A replacement that is not written would re-rotate on every restart,
+        invalidating every token minted since the last one -- which is worse than
+        the derived key it replaced, because it never settles."""
+        db = _FakeSession(
+            key_row=TokenSigningKey(
+                key=_PRE_2_0_KEY.hex(), provenance=token_signing.PROVENANCE_DATABASE_URL
+            )
+        )
+        with patch("terrapod.config.settings", _settings("")):
+            await token_signing.init_token_signing_key(db)
+        assert db.commits >= 1, "nothing was committed, so the next restart rotates again"
+
+        # The row the first startup wrote is what a later startup reads.
+        second = _FakeSession(
+            key_row=TokenSigningKey(
+                **{
+                    "key": db.added[0].key,
+                    "provenance": db.added[0].provenance,
+                }
+            )
+        )
+        with patch("terrapod.config.settings", _settings("")):
+            again = await token_signing.init_token_signing_key(second)
+        assert again.hex() == db.added[0].key, "the stored replacement was not loaded"
+        assert len(second.added) == 0, "it rotated a second time"
+
+    async def test_a_generated_row_is_left_alone(self):
+        """Only the derived provenance rotates. A generated key is already strong,
+        and replacing it would invalidate tokens for no gain."""
+        stored = secrets.token_bytes(32)
+        db = _FakeSession(
+            key_row=TokenSigningKey(key=stored.hex(), provenance=token_signing.PROVENANCE_GENERATED)
+        )
+        with patch("terrapod.config.settings", _settings("")):
+            key = await token_signing.init_token_signing_key(db)
+        assert key == stored
+        assert len(db.added) == 0
+
+    async def test_a_supplied_key_is_read_before_the_table_so_nothing_rotates(self):
+        """An operator-supplied key wins on every startup, so a deployment that
+        supplies one never reaches the rotation at all -- and its derived row is
+        left where it is rather than being quietly replaced underneath it."""
+        db = _FakeSession(
+            key_row=TokenSigningKey(
+                key=_PRE_2_0_KEY.hex(), provenance=token_signing.PROVENANCE_DATABASE_URL
+            )
+        )
+        with patch("terrapod.config.settings", _settings(_STRONG)):
+            await token_signing.init_token_signing_key(db)
+        assert token_signing.get_provenance() == token_signing.PROVENANCE_CONFIG
+        assert len(db.added) == 0
+        assert db.statements == [], "the table was read at all"

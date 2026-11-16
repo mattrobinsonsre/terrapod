@@ -3918,8 +3918,20 @@ class Settings(BaseSettings):
     # See terrapod/secret_strength.py.
     require_strong_secrets: bool = Field(
         default=False,
-        description="Fail startup when the token signing key or static KEK is "
-        "weak or falls back to the database URL, instead of warning.",
+        description="Fail startup when a secret this deployment was GIVEN is weak, "
+        "instead of warning. It fires on a configured `token_signing_key` that a "
+        "strength estimate rejects, and on a static encryption KEK that is a typed "
+        "passphrase rather than generated material. It no longer fires on a signing "
+        "key derived from the database URL, because such a key is now REPLACED with a "
+        "generated one on startup rather than adopted -- so leaving `token_signing_key` "
+        "unset is the normal, strong case and is not reported at all.\n\n"
+        "OFF by default, deliberately, and the static KEK is the reason. The refusal "
+        "happens at provider construction, so turning this on fails startup -- and an "
+        "operator with a passphrase KEK cannot simply supply a better one, because the "
+        "KEK is derived from that secret and changing it leaves every already-wrapped "
+        "DEK unable to unwrap. Their remedy is the re-encryption migration, not a "
+        "config edit, so a default that fails the pod would stand between them and "
+        "their own data. Turn it on once your supplied secrets are generated material.",
     )
 
     # Database
