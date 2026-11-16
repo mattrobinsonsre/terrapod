@@ -207,6 +207,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Optional split webhook ingress](deployment-webhook-ingress.md) | Optional second Ingress for the public-must-reach surface (VCS webhooks, run-task callbacks) |
 | [Forward proxy & custom CA trust](deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |
 | [Security Hardening](security-hardening.md) | TLS, secrets management, network policies, rate limiting |
+| [Post-Quantum Readiness](post-quantum.md) | Which of Terrapod's cryptography is already quantum-resistant, which is hybrid-capable with no change, and which cannot move yet — with the external constraint and the mitigation for each |
 | [Rate limiting](rate-limiting.md) | Client attribution, trusted proxies, and the ingress `X-Forwarded-For` requirement |
 | [CVE Policy](cve-policy.md) | How Terrapod's own images are gated on HIGH/CRITICAL CVEs, what `ignore-unfixed` does and does not guarantee, and the reasoning behind every accepted-risk suppression |
 | [Versioning & Support](versioning-and-support.md) | What each version bump guarantees, the stable surfaces + their CI gates, component version-skew support, the deprecation window, and the support matrix |

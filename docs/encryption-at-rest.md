@@ -227,6 +227,7 @@ See the [encryption key recovery runbook](runbooks.md#encryption-key-lost-or-unu
 
 ## See also
 
+- [Post-quantum readiness](post-quantum.md) — the DEK path is AES-256-GCM, so it is already quantum-resistant; that page says what is not
 - [Cloud Credentials](cloud-credentials.md) — the at-rest encryption baseline this sits on top of.
 - [Security Hardening](security-hardening.md) — the broader posture.
 - [Supply-chain verification](supply-chain-verification.md) — signed releases + verified dependencies.
