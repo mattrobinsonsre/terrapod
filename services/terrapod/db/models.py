@@ -1808,6 +1808,18 @@ class CachedPackageFile(Base):
     #: for PyPI, the literal (scope-bearing) name for npm. Normalised on the way
     #: in so `Flask`, `flask` and `FLASK` are one cache entry rather than three.
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: How this artifact was admitted, and NULL is the load-bearing value.
+    #:
+    #: NULL means "admitted by a build that recorded nothing" -- i.e. before digest
+    #: verification existed -- and `substrate.lookup_present` treats such a row as a
+    #: MISS, so the artifact is re-fetched once and verified under the current rules.
+    #: That is how a cache populated before #2589 stops being served unverified,
+    #: lazily and per artifact rather than by a purge.
+    #:
+    #: The values are `substrate.ATTESTATIONS` and they are the vocabulary the
+    #: artifact ledger uses, so this column is its first field rather than a
+    #: throwaway marker.
+    attestation: Mapped[str | None] = mapped_column(String(32), nullable=True)
     version: Mapped[str] = mapped_column(String(100), nullable=False)
     #: The artifact filename, which is what actually distinguishes one file from
     #: another: a PyPI version has an sdist and many wheels, all the same version.
