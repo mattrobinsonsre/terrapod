@@ -1640,7 +1640,12 @@ class PulumiPluginCacheConfig(PackageEcosystemConfig):
         "its tag. Separate from `upstream` deliberately: that one is where PULUMI's "
         "plugins come from, and pointing it here to reach ours would send every other "
         "plugin to a host that does not have it. Point this at an internal mirror for a "
-        "restricted-network install, the same way the other mirror URLs work.",
+        "restricted-network install, the same way the other mirror URLs work -- but note "
+        "that MIRROR MUST ALSO CARRY `v{version}/pulumi-resource-terrapod_{version}_"
+        "SHA256SUMS`, which is fetched from here on a cache miss: this plugin's digest "
+        "is required rather than best effort, because Terrapod is its publisher, so a "
+        "mirror holding only the tarballs refuses them instead of caching them "
+        "unverified (#2589).",
     )
 
 

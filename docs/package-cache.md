@@ -81,6 +81,48 @@ through exactly as published. Since Terrapod serves byte-identical content, your
 client checks our bytes against the digest the package author published, and a
 corrupted or substituted artifact fails at the client where it should.
 
+### What Terrapod checks before it caches anything
+
+Passing the digest through is necessary and was never sufficient, because
+**some clients check nothing**: `pip install` verifies no hash at all without
+`--require-hashes` or a hash-pinned lock, which is the commonest case in the
+commonest ecosystem. So on a miss Terrapod also verifies the bytes against
+upstream's own published digest *before* storing them, and refuses to cache a
+mismatch — neither the object nor the row is written, because a mismatch is
+either a corrupted transfer or a substituted artifact and there is no telling
+which from here.
+
+Every cached row records **how it was admitted**, so the ledger can be read
+rather than assumed:
+
+| Recorded as | Means |
+|---|---|
+| `upstream-digest` | verified against a digest its publisher published |
+| `none-published` | that upstream publishes no per-file digest, so there was nothing to check — a statement about the ecosystem, not about the artifact |
+
+A row carrying neither was admitted before any of this existed; it is treated as
+a miss, re-fetched once, verified under the current rules and rewritten.
+
+**PyPI, npm, Ansible Galaxy and NuGet always publish one**, so an artifact
+arriving from them *without* a digest is refused rather than cached unverified —
+an absent digest there means the index was not the one we expect. Two ecosystems
+publish nothing beside the artifact and are recorded `none-published`:
+
+- **Go modules.** The proxy protocol serves no digest (`.ziphash` and
+  `.zip.sha256` are both 404), and nothing is lost by it, because **the consumer
+  already verifies with a stronger control**: a Go program carries a committed
+  `go.sum`, and the `go` command enforces it against every module it downloads.
+  Those hashes were pinned by the program's author rather than asserted by
+  whichever proxy answered. The only other source is the Go checksum database — a
+  third upstream a sealed deployment cannot reach, which is why a run sets
+  `GOSUMDB=off` (that turns off the *database lookup*, not the `go.sum` check).
+  A client for it here would duplicate a check your program makes anyway, against
+  a host we have deliberately stopped reaching.
+- **Pulumi plugins** published by Pulumi. `get.pulumi.com` publishes nothing
+  beside a tarball (`.sha256` and `SHA256SUMS` are both 403). **Terrapod's own
+  bridged plugin is the exception and *is* verified** — see
+  [Pulumi plugins](#pulumi-plugins).
+
 ## Air-gapped operation
 
 Set `registry.cache_only: true` and Terrapod never attempts an upstream request
@@ -121,7 +163,7 @@ off — pointing at an internal mirror if you have one — then seal.
 | `api.config.registry.package_cache.npm.upstream` | `https://registry.npmjs.org` | As above. |
 | `api.config.registry.package_cache.galaxy.upstream` | `https://galaxy.ansible.com` | As above. |
 | `api.config.registry.package_cache.pulumi.upstream` | `https://get.pulumi.com/releases/plugins` | As above. Where **Pulumi's** plugins come from. |
-| `api.config.registry.package_cache.pulumi.first_party_url` | `https://github.com/mattrobinsonsre/terrapod/releases/download` | Where **Terrapod's own** bridged Pulumi provider plugin is published. Separate from `upstream` deliberately: pointing that one here would send every other plugin to a host which does not have it. |
+| `api.config.registry.package_cache.pulumi.first_party_url` | `https://github.com/mattrobinsonsre/terrapod/releases/download` | Where **Terrapod's own** bridged Pulumi provider plugin is published. Separate from `upstream` deliberately: pointing that one here would send every other plugin to a host which does not have it. **The `SHA256SUMS` manifest is fetched from here too** — a mirror holding only the tarballs will refuse them, because that plugin's digest is required rather than best effort. |
 | `api.config.registry.package_cache.go.upstream` | `https://proxy.golang.org` | As above. |
 | `api.config.registry.package_cache.nuget.upstream` | `https://api.nuget.org/v3-flatcontainer` | As above. |
 | `api.config.artifact_retention.package_cache_retention_days` | `30` | Days since **last access** before an artifact is eligible for cleanup. Skipped entirely on a sealed node, where an evicted artifact cannot be re-fetched — note the [manual eviction routes](caches.md#sealed-deployments) are not, so on a sealed node they are a deletion. |
@@ -427,9 +469,31 @@ a plugin at a version is immutable.
 means, and that resolution does not go through the download URL, so it still
 needs upstream. Pinning is good practice in a restricted estate regardless.
 
-**No digest is recorded**, because upstream publishes none alongside the
-tarball. That is weaker than the PyPI, npm and Galaxy proxies, where the client
-verifies our bytes against a published digest.
+**For a Pulumi-published plugin no digest is recorded**, because
+`get.pulumi.com` publishes none alongside the tarball — `.sha256` and
+`SHA256SUMS` are both 403. The row says `none-published` rather than being left
+to look verified. That is weaker than the PyPI, npm, Galaxy and NuGet proxies,
+where Terrapod verifies our bytes against a published digest before caching
+them.
+
+**Terrapod's own bridged plugin is verified, and required to be.** We publish it,
+so its release carries a `SHA256SUMS` manifest beside the tarballs: on a miss
+Terrapod fetches that manifest from the same release, finds the line for the exact
+asset it is about to cache, and **refuses the plugin** if the manifest is absent,
+unreadable, or does not list it. There is no setting for this — an absent manifest
+is a statement about *our* release rather than about an upstream that ships no
+digests, so admitting it would make a broken release of ours indistinguishable in
+the ledger from Pulumi's deliberate silence.
+
+Two consequences worth knowing before you point `first_party_url` somewhere else:
+
+- **An internal mirror of our release must carry the `SHA256SUMS` manifest too**,
+  not just the tarballs. It is fetched from the same base, under the same
+  `v{version}/` path segment. A mirror holding only the tarballs will refuse them.
+- **`source` on a warm request is unaffected.** A warm from a named mirror
+  replaces the whole upstream flat, with no version path segment, so there is no
+  manifest to derive and that path is admitted and recorded `none-published`
+  exactly as it was before.
 
 
 ## Go modules
@@ -451,6 +515,17 @@ say what exists and are **mutable**, so they are bounded; `@v/{version}.info`,
 `.mod` and `.zip` are **immutable** and need no TTL at all, because a module
 version's bytes cannot change — which is what Go's checksum database exists to
 guarantee.
+
+**Nothing here is verified at fetch time, deliberately**, and a cached row says
+`none-published`. The reason is that **your toolchain already verifies, with a
+stronger control than ours would be**: your program carries a committed `go.sum`
+and the `go` command enforces it against every module it downloads, pinned by the
+program's author rather than asserted by whichever proxy answered. The proxy
+protocol publishes no digest beside these files, and the only other source is the
+checksum database — a third upstream a sealed deployment cannot reach, which is
+why a run sets `GOSUMDB=off`. That turns off the *database lookup* and nothing
+else; the `go.sum` check is untouched. See
+[What Terrapod checks before it caches anything](#what-terrapod-checks-before-it-caches-anything).
 
 Uppercase in a module path is escaped — `github.com/BurntSushi/toml` is fetched
 as `github.com/!burnt!sushi/toml` — and Terrapod passes that form through

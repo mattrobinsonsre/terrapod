@@ -692,6 +692,13 @@ api:
           # plugins come from, and pointing it here would send every other
           # plugin to a host that does not have it. Assets live under their
           # release tag, so the version is a path segment.
+          #
+          # A mirror here must carry the release's
+          # `pulumi-resource-terrapod_<version>_SHA256SUMS` as well as the
+          # tarballs: that manifest is fetched from this base on a cache miss
+          # and this plugin's digest is REQUIRED rather than best effort,
+          # because Terrapod is its publisher (#2589). A mirror holding only
+          # the tarballs refuses them rather than caching them unverified.
           first_party_url: https://github.com/mattrobinsonsre/terrapod/releases/download
         # Go module proxy. Pulumi-only (Go SDK programs). There is no engine
         # switch to disable it with -- that was withdrawn (#1986) -- so turn this
