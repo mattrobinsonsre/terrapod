@@ -1802,7 +1802,9 @@
       "repository": "仓库",
       "commit": "提交",
       "paths": "路径",
-      "written": "写入时间"
+      "written": "写入时间",
+      "origin": "来源",
+      "uploadedBy": "上传者"
     },
     "warm": {
       "heading": "预热缓存",
@@ -1869,7 +1871,9 @@
       "loadingMore": "加载中…",
       "showing": "正在显示 {total} 项中的 {shown} 项 —— 表格只排序已加载的内容，因此在把某个排序当作整个缓存来读之前，请先加载其余部分。",
       "listedAll": "已列出 {count, plural, other {# 个构件}}，这就是符合这些筛选条件的全部内容。",
-      "successBulkTruncated": "已清除 {files} 个构件，释放 {size}。符合条件的比一次清除所能移除的更多 —— 再清除一次以继续。"
+      "successBulkTruncated": "已清除 {files} 个构件，释放 {size}。符合条件的比一次清除所能移除的更多 —— 再清除一次以继续。",
+      "uploadedBy": "由 {who} 上传",
+      "confirmRowUploaded": "此构件由运维人员上传，因此在任何上游注册表中都不存在。移除它将销毁唯一的副本。"
     },
     "archives": {
       "connectionLabel": "连接",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "无法启动预热",
       "errorStatus": "无法读取预热作业",
       "helpLead": "在有东西请求之前就把构件拉入缓存 — 每行一个，写明名称与版本。"
+    },
+    "attestation": {
+      "upstreamDigest": "已校验",
+      "nonePublished": "未发布摘要",
+      "operatorUpload": "已上传",
+      "unrecorded": "未记录"
+    },
+    "upload": {
+      "title": "上传已审核的构件",
+      "description": "将您自己验证过的构件放入缓存。这是节点密封期间添加构件的唯一方式，并且不需要发布者签名 — 记录下来的是上传者是谁。",
+      "show": "上传",
+      "hide": "关闭",
+      "sealedNote": "本节点已密封，因此上传是添加构件的唯一方式，而且这会是唯一的副本，因为这里的任何内容都无法重新获取。",
+      "ecosystem": "缓存",
+      "kind": "您要上传什么",
+      "kindArtifact": "构件的字节",
+      "kindIndex": "索引文档",
+      "kindHintIndexed": "已密封的节点从索引文档中读取存在哪些版本，因此未随索引文档上传的构件无法被解析。",
+      "kindHintNoIndex": "此缓存不需要索引文档。",
+      "file": "文件",
+      "reference": "参考编号（可选）",
+      "referenceHint": "您自己的工单、变更或审批 ID。与上传一并存储。",
+      "replace": "替换此坐标上已有的内容",
+      "replaceHint": "没有此选项，已存在的构件会被拒绝而不是被覆盖。被挤掉的内容可能正是某次运行已经依赖的内容。",
+      "confirmReplace": "将 {filename} 上传并覆盖此坐标上已有的构件？被替换的字节将被销毁。",
+      "confirmReplaceSealed": "本节点已密封，因此被替换的字节无法从任何地方取回。",
+      "submit": "上传",
+      "submitting": "上传中…",
+      "provenanceNote": "记录在您的账户名下。",
+      "success": "已上传 {filename}。",
+      "successReplaced": "已上传 {filename}，并替换了原有内容。",
+      "successUnchanged": "{filename} 已以完全相同的字节缓存。没有任何变化。",
+      "error": "上传失败。",
+      "fields": {
+        "project": "项目",
+        "name": "名称",
+        "version": "版本",
+        "filename": "文件名",
+        "package_id": "软件包 ID",
+        "module": "模块路径",
+        "suffix": "文件",
+        "namespace": "命名空间",
+        "document": "文档",
+        "kind": "插件类型",
+        "os": "操作系统",
+        "arch": "架构"
+      },
+      "hints": {
+        "filename": "需要填写而非推导：wheel 的文件名编码了它的兼容性标签。",
+        "suffix": ".info、.mod 或 .zip 之一。一个版本是三个文件，每个单独上传。",
+        "document": "哪一个索引文档。Galaxy 有 collection 和 versions；Go 有 list 和 latest。",
+        "kind": "resource、language、analyzer 或 converter。"
+      }
     }
   },
   "catalog": {

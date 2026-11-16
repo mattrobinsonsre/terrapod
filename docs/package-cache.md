@@ -166,7 +166,7 @@ off — pointing at an internal mirror if you have one — then seal.
 | `api.config.registry.package_cache.pulumi.first_party_url` | `https://github.com/mattrobinsonsre/terrapod/releases/download` | Where **Terrapod's own** bridged Pulumi provider plugin is published. Separate from `upstream` deliberately: pointing that one here would send every other plugin to a host which does not have it. **The `SHA256SUMS` manifest is fetched from here too**, so a mirror that carries it gets verified plugins. One holding only the tarballs still works: the absence is logged and the row records `none-published`, rather than refusing a plugin under configuration you already have. |
 | `api.config.registry.package_cache.go.upstream` | `https://proxy.golang.org` | As above. |
 | `api.config.registry.package_cache.nuget.upstream` | `https://api.nuget.org/v3-flatcontainer` | As above. |
-| `api.config.artifact_retention.package_cache_retention_days` | `30` | Days since **last access** before an artifact is eligible for cleanup. Skipped entirely on a sealed node, where an evicted artifact cannot be re-fetched — note the [manual eviction routes](caches.md#sealed-deployments) are not, so on a sealed node they are a deletion. |
+| `api.config.artifact_retention.package_cache_retention_days` | `30` | Days since **last access** before an artifact is eligible for cleanup. Skipped entirely on a sealed node, where an evicted artifact cannot be re-fetched — note the [manual eviction routes](caches.md#sealed-deployments) are not, so on a sealed node they are a deletion. An **operator-uploaded** artifact is never eligible, on a sealed node or an unsealed one, because it exists upstream nowhere. |
 | `api.config.registry.cache_only` | `false` | Seals every cache, these included. |
 
 The upstream is a single operator-set URL rather than a client-chosen host. A
@@ -359,6 +359,34 @@ never sees the bytes a client is served:
   recorded digest to verify against. Nothing is repaired or evicted either way:
   what to do about a mismatch is yours to decide.
 
+### From the admin UI
+
+Everything above is also on the **Caches** admin page, under the package-cache
+listing it fills: pick the cache, pick whether you are uploading the artifact's
+bytes or an index document, fill that cache's coordinates, choose the file.
+
+Three things the page does that the API does not:
+
+- **It shows where each cached artifact came from.** An `Origin` column reads
+  *Verified* where the bytes were checked against the digest the registry
+  published, *No digest published* where that ecosystem publishes nothing to
+  check against, *Uploaded* for an operator upload (with who uploaded it), and
+  *Not recorded* for a row written before this was tracked. The last of those is
+  not a finding: such a row is re-fetched and re-verified on the next request
+  rather than served.
+- **It warns before evicting an upload.** An uploaded artifact exists in no
+  upstream registry, so removing one destroys the only copy *however unsealed the
+  node is* — a different warning from the sealed one, and the one that is easy to
+  miss, because the node being able to re-fetch everything else makes the
+  eviction look recoverable.
+- **The index-document choice is offered only where there is one.** For PyPI and
+  Pulumi the control is disabled and says so, rather than being absent and
+  leaving you to wonder.
+
+The upload goes through the BFF's `/api/*` proxy, which forwards the request body
+unbuffered — the same path a configuration-version tarball already takes, so a
+large artifact is streamed rather than held in the web pod's memory.
+
 ### Uploading an index document
 
 An artifact upload supplies **bytes**, and for three of the six caches that is not
@@ -403,6 +431,14 @@ requirement rather than a choice: a failover onto a follower whose blob store wa
 not replicated leaves it holding a complete record of what should be there and
 unable to serve any of it, and the only recovery is re-uploading the whole
 curated set.
+
+The same fact is why **the age-based retention sweep never reaps an upload**. That
+is not covered by the sealed-mode skip, and the case it protects is the ordinary
+one: `seed-then-seal` has you upload while the node is still unsealed, so the
+uploads sit for as long as that preparation takes on a node where the sweep does
+run. A deployment that stays unsealed and uses uploads for its internal packages
+would otherwise lose them to a timer. Deliberate removal is unaffected — the
+admin eviction route still takes an upload by id, and says it is the only copy.
 
 **An upload is never gated on a scan of ours.** Terrapod does not scan
 package-cache artifacts at all today — not uploaded ones and not fetched ones —

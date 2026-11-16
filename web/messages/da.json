@@ -1802,7 +1802,9 @@
       "repository": "Repositorie",
       "commit": "Commit",
       "paths": "Stier",
-      "written": "Skrevet"
+      "written": "Skrevet",
+      "origin": "Oprindelse",
+      "uploadedBy": "Uploadet af"
     },
     "warm": {
       "heading": "Opvarm cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Indlæser…",
       "showing": "Viser {shown} af {total} — tabellen sorterer det, der er indlæst, så indlæs resten, før du læser en sortering som hele cachen.",
       "listedAll": "{count, plural, one {# artefakt} other {# artefakter}} vist — det er alt, der matcher disse filtre.",
-      "successBulkTruncated": "Ryddede {files} artefakter og frigjorde {size}. Flere matcher, end én rydning fjerner — ryd igen for at fortsætte."
+      "successBulkTruncated": "Ryddede {files} artefakter og frigjorde {size}. Flere matcher, end én rydning fjerner — ryd igen for at fortsætte.",
+      "uploadedBy": "af {who}",
+      "confirmRowUploaded": "Dette artefakt blev uploadet af en operatør og findes derfor ikke i noget upstream-registry. Hvis du fjerner det, ødelægges den eneste kopi."
     },
     "archives": {
       "connectionLabel": "Forbindelse",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Kunne ikke starte opvarmningen",
       "errorStatus": "Kunne ikke læse opvarmningsjobbet",
       "helpLead": "Hent artefakter ind i cachen, før noget beder om dem — én pr. linje, som et navn og en version."
+    },
+    "attestation": {
+      "upstreamDigest": "Verificeret",
+      "nonePublished": "Ingen kontrolsum offentliggjort",
+      "operatorUpload": "Uploadet",
+      "unrecorded": "Ikke registreret"
+    },
+    "upload": {
+      "title": "Upload et kontrolleret artefakt",
+      "description": "Læg et artefakt, du selv har valideret, i cachen. Det er den eneste måde at tilføje et, mens noden er forseglet, og det kræver ingen signatur fra udgiveren — i stedet registreres det, hvem der uploadede det.",
+      "show": "Upload",
+      "hide": "Luk",
+      "sealedNote": "Denne node er forseglet, så en upload er den eneste måde at tilføje et artefakt — og den eneste kopi, for intet her kan hentes igen.",
+      "ecosystem": "Cache",
+      "kind": "Hvad du uploader",
+      "kindArtifact": "Artefaktets bytes",
+      "kindIndex": "Et indeksdokument",
+      "kindHintIndexed": "En forseglet node læser i et indeksdokument, hvilke versioner der findes, så et artefakt, der uploades uden et, kan ikke slås op.",
+      "kindHintNoIndex": "Denne cache behøver ikke noget indeksdokument.",
+      "file": "Fil",
+      "reference": "Reference (valgfri)",
+      "referenceHint": "Dit eget sags-, ændrings- eller godkendelses-id. Gemmes sammen med uploaden.",
+      "replace": "Erstat det, der allerede ligger på disse koordinater",
+      "replaceHint": "Uden dette afvises et eksisterende artefakt i stedet for at blive overskrevet. Det, der fortrænges, kan være netop det, som en kørsel allerede afhænger af.",
+      "confirmReplace": "Upload {filename} oven i artefaktet, der allerede ligger på disse koordinater? De bytes, det erstatter, ødelægges.",
+      "confirmReplaceSealed": "Denne node er forseglet, så de erstattede bytes kan ikke hentes tilbage nogetsteds.",
+      "submit": "Upload",
+      "submitting": "Uploader…",
+      "provenanceNote": "Registreres på din konto.",
+      "success": "{filename} uploadet.",
+      "successReplaced": "{filename} uploadet og erstattede det, der var der.",
+      "successUnchanged": "{filename} var allerede cachet med identiske bytes. Intet blev ændret.",
+      "error": "Uploaden mislykkedes.",
+      "fields": {
+        "project": "Projekt",
+        "name": "Navn",
+        "version": "Version",
+        "filename": "Filnavn",
+        "package_id": "Pakke-id",
+        "module": "Modulsti",
+        "suffix": "Fil",
+        "namespace": "Navnerum",
+        "document": "Dokument",
+        "kind": "Plugintype",
+        "os": "Operativsystem",
+        "arch": "Arkitektur"
+      },
+      "hints": {
+        "filename": "Angives i stedet for at udledes: navnet på et wheel koder dets kompatibilitetstags.",
+        "suffix": "Én af .info, .mod eller .zip. En version er tre filer, og hver uploades separat.",
+        "document": "Hvilket indeksdokument. Galaxy har collection og versions; Go har list og latest.",
+        "kind": "resource, language, analyzer eller converter."
+      }
     }
   },
   "catalog": {
