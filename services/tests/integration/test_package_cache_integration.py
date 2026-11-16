@@ -22,6 +22,7 @@ from sqlalchemy import func, select, update
 from terrapod import http_retry
 from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db_session
+from terrapod.services.package_cache import goproxy
 from terrapod.services.package_cache.substrate import (
     Artifact,
     DigestMismatch,
@@ -387,14 +388,21 @@ class TestVerification:
         assert await storage.get(record.storage_key) == WHEEL
 
     async def test_an_ecosystem_with_no_published_digest_still_caches(self, app) -> None:
-        """goproxy, nuget and pulumi_plugins are deliberately outside
-        `_DIGEST_REQUIRED` -- their material lives at a separate upstream. Until
-        that is wired they must keep working, or the gate takes the cache down
-        rather than making it safer."""
+        """`go` and `pulumi` are deliberately outside `_DIGEST_REQUIRED` -- their
+        material lives at a separate upstream. Until that is wired they must keep
+        working, or the gate takes the cache down rather than making it safer.
+
+        The ecosystem string is `goproxy.ECOSYSTEM`, NOT the module name. They
+        differ (`"go"` vs `"goproxy"`), the gate matches on the former, and a
+        fixture naming the latter tests an ecosystem no production code produces
+        -- so it would keep passing after `go` joined the required set, which is
+        the one regression this test exists to catch. It said `"goproxy"` until
+        2026-11-16 and could not have caught it.
+        """
         calls: list[str] = []
         storage = get_storage()
         artifact = Artifact(
-            ecosystem="goproxy",
+            ecosystem=goproxy.ECOSYSTEM,
             name="example.com/m",
             version="v1.0.0",
             filename="v1.0.0.zip",
@@ -428,11 +436,15 @@ class TestAttestation:
 
     async def test_an_ecosystem_publishing_none_records_that_rather_than_nothing(self, app) -> None:
         """`none-published` and NULL must not be the same value: one is a declaration
-        about the ecosystem, the other is an absence of information about the row."""
+        about the ecosystem, the other is an absence of information about the row.
+
+        Uses the real `goproxy.ECOSYSTEM` rather than the module name, for the
+        reason given on the sibling test above.
+        """
         calls: list[str] = []
         storage = get_storage()
         artifact = Artifact(
-            ecosystem="goproxy",
+            ecosystem=goproxy.ECOSYSTEM,
             name="example.com/attest",
             version="v1.0.0",
             filename="v1.0.0.zip",

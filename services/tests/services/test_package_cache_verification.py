@@ -97,3 +97,63 @@ class TestTheRequiredSet:
         matter, so a subset check would miss the one that loses a control.
         """
         assert _DIGEST_REQUIRED == frozenset({"pypi", "npm", "galaxy", "nuget"})
+
+
+class TestTheRequiredSetNamesREALEcosystems:
+    """Every entry must be an ecosystem string some module actually produces.
+
+    The gate matches on `Artifact.ecosystem`, and two modules' ecosystem strings
+    differ from their module names: `goproxy.py` produces `"go"` and
+    `pulumi_plugins.py` produces `"pulumi"`. So adding `"goproxy"` to the
+    required set is a SILENT NO-OP -- it reads as having closed the gap, the
+    suite stays green, and nothing is verified. Deriving the valid set from the
+    modules is what makes that a failure instead.
+
+    Two fixtures in the integration tier named `"goproxy"` until 2026-11-16, so
+    this is a defect that has already happened rather than one being guarded
+    against in the abstract.
+    """
+
+    @staticmethod
+    def _real_ecosystems() -> frozenset[str]:
+        """The ecosystem strings the package-cache modules actually produce.
+
+        Derived by importing each module and reading its `ECOSYSTEM`, rather than
+        listed here -- a list would be the same ledger-with-no-gate that the
+        required set already is.
+        """
+        import importlib
+        import pkgutil
+
+        from terrapod.services import package_cache
+
+        found: set[str] = set()
+        for mod in pkgutil.iter_modules(package_cache.__path__):
+            m = importlib.import_module(f"{package_cache.__name__}.{mod.name}")
+            value = getattr(m, "ECOSYSTEM", None)
+            if isinstance(value, str) and value:
+                found.add(value)
+        return frozenset(found)
+
+    def test_every_required_ecosystem_is_one_a_module_produces(self) -> None:
+        real = self._real_ecosystems()
+        # A floor, so a matcher that stops finding modules fails here rather than
+        # passing vacuously on an empty set.
+        assert len(real) >= 6, f"only discovered {sorted(real)}"
+        unreal = _DIGEST_REQUIRED - real
+        assert not unreal, (
+            f"{sorted(unreal)} is not an ecosystem any module produces, so the gate "
+            f"can never match it. Real ecosystems: {sorted(real)}"
+        )
+
+    def test_the_two_mismatched_modules_are_still_mismatched(self) -> None:
+        """Pins the trap itself, so the reason the test above exists stays visible.
+
+        If a later change renames these to match their module names the trap is
+        gone and this test should be deleted -- deliberately, after checking the
+        required set and every fixture, rather than left asserting a coincidence.
+        """
+        from terrapod.services.package_cache import goproxy, pulumi_plugins
+
+        assert goproxy.ECOSYSTEM == "go"
+        assert pulumi_plugins.ECOSYSTEM == "pulumi"
