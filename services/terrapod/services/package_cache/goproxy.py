@@ -12,6 +12,13 @@ Per the cache-expiry rule, only the first two need a bound — a module version'
 bytes cannot change, which the Go checksum database exists to guarantee, so the
 artifacts need no TTL at all and only `last_accessed_at` for retention.
 
+**Nothing here is verified at fetch time, deliberately (#2589).** The reason is
+recorded in full on `artifact_for`, and the short version is that the consumer
+already verifies: a Go program carries a committed `go.sum` and the `go` command
+enforces it against every module it downloads, which is a stronger control than
+ours would be because the program's author pinned it. So a row cached here
+records `none-published` rather than being left to look verified.
+
 Two properties captured from a real toolchain (`scripts/goproxy-capture.py`),
 either of which breaks common modules if guessed:
 
@@ -102,10 +109,28 @@ def artifact_for(module: str, version: str, suffix: str, *, base: str | None = N
         version=version,
         filename=f"{version}{suffix}",
         upstream_url=f"{root}/{module}/@v/{version}{suffix}",
-        # The proxy protocol publishes no digest alongside these; integrity
-        # comes from the client's own checksum database, which it consults
-        # independently of us. Claiming one here would imply a check we do not
-        # perform.
+        # No digest, and the reason is not that nobody checks -- **the consumer
+        # already does, with a stronger control than a fetch-time digest would
+        # be (#2589).**
+        #
+        # The proxy protocol publishes none alongside these files (`.ziphash`
+        # and `.zip.sha256` are both 404 -- measured), and the authoritative
+        # hash lives in the Go checksum database: a THIRD upstream, which a
+        # sealed deployment cannot reach, which is why
+        # `runner/phases/pulumi_deps.py::go_env` sets `GOSUMDB=off`. That turns
+        # off the DATABASE LOOKUP and nothing else -- the module hashes in the
+        # program's own **`go.sum`** are still enforced by the `go` command
+        # against every module it downloads, and those were pinned by the
+        # program's author rather than asserted by whichever proxy answered. So
+        # a checksum-database client here would duplicate a check the consumer
+        # makes anyway, against an upstream we have deliberately stopped
+        # reaching.
+        #
+        # The row therefore records `none-published`, which is a declaration
+        # about this ecosystem rather than an absence of information about the
+        # row. Claiming a digest here would imply a check we do not perform;
+        # leaving the reason out would let a later reader read a measured
+        # decision as an oversight and go looking for a sumdb client to write.
         digest="",
         content_type=_CONTENT_TYPES[suffix],
     )

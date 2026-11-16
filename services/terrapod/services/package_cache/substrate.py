@@ -101,9 +101,15 @@ class Artifact:
     upstream_url: str
     digest: str = ""
     content_type: str = "application/octet-stream"
-    #: Fetch upstream's digest, for an ecosystem that publishes it somewhere other
-    #: than the index the download URL came from -- NuGet's `catalogEntry`, Go's
-    #: checksum database, a Pulumi provider's release checksums.
+    #: Fetch upstream's digest, for an artifact whose publisher puts it somewhere
+    #: other than the index the download URL came from -- NuGet's `catalogEntry`,
+    #: and the `SHA256SUMS` manifest on the release carrying Terrapod's own
+    #: bridged Pulumi plugin.
+    #:
+    #: Per ARTIFACT rather than per ecosystem, which is what lets a requirement
+    #: apply to one plugin out of an ecosystem that publishes nothing for the
+    #: rest (`pulumi_plugins.is_first_party`). `_DIGEST_REQUIRED` cannot express
+    #: that, because it matches on `Artifact.ecosystem`.
     #:
     #: Called ONLY from `fetch_and_cache`, which is the miss path, and only when
     #: `digest` is empty. That placement is the whole of the design: an Artifact is
@@ -143,24 +149,41 @@ _ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
 #: module:
 #:
 #:   goproxy          the module proxy serves no digest at all (`.ziphash` and
-#:                    `.zip.sha256` are both 404). The authoritative hash is the
-#:                    checksum database's, which is also a different upstream,
-#:                    and it is a `dirhash` over the zip's sorted contents
-#:                    rather than a digest of the file.
+#:                    `.zip.sha256` are both 404), and **the consumer already
+#:                    verifies with a stronger control**: a Go program carries a
+#:                    committed `go.sum` and the `go` command enforces it against
+#:                    every module it downloads, pinned by the program's author
+#:                    rather than asserted by whichever proxy answered. The
+#:                    authoritative hash otherwise lives in the checksum
+#:                    database -- a THIRD upstream a sealed deployment cannot
+#:                    reach, which is why the runner sets `GOSUMDB=off` (that
+#:                    turns off the database lookup, NOT the `go.sum` check). A
+#:                    sumdb client here would duplicate the consumer's check
+#:                    against an upstream we have deliberately stopped reaching.
+#:                    Recorded in full on `goproxy.artifact_for`.
 #:   pulumi_plugins   get.pulumi.com publishes nothing beside the tarball (403
-#:                    for `.sha256` and `SHA256SUMS`). The provider's own GitHub
-#:                    release does publish `pulumi-<name>_<ver>_checksums.txt`
-#:                    -- a different upstream again, and only derivable for
-#:                    official `pulumi/pulumi-<name>` repositories.
+#:                    for `.sha256` and `SHA256SUMS`), so a Pulumi-published
+#:                    plugin is admitted and recorded honestly. **Terrapod's own
+#:                    plugin is the exception and IS required**: we are its
+#:                    publisher, its release carries a `SHA256SUMS` manifest, and
+#:                    `pulumi_plugins.resolve_first_party_digest` refuses the
+#:                    fetch when that manifest is absent or does not list the
+#:                    asset. That requirement is enforced in the module rather
+#:                    than by joining this set, because this set matches on
+#:                    `Artifact.ecosystem` -- `"pulumi"` here would demand a
+#:                    digest for `random` and `aws-native` too and break every
+#:                    Pulumi-published plugin.
 #:
-#: Both keep their material at a SEPARATE upstream, which is not the obstacle it
-#: first looks like: `digest_resolver` fetches it on the MISS path, where egress is
+#: So absence from this set is per-ECOSYSTEM and says nothing about whether some
+#: artifact within it is verified: a required digest that applies to one artifact
+#: rather than to the whole ecosystem belongs in that ecosystem's module, where
+#: the predicate identifying it already lives.
+#:
+#: Where an ecosystem's digest does live at a SEPARATE upstream that is not an
+#: obstacle: `digest_resolver` fetches it on the MISS path, where egress is
 #: already required, so there is no case of reaching the artifact and not its
-#: digest -- a sealed node fetches neither. NuGet is wired exactly that way. What
-#: these two still need is per-ecosystem work rather than a decision: Go's hash is
-#: a `dirhash` over the zip's sorted contents rather than a digest of the file, and
-#: a Pulumi plugin's checksums live on its provider repository's release, which is
-#: only derivable for the official `pulumi/pulumi-<name>` set.
+#: digest -- a sealed node fetches neither. NuGet is wired exactly that way, and
+#: so is the first-party Pulumi plugin.
 #:
 #: Adding an ecosystem here without wiring its digest breaks that ecosystem
 #: loudly, which is the intended direction.
