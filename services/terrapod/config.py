@@ -853,7 +853,7 @@ class OIDCIssuerConfig(BaseSettings):
         ),
     )
     require_phase: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Refuse to mint an identity token for a run whose runner token carries "
             "no phase, and refuse to issue such a runner token in the first place. "
@@ -866,7 +866,7 @@ class OIDCIssuerConfig(BaseSettings):
         ),
     )
     require_assigned_pool: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Refuse to mint an identity for a run whose executing agent pool is "
             "no longer in the workspace's pool set. A run snapshots its candidate "
@@ -1206,14 +1206,21 @@ class ProviderCacheConfig(BaseModel):
     platforms: list[dict[str, str]] = Field(
         default=[{"os": "linux", "arch": "amd64"}, {"os": "linux", "arch": "arm64"}],
     )
-    verify: Literal["off", "checksum", "signature"] = Field(
+    verify: Literal["checksum", "signature"] = Field(
         default="signature",
         description="Integrity verification for provider archives fetched from upstream. "
         "'signature' (default, fail-closed): verify the archive's SHA-256 against the "
         "registry-advertised shasum AND verify the registry's SHA256SUMS GPG signature "
         "against the registry-advertised signing key (mirrors `terraform init`). "
         "'checksum': verify the SHA-256 against the advertised shasum only. "
-        "'off': no verification (NOT recommended — the mirror would trust any bytes). "
+        "There is deliberately NO 'off'. A network mirror carries no signature "
+        "verification of its own: terraform and tofu attach only a hash check on that "
+        "path, against the hashes the mirror itself declares. So this is the ONLY "
+        "publisher-provenance check anywhere in the chain for a third-party provider, "
+        "and disabling it left a deployment strictly worse off than not using the "
+        "cache at all. Where upstream advertises no signature material use "
+        "`allow_unsigned`, which degrades to a shasum check per provider with a "
+        "warning rather than abandoning verification wholesale. "
         "On failure the fetch is rejected; nothing is cached or served.",
     )
     allow_unsigned: bool = Field(

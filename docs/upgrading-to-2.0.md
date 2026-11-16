@@ -131,6 +131,55 @@ Worth saying, because both look like upgrade steps and are not:
 
 ## Breaking changes
 
+### `registry.provider_cache.verify: off` is removed
+
+If your values set it, **change it before you upgrade** — the value is no longer in the
+schema, so `helm lint` and `helm upgrade` reject it and the API refuses to start.
+
+| you had | set instead |
+|---|---|
+| upstream signs and you turned verification off anyway | remove the key; `signature` is the default |
+| your registry or mirror serves checksums but no signatures | `verify: checksum` |
+| *some* providers you use carry no signature material | keep `signature` and set `allow_unsigned: true` — it degrades to a shasum check for those providers only, with a warning |
+
+**Why it is gone rather than deprecated.** A `network_mirror` carries no signature
+verification of its own: terraform and tofu attach only a hash check on that path, and the
+hashes they check are the ones the mirror itself declares. Terrapod's admission-time
+verification is therefore the **only** publisher-provenance check anywhere in the chain for
+a third-party provider — so `verify: off` left a deployment strictly worse off than not
+using the provider cache at all, while reading like an ordinary compatibility switch. No
+configuration it enabled is unreachable through `checksum` or `allow_unsigned`.
+
+`registry.platform_tools.verify: off` is **unchanged** and still available: Checkov
+publishes no checksum file, so an internal mirror that cannot serve a GitHub-shaped release
+API genuinely needs it.
+
+### Cloud-identity minting is strict by default: `require_phase` and `require_assigned_pool`
+
+Both now default to **true**. Each refuses to mint a run identity in a case that was
+previously allowed, so a trust policy that relied on the permissive behaviour needs checking
+first.
+
+**`auth.oidc_issuer.require_phase: true`** — an identity is refused for a run whose runner
+token carries no `phase` claim, and such a token is no longer issued. An unphased token
+exists only for a listener predating the phase claim, which means **v1.10 or earlier**. That
+was a supported configuration when the switch was added and is not one in 2.0, so the
+previous reason for defaulting off has expired. **Before upgrading:** confirm every listener
+is on v1.10 or later. An unphased token yields an identity with no `phase` claim and an
+unphased `sub` — a shape every trust policy has to remember to exclude, and a wildcard that
+forgets to is how a plan-phase run reaches an apply-phase role.
+
+**`auth.oidc_issuer.require_assigned_pool: true`** — an identity is refused for a run whose
+executing agent pool has left the workspace's pool set. A run snapshots its candidate pools
+at creation, so detaching a pool mid-flight previously left that run claimable by a pool the
+workspace no longer has. The flip trades a narrow mis-issuance window for a narrow
+run-failure window, which is the right way round for a credential. It does **not** constrain
+multi-pool routing: every pool in a workspace's set is a legitimate executor and passes.
+
+Set either back to `false` if you need the old behaviour while you adjust, but treat that as
+temporary — the refusals exist because the permissive shapes are the ones a trust policy
+silently accepts.
+
 ### `TF_VAR_terrapod_run_phase` is no longer exported
 
 **Affects:** a configuration that declares `variable "terrapod_run_phase"`, on a
