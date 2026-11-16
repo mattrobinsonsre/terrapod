@@ -208,16 +208,18 @@ It has no default action; choosing an item runs it:
 | Action | Applies to | Asks first |
 |---|---|---|
 | **Plan** | a workspace with plan/apply enabled; queues a plan-only run | on a touch screen |
-| **Retry run** | the server says the latest run can be retried; a configure run needs configure enabled and an unlocked workspace, a combined apply-and-configure run needs both enabled and an unlocked workspace, any other needs plan/apply enabled | always |
+| **Retry run** | the server says the latest run can be retried; a configure run needs configure enabled and an unlocked workspace, a combined apply-and-configure run needs both enabled and an unlocked workspace, any other needs plan/apply enabled | on every pointer when it can apply, on a touch screen when every selected run is plan-only and not a destroy |
 | **Cancel run** | the server says the latest run can be cancelled | on a touch screen |
 | **Apply** | the server says the latest run can be confirmed; not on a locked workspace | always |
 | **Discard** | the server says the latest run can be discarded, including a run held after its plan | always |
 
 Each item shows `N of M eligible`, and is enabled only when every selected
 workspace qualifies. Each asks for confirmation first, showing the count and the
-first few names: **Apply**, **Discard** and **Retry run** on every pointer (a retry
-can apply a run on an auto-apply workspace), **Plan** and **Cancel run** only on a
-touch screen.
+first few names: **Apply** and **Discard** on every pointer, **Plan** and **Cancel
+run** only on a touch screen. **Retry run** follows what it can do: on every pointer
+when it can apply (a retry applies on an auto-apply workspace), on a touch screen
+only when every selected run is plan-only. One apply-capable run in the selection
+makes the whole retry ask.
 
 Each action is one request per workspace to the existing run endpoints, so the
 permissions are the usual per-workspace ones. A workspace the server refuses is

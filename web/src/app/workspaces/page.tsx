@@ -22,6 +22,7 @@ import { Checkbox } from '@/components/checkbox'
 import { SelectionMenu, type SelectionMenuItem } from '@/components/selection-menu'
 import {
   BULK_ACTIONS,
+  confirmTier,
   summarise,
   type BulkActionId,
   type BulkWorkspace,
@@ -105,6 +106,7 @@ interface LatestRun {
   'created-at': string
   // Absent from an older API: the run actions then fail closed.
   'run-kind'?: string
+  'is-destroy'?: boolean
   actions?: {
     'is-confirmable': boolean
     'is-discardable': boolean
@@ -1020,6 +1022,8 @@ function WorkspacesPageInner() {
               ? {
                   id: run.id,
                   runKind: run['run-kind'] ?? null,
+                  planOnly: run['plan-only'],
+                  isDestroy: run['is-destroy'],
                   actions: run.actions
                     ? {
                         confirmable: run.actions['is-confirmable'],
@@ -1037,27 +1041,23 @@ function WorkspacesPageInner() {
 
   const runBulk = useCallback(
     async (action: BulkActionId) => {
-      const meta = BULK_ACTIONS.find((a) => a.id === action)
-      // Apply, Discard and Retry prompt in both pointer modes; Plan and Cancel on touch only.
-      if (meta) {
-        const lines = confirmLines(selectedBulk.map((w) => w.name))
-        const values = {
-          count: lines.count,
-          names: lines.names.join('\n'),
-          more: lines.more > 0 ? t('bulk.andMore', { count: lines.more }) : '',
-        }
-        // Literal keys, so the key-resolve gate sees every one.
-        const confirmText: Record<BulkActionId, () => string> = {
-          plan: () => t('bulk.confirmPlan', values),
-          retry: () => t('bulk.confirmRetry', values),
-          cancel: () => t('bulk.confirmCancel', values),
-          apply: () => t('bulk.confirmApply', values),
-          discard: () => t('bulk.confirmDiscard', values),
-        }
-        const text = confirmText[action]()
-        const approved = meta.confirm === 'irreversible' ? confirmIrreversible : confirmTouchMutation
-        if (!approved(text)) return
+      // Apply, Discard and a Retry that can apply prompt on every pointer; the rest on touch only.
+      const lines = confirmLines(selectedBulk.map((w) => w.name))
+      const values = {
+        count: lines.count,
+        names: lines.names.join('\n'),
+        more: lines.more > 0 ? t('bulk.andMore', { count: lines.more }) : '',
       }
+      // Literal keys, so the key-resolve gate sees every one.
+      const confirmText: Record<BulkActionId, () => string> = {
+        plan: () => t('bulk.confirmPlan', values),
+        retry: () => t('bulk.confirmRetry', values),
+        cancel: () => t('bulk.confirmCancel', values),
+        apply: () => t('bulk.confirmApply', values),
+        discard: () => t('bulk.confirmDiscard', values),
+      }
+      const approved = confirmTier(action, selectedBulk) === 'irreversible' ? confirmIrreversible : confirmTouchMutation
+      if (!approved(confirmText[action]())) return
       setBulkBusy(true)
       setBulkRunning({ action, count: selectedBulk.length })
       setBulkResult(null)

@@ -91,3 +91,8 @@ export function showsConfigureBadge(run: RunBadgeInput): boolean {
 export function isConfigureOnlyRun(run: RunBadgeInput): boolean {
   return run.runKind === 'configure'
 }
+
+/** Whether the run is a plan/apply run with no configure half; `false` where the kind is absent or new. */
+export function isPlanApplyRun(run: RunBadgeInput): boolean {
+  return run.runKind === 'plan_apply'
+}

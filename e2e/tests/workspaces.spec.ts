@@ -2,12 +2,19 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 import { getStoredToken, createWorkspace, lockWorkspace, seedRun, uniqueName } from "../helpers/api";
 import { listOnly, stubLatestRun, NO_ACTIONS } from "../helpers/workspace-list";
 
-// Every action offered on one stubbed run; returns the URLs the bulk actions would POST to.
-async function stubBulkRuns(page: Page, ids: string[]) {
+// Every action offered on one stubbed run (plan-only where `planOnly(i)`); returns the URLs the bulk actions would POST to.
+async function stubBulkRuns(
+  page: Page,
+  ids: string[],
+  planOnly: (i: number) => boolean = () => false,
+  isDestroy: (i: number) => boolean = () => false,
+) {
   const posts: string[] = [];
   await stubLatestRun(page, ids, (i) => ({
     id: `run-stub-${i}`,
     status: "errored",
+    "plan-only": planOnly(i),
+    "is-destroy": isDestroy(i),
     actions: { "is-confirmable": true, "is-discardable": true, "is-cancelable": true, "is-retryable": true },
   }));
   const record = async (route: Route) => {
@@ -984,7 +991,7 @@ test.describe("Workspaces", () => {
     await expect(page.getByTestId("ws-selection")).toBeFocused();
   });
 
-  test("on a precise pointer Plan and Cancel open no dialog, and Retry does", async ({ page }) => {
+  test("on a precise pointer Plan and Cancel open no dialog, and Retry of an apply-capable run does", async ({ page }) => {
     const prefix = uniqueName("e2e-sel-tiers");
     const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
     const posts = await stubBulkRuns(page, [id]);
@@ -1005,9 +1012,72 @@ test.describe("Workspaces", () => {
     expect(posts).toHaveLength(2);
     expect(dialogs, "Plan and Cancel must not prompt on a precise pointer").toEqual([]);
 
-    // Retry can apply infrastructure on an auto-apply workspace, so it always asks.
+    // This run can apply, so its Retry asks on every pointer.
     await runFromMenu(page, "retry");
     await expect.poll(() => dialogs.length).toBe(1);
+    // Requests reach the route in order, so once this one is recorded any retry sent before it is too.
+    await page.evaluate(() => fetch("/api/v1/runs/settle/actions/settle", { method: "POST" }));
+    await expect.poll(() => posts.some((u) => u.endsWith("/actions/settle"))).toBe(true);
+    expect(posts.some((u) => u.endsWith("/actions/retry"))).toBe(false);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
+  test("on a precise pointer Retry of a plan-only run opens no dialog", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-retry-plan");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    const posts = await stubBulkRuns(page, [id], () => true);
+
+    await listOnly(page, prefix, 1);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(false);
+    let dialogs = 0;
+    page.on("dialog", (d) => {
+      dialogs += 1;
+      void d.dismiss();
+    });
+
+    await runFromMenu(page, "retry");
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Retry run: 1 of 1", { timeout: 15_000 });
+    expect(posts.filter((u) => u.endsWith("/actions/retry"))).toHaveLength(1);
+    expect(dialogs, "a plan-only retry applies nothing, so a mouse click does not ask").toBe(0);
+  });
+
+  test("one apply-capable run among plan-only ones makes Retry ask on every pointer", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-retry-mixed");
+    const token = getStoredToken();
+    const ids = [await createWorkspace(token, `${prefix}-a`), await createWorkspace(token, `${prefix}-b`)];
+    const posts = await stubBulkRuns(page, ids, (i) => i === 0);
+
+    await listOnly(page, prefix, 2);
+    await page.getByTestId("ws-select-all").check();
+    const seen: string[] = [];
+    page.once("dialog", (d) => {
+      seen.push(d.message());
+      void d.dismiss();
+    });
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-retry").click();
+    await expect.poll(() => seen.length).toBe(1);
+    expect(seen[0]).toContain("(2)");
+    // Requests reach the route in order, so once this one is recorded any retry sent before it is too.
+    await page.evaluate(() => fetch("/api/v1/runs/settle/actions/settle", { method: "POST" }));
+    await expect.poll(() => posts.some((u) => u.endsWith("/actions/settle"))).toBe(true);
+    expect(posts.some((u) => u.endsWith("/actions/retry"))).toBe(false);
+  });
+
+  test("on a precise pointer Retry of a plan-only destroy asks", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-retry-destroy");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    const posts = await stubBulkRuns(page, [id], () => true, () => true);
+
+    await listOnly(page, prefix, 1);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(false);
+    const seen: string[] = [];
+    page.once("dialog", (d) => {
+      seen.push(d.message());
+      void d.dismiss();
+    });
+    await runFromMenu(page, "retry");
+    await expect.poll(() => seen.length).toBe(1);
     // Requests reach the route in order, so once this one is recorded any retry sent before it is too.
     await page.evaluate(() => fetch("/api/v1/runs/settle/actions/settle", { method: "POST" }));
     await expect.poll(() => posts.some((u) => u.endsWith("/actions/settle"))).toBe(true);
@@ -1072,6 +1142,31 @@ test.describe("Workspaces: bulk confirmations at tablet width with a touch point
     await expect(page.getByTestId("ws-bulk-result")).toContainText("Plan: 1 of 1", { timeout: 15_000 });
     expect(posts).toHaveLength(1);
     await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+});
+
+test.describe("Workspaces: Retry of a plan-only run on a touch pointer", () => {
+  test.use({ viewport: { width: 1024, height: 768 }, hasTouch: true, isMobile: true });
+
+  test("asks first, because touch confirms every single-tap action", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-touch-plan");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    const posts = await stubBulkRuns(page, [id], () => true);
+
+    await listOnly(page, prefix, 1);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+    const seen: string[] = [];
+    page.once("dialog", (d) => {
+      seen.push(d.message());
+      void d.dismiss();
+    });
+    await runFromMenu(page, "retry");
+    await expect.poll(() => seen.length).toBe(1);
+    expect(seen[0]).toContain(`${prefix}-a`);
+    // Requests reach the route in order, so once this one is recorded any retry sent before it is too.
+    await page.evaluate(() => fetch("/api/v1/runs/settle/actions/settle", { method: "POST" }));
+    await expect.poll(() => posts.some((u) => u.endsWith("/actions/settle"))).toBe(true);
+    expect(posts.some((u) => u.endsWith("/actions/retry")), "declining must send nothing").toBe(false);
   });
 });
 

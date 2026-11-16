@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 
 import {
   BULK_ACTIONS,
+  confirmTier,
   eligibleFor,
   summarise,
   type BulkRunActions,
@@ -20,6 +21,8 @@ interface Opts {
   planApply?: boolean
   configure?: boolean
   noRun?: boolean
+  planOnly?: boolean
+  isDestroy?: boolean | null
 }
 
 function ws(id: string, o: Opts = {}): BulkWorkspace {
@@ -34,6 +37,8 @@ function ws(id: string, o: Opts = {}): BulkWorkspace {
       : {
           id: `run-${id}`,
           runKind: o.runKind === undefined ? 'plan_apply' : o.runKind,
+          planOnly: o.planOnly,
+          isDestroy: o.isDestroy === null ? undefined : (o.isDestroy ?? false),
           actions: o.actions === null ? null : { ...NONE, ...o.actions },
         },
   }
@@ -171,6 +176,53 @@ describe('the action list', () => {
         ['discard', 'irreversible'],
       ],
     )
+  })
+})
+
+describe('which pointer a confirmation is for', () => {
+  const tier = (action: Parameters<typeof confirmTier>[0], ...sel: BulkWorkspace[]) => confirmTier(action, sel)
+
+  it('Apply and Discard always confirm; Plan and Cancel confirm on touch only', () => {
+    const run = ws('a', { planOnly: true })
+    assert.equal(tier('apply', run), 'irreversible')
+    assert.equal(tier('discard', run), 'irreversible')
+    assert.equal(tier('plan', run), 'touch')
+    assert.equal(tier('cancel', run), 'touch')
+  })
+
+  it('a retry of a plan-only run applies nothing, so it confirms on touch only', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true })), 'touch')
+  })
+
+  it('a retry that can apply confirms on every pointer', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: false })), 'irreversible')
+  })
+
+  it('a configure or combined run is never read-only, even when it says plan-only', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: 'configure' })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: 'full' })), 'irreversible')
+  })
+
+  it('a destroy confirms on every pointer, plan-only or not', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true, isDestroy: true })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: false, isDestroy: true })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true }), ws('b', { planOnly: true, isDestroy: true })), 'irreversible')
+  })
+
+  it('fails toward confirming when the kind or plan-only is not known', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true, isDestroy: null })), 'irreversible')
+    assert.equal(tier('retry', ws('a')), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: null })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: 'something-new' })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { noRun: true })), 'irreversible')
+    assert.equal(tier('retry'), 'irreversible')
+  })
+
+  it('one apply-capable run in the selection makes the whole retry confirm on every pointer', () => {
+    const readOnly = ws('a', { planOnly: true })
+    assert.equal(tier('retry', readOnly, ws('b', { planOnly: true })), 'touch')
+    assert.equal(tier('retry', readOnly, ws('b', { planOnly: false })), 'irreversible')
+    assert.equal(tier('retry', readOnly, ws('b')), 'irreversible')
   })
 })
 

@@ -1142,9 +1142,10 @@ differences are the whole of the recovery.
 | a partial result | impossible | **the normal failure mode** |
 | dry run | `dry_run` defaults on | **none — the action happens when confirmed** |
 
-Apply, Discard and Retry prompt in the irreversible tier, so they confirm on a
-precise pointer as well as on touch (a retry can apply on an auto-apply workspace);
-Plan and Cancel confirm on touch only. Plan is `plan-only`, so it writes no state
+Apply and Discard prompt in the irreversible tier, so they confirm on a precise
+pointer as well as on touch. Retry does the same when it can apply (on an auto-apply
+workspace a retry applies) and on touch only when every selected run is plan-only and not a destroy;
+one apply-capable run makes the whole retry ask. Plan and Cancel confirm on touch only. Plan is `plan-only`, so it writes no state
 and the worst case is wasted runner capacity.
 
 ### Diagnosis
