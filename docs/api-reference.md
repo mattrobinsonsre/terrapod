@@ -3311,6 +3311,8 @@ Unlike a bulk update, saving a rule does **not** require every `exclude` entry t
 match a workspace today: a rule is standing, so an entry matching nothing yet is
 accepted. The varset's [association view](#association-views) reports `meta.exclusion` (how many workspaces were excluded and which entries match nothing) so a mistyped entry is visible after saving.
 
+The Terraform provider's `assignment_rule` does not model `exclude`. On every update it reads the set's current rule and carries its `exclude` across unchanged, so an exclusion set through the API or UI survives an apply; removing the `assignment_rule` block clears the whole rule, exclusion included.
+
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
 credential set to the whole estate. That includes an `exclude` that cannot be
