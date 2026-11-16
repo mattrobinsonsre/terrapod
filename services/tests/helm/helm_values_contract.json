@@ -5,6 +5,7 @@
   "api.autoscaling.minReplicas",
   "api.autoscaling.targetCPUUtilizationPercentage",
   "api.command",
+  "api.config.agent_pools.ca_algorithm",
   "api.config.agent_pools.default_join_token_max_uses",
   "api.config.agent_pools.default_join_token_ttl_seconds",
   "api.config.agent_pools.listener_cert_ttl_seconds",

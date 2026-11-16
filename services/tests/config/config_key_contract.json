@@ -60,6 +60,7 @@
   "[runners.yaml] tolerations",
   "[runners.yaml] topology_spread_constraints",
   "[runners.yaml] ttl_seconds_after_finished",
+  "agent_pools.ca_algorithm",
   "agent_pools.default_join_token_max_uses",
   "agent_pools.default_join_token_ttl_seconds",
   "agent_pools.listener_cert_ttl_seconds",

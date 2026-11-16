@@ -2239,6 +2239,29 @@ class AgentPoolsConfig(BaseModel):
             "in values-local.yaml so a renewal cycle finishes in minutes."
         ),
     )
+    ca_algorithm: str = Field(
+        default="ed25519",
+        description=(
+            "Signature algorithm for the listener certificate authority: `ed25519` "
+            "(the default) or `mldsa44` / `mldsa65` / `mldsa87` for ML-DSA, the NIST "
+            "post-quantum signature standard. It applies to the CA key AND to the "
+            "listener certificates it issues, so a post-quantum CA issues "
+            "post-quantum leaves whose proof-of-possession signatures are "
+            "post-quantum too. "
+            "It takes effect only when a CA is GENERATED: an existing one is loaded "
+            "as it is, whatever this says, because the algorithm is a property of the "
+            "stored key rather than of the configuration -- so changing it on a "
+            "running deployment does nothing until the CA is rotated. "
+            "RSA and ECDSA are deliberately not offered: the capability-URL signing "
+            "key is derived from the CA private key's RAW bytes, which only the "
+            "Edwards and ML-DSA key types expose, so admitting one would break a path "
+            "that has nothing to do with listener certificates. "
+            "Nothing forces this yet -- a listener certificate lives an hour and the "
+            "CA is node-local -- so the realistic reason to set it is an "
+            "organisational post-quantum mandate rather than a threat. See "
+            "docs/post-quantum.md."
+        ),
+    )
     require_listener_proof_of_possession: bool = Field(
         default=True,
         description=(

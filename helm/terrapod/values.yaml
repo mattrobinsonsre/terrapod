@@ -1226,6 +1226,22 @@ api:
       # values-local.yaml overrides to 300s so renewal cycles are
       # observable in a few minutes.
       listener_cert_ttl_seconds: 3600
+      # Signature algorithm for the listener CA: ed25519 (default) or mldsa44 /
+      # mldsa65 / mldsa87 for ML-DSA, the NIST post-quantum signature standard.
+      # Applies to the CA key AND the listener certificates it issues.
+      #
+      # Only takes effect when a CA is GENERATED. An existing one is loaded as it is
+      # whatever this says, because the algorithm is a property of the stored key --
+      # so changing this on a running deployment does nothing until the CA is
+      # rotated, and cannot invalidate the certificates already in your fleet.
+      #
+      # RSA and ECDSA are deliberately not offered: the capability-URL signing key
+      # is derived from the CA key's raw private bytes, which they do not expose.
+      #
+      # Nothing forces this. A listener certificate lives an hour and the CA is
+      # node-local, so the realistic reason to set it is a post-quantum mandate
+      # rather than a threat -- see docs/post-quantum.md.
+      ca_algorithm: "ed25519"
       # New join tokens default to 2 uses + 1h expiry — tolerates a single
       # bootstrap-race retry across multi-replica listener Deployments
       # without leaving the token reusable. Set per-token via the API to

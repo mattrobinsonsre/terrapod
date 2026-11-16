@@ -82,12 +82,59 @@ protects data at rest or in transit.
 
 | What | Algorithm | Why it cannot move yet | Mitigation today |
 |---|---|---|---|
-| **Listener CA**, the certificates it issues, and the listener proof-of-possession | Ed25519 | Nothing external constrains this one — it is ours, and it is the piece being made selectable | Certificates live **3600s** by default and renew at half that, so an issued credential is short-lived. The CA is **node-local and deliberately not replicated**, so it has no fleet-wide reach ([HA](high-availability.md)). ML-DSA is supported by the bundled library, and the verification call site is unchanged by it |
+| **Listener CA**, the certificates it issues, and the listener proof-of-possession | Ed25519 by default, **ML-DSA selectable** | Nothing external constrains this one — it is ours at both ends, which is why it is the one path that *can* move | **It can be moved today**: set `api.config.agent_pools.ca_algorithm` to `mldsa44`, `mldsa65` or `mldsa87` and a generated CA, the certificates it issues, and their proof-of-possession signatures are all post-quantum. See below. Until then: certificates live **3600s** and renew at half that, and the CA is **node-local and not replicated**, so it has no fleet-wide reach ([HA](high-availability.md)) |
 | **Run identity tokens** (the OIDC issuer a cloud federates to) | RS256 | Cloud workload-identity federation does not accept EdDSA, let alone ML-DSA. A federation path that works on two clouds out of three is not worth the elegance | **900s** default lifetime, minted per run, audience-scoped to a single target, and exchanged by the cloud for its own credentials immediately. The signing key rotates as a set, with a publish-before-sign window |
 | **GitHub App JWTs** | RS256 | GitHub requires it | **600s** — GitHub's own maximum — exchanged at once for an installation token and never stored |
 | **Provider registry signatures** | OpenPGP | The signature must be verifiable by `terraform` / `tofu`, which define the format | It is not the only control. The publisher's `SHA256SUMS` is signed and checked, the engine's lock file pins a per-platform hash, and Terrapod refuses an artifact it cannot verify at admission rather than serving it |
 | **SSO assertions** — OIDC id tokens and SAML | the identity provider's choice | Set by your IdP, not by Terrapod | Assertions are short-lived and **replay-protected**: the request id is checked, and each assertion id is cached until its own `NotOnOrAfter`. The resulting Terrapod session is an **opaque random token** looked up server-side, not a signed bearer, so there is no onward signature to forge |
 | **Upstream vendors' signing keys** | each vendor's own | We verify against the key the vendor publishes | A vendor moving to a post-quantum key is picked up by registering it; nothing here is pinned to RSA |
+
+## Moving the listener CA to ML-DSA
+
+This is the one algorithm Terrapod can change on its own, because it issues the
+certificates and verifies them: no external party has to agree.
+
+```yaml
+api:
+  config:
+    agent_pools:
+      ca_algorithm: mldsa65     # or mldsa44 / mldsa87; default is ed25519
+```
+
+**It applies when a CA is generated, not when one is loaded.** The algorithm is a
+property of the stored key, so an existing deployment keeps signing with the CA it
+has — setting this changes nothing until that CA is rotated, and cannot invalidate
+certificates already in your fleet.
+
+**What it covers**: the CA key, the listener certificates it issues, and therefore
+the proof-of-possession signature on every listener request. A post-quantum CA
+issuing classical leaves would leave the signature that actually authenticates a
+request classical, which is most of what this is for.
+
+**Sizes, measured.** ML-DSA certificates are large, and that is why
+[identifying by fingerprint](runners.md#identifying-by-fingerprint-rather-than-by-certificate)
+had to come first — a listener no longer sends its certificate on every request, so
+only the signature header scales:
+
+| | certificate (if it were sent) | signature header |
+|---|---|---|
+| Ed25519 | 584 | 88 |
+| ML-DSA-44 | 7,196 | 3,228 |
+| ML-DSA-65 | 9,952 | 4,412 |
+| ML-DSA-87 | 13,492 | 6,172 |
+
+nginx's default per-header buffer is 8 KB and Node's default total is 16 KiB, so
+sending an ML-DSA-65 certificate would exceed the first and ML-DSA-87 with its
+signature would exceed the second. Sending the fingerprint instead leaves every size
+comfortably inside both.
+
+**RSA and ECDSA are deliberately not offered.** The capability-URL signing key is
+derived from the CA private key's raw bytes, an encoding only the Edwards and ML-DSA
+key types expose, so admitting one would break a path with nothing to do with
+listener certificates.
+
+**Nothing forces this.** Given the mitigations above, the realistic reason to set it
+is an organisational post-quantum mandate rather than a present threat.
 
 ## What would change this
 
