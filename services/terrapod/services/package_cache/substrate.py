@@ -64,6 +64,26 @@ class NotFoundUpstream(RuntimeError):
     """Upstream says this artifact does not exist."""
 
 
+class UploadedArtifactUnavailable(RuntimeError):
+    """An operator-uploaded artifact's object is gone, or is not what was recorded.
+
+    Raised rather than reported as a cache miss, and that distinction is the whole
+    of it (#2599). A miss has two outcomes and both are wrong here:
+
+    * unsealed, a miss is filled from upstream -- which would silently replace a
+      vetted artifact with one nobody vetted, under the coordinates the operator
+      curated. That is the posture defeated by its own cache;
+    * sealed, a miss deletes the row (the object is gone, so the row promises
+      nothing) -- which discards the operator's own record of what should be
+      there, leaving nothing to tell them what to re-upload.
+
+    So the row is left exactly as it is and the request fails saying what is
+    wrong. This is also what a failover onto a follower whose blob store was not
+    replicated looks like: the ledger is complete and the bytes are not, and an
+    honest 503 naming the artifact is the only useful thing to say.
+    """
+
+
 class DigestMismatch(RuntimeError):
     """The bytes upstream served are not the bytes upstream published a digest for.
 
@@ -120,6 +140,39 @@ class Artifact:
     #: requires egress and `fetch_and_cache` refuses before anything else when
     #: sealed.
     digest_resolver: DigestResolver | None = None
+
+
+class CoordinateError(ValueError):
+    """The coordinates an upload supplied are not ones this ecosystem addresses.
+
+    Checked against the ecosystem's OWN naming rules and **never against an
+    upstream index** (#2599): an operator must be able to upload a patched
+    provider, an internal collection or a rebuilt binary that upstream has never
+    published, and validating against upstream would fail the feature for its
+    most important case. What is checked is what has to be: these values become a
+    cache key and a storage path, so a separator or a `..` in one is refused.
+    """
+
+
+@dataclass(frozen=True)
+class Coordinates:
+    """Where an uploaded artifact is served from, in the cache's own terms.
+
+    The upload-side peer of :class:`Artifact`, and deliberately the same
+    `(name, version, filename)` triple each ecosystem's own `artifact_for`
+    produces on the fetch path: an upload is that cache key arrived at from the
+    other direction. It carries no URL, because there is no upstream to reach.
+
+    Built by `upload_coordinates` in each ecosystem module rather than by one
+    validator switching on a kind — every ecosystem already defines its own
+    naming, normalisation and filename convention here, and a second copy of
+    those rules somewhere central is how the two come to disagree.
+    """
+
+    name: str
+    version: str
+    filename: str
+    content_type: str = "application/octet-stream"
 
 
 def sealed() -> bool:
@@ -200,7 +253,18 @@ ATTEST_UPSTREAM_DIGEST = "upstream-digest"
 #: goproxy and pulumi_plugins today, each with its reason recorded above. Admitted
 #: deliberately and recorded honestly rather than left looking verified.
 ATTEST_NONE_PUBLISHED = "none-published"
-ATTESTATIONS = frozenset({ATTEST_UPSTREAM_DIGEST, ATTEST_NONE_PUBLISHED})
+#: An operator uploaded these bytes having vetted them with their own process
+#: (#2599). There is no upstream digest to check against and asking for one would
+#: defeat the posture -- the likeliest upload is something they built, patched or
+#: re-packaged, which no publisher key covers. What stands in for it is
+#: provenance: `uploaded_by`, `cached_at` and `upload_reference` name who
+#: asserted what, and `digest` is the digest computed on receipt.
+#:
+#: It is a distinct value rather than reusing either of the others because an
+#: uploaded artifact must never read as fetched-and-verified in the record: that
+#: would make the ledger lie about the one thing on it that matters.
+ATTEST_OPERATOR_UPLOAD = "operator-upload"
+ATTESTATIONS = frozenset({ATTEST_UPSTREAM_DIGEST, ATTEST_NONE_PUBLISHED, ATTEST_OPERATOR_UPLOAD})
 
 
 def _parse_digest(declared: str) -> tuple[str, str] | None:
@@ -517,7 +581,24 @@ async def lookup_present(
             filename=filename,
         )
         return None
-    if not await storage.exists(record.storage_key):
+    if record.attestation == ATTEST_OPERATOR_UPLOAD:
+        # An uploaded artifact gets the strictest check this path can afford, for
+        # the reason the issue states as a requirement rather than a caveat: a
+        # fetched artifact can be re-verified any time, because the publisher's
+        # material is still upstream, and an uploaded one cannot be re-verified
+        # against anything at all. So the digest recorded on receipt is its whole
+        # integrity story, and never looking at it again is the one thing "we
+        # trust the operator vetted it" must not become.
+        #
+        # What a REDIRECT permits is a metadata check: every read here ends in a
+        # redirect to object storage, so the API never sees the bytes and cannot
+        # hash them per request. `head` costs the same round trip as `exists`
+        # (on S3 `exists` IS a head_object), and a size that no longer matches
+        # catches a truncated write or a substitution of a different length.
+        # `POST /admin/package-cache/{id}/verify` is the full digest check, on
+        # demand; `uploads.verify_object` is what it calls.
+        await _check_uploaded_object(storage, record, ecosystem, name, filename)
+    elif not await storage.exists(record.storage_key):
         logger.warning(
             "Cached package row has no object; treating as a miss",
             ecosystem=ecosystem,
@@ -529,6 +610,39 @@ async def lookup_present(
         return None
     await touch(db, record)
     return record
+
+
+async def _check_uploaded_object(
+    storage: ObjectStore,
+    record: CachedPackageFile,
+    ecosystem: str,
+    name: str,
+    filename: str,
+) -> None:
+    """Refuse to serve an uploaded artifact whose object disagrees with its row.
+
+    Raises :class:`UploadedArtifactUnavailable`; see that class for why this is
+    not a miss. Split out so the serve path reads as one decision and so the
+    refusal can be driven directly in a test.
+    """
+    from terrapod.storage.protocol import ObjectNotFoundError
+
+    try:
+        meta = await storage.head(record.storage_key)
+    except ObjectNotFoundError as exc:
+        raise UploadedArtifactUnavailable(
+            f"{ecosystem} {name} {filename} was uploaded by "
+            f"{record.uploaded_by or 'an operator'} and its object is missing from "
+            "storage. It cannot be re-fetched -- there is no upstream for an "
+            "uploaded artifact -- so it has to be uploaded again."
+        ) from exc
+    if meta.size_bytes != record.size:
+        raise UploadedArtifactUnavailable(
+            f"{ecosystem} {name} {filename} was uploaded as {record.size} bytes "
+            f"({record.digest}) and the stored object is now {meta.size_bytes}. "
+            "Refusing to serve it: an uploaded artifact's recorded digest is the "
+            "whole of its integrity story, and these are not those bytes."
+        )
 
 
 async def get_or_fetch(

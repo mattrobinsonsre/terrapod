@@ -4903,12 +4903,12 @@ walkthrough, see [Caches](caches.md).
 > having no database table; see
 > [Where the two caches differ](caches.md#where-the-two-caches-differ-and-why).
 
-> **The four package-cache routes are absent when the package cache is.** With
-> `api.config.registry.package_cache.enabled` set to `false` they are not
+> **Every package-cache route is absent when the package cache is.** With
+> `api.config.registry.package_cache.enabled` set to `false` none of them is
 > registered at all — a 404 as an unrouted path, which is what a switched-off
-> capability means everywhere in Terrapod. The four archive routes have no such
-> flag and are always there. Nothing cached is lost while a capability is off;
-> see [Caches](caches.md#where-the-two-caches-differ-and-why).
+> capability means everywhere in Terrapod. The archive routes have no such flag
+> and are always there. Nothing cached is lost while a capability is off; see
+> [Caches](caches.md#where-the-two-caches-differ-and-why).
 
 ### List Cached Package Artifacts (Admin)
 
@@ -4938,9 +4938,20 @@ UUID):
 | `version` | string | The version this file belongs to |
 | `filename` | string | The artifact file. One version has many — an sdist plus a wheel per platform and ABI — so the cache is keyed on the filename |
 | `size` | int | Bytes |
-| `digest` | string | **Upstream's own** digest as that ecosystem publishes it (`sha256:…`, or an SRI `sha512-…`); empty when upstream published none. Never re-derived — it is what the client checks our bytes against |
-| `cached-at` | string | RFC3339; first fetch |
+| `digest` | string | The digest these bytes were admitted against, in the form its **source** expresses it (`sha256:…`, or an SRI `sha512-…`). For a fetched artifact that is **upstream's own**, never re-derived — it is what the client checks our bytes against. For an operator upload there is no upstream, so it is the digest computed **on receipt**. `attestation` says which |
+| `attestation` | string \| null | How the row was admitted: `upstream-digest` (checked against what upstream published), `none-published` (that ecosystem's upstream publishes no per-file digest), or `operator-upload`. `null` means it was admitted before verification existed, which the serve path treats as a miss and re-verifies |
+| `uploaded-by` | string \| null | The admin who uploaded it. `null` for a fetched artifact, which has no uploader |
+| `upload-reference` | string \| null | Free text an uploader attached — their own ticket or approval record. Never interpreted |
+| `replaced-digest` | string \| null | The digest that was at these coordinates before the last deliberate replacement. The immediately previous admission, not a history |
+| `replaced-at` | string \| null | RFC3339; when that replacement happened |
+| `cached-at` | string | RFC3339; first fetch, or when it was uploaded |
 | `last-accessed-at` | string | RFC3339; what retention and the age filter read |
+
+> **An uploaded artifact is never indistinguishable from a fetched one here.**
+> `attestation` and `uploaded-by` are that guarantee: if an artifact somebody
+> supplied read as fetched-and-verified, this listing would be wrong about the
+> one thing on it that matters. See
+> [Uploading a vetted artifact](package-cache.md#uploading-a-vetted-artifact).
 
 ### Package Cache Totals (Admin)
 
@@ -5011,6 +5022,106 @@ deleted stay deleted.
 | `files` | How many artifacts this call removed |
 | `bytes` | How much they held |
 | `truncated` | `true` when **more matched than this call took**. Repeat the same request to continue; there is no cursor, because the artifacts that matched are the ones that went, so the next call starts on what is left. Keep going until it is `false` |
+
+### Upload a Vetted Artifact (Admin)
+
+```
+POST /api/v1/admin/package-cache/pypi/artifacts
+POST /api/v1/admin/package-cache/npm/artifacts
+POST /api/v1/admin/package-cache/nuget/artifacts
+POST /api/v1/admin/package-cache/go/artifacts
+POST /api/v1/admin/package-cache/galaxy/artifacts
+POST /api/v1/admin/package-cache/pulumi/artifacts
+```
+
+For the posture these serve — an operator vets an artifact with their own
+process, and a sealed deployment serves only what was vetted — see
+[Uploading a vetted artifact](package-cache.md#uploading-a-vetted-artifact).
+
+**One route per cache rather than one taking a kind.** Each ecosystem already
+computes its cache key from exactly the coordinates an upload supplies, so each
+route takes its own and validates them against that ecosystem's own naming
+rules. An upload is the same cache key arrived at from the other direction.
+
+Every route is `multipart/form-data`, so a browser form drives it unchanged.
+
+| Form field | Routes | Meaning |
+|---|---|---|
+| `file` | all | The artifact's bytes |
+| `project`, `filename` | pypi | The project, and the distribution's own filename. The version is read out of the filename |
+| `name`, `version` | npm | The package name, scope and all. The tarball filename is **derived** rather than supplied, because the serve path matches on the derived form |
+| `package_id`, `version` | nuget | The `.nupkg` filename is derived |
+| `module`, `version`, `suffix` | go | `suffix` is `.info`, `.mod` or `.zip`. A module version is three artifacts to the proxy protocol and each is uploaded in its own right — `go mod download` needs all three |
+| `namespace`, `name`, `version` | galaxy | The collection tarball filename is derived |
+| `kind`, `name`, `version`, `os`, `arch` | pulumi | The plugin filename is assembled from these. A leading `v` on the version is accepted either way |
+| `reference` | all | Optional free text — your own ticket or approval record. Stored and shown, never interpreted |
+| `replace` | all | Overwrite an artifact already at these coordinates. Without it such an upload is **409** |
+
+**`uploaded-by` comes from the authenticated session, never from the body.** Who
+vouched for an artifact is the whole of the provenance, so it is not something a
+request can claim.
+
+**The coordinates are never checked against an upstream index.** Uploading
+something upstream never published — a patched version, an internal package, a
+rebuilt binary — is the case this exists for.
+
+**These work while the node is sealed** (`api.config.registry.cache_only`), which
+is the point: every other write to this cache is an upstream fetch, so without
+them a sealed deployment has no way to get an artifact in.
+
+Responses carry the same `cached-package-files` resource the listing does, with
+`attestation` = `operator-upload`.
+
+| Status | When |
+|---|---|
+| **201** | A first upload at these coordinates |
+| **200** | A replacement (`meta.replaced`), or a re-upload of the identical artifact (`meta.unchanged`) |
+| **400** | The `file` part is empty |
+| **409** | Something is already held here and `replace` was not asked for. The detail names the digest that is there and how it was admitted |
+| **422** | Coordinates this ecosystem cannot address. Not a 404 — there is nothing to look up, by design |
+
+| `meta` field | Meaning |
+|---|---|
+| `replaced` | A deliberate overwrite happened |
+| `unchanged` | The identical artifact was already here, so nothing was displaced. The object is still re-written, which is the one repair available for an uploaded artifact whose bytes have gone |
+| `previous-digest` | On a replacement, the digest that was displaced. Also written to the row as `replaced-digest` |
+| `sealed`, `warning` | On a replacement on a sealed node: the bytes you replaced cannot be fetched back |
+
+### Verify a Cached Artifact (Admin)
+
+```
+POST /api/v1/admin/package-cache/{file_id}/verify
+```
+
+Re-reads the stored object and re-hashes it against the digest on its row.
+
+**This is the check the serve path cannot do.** Every cache read ends in a
+redirect to object storage, so the API never sees the bytes a client is served;
+what it compares on the serve path is an uploaded artifact's object **size**
+against its row, which refuses the request on a mismatch rather than reporting a
+cache miss. This is the full digest check, on demand.
+
+It matters most for an upload: a fetched artifact can be re-verified against
+upstream at any time, and an uploaded one has nothing to be verified against
+except the digest recorded when it arrived.
+
+Reads the whole object, so a multi-gigabyte artifact takes correspondingly long.
+Nothing is repaired or evicted either way. **404** when the row is gone, and
+equally when the id is not a well-formed UUID.
+
+**Response attributes** (`data.type` = `package-cache-verifications`):
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `ok` | bool \| null | `null` where there was no recorded digest to verify against — a `none-published` row. A third answer, which must not be read as either a pass or a failure |
+| `detail` | string | What was found, in words |
+| `algorithm` | string | The digest algorithm used, read from the recorded digest |
+| `recorded-digest` | string | What the row says |
+| `computed-digest` | string | What the stored bytes hash to |
+| `recorded-size` | int | Bytes, per the row |
+| `stored-size` | int | Bytes actually read from storage |
+| `attestation` | string \| null | How the row was admitted; see the listing above |
+| `uploaded-by` | string \| null | Who uploaded it, where it was an upload |
 
 ### List Cached VCS Archives (Admin)
 

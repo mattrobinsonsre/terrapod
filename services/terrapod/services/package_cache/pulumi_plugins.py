@@ -42,6 +42,8 @@ from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    CoordinateError,
+    Coordinates,
     DigestResolver,
     UpstreamError,
 )
@@ -273,5 +275,39 @@ def artifact_for(filename: str, parts: dict[str, str], *, base: str | None = Non
         # hit path and break `cache_only` outright.
         digest="",
         digest_resolver=resolver,
+        content_type="application/gzip",
+    )
+
+
+def upload_coordinates(kind: str, name: str, version: str, os_: str, arch: str) -> Coordinates:
+    """Where an operator-uploaded plugin tarball is served from.
+
+    The filename is **built and then parsed back** through `_FILENAME` rather
+    than validated field by field. That one regex is already the authority for
+    what a plugin filename is — the download route resolves nothing else — so
+    re-deriving the rules here would be a second spelling of them, and the two
+    would eventually disagree about which names this cache can address.
+
+    **Not checked against get.pulumi.com** (#2599): a plugin an operator built
+    from a bridged provider of their own is exactly what gets uploaded here, and
+    `pulumi` has no index to consult anyway — it asks for the file by name.
+    """
+    kind = (kind or "").strip()
+    name = (name or "").strip()
+    version = (version or "").strip().lstrip("v")
+    os_ = (os_ or "").strip()
+    arch = (arch or "").strip()
+    filename = f"pulumi-{kind}-{name}-v{version}-{os_}-{arch}.tar.gz"
+    parts = parse_filename(filename)
+    if parts is None:
+        raise CoordinateError(
+            f"{filename!r} is not a plugin filename. A plugin is addressed as "
+            "kind, name, version, os and arch — e.g. resource, aws, 6.0.0, "
+            "linux, amd64."
+        )
+    return Coordinates(
+        name=f"pulumi-{parts['kind']}-{parts['name']}",
+        version=parts["version"],
+        filename=filename,
         content_type="application/gzip",
     )

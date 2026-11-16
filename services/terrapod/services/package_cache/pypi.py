@@ -25,6 +25,8 @@ from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    CoordinateError,
+    Coordinates,
     NotFoundUpstream,
     UpstreamError,
 )
@@ -131,6 +133,49 @@ def artifact_for(project: str, entry: dict) -> Artifact:
         upstream_url=entry["url"],
         digest=_digest_of(entry),
         content_type="application/octet-stream",
+    )
+
+
+#: A project name as a caller spells it, before normalisation — PEP 503's own
+#: character set. Nothing in the proxy needed this, because a project name only
+#: ever arrived from a URL and was looked up upstream; an upload is never looked
+#: up anywhere, so this is the only thing standing between a caller and a
+#: storage path (#2599).
+_PROJECT = re.compile(r"^[A-Za-z0-9._-]+$")
+
+#: A distribution filename. Deliberately strict: it becomes the last segment of
+#: a storage key, so a separator or a `..` in it is not an unusual name, it is a
+#: way out of the prefix.
+_UPLOAD_FILENAME = re.compile(r"^[A-Za-z0-9._+!-]+$")
+
+
+def upload_coordinates(project: str, filename: str) -> Coordinates:
+    """Where an operator-uploaded distribution is served from.
+
+    `project` and `filename` are the two things pip asks for, and they are all
+    that is needed: the version is read out of the filename exactly as it is on
+    the fetch path, so an upload and a fetch of the same artifact land on the
+    same row.
+
+    **Not checked against the upstream index**, deliberately: the likeliest
+    upload here is an internally built or patched wheel that PyPI has never seen
+    (#2599).
+    """
+    project = (project or "").strip()
+    filename = (filename or "").strip()
+    if not _PROJECT.match(project):
+        raise CoordinateError(
+            f"project {project!r} is not a PyPI project name (letters, digits, '.', '-' and '_')"
+        )
+    if not _UPLOAD_FILENAME.match(filename) or ".." in filename:
+        raise CoordinateError(
+            f"filename {filename!r} is not a distribution filename; it has to be "
+            "the file's own name, with no path in it"
+        )
+    return Coordinates(
+        name=normalise(project),
+        version=_version_from_filename(filename),
+        filename=filename,
     )
 
 

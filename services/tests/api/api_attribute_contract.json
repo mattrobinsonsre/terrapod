@@ -188,15 +188,25 @@
     "pulumi-version",
     "trivy-version"
   ],
-  "cache_admin.list_package_cache": [
+  "cache_admin._package_file_json": [
+    "attestation",
     "cached-at",
     "digest",
     "ecosystem",
     "filename",
     "last-accessed-at",
     "name",
+    "replaced-at",
+    "replaced-digest",
     "size",
+    "upload-reference",
+    "uploaded-by",
     "version"
+  ],
+  "cache_admin._upload_artifact:meta": [
+    "previous-digest",
+    "replaced",
+    "unchanged"
   ],
   "cache_admin.list_vcs_archive_cache": [
     "connection-id",
@@ -233,6 +243,17 @@
     "bytes",
     "scan-limit",
     "truncated"
+  ],
+  "cache_admin.verify_package_cache_file": [
+    "algorithm",
+    "attestation",
+    "computed-digest",
+    "detail",
+    "ok",
+    "recorded-digest",
+    "recorded-size",
+    "stored-size",
+    "uploaded-by"
   ],
   "cache_warm._submit": [
     "status",

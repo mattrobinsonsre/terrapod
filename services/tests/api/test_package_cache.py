@@ -484,6 +484,48 @@ class TestAuthenticationIsRequired:
             "/api/v1/admin/package-cache/evict",
             {"ecosystem": "pypi"},
         ),
+        # Operator uploads (#2599). The body is deliberately `None` for all of
+        # these: they take MULTIPART, and the gate below sends `json=`, so the
+        # request carries no form at all. That is the right shape here --
+        # `require_admin` is resolved before any body validation, so an anonymous
+        # or non-admin caller is refused without the handler ever seeing a part.
+        # A route that answered 422 instead would be one whose auth dependency
+        # the gate had not actually reached.
+        "/api/v1/admin/package-cache/pypi/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/pypi/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/npm/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/npm/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/nuget/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/nuget/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/go/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/go/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/galaxy/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/galaxy/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/pulumi/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/pulumi/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/{file_id}/verify": (
+            "POST",
+            "/api/v1/admin/package-cache/01a06dfc-9451-798c-bed0-348d71a4ac26/verify",
+            None,
+        ),
     }
 
     def test_every_route_has_a_sample_request(self) -> None:
