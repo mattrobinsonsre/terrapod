@@ -166,6 +166,19 @@ _ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
 #: loudly, which is the intended direction.
 _DIGEST_REQUIRED = frozenset({"pypi", "npm", "galaxy", "nuget"})
 
+#: What `CachedPackageFile.attestation` may say about how a row was admitted. The
+#: vocabulary the artifact ledger uses (#2589), so it is additive from here.
+#:
+#: NULL is not in this set and is the load-bearing value: it means a build that
+#: recorded nothing admitted the row, which is to say before verification existed.
+#: `lookup_present` treats that as a miss.
+ATTEST_UPSTREAM_DIGEST = "upstream-digest"
+#: The ecosystem's upstream publishes no per-file digest anywhere we can reach --
+#: goproxy and pulumi_plugins today, each with its reason recorded above. Admitted
+#: deliberately and recorded honestly rather than left looking verified.
+ATTEST_NONE_PUBLISHED = "none-published"
+ATTESTATIONS = frozenset({ATTEST_UPSTREAM_DIGEST, ATTEST_NONE_PUBLISHED})
+
 
 def _parse_digest(declared: str) -> tuple[str, str] | None:
     """`(hashlib algorithm, lowercase hex)` from upstream's published form.
@@ -405,17 +418,34 @@ async def fetch_and_cache(
         # What was VERIFIED, which for a resolved digest is not what the
         # Artifact was constructed with.
         digest=declared,
+        attestation=(ATTEST_UPSTREAM_DIGEST if expected is not None else ATTEST_NONE_PUBLISHED),
     )
     db.add(record)
     try:
         await db.flush()
     except IntegrityError:
-        # Lost the race. The winner stored identical bytes at the identical key,
-        # so its row is as good as ours.
+        # Either we lost a race, or the row is a legacy one carrying no attestation
+        # -- which is the COMMON case here, not an edge: `lookup_present` sends
+        # every unattested row down the miss path, and that row is still present, so
+        # the insert above is always a duplicate for one.
         await db.rollback()
         existing = await lookup(db, artifact.ecosystem, artifact.name, artifact.filename)
         if existing is None:  # pragma: no cover — the constraint says otherwise
             raise
+        if existing.attestation is None:
+            # Re-verified just now, so rewrite the row with what was actually
+            # checked. Returning it unchanged would re-download the artifact on
+            # every single request and still serve a row nobody can vouch for --
+            # which is the bug this branch existed to avoid, arriving the other way
+            # round.
+            existing.digest = declared
+            existing.attestation = (
+                ATTEST_UPSTREAM_DIGEST if expected is not None else ATTEST_NONE_PUBLISHED
+            )
+            existing.size = size
+            await db.flush()
+        # Otherwise we lost a race: the winner stored identical bytes at the
+        # identical key, so its row is as good as ours.
         return existing
 
     logger.info(
@@ -445,6 +475,24 @@ async def lookup_present(
     """
     record = await lookup(db, ecosystem, name, filename)
     if record is None:
+        return None
+    if record.attestation is None:
+        # Admitted by a build that recorded nothing, i.e. before this cache verified
+        # anything. Serving it would mean an operator cannot tell a verified artifact
+        # from one that merely arrived, so it is a miss: re-fetched once, verified
+        # under the current rules, and the row rewritten with what was checked.
+        #
+        # The row is left in place rather than deleted, which matters in two ways.
+        # `fetch_and_cache` rewrites it once the artifact has been re-verified, so
+        # the transition happens exactly once per artifact. And deleting here would
+        # be destructive under `cache_only`: the re-fetch cannot succeed while
+        # sealed, so the row would be gone for good rather than merely unserved.
+        logger.info(
+            "Cached package row carries no attestation; re-fetching to verify it",
+            ecosystem=ecosystem,
+            name=name,
+            filename=filename,
+        )
         return None
     if not await storage.exists(record.storage_key):
         logger.warning(

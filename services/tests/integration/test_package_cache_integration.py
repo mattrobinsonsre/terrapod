@@ -17,11 +17,12 @@ import hashlib
 
 import httpx
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from terrapod import http_retry
 from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db_session
+from terrapod.services.package_cache import goproxy
 from terrapod.services.package_cache.substrate import (
     Artifact,
     DigestMismatch,
@@ -387,14 +388,21 @@ class TestVerification:
         assert await storage.get(record.storage_key) == WHEEL
 
     async def test_an_ecosystem_with_no_published_digest_still_caches(self, app) -> None:
-        """goproxy, nuget and pulumi_plugins are deliberately outside
-        `_DIGEST_REQUIRED` -- their material lives at a separate upstream. Until
-        that is wired they must keep working, or the gate takes the cache down
-        rather than making it safer."""
+        """`go` and `pulumi` are deliberately outside `_DIGEST_REQUIRED` -- their
+        material lives at a separate upstream. Until that is wired they must keep
+        working, or the gate takes the cache down rather than making it safer.
+
+        The ecosystem string is `goproxy.ECOSYSTEM`, NOT the module name. They
+        differ (`"go"` vs `"goproxy"`), the gate matches on the former, and a
+        fixture naming the latter tests an ecosystem no production code produces
+        -- so it would keep passing after `go` joined the required set, which is
+        the one regression this test exists to catch. It said `"goproxy"` until
+        2026-11-16 and could not have caught it.
+        """
         calls: list[str] = []
         storage = get_storage()
         artifact = Artifact(
-            ecosystem="goproxy",
+            ecosystem=goproxy.ECOSYSTEM,
             name="example.com/m",
             version="v1.0.0",
             filename="v1.0.0.zip",
@@ -406,3 +414,122 @@ class TestVerification:
             record = await fetch_and_cache(db, storage, artifact, client=client)
 
         assert await storage.get(record.storage_key) == WHEEL
+
+
+class TestAttestation:
+    """A row records HOW it was admitted, and an unattested one is re-verified.
+
+    The population this exists for is every artifact cached before this cache
+    verified anything: NULL means "a build that recorded nothing admitted this",
+    and serving it would leave an operator unable to tell a verified artifact from
+    one that merely arrived.
+    """
+
+    async def test_a_verified_artifact_records_the_digest_it_was_checked_against(self, app) -> None:
+        calls: list[str] = []
+        storage = get_storage()
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, _artifact("attest-ok.whl"), client=client)
+
+        assert record.attestation == "upstream-digest"
+
+    async def test_an_ecosystem_publishing_none_records_that_rather_than_nothing(self, app) -> None:
+        """`none-published` and NULL must not be the same value: one is a declaration
+        about the ecosystem, the other is an absence of information about the row.
+
+        Uses the real `goproxy.ECOSYSTEM` rather than the module name, for the
+        reason given on the sibling test above.
+        """
+        calls: list[str] = []
+        storage = get_storage()
+        artifact = Artifact(
+            ecosystem=goproxy.ECOSYSTEM,
+            name="example.com/attest",
+            version="v1.0.0",
+            filename="v1.0.0.zip",
+            upstream_url="https://upstream.test/v1.0.0.zip",
+            digest="",
+        )
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert record.attestation == "none-published"
+
+    async def test_an_unattested_row_is_re_fetched_and_rewritten_exactly_once(self, app) -> None:
+        """The property that matters, and the one a naive implementation gets wrong.
+
+        The legacy row is still present, so `fetch_and_cache`'s insert is a
+        duplicate and lands in the IntegrityError branch. Returning the existing row
+        unchanged there would re-download the artifact on EVERY request and still
+        serve a row nobody can vouch for -- so the third request below is the real
+        assertion, not the second.
+        """
+        from sqlalchemy import update
+
+        calls: list[str] = []
+        storage = get_storage()
+        artifact = _artifact("attest-legacy.whl")
+
+        # Cache it, then forge the legacy state by clearing what was recorded.
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+            await db.execute(
+                update(CachedPackageFile)
+                .where(CachedPackageFile.id == record.id)
+                .values(attestation=None)
+            )
+            await db.commit()
+        assert len(calls) == 1
+
+        # Second request: a miss despite the row, so it is re-fetched and verified.
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            again = await get_or_fetch(db, storage, artifact, client=client)
+            await db.commit()
+        assert len(calls) == 2, "an unattested row should have been treated as a miss"
+        assert again.attestation == "upstream-digest", "the row was not rewritten"
+
+        # Third request: now a hit. If the row had not been rewritten this would
+        # fetch again, for ever.
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            await get_or_fetch(db, storage, artifact, client=client)
+        assert len(calls) == 2, "the transition must happen once, not on every request"
+
+    async def test_an_unattested_row_whose_re_fetch_cannot_run_is_not_destroyed(
+        self, app, monkeypatch
+    ) -> None:
+        """Sealed mode. The row must survive being unserveable.
+
+        Deleting an unattested row on sight would be destructive here: the re-fetch
+        cannot succeed while sealed, so the only record of a cached artifact would
+        be gone for good rather than merely unserved until the operator re-warms.
+        """
+        from sqlalchemy import select
+
+        from terrapod.services.package_cache import substrate
+
+        calls: list[str] = []
+        storage = get_storage()
+        artifact = _artifact("attest-sealed.whl")
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+            row_id = record.id
+            await db.execute(
+                update(CachedPackageFile)
+                .where(CachedPackageFile.id == row_id)
+                .values(attestation=None)
+            )
+            await db.commit()
+
+        monkeypatch.setattr(substrate, "sealed", lambda: True)
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            with pytest.raises(SealedError):
+                await get_or_fetch(db, storage, artifact, client=client)
+
+        async with get_db_session() as db:
+            still = (
+                await db.execute(select(CachedPackageFile).where(CachedPackageFile.id == row_id))
+            ).scalar_one_or_none()
+        assert still is not None, "the row was destroyed by a re-fetch that could not run"

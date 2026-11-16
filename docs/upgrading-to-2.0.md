@@ -71,6 +71,7 @@ first — most rows do not apply to most deployments.
 | Do this | If | Why it cannot wait |
 |---|---|---|
 | Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
+| [Unseal, re-warm, re-seal](#if-you-run-a-sealed-deployment-registrycache_only-true-read-this-before-upgrading) | `registry.cache_only: true` | artifacts cached before 2.0 are re-fetched once to verify them, and **a miss cannot be filled while sealed** — so between the upgrade and a re-warm, runs needing a cached package fail. Nothing is deleted, so re-warming later recovers everything, but the window is a real outage for those runs |
 | Move automation off the shapes that change: [a `status == "planning"` branch](#a-run-held-after-its-plan-reports-terraform-enterprises-statuses), [`ListRunPolicyEvaluations` and `IsBlocking()`](#policyevaluation-becomes-policycheck-in-the-go-sdk), and [a literal `queued` or `canceling` read from `/api/tfe/v2`](#a-runs-status-on-apitfev2-is-always-one-go-tfe-defines) | you have scripts or Go programs that read a run's status or its policy results | each is silent: a branch that no longer fires, a `switch` that falls through every case. The first two can be tried ahead of time on your current release |
 | [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status), and move bookmarked `status:locked` / `status:unhealthy` filters | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked`, or you share filter URLs | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then |
 | [Check your own EE images can function as uid 1000](#an-execution-environment-must-run-as-uid-1000) | you set `api.config.ansible.execution_environments`. Terrapod's own published images need nothing | the sidecar's startup probe asserts it, so a non-conforming image fails at pod start — which is better than mid-playbook, but it is still every configure on that workspace |
@@ -130,6 +131,39 @@ Worth saying, because both look like upgrade steps and are not:
   does promise.
 
 ## Breaking changes
+
+### Artifacts cached before 2.0 are re-fetched once, to verify them
+
+The pull-through package cache now checks every artifact against the digest its own
+upstream publishes, before storing it (PyPI, npm, Galaxy and NuGet). Artifacts cached
+*before* that existed were admitted without any such check, and a cache hit is served
+without re-checking — so they would be served unverified for ever while everything fetched
+afterwards was verified, with no way for you or us to tell the two populations apart.
+
+So each row now records **how** it was admitted, and a row that records nothing is treated
+as a miss: the artifact is re-fetched once, verified, and the row rewritten. This is lazy
+and per artifact, on next use. **No action is required and nothing is deleted** — expect one
+extra upstream fetch per artifact the first time it is used after the upgrade.
+
+#### If you run a sealed deployment (`registry.cache_only: true`), read this before upgrading
+
+A miss cannot be filled while sealed, and a pre-2.0 artifact is a miss until it has been
+re-fetched. **A sealed deployment will therefore refuse to serve its existing cached
+artifacts after this upgrade**, and the refusal names the package and says the node is
+sealed.
+
+Your upgrade becomes the warm flow you already use, run once more:
+
+1. **Unseal** — set `registry.cache_only: false`.
+2. **Re-warm** — submit the bulk warm with the set you need, exactly as you did before
+   sealing. Each artifact is fetched once and verified, and its row is rewritten.
+3. **Re-seal** — set `registry.cache_only: true` again.
+
+Doing it in that order means nothing is ever unavailable. Upgrading while sealed is not
+destructive — the rows are left in place, so re-warming later recovers everything — but
+between the upgrade and the re-warm, runs that need a cached package will fail.
+
+A deployment with ordinary outbound reach needs none of this; it re-verifies as it goes.
 
 ### `registry.provider_cache.verify: off` is removed
 
