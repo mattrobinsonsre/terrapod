@@ -388,9 +388,10 @@ api:
         # which is a form every trust policy then has to remember to exclude --
         # and a wildcard that forgets to is how a plan-phase run reaches an
         # apply-phase role. Off by default so an upgrade cannot break a lagging
-        # listener; set it once every listener is on v1.10 or later. It becomes
-        # the default in 2.0.
-        require_phase: false
+        # listener. It became the default in 2.0: every supported listener is
+        # on v1.10 or later, so an unphased token now means a listener that is
+        # out of support rather than one mid-upgrade.
+        require_phase: true
         # Refuse to mint an identity for a run whose executing agent pool is no
         # longer in the workspace's pool set.
         #
@@ -398,13 +399,15 @@ api:
         # from a workspace mid-flight leaves that run claimable by a pool the
         # workspace no longer has -- and which pool runs a workspace is which
         # listeners its federated credential is reachable from. Off by default
-        # because the window is narrow and the refusal fails the run.
+        # because the window is narrow and the refusal fails the run -- ON by
+        # default from 2.0, which trades that narrow run-failure window for a
+        # narrow mis-issuance window, the right way round for a credential.
         #
         # It does NOT constrain multi-pool routing: a workspace's runs are
         # offered to every pool in its set at once and whichever has a live
         # listener claims first, so every pool in the set is a legitimate
         # executor and passes this check.
-        require_assigned_pool: false
+        require_assigned_pool: true
         # ── The audience catalogue: deployment defaults, per provider ──
         #
         # Keyed on the BARE PROVIDER TYPE exactly as it appears in a `provider`

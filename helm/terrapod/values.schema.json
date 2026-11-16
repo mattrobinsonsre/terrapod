@@ -1928,7 +1928,6 @@
                 "verify": {
                   "type": "string",
                   "enum": [
-                    "off",
                     "checksum",
                     "signature"
                   ]
