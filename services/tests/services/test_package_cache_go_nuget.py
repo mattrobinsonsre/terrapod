@@ -113,10 +113,84 @@ class TestGoArtifacts:
         assert a.name == b.name == "example.com/m"
         assert a.filename != b.filename
 
-    def test_no_digest_is_claimed(self) -> None:
-        """The proxy protocol publishes none; integrity comes from the client's
-        own checksum database, which it consults independently of us."""
-        assert goproxy.artifact_for("example.com/m", "v1.0.0", ".zip").digest == ""
+    @pytest.mark.parametrize("suffix", [".info", ".mod", ".zip"])
+    def test_no_digest_is_claimed_and_none_is_resolvable(self, suffix: str) -> None:
+        """The proxy protocol publishes none (`.ziphash` and `.zip.sha256` are
+        both 404), and unlike NuGet there is no second upstream to fetch one
+        from that we are willing to reach -- so there is no resolver either and
+        the row records `none-published`.
+
+        All three files, because a digest claimed for one of them and not the
+        others would be the shape nobody checks: `.zip` is the one anybody looks
+        at, and `.mod` and `.info` go through the identical path.
+
+        The ASSERTION ON THE RESOLVER is the half that matters going forward. A
+        future checksum-database client would be wired as a `digest_resolver`,
+        and this is the test that would have to be changed to add one -- which is
+        the intended friction, because the decision not to is recorded rather
+        than accidental. See the sibling class for why.
+        """
+        artifact = goproxy.artifact_for("example.com/m", "v1.0.0", suffix)
+        assert artifact.digest == ""
+        assert artifact.digest_resolver is None
+
+
+class TestWhyGoIsNotVerifiedHere:
+    """The decision is a measurement, so losing its reason is losing the decision.
+
+    **The consumer already verifies, with a stronger control than a fetch-time
+    digest would be.** A Go program carries a committed `go.sum` and the `go`
+    command enforces it against every module it downloads -- pinned by the
+    program's author rather than asserted by whichever proxy answered. The
+    authoritative hash otherwise lives in the Go checksum database, a THIRD
+    upstream a sealed deployment cannot reach, which is why the runner sets
+    `GOSUMDB=off` (that turns off the database LOOKUP, not the `go.sum` check).
+
+    Without that written down, the only evidence is a 404 against
+    `.zip.sha256`, which reads as an unfinished job rather than a closed
+    question -- and the next person writes a sumdb client that duplicates the
+    consumer's check against an upstream we deliberately stopped reaching.
+    """
+
+    def test_the_ecosystem_is_outside_the_required_set(self) -> None:
+        """The behavioural half. `_DIGEST_REQUIRED` matches on
+        `Artifact.ecosystem`, and `goproxy.ECOSYSTEM` is `"go"` rather than the
+        module name -- so this is asserted against the real string the gate sees.
+        """
+        from terrapod.services.package_cache.substrate import _DIGEST_REQUIRED
+
+        assert goproxy.ECOSYSTEM == "go"
+        assert goproxy.ECOSYSTEM not in _DIGEST_REQUIRED
+
+    def test_the_reason_is_recorded_where_the_decision_is_made(self) -> None:
+        """A prose gate with exactly one failure mode: somebody deletes the
+        explanation while leaving the behaviour.
+
+        It reads `artifact_for`'s own source rather than the module docstring,
+        because the comment has to be where the empty digest is written -- that is
+        where a reader arrives, and a reason two hundred lines away is a reason
+        nobody meets.
+        """
+        import inspect
+
+        source = inspect.getsource(goproxy.artifact_for)
+        for token in ("go.sum", "GOSUMDB"):
+            assert token in source, (
+                f"{token} is no longer named where the empty digest is written. "
+                "That reason is the decision; restore it rather than deleting this."
+            )
+
+    def test_the_runner_really_does_turn_the_checksum_database_off(self) -> None:
+        """The premise of the reason above, asserted rather than quoted.
+
+        If a future change pointed the runner at a reachable checksum database,
+        the argument would still hold on `go.sum` but its second half would be
+        stale -- and a stale REASON reads as considered, which is the direction
+        that survives review.
+        """
+        from terrapod.runner.phases.pulumi_deps import go_env
+
+        assert go_env(1234)["GOSUMDB"] == "off"
 
 
 # ── NuGet ───────────────────────────────────────────────────────────────────

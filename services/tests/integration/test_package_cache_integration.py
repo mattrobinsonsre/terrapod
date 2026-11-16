@@ -22,7 +22,7 @@ from sqlalchemy import func, select, update
 from terrapod import http_retry
 from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db_session
-from terrapod.services.package_cache import goproxy
+from terrapod.services.package_cache import goproxy, pulumi_plugins
 from terrapod.services.package_cache.substrate import (
     Artifact,
     DigestMismatch,
@@ -533,3 +533,255 @@ class TestAttestation:
                 await db.execute(select(CachedPackageFile).where(CachedPackageFile.id == row_id))
             ).scalar_one_or_none()
         assert still is not None, "the row was destroyed by a re-fetch that could not run"
+
+
+class TestPulumiPluginVerification:
+    """Two publishers, two answers, and the split is who we can hold to account.
+
+    `get.pulumi.com` publishes nothing beside a tarball, so a Pulumi-published
+    plugin is cached and recorded `none-published`. Terrapod's own bridged plugin
+    is the exception: we publish it, its release carries a `SHA256SUMS` manifest,
+    and so an absent or incomplete manifest is a statement about OUR release
+    rather than about an ecosystem that ships no digests. That one is refused.
+
+    Both halves are here because either alone is satisfied by the wrong
+    implementation. "Ours is verified" passes if the resolver were attached to
+    every plugin -- which would refuse `random` and `aws` for every install, the
+    damaging direction.
+    """
+
+    PLUGIN_BODY = b"not really a plugin tarball, but bytes are bytes" * 50
+    PLUGIN_SHA = hashlib.sha256(PLUGIN_BODY).hexdigest()
+    RELEASE = "https://release.test/download"
+    UPSTREAM = "https://plugins.test/releases/plugins"
+
+    @pytest.fixture(autouse=True)
+    def _bases(self, monkeypatch):
+        from terrapod.config import settings
+
+        pulumi = settings.registry.package_cache.pulumi
+        monkeypatch.setattr(pulumi, "first_party_url", self.RELEASE)
+        monkeypatch.setattr(pulumi, "upstream", self.UPSTREAM)
+
+    def _client(self, calls: list[str], *, manifest: str | None, body: bytes | None = None):
+        """Serves the manifest at its own URL and the tarball everywhere else.
+
+        One transport for both, deliberately: `fetch_and_cache` passes the SAME
+        client to the resolver so the extra request shares its connection pool,
+        and a test using two clients would not exercise that.
+        """
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(str(request.url))
+            if request.url.path.endswith("_SHA256SUMS"):
+                if manifest is None:
+                    return httpx.Response(404, content=b"Not Found")
+                return httpx.Response(200, content=manifest.encode())
+            return httpx.Response(200, content=self.PLUGIN_BODY if body is None else body)
+
+        return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+    def _artifact(self, filename: str, *, base: str | None = None):
+        parts = pulumi_plugins.parse_filename(filename)
+        assert parts is not None, filename
+        return pulumi_plugins.artifact_for(filename, parts, base=base)
+
+    async def test_the_first_party_plugin_is_verified_against_its_release_manifest(
+        self, app
+    ) -> None:
+        filename = "pulumi-resource-terrapod-v8.1.0-linux-amd64.tar.gz"
+        manifest = f"{self.PLUGIN_SHA}  {filename}\n"
+        calls: list[str] = []
+        storage = get_storage()
+
+        async with get_db_session() as db, self._client(calls, manifest=manifest) as client:
+            record = await fetch_and_cache(db, storage, self._artifact(filename), client=client)
+
+        assert record.attestation == "upstream-digest"
+        assert record.digest == f"sha256:{self.PLUGIN_SHA}"
+        assert await storage.get(record.storage_key) == self.PLUGIN_BODY
+        assert any(url.endswith("_SHA256SUMS") for url in calls), calls
+
+    async def test_an_absent_manifest_CACHES_the_plugin_as_unverified(self, app) -> None:
+        """Cached, and recorded honestly as `none-published`.
+
+        This asserted a refusal until 2026-11-16, on the reasoning that a broken
+        release of ours should not look like an upstream that ships no digests. It
+        broke a supported configuration: an operator who has pointed
+        `first_party_url` at an internal mirror holding only the tarballs would have
+        had these plugins refused on upgrade, under config they already had. The
+        absence is logged at WARNING instead, and the integrity check that matters --
+        bytes against a manifest that IS there -- is unaffected.
+        """
+        filename = "pulumi-resource-terrapod-v8.1.1-linux-amd64.tar.gz"
+        calls: list[str] = []
+        storage = get_storage()
+
+        async with get_db_session() as db, self._client(calls, manifest=None) as client:
+            record = await fetch_and_cache(db, storage, self._artifact(filename), client=client)
+
+        assert record.attestation == "none-published"
+        assert record.digest == ""
+        assert await storage.exists(
+            keys.package_cache_key("pulumi", "pulumi-resource-terrapod", filename)
+        )
+
+    async def test_a_manifest_NOT_LISTING_this_platform_caches_it_unverified(self, app) -> None:
+        """A partial release, or a mirror carrying a subset of platforms: the manifest
+        is there and this asset is not in it.
+
+        What must NOT happen is verifying these bytes against the OTHER platform's
+        digest, which would refuse a perfectly good download and read as corruption.
+        So the absence is recorded rather than a digest invented -- see
+        `test_it_NEVER_INVENTS_a_digest` for the unit-level form.
+        """
+        filename = "pulumi-resource-terrapod-v8.1.2-windows-arm64.tar.gz"
+        other = "pulumi-resource-terrapod-v8.1.2-linux-amd64.tar.gz"
+        calls: list[str] = []
+        storage = get_storage()
+
+        async with (
+            get_db_session() as db,
+            self._client(calls, manifest=f"{self.PLUGIN_SHA}  {other}\n") as client,
+        ):
+            record = await fetch_and_cache(db, storage, self._artifact(filename), client=client)
+
+        assert record.attestation == "none-published"
+
+    async def test_BYTES_THAT_DO_NOT_MATCH_the_manifest_are_refused_and_not_stored(
+        self, app
+    ) -> None:
+        """The point of resolving a digest at all. A mismatch is either a
+        corrupted transfer or a substituted artifact and there is no way to tell
+        which from here, so neither the object nor the row is written."""
+        filename = "pulumi-resource-terrapod-v8.1.3-linux-amd64.tar.gz"
+        calls: list[str] = []
+        storage = get_storage()
+        manifest = f"{self.PLUGIN_SHA}  {filename}\n"
+
+        async with (
+            get_db_session() as db,
+            self._client(calls, manifest=manifest, body=b"different bytes entirely") as client,
+        ):
+            with pytest.raises(DigestMismatch):
+                await fetch_and_cache(db, storage, self._artifact(filename), client=client)
+
+        async with get_db_session() as db:
+            assert await lookup(db, "pulumi", "pulumi-resource-terrapod", filename) is None
+        assert not await storage.exists(
+            keys.package_cache_key("pulumi", "pulumi-resource-terrapod", filename)
+        )
+
+    async def test_a_PULUMI_PUBLISHED_plugin_caches_exactly_as_it_did_before(self, app) -> None:
+        """The no-regression half. One upstream request, no manifest fetched, and
+        the row records `none-published` rather than being left to look verified.
+        """
+        filename = "pulumi-resource-random-v4.16.3-linux-amd64.tar.gz"
+        calls: list[str] = []
+        storage = get_storage()
+
+        async with get_db_session() as db, self._client(calls, manifest=None) as client:
+            record = await fetch_and_cache(db, storage, self._artifact(filename), client=client)
+
+        assert record.attestation == "none-published"
+        assert record.digest == ""
+        assert await storage.get(record.storage_key) == self.PLUGIN_BODY
+        assert calls == [f"{self.UPSTREAM}/{filename}"], calls
+
+    async def test_a_HIT_fetches_NEITHER_the_tarball_NOR_the_manifest(self, app) -> None:
+        """Where the resolver is called is the whole of the sealed-node property.
+
+        An `Artifact` is constructed on EVERY request including a cache hit, so a
+        digest resolved during construction -- or anywhere above
+        `lookup_present` -- would put an upstream round-trip on the hit path. The
+        cost is not only latency: `cache_only` promises a sealed node serves hits
+        with no egress at all, and that promise would be broken by the one
+        ecosystem whose digest lives at a separate upstream.
+        """
+        filename = "pulumi-resource-terrapod-v8.2.0-linux-amd64.tar.gz"
+        manifest = f"{self.PLUGIN_SHA}  {filename}\n"
+        calls: list[str] = []
+        storage = get_storage()
+
+        async with get_db_session() as db, self._client(calls, manifest=manifest) as client:
+            await get_or_fetch(db, storage, self._artifact(filename), client=client)
+            await db.commit()
+        after_miss = len(calls)
+        assert after_miss == 2, f"a miss should fetch the manifest and the tarball: {calls}"
+
+        async with get_db_session() as db, self._client(calls, manifest=manifest) as client:
+            record = await get_or_fetch(db, storage, self._artifact(filename), client=client)
+        assert record.attestation == "upstream-digest"
+        assert len(calls) == after_miss, f"a hit reached upstream: {calls[after_miss:]}"
+
+    async def test_SEALED_it_refuses_before_reaching_for_the_manifest(
+        self, app, monkeypatch
+    ) -> None:
+        """A sealed node fetches neither the artifact nor its digest.
+
+        `fetch_and_cache` refuses before anything else, so the resolver is never
+        called -- which is what makes "the digest lives at a separate upstream"
+        safe rather than a second thing that can fail while sealed. The assertion
+        is on `calls` rather than on the exception: a `SealedError` raised AFTER a
+        manifest request would satisfy a weaker test while having already
+        reached out.
+        """
+        from terrapod.services.package_cache import substrate
+
+        filename = "pulumi-resource-terrapod-v8.2.1-linux-amd64.tar.gz"
+        calls: list[str] = []
+        storage = get_storage()
+        monkeypatch.setattr(substrate, "sealed", lambda: True)
+
+        async with get_db_session() as db, self._client(calls, manifest="") as client:
+            with pytest.raises(SealedError):
+                await get_or_fetch(db, storage, self._artifact(filename), client=client)
+
+        assert calls == [], f"a sealed node reached upstream: {calls}"
+
+    async def test_a_MIRRORED_first_party_plugin_caches_exactly_as_it_did_before(self, app) -> None:
+        """A warm `base` override is flat -- no version path segment -- so the
+        manifest is not at a place we can derive. Requiring one would break
+        warming from a mirror that holds the tarballs, which is config that works
+        today, so the override admits and records honestly instead."""
+        filename = "pulumi-resource-terrapod-v8.1.4-linux-amd64.tar.gz"
+        calls: list[str] = []
+        storage = get_storage()
+        artifact = self._artifact(filename, base="https://mirror.test/p")
+
+        async with get_db_session() as db, self._client(calls, manifest=None) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert record.attestation == "none-published"
+        assert calls == [f"https://mirror.test/p/{filename}"], calls
+
+
+class TestGoModulesRecordNonePublished:
+    """Honest rather than verified, and the reason is in `goproxy.artifact_for`.
+
+    The consumer already verifies with a stronger control: a Go program carries a
+    committed `go.sum` and the `go` command enforces it against every module it
+    downloads. A fetch-time digest would duplicate that against the checksum
+    database, a third upstream a sealed deployment cannot reach.
+
+    This drives `goproxy.artifact_for` rather than building an `Artifact` by
+    hand, which is the difference from the sibling attestation test above it: a
+    hand-built fixture says nothing about what the producer produces, so a
+    `digest_resolver` quietly added there would go unnoticed.
+    """
+
+    @pytest.mark.parametrize("suffix", [".info", ".mod", ".zip"])
+    async def test_every_immutable_file_records_it(self, app, suffix: str, monkeypatch) -> None:
+        calls: list[str] = []
+        storage = get_storage()
+        monkeypatch.setattr(goproxy, "upstream_base", lambda: "https://goupstream.test")
+        artifact = goproxy.artifact_for("example.com/attested", "v3.0.0", suffix)
+
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert record.attestation == "none-published"
+        assert record.digest == ""
+        # One request: no second upstream is consulted for a digest, which is the
+        # whole of the decision recorded on `goproxy.artifact_for`.
+        assert len(calls) == 1, calls

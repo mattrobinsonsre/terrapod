@@ -1640,7 +1640,14 @@ class PulumiPluginCacheConfig(PackageEcosystemConfig):
         "its tag. Separate from `upstream` deliberately: that one is where PULUMI's "
         "plugins come from, and pointing it here to reach ours would send every other "
         "plugin to a host that does not have it. Point this at an internal mirror for a "
-        "restricted-network install, the same way the other mirror URLs work.",
+        "restricted-network install, the same way the other mirror URLs work -- and if "
+        "you want those plugins VERIFIED, carry "
+        "`v{version}/pulumi-resource-terrapod_{version}_SHA256SUMS` there too, which is "
+        "fetched from this base on a cache miss. A mirror holding only the tarballs "
+        "still serves them: the absence is logged and the row records "
+        "`none-published`, rather than refusing a plugin under configuration you "
+        "already have. A manifest that IS present and disagrees with the bytes does "
+        "refuse (#2589).",
     )
 
 

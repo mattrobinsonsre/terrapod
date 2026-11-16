@@ -91,11 +91,21 @@ proxy can supply, and pinning is good practice in an air-gapped estate anyway.
 
 ## Integrity
 
-Upstream publishes no digest alongside the tarball, so Terrapod records none.
-This is weaker than the PyPI and npm proxies, where the client checks our bytes
-against a digest upstream published, and it is worth being plain about rather
-than implying a check that does not happen. Pulumi's own verification is that
-the plugin unpacks and runs.
+`get.pulumi.com` publishes no digest alongside the tarball — `.sha256` and
+`SHA256SUMS` are both 403 — so for a **Pulumi-published** plugin Terrapod
+records none, and the cached row says `none-published` rather than being left to
+look verified. This is weaker than the PyPI, npm, Galaxy and NuGet proxies, where
+Terrapod verifies our bytes against a published digest before caching them, and
+it is worth being plain about rather than implying a check that does not happen.
+Pulumi's own verification is that the plugin unpacks and runs.
+
+**Terrapod's own bridged plugin is the exception, and its digest is required.**
+We are its publisher, so its release carries a `SHA256SUMS` manifest beside the
+tarballs: on a miss Terrapod fetches that manifest from the same release and
+refuses the plugin if it is absent, unreadable, or does not list the asset. There
+is no setting to relax it — an absent manifest says something about *our* release
+rather than about an upstream that ships no digests. See
+[the package cache](package-cache.md#pulumi-plugins).
 
 ## The stored secrets-provider URL is the one the CLI uses (#1580)
 
