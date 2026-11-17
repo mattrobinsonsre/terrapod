@@ -1976,13 +1976,22 @@
         "document": "Dokument",
         "kind": "Plugintype",
         "os": "Operativsystem",
-        "arch": "Arkitektur"
+        "arch": "Arkitektur",
+        "tool": "Verktøy",
+        "hostname": "Registervert",
+        "type": "Leverandørtype"
       },
       "hints": {
         "filename": "Oppgis i stedet for å utledes: navnet på et wheel koder kompatibilitetsmerkene.",
         "suffix": "Én av .info, .mod eller .zip. En versjon er tre filer, og hver lastes opp separat.",
         "document": "Hvilket indeksdokument. Galaxy har collection og versions; Go har list og latest.",
-        "kind": "resource, language, analyzer eller converter."
+        "kind": "resource, language, analyzer eller converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, eller verten til ditt eget register"
+      },
+      "ecosystems": {
+        "binary": "Motorbinærfiler",
+        "provider": "Terraform-leverandører"
       }
     }
   },

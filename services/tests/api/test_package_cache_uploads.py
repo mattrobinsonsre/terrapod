@@ -320,13 +320,52 @@ class TestAnUploadRouteGoesWithItsOwnEcosystem:
         assert "/api/v1/admin/package-cache" in paths
         assert "/api/v1/admin/package-cache/{file_id}/verify" in paths
 
-    def test_every_upload_route_goes_when_the_cache_itself_is_off(self, monkeypatch) -> None:
+    def test_every_package_cache_upload_route_goes_when_the_cache_itself_is_off(
+        self, monkeypatch
+    ) -> None:
+        """Scoped to THIS cache's prefix, which it was not when written.
+
+        A bare `p.endswith("/artifacts")` was exact while the package cache was
+        the only cache accepting an upload. It stopped being exact the moment
+        the binary and provider caches gained theirs (#2599): those are
+        different caches with their own flags, so they are rightly unaffected
+        by this one being off, and a tree-wide matcher read that correctness as
+        a failure.
+
+        The prefix is what the assertion is about, so it belongs in the
+        assertion.
+        """
         from terrapod.config import settings
 
         monkeypatch.setattr(settings.registry.package_cache, "enabled", False)
         paths = self._paths()
 
-        assert [p for p in paths if p.endswith("/artifacts")] == []
+        assert [
+            p
+            for p in paths
+            if p.startswith("/api/v1/admin/package-cache/") and p.endswith("/artifacts")
+        ] == []
+
+    def test_the_other_caches_uploads_are_not_this_cache_s_to_switch_off(self, monkeypatch) -> None:
+        """The contrast, which is what this class is for.
+
+        Narrowing the matcher above could be made to pass by unmounting
+        everything, so the other direction has to be asserted too: the binary
+        and provider upload routes are governed by `binary_cache.enabled` and
+        `provider_cache.enabled`, and the package cache has no say over them.
+
+        They stay MOUNTED either way, because those two caches refuse at
+        request time rather than by unmounting -- the pattern every sibling
+        route on them already follows. `tests/api/test_binary_cache.py` is
+        where that refusal is asserted.
+        """
+        from terrapod.config import settings
+
+        monkeypatch.setattr(settings.registry.package_cache, "enabled", False)
+        paths = self._paths()
+
+        assert "/api/v1/admin/binary-cache/artifacts" in paths
+        assert "/api/v1/admin/provider-cache/artifacts" in paths
 
 
 class TestWhatTheOperatorGetsBack:

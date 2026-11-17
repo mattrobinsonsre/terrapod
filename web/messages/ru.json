@@ -1976,13 +1976,22 @@
         "document": "Документ",
         "kind": "Тип плагина",
         "os": "Операционная система",
-        "arch": "Архитектура"
+        "arch": "Архитектура",
+        "tool": "Инструмент",
+        "hostname": "Хост реестра",
+        "type": "Тип провайдера"
       },
       "hints": {
         "filename": "Указывается, а не выводится: имя wheel-файла кодирует его теги совместимости.",
         "suffix": "Один из .info, .mod или .zip. Версия состоит из трёх файлов, и каждый загружается отдельно.",
         "document": "Какой индексный документ. У Galaxy это collection и versions; у Go — list и latest.",
-        "kind": "resource, language, analyzer или converter."
+        "kind": "resource, language, analyzer или converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io или хост вашего собственного реестра"
+      },
+      "ecosystems": {
+        "binary": "Бинарные файлы движков",
+        "provider": "Провайдеры Terraform"
       }
     }
   },

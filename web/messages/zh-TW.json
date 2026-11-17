@@ -1976,13 +1976,22 @@
         "document": "文件",
         "kind": "外掛類型",
         "os": "作業系統",
-        "arch": "架構"
+        "arch": "架構",
+        "tool": "工具",
+        "hostname": "登錄庫主機",
+        "type": "提供者型別"
       },
       "hints": {
         "filename": "需要填寫而非推導：wheel 的檔名編碼了它的相容性標籤。",
         "suffix": ".info、.mod 或 .zip 之一。一個版本是三個檔案，每個單獨上傳。",
         "document": "哪一個索引文件。Galaxy 有 collection 和 versions；Go 有 list 和 latest。",
-        "kind": "resource、language、analyzer 或 converter。"
+        "kind": "resource、language、analyzer 或 converter。",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io，或您自有登錄庫的主機"
+      },
+      "ecosystems": {
+        "binary": "引擎二進位制檔案",
+        "provider": "Terraform 提供者"
       }
     }
   },

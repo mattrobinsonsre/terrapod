@@ -1976,13 +1976,22 @@
         "document": "Dokumentti",
         "kind": "Laajennuksen tyyppi",
         "os": "Käyttöjärjestelmä",
-        "arch": "Arkkitehtuuri"
+        "arch": "Arkkitehtuuri",
+        "tool": "Työkalu",
+        "hostname": "Rekisterin isäntä",
+        "type": "Palveluntarjoajan tyyppi"
       },
       "hints": {
         "filename": "Annetaan, ei päätellä: wheel-tiedoston nimi koodaa sen yhteensopivuustunnisteet.",
         "suffix": "Yksi näistä: .info, .mod tai .zip. Versio on kolme tiedostoa, ja kukin ladataan erikseen.",
         "document": "Mikä indeksidokumentti. Galaxylla on collection ja versions; Golla on list ja latest.",
-        "kind": "resource, language, analyzer tai converter."
+        "kind": "resource, language, analyzer tai converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io tai oman rekisterisi isäntä"
+      },
+      "ecosystems": {
+        "binary": "Moottoribinaarit",
+        "provider": "Terraform-palveluntarjoajat"
       }
     }
   },

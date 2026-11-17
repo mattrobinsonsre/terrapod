@@ -1976,13 +1976,22 @@
         "document": "سند",
         "kind": "نوع افزونه",
         "os": "سیستم‌عامل",
-        "arch": "معماری"
+        "arch": "معماری",
+        "tool": "ابزار",
+        "hostname": "میزبان رجیستری",
+        "type": "نوع ارائه‌دهنده"
       },
       "hints": {
         "filename": "داده می‌شود نه استنتاج: نام یک wheel برچسب‌های سازگاری‌اش را رمز می‌کند.",
         "suffix": "یکی از .info، .mod یا .zip. هر نسخه سه پرونده است و هر یک جداگانه بارگذاری می‌شود.",
         "document": "کدام سند فهرست. Galaxy سندهای collection و versions دارد؛ Go سندهای list و latest.",
-        "kind": "resource، language، analyzer یا converter."
+        "kind": "resource، language، analyzer یا converter.",
+        "tool": "tofu، terraform، terragrunt، opa، trivy، checkov",
+        "hostname": "registry.terraform.io، یا میزبان رجیستری خودتان"
+      },
+      "ecosystems": {
+        "binary": "باینری‌های موتور",
+        "provider": "ارائه‌دهندگان Terraform"
       }
     }
   },

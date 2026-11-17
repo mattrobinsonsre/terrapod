@@ -1976,13 +1976,22 @@
         "document": "מסמך",
         "kind": "סוג תוסף",
         "os": "מערכת הפעלה",
-        "arch": "ארכיטקטורה"
+        "arch": "ארכיטקטורה",
+        "tool": "כלי",
+        "hostname": "מארח הרישום",
+        "type": "סוג ספק"
       },
       "hints": {
         "filename": "נמסר ולא נגזר: שם של wheel מקודד את תגי התאימות שלו.",
         "suffix": "אחד מ-.info, .mod או .zip. גרסה היא שלושה קבצים וכל אחד מהם מועלה בנפרד.",
         "document": "איזה מסמך אינדקס. ל-Galaxy יש collection ו-versions; ל-Go יש list ו-latest.",
-        "kind": "resource, language, analyzer או converter."
+        "kind": "resource, language, analyzer או converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, או המארח של הרישום שלכם"
+      },
+      "ecosystems": {
+        "binary": "קבצים בינאריים של מנוע",
+        "provider": "ספקי Terraform"
       }
     }
   },

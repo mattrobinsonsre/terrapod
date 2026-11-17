@@ -1976,13 +1976,22 @@
         "document": "Document",
         "kind": "Soort plug-in",
         "os": "Besturingssysteem",
-        "arch": "Architectuur"
+        "arch": "Architectuur",
+        "tool": "Tool",
+        "hostname": "Registryhost",
+        "type": "Providertype"
       },
       "hints": {
         "filename": "Opgegeven in plaats van afgeleid: de naam van een wheel codeert de compatibiliteitstags.",
         "suffix": "Een van .info, .mod of .zip. Een versie bestaat uit drie bestanden en elk wordt afzonderlijk geüpload.",
         "document": "Welk indexdocument. Galaxy heeft collection en versions; Go heeft list en latest.",
-        "kind": "resource, language, analyzer of converter."
+        "kind": "resource, language, analyzer of converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, of de host van uw eigen registry"
+      },
+      "ecosystems": {
+        "binary": "Engine-binaries",
+        "provider": "Terraform-providers"
       }
     }
   },

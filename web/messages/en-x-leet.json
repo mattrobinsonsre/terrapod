@@ -1976,13 +1976,22 @@
         "document": "D0cum3n7",
         "kind": "Plug1n k1nd",
         "os": "0p3r471ng 5y573m",
-        "arch": "4rch173c7ur3"
+        "arch": "4rch173c7ur3",
+        "tool": "700l",
+        "hostname": "R3g157ry h057",
+        "type": "Pr0v1d3r 7yp3"
       },
       "hints": {
         "filename": "5uppl13d r47h3r 7h4n d3r1v3d: 4 wh33l'5 n4m3 3nc0d35 175 c0mp471b1l17y 74g5.",
         "suffix": "0n3 0f .1nf0, .m0d 0r .z1p. 4 v3r510n 15 7hr33 f1l35 4nd 34ch 15 upl04d3d 53p4r473ly.",
         "document": "Wh1ch 1nd3x d0cum3n7. G4l4xy h45 c0ll3c710n 4nd v3r510n5; G0 h45 l157 4nd l47357.",
-        "kind": "r350urc3, l4ngu4g3, 4n4lyz3r 0r c0nv3r73r."
+        "kind": "r350urc3, l4ngu4g3, 4n4lyz3r 0r c0nv3r73r.",
+        "tool": "70fu, 73rr4f0rm, 73rr4grun7, 0p4, 7r1vy, ch3ck0v",
+        "hostname": "r3g157ry.73rr4f0rm.10, 0r y0ur 0wn r3g157ry'5 h057"
+      },
+      "ecosystems": {
+        "binary": "3ng1n3 b1n4r135",
+        "provider": "73rr4f0rm pr0v1d3r5"
       }
     }
   },

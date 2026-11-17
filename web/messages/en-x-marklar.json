@@ -1976,13 +1976,22 @@
         "document": "Marklar",
         "kind": "Marklar marklar",
         "os": "Operating marklar",
-        "arch": "Marklar"
+        "arch": "Marklar",
+        "tool": "Marklar",
+        "hostname": "Marklar marklar",
+        "type": "Marklar marklar"
       },
       "hints": {
         "filename": "Supplied rather than derived: a marklar's marklar encodes its marklar marklars.",
         "suffix": "One of .info, .mod or .zip. A marklar is three marklars and each is uploaded separately.",
         "document": "Which marklar marklar. Galaxy has collection and versions; Go has list and latest.",
-        "kind": "resource, language, analyzer or converter. Marklar."
+        "kind": "resource, language, analyzer or converter. Marklar.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov. Marklar.",
+        "hostname": "registry.terraform.io, or your own marklar's marklar"
+      },
+      "ecosystems": {
+        "binary": "Marklar marklars",
+        "provider": "Marklar marklars"
       }
     }
   },

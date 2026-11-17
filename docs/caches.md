@@ -292,6 +292,64 @@ fail.
 
 ---
 
+## Uploading into the binary and provider caches
+
+An air-gapped deployment cannot fetch either of these, and they are the two it
+can least do without: without an engine binary it cannot run at all, and without
+providers `init` cannot resolve. So both caches accept a vetted artifact
+directly, the same third posture the package cache offers.
+
+Everything that governs a package upload governs these too, and is not repeated
+here: platform `admin` is required, it works while sealed, the record says who
+uploaded it, a replacement is deliberate, and nothing is gated on a scan of
+ours. See [Uploading a vetted
+artifact](package-cache.md#uploading-a-vetted-artifact) for all of that.
+
+What differs is worth knowing before you use them.
+
+**They are separate caches, not ecosystems.** Each has its own route with no
+ecosystem segment:
+
+```sh
+curl -X POST https://terrapod.example.com/api/v1/admin/binary-cache/artifacts \
+  -H "Authorization: Bearer $TOKEN" \
+  -F tool=tofu -F version=1.9.0 -F os=linux -F arch=arm64 \
+  -F reference=CHG-4821 \
+  -F file=@tofu_1.9.0_linux_arm64.zip
+
+curl -X POST https://terrapod.example.com/api/v1/admin/provider-cache/artifacts \
+  -H "Authorization: Bearer $TOKEN" \
+  -F hostname=registry.terraform.io -F namespace=hashicorp -F type=aws \
+  -F version=5.0.0 -F os=linux -F arch=amd64 \
+  -F file=@terraform-provider-aws_5.0.0_linux_amd64.zip
+```
+
+**The binary is executed on every run, which makes its provenance the most
+consequential thing the listing says.** On the fetch path a binary is checked
+against the publisher's signed `SHA256SUMS`; an upload replaces that check with
+a person's judgement, and `attestation` reading `operator-upload` is how anyone
+looking later can tell which of the two happened.
+
+**A provider's `h1:` hash is computed here, from the archive, and never taken
+from you.** This is the one upload whose bytes the *consumer* verifies —
+`terraform init` checks the hash against `.terraform.lock.hcl`. If the hash
+could be supplied alongside the bytes, it could be a hash matching bytes nobody
+vetted, and `init` would accept them against a lock file that looks correct. For
+the same reason a file that is not a readable zip is refused outright rather
+than stored: no engine could install it, and a present-but-uninstallable
+provider is worse than an absent one.
+
+**Neither takes an index document.** The binary cache answers "what versions
+exist" from the rows it holds, as PyPI does, so an upload is advertised the
+moment it exists. Providers are addressed by their coordinates and have no index
+to populate. So unlike npm, Galaxy and NuGet there is no second upload to
+remember, and no way to leave an artifact present and unresolvable.
+
+**From the admin UI**, both appear in the same upload form as the package
+ecosystems, as *Engine binaries* and *Terraform providers*. The form asks only
+for the coordinates each route reads; there is no hash field for a provider,
+because there is nothing for you to supply.
+
 ## The package cache
 
 ### Listing cached artifacts

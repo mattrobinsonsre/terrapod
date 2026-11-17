@@ -1976,13 +1976,22 @@
         "document": "المستند",
         "kind": "نوع الإضافة",
         "os": "نظام التشغيل",
-        "arch": "المعمارية"
+        "arch": "المعمارية",
+        "tool": "الأداة",
+        "hostname": "مضيف السجل",
+        "type": "نوع الموفّر"
       },
       "hints": {
         "filename": "مُعطى لا مُستنتج: فاسم ملف wheel يرمّز وسوم التوافق الخاصة به.",
         "suffix": "واحد من .info أو .mod أو .zip. فالإصدار ثلاثة ملفات، ويُرفع كل منها على حدة.",
         "document": "أي مستند فهرس. لدى Galaxy مستندا collection و versions؛ ولدى Go مستندا list و latest.",
-        "kind": "resource أو language أو analyzer أو converter."
+        "kind": "resource أو language أو analyzer أو converter.",
+        "tool": "tofu، terraform، terragrunt، opa، trivy، checkov",
+        "hostname": "registry.terraform.io، أو مضيف سجلك الخاص"
+      },
+      "ecosystems": {
+        "binary": "ملفات المحرك الثنائية",
+        "provider": "موفّرو Terraform"
       }
     }
   },

@@ -56,6 +56,16 @@ def _cached_binary():
     e.shasum = "abc123"
     e.download_url = "https://example.test/terraform_1.9.0.zip"
     e.cached_at = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
+    # Provenance (#2599), set explicitly because the listing serialises it and an
+    # unset MagicMock attribute reaches `json.dumps` as a MagicMock rather than as
+    # None. A FETCHED row carries none of it -- which is the asymmetry that makes
+    # an operator upload visible in the first place -- so these are the honest
+    # values for this fixture, not placeholders.
+    e.attestation = None
+    e.uploaded_by = None
+    e.upload_reference = None
+    e.replaced_digest = None
+    e.replaced_at = None
     return e
 
 
@@ -70,6 +80,15 @@ def _cached_provider():
     e.arch = "amd64"
     e.shasum = "deadbeef"
     e.cached_at = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
+    # Provenance (#2599), as on `_cached_binary` above and for the same reason:
+    # the listing serialises it, and an unset MagicMock attribute reaches
+    # `json.dumps` as a MagicMock rather than as None. None is the honest value
+    # for a FETCHED row -- the asymmetry is what makes an upload visible.
+    e.attestation = None
+    e.uploaded_by = None
+    e.upload_reference = None
+    e.replaced_digest = None
+    e.replaced_at = None
     return e
 
 
@@ -643,3 +662,110 @@ async def test_bulk_warm_redacts_index_url_in_partial_failure():
     assert result.json()["results"][0]["error"] == "upstream [redacted URL] returned 503"
     assert "password" not in result.text
     assert "index-secret" not in result.text
+
+
+class TestAnUploadIsRefusedWhenItsCacheIsOff:
+    """A cache that will not serve must not accept a write either (#2599).
+
+    Both these caches refuse at REQUEST time rather than by unmounting, which
+    is the pattern every sibling route on them already follows, so the route
+    stays in the table and answers 404. The package cache does the opposite --
+    it unmounts its per-ecosystem upload routes -- and the two conventions are
+    asserted in their own files; `test_package_cache_uploads.py` holds the
+    contrast from the other side.
+
+    These shipped WITHOUT the guard and no test noticed, because the upload
+    tests all drive the service rather than the route. An operator who had
+    turned a cache off could still put bytes into it: stored, recorded, and
+    unreachable, which is the half-present surface the convention exists to
+    prevent.
+    """
+
+    _BINARY = "/api/v1/admin/binary-cache/artifacts"
+    _PROVIDER = "/api/v1/admin/provider-cache/artifacts"
+
+    @staticmethod
+    def _form(path: str) -> dict[str, str]:
+        if "binary" in path:
+            return {"tool": "tofu", "version": "1.9.0", "os": "linux", "arch": "arm64"}
+        return {
+            "hostname": "registry.terraform.io",
+            "namespace": "hashicorp",
+            "type": "aws",
+            "version": "5.0.0",
+            "os": "linux",
+            "arch": "amd64",
+        }
+
+    @pytest.mark.parametrize(
+        ("path", "flag", "detail"),
+        [
+            (_BINARY, "binary_cache", "Binary cache is disabled"),
+            (_PROVIDER, "provider_cache", "Provider cache is disabled"),
+        ],
+    )
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_it_is_404_naming_the_cache(
+        self,
+        _init_db,
+        _init_redis,
+        _init_storage,
+        path,
+        flag,
+        detail,
+        monkeypatch,
+    ):
+        # Named rather than `*mocks`: a star-arg swallows the parametrize
+        # values too, and pytest reports that as "function uses no argument".
+        monkeypatch.setattr(getattr(settings.registry, flag), "enabled", False)
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                path,
+                data=self._form(path),
+                files={"file": ("artifact.zip", b"bytes", "application/octet-stream")},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 404, resp.text
+        # Naming the cache, not a bare 404: the operator turned this off and the
+        # message is the only thing that says so rather than looking like a typo
+        # in the coordinates.
+        assert detail in resp.text
+
+    @pytest.mark.parametrize(
+        ("path", "flag"),
+        [(_BINARY, "binary_cache"), (_PROVIDER, "provider_cache")],
+    )
+    async def test_the_refusal_precedes_reading_the_body(self, path, flag):
+        """Positional, because a guard below the work it prevents is no guard.
+
+        `stream_upload_to_tempfile` writes the whole upload to the PVC before
+        anything else looks at it. A flag check after that point would refuse
+        correctly and still have consumed a provider archive first, which on a
+        disabled cache is pure waste and, at the upload size limit, a way to
+        fill a disk through an endpoint that answers 404.
+        """
+        import ast
+        import inspect
+
+        from terrapod.api.routers import binary_cache as module
+
+        name = "upload_binary_artifact" if "binary" in path else "upload_provider_artifact"
+        src = inspect.getsource(module)
+        fn = next(
+            n
+            for n in ast.walk(ast.parse(src))
+            if isinstance(n, ast.AsyncFunctionDef) and n.name == name
+        )
+        body = [
+            n
+            for n in fn.body
+            if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant))
+        ]
+        first = body[0]
+        assert isinstance(first, ast.If), f"{name} does not open with a guard"
+        guard = ast.get_source_segment(src, first) or ""
+        assert f"{flag}.enabled" in guard, f"{name} opens with a guard on something else"

@@ -1976,13 +1976,22 @@
         "document": "Dokument",
         "kind": "Plugintyp",
         "os": "Operativsystem",
-        "arch": "Arkitektur"
+        "arch": "Arkitektur",
+        "tool": "Verktyg",
+        "hostname": "Registervärd",
+        "type": "Providertyp"
       },
       "hints": {
         "filename": "Anges i stället för att härledas: namnet på ett wheel kodar dess kompatibilitetstaggar.",
         "suffix": "Någon av .info, .mod eller .zip. En version är tre filer och var och en laddas upp separat.",
         "document": "Vilket indexdokument. Galaxy har collection och versions; Go har list och latest.",
-        "kind": "resource, language, analyzer eller converter."
+        "kind": "resource, language, analyzer eller converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, eller värden för ditt eget register"
+      },
+      "ecosystems": {
+        "binary": "Motorbinärer",
+        "provider": "Terraform-providers"
       }
     }
   },

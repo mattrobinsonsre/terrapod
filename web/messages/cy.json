@@ -1976,13 +1976,22 @@
         "document": "Dogfen",
         "kind": "Math o ategyn",
         "os": "System weithredu",
-        "arch": "Pensaernïaeth"
+        "arch": "Pensaernïaeth",
+        "tool": "Offeryn",
+        "hostname": "Gwesteiwr cofrestrfa",
+        "type": "Math o ddarparwr"
       },
       "hints": {
         "filename": "Caiff ei roi, nid ei ddeillio: mae enw ffeil wheel yn amgodio ei dagiau cydweddoldeb.",
         "suffix": "Un o .info, .mod neu .zip. Tri ffeil yw fersiwn, a chaiff pob un ei uwchlwytho ar wahân.",
         "document": "Pa ddogfen fynegai. Mae gan Galaxy collection a versions; mae gan Go list a latest.",
-        "kind": "resource, language, analyzer neu converter."
+        "kind": "resource, language, analyzer neu converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, neu westeiwr eich cofrestrfa eich hun"
+      },
+      "ecosystems": {
+        "binary": "Deuaidd peiriant",
+        "provider": "Darparwyr Terraform"
       }
     }
   },

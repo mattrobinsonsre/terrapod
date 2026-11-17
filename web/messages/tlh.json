@@ -1976,13 +1976,22 @@
         "document": "teywI'",
         "kind": "chenmoHwI' Segh",
         "os": "OS pat",
-        "arch": "qach"
+        "arch": "qach",
+        "tool": "tool",
+        "hostname": "nughmey teywI' host",
+        "type": "nobwI' Segh"
       },
       "hints": {
         "filename": "noblu', 'ach chenmoHlu'be': wheel pong rurlaHbogh permey ngu'.",
         "suffix": ".info, .mod, joq .zip. wa' mI' wej De' 'oH, 'ej Hoch De' pIm lI'lu'.",
         "document": "nuq tetlh teywI'. Galaxy ghaj collection versions je; Go ghaj list latest je.",
-        "kind": "resource, language, analyzer joq converter."
+        "kind": "resource, language, analyzer joq converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, joq nughmey teywI'lIj host"
+      },
+      "ecosystems": {
+        "binary": "QuQ HaqwI'mey",
+        "provider": "Terraform nobwI'pu'"
       }
     }
   },
