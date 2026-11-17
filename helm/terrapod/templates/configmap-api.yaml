@@ -112,6 +112,66 @@ data:
         base_url: {{ .Values.api.config.storage.filesystem.base_url | quote }}
         {{- end }}
       {{- end }}
+      {{- with .Values.api.config.storage.locations }}
+      locations:
+        {{- range $name, $loc := . }}
+        {{ $name | quote }}:
+          backend: {{ $loc.backend | quote }}
+          {{- if eq $loc.backend "s3" }}
+          {{- with $loc.s3 }}
+          s3:
+            bucket: {{ .bucket | default "" | quote }}
+            {{- if .region }}
+            region: {{ .region | quote }}
+            {{- end }}
+            {{- if .prefix }}
+            prefix: {{ .prefix | quote }}
+            {{- end }}
+            {{- if .endpoint_url }}
+            endpoint_url: {{ .endpoint_url | quote }}
+            {{- end }}
+            {{- if .presigned_url_expiry_seconds }}
+            presigned_url_expiry_seconds: {{ .presigned_url_expiry_seconds | int64 }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if eq $loc.backend "azure" }}
+          {{- with $loc.azure }}
+          azure:
+            account_name: {{ .account_name | default "" | quote }}
+            container_name: {{ .container_name | default "" | quote }}
+            {{- if .prefix }}
+            prefix: {{ .prefix | quote }}
+            {{- end }}
+            {{- if .presigned_url_expiry_seconds }}
+            presigned_url_expiry_seconds: {{ .presigned_url_expiry_seconds | int64 }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if eq $loc.backend "gcs" }}
+          {{- with $loc.gcs }}
+          gcs:
+            bucket: {{ .bucket | default "" | quote }}
+            {{- if .prefix }}
+            prefix: {{ .prefix | quote }}
+            {{- end }}
+            {{- if .project_id }}
+            project_id: {{ .project_id | quote }}
+            {{- end }}
+            {{- if .service_account_email }}
+            service_account_email: {{ .service_account_email | quote }}
+            {{- end }}
+            {{- if .presigned_url_expiry_seconds }}
+            presigned_url_expiry_seconds: {{ .presigned_url_expiry_seconds | int64 }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- with $loc.credentials }}
+          credentials:
+            type: {{ .type | default "default" | quote }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
     {{- if .Values.api.config.auth }}
     auth:
       local_enabled: {{ .Values.api.config.auth.local_enabled }}

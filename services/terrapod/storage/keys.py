@@ -13,6 +13,21 @@ def state_index_key() -> str:
     return "state/index.yaml"
 
 
+PULUMI_CHECKPOINT_PREFIX = "state/pulumi-checkpoints/"
+
+#: Prefixes whose next path segment is a workspace id; derived-tested against the
+#: workspace-scoped builders below.
+WORKSPACE_KEY_PREFIXES: tuple[str, ...] = (
+    "state/",
+    "plans/",
+    "logs/",
+    "config/",
+    "runs/",
+    "inventory/",
+    PULUMI_CHECKPOINT_PREFIX,
+)
+
+
 #: Prefix for workspace delete markers (#1253). Deliberately a FLAT prefix
 #: rather than a marker nested inside each workspace's `state/{id}/`:
 #:
@@ -34,6 +49,29 @@ def deleted_workspace_marker_key(workspace_id: str) -> str:
     return f"{DELETED_MARKER_PREFIX}{workspace_id}.json"
 
 
+def workspace_id_of_key(key: str) -> str | None:
+    """The workspace a key belongs to, or None for a shared key (incl. `state/index.yaml`
+    and `state/deleted/` markers)."""
+    if key.startswith(DELETED_MARKER_PREFIX):
+        return None
+    if key.startswith(PULUMI_CHECKPOINT_PREFIX):
+        rest = key[len(PULUMI_CHECKPOINT_PREFIX) :]
+    else:
+        prefix = next((p for p in WORKSPACE_KEY_PREFIXES if key.startswith(p)), None)
+        if prefix is None:
+            return None
+        rest = key[len(prefix) :]
+    workspace_id, sep, _ = rest.partition("/")
+    return workspace_id if sep and workspace_id else None
+
+
+def prefix_may_hold_workspace_keys(prefix: str) -> bool:
+    """Whether a listing of `prefix` can match a workspace-scoped key."""
+    if prefix.startswith((DELETED_MARKER_PREFIX, state_index_key())):
+        return False
+    return any(prefix.startswith(p) or p.startswith(prefix) for p in WORKSPACE_KEY_PREFIXES)
+
+
 def state_key(workspace_id: str, version_id: str) -> str:
     """Key for a workspace state version."""
     return f"state/{workspace_id}/{version_id}.tfstate"
@@ -48,7 +86,7 @@ def pulumi_checkpoint_key(workspace_id: str, update_id: str) -> str:
     so the orphaned-state reaper passes over it, and the `.json` suffix keeps it out
     of anything that looks for `.tfstate`.
     """
-    return f"state/pulumi-checkpoints/{workspace_id}/{update_id}.json"
+    return f"{PULUMI_CHECKPOINT_PREFIX}{workspace_id}/{update_id}.json"
 
 
 def state_backup_key(workspace_id: str, version_id: str) -> str:
