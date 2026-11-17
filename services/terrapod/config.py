@@ -3990,21 +3990,31 @@ class Settings(BaseSettings):
     # once `token_signing_key` is set and the static KEK is generated material.
     # See terrapod/secret_strength.py.
     require_strong_secrets: bool = Field(
-        default=False,
+        default=True,
         description="Fail startup when a secret this deployment was GIVEN is weak, "
         "instead of warning. It fires on a configured `token_signing_key` that a "
         "strength estimate rejects, and on a static encryption KEK that is a typed "
-        "passphrase rather than generated material. It no longer fires on a signing "
-        "key derived from the database URL, because such a key is now REPLACED with a "
-        "generated one on startup rather than adopted -- so leaving `token_signing_key` "
-        "unset is the normal, strong case and is not reported at all.\n\n"
-        "OFF by default, deliberately, and the static KEK is the reason. The refusal "
-        "happens at provider construction, so turning this on fails startup -- and an "
-        "operator with a passphrase KEK cannot simply supply a better one, because the "
-        "KEK is derived from that secret and changing it leaves every already-wrapped "
-        "DEK unable to unwrap. Their remedy is the re-encryption migration, not a "
-        "config edit, so a default that fails the pod would stand between them and "
-        "their own data. Turn it on once your supplied secrets are generated material.",
+        "passphrase rather than generated material. It does NOT fire on a signing key "
+        "derived from the database URL, because such a key is REPLACED with a "
+        "generated one on startup rather than adopted (#2605) -- so leaving "
+        "`token_signing_key` unset is the normal, strong case and is not reported at "
+        "all.\n\n"
+        "ON by default from 2.0, and the two changes that made that safe are worth "
+        "knowing because the reason it was off is still true in part. The refusal "
+        "happens at provider construction, so this fails the pod -- and an operator "
+        "with a passphrase KEK still cannot simply edit it to something better, "
+        "because the KEK derives from that secret and changing it alone leaves every "
+        "already-wrapped DEK unable to unwrap. What changed is that there is now a "
+        "remedy: `python -m terrapod.cli.kek_rotate` re-wraps every DEK from the old "
+        "secret to a new one in a single transaction, having first proven each new "
+        "wrap reads back. That is bounded work -- `crypto_keys` holds one row per DEK "
+        "version and the DEKs themselves do not change, so nothing encrypted under "
+        "them is touched. Rotate first, then upgrade.\n\n"
+        "Set it to false only to buy time, and read "
+        "`docs/upgrading-to-2.0.md` before you do: a deployment that leaves it off is "
+        "keeping a KEK an attacker holding a backup can guess at one hash per attempt "
+        "(GHSA-hc47-q72v-4vcm), which is the exposure the stretched wrap format and "
+        "this default exist together to close.",
     )
 
     # Database
