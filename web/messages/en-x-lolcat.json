@@ -1976,13 +1976,22 @@
         "document": "Dokyument",
         "kind": "Plugin kynd",
         "os": "Operatin sistem",
-        "arch": "Arkitekchur"
+        "arch": "Arkitekchur",
+        "tool": "Toolz",
+        "hostname": "Registree host",
+        "type": "Providr type"
       },
       "hints": {
         "filename": "Givd 2 us insted of gessd: a wheel's naym haz its compatibilitee tagz baekd in.",
         "suffix": "Wun of .info, .mod or .zip. A vershun iz three fylez an each wun getz uplodid separatly.",
         "document": "Wich index dokyument. Galaxy haz collection an versions; Go haz list an latest.",
-        "kind": "resource, language, analyzer or converter. kthx"
+        "kind": "resource, language, analyzer or converter. kthx",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov. kthx",
+        "hostname": "registry.terraform.io, or ur own registree's host"
+      },
+      "ecosystems": {
+        "binary": "Enginz binariez",
+        "provider": "Terraform providrs"
       }
     }
   },

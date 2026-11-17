@@ -646,11 +646,17 @@ async def upload_provider_artifact(
         body = {
             "data": {
                 "id": str(record.id),
-                "type": "cached-provider-packages",
+                "type": "cached-providers",
                 "attributes": {
                     "hostname": record.hostname,
                     "namespace": record.namespace,
-                    "type": record.type,
+                    # `provider-type`, not `type`: in JSON:API the resource's own
+                    # `type` is a reserved member of the resource object, so an
+                    # attribute of the same name is ambiguous to a client walking
+                    # the document. The listing route already made that call, and
+                    # one resource must not answer to two names depending on which
+                    # route returned it.
+                    "provider-type": record.type,
                     "version": record.version,
                     "os": record.os,
                     "arch": record.arch,

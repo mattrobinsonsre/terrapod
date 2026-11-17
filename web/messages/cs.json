@@ -1976,13 +1976,22 @@
         "document": "Dokument",
         "kind": "Druh pluginu",
         "os": "Operační systém",
-        "arch": "Architektura"
+        "arch": "Architektura",
+        "tool": "Nástroj",
+        "hostname": "Host registry",
+        "type": "Typ provideru"
       },
       "hints": {
         "filename": "Zadává se, neodvozuje: název souboru wheel kóduje jeho tagy kompatibility.",
         "suffix": "Jeden z .info, .mod nebo .zip. Verze jsou tři soubory a každý se nahrává zvlášť.",
         "document": "Který indexový dokument. Galaxy má collection a versions; Go má list a latest.",
-        "kind": "resource, language, analyzer nebo converter."
+        "kind": "resource, language, analyzer nebo converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io nebo host vašeho vlastního registry"
+      },
+      "ecosystems": {
+        "binary": "Binární soubory enginů",
+        "provider": "Terraform providery"
       }
     }
   },

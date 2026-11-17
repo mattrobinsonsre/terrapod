@@ -1976,13 +1976,22 @@
         "document": "ドキュメント",
         "kind": "プラグインの種類",
         "os": "オペレーティングシステム",
-        "arch": "アーキテクチャ"
+        "arch": "アーキテクチャ",
+        "tool": "ツール",
+        "hostname": "レジストリホスト",
+        "type": "プロバイダー種別"
       },
       "hints": {
         "filename": "導出ではなく指定します。wheel のファイル名は互換性タグを符号化しています。",
         "suffix": ".info、.mod、.zip のいずれか。1 つのバージョンは 3 つのファイルで構成され、それぞれ個別にアップロードします。",
         "document": "どのインデックスドキュメントか。Galaxy には collection と versions、Go には list と latest があります。",
-        "kind": "resource、language、analyzer、converter のいずれか。"
+        "kind": "resource、language、analyzer、converter のいずれか。",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io、または自分のレジストリのホスト"
+      },
+      "ecosystems": {
+        "binary": "エンジンバイナリ",
+        "provider": "Terraform プロバイダー"
       }
     }
   },

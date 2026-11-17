@@ -1976,13 +1976,22 @@
         "document": "Documentum",
         "kind": "Genus interpolamenti",
         "os": "Systema operandi",
-        "arch": "Architectura"
+        "arch": "Architectura",
+        "tool": "Instrumentum",
+        "hostname": "Hospes tabularii",
+        "type": "Genus praebitoris"
       },
       "hints": {
         "filename": "Datum potius quam derivatum: nomen ipsius wheel notas compatibilitatis in se continet.",
         "suffix": "Unum ex .info, .mod vel .zip. Versio tres plicae est et singulae separatim immittuntur.",
         "document": "Quod documentum indicis. Galaxy habet collection et versions; Go habet list et latest.",
-        "kind": "resource, language, analyzer vel converter."
+        "kind": "resource, language, analyzer vel converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, vel hospes tabularii tui proprii"
+      },
+      "ecosystems": {
+        "binary": "Binaria machinae",
+        "provider": "Praebitores Terraform"
       }
     }
   },

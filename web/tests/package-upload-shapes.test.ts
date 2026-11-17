@@ -28,8 +28,16 @@ const ROUTES: string[] = JSON.parse(read('../../services/tests/api/api_route_con
 
 /** The ecosystems the form offers, parsed out of SHAPES rather than listed here
  *  — a list would be a second copy of the thing under test. */
-function shapes(): { ecosystem: string; artifact: string[]; index: string[] | null }[] {
-  const out: { ecosystem: string; artifact: string[]; index: string[] | null }[] = []
+type Shape = {
+  ecosystem: string
+  artifact: string[]
+  index: string[] | null
+  /** The `base:` the entry declares, or null for the package-cache default. */
+  base: string | null
+}
+
+function shapes(): Shape[] {
+  const out: Shape[] = []
   // Each entry runs from `ecosystem: '...'` to the next one (or the end of the
   // array), so the field lists are read per entry rather than file-wide.
   const body = PANEL.slice(PANEL.indexOf('export const SHAPES'))
@@ -41,10 +49,14 @@ function shapes(): { ecosystem: string; artifact: string[]; index: string[] | nu
     assert.ok(artifactAt >= 0 && indexAt > artifactAt, `${ecosystem}: unreadable SHAPES entry`)
     const names = (segment: string) => [...segment.matchAll(/name:\s*'([^']+)'/g)].map((m) => m[1])
     const indexSegment = chunk.slice(indexAt)
+    // `base:` is declared before `artifact:`, and only by a shape that posts to
+    // a cache of its own rather than to the package cache.
+    const base = chunk.slice(0, artifactAt).match(/base:\s*'([^']+)'/)
     out.push({
       ecosystem,
       artifact: names(chunk.slice(artifactAt, indexAt)),
       index: /index:\s*null/.test(indexSegment) ? null : names(indexSegment),
+      base: base ? base[1] : null,
     })
   }
   return out
@@ -55,11 +67,11 @@ const SHAPES = shapes()
 test('SHAPES is read, and covers every ecosystem the cache serves', () => {
   // The floor: a parser that stopped matching would make every assertion below
   // pass on nothing, which is the way these gates die.
-  assert.equal(SHAPES.length, 6, `parsed ${SHAPES.length} shapes, expected 6`)
+  assert.equal(SHAPES.length, 8, `parsed ${SHAPES.length} shapes, expected 8`)
   assert.deepEqual(
     SHAPES.map((s) => s.ecosystem).sort(),
-    ['galaxy', 'go', 'npm', 'nuget', 'pulumi', 'pypi'],
-    'the form offers a different set of ecosystems than the cache serves',
+    ['binary', 'galaxy', 'go', 'npm', 'nuget', 'provider', 'pulumi', 'pypi'],
+    'the form offers a different set of artifacts than the caches serve',
   )
   for (const s of SHAPES) {
     assert.ok(s.artifact.length > 0, `${s.ecosystem}: no artifact coordinate fields parsed`)
@@ -71,10 +83,14 @@ test('every route the form posts to is one the server actually serves', () => {
   // assertion that a typo in either is caught here rather than as a 404 an
   // operator meets with a file already selected.
   for (const s of SHAPES) {
-    const artifact = `POST /api/v1/admin/package-cache/${s.ecosystem}/artifacts`
+    // Built exactly as the form builds it: the shape's own `base`, or the
+    // package-cache default. A shape pointing at a cache that does not serve
+    // it is a 404 the operator meets with a file already chosen.
+    const base = s.base ?? `/api/v1/admin/package-cache/${s.ecosystem}`
+    const artifact = `POST ${base}/artifacts`
     assert.ok(ROUTES.includes(artifact), `server does not serve ${artifact}`)
     if (s.index !== null) {
-      const index = `POST /api/v1/admin/package-cache/${s.ecosystem}/index`
+      const index = `POST ${base}/index`
       assert.ok(ROUTES.includes(index), `form offers an index upload the server does not serve: ${index}`)
     }
   }
@@ -203,4 +219,72 @@ test('the four Origin labels the docs quote are the ones the page renders', () =
   // The column header too, which the docs name as `Origin`.
   assert.equal(EN.columns?.origin, 'Origin')
   assert.ok(/`Origin` column/.test(DOC), 'the docs no longer name the Origin column')
+})
+
+test('the engine binaries and the providers post to their OWN caches', () => {
+  // These two are not package ecosystems: they are separate caches with their
+  // own routes and no ecosystem segment. Deriving their path from the
+  // ecosystem name would post to `package-cache/binary/artifacts`, which the
+  // server does not serve — so the `base` is the whole of what makes them
+  // work, and a shape that lost it would 404 with a file already chosen.
+  const expected: Record<string, string> = {
+    binary: '/api/v1/admin/binary-cache',
+    provider: '/api/v1/admin/provider-cache',
+  }
+  for (const [ecosystem, base] of Object.entries(expected)) {
+    const shape = SHAPES.find((s) => s.ecosystem === ecosystem)
+    assert.ok(shape, `${ecosystem} missing from SHAPES`)
+    assert.equal(shape!.base, base, `${ecosystem} posts to the wrong collection`)
+    // Neither cache has an index route, so offering one would be a 404.
+    assert.equal(shape!.index, null, `${ecosystem} should offer no index upload`)
+  }
+  // And the converse: every PACKAGE ecosystem must NOT declare a base, or it
+  // would stop posting to the package cache it belongs to.
+  for (const s of SHAPES.filter((x) => !(x.ecosystem in expected))) {
+    assert.equal(s.base, null, `${s.ecosystem} is a package ecosystem and must not declare a base`)
+  }
+})
+
+test('the coordinate fields are the ones the two new routes actually read', () => {
+  // The server's own form field names, from the route signatures. `os` and
+  // `type` are wire ALIASES (`os_`, `type_` in Python), so the browser must
+  // post the alias and not the parameter name.
+  const expected: Record<string, string[]> = {
+    binary: ['tool', 'version', 'os', 'arch'],
+    provider: ['hostname', 'namespace', 'type', 'version', 'os', 'arch'],
+  }
+  for (const [ecosystem, fields] of Object.entries(expected)) {
+    const shape = SHAPES.find((s) => s.ecosystem === ecosystem)
+    assert.ok(shape, `${ecosystem} missing from SHAPES`)
+    assert.deepEqual(shape!.artifact, fields, `${ecosystem}: wrong coordinate fields`)
+  }
+})
+
+test('a shape whose name is a word is translated, not shown raw', () => {
+  // `pypi` and `npm` are proper nouns and render as they are. `binary` and
+  // `provider` are English words, so rendering them raw would ship untranslated
+  // copy in 32 locales — which the i18n completeness gate cannot see, because
+  // the string never enters a catalogue at all.
+  const labels = EN.upload?.ecosystems ?? {}
+  const code = PANEL.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  for (const name of ['binary', 'provider']) {
+    assert.ok(
+      new RegExp(`label:\\s*'${name}'`).test(code),
+      `${name} does not declare a translated label`,
+    )
+    assert.ok(labels[name], `upload.ecosystems.${name} is missing from en.json`)
+  }
+  // The option renders the label when there is one, and the raw name otherwise.
+  assert.ok(
+    /s\.label\s*\?\s*t\(`upload\.ecosystems\.\$\{s\.label\}`\)\s*:\s*s\.ecosystem/.test(code),
+    'the option does not render the translated label',
+  )
+  // The converse: a label for a shape that does not declare one is dead weight
+  // every locale is required to translate.
+  for (const name of Object.keys(labels)) {
+    assert.ok(
+      new RegExp(`label:\\s*'${name}'`).test(code),
+      `upload.ecosystems.${name} is translated but no shape declares it`,
+    )
+  }
 })

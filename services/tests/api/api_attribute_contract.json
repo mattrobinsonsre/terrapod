@@ -243,8 +243,8 @@
     "hostname",
     "namespace",
     "os",
+    "provider-type",
     "shasum",
-    "type",
     "upload-reference",
     "uploaded-by",
     "version"

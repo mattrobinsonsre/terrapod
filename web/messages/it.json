@@ -1976,13 +1976,22 @@
         "document": "Documento",
         "kind": "Tipo di plugin",
         "os": "Sistema operativo",
-        "arch": "Architettura"
+        "arch": "Architettura",
+        "tool": "Strumento",
+        "hostname": "Host del registry",
+        "type": "Tipo di provider"
       },
       "hints": {
         "filename": "Fornito anziché dedotto: il nome di un wheel codifica i suoi tag di compatibilità.",
         "suffix": "Uno tra .info, .mod o .zip. Una versione è composta da tre file, ciascuno caricato separatamente.",
         "document": "Quale documento di indice. Galaxy ha collection e versions; Go ha list e latest.",
-        "kind": "resource, language, analyzer o converter."
+        "kind": "resource, language, analyzer o converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, oppure l''host del tuo registry"
+      },
+      "ecosystems": {
+        "binary": "Binari del motore",
+        "provider": "Provider Terraform"
       }
     }
   },

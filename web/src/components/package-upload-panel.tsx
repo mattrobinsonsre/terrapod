@@ -63,6 +63,15 @@ interface Shape {
   artifact: Field[]
   /** The index route's fields, or null where the ecosystem has no index. */
   index: Field[] | null
+  /** The collection this shape posts to. Absent means the package-cache form,
+   *  `/api/v1/admin/package-cache/<ecosystem>`, which is every package
+   *  ecosystem. The engine binaries and the providers are SEPARATE caches with
+   *  their own routes and no ecosystem segment, so they name theirs. */
+  base?: string
+  /** An `upload.ecosystems.<label>` key, for a shape whose name is a word
+   *  rather than a proper noun. `pypi` and `npm` are names and are shown as
+   *  they are; `binary` and `provider` are English and must be translated. */
+  label?: string
 }
 
 /** Every upload shape, in the order the listing shows the ecosystems.
@@ -111,6 +120,41 @@ export const SHAPES: Shape[] = [
     artifact: [
       { name: 'kind', hint: true },
       { name: 'name' },
+      { name: 'version' },
+      { name: 'os' },
+      { name: 'arch' },
+    ],
+    index: null,
+  },
+  {
+    // The engine itself. A sealed deployment that cannot reach the upstream
+    // release host cannot run at all, so this is the one upload that has to
+    // work before any of the others matter.
+    ecosystem: 'binary',
+    label: 'binary',
+    base: '/api/v1/admin/binary-cache',
+    artifact: [
+      { name: 'tool', hint: true },
+      { name: 'version' },
+      { name: 'os' },
+      { name: 'arch' },
+    ],
+    // No index document: the binary cache derives its version list from rows it
+    // holds, as PyPI does, so an upload is advertised the moment it exists.
+    index: null,
+  },
+  {
+    // A provider is the only upload whose bytes the CONSUMER verifies:
+    // `terraform init` checks the `h1:` hash against the lock file. The server
+    // computes that hash from the archive and never accepts it from the
+    // uploader, which is why there is no hash field here to fill in.
+    ecosystem: 'provider',
+    label: 'provider',
+    base: '/api/v1/admin/provider-cache',
+    artifact: [
+      { name: 'hostname', hint: true },
+      { name: 'namespace' },
+      { name: 'type' },
       { name: 'version' },
       { name: 'os' },
       { name: 'arch' },
@@ -189,12 +233,17 @@ export function PackageUploadPanel({
     if (replace) body.set('replace', 'true')
     body.set('file', file)
 
+    // The collection comes from the SHAPE. Deriving it from the ecosystem
+    // would post a binary to `package-cache/binary/artifacts`, a route the
+    // server does not serve, which is a 404 the operator meets with a file
+    // already chosen.
+    const base = shape.base ?? `/api/v1/admin/package-cache/${ecosystem}`
     const path = effectiveKind === 'index' ? 'index' : 'artifacts'
     setBusy(true)
     try {
       // No Content-Type header: the browser sets it with the multipart boundary,
       // and setting it by hand omits the boundary and makes the body unparseable.
-      const res = await apiFetch(`/api/v1/admin/package-cache/${ecosystem}/${path}`, {
+      const res = await apiFetch(`${base}/${path}`, {
         method: 'POST',
         body,
       })
@@ -256,7 +305,7 @@ export function PackageUploadPanel({
               >
                 {SHAPES.map((s) => (
                   <option key={s.ecosystem} value={s.ecosystem}>
-                    {s.ecosystem}
+                    {s.label ? t(`upload.ecosystems.${s.label}`) : s.ecosystem}
                   </option>
                 ))}
               </select>

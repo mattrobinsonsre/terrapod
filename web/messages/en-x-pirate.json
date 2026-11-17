@@ -1976,13 +1976,22 @@
         "document": "Manifest",
         "kind": "Plugin breed",
         "os": "Ship''s system",
-        "arch": "Hull"
+        "arch": "Hull",
+        "tool": "Tackle",
+        "hostname": "Registry berth",
+        "type": "Provider breed"
       },
       "hints": {
         "filename": "Handed over rather than reckoned: a wheel''s name carries its compatibility tags.",
         "suffix": "One o'' .info, .mod or .zip. A version be three scrolls an'' each goes aboard on its own.",
         "document": "Which manifest. Galaxy has collection an'' versions; Go has list an'' latest.",
-        "kind": "resource, language, analyzer or converter, aye."
+        "kind": "resource, language, analyzer or converter, aye.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov, aye.",
+        "hostname": "registry.terraform.io, or yer own registry''s berth"
+      },
+      "ecosystems": {
+        "binary": "Engine irons",
+        "provider": "Terraform provider wares"
       }
     }
   },

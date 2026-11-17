@@ -1976,13 +1976,22 @@
         "document": "Document, the",
         "kind": "Plugin kind, the",
         "os": "Operating system, the",
-        "arch": "Architecture, the"
+        "arch": "Architecture, the",
+        "tool": "Tool, the",
+        "hostname": "Registry host, the",
+        "type": "Provider type, the"
       },
       "hints": {
         "filename": "Supplied rather than derived, it is: its compatibility tags, a wheel's name encodes.",
         "suffix": "One of .info, .mod or .zip, it is. Three files a version is, and separately each is uploaded.",
         "document": "Which index document, hmm. collection and versions, Galaxy has; list and latest, Go has.",
-        "kind": "resource, language, analyzer or converter, these are."
+        "kind": "resource, language, analyzer or converter, these are.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov, these are.",
+        "hostname": "registry.terraform.io, it is. Or the host of your own registry, hmm."
+      },
+      "ecosystems": {
+        "binary": "Binaries, engine",
+        "provider": "Providers, Terraform"
       }
     }
   },

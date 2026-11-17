@@ -1976,13 +1976,22 @@
         "document": "문서",
         "kind": "플러그인 종류",
         "os": "운영 체제",
-        "arch": "아키텍처"
+        "arch": "아키텍처",
+        "tool": "도구",
+        "hostname": "레지스트리 호스트",
+        "type": "프로바이더 유형"
       },
       "hints": {
         "filename": "파생하지 않고 직접 지정합니다. wheel 파일 이름에는 호환성 태그가 인코딩되어 있습니다.",
         "suffix": ".info, .mod, .zip 중 하나입니다. 버전 하나는 파일 세 개이며 각각 따로 업로드합니다.",
         "document": "어떤 인덱스 문서인지. Galaxy에는 collection과 versions가, Go에는 list와 latest가 있습니다.",
-        "kind": "resource, language, analyzer 또는 converter."
+        "kind": "resource, language, analyzer 또는 converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io 또는 자체 레지스트리의 호스트"
+      },
+      "ecosystems": {
+        "binary": "엔진 바이너리",
+        "provider": "Terraform 프로바이더"
       }
     }
   },

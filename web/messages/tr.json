@@ -1976,13 +1976,22 @@
         "document": "Belge",
         "kind": "Eklenti türü",
         "os": "İşletim sistemi",
-        "arch": "Mimari"
+        "arch": "Mimari",
+        "tool": "Araç",
+        "hostname": "Registry ana bilgisayarı",
+        "type": "Sağlayıcı türü"
       },
       "hints": {
         "filename": "Türetilmez, verilir: bir wheel dosyasının adı uyumluluk etiketlerini kodlar.",
         "suffix": ".info, .mod veya .zip dosyalarından biri. Bir sürüm üç dosyadır ve her biri ayrı ayrı yüklenir.",
         "document": "Hangi dizin belgesi. Galaxy için collection ve versions; Go için list ve latest.",
-        "kind": "resource, language, analyzer veya converter."
+        "kind": "resource, language, analyzer veya converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io veya kendi registry''nizin ana bilgisayarı"
+      },
+      "ecosystems": {
+        "binary": "Motor ikili dosyaları",
+        "provider": "Terraform sağlayıcıları"
       }
     }
   },

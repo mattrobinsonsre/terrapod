@@ -1976,13 +1976,22 @@
         "document": "Dokument",
         "kind": "Rodzaj wtyczki",
         "os": "System operacyjny",
-        "arch": "Architektura"
+        "arch": "Architektura",
+        "tool": "Narzędzie",
+        "hostname": "Host rejestru",
+        "type": "Typ dostawcy"
       },
       "hints": {
         "filename": "Podawana, a nie wyprowadzana: nazwa pliku wheel koduje jego tagi zgodności.",
         "suffix": "Jeden z .info, .mod lub .zip. Wersja to trzy pliki i każdy przesyła się osobno.",
         "document": "Który dokument indeksu. Galaxy ma collection i versions; Go ma list i latest.",
-        "kind": "resource, language, analyzer lub converter."
+        "kind": "resource, language, analyzer lub converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io lub host własnego rejestru"
+      },
+      "ecosystems": {
+        "binary": "Pliki binarne silników",
+        "provider": "Dostawcy Terraform"
       }
     }
   },
