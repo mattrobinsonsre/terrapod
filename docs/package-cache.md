@@ -109,15 +109,24 @@ an absent digest there means the index was not the one we expect. Two ecosystems
 publish nothing beside the artifact and are recorded `none-published`:
 
 - **Go modules.** The proxy protocol serves no digest (`.ziphash` and
-  `.zip.sha256` are both 404), and nothing is lost by it, because **the consumer
-  already verifies with a stronger control**: a Go program carries a committed
-  `go.sum`, and the `go` command enforces it against every module it downloads.
-  Those hashes were pinned by the program's author rather than asserted by
+  `.zip.sha256` are both 404). For every module your program has **already
+  pinned**, nothing is lost by that, because the consumer verifies with a
+  stronger control: the hashes in its committed `go.sum` are enforced by the `go`
+  command, and they were pinned by the program's author rather than asserted by
   whichever proxy answered. The only other source is the Go checksum database — a
   third upstream a sealed deployment cannot reach, which is why a run sets
   `GOSUMDB=off` (that turns off the *database lookup*, not the `go.sum` check).
-  A client for it here would duplicate a check your program makes anyway, against
-  a host we have deliberately stopped reaching.
+  For a pinned module, a client for it here would duplicate a check your program
+  makes anyway.
+
+  **A module that is NOT in your `go.sum` is a different case, so keep that file
+  complete.** Measured against go1.27.3 with a cold module cache: `go mod
+  download` with `GOSUMDB=off` and no `go.sum` entry exits 0 and *writes* the hash
+  of whatever the proxy served — it does not error, and nothing independent checks
+  it. A run executes exactly that command against this cache, so an incomplete
+  `go.sum` records our bytes as authoritative. Commit a complete `go.sum`
+  (`go mod tidy` with the checksum database reachable, before you seal) and this
+  does not arise.
 - **Pulumi plugins** published by Pulumi. `get.pulumi.com` publishes nothing
   beside a tarball (`.sha256` and `SHA256SUMS` are both 403). **Terrapod's own
   bridged plugin is the exception and *is* verified** — see
@@ -759,14 +768,18 @@ version's bytes cannot change — which is what Go's checksum database exists to
 guarantee.
 
 **Nothing here is verified at fetch time, deliberately**, and a cached row says
-`none-published`. The reason is that **your toolchain already verifies, with a
-stronger control than ours would be**: your program carries a committed `go.sum`
-and the `go` command enforces it against every module it downloads, pinned by the
-program's author rather than asserted by whichever proxy answered. The proxy
-protocol publishes no digest beside these files, and the only other source is the
-checksum database — a third upstream a sealed deployment cannot reach, which is
-why a run sets `GOSUMDB=off`. That turns off the *database lookup* and nothing
-else; the `go.sum` check is untouched. See
+`none-published`. For a module your program has **already pinned**, your
+toolchain verifies it with a stronger control than ours would be: the hashes in
+your committed `go.sum` are enforced by the `go` command, pinned by the program's
+author rather than asserted by whichever proxy answered. The proxy protocol
+publishes no digest beside these files, and the only other source is the checksum
+database — a third upstream a sealed deployment cannot reach, which is why a run
+sets `GOSUMDB=off`. That turns off the *database lookup* and nothing else; the
+`go.sum` check is untouched.
+
+**Keep `go.sum` complete.** A module missing from it is *not* covered: with
+`GOSUMDB=off`, `go mod download` writes the hash of whatever the proxy served and
+exits 0 (measured, go1.27.3, cold cache). See
 [What Terrapod checks before it caches anything](#what-terrapod-checks-before-it-caches-anything).
 
 Uppercase in a module path is escaped — `github.com/BurntSushi/toml` is fetched

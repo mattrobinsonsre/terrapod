@@ -14,10 +14,14 @@ artifacts need no TTL at all and only `last_accessed_at` for retention.
 
 **Nothing here is verified at fetch time, deliberately (#2589).** The reason is
 recorded in full on `artifact_for`, and the short version is that the consumer
-already verifies: a Go program carries a committed `go.sum` and the `go` command
-enforces it against every module it downloads, which is a stronger control than
-ours would be because the program's author pinned it. So a row cached here
-records `none-published` rather than being left to look verified.
+already verifies what it has PINNED: the hashes in a program's committed
+`go.sum` are enforced by the `go` command, which is a stronger control than ours
+would be because the program's author pinned them. So a row cached here records
+`none-published` rather than being left to look verified.
+
+A module ABSENT from that `go.sum` is not covered, and `artifact_for` records the
+measurement -- with `GOSUMDB=off` the `go` command writes our bytes' hash rather
+than refusing. Closing that is #2589 Gap A.
 
 Two properties captured from a real toolchain (`scripts/goproxy-capture.py`),
 either of which breaks common modules if guessed:
@@ -120,13 +124,29 @@ def artifact_for(module: str, version: str, suffix: str, *, base: str | None = N
         # hash lives in the Go checksum database: a THIRD upstream, which a
         # sealed deployment cannot reach, which is why
         # `runner/phases/pulumi_deps.py::go_env` sets `GOSUMDB=off`. That turns
-        # off the DATABASE LOOKUP and nothing else -- the module hashes in the
-        # program's own **`go.sum`** are still enforced by the `go` command
-        # against every module it downloads, and those were pinned by the
-        # program's author rather than asserted by whichever proxy answered. So
-        # a checksum-database client here would duplicate a check the consumer
-        # makes anyway, against an upstream we have deliberately stopped
-        # reaching.
+        # off the DATABASE LOOKUP and nothing else, and for every module the
+        # program has already pinned that is enough: the hashes in its own
+        # **`go.sum`** are enforced by the `go` command, and they were pinned by
+        # the program's author rather than asserted by whichever proxy answered.
+        # For those, a checksum-database client here would duplicate a check the
+        # consumer makes anyway, against an upstream we have deliberately
+        # stopped reaching.
+        #
+        # **It is NOT enough for a module absent from that `go.sum`, and this
+        # comment used to claim otherwise.** Measured against go1.27.3 with a
+        # cold module cache: `go mod download` with `GOSUMDB=off` and no
+        # `go.sum` exits 0 and WRITES the hash of whatever the proxy served --
+        # it does not error, and nothing independent checks it. The runner runs
+        # exactly that command against exactly this cache, so a program whose
+        # `go.sum` is incomplete records our bytes as authoritative. The old
+        # wording -- "enforced against every module it downloads" -- was true of
+        # the pinned case and false of this one, which is the direction that
+        # reads as there being nothing left to do.
+        #
+        # Mirroring `sum.golang.org` through this cache is what would close it
+        # (#2589 Gap A). That is a scope decision rather than an oversight and it
+        # is recorded on the issue; what is not defensible is leaving a reason
+        # here that says the gap does not exist.
         #
         # The row therefore records `none-published`, which is a declaration
         # about this ecosystem rather than an absence of information about the
