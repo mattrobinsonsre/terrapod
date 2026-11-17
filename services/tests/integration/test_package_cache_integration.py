@@ -829,10 +829,11 @@ class TestPulumiPluginVerification:
 class TestGoModulesRecordNonePublished:
     """Honest rather than verified, and the reason is in `goproxy.artifact_for`.
 
-    The consumer already verifies with a stronger control: a Go program carries a
-    committed `go.sum` and the `go` command enforces it against every module it
-    downloads. A fetch-time digest would duplicate that against the checksum
-    database, a third upstream a sealed deployment cannot reach.
+    The consumer already verifies what it has PINNED, with a stronger control: the
+    hashes in a program's committed `go.sum` are enforced by the `go` command. A
+    fetch-time digest would duplicate that against the checksum database, a third
+    upstream a sealed deployment cannot reach. A module absent from `go.sum` is
+    NOT covered -- see `goproxy.artifact_for` for the measurement.
 
     This drives `goproxy.artifact_for` rather than building an `Artifact` by
     hand, which is the difference from the sibling attestation test above it: a

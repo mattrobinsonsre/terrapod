@@ -1740,6 +1740,50 @@ jobs:
             exit 1
           fi
 
+      - name: (helm-smoke) The content allowlist reaches the pod, quoted, and only valid modes do
+        run: |
+          # #2589 Gap B. The third leg again, plus one trap specific to this value:
+          # `off` is a YAML 1.1 boolean, so rendered BARE it reaches Pydantic as
+          # False, the Literal refuses it, and an operator who set the documented
+          # default gets a pod that will not start. So this asserts the QUOTED form.
+          renders_mode () {
+            want="$1"; shift
+            out=$(helm template tp ./helm/terrapod "$@") \
+              || { echo "render failed for: $*"; exit 1; }
+            n=$(printf '%s' "$out" | grep -c "mode: \"$want\"" || true)
+            [ "$n" = "1" ] \
+              || { echo "expected mode: \"$want\" once for ($*), got $n"; exit 1; }
+          }
+          # Off on every profile: a control nobody configured must not start
+          # refusing or logging on upgrade.
+          renders_mode off
+          renders_mode off -f helm/terrapod/values-local.yaml
+          renders_mode off -f helm/terrapod/values-eval.yaml
+          renders_mode enforce --set api.config.registry.content_allowlist.mode=enforce
+
+          # The patterns reach the pod too -- a mode with no list is the half that
+          # would render and do nothing.
+          out=$(helm template tp ./helm/terrapod \
+                  --set api.config.registry.content_allowlist.mode=enforce \
+                  --set 'api.config.registry.content_allowlist.packages[0]=@acme/*') \
+            || { echo "render failed"; exit 1; }
+          printf '%s' "$out" | grep -q "'@acme/\*'" \
+            || { echo "the allowlist patterns did not reach the rendered ConfigMap"; exit 1; }
+
+          # The enum is what stops a typo becoming a startup failure.
+          if helm template tp ./helm/terrapod \
+               --set api.config.registry.content_allowlist.mode=allow >/dev/null 2>&1; then
+            echo "an unknown content_allowlist mode rendered; the schema enum is not binding"
+            exit 1
+          fi
+          # And an unknown ecosystem key, which would otherwise be a silently
+          # ignored allowlist an operator believed was in force.
+          if helm template tp ./helm/terrapod \
+               --set 'api.config.registry.content_allowlist.ecosystems.rubygems[0]=x' >/dev/null 2>&1; then
+            echo "an unknown ecosystem rendered; propertyNames is not binding"
+            exit 1
+          fi
+
       - name: (helm-smoke) The chart never mints a token signing key, and yields to a supplied one
         run: |
           # GHSA-hc47-q72v-4vcm, #1994. The chart used to generate this key, which

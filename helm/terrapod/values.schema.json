@@ -2276,6 +2276,45 @@
                   }
                 }
               }
+            },
+            "content_allowlist": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "observe",
+                    "enforce"
+                  ]
+                },
+                "packages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ecosystems": {
+                  "type": "object",
+                  "propertyNames": {
+                    "enum": [
+                      "pypi",
+                      "npm",
+                      "nuget",
+                      "go",
+                      "galaxy",
+                      "pulumi"
+                    ]
+                  },
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -2425,7 +2464,12 @@
             },
             "ca_algorithm": {
               "type": "string",
-              "enum": ["ed25519", "mldsa44", "mldsa65", "mldsa87"]
+              "enum": [
+                "ed25519",
+                "mldsa44",
+                "mldsa65",
+                "mldsa87"
+              ]
             },
             "default_join_token_max_uses": {
               "oneOf": [
