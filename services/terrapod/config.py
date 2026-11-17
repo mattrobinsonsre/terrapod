@@ -1776,10 +1776,53 @@ class ModuleAutodiscoveryConfig(BaseModel):
     )
 
 
+class ContentAllowlistConfig(BaseModel):
+    """What this deployment is willing to serve, not just where it fetches from (#2589).
+
+    `provider_cache.upstream_registries` restricts which HOSTS we reach; this
+    restricts WHAT. Without it, a workspace naming any package gets it faithfully
+    fetched, verified and served -- verification working perfectly while an
+    artifact signed by its own author executes. Verification answers "is this what
+    the publisher published" and has no opinion on whether this deployment wanted
+    that publisher's package at all.
+
+    **Ships `off`, and the intended path is `off` -> `observe` -> `enforce`.**
+    Nobody can hand-write an allowlist for an estate they do not yet understand,
+    so `observe` is what tells an operator what their own estate actually pulls;
+    `enforce` then fails closed against a set they have already approved rather
+    than being a cliff they walk off on upgrade.
+    """
+
+    mode: Literal["off", "observe", "enforce"] = Field(
+        default="off",
+        description="'off' (default): no allowlist, and no per-fetch log line -- a "
+        "control nobody configured must not fill the log. 'observe': record what "
+        "WOULD be refused and fetch it anyway, which is how the list gets built. "
+        "'enforce': refuse anything unmatched, fail-closed. An EMPTY list under "
+        "'enforce' refuses everything, deliberately: that is loud rather than "
+        "silent, and a mode that quietly allowed everything would make the "
+        "posture a false claim.",
+    )
+    packages: list[str] = Field(
+        default=[],
+        description="Glob patterns applied to EVERY package cache, for an estate "
+        "that mirrors the same namespace across ecosystems (e.g. '@acme/*'). "
+        "fnmatch rather than regex, so a mis-escaped '.' cannot silently match "
+        "more than it reads as. Matched case-insensitively.",
+    )
+    ecosystems: dict[str, list[str]] = Field(
+        default={},
+        description="Per-ecosystem glob patterns, keyed by pypi/npm/nuget/go/"
+        "galaxy/pulumi, for a rule that is only meaningful to one cache (a Go "
+        "module path, say). Unioned with `packages` rather than overriding it.",
+    )
+
+
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
     enabled: bool = Field(default=True)
+    content_allowlist: ContentAllowlistConfig = Field(default_factory=ContentAllowlistConfig)
     cache_only: bool = Field(
         default=False,
         description="Sealed (cache-only) mode for air-gapped deployments. When true, "

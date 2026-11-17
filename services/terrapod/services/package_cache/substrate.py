@@ -38,6 +38,7 @@ from terrapod.config import settings
 from terrapod.db.models import CachedPackageFile
 from terrapod.http_retry import DEFAULT_RETRIES, retry_delay_seconds
 from terrapod.logging_config import get_logger
+from terrapod.services.package_cache import content_allowlist
 from terrapod.storage import keys
 from terrapod.storage.protocol import ObjectStore
 
@@ -441,6 +442,17 @@ async def fetch_and_cache(
             f"cached, and this node is sealed (registry.cache_only). Warm it before "
             f"sealing, or unset registry.cache_only."
         )
+
+    # BEFORE the fetch, not after it (#2589). The control is about what this
+    # deployment is willing to serve, and an artifact that has already been
+    # downloaded has already been reached for -- the refusal has to happen while
+    # it still means something. It sits here rather than in each ecosystem module
+    # because this is the one pull-through point all six share, so a cache added
+    # later is covered without anybody remembering to add it.
+    #
+    # Deliberately AFTER the sealed check: a sealed node fetches nothing at all,
+    # so its own error is the more useful one and this would only mask it.
+    content_allowlist.check(artifact.ecosystem, artifact.name, artifact.filename)
 
     key = keys.package_cache_key(artifact.ecosystem, artifact.name, artifact.filename)
     owns_client = client is None

@@ -549,6 +549,24 @@ api:
     # Private Registry & Caching
     registry:
       enabled: true
+      # WHAT this deployment is willing to serve, as opposed to WHERE it fetches
+      # from (#2589). provider_cache.upstream_registries restricts the hosts;
+      # nothing restricted the content, so a workspace naming any package got it
+      # faithfully fetched, verified and served -- verification working perfectly
+      # while an artifact signed by its own author executes.
+      #
+      # The intended path is off -> observe -> enforce. Nobody can hand-write an
+      # allowlist for an estate they do not yet understand, so `observe` logs what
+      # WOULD be refused (and fetches it anyway), which is how the list gets
+      # built; `enforce` then fails closed against a set already approved.
+      # An empty list under `enforce` refuses EVERYTHING, deliberately.
+      content_allowlist:
+        mode: "off"
+        # Globs applied to every package cache, e.g. "@acme/*".
+        packages: []
+        # Per-ecosystem globs, keyed pypi/npm/nuget/go/galaxy/pulumi. Unioned
+        # with `packages` rather than overriding it.
+        ecosystems: {}
       # Sealed (cache-only) mode for air-gapped deployments. When true, NO
       # upstream fetch ever happens across the binary cache, provider network
       # mirror, terragrunt binary, and version resolution: a cache miss returns

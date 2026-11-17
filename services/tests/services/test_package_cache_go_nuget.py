@@ -138,10 +138,11 @@ class TestGoArtifacts:
 class TestWhyGoIsNotVerifiedHere:
     """The decision is a measurement, so losing its reason is losing the decision.
 
-    **The consumer already verifies, with a stronger control than a fetch-time
-    digest would be.** A Go program carries a committed `go.sum` and the `go`
-    command enforces it against every module it downloads -- pinned by the
-    program's author rather than asserted by whichever proxy answered. The
+    **The consumer already verifies what it has PINNED, with a stronger control
+    than a fetch-time digest would be.** The hashes in a program's committed
+    `go.sum` are enforced by the `go` command -- pinned by the program's author
+    rather than asserted by whichever proxy answered. A module absent from that
+    file is not covered; `goproxy.artifact_for` records the measurement. The
     authoritative hash otherwise lives in the Go checksum database, a THIRD
     upstream a sealed deployment cannot reach, which is why the runner sets
     `GOSUMDB=off` (that turns off the database LOOKUP, not the `go.sum` check).

@@ -109,15 +109,24 @@ an absent digest there means the index was not the one we expect. Two ecosystems
 publish nothing beside the artifact and are recorded `none-published`:
 
 - **Go modules.** The proxy protocol serves no digest (`.ziphash` and
-  `.zip.sha256` are both 404), and nothing is lost by it, because **the consumer
-  already verifies with a stronger control**: a Go program carries a committed
-  `go.sum`, and the `go` command enforces it against every module it downloads.
-  Those hashes were pinned by the program's author rather than asserted by
+  `.zip.sha256` are both 404). For every module your program has **already
+  pinned**, nothing is lost by that, because the consumer verifies with a
+  stronger control: the hashes in its committed `go.sum` are enforced by the `go`
+  command, and they were pinned by the program's author rather than asserted by
   whichever proxy answered. The only other source is the Go checksum database — a
   third upstream a sealed deployment cannot reach, which is why a run sets
   `GOSUMDB=off` (that turns off the *database lookup*, not the `go.sum` check).
-  A client for it here would duplicate a check your program makes anyway, against
-  a host we have deliberately stopped reaching.
+  For a pinned module, a client for it here would duplicate a check your program
+  makes anyway.
+
+  **A module that is NOT in your `go.sum` is a different case, so keep that file
+  complete.** Measured against go1.27.3 with a cold module cache: `go mod
+  download` with `GOSUMDB=off` and no `go.sum` entry exits 0 and *writes* the hash
+  of whatever the proxy served — it does not error, and nothing independent checks
+  it. A run executes exactly that command against this cache, so an incomplete
+  `go.sum` records our bytes as authoritative. Commit a complete `go.sum`
+  (`go mod tidy` with the checksum database reachable, before you seal) and this
+  does not arise.
 - **Pulumi plugins** published by Pulumi. `get.pulumi.com` publishes nothing
   beside a tarball (`.sha256` and `SHA256SUMS` are both 403). **Terrapod's own
   bridged plugin is the exception and *is* verified** — see
@@ -249,6 +258,62 @@ The warm is the *seed*; `cache_only` is the *seal*. A warm submitted after the
 seal is refused with a 409 naming the setting, which is why the order matters and
 why the per-item outcomes are worth reading before you take the second step
 rather than after.
+
+## Restricting WHAT is served, not just where it comes from
+
+`registry.provider_cache.upstream_registries` restricts which **hosts** Terrapod
+reaches. Until now nothing restricted **what**: a workspace naming any package got
+it faithfully fetched, verified against the publisher's own digest, and served —
+verification working perfectly while an artifact signed by its own author executes.
+Verification answers *"is this what the publisher published"*. It has no opinion on
+whether this deployment wanted that publisher's package at all, and no amount of
+scanning closes that gap.
+
+`registry.content_allowlist` is that second control, and it is checked **before the
+fetch** at the one pull-through point all six package caches share — an artifact that
+has already been downloaded has already been reached for.
+
+```yaml
+api:
+  config:
+    registry:
+      content_allowlist:
+        mode: observe            # off (default) | observe | enforce
+        packages:                # globs applied to every cache
+          - "@acme/*"
+        ecosystems:              # and per-cache, unioned with the above
+          go:
+            - "github.com/acme/*"
+```
+
+### The three modes, and why it ships `off`
+
+| mode | what it does |
+|---|---|
+| `off` | the default. No allowlist, and **no per-fetch log line** — a control nobody configured must not fill the log, which is how a feature gets switched off wholesale before it is ever used |
+| `observe` | records what it **would** refuse and fetches it anyway |
+| `enforce` | refuses anything unmatched, fail-closed |
+
+**Run `observe` first.** Nobody can hand-write an allowlist for an estate they do not
+yet understand: deny-all is unusable on day one and allow-all makes the claim false.
+`observe` is what tells you what your own estate actually pulls, so promoting that set
+to `packages` is one review rather than an archaeology project. `enforce` then fails
+closed against a set you have already approved, rather than being a cliff you walk off
+on upgrade.
+
+**An empty list under `enforce` refuses everything, deliberately.** That is loud rather
+than silent — every fetch fails at once and the message names the setting and the way
+back. A mode that quietly permitted everything when the list was empty would make the
+whole posture a false claim, which is worse than an outage.
+
+Patterns are globs rather than regexes (so a mis-escaped `.` cannot silently match more
+than it reads as) and are matched case-insensitively, because every cache this guards
+either addresses packages case-insensitively or normalises before the check. A blank
+pattern matches **nothing** rather than everything — a stray blank line in a values file
+must not read as a wildcard.
+
+A refusal subclasses `PermissionError`, so a `except OSError` written for the network
+cannot swallow it and leave a policy decision looking like a flaky upstream.
 
 ## Uploading a vetted artifact
 
@@ -703,14 +768,18 @@ version's bytes cannot change — which is what Go's checksum database exists to
 guarantee.
 
 **Nothing here is verified at fetch time, deliberately**, and a cached row says
-`none-published`. The reason is that **your toolchain already verifies, with a
-stronger control than ours would be**: your program carries a committed `go.sum`
-and the `go` command enforces it against every module it downloads, pinned by the
-program's author rather than asserted by whichever proxy answered. The proxy
-protocol publishes no digest beside these files, and the only other source is the
-checksum database — a third upstream a sealed deployment cannot reach, which is
-why a run sets `GOSUMDB=off`. That turns off the *database lookup* and nothing
-else; the `go.sum` check is untouched. See
+`none-published`. For a module your program has **already pinned**, your
+toolchain verifies it with a stronger control than ours would be: the hashes in
+your committed `go.sum` are enforced by the `go` command, pinned by the program's
+author rather than asserted by whichever proxy answered. The proxy protocol
+publishes no digest beside these files, and the only other source is the checksum
+database — a third upstream a sealed deployment cannot reach, which is why a run
+sets `GOSUMDB=off`. That turns off the *database lookup* and nothing else; the
+`go.sum` check is untouched.
+
+**Keep `go.sum` complete.** A module missing from it is *not* covered: with
+`GOSUMDB=off`, `go mod download` writes the hash of whatever the proxy served and
+exits 0 (measured, go1.27.3, cold cache). See
 [What Terrapod checks before it caches anything](#what-terrapod-checks-before-it-caches-anything).
 
 Uppercase in a module path is escaped — `github.com/BurntSushi/toml` is fetched
