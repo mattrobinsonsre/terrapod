@@ -1802,7 +1802,9 @@
       "repository": "儲存庫",
       "commit": "提交",
       "paths": "路徑",
-      "written": "寫入時間"
+      "written": "寫入時間",
+      "origin": "來源",
+      "uploadedBy": "上傳者"
     },
     "warm": {
       "heading": "預熱快取",
@@ -1869,7 +1871,9 @@
       "loadingMore": "載入中…",
       "showing": "正在顯示 {total} 項中的 {shown} 項 —— 表格只排序已載入的內容，因此在把某個排序當作整個快取來讀之前，請先載入其餘部分。",
       "listedAll": "已列出 {count, plural, other {# 個構件}}，這就是符合這些篩選條件的全部內容。",
-      "successBulkTruncated": "已清除 {files} 個構件，釋出 {size}。符合條件的比一次清除所能移除的更多 —— 再清除一次以繼續。"
+      "successBulkTruncated": "已清除 {files} 個構件，釋出 {size}。符合條件的比一次清除所能移除的更多 —— 再清除一次以繼續。",
+      "uploadedBy": "由 {who} 上傳",
+      "confirmRowUploaded": "此構件由維運人員上傳，因此在任何上游登錄庫中都不存在。移除它將銷毀唯一的副本。"
     },
     "archives": {
       "connectionLabel": "連線",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "無法啟動預熱",
       "errorStatus": "無法讀取預熱作業",
       "helpLead": "在有東西請求之前就把構件拉入快取 — 每行一個，寫明名稱與版本。"
+    },
+    "attestation": {
+      "upstreamDigest": "已校驗",
+      "nonePublished": "未發布摘要",
+      "operatorUpload": "已上傳",
+      "unrecorded": "未記錄"
+    },
+    "upload": {
+      "title": "上傳已審核的構件",
+      "description": "將您自行驗證過的構件放入快取。這是節點密封期間新增構件的唯一方式，而且不需要發布者簽章 — 記錄下來的是上傳者是誰。",
+      "show": "上傳",
+      "hide": "關閉",
+      "sealedNote": "本節點已密封，因此上傳是新增構件的唯一方式，而且這會是唯一的副本，因為這裡的任何內容都無法重新取得。",
+      "ecosystem": "快取",
+      "kind": "您要上傳什麼",
+      "kindArtifact": "構件的位元組",
+      "kindIndex": "索引文件",
+      "kindHintIndexed": "已密封的節點會從索引文件中讀取存在哪些版本，因此未隨索引文件上傳的構件無法被解析。",
+      "kindHintNoIndex": "此快取不需要索引文件。",
+      "file": "檔案",
+      "reference": "參考編號（選填）",
+      "referenceHint": "您自己的工單、變更或核准 ID。會與上傳一併儲存。",
+      "replace": "取代此座標上已有的內容",
+      "replaceHint": "沒有此選項，已存在的構件會被拒絕而不是被覆寫。被擠掉的內容可能正是某次執行已經依賴的內容。",
+      "confirmReplace": "將 {filename} 上傳並覆寫此座標上已有的構件？被取代的位元組將被銷毀。",
+      "confirmReplaceSealed": "本節點已密封，因此被取代的位元組無法從任何地方取回。",
+      "submit": "上傳",
+      "submitting": "上傳中…",
+      "provenanceNote": "記錄在您的帳戶名下。",
+      "success": "已上傳 {filename}。",
+      "successReplaced": "已上傳 {filename}，並取代了原有內容。",
+      "successUnchanged": "{filename} 已以完全相同的位元組快取。沒有任何變更。",
+      "error": "上傳失敗。",
+      "fields": {
+        "project": "專案",
+        "name": "名稱",
+        "version": "版本",
+        "filename": "檔名",
+        "package_id": "套件 ID",
+        "module": "模組路徑",
+        "suffix": "檔案",
+        "namespace": "命名空間",
+        "document": "文件",
+        "kind": "外掛類型",
+        "os": "作業系統",
+        "arch": "架構"
+      },
+      "hints": {
+        "filename": "需要填寫而非推導：wheel 的檔名編碼了它的相容性標籤。",
+        "suffix": ".info、.mod 或 .zip 之一。一個版本是三個檔案，每個單獨上傳。",
+        "document": "哪一個索引文件。Galaxy 有 collection 和 versions；Go 有 list 和 latest。",
+        "kind": "resource、language、analyzer 或 converter。"
+      }
     }
   },
   "catalog": {

@@ -1802,7 +1802,9 @@
       "repository": "Ystorfa",
       "commit": "Ymrwymiad",
       "paths": "Llwybrau",
-      "written": "Ysgrifennwyd"
+      "written": "Ysgrifennwyd",
+      "origin": "Tarddiad",
+      "uploadedBy": "Uwchlwythwyd gan"
     },
     "warm": {
       "heading": "Cynhesu'r storfa",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Wrthi'n llwytho…",
       "showing": "Yn dangos {shown} o {total} — mae'r tabl yn trefnu'r hyn sydd wedi'i lwytho, felly llwythwch y gweddill cyn darllen trefn fel y storfa gyfan.",
       "listedAll": "{count, plural, one {# arteffact} other {# arteffact}} wedi'u rhestru — dyna bopeth sy'n cyfateb i'r hidlyddion hyn.",
-      "successBulkTruncated": "Gwaredwyd {files} arteffact, gan ryddhau {size}. Mae mwy yn cyfateb nag y mae un gwarediad yn ei dynnu — gwaredwch eto i barhau."
+      "successBulkTruncated": "Gwaredwyd {files} arteffact, gan ryddhau {size}. Mae mwy yn cyfateb nag y mae un gwarediad yn ei dynnu — gwaredwch eto i barhau.",
+      "uploadedBy": "gan {who}",
+      "confirmRowUploaded": "Uwchlwythwyd yr arteffact hwn gan weithredwr, felly nid yw'n bodoli yn unrhyw gofrestrfa ffynhonnell. Bydd ei dynnu yn dinistrio'r unig gopi."
     },
     "archives": {
       "connectionLabel": "Cysylltiad",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Methwyd cychwyn y cynhesu",
       "errorStatus": "Methwyd darllen y dasg gynhesu",
       "helpLead": "Nôl arteffactau i'r storfa cyn i unrhyw beth ofyn amdanynt — un fesul llinell, ar ffurf enw a fersiwn."
+    },
+    "attestation": {
+      "upstreamDigest": "Wedi'i ddilysu",
+      "nonePublished": "Dim crynodeb wedi'i gyhoeddi",
+      "operatorUpload": "Uwchlwythwyd",
+      "unrecorded": "Heb ei gofnodi"
+    },
+    "upload": {
+      "title": "Uwchlwytho arteffact a archwiliwyd",
+      "description": "Rhowch yn y storfa arteffact rydych wedi'i ddilysu eich hun. Dyma'r unig ffordd i ychwanegu un tra bo'r nod wedi'i selio, ac nid oes angen llofnod cyhoeddwr — yr hyn a gofnodir yn ei le yw pwy a'i uwchlwythodd.",
+      "show": "Uwchlwytho",
+      "hide": "Cau",
+      "sealedNote": "Mae'r nod hwn wedi'i selio, felly uwchlwytho yw'r unig ffordd i ychwanegu arteffact — a'r unig gopi hefyd, gan nad oes modd ail-nôl dim yma.",
+      "ecosystem": "Storfa",
+      "kind": "Beth rydych yn ei uwchlwytho",
+      "kindArtifact": "Beitiau'r arteffact",
+      "kindIndex": "Dogfen fynegai",
+      "kindHintIndexed": "Mae nod wedi'i selio yn darllen pa fersiynau sy'n bodoli o ddogfen fynegai, felly nid oes modd datrys arteffact a uwchlwythwyd heb un.",
+      "kindHintNoIndex": "Nid oes angen dogfen fynegai ar y storfa hon.",
+      "file": "Ffeil",
+      "reference": "Cyfeirnod (dewisol)",
+      "referenceHint": "Dynodydd eich tocyn, newid neu gymeradwyaeth eich hun. Caiff ei storio gyda'r uwchlwythiad.",
+      "replace": "Disodli'r hyn sydd yn y cyfesurynnau hyn yn barod",
+      "replaceHint": "Heb hyn, caiff arteffact presennol ei wrthod yn lle ei drosysgrifo. Gallai'r hyn y mae'n ei ddisodli fod yr union beth y mae rhediad yn dibynnu arno eisoes.",
+      "confirmReplace": "Uwchlwytho {filename} dros yr arteffact sydd yn y cyfesurynnau hyn yn barod? Caiff y beitiau y mae'n eu disodli eu dinistrio.",
+      "confirmReplaceSealed": "Mae'r nod hwn wedi'i selio, felly nid oes modd nôl y beitiau a ddisodlwyd o unlle.",
+      "submit": "Uwchlwytho",
+      "submitting": "Wrthi'n uwchlwytho…",
+      "provenanceNote": "Cofnodir yn erbyn eich cyfrif.",
+      "success": "Uwchlwythwyd {filename}.",
+      "successReplaced": "Uwchlwythwyd {filename}, gan ddisodli'r hyn oedd yno.",
+      "successUnchanged": "Roedd {filename} yn y storfa yn barod gyda beitiau unfath. Ni newidiodd dim.",
+      "error": "Methodd yr uwchlwythiad.",
+      "fields": {
+        "project": "Prosiect",
+        "name": "Enw",
+        "version": "Fersiwn",
+        "filename": "Enw'r ffeil",
+        "package_id": "Dynodydd y pecyn",
+        "module": "Llwybr y modiwl",
+        "suffix": "Ffeil",
+        "namespace": "Gofod enwau",
+        "document": "Dogfen",
+        "kind": "Math o ategyn",
+        "os": "System weithredu",
+        "arch": "Pensaernïaeth"
+      },
+      "hints": {
+        "filename": "Caiff ei roi, nid ei ddeillio: mae enw ffeil wheel yn amgodio ei dagiau cydweddoldeb.",
+        "suffix": "Un o .info, .mod neu .zip. Tri ffeil yw fersiwn, a chaiff pob un ei uwchlwytho ar wahân.",
+        "document": "Pa ddogfen fynegai. Mae gan Galaxy collection a versions; mae gan Go list a latest.",
+        "kind": "resource, language, analyzer neu converter."
+      }
     }
   },
   "catalog": {

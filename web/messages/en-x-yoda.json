@@ -1802,7 +1802,9 @@
       "repository": "Repository, the",
       "commit": "Commit, the",
       "paths": "Paths, the",
-      "written": "Written, when"
+      "written": "Written, when",
+      "origin": "Origin, the",
+      "uploadedBy": "Uploaded by, whom"
     },
     "warm": {
       "heading": "cache, Warm",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Loading, we are…",
       "showing": "{shown} of {total}, showing we are — what is loaded, the table sorts, so the rest load you must, before an order as the whole cache you read.",
       "listedAll": "{count, plural, one {# artifact} other {# artifacts}} listed — everything matching these filters, that is.",
-      "successBulkTruncated": "{files} artifacts purged, {size} freed. More match than one purge removes — again purge, to carry on."
+      "successBulkTruncated": "{files} artifacts purged, {size} freed. More match than one purge removes — again purge, to carry on.",
+      "uploadedBy": "{who}, by",
+      "confirmRowUploaded": "By an operator, uploaded this artifact was, so in no upstream registry does it exist. Remove it, and destroyed the only copy is."
     },
     "archives": {
       "connectionLabel": "Connection, the",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Start warming, we could not",
       "errorStatus": "Read the warming job, we could not",
       "helpLead": "Into the cache, fetch artifacts before anything asks for them — one per line, as a name and a version."
+    },
+    "attestation": {
+      "upstreamDigest": "Verified, it is",
+      "nonePublished": "Published, no digest was",
+      "operatorUpload": "Uploaded, it was",
+      "unrecorded": "Recorded, it was not"
+    },
+    "upload": {
+      "title": "A vetted artifact, upload",
+      "description": "Into the cache, an artifact you have validated yourself, put. While sealed the node is, the only way to add one this is, and no publisher signature does it need — recorded instead, who uploaded it is.",
+      "show": "Upload",
+      "hide": "Close",
+      "sealedNote": "Sealed, this node is, so the only way to add an artifact an upload is — and the only copy, because re-fetched nothing here can be.",
+      "ecosystem": "Cache, the",
+      "kind": "Uploading, what are you",
+      "kindArtifact": "The artifact's bytes, these are",
+      "kindIndex": "An index document, this is",
+      "kindHintIndexed": "From an index document, which versions exist a sealed node reads — so resolved, an artifact uploaded without one cannot be.",
+      "kindHintNoIndex": "No index document, this cache needs.",
+      "file": "File, the",
+      "reference": "Reference, optional it is",
+      "referenceHint": "Your own ticket, change or approval id. Stored with the upload, it is.",
+      "replace": "What is already at these coordinates, replace",
+      "replaceHint": "Without this, refused an existing artifact is, rather than overwritten. What it displaces may be what a run already depends on, hmm.",
+      "confirmReplace": "Over the artifact already at these coordinates, {filename} upload? Destroyed, the bytes it replaces are.",
+      "confirmReplaceSealed": "Sealed, this node is, so from anywhere the replaced bytes cannot be fetched back.",
+      "submit": "Upload",
+      "submitting": "Uploading, we are…",
+      "provenanceNote": "Against your account, recorded it is.",
+      "success": "{filename}, uploaded it is.",
+      "successReplaced": "{filename}, uploaded it is — and what was there, replaced.",
+      "successUnchanged": "With identical bytes, {filename} was already cached. Changed, nothing has.",
+      "error": "Failed, the upload did.",
+      "fields": {
+        "project": "Project, the",
+        "name": "Name, the",
+        "version": "Version, the",
+        "filename": "Filename, the",
+        "package_id": "Package id, the",
+        "module": "Module path, the",
+        "suffix": "File, the",
+        "namespace": "The namespace, this is",
+        "document": "Document, the",
+        "kind": "Plugin kind, the",
+        "os": "Operating system, the",
+        "arch": "Architecture, the"
+      },
+      "hints": {
+        "filename": "Supplied rather than derived, it is: its compatibility tags, a wheel's name encodes.",
+        "suffix": "One of .info, .mod or .zip, it is. Three files a version is, and separately each is uploaded.",
+        "document": "Which index document, hmm. collection and versions, Galaxy has; list and latest, Go has.",
+        "kind": "resource, language, analyzer or converter, these are."
+      }
     }
   },
   "catalog": {

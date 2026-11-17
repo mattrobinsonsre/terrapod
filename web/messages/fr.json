@@ -1802,7 +1802,9 @@
       "repository": "Dépôt",
       "commit": "Commit",
       "paths": "Chemins",
-      "written": "Écrite"
+      "written": "Écrite",
+      "origin": "Origine",
+      "uploadedBy": "Téléversé par"
     },
     "warm": {
       "heading": "Préchauffer le cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Chargement…",
       "showing": "{shown} sur {total} affichés — le tableau trie ce qui est chargé, chargez donc le reste avant de lire un tri comme l'ensemble du cache.",
       "listedAll": "{count, plural, one {# artefact listé} other {# artefacts listés}} — c'est tout ce qui correspond à ces filtres.",
-      "successBulkTruncated": "{files} artefacts purgés, {size} libérés. Il y a plus de correspondances qu'une purge n'en retire — purgez à nouveau pour continuer."
+      "successBulkTruncated": "{files} artefacts purgés, {size} libérés. Il y a plus de correspondances qu'une purge n'en retire — purgez à nouveau pour continuer.",
+      "uploadedBy": "par {who}",
+      "confirmRowUploaded": "Cet artefact a été téléversé par un opérateur ; il n'existe donc dans aucun registre en amont. Le supprimer détruit la seule copie."
     },
     "archives": {
       "connectionLabel": "Connexion",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Impossible de démarrer le préchauffage",
       "errorStatus": "Impossible de lire la tâche de préchauffage",
       "helpLead": "Récupérez les artefacts dans le cache avant que quoi que ce soit ne les demande — un par ligne, sous la forme d''un nom et d''une version."
+    },
+    "attestation": {
+      "upstreamDigest": "Vérifié",
+      "nonePublished": "Aucune empreinte publiée",
+      "operatorUpload": "Téléversé",
+      "unrecorded": "Non enregistré"
+    },
+    "upload": {
+      "title": "Téléverser un artefact contrôlé",
+      "description": "Placez dans le cache un artefact que vous avez validé vous-même. C'est la seule façon d'en ajouter un pendant que le nœud est scellé, et aucune signature de l'éditeur n'est requise : ce qui est enregistré à la place, c'est qui l'a téléversé.",
+      "show": "Téléverser",
+      "hide": "Fermer",
+      "sealedNote": "Ce nœud est scellé : un téléversement est donc la seule façon d'ajouter un artefact — et la seule copie, car rien ici ne peut être récupéré de nouveau.",
+      "ecosystem": "Cache",
+      "kind": "Ce que vous téléversez",
+      "kindArtifact": "Les octets de l'artefact",
+      "kindIndex": "Un document d'index",
+      "kindHintIndexed": "Un nœud scellé lit dans un document d'index quelles versions existent ; un artefact téléversé sans ce document ne peut donc pas être résolu.",
+      "kindHintNoIndex": "Ce cache n'a besoin d'aucun document d'index.",
+      "file": "Fichier",
+      "reference": "Référence (facultatif)",
+      "referenceHint": "Votre propre identifiant de ticket, de changement ou d'approbation. Stocké avec le téléversement.",
+      "replace": "Remplacer ce qui se trouve déjà à ces coordonnées",
+      "replaceHint": "Sans cela, un artefact existant est refusé plutôt qu'écrasé. Ce qu'il déplace peut être précisément ce dont une exécution dépend déjà.",
+      "confirmReplace": "Téléverser {filename} par-dessus l'artefact déjà présent à ces coordonnées ? Les octets qu'il remplace sont détruits.",
+      "confirmReplaceSealed": "Ce nœud est scellé : les octets remplacés ne pourront donc être récupérés de nulle part.",
+      "submit": "Téléverser",
+      "submitting": "Téléversement…",
+      "provenanceNote": "Enregistré sur votre compte.",
+      "success": "{filename} téléversé.",
+      "successReplaced": "{filename} téléversé, en remplacement de ce qui s'y trouvait.",
+      "successUnchanged": "{filename} était déjà en cache avec des octets identiques. Rien n'a changé.",
+      "error": "Le téléversement a échoué.",
+      "fields": {
+        "project": "Projet",
+        "name": "Nom",
+        "version": "Version",
+        "filename": "Nom de fichier",
+        "package_id": "Identifiant de paquet",
+        "module": "Chemin du module",
+        "suffix": "Fichier",
+        "namespace": "Espace de noms",
+        "document": "Document",
+        "kind": "Type de plugin",
+        "os": "Système d'exploitation",
+        "arch": "Architecture"
+      },
+      "hints": {
+        "filename": "Fourni plutôt que déduit : le nom d'un wheel encode ses tags de compatibilité.",
+        "suffix": "L'un de .info, .mod ou .zip. Une version est constituée de trois fichiers, téléversés séparément.",
+        "document": "Quel document d'index. Galaxy a collection et versions ; Go a list et latest.",
+        "kind": "resource, language, analyzer ou converter."
+      }
     }
   },
   "catalog": {

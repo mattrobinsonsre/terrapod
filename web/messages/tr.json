@@ -1802,7 +1802,9 @@
       "repository": "Depo",
       "commit": "Commit",
       "paths": "Yollar",
-      "written": "Yazıldı"
+      "written": "Yazıldı",
+      "origin": "Köken",
+      "uploadedBy": "Yükleyen"
     },
     "warm": {
       "heading": "Önbelleği ısıt",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Yükleniyor…",
       "showing": "{total} ögeden {shown} tanesi gösteriliyor — tablo yalnızca yüklenmiş olanı sıralar, bu nedenle bir sıralamayı önbelleğin tamamı olarak okumadan önce gerisini yükleyin.",
       "listedAll": "{count, plural, one {# yapıt} other {# yapıt}} listelendi — bu filtrelere uyanların tamamı bu.",
-      "successBulkTruncated": "{files} yapıt temizlendi, {size} boşaltıldı. Bir temizliğin kaldırdığından fazlası uyuyor — sürdürmek için yeniden temizleyin."
+      "successBulkTruncated": "{files} yapıt temizlendi, {size} boşaltıldı. Bir temizliğin kaldırdığından fazlası uyuyor — sürdürmek için yeniden temizleyin.",
+      "uploadedBy": "{who} tarafından",
+      "confirmRowUploaded": "Bu yapıt bir operatör tarafından yüklendi, dolayısıyla yukarı akıştaki hiçbir registry'de bulunmuyor. Kaldırmak tek kopyayı yok eder."
     },
     "archives": {
       "connectionLabel": "Bağlantı",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Isıtma başlatılamadı",
       "errorStatus": "Isıtma işi okunamadı",
       "helpLead": "Yapıtları, herhangi bir şey onları istemeden önce önbelleğe getirin — her satıra bir tane, bir ad ve bir sürüm olarak."
+    },
+    "attestation": {
+      "upstreamDigest": "Doğrulandı",
+      "nonePublished": "Özet yayımlanmıyor",
+      "operatorUpload": "Yüklendi",
+      "unrecorded": "Kaydedilmedi"
+    },
+    "upload": {
+      "title": "İncelenmiş bir yapıt yükle",
+      "description": "Kendiniz doğruladığınız bir yapıtı önbelleğe koyun. Düğüm mühürlüyken yapıt eklemenin tek yolu budur ve yayımcı imzası gerektirmez — onun yerine yapıtı kimin yüklediği kaydedilir.",
+      "show": "Yükle",
+      "hide": "Kapat",
+      "sealedNote": "Bu düğüm mühürlü olduğundan yapıt eklemenin tek yolu yüklemedir — ve tek kopya da bu olur, çünkü burada hiçbir şey yeniden getirilemez.",
+      "ecosystem": "Önbellek",
+      "kind": "Ne yüklüyorsunuz",
+      "kindArtifact": "Yapıtın baytları",
+      "kindIndex": "Bir dizin belgesi",
+      "kindHintIndexed": "Mühürlü bir düğüm hangi sürümlerin bulunduğunu dizin belgesinden okur, dolayısıyla dizin belgesi olmadan yüklenen bir yapıt çözümlenemez.",
+      "kindHintNoIndex": "Bu önbellek dizin belgesi gerektirmez.",
+      "file": "Dosya",
+      "reference": "Dayanak (isteğe bağlı)",
+      "referenceHint": "Kendi kaydınızın, değişikliğinizin ya da onayınızın kimliği. Yüklemeyle birlikte saklanır.",
+      "replace": "Bu koordinatlarda hâlihazırda bulunanı değiştir",
+      "replaceHint": "Bu olmadan mevcut bir yapıt üzerine yazılmak yerine reddedilir. Yerinden ettiği şey, bir çalıştırmanın hâlen bağlı olduğu şey olabilir.",
+      "confirmReplace": "{filename} dosyası bu koordinatlarda hâlihazırda bulunan yapıtın üzerine yüklensin mi? Yerine geçtiği baytlar yok edilir.",
+      "confirmReplaceSealed": "Bu düğüm mühürlü olduğundan değiştirilen baytlar hiçbir yerden geri getirilemez.",
+      "submit": "Yükle",
+      "submitting": "Yükleniyor…",
+      "provenanceNote": "Hesabınıza kaydedilir.",
+      "success": "{filename} yüklendi.",
+      "successReplaced": "{filename} yüklendi, orada bulunan içerik değiştirildi.",
+      "successUnchanged": "{filename} aynı baytlarla zaten önbellekteydi. Hiçbir şey değişmedi.",
+      "error": "Yükleme başarısız oldu.",
+      "fields": {
+        "project": "Proje",
+        "name": "Ad",
+        "version": "Sürüm",
+        "filename": "Dosya adı",
+        "package_id": "Paket kimliği",
+        "module": "Modül yolu",
+        "suffix": "Dosya",
+        "namespace": "Ad alanı",
+        "document": "Belge",
+        "kind": "Eklenti türü",
+        "os": "İşletim sistemi",
+        "arch": "Mimari"
+      },
+      "hints": {
+        "filename": "Türetilmez, verilir: bir wheel dosyasının adı uyumluluk etiketlerini kodlar.",
+        "suffix": ".info, .mod veya .zip dosyalarından biri. Bir sürüm üç dosyadır ve her biri ayrı ayrı yüklenir.",
+        "document": "Hangi dizin belgesi. Galaxy için collection ve versions; Go için list ve latest.",
+        "kind": "resource, language, analyzer veya converter."
+      }
     }
   },
   "catalog": {
