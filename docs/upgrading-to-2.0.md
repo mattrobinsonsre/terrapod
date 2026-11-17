@@ -64,6 +64,7 @@ first — most rows do not apply to most deployments.
 | [Check your provider sends `email_verified`](#an-oidc-login-needs-an-email-the-provider-vouches-for), and set `require_email_verified: false` if it does not | you use OIDC | a login whose claims omit the field is refused from 2.0, and some providers verify the address without sending it |
 | [Grant `admin` / `audit` deliberately](#an-idp-group-can-no-longer-grant-admin-or-audit) — the entry's `SELECT` runs on your current release | your administrators get their role from an IdP group name | a bare group name stops granting a built-in role at the upgrade, and the grant is what you would need in order to put it back |
 | [Supply a CA bundle, or pin `ssl_mode: require`](#cloud-iam-database-auth-verifies-the-server-by-default) | `database.auth_mode` is one of the cloud-IAM modes **and** you have not set `database.ssl_mode` | the mode becomes `verify-full`, and verification needs CA material the system trust store may not carry — the API then cannot reach its database at all. **This is the one row whose own section does not frame it as a sequencing step**; it reads as a configuration note and has the blast radius of one |
+| [Rotate your static encryption KEK to generated material](#a-weak-supplied-secret-now-fails-startup-and-the-kek-has-a-remedy-now) | `encryption.enabled: true`, `encryption.provider: static`, and the key is a passphrase somebody typed | `require_strong_secrets` defaults **on** from 2.0 and the refusal happens at provider construction, so the pod does not start. You cannot fix it forward by editing the key: the KEK derives from it, so a new value leaves every wrapped DEK unreadable. The rotation tool ships in 2.0, so **run it from the 2.0 image before you point the deployment at it**, or set the flag false to buy time |
 | [Upgrade every listener in every pool first, or set `require_listener_proof_of_possession: false`](#listeners-must-prove-they-hold-their-certificates-private-key) | you run server-side execution and a pool may still hold a pre-2.0 listener image | a listener that does not sign gets `401` on every call including the event stream, so **the pool goes quiet rather than noisy**: nothing connects, nothing claims a run, and no error says why |
 
 ### Before you upgrade, or something breaks quietly
@@ -131,6 +132,73 @@ Worth saying, because both look like upgrade steps and are not:
   does promise.
 
 ## Breaking changes
+
+### A weak supplied secret now fails startup, and the KEK has a remedy now
+
+`require_strong_secrets` defaults to **`true`** from 2.0. It fires on a secret this
+deployment was *given* and a strength estimate rejects: a configured
+`api.tokenSigningKey`, or a static encryption KEK that is a passphrase somebody
+typed rather than generated material (GHSA-hc47-q72v-4vcm).
+
+**Most deployments have nothing to do.** It does not fire on a signing key you never
+set — Terrapod generates and persists its own — and it does not fire on a KMS-backed
+KEK (Vault Transit, AWS KMS), where the key material never came from you. It also no
+longer fires on a signing key derived from the database URL, because such a key is
+now *replaced* with a generated one on startup rather than adopted.
+
+One case needs action before the upgrade, and it is the reason this default was off
+until now:
+
+> **If `encryption.provider` is `static` and the key is a typed passphrase, the pod
+> will not start.** The refusal happens at provider construction, before anything
+> serves. And you cannot fix it forward by editing the key — the KEK is derived from
+> that secret, so a new value leaves every already-wrapped DEK unable to unwrap,
+> which is unrecoverable rather than inconvenient.
+
+What changed is that there is now a remedy. `terrapod-kek-rotate` re-wraps every DEK
+from the old secret to a new one:
+
+```sh
+TERRAPOD_ENCRYPTION__STATIC_KEY="<your current key>" \
+TERRAPOD_KEK_ROTATE_NEW_SECRET="$(openssl rand -base64 32)" \
+  python -m terrapod.cli.kek_rotate
+```
+
+Then set `encryption.static_key` to the new secret and restart.
+
+**This is bounded work, not a re-encryption.** `crypto_keys` holds one row per DEK
+version — a handful — and the DEKs themselves do not change, so nothing encrypted
+under them is touched. It is not `encryption_migrate`, which re-keys *columns* and
+walks the estate.
+
+Three things about the tool worth knowing before you run it:
+
+- **It writes nothing until every new wrap has been read back.** Each DEK is
+  unwrapped under the old secret, its canary checked, re-wrapped, and the re-wrap
+  unwrapped again and compared — and only then, in one transaction, are the rows
+  replaced. A partial rotation is the worst outcome available (some DEKs under each
+  secret, with no single secret that reads them all), so it is all or nothing.
+- **It refuses a weak *new* secret**, because rotating to one would leave you exactly
+  where you started and then be refused at startup anyway.
+- **Keep the old secret until the restart is confirmed.** Backups taken before the
+  rotation are still wrapped under it, and it is the only thing that reads them.
+
+**The sequencing matters and is easy to get wrong:** the tool ships *in* 2.0. Run it
+from the 2.0 image (a one-off job or `kubectl run` against the same database) while
+your deployment is still on 1.x, then upgrade. If you would rather not, setting
+`api.config.require_strong_secrets: false` keeps 1.x behaviour and the upgrade
+proceeds — at the cost of keeping a KEK an attacker holding a backup can guess at one
+hash per attempt, which is the exposure this default exists to close.
+
+### New wraps are salted and stretched
+
+Independently of the flag: a static-KEK wrap written from 2.0 is `v2` — scrypt over
+the passphrase with a per-wrap salt, instead of a bare unsalted SHA-256. **Wraps
+written before 2.0 are still read**, so there is nothing to do and no migration;
+every DEK moves to the new format the next time it is wrapped, which a rotation does.
+Nothing about this changes what a DEK decrypts.
+
+
 
 ### Artifacts cached before 2.0 are re-fetched once, to verify them
 
