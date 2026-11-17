@@ -510,7 +510,7 @@ jobs:
       # checker's own blind spots before they were closed. Reads the light
       # values out of globals.css itself, so it cannot disagree with the
       # stylesheet the app serves.
-      - name: (docs-audit) Light-theme colour contrast clears WCAG AA
+      - name: (docs-audit) Light-theme text contrast clears AA, and the checkbox outline clears 3:1
         run: python3 scripts/docs-audit/check_theme_contrast.py
 
       # Every committed screenshot is the capture viewport, so the set is one
