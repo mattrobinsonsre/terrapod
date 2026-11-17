@@ -1802,7 +1802,9 @@
       "repository": "Repozitář",
       "commit": "Commit",
       "paths": "Cesty",
-      "written": "Zapsáno"
+      "written": "Zapsáno",
+      "origin": "Původ",
+      "uploadedBy": "Nahrál"
     },
     "warm": {
       "heading": "Předehřát cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Načítání…",
       "showing": "Zobrazeno {shown} z {total} — tabulka řadí jen to, co je načteno, takže než budete řazení čtete jako celou cache, načtěte zbytek.",
       "listedAll": "{count, plural, one {# vypsaný artefakt} few {# vypsané artefakty} other {# vypsaných artefaktů}} — to je vše, co odpovídá těmto filtrům.",
-      "successBulkTruncated": "Vymazáno {files} artefaktů, uvolněno {size}. Odpovídá jich víc, než jedno mazání odstraní — spusťte je znovu a pokračujte."
+      "successBulkTruncated": "Vymazáno {files} artefaktů, uvolněno {size}. Odpovídá jich víc, než jedno mazání odstraní — spusťte je znovu a pokračujte.",
+      "uploadedBy": "od {who}",
+      "confirmRowUploaded": "Tento artefakt nahrál operátor, takže neexistuje v žádném upstream registry. Jeho odstraněním zničíte jedinou kopii."
     },
     "archives": {
       "connectionLabel": "Připojení",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Předehřívání se nepodařilo spustit",
       "errorStatus": "Úlohu předehřívání se nepodařilo přečíst",
       "helpLead": "Stáhněte artefakty do cache dříve, než si o ně cokoli řekne — jeden na řádek, jako název a verzi."
+    },
+    "attestation": {
+      "upstreamDigest": "Ověřeno",
+      "nonePublished": "Digest nepublikován",
+      "operatorUpload": "Nahráno",
+      "unrecorded": "Nezaznamenáno"
+    },
+    "upload": {
+      "title": "Nahrát ověřený artefakt",
+      "description": "Vložte do cache artefakt, který jste si sami ověřili. Je to jediný způsob, jak ho přidat, dokud je uzel zapečetěný, a nevyžaduje podpis vydavatele — místo něj se zaznamená, kdo ho nahrál.",
+      "show": "Nahrát",
+      "hide": "Zavřít",
+      "sealedNote": "Tento uzel je zapečetěný, takže nahrání je jediný způsob, jak artefakt přidat — a bude to jeho jediná kopie, protože zde nelze nic stáhnout znovu.",
+      "ecosystem": "Cache",
+      "kind": "Co nahráváte",
+      "kindArtifact": "Bajty artefaktu",
+      "kindIndex": "Indexový dokument",
+      "kindHintIndexed": "Zapečetěný uzel zjišťuje existující verze z indexového dokumentu, takže artefakt nahraný bez něj nelze vyřešit.",
+      "kindHintNoIndex": "Tato cache indexový dokument nepotřebuje.",
+      "file": "Soubor",
+      "reference": "Reference (volitelné)",
+      "referenceHint": "Identifikátor vašeho tiketu, změny nebo schválení. Ukládá se společně s nahráním.",
+      "replace": "Přepsat to, co už na těchto souřadnicích je",
+      "replaceHint": "Bez tohoto bude existující artefakt odmítnut, nikoli přepsán. To, co vytlačí, může být právě to, na čem už závisí nějaký běh.",
+      "confirmReplace": "Nahrát {filename} přes artefakt, který už na těchto souřadnicích je? Bajty, které nahradí, budou zničeny.",
+      "confirmReplaceSealed": "Tento uzel je zapečetěný, takže nahrazené bajty už nelze odnikud stáhnout zpět.",
+      "submit": "Nahrát",
+      "submitting": "Nahrávání…",
+      "provenanceNote": "Zaznamenáno na váš účet.",
+      "success": "Nahráno {filename}.",
+      "successReplaced": "Nahráno {filename}, dosavadní obsah byl nahrazen.",
+      "successUnchanged": "{filename} už byl v cache s identickými bajty. Nic se nezměnilo.",
+      "error": "Nahrání se nezdařilo.",
+      "fields": {
+        "project": "Projekt",
+        "name": "Název",
+        "version": "Verze",
+        "filename": "Název souboru",
+        "package_id": "ID balíčku",
+        "module": "Cesta modulu",
+        "suffix": "Soubor",
+        "namespace": "Jmenný prostor",
+        "document": "Dokument",
+        "kind": "Druh pluginu",
+        "os": "Operační systém",
+        "arch": "Architektura"
+      },
+      "hints": {
+        "filename": "Zadává se, neodvozuje: název souboru wheel kóduje jeho tagy kompatibility.",
+        "suffix": "Jeden z .info, .mod nebo .zip. Verze jsou tři soubory a každý se nahrává zvlášť.",
+        "document": "Který indexový dokument. Galaxy má collection a versions; Go má list a latest.",
+        "kind": "resource, language, analyzer nebo converter."
+      }
     }
   },
   "catalog": {

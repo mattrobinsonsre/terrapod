@@ -1802,7 +1802,9 @@
       "repository": "Repositorio",
       "commit": "Commit",
       "paths": "Rutas",
-      "written": "Escrito"
+      "written": "Escrito",
+      "origin": "Origen",
+      "uploadedBy": "Subido por"
     },
     "warm": {
       "heading": "Precalentar caché",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Cargando…",
       "showing": "Mostrando {shown} de {total}: la tabla ordena lo que está cargado, así que cargue el resto antes de leer un orden como si fuera toda la caché.",
       "listedAll": "{count, plural, one {# artefacto listado} other {# artefactos listados}}: eso es todo lo que coincide con estos filtros.",
-      "successBulkTruncated": "{files} artefactos purgados, {size} liberados. Coinciden más de los que quita una purga: purgue otra vez para continuar."
+      "successBulkTruncated": "{files} artefactos purgados, {size} liberados. Coinciden más de los que quita una purga: purgue otra vez para continuar.",
+      "uploadedBy": "por {who}",
+      "confirmRowUploaded": "Este artefacto lo subió un operador, por lo que no existe en ningún registro de origen. Si lo elimina, se destruye la única copia."
     },
     "archives": {
       "connectionLabel": "Conexión",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "No se pudo iniciar el precalentamiento",
       "errorStatus": "No se pudo leer el trabajo de precalentamiento",
       "helpLead": "Obtenga los artefactos en la caché antes de que algo los pida: uno por línea, con un nombre y una versión."
+    },
+    "attestation": {
+      "upstreamDigest": "Verificado",
+      "nonePublished": "Sin suma de verificación publicada",
+      "operatorUpload": "Subido",
+      "unrecorded": "No registrado"
+    },
+    "upload": {
+      "title": "Subir un artefacto revisado",
+      "description": "Coloque en la caché un artefacto que usted mismo haya validado. Es la única forma de añadir uno mientras el nodo está sellado, y no requiere firma del publicador: en su lugar se registra quién lo subió.",
+      "show": "Subir",
+      "hide": "Cerrar",
+      "sealedNote": "Este nodo está sellado, así que subir un artefacto es la única forma de añadirlo — y es la única copia, porque aquí nada se puede volver a obtener.",
+      "ecosystem": "Caché",
+      "kind": "Qué va a subir",
+      "kindArtifact": "Los bytes del artefacto",
+      "kindIndex": "Un documento de índice",
+      "kindHintIndexed": "Un nodo sellado lee de un documento de índice qué versiones existen, así que un artefacto subido sin él no se puede resolver.",
+      "kindHintNoIndex": "Esta caché no necesita documento de índice.",
+      "file": "Archivo",
+      "reference": "Referencia (opcional)",
+      "referenceHint": "Su propio id de ticket, cambio o aprobación. Se guarda junto con la subida.",
+      "replace": "Reemplazar lo que ya hay en estas coordenadas",
+      "replaceHint": "Sin esto, un artefacto existente se rechaza en lugar de sobrescribirse. Lo que desplaza puede ser justo aquello de lo que ya depende una ejecución.",
+      "confirmReplace": "¿Subir {filename} encima del artefacto que ya hay en estas coordenadas? Los bytes que reemplaza se destruyen.",
+      "confirmReplaceSealed": "Este nodo está sellado, así que los bytes reemplazados no se podrán recuperar de ningún sitio.",
+      "submit": "Subir",
+      "submitting": "Subiendo…",
+      "provenanceNote": "Se registra en su cuenta.",
+      "success": "{filename} subido.",
+      "successReplaced": "{filename} subido, reemplazando lo que había.",
+      "successUnchanged": "{filename} ya estaba en caché con bytes idénticos. No se cambió nada.",
+      "error": "La subida falló.",
+      "fields": {
+        "project": "Proyecto",
+        "name": "Nombre",
+        "version": "Versión",
+        "filename": "Nombre de archivo",
+        "package_id": "Id de paquete",
+        "module": "Ruta del módulo",
+        "suffix": "Archivo",
+        "namespace": "Espacio de nombres",
+        "document": "Documento",
+        "kind": "Tipo de plugin",
+        "os": "Sistema operativo",
+        "arch": "Arquitectura"
+      },
+      "hints": {
+        "filename": "Se indica en lugar de deducirse: el nombre de un wheel codifica sus etiquetas de compatibilidad.",
+        "suffix": "Uno de .info, .mod o .zip. Una versión son tres archivos y cada uno se sube por separado.",
+        "document": "Qué documento de índice. Galaxy tiene collection y versions; Go tiene list y latest.",
+        "kind": "resource, language, analyzer o converter."
+      }
     }
   },
   "catalog": {

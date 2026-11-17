@@ -1802,7 +1802,9 @@
       "repository": "Arkiv",
       "commit": "Commit",
       "paths": "Sökvägar",
-      "written": "Skriven"
+      "written": "Skriven",
+      "origin": "Ursprung",
+      "uploadedBy": "Uppladdad av"
     },
     "warm": {
       "heading": "Förvärm cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Läser in…",
       "showing": "Visar {shown} av {total} — tabellen sorterar det som är inläst, så läs in resten innan du läser en sortering som hela cachen.",
       "listedAll": "{count, plural, one {# artefakt} other {# artefakter}} visas — det är allt som matchar dessa filter.",
-      "successBulkTruncated": "Rensade {files} artefakter och frigjorde {size}. Fler matchar än en rensning tar bort — rensa igen för att fortsätta."
+      "successBulkTruncated": "Rensade {files} artefakter och frigjorde {size}. Fler matchar än en rensning tar bort — rensa igen för att fortsätta.",
+      "uploadedBy": "av {who}",
+      "confirmRowUploaded": "Den här artefakten laddades upp av en operatör och finns därför inte i något uppströmsregister. Om du tar bort den förstörs den enda kopian."
     },
     "archives": {
       "connectionLabel": "Anslutning",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Det gick inte att starta förvärmningen",
       "errorStatus": "Det gick inte att läsa förvärmningsjobbet",
       "helpLead": "Hämta artefakter till cachen innan något begär dem — en per rad, som ett namn och en version."
+    },
+    "attestation": {
+      "upstreamDigest": "Verifierad",
+      "nonePublished": "Ingen kontrollsumma publicerad",
+      "operatorUpload": "Uppladdad",
+      "unrecorded": "Ej registrerat"
+    },
+    "upload": {
+      "title": "Ladda upp en granskad artefakt",
+      "description": "Lägg in en artefakt som du själv har validerat i cachen. Det är enda sättet att lägga till en medan noden är förseglad, och det krävs ingen signatur från utgivaren — i stället registreras vem som laddade upp den.",
+      "show": "Ladda upp",
+      "hide": "Stäng",
+      "sealedNote": "Den här noden är förseglad, så en uppladdning är enda sättet att lägga till en artefakt — och den enda kopian, eftersom inget här kan hämtas på nytt.",
+      "ecosystem": "Cache",
+      "kind": "Vad du laddar upp",
+      "kindArtifact": "Artefaktens bytes",
+      "kindIndex": "Ett indexdokument",
+      "kindHintIndexed": "En förseglad nod läser ur ett indexdokument vilka versioner som finns, så en artefakt som laddas upp utan ett sådant kan inte slås upp.",
+      "kindHintNoIndex": "Den här cachen behöver inget indexdokument.",
+      "file": "Fil",
+      "reference": "Referens (valfritt)",
+      "referenceHint": "Ditt eget ärende-, ändrings- eller godkännande-id. Sparas med uppladdningen.",
+      "replace": "Ersätt det som redan finns på dessa koordinater",
+      "replaceHint": "Utan detta avvisas en befintlig artefakt i stället för att skrivas över. Det som trängs undan kan vara just det som en körning redan är beroende av.",
+      "confirmReplace": "Ladda upp {filename} över artefakten som redan finns på dessa koordinater? De bytes den ersätter förstörs.",
+      "confirmReplaceSealed": "Den här noden är förseglad, så de ersatta bytena kan inte hämtas tillbaka någonstans.",
+      "submit": "Ladda upp",
+      "submitting": "Laddar upp…",
+      "provenanceNote": "Registreras på ditt konto.",
+      "success": "{filename} uppladdad.",
+      "successReplaced": "{filename} uppladdad och ersatte det som fanns.",
+      "successUnchanged": "{filename} fanns redan i cachen med identiska bytes. Inget ändrades.",
+      "error": "Uppladdningen misslyckades.",
+      "fields": {
+        "project": "Projekt",
+        "name": "Namn",
+        "version": "Version",
+        "filename": "Filnamn",
+        "package_id": "Paket-id",
+        "module": "Modulsökväg",
+        "suffix": "Fil",
+        "namespace": "Namnrymd",
+        "document": "Dokument",
+        "kind": "Plugintyp",
+        "os": "Operativsystem",
+        "arch": "Arkitektur"
+      },
+      "hints": {
+        "filename": "Anges i stället för att härledas: namnet på ett wheel kodar dess kompatibilitetstaggar.",
+        "suffix": "Någon av .info, .mod eller .zip. En version är tre filer och var och en laddas upp separat.",
+        "document": "Vilket indexdokument. Galaxy har collection och versions; Go har list och latest.",
+        "kind": "resource, language, analyzer eller converter."
+      }
     }
   },
   "catalog": {

@@ -1802,7 +1802,15 @@
       "repository": "Repository",
       "commit": "Commit",
       "paths": "Paths",
-      "written": "Written"
+      "written": "Written",
+      "origin": "Origin",
+      "uploadedBy": "Uploaded by"
+    },
+    "attestation": {
+      "upstreamDigest": "Verified",
+      "nonePublished": "No digest published",
+      "operatorUpload": "Uploaded",
+      "unrecorded": "Not recorded"
     },
     "warm": {
       "heading": "Warm cache",
@@ -1869,7 +1877,9 @@
       "loadingMore": "Loading…",
       "showing": "Showing {shown} of {total} — the table sorts what is loaded, so load the rest before reading an order as the whole cache.",
       "listedAll": "{count, plural, one {# artifact} other {# artifacts}} listed — that is everything matching these filters.",
-      "successBulkTruncated": "Purged {files} artifacts, freeing {size}. More match than one purge removes — purge again to carry on."
+      "successBulkTruncated": "Purged {files} artifacts, freeing {size}. More match than one purge removes — purge again to carry on.",
+      "uploadedBy": "by {who}",
+      "confirmRowUploaded": "This artifact was uploaded by an operator, so it exists in no upstream registry. Removing it destroys the only copy."
     },
     "archives": {
       "connectionLabel": "Connection",
@@ -1927,6 +1937,53 @@
       "errorSources": "Could not read where warming would fetch from",
       "errorSubmit": "Could not start warming",
       "errorStatus": "Could not read the warming job"
+    },
+    "upload": {
+      "title": "Upload a vetted artifact",
+      "description": "Put an artifact you have validated yourself into the cache. This is the only way to add one while the node is sealed, and it needs no publisher signature — what is recorded instead is who uploaded it.",
+      "show": "Upload",
+      "hide": "Close",
+      "sealedNote": "This node is sealed, so an upload is the only way to add an artifact — and the only copy, because nothing here can be re-fetched.",
+      "ecosystem": "Cache",
+      "kind": "What you are uploading",
+      "kindArtifact": "The artifact's bytes",
+      "kindIndex": "An index document",
+      "kindHintIndexed": "A sealed node reads which versions exist from an index document, so an artifact uploaded without one cannot be resolved.",
+      "kindHintNoIndex": "This cache needs no index document.",
+      "file": "File",
+      "reference": "Reference (optional)",
+      "referenceHint": "Your own ticket, change or approval id. Stored with the upload.",
+      "replace": "Replace what is already at these coordinates",
+      "replaceHint": "Without this an existing artifact is refused rather than overwritten. What it displaces may be what a run already depends on.",
+      "confirmReplace": "Upload {filename} over the artifact already at these coordinates? The bytes it replaces are destroyed.",
+      "confirmReplaceSealed": "This node is sealed, so the replaced bytes cannot be fetched back from anywhere.",
+      "submit": "Upload",
+      "submitting": "Uploading…",
+      "provenanceNote": "Recorded against your account.",
+      "success": "Uploaded {filename}.",
+      "successReplaced": "Uploaded {filename}, replacing what was there.",
+      "successUnchanged": "{filename} was already cached with identical bytes. Nothing changed.",
+      "error": "The upload failed.",
+      "fields": {
+        "project": "Project",
+        "name": "Name",
+        "version": "Version",
+        "filename": "Filename",
+        "package_id": "Package id",
+        "module": "Module path",
+        "suffix": "File",
+        "namespace": "Namespace",
+        "document": "Document",
+        "kind": "Plugin kind",
+        "os": "Operating system",
+        "arch": "Architecture"
+      },
+      "hints": {
+        "filename": "Supplied rather than derived: a wheel's name encodes its compatibility tags.",
+        "suffix": "One of .info, .mod or .zip. A version is three files and each is uploaded separately.",
+        "document": "Which index document. Galaxy has collection and versions; Go has list and latest.",
+        "kind": "resource, language, analyzer or converter."
+      }
     }
   },
   "catalog": {

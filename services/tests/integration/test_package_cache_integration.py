@@ -296,6 +296,76 @@ class TestRetention:
             assert await db.get(CachedPackageFile, fresh_id) is not None
             assert await db.get(CachedPackageFile, stale_id) is None
 
+    async def test_the_sweep_spares_an_operator_upload_however_stale(self, app) -> None:
+        """An upload exists upstream nowhere, so reaping one destroys the only copy.
+
+        Every other row here is a copy of something a registry still serves, which
+        is what makes an age-based sweep safe: the cost is a slower run later. An
+        operator upload has no such fallback, and age is not evidence it is
+        unwanted -- it would be deleted in a background task, days after anybody
+        chose anything, because nothing happened to pull it.
+
+        THREE rows, all equally stale, because the property is a RELATIONSHIP
+        between them: a test with only the upload would pass against a sweep that
+        had simply stopped deleting anything.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import update
+
+        from terrapod.services.artifact_retention_service import _cleanup_package_cache
+        from terrapod.services.package_cache.substrate import (
+            ATTEST_OPERATOR_UPLOAD,
+            ATTEST_UPSTREAM_DIGEST,
+        )
+
+        storage = get_storage()
+        calls: list[str] = []
+        async with get_db_session() as db, _fake_upstream(calls=calls) as client:
+            uploaded = await fetch_and_cache(
+                db, storage, _artifact("vetted-1.0.whl"), client=client
+            )
+            fetched = await fetch_and_cache(db, storage, _artifact("pulled-1.0.whl"), client=client)
+            legacy = await fetch_and_cache(db, storage, _artifact("legacy-1.0.whl"), client=client)
+            uploaded_id, uploaded_key = uploaded.id, uploaded.storage_key
+            fetched_id, legacy_id = fetched.id, legacy.id
+
+        stale = datetime.now(UTC) - timedelta(days=60)
+        async with get_db_session() as db:
+            # All three past the cutoff, differing ONLY in how they were admitted.
+            for row_id, attestation in (
+                (uploaded_id, ATTEST_OPERATOR_UPLOAD),
+                (fetched_id, ATTEST_UPSTREAM_DIGEST),
+                # NULL: a row written before the attestation existed. This is the
+                # case that makes `is_distinct_from` necessary -- under a plain
+                # `!= 'operator-upload'` the comparison is NULL rather than true,
+                # so the whole legacy cache would be spared along with the uploads
+                # and the sweep would quietly stop reclaiming anything.
+                (legacy_id, None),
+            ):
+                await db.execute(
+                    update(CachedPackageFile)
+                    .where(CachedPackageFile.id == row_id)
+                    .values(last_accessed_at=stale, attestation=attestation)
+                )
+
+        async with get_db_session() as db:
+            deleted = await _cleanup_package_cache(db, storage, retention_days=30, batch_size=100)
+
+        assert deleted == 2, "expected the fetched and the legacy rows to go, and only those"
+        async with get_db_session() as db:
+            assert await db.get(CachedPackageFile, uploaded_id) is not None, (
+                "the sweep destroyed an operator upload, which exists nowhere else"
+            )
+            assert await db.get(CachedPackageFile, fetched_id) is None
+            assert await db.get(CachedPackageFile, legacy_id) is None, (
+                "a NULL attestation was spared, so the sweep has stopped reclaiming "
+                "every row written before the attestation existed"
+            )
+        # The bytes too, not just the row: a surviving row pointing at a deleted
+        # object is the same loss with a worse symptom.
+        assert await storage.exists(uploaded_key)
+
 
 class TestVerification:
     """The digest gate (#2589). Upstream's published digest is checked against the

@@ -1802,7 +1802,9 @@
       "repository": "Repository",
       "commit": "Commit",
       "paths": "Percorsi",
-      "written": "Scritto"
+      "written": "Scritto",
+      "origin": "Origine",
+      "uploadedBy": "Caricato da"
     },
     "warm": {
       "heading": "Precarica cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Caricamento…",
       "showing": "Visualizzati {shown} di {total}: la tabella ordina ciò che è caricato, quindi carica il resto prima di leggere un ordine come l'intera cache.",
       "listedAll": "{count, plural, one {# artefatto elencato} other {# artefatti elencati}}: è tutto ciò che corrisponde a questi filtri.",
-      "successBulkTruncated": "Svuotati {files} artefatti, liberando {size}. Le corrispondenze sono più di quante ne rimuova uno svuotamento: ripeti per continuare."
+      "successBulkTruncated": "Svuotati {files} artefatti, liberando {size}. Le corrispondenze sono più di quante ne rimuova uno svuotamento: ripeti per continuare.",
+      "uploadedBy": "da {who}",
+      "confirmRowUploaded": "Questo artefatto è stato caricato da un operatore, quindi non esiste in nessun registry upstream. Rimuoverlo distrugge l''unica copia."
     },
     "archives": {
       "connectionLabel": "Connessione",
@@ -1927,6 +1931,59 @@
       "errorSubmit": "Impossibile avviare il precaricamento",
       "errorStatus": "Impossibile leggere il processo di precaricamento",
       "helpLead": "Scarica gli artefatti nella cache prima che qualcosa li richieda — uno per riga, con un nome e una versione."
+    },
+    "attestation": {
+      "upstreamDigest": "Verificato",
+      "nonePublished": "Nessun digest pubblicato",
+      "operatorUpload": "Caricato",
+      "unrecorded": "Non registrato"
+    },
+    "upload": {
+      "title": "Carica un artefatto controllato",
+      "description": "Inserisci nella cache un artefatto che hai validato tu stesso. È l''unico modo per aggiungerne uno mentre il nodo è sigillato, e non richiede la firma dell''editore: al suo posto viene registrato chi lo ha caricato.",
+      "show": "Carica",
+      "hide": "Chiudi",
+      "sealedNote": "Questo nodo è sigillato, quindi il caricamento è l''unico modo per aggiungere un artefatto — ed è l''unica copia, perché qui nulla può essere recuperato di nuovo.",
+      "ecosystem": "Cache",
+      "kind": "Che cosa stai caricando",
+      "kindArtifact": "I byte dell''artefatto",
+      "kindIndex": "Un documento di indice",
+      "kindHintIndexed": "Un nodo sigillato legge da un documento di indice quali versioni esistono, quindi un artefatto caricato senza di esso non può essere risolto.",
+      "kindHintNoIndex": "Questa cache non ha bisogno di alcun documento di indice.",
+      "file": "File",
+      "reference": "Riferimento (opzionale)",
+      "referenceHint": "Il tuo id di ticket, modifica o approvazione. Viene memorizzato insieme al caricamento.",
+      "replace": "Sostituisci ciò che si trova già a queste coordinate",
+      "replaceHint": "Senza questa opzione un artefatto esistente viene rifiutato anziché sovrascritto. Ciò che viene soppiantato può essere proprio quello da cui un''esecuzione già dipende.",
+      "confirmReplace": "Caricare {filename} sopra l''artefatto già presente a queste coordinate? I byte che sostituisce vengono distrutti.",
+      "confirmReplaceSealed": "Questo nodo è sigillato, quindi i byte sostituiti non possono essere recuperati da nessuna parte.",
+      "submit": "Carica",
+      "submitting": "Caricamento in corso…",
+      "provenanceNote": "Registrato sul tuo account.",
+      "success": "{filename} caricato.",
+      "successReplaced": "{filename} caricato, sostituendo ciò che c''era.",
+      "successUnchanged": "{filename} era già in cache con byte identici. Nulla è cambiato.",
+      "error": "Il caricamento è fallito.",
+      "fields": {
+        "project": "Progetto",
+        "name": "Nome",
+        "version": "Versione",
+        "filename": "Nome del file",
+        "package_id": "Id del pacchetto",
+        "module": "Percorso del modulo",
+        "suffix": "File",
+        "namespace": "Namespace",
+        "document": "Documento",
+        "kind": "Tipo di plugin",
+        "os": "Sistema operativo",
+        "arch": "Architettura"
+      },
+      "hints": {
+        "filename": "Fornito anziché dedotto: il nome di un wheel codifica i suoi tag di compatibilità.",
+        "suffix": "Uno tra .info, .mod o .zip. Una versione è composta da tre file, ciascuno caricato separatamente.",
+        "document": "Quale documento di indice. Galaxy ha collection e versions; Go ha list e latest.",
+        "kind": "resource, language, analyzer o converter."
+      }
     }
   },
   "catalog": {
