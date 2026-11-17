@@ -182,11 +182,16 @@
   ],
   "binary_cache.list_cached_binaries_endpoint": [
     "arch",
+    "attestation",
     "cached-at",
     "download-url",
     "os",
+    "replaced-at",
+    "replaced-digest",
     "shasum",
     "tool",
+    "upload-reference",
+    "uploaded-by",
     "version"
   ],
   "binary_cache.list_cached_providers_endpoint": [
@@ -207,6 +212,22 @@
     "opa-version",
     "pulumi-version",
     "trivy-version"
+  ],
+  "binary_cache.upload_binary_artifact": [
+    "arch",
+    "attestation",
+    "cached-at",
+    "os",
+    "shasum",
+    "tool",
+    "upload-reference",
+    "uploaded-by",
+    "version"
+  ],
+  "binary_cache.upload_binary_artifact:meta": [
+    "previous-digest",
+    "replaced",
+    "unchanged"
   ],
   "cache_admin._package_file_json": [
     "attestation",

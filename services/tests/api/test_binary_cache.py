@@ -56,6 +56,16 @@ def _cached_binary():
     e.shasum = "abc123"
     e.download_url = "https://example.test/terraform_1.9.0.zip"
     e.cached_at = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
+    # Provenance (#2599), set explicitly because the listing serialises it and an
+    # unset MagicMock attribute reaches `json.dumps` as a MagicMock rather than as
+    # None. A FETCHED row carries none of it -- which is the asymmetry that makes
+    # an operator upload visible in the first place -- so these are the honest
+    # values for this fixture, not placeholders.
+    e.attestation = None
+    e.uploaded_by = None
+    e.upload_reference = None
+    e.replaced_digest = None
+    e.replaced_at = None
     return e
 
 

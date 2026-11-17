@@ -21,7 +21,20 @@ Endpoints:
     DELETE /api/terrapod/v1/admin/provider-cache/{hostname}/{namespace}/{type}/{version}      — purge provider
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import asyncio
+import os
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -285,12 +298,128 @@ async def list_cached_binaries_endpoint(
                 "shasum": e.shasum,
                 "download-url": e.download_url,
                 "cached-at": rfc3339(e.cached_at),
+                # Provenance (#2599). A binary is EXECUTED on every run, so where
+                # it came from is the most consequential thing this listing says:
+                # `operator-upload` means a person vouched for it instead of the
+                # publisher's signed SHA256SUMS the fetch path checks.
+                "attestation": e.attestation,
+                "uploaded-by": e.uploaded_by,
+                "upload-reference": e.upload_reference,
+                "replaced-digest": e.replaced_digest,
+                "replaced-at": rfc3339(e.replaced_at) if e.replaced_at else None,
             },
         }
         for e in entries
     ]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
+
+
+@router.post("/admin/binary-cache/artifacts", status_code=201)
+async def upload_binary_artifact(
+    tool: str = Form(..., description="tofu, terraform, terragrunt, opa, trivy, checkov, ..."),
+    version: str = Form(..., description="The exact version, as the publisher names it."),
+    os_: str = Form(..., alias="os", description="linux, darwin, windows."),
+    arch: str = Form(..., description="amd64, arm64."),
+    file: UploadFile = File(..., description="The binary's bytes."),
+    reference: str = Form(
+        "", description="Free text: the operator's own ticket or approval record."
+    ),
+    replace: bool = Form(
+        False,
+        description=(
+            "Overwrite a binary already at these coordinates. Without it such an upload "
+            "is refused with 409, because what it would displace is what every run on "
+            "this version executes."
+        ),
+    ),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Put an engine or platform-tool binary an operator vetted into the cache.
+
+    **This is the most consequential upload Terrapod accepts: the binary is
+    executed on every run.** The fetch path verifies one against the publisher's
+    signed SHA256SUMS before recording it (#607) and an upload has no signature to
+    check -- which is the posture, not a hole in it. What stands in for the
+    signature is provenance: the row records `operator-upload`, who uploaded it,
+    and their reference, so an audit names the person who vouched rather than
+    assuming a publisher relationship nobody re-checks.
+
+    It is also the upload a sealed deployment most needs: without it a sealed node
+    cannot be given `tofu` itself, and no run can execute at all.
+    """
+    from terrapod.api.routers.cache_admin import _sealed_note
+    from terrapod.api.upload_stream import stream_upload_to_tempfile
+    from terrapod.services import binary_cache_uploads, cache_admission
+    from terrapod.services.package_cache import substrate, uploads
+
+    tmp_path, size = await stream_upload_to_tempfile(
+        file, suffix=".binary-upload", max_bytes=uploads.MAX_UPLOAD_BYTES
+    )
+    try:
+        if size == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Empty upload. The binary's bytes go in the `file` part; the "
+                    "coordinates are the other form fields."
+                ),
+            )
+        try:
+            record, outcome, previous = await binary_cache_uploads.admit(
+                db,
+                storage,
+                tool=tool,
+                version=version,
+                os_=os_,
+                arch=arch,
+                tmp_path=tmp_path,
+                uploaded_by=user.email or "",
+                reference=reference,
+                replace=replace,
+            )
+        except substrate.CoordinateError as exc:
+            # 422, not 404: the request is well-formed and the coordinates are not
+            # ones this cache can address.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except binary_cache_uploads.BinaryUploadConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        replaced = outcome is cache_admission.Outcome.REPLACE
+        unchanged = outcome is cache_admission.Outcome.UNCHANGED
+        meta: dict[str, object] = {"replaced": replaced, "unchanged": unchanged}
+        if replaced:
+            meta["previous-digest"] = previous
+            # A replacement DELETED bytes that a sealed node cannot fetch back.
+            meta.update(_sealed_note())
+        body = {
+            "data": {
+                "id": str(record.id),
+                "type": "cached-binaries",
+                "attributes": {
+                    "tool": record.tool,
+                    "version": record.version,
+                    "os": record.os,
+                    "arch": record.arch,
+                    "shasum": record.shasum,
+                    "attestation": record.attestation,
+                    "uploaded-by": record.uploaded_by,
+                    "upload-reference": record.upload_reference,
+                    "cached-at": rfc3339(record.cached_at),
+                },
+            },
+            "meta": meta,
+        }
+        await db.commit()
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+
+    return JSONResponse(status_code=200 if (replaced or unchanged) else 201, content=body)
 
 
 @router.post("/admin/binary-cache/warm")
