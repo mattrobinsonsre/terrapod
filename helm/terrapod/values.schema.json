@@ -2126,9 +2126,6 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
             "cache_only": {
               "type": "boolean"
             },
@@ -2136,9 +2133,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "upstream_registries": {
                   "type": "array",
                   "items": {
@@ -2165,7 +2159,6 @@
                 "verify": {
                   "type": "string",
                   "enum": [
-                    "off",
                     "checksum",
                     "signature"
                   ]
@@ -2179,9 +2172,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "terraform_mirror_url": {
                   "type": "string"
                 },
@@ -2325,16 +2315,10 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "pypi": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2352,9 +2336,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2372,9 +2353,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2396,9 +2374,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2409,6 +2384,10 @@
                         "type": "string",
                         "format": "uri"
                       }
+                    },
+                    "sumdb_upstream": {
+                      "type": "string",
+                      "description": "The Go checksum database to mirror through this cache; empty serves none."
                     }
                   }
                 },
@@ -2416,9 +2395,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2429,6 +2405,9 @@
                         "type": "string",
                         "format": "uri"
                       }
+                    },
+                    "registration_upstream": {
+                      "type": "string"
                     }
                   }
                 },
@@ -2436,9 +2415,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2458,9 +2434,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "upload_session_timeout_hours": {
                   "type": "integer",
                   "minimum": 1
@@ -2507,6 +2480,45 @@
                       "existingSecretKey": {
                         "type": "string"
                       }
+                    }
+                  }
+                }
+              }
+            },
+            "content_allowlist": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "observe",
+                    "enforce"
+                  ]
+                },
+                "packages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ecosystems": {
+                  "type": "object",
+                  "propertyNames": {
+                    "enum": [
+                      "pypi",
+                      "npm",
+                      "nuget",
+                      "go",
+                      "galaxy",
+                      "pulumi"
+                    ]
+                  },
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
                     }
                   }
                 }
@@ -2657,6 +2669,15 @@
             "listener_cert_ttl_seconds": {
               "type": "integer",
               "minimum": 60
+            },
+            "ca_algorithm": {
+              "type": "string",
+              "enum": [
+                "ed25519",
+                "mldsa44",
+                "mldsa65",
+                "mldsa87"
+              ]
             },
             "default_join_token_max_uses": {
               "oneOf": [

@@ -765,33 +765,29 @@ async def fetch_and_cache_single_platform(
             f"the bulk-warm admin endpoint before sealing, or disable registry.cache_only."
         )
 
-    # Check Redis metadata for download info (avoids extra upstream call)
+    # No Redis metadata read here. The reduced metadata carries only
+    # download_url/filename, and the authoritative upstream fetch below supplies
+    # both now that verification is unconditional -- so reading it would be a
+    # round-trip whose every result is immediately overwritten.
     platform_key = f"{os_}_{arch}"
-    meta = await _get_cached_metadata(hostname, namespace, type_, version)
-    download_url = None
-    filename = None
     download_info: dict | None = None
-    if meta and platform_key in meta:
-        download_url = meta[platform_key].get("download_url")
-        filename = meta[platform_key].get("filename")
 
     verify_level = settings.registry.provider_cache.verify
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-        # If we don't have download info from Redis — OR verification is on, in
-        # which case the reduced Redis metadata lacks the shasum/signature/keys
-        # material we need — fetch the authoritative download response upstream.
-        if not download_url or not filename or verify_level != "off":
-            download_info = await _fetch_platform_download(
-                client, hostname, namespace, type_, version, os_, arch
+        # Always upstream: verification needs the shasum/signature/keys material
+        # that only the authoritative download response carries, and it can no
+        # longer be switched off (see `ProviderCacheConfig.verify`).
+        download_info = await _fetch_platform_download(
+            client, hostname, namespace, type_, version, os_, arch
+        )
+        if download_info is None:
+            raise ValueError(
+                f"Platform {os_}/{arch} not found upstream for "
+                f"{hostname}/{namespace}/{type_} v{version}"
             )
-            if download_info is None:
-                raise ValueError(
-                    f"Platform {os_}/{arch} not found upstream for "
-                    f"{hostname}/{namespace}/{type_} v{version}"
-                )
-            download_url = download_info["download_url"]
-            filename = download_info["filename"]
+        download_url = download_info["download_url"]
+        filename = download_info["filename"]
 
         key = provider_cache_key(hostname, namespace, type_, version, filename)
 
@@ -825,16 +821,17 @@ async def fetch_and_cache_single_platform(
             # registry-advertised shasum (+ GPG signature in `signature` mode)
             # BEFORE computing h1 / persisting. Fail closed — an unverified
             # archive must never be cached, served, or have its h1 spliced into
-            # a lock file. `download_info` is guaranteed populated above when
-            # verify_level != "off".
-            if verify_level != "off":
-                await verify_provider(
-                    client,
-                    download_info or {},
-                    shasum,
-                    level=verify_level,
-                    allow_unsigned=settings.registry.provider_cache.allow_unsigned,
-                )
+            # a lock file. Unconditional: `verify` has no 'off' level, because the
+            # mirror path carries no signature check of its own and this is the only
+            # publisher-provenance check in the chain. `download_info` is guaranteed
+            # populated above.
+            await verify_provider(
+                client,
+                download_info or {},
+                shasum,
+                level=verify_level,
+                allow_unsigned=settings.registry.provider_cache.allow_unsigned,
+            )
 
             # Phase 2: compute h1 from the on-disk archive (constant
             # memory). Earlier versions called `_compute_h1_from_zip_bytes(fh.read())`

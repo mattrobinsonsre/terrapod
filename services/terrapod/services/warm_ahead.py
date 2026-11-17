@@ -58,7 +58,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.config import settings
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
-from terrapod.services.capabilities import capability_enabled
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -290,13 +289,14 @@ def effective_sources() -> dict[str, dict[str, object]]:
     for ecosystem in PACKAGE_ECOSYSTEMS:
         config = getattr(cache, ecosystem)
         out[ecosystem] = {
-            "enabled": capability_enabled(ecosystem),
+            # No `enabled`: every cache serves, always, so a field that could
+            # only ever read `true` is noise that invites a reader to branch on
+            # it. Removed on the 2.0 line with the flags themselves.
             "upstream": config.upstream,
             "mirrors": dict(config.mirrors),
             "resolves_latest": ecosystem in RESOLVES_LATEST,
         }
     out["oci"] = {
-        "enabled": capability_enabled("oci"),
         # Deliberately not an `upstream`: the reference's first path component
         # names the host, so there is no single answer to show.
         "upstream": "",

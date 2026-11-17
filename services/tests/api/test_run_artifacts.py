@@ -4,6 +4,7 @@ import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -322,6 +323,19 @@ class TestUploadStateDuplicateSerial:
 # ── upload_plan_json_output (#280) ─────────────────────────────────────
 
 
+def _savepointed_db(events=None):
+    """A mock session whose `begin_nested()` is an async context manager that
+    does not swallow exceptions, as SQLAlchemy's savepoint does; queries find nothing."""
+    log = [] if events is None else events
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = MagicMock()
+    savepoint = MagicMock()
+    savepoint.__aenter__ = AsyncMock(side_effect=lambda: log.append("enter"))
+    savepoint.__aexit__ = AsyncMock(side_effect=lambda *a: log.append("exit"))
+    mock_db.begin_nested = MagicMock(return_value=savepoint)
+    return mock_db
+
+
 class TestUploadPlanJsonOutput:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -331,7 +345,7 @@ class TestUploadPlanJsonOutput:
         run_id = uuid.uuid4()
         ws_id = uuid.uuid4()
         run = _mock_run(run_id=run_id, ws_id=ws_id)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_storage = AsyncMock()
         mock_get_storage.return_value = mock_storage
@@ -388,7 +402,7 @@ class TestUploadPlanJsonOutput:
         """
         run_id = uuid.uuid4()
         run = _mock_run(run_id=run_id)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -439,7 +453,7 @@ class TestUploadPlanJsonOutput:
         mock_literals.return_value = ["workspace-secret-9999"]
         run_id = uuid.uuid4()
         run = _mock_run(run_id=run_id)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -503,7 +517,7 @@ class TestUploadPlanJsonOutput:
         run = _mock_run(run_id=run_id)
         run.run_variables = None
         run.plan_resources = "untouched"
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -536,7 +550,7 @@ class TestUploadPlanJsonOutput:
         run = _mock_run(run_id=run_id)
         run.run_variables = "{not json"
         run.plan_resources = "untouched"
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -567,7 +581,7 @@ class TestUploadPlanJsonOutput:
         run = _mock_run(run_id=run_id)
         run.run_variables = None
         run.plan_resources = "untouched"
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -588,6 +602,95 @@ class TestUploadPlanJsonOutput:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch(
+        "terrapod.api.routers.run_artifacts.strict_sensitive_literals",
+        new_callable=AsyncMock,
+    )
+    async def test_the_variable_lookup_runs_inside_a_savepoint(
+        self, mock_literals, mock_get_storage, *_mocks
+    ):
+        """A failed lookup must roll back its own savepoint, not the session the
+        upload then commits on. A mock cannot poison a session; the integration
+        test does, and this pins that the lookup is inside the savepoint."""
+        events: list[str] = []
+        mock_literals.side_effect = lambda *a: events.append("lookup") or []
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = _savepointed_db(events)
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {"resource_changes": [{"address": "a.b", "change": {"actions": ["create"]}}]}
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert events == ["enter", "lookup", "exit"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch(
+        "terrapod.api.routers.run_artifacts.strict_sensitive_literals",
+        new_callable=AsyncMock,
+    )
+    @pytest.mark.parametrize(
+        ("pr_number", "sha", "resolves"),
+        [(None, "", False), (7, "", True), (None, "a" * 40, True)],
+        ids=["no-pr-no-commit", "pr", "branch-run"],
+    )
+    async def test_a_run_no_pull_request_can_reference_records_no_list_and_resolves_no_variables(
+        self,
+        mock_literals,
+        mock_get_storage,
+        _init_db,
+        _init_redis,
+        _init_storage,
+        pr_number,
+        sha,
+        resolves,
+    ):
+        """A run with neither a PR number nor a commit (a CLI upload, say) can
+        never have its list shown in a comment, so it should not pay for variable
+        resolution. A branch run (a commit, no PR number) can, so it does."""
+        mock_literals.return_value = []
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.vcs_pull_request_number = pr_number
+        run.vcs_commit_sha = sha
+        run.plan_resources = "untouched"
+        mock_db = _savepointed_db()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {"resource_changes": [{"address": "a.b", "change": {"actions": ["create"]}}]}
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.resource_additions == 1  # the counts are unaffected
+        if resolves:
+            mock_literals.assert_awaited_once()
+            assert [e["address"] for e in run.plan_resources["entries"]] == ["a.b"]
+        else:
+            mock_literals.assert_not_awaited()
+            assert run.plan_resources is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
     async def test_malformed_plan_leaves_counts_null_but_still_204(self, mock_get_storage, *_mocks):
         """A parse failure must not fail the upload — the download URL
         is still served, the UI just won't show a summary.
@@ -601,7 +704,7 @@ class TestUploadPlanJsonOutput:
         run.resource_destructions = None
         run.resource_replacements = None
         run.resource_imports = None
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -634,7 +737,7 @@ class TestUploadPlanJsonOutput:
         mock_settings.ai_summary.enabled = True
         run_id = uuid.uuid4()
         run = _mock_run(run_id=run_id)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -667,7 +770,7 @@ class TestUploadPlanJsonOutput:
         mock_settings.ai_summary.enabled = False
         run_id = uuid.uuid4()
         run = _mock_run(run_id=run_id)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -703,7 +806,7 @@ class TestUploadPlanJsonOutput:
         run_id = uuid.uuid4()
         ws_id = uuid.uuid4()
         run = _mock_run(run_id=run_id, ws_id=ws_id, is_drift_detection=True)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -737,7 +840,7 @@ class TestUploadPlanJsonOutput:
         mock_settings.ai_summary.enabled = False
         run_id = uuid.uuid4()
         run = _mock_run(run_id=run_id, is_drift_detection=False)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -1544,7 +1647,7 @@ class TestArtifactUploadsRefreshThePRComment:
     ):
         run_id = uuid.uuid4()
         run = _mock_run(run_id=run_id)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 
@@ -1803,7 +1906,7 @@ class TestTheUploadsThatWriteRunColumnsPublishRunUpdated:
         run_id = uuid.uuid4()
         ws_id = uuid.uuid4()
         run = _mock_run(run_id=run_id, ws_id=ws_id)
-        mock_db = AsyncMock()
+        mock_db = _savepointed_db()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()
 

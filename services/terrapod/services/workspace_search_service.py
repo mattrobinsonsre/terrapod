@@ -11,16 +11,21 @@ Design notes:
 - An empty/omitted filter is a caller error (`WorkspaceFilterError`), never
   an implicit match-all. Matching the whole fleet requires explicit
   `all: true` (operators are trusted to ask for it on purpose).
-- `all: true` short-circuits — other dimensions are ignored.
+- `all: true` ignores the other positive dimensions; `exclude` still applies.
+- `exclude` is a list of selectors (same dimensions, AND-combined within an
+  entry). A workspace matching ANY entry is removed. `exclude` alone is never a
+  selector, and entries cannot nest `exclude` or set `all`.
 """
 
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
-from sqlalchemy import Select, select
+from sqlalchemy import ColumnElement, Select, and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import Workspace, WorkspaceAgentPool
 
@@ -82,6 +87,7 @@ class WorkspaceFilter(BaseModel):
     locked: bool | None = None
     has_vcs: bool | None = None
     all: bool = Field(default=False)
+    exclude: list[WorkspaceFilter] = Field(default_factory=list)
 
     def _explicit_dimensions(self) -> list[str]:
         return [
@@ -117,6 +123,62 @@ class WorkspaceFilter(BaseModel):
         ]
 
 
+def _dimension_clauses(f: WorkspaceFilter) -> list[ColumnElement[bool]]:
+    """WHERE clauses for the positive dimensions of `f` (AND them together)."""
+    clauses: list[ColumnElement[bool]] = []
+    if f.workspace_ids is not None:
+        ids = [_strip_uuid(w, "ws-") for w in f.workspace_ids]
+        clauses.append(Workspace.id.in_(ids))
+    if f.labels:
+        for k, v in f.labels.items():
+            clauses.append(Workspace.labels.contains({k: v}))
+    if f.name_prefix:
+        clauses.append(Workspace.name.ilike(_glob_to_like(f.name_prefix) + "%", escape="\\"))
+    if f.name_glob:
+        clauses.append(Workspace.name.ilike(_glob_to_like(f.name_glob), escape="\\"))
+    if f.execution_backend is not None:
+        clauses.append(Workspace.execution_backend == f.execution_backend)
+    if f.execution_mode is not None:
+        clauses.append(Workspace.execution_mode == f.execution_mode)
+    if f.engine_version is not None:
+        clauses.append(Workspace.engine_version == f.engine_version)
+    if f.agent_pool_id is not None:
+        # Matches a workspace that names this pool ANYWHERE in its pool set
+        # (#1085) — "which workspaces would this pool have to run?" is the
+        # question an operator is asking, and a workspace that lists the pool
+        # as a fallback is just as much its responsibility.
+        pool_uuid = _strip_uuid(f.agent_pool_id, "apool-")
+        clauses.append(
+            select(WorkspaceAgentPool.workspace_id)
+            .where(
+                WorkspaceAgentPool.workspace_id == Workspace.id,
+                WorkspaceAgentPool.agent_pool_id == pool_uuid,
+            )
+            .exists()
+        )
+    if f.vcs_connection_id is not None:
+        clauses.append(Workspace.vcs_connection_id == _strip_uuid(f.vcs_connection_id, "vcs-"))
+    if f.owner_email is not None:
+        clauses.append(Workspace.owner_email == f.owner_email)
+    if f.drift_status is not None:
+        clauses.append(Workspace.drift_status == f.drift_status)
+    if f.locked is not None:
+        clauses.append(Workspace.locked.is_(f.locked))
+    if f.has_vcs is not None:
+        if f.has_vcs:
+            clauses.append(Workspace.vcs_connection_id.is_not(None))
+        else:
+            clauses.append(Workspace.vcs_connection_id.is_(None))
+    return clauses
+
+
+def _check_exclude_entry(entry: WorkspaceFilter, index: int) -> None:
+    if entry.all or entry.exclude:
+        raise WorkspaceFilterError(f"exclude[{index}] cannot set 'all' or nest 'exclude'")
+    if not entry._explicit_dimensions():
+        raise WorkspaceFilterError(f"exclude[{index}] sets no selector")
+
+
 def build_workspace_query(f: WorkspaceFilter) -> Select[tuple[Workspace]]:
     """Build the workspace SELECT for a filter.
 
@@ -128,60 +190,106 @@ def build_workspace_query(f: WorkspaceFilter) -> Select[tuple[Workspace]]:
     """
     q: Select[tuple[Workspace]] = select(Workspace).order_by(Workspace.name)
 
-    if f.all:
-        return q
-
-    dims = f._explicit_dimensions()
-    if not dims:
-        raise WorkspaceFilterError(
-            "filter must set at least one selector, or 'all': true to match every workspace"
-        )
-
-    if f.workspace_ids is not None:
-        ids = [_strip_uuid(w, "ws-") for w in f.workspace_ids]
-        q = q.where(Workspace.id.in_(ids))
-    if f.labels:
-        for k, v in f.labels.items():
-            q = q.where(Workspace.labels.contains({k: v}))
-    if f.name_prefix:
-        q = q.where(Workspace.name.ilike(_glob_to_like(f.name_prefix) + "%", escape="\\"))
-    if f.name_glob:
-        q = q.where(Workspace.name.ilike(_glob_to_like(f.name_glob), escape="\\"))
-    if f.execution_backend is not None:
-        q = q.where(Workspace.execution_backend == f.execution_backend)
-    if f.execution_mode is not None:
-        q = q.where(Workspace.execution_mode == f.execution_mode)
-    if f.engine_version is not None:
-        q = q.where(Workspace.engine_version == f.engine_version)
-    if f.agent_pool_id is not None:
-        # Matches a workspace that names this pool ANYWHERE in its pool set
-        # (#1085) — "which workspaces would this pool have to run?" is the
-        # question an operator is asking, and a workspace that lists the pool
-        # as a fallback is just as much its responsibility.
-        pool_uuid = _strip_uuid(f.agent_pool_id, "apool-")
-        q = q.where(
-            select(WorkspaceAgentPool.workspace_id)
-            .where(
-                WorkspaceAgentPool.workspace_id == Workspace.id,
-                WorkspaceAgentPool.agent_pool_id == pool_uuid,
+    if not f.all:
+        if not f._explicit_dimensions():
+            raise WorkspaceFilterError(
+                "filter must set at least one selector, or 'all': true to match every workspace"
             )
-            .exists()
-        )
-    if f.vcs_connection_id is not None:
-        q = q.where(Workspace.vcs_connection_id == _strip_uuid(f.vcs_connection_id, "vcs-"))
-    if f.owner_email is not None:
-        q = q.where(Workspace.owner_email == f.owner_email)
-    if f.drift_status is not None:
-        q = q.where(Workspace.drift_status == f.drift_status)
-    if f.locked is not None:
-        q = q.where(Workspace.locked.is_(f.locked))
-    if f.has_vcs is not None:
-        if f.has_vcs:
-            q = q.where(Workspace.vcs_connection_id.is_not(None))
-        else:
-            q = q.where(Workspace.vcs_connection_id.is_(None))
+        for clause in _dimension_clauses(f):
+            q = q.where(clause)
+
+    if f.exclude:
+        for i, entry in enumerate(f.exclude):
+            _check_exclude_entry(entry, i)
+        removed = or_(*[and_(*_dimension_clauses(e)) for e in f.exclude])
+        # `IS NOT true` keeps rows where the match is NULL (nullable columns).
+        q = q.where(removed.is_not(True))
 
     return q
+
+
+@dataclass
+class ExclusionReport:
+    excluded: int
+    #: Indexes of exclude entries that match no workspace anywhere in the fleet.
+    empty: list[int]
+    #: Per entry index, the `workspace_ids` it names (as written) that do not exist.
+    missing_ids: dict[int, list[str]] = field(default_factory=dict)
+
+
+async def _count(db: AsyncSession, q: Select[Any]) -> int:
+    return (
+        await db.execute(select(func.count()).select_from(q.order_by(None).subquery()))
+    ).scalar_one()
+
+
+async def exclusion_report(db: AsyncSession, f: WorkspaceFilter) -> ExclusionReport:
+    """How many workspaces `f.exclude` removed, and which entries match nothing."""
+    if not f.exclude:
+        return ExclusionReport(excluded=0, empty=[])
+
+    kept = await _count(db, build_workspace_query(f))
+    before = await _count(db, build_workspace_query(f.model_copy(update={"exclude": []})))
+
+    empty: list[int] = []
+    for i, entry in enumerate(f.exclude):
+        q = select(Workspace.id).where(*_dimension_clauses(entry))
+        if await _count(db, q) == 0:
+            empty.append(i)
+
+    missing = await _missing_ids(db, f.exclude)
+    empty = sorted(set(empty) | set(missing))
+    return ExclusionReport(excluded=before - kept, empty=empty, missing_ids=missing)
+
+
+async def _missing_ids(db: AsyncSession, entries: list[WorkspaceFilter]) -> dict[int, list[str]]:
+    """Per entry index, the `workspace_ids` it names that match no workspace."""
+    named = {i: e.workspace_ids for i, e in enumerate(entries) if e.workspace_ids}
+    wanted = {_strip_uuid(w, "ws-") for ids in named.values() for w in ids}
+    if not wanted:
+        return {}
+    found = set((await db.execute(select(Workspace.id).where(Workspace.id.in_(wanted)))).scalars())
+    absent = {i: [w for w in ids if _strip_uuid(w, "ws-") not in found] for i, ids in named.items()}
+    return {i: ids for i, ids in absent.items() if ids}
+
+
+def _parse_entry(raw: Any, label: str | None = None) -> WorkspaceFilter:
+    """Parse one filter dict; `label` (e.g. `exclude[0]`) marks an exclude entry."""
+    prefix = f"{label}: " if label else ""
+    if not isinstance(raw, dict):
+        raise WorkspaceFilterError(f"{prefix}must be an object")
+    norm = {k.replace("-", "_"): v for k, v in raw.items()}
+    # `terraform-version` was this selector's name before the column became
+    # `engine_version` (#1559). A stored rule -- a dynamic variable-set
+    # assignment, a saved bulk-update selector -- keeps the old spelling, and
+    # unknown keys are rejected, so dropping it would turn those rules into
+    # errors. The canonical spelling wins where a caller sends both.
+    legacy_version = norm.pop("terraform_version", None)
+    if legacy_version is not None:
+        norm.setdefault("engine_version", legacy_version)
+    unknown = set(norm) - set(WorkspaceFilter.model_fields)
+    if unknown:
+        raise WorkspaceFilterError(f"{prefix}unknown filter key(s): {', '.join(sorted(unknown))}")
+    if label:
+        nested = {"all", "exclude"} & set(norm)
+        if nested:
+            raise WorkspaceFilterError(
+                f"{prefix}'all' and 'exclude' are not allowed in an exclude entry"
+            )
+    else:
+        raw_exclude = norm.pop("exclude", None)
+        if raw_exclude is None:
+            raw_exclude = []
+        if not isinstance(raw_exclude, list):
+            raise WorkspaceFilterError("'exclude' must be a list of selectors")
+        norm["exclude"] = [_parse_entry(e, f"exclude[{i}]") for i, e in enumerate(raw_exclude)]
+    try:
+        entry = WorkspaceFilter(**norm)
+    except Exception as e:  # pydantic validation
+        raise WorkspaceFilterError(f"{prefix}{e}") from e
+    if label and not entry._explicit_dimensions():
+        raise WorkspaceFilterError(f"{label} sets no selector")
+    return entry
 
 
 def parse_filter(raw: dict[str, Any] | None) -> WorkspaceFilter:
@@ -193,22 +301,4 @@ def parse_filter(raw: dict[str, Any] | None) -> WorkspaceFilter:
         raise WorkspaceFilterError(
             "a non-empty 'filter' is required (use 'all': true to match all)"
         )
-    norm = {k.replace("-", "_"): v for k, v in raw.items()}
-    # `terraform-version` was this selector's name before the column became
-    # `engine_version` (#1559). A stored rule -- a dynamic variable-set
-    # assignment, a saved bulk-update selector -- keeps the old spelling, and
-    # unknown keys are rejected, so dropping it would turn those rules into
-    # errors. The canonical spelling wins where a caller sends both.
-    legacy_version = norm.pop("terraform_version", None)
-    if legacy_version is not None:
-        norm.setdefault("engine_version", legacy_version)
-    allowed = set(WorkspaceFilter.model_fields)
-    unknown = set(norm) - allowed
-    if unknown:
-        raise WorkspaceFilterError(f"unknown filter key(s): {', '.join(sorted(unknown))}")
-    try:
-        return WorkspaceFilter(**norm)
-    except WorkspaceFilterError:
-        raise
-    except Exception as e:  # pydantic validation
-        raise WorkspaceFilterError(str(e)) from e
+    return _parse_entry(raw)

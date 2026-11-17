@@ -238,6 +238,64 @@ test.describe('Caches — the package and VCS archive sections (#2474)', () => {
     await expect(adminPage.getByText('Totals by repository')).toBeVisible();
   });
 
+  // The operator upload, driven through the REAL BFF (#2599).
+  //
+  // This is the one thing no other tier can show. The upload is a multipart
+  // POST, and it reaches the API through the `/api/*` Route Handler that
+  // forwards `request.body` unbuffered -- a path a services-tier test skips
+  // entirely, and the path every real client takes. The issue calls this "one
+  // check, not a decision": the existing streaming proxy has to carry a
+  // multipart body unchanged, and nothing asserted that it did.
+  //
+  // It also proves the two properties an operator depends on that no component
+  // test can: the artifact appears in THIS listing afterwards, and it is
+  // distinguishable from a fetched one.
+  test('an uploaded artifact reaches the server through the BFF and is marked as uploaded', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.getByTestId('package-cache-section')).toBeVisible({ timeout: 15_000 });
+
+    await adminPage.getByTestId('package-upload-toggle').click();
+    await expect(adminPage.getByTestId('package-upload-ecosystem')).toBeVisible();
+
+    // pypi, because its coordinates are the simplest and it needs no index
+    // document for the uploaded row to be resolvable.
+    await adminPage.getByTestId('package-upload-ecosystem').selectOption('pypi');
+
+    // A name unique to this run: the suite shares a stack, so an assertion on a
+    // fixed name could pass on another spec's leftovers.
+    const project = `e2e-upload-${Date.now()}`;
+    const filename = `${project}-1.0.0-py3-none-any.whl`;
+    await adminPage.getByTestId('package-upload-field-project').fill(project);
+    await adminPage.getByTestId('package-upload-field-filename').fill(filename);
+
+    // Real bytes through the proxy. Small deliberately: this proves the path
+    // carries a multipart body at all, and streaming a large one is a property
+    // of the handler rather than of the size used here.
+    await adminPage.getByTestId('package-upload-file').setInputFiles({
+      name: filename,
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from('an artifact an operator vetted'),
+    });
+
+    await adminPage.getByTestId('package-upload-submit').click();
+
+    // The listing reloads on success, so the ROW is the assertion rather than
+    // the toast: a success message with no row would mean the upload landed
+    // somewhere the operator cannot see.
+    await expect(adminPage.getByText(project, { exact: false }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // And it must be DISTINGUISHABLE from a fetched artifact -- requirement 1 on
+    // the issue. `.filter({ visible: true })` because the page keeps both the
+    // table and the phone-width card list in the DOM at every width.
+    await expect(
+      adminPage.getByText('Uploaded', { exact: true }).filter({ visible: true }).first(),
+    ).toBeVisible();
+  });
+
   test('the two age filters do not say the same thing', async ({ adminPage }) => {
     // Package age is measured from the LAST ACCESS and an archive's from its
     // WRITE time, so the labels have to differ: "older than" would be wrong

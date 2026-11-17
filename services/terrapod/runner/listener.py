@@ -186,14 +186,40 @@ class RunnerListener:
         cached: caching it is the same thing as not signing.
         """
         cert_pem = self.identity.certificate_pem if self.identity else ""
+        mode = getattr(self.identity, "cert_header_mode", "") if self.identity else ""
         cached = getattr(self, "_cached_auth_headers_for_cert", None)
-        if cached is not None and cached[0] is cert_pem:
+        if cached is not None and cached[0] is cert_pem and cached[2] == mode:
             headers = dict(cached[1])
         else:
             headers = {}
             if cert_pem:
-                headers["X-Terrapod-Client-Cert"] = base64.b64encode(cert_pem.encode()).decode()
-            self._cached_auth_headers_for_cert = (cert_pem, dict(headers))
+                if mode == "fingerprint":
+                    # The API issued this certificate and recorded its key, so it
+                    # needs the fingerprint rather than the whole thing (#2602). For
+                    # an Ed25519 certificate this trades a 584-byte header for a
+                    # 64-character one; for a post-quantum CA it is the difference
+                    # between ~10 KB and 64 bytes, and nginx's default per-header
+                    # buffer is 8 KB.
+                    #
+                    # Computed here rather than taken from the response: it is a hash
+                    # of material we already hold, so deriving it cannot disagree with
+                    # the certificate we are actually signing with -- where a value
+                    # carried separately could, after a renewal race.
+                    from terrapod.runner.identity import certificate_fingerprint
+
+                    fp = certificate_fingerprint(cert_pem)
+                    if fp:
+                        headers["X-Terrapod-Client-Cert-Fingerprint"] = fp
+                    else:
+                        # Unparseable certificate. Fall back rather than send nothing:
+                        # the API accepts the certificate form, so a listener that
+                        # cannot hash its own PEM still authenticates.
+                        headers["X-Terrapod-Client-Cert"] = base64.b64encode(
+                            cert_pem.encode()
+                        ).decode()
+                else:
+                    headers["X-Terrapod-Client-Cert"] = base64.b64encode(cert_pem.encode()).decode()
+            self._cached_auth_headers_for_cert = (cert_pem, dict(headers), mode)
 
         key_pem = getattr(self.identity, "private_key_pem", "") if self.identity else ""
         # isinstance, not truthiness: anything that is not actually a PEM string

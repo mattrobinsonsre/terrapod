@@ -23,7 +23,22 @@ from terrapod.services import cache_inventory as ci
 
 
 def _now() -> datetime:
-    return datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
+    """The REAL clock, deliberately, because every caller is relative to it.
+
+    This used to return a frozen `datetime(2026, 11, 10, 12, 0)`, which looks like
+    ordinary test determinism and is a time bomb: the fixtures are frozen and the
+    CODE under test compares against `datetime.now`, so the gap between the two
+    grows by one day per day. `test_age_is_the_objects_WRITE_time` builds an
+    object "1 hour old" against that frozen point and asserts a 7-day filter
+    spares it -- true until the real clock passed 2026-11-17 11:00, after which
+    the "new" object was genuinely more than 7 days old and the filter correctly
+    deleted it. It began failing on every branch at that minute, `main` included.
+
+    Freezing a fixture is only safe when the code shares the frozen clock. Here it
+    does not, so the fixtures use the same clock the code does and every offset
+    below means what it says.
+    """
+    return datetime.now(UTC)
 
 
 @dataclass

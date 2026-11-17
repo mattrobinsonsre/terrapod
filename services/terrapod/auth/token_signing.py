@@ -154,9 +154,10 @@ async def init_token_signing_key(db: AsyncSession) -> bytes:
     1. A configured key wins and the table is not read (see the module
        docstring — bring-your-own stays authoritative).
     2. Otherwise take the advisory lock and load the newest stored key.
-    3. If there is none, adopt the database-URL derivation when this
-       deployment has executed runs, and generate 32 random bytes when it
-       has not.
+    3. A stored key whose provenance is the pre-2.0 database-URL derivation is
+       REPLACED with 32 random bytes, once, rather than loaded (#2589).
+    4. If there is none, generate 32 random bytes -- in every case, including a
+       deployment that has executed runs.
     """
     global _signing_key, _provenance  # noqa: PLW0603
 
@@ -201,19 +202,49 @@ async def init_token_signing_key(db: AsyncSession) -> bytes:
     )
     row = result.scalar_one_or_none()
 
-    if row is not None:
+    if row is not None and row.provenance == PROVENANCE_DATABASE_URL:
+        # ROTATE, once, rather than load it (#2589). A stored derived key is the
+        # GHSA-hc47-q72v-4vcm exposure sitting in the database: anyone holding the
+        # database URL -- every client of that database, backup and migration jobs,
+        # a DBA with no business minting platform tokens -- can mint all four
+        # stateless token families. It was adopted rather than replaced so tokens in
+        # flight across that upgrade kept verifying, and the cost was that the
+        # exposure persisted and `require_strong_secrets` could not default on,
+        # because it fires on exactly this key.
+        #
+        # Replacing it on sight is what lets that switch default on in 2.0. Without
+        # this branch the flip would refuse startup for precisely the deployments
+        # that adopted a key, which is most of them.
+        #
+        # What this breaks is bounded and in flight: runs executing across the
+        # rollout fail their API calls, and a run task dispatched before the upgrade
+        # and answered after it fails its HMAC. Nothing persistent -- this key
+        # protects no stored data. The row holding it is itself an encrypted column,
+        # so the dependency runs the other way round and no other encrypted column
+        # is touched.
+        key = secrets.token_bytes(32)
+        provenance = PROVENANCE_GENERATED
+        db.add(TokenSigningKey(key=key.hex(), provenance=provenance))
+        await db.commit()
+        logger.warning(
+            "Replaced the database-URL-derived token signing key with a generated one. "
+            "Tokens minted under the old key no longer verify: runs executing across "
+            "this restart will fail and need re-running, and a run task answered after "
+            "it will fail its callback. Nothing stored is affected.",
+            previous_provenance=PROVENANCE_DATABASE_URL,
+        )
+    elif row is not None:
         key = _decode_stored_key(row.key)
         provenance = row.provenance
         # Release the lock held on this transaction; nothing was written.
         await db.commit()
         logger.info("Loaded token signing key from database", provenance=provenance)
     else:
-        if await _has_executed_runs(db):
-            key = hashlib.sha256(str(settings.database_url).encode()).digest()
-            provenance = PROVENANCE_DATABASE_URL
-        else:
-            key = secrets.token_bytes(32)
-            provenance = PROVENANCE_GENERATED
+        # Always generated, including where this deployment has executed runs. That
+        # case used to adopt `sha256(database_url)`; see the rotation branch above
+        # for why it no longer does.
+        key = secrets.token_bytes(32)
+        provenance = PROVENANCE_GENERATED
         db.add(TokenSigningKey(key=key.hex(), provenance=provenance))
         await db.commit()
         logger.info("Stored a new token signing key", provenance=provenance)
@@ -247,22 +278,6 @@ def _decode_stored_key(stored: str) -> bytes:
     if len(key) != 32:
         raise RuntimeError(f"stored token signing key is {len(key)} bytes, expected 32")
     return key
-
-
-async def _has_executed_runs(db: AsyncSession) -> bool:
-    """Has this deployment ever executed a run?
-
-    The question behind it is "could a token minted under the old derivation
-    still be in flight", and a deployment with no runs has never minted a
-    runner token, a callback token or a download ticket. It is deliberately
-    conservative in the safe direction: anything that has been used adopts,
-    which cannot break a live run, and the cost is a weak-but-reported key
-    the operator replaces.
-    """
-    from terrapod.db.models import Run
-
-    result = await db.execute(select(Run.id).limit(1))
-    return result.scalar_one_or_none() is not None
 
 
 def get_token_signing_key() -> bytes:

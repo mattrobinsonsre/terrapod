@@ -73,3 +73,50 @@ class TestRenewalSignsPerAttempt:
             "sign_request is called before the retry loop, so all three attempts "
             "share one single-use nonce and the retries are rejected as replays."
         )
+
+
+class TestTheFingerprintPathIsGatedToo:
+    def test_the_shared_fingerprint_helper_enforces_proof_of_possession(self):
+        """#2602 added a THIRD way into listener auth, and the gate above cannot see it.
+
+        `TestBothServerPathsEnforceIt` slices the two named auth functions and
+        requires the call inside each. Both now delegate to
+        `_identity_from_fingerprint` for a request carrying a fingerprint instead of a
+        certificate — so that body satisfies the older gate via its certificate
+        fallback while the fingerprint branch could have no gate at all.
+
+        A fingerprint is public material that travels on every request, exactly like
+        the certificate it replaces, so it is replayable in precisely the same way and
+        needs precisely the same proof.
+        """
+        src = (ROOT / "api/dependencies.py").read_text()
+        start = src.index("async def _identity_from_fingerprint(")
+        nxt = src.find("\nasync def ", start + 1)
+        nxt2 = src.find("\ndef ", start + 1)
+        end = min(x for x in (nxt, nxt2, len(src)) if x != -1)
+        body = src[start:end]
+        assert "_enforce_listener_pop(" in body, (
+            "_identity_from_fingerprint does not call _enforce_listener_pop, so a "
+            "request authenticating on a fingerprint is accepted on public material "
+            "alone and a captured header can be replayed for as long as it is valid."
+        )
+
+    def test_the_gate_verifies_against_the_recorded_key_not_the_request(self):
+        """The fingerprint path must verify against what the API STORED.
+
+        Passing anything derived from the request would make the proof circular: the
+        caller would be supplying both the signature and the key it is checked
+        against, which is no proof at all.
+        """
+        src = (ROOT / "api/dependencies.py").read_text()
+        start = src.index("async def _identity_from_fingerprint(")
+        nxt = src.find("\nasync def ", start + 1)
+        end = nxt if nxt != -1 else len(src)
+        body = src[start:end]
+        assert "public_key=public_key" in body, "the gate is not given the stored key"
+        assert "load_der_public_key" in body, "the stored key is not being decoded"
+        # The key must come from the lookup, not from anything parsed out of the request.
+        assert "x509.load_pem" not in body, (
+            "the fingerprint path parses a certificate out of the request, which is "
+            "the attacker-supplied material this path exists to stop trusting"
+        )

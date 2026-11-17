@@ -50,8 +50,6 @@ func registerCacheWarm(s *mcp.Server, c *terrapod.Client) {
 
 type cacheWarmSourceOut struct {
 	Ecosystem string `json:"ecosystem"`
-	// Enabled false means that proxy does not serve, so a warm for it is a 404.
-	Enabled bool `json:"enabled"`
 	// Upstream is the default registry this ecosystem pulls through. EMPTY for
 	// `oci`, which has no single answer: an image reference's first path
 	// component names its own host.
@@ -91,7 +89,6 @@ func registerCacheWarmSources(s *mcp.Server, c *terrapod.Client) {
 		for _, s := range sources {
 			out.Ecosystems = append(out.Ecosystems, cacheWarmSourceOut{
 				Ecosystem:      s.Ecosystem,
-				Enabled:        s.Enabled,
 				Upstream:       s.Upstream,
 				Mirrors:        s.Mirrors,
 				ResolvesLatest: s.ResolvesLatest,

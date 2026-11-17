@@ -123,13 +123,17 @@ either way. The provider mirror, the engine binary cache and the module registry
 are what Terrapod is.
 
 The supporting surfaces for Ansible and Pulumi work — the container registry and
-the PyPI, npm, Galaxy, Pulumi-plugin, Go and NuGet proxies — each keep their own
-Helm switch (`api.config.registry.oci.enabled`,
-`api.config.registry.package_cache.enabled` and one flag per ecosystem), for
-operators who want a smaller surface. Off means the routes are never registered,
-the background tasks never scheduled, and nothing in the UI or the API schema.
-Never destructive: anything already stored stays put and comes back untouched if
-you turn it on again.
+the PyPI, npm, Galaxy, Pulumi-plugin, Go and NuGet proxies — have **no switches
+either**, and need none: a cache costs nothing until a run asks it for something,
+so a deployment that only writes HCL never sends them a request. An empty proxy
+holds no storage and does no background work.
+
+They used to have one flag each. The flags are gone because a cache that is off
+is a *surface half-present* rather than a smaller deployment — and because the
+container registry turned out to be load-bearing for Ansible rather than optional
+beside it: resolving which ansible-core lines a deployment can run is a tag
+listing through it, so switching it off broke every Ansible configure operation
+for a reason nothing connected back to a registry switch.
 
 The one hard requirement is Kubernetes, and that's a low bar: Terrapod is a single Helm release, a one-node [k3s](https://k3s.io/) VM is plenty to start, and `make eval` spins up a throwaway [k3d](https://k3d.io/)/kind cluster in one command.
 
@@ -206,6 +210,7 @@ a 2.0 pre-release and are not in the stable 1.11.x line; everything else ships i
 | Private provider registry | Publish, version, and share providers with GPG signing and network-mirror caching |
 | Binary caching | Pull-through cache for the terraform / tofu / terragrunt CLI binaries |
 | Bulk run actions | Tick workspaces on the Workspaces list and run Plan, Retry, Cancel, Apply or Discard across the selection; one request per workspace, every refusal reported against its own workspace |
+| Vetted-artifact uploads | Upload an artifact your own process approved and have a sealed deployment serve **only** what was vetted -- one admin endpoint per language-package cache, working while the pull-through is sealed, with the uploader, the date and your own approval reference on the record and the digest computed on receipt |
 | Cache pre-population | Warm **every** cache the product keeps, ahead of time and at explicit versions -- CLI and provider binaries, six language-package ecosystems and container images -- via admin endpoints, the SDK, MCP tools or the UI panel (for restricted-network / fast-first-run deployments). Refused on a sealed node, so warm before sealing |
 | Sealed (cache-only) mode | Air-gap switch (`registry.cache_only`) guaranteeing no upstream fetch — flipped on *after* the caches are populated — cache-backed version resolution, actionable cache-miss errors, retention skips the caches |
 

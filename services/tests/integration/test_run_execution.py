@@ -165,11 +165,18 @@ async def _report_job_launched(client, listener_id: str, run_id: str) -> None:
     assert resp.status_code == 200, resp.text
 
 
-async def _get_runner_token(client, listener_id: str, run_id: str) -> str:
-    """Get a runner token for artifact uploads. Run must be claimed first."""
+async def _get_runner_token(client, listener_id: str, run_id: str, phase: str = "plan") -> str:
+    """Get a runner token for artifact uploads. Run must be claimed first.
+
+    The phase is named, because a real listener names it: the token is scoped to
+    one run AND one phase (GHSA-xmrf-hxq9-m59m), so a plan-phase token cannot
+    drive the apply-phase routes. Sending none mints the legacy unphased form,
+    which only a listener predating v1.10 does -- and `require_phase`, on by
+    default from 2.0, refuses it outright.
+    """
     resp = await client.post(
         f"/api/terrapod/v1/listeners/{listener_id}/runs/{run_id}/runner-token",
-        json={},
+        json={"phase": phase},
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["token"]
@@ -282,14 +289,22 @@ async def _do_plan_phase(client, listener_id: str, run_id: str, runner_token: st
     await reconcile_runs()
 
 
-async def _do_apply_phase(client, listener_id: str, run_id: str, runner_token: str) -> None:
-    """Execute the full apply phase: claim + job-launched + artifacts + state + status + reconcile."""
+async def _do_apply_phase(client, listener_id: str, run_id: str) -> None:
+    """Execute the full apply phase: claim + job-launched + artifacts + state + status + reconcile.
+
+    Takes no token: it mints its own, because the claim below is the APPLY claim
+    and a token is scoped to one phase. That is what a real listener does -- it
+    gets a fresh token after each claim -- and reusing the plan-phase token here
+    only worked while the unphased form existed.
+    """
     # Claim the run (apply phase)
     result = await _claim_run(client, listener_id)
     assert result is not None, "Expected a run to claim for apply"
     data, phase = result
     assert phase == "apply"
     assert data["id"] == run_id
+
+    runner_token = await _get_runner_token(client, listener_id, run_id, phase="apply")
 
     # Report job launched
     await _report_job_launched(client, listener_id, run_id)
@@ -622,14 +637,14 @@ class TestAutoApplyLifecycle:
         run_id = run["id"]
 
         # Plan phase (claim + token + artifacts + reconcile)
-        runner_token = await _run_plan_lifecycle(client, listener_id, run_id)
+        await _run_plan_lifecycle(client, listener_id, run_id)
 
         # After reconciler, run should be "confirmed" (auto-apply)
         run_data = await _get_run(client, run_id)
         assert run_data["attributes"]["status"] == "confirmed"
 
         # Apply phase
-        await _do_apply_phase(client, listener_id, run_id, runner_token)
+        await _do_apply_phase(client, listener_id, run_id)
 
         # Verify final state
         run_data = await _get_run(client, run_id)
@@ -656,7 +671,7 @@ class TestManualConfirmApply:
         run_id = run["id"]
 
         # Plan phase
-        runner_token = await _run_plan_lifecycle(client, listener_id, run_id)
+        await _run_plan_lifecycle(client, listener_id, run_id)
 
         run_data = await _get_run(client, run_id)
         assert run_data["attributes"]["status"] == "planned"
@@ -669,7 +684,7 @@ class TestManualConfirmApply:
         assert run_data["attributes"]["status"] == "confirmed"
 
         # Apply phase
-        await _do_apply_phase(client, listener_id, run_id, runner_token)
+        await _do_apply_phase(client, listener_id, run_id)
 
         run_data = await _get_run(client, run_id)
         assert run_data["attributes"]["status"] == "applied"
@@ -801,10 +816,10 @@ class TestStateUpload:
         run_id = run["id"]
 
         # Plan phase (claim + token + artifacts + reconcile)
-        runner_token = await _run_plan_lifecycle(client, listener_id, run_id)
+        await _run_plan_lifecycle(client, listener_id, run_id)
 
         # Apply phase (includes state upload)
-        await _do_apply_phase(client, listener_id, run_id, runner_token)
+        await _do_apply_phase(client, listener_id, run_id)
 
         # Verify state version exists via API
         resp = await client.get(f"/api/v2/workspaces/{ws_id}/state-versions", headers=AUTH)
@@ -991,6 +1006,10 @@ class TestRunSerializationAndLocking:
         result = await _claim_run(client, listener_id)
         assert result is not None and result[1] == "apply" and result[0]["id"] == run_a_id
         assert (await _get_run(client, run_a_id))["attributes"]["status"] == "applying"
+
+        # A fresh token for the apply claim just made: the plan-phase one above
+        # cannot drive the apply-phase upload routes.
+        runner_token = await _get_runner_token(client, listener_id, run_a_id, phase="apply")
 
         # Newer apply-capable run B queues — A is in-flight, so not superseded.
         run_b = await _create_run(client, ws_id, message="newer")

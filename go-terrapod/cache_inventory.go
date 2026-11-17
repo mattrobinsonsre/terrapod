@@ -75,6 +75,26 @@ type CachedPackageFile struct {
 	// also the sort key of the listing, so the artifacts nothing has touched
 	// surface last.
 	LastAccessedAt string `json:"last-accessed-at"`
+	// Attestation records HOW this artifact was admitted, and is the field an
+	// audit reads: "upstream-digest" (verified against what the registry
+	// published), "none-published" (upstream publishes nothing beside the
+	// artifact, recorded honestly rather than implied), or "operator-upload".
+	//
+	// EMPTY means the row was written by a build that recorded nothing, which is
+	// not the same as "unverified" -- such a row is re-fetched rather than
+	// served, because we cannot vouch for it either way.
+	Attestation string `json:"attestation"`
+	// UploadedBy is the authenticated principal who uploaded it, and is set only
+	// for "operator-upload". Taken from the session, never from the request
+	// body, so it cannot be asserted by the uploader.
+	UploadedBy string `json:"uploaded-by"`
+	// UploadReference is the operator's own ticket or approval id, free text.
+	UploadReference string `json:"upload-reference"`
+	// ReplacedAt and ReplacedDigest describe what an upload DISPLACED, so a
+	// replacement is answerable afterwards rather than only at the moment it
+	// happened. Empty when nothing was displaced.
+	ReplacedAt     string `json:"replaced-at"`
+	ReplacedDigest string `json:"replaced-digest"`
 }
 
 // PackageCacheListOptions filters and pages ListPackageCache.

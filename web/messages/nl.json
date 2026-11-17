@@ -1802,7 +1802,9 @@
       "repository": "Repository",
       "commit": "Commit",
       "paths": "Paden",
-      "written": "Geschreven"
+      "written": "Geschreven",
+      "origin": "Herkomst",
+      "uploadedBy": "Geüpload door"
     },
     "warm": {
       "heading": "Cache opwarmen",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Laden…",
       "showing": "{shown} van {total} weergegeven — de tabel sorteert wat is geladen, laad dus de rest voordat je een sortering als de hele cache leest.",
       "listedAll": "{count, plural, one {# artefact} other {# artefacten}} weergegeven — dat is alles wat aan deze filters voldoet.",
-      "successBulkTruncated": "{files} artefacten gewist, {size} vrijgemaakt. Er voldoen er meer dan één wisbeurt verwijdert — wis opnieuw om door te gaan."
+      "successBulkTruncated": "{files} artefacten gewist, {size} vrijgemaakt. Er voldoen er meer dan één wisbeurt verwijdert — wis opnieuw om door te gaan.",
+      "uploadedBy": "door {who}",
+      "confirmRowUploaded": "Dit artefact is door een operator geüpload en bestaat daarom in geen enkele upstream-registry. Als u het verwijdert, wordt de enige kopie vernietigd."
     },
     "archives": {
       "connectionLabel": "Verbinding",
@@ -1903,7 +1907,6 @@
       "heading": "Pakket- en image-caches opwarmen",
       "help": "Geef een versie op waar die bekend is: een opwarming die een versie noemt, is later tegen een lockbestand te controleren, “wat het nieuwste ook is” niet. Schrijf elke regel als <code>naam versie</code>; voeg voor Pulumi-plugins achterliggende <code>os/arch</code>-tokens toe om specifieke platformen op te warmen.",
       "ecosystemLabel": "Artefactsoort",
-      "ecosystemOff": "{ecosystem} (uitgeschakeld)",
       "sourceLabel": "Ophalen van",
       "sourceDefault": "Geconfigureerde upstream",
       "upstreamIs": "Wordt opgehaald van <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Kon het opwarmen niet starten",
       "errorStatus": "Kon de opwarmtaak niet lezen",
       "helpLead": "Haal artefacten de cache in voordat iets erom vraagt — één per regel, als een naam en een versie."
+    },
+    "attestation": {
+      "upstreamDigest": "Geverifieerd",
+      "nonePublished": "Geen controlesom gepubliceerd",
+      "operatorUpload": "Geüpload",
+      "unrecorded": "Niet vastgelegd"
+    },
+    "upload": {
+      "title": "Een gecontroleerd artefact uploaden",
+      "description": "Plaats een artefact dat u zelf hebt gevalideerd in de cache. Dit is de enige manier om er een toe te voegen zolang de node verzegeld is, en er is geen ondertekening van de uitgever nodig — wat in plaats daarvan wordt vastgelegd, is wie het heeft geüpload.",
+      "show": "Uploaden",
+      "hide": "Sluiten",
+      "sealedNote": "Deze node is verzegeld, dus uploaden is de enige manier om een artefact toe te voegen — en het is de enige kopie, want hier kan niets opnieuw worden opgehaald.",
+      "ecosystem": "Cache",
+      "kind": "Wat u uploadt",
+      "kindArtifact": "De bytes van het artefact",
+      "kindIndex": "Een indexdocument",
+      "kindHintIndexed": "Een verzegelde node leest uit een indexdocument welke versies bestaan, dus een artefact dat zonder indexdocument is geüpload kan niet worden opgelost.",
+      "kindHintNoIndex": "Deze cache heeft geen indexdocument nodig.",
+      "file": "Bestand",
+      "reference": "Referentie (optioneel)",
+      "referenceHint": "Uw eigen ticket-, wijzigings- of goedkeuringsnummer. Wordt bij de upload opgeslagen.",
+      "replace": "Vervang wat op deze coördinaten al staat",
+      "replaceHint": "Zonder dit wordt een bestaand artefact geweigerd in plaats van overschreven. Wat daarbij verdrongen wordt, kan juist zijn waarvan een uitvoering al afhankelijk is.",
+      "confirmReplace": "{filename} uploaden over het artefact dat op deze coördinaten al staat? De bytes die het vervangt worden vernietigd.",
+      "confirmReplaceSealed": "Deze node is verzegeld, dus de vervangen bytes kunnen nergens meer worden teruggehaald.",
+      "submit": "Uploaden",
+      "submitting": "Bezig met uploaden…",
+      "provenanceNote": "Vastgelegd op uw account.",
+      "success": "{filename} geüpload.",
+      "successReplaced": "{filename} geüpload; wat er stond is vervangen.",
+      "successUnchanged": "{filename} stond al in de cache met identieke bytes. Niets gewijzigd.",
+      "error": "Het uploaden is mislukt.",
+      "fields": {
+        "project": "Project",
+        "name": "Naam",
+        "version": "Versie",
+        "filename": "Bestandsnaam",
+        "package_id": "Pakket-id",
+        "module": "Modulepad",
+        "suffix": "Bestand",
+        "namespace": "Namespace",
+        "document": "Document",
+        "kind": "Soort plug-in",
+        "os": "Besturingssysteem",
+        "arch": "Architectuur",
+        "tool": "Tool",
+        "hostname": "Registryhost",
+        "type": "Providertype"
+      },
+      "hints": {
+        "filename": "Opgegeven in plaats van afgeleid: de naam van een wheel codeert de compatibiliteitstags.",
+        "suffix": "Een van .info, .mod of .zip. Een versie bestaat uit drie bestanden en elk wordt afzonderlijk geüpload.",
+        "document": "Welk indexdocument. Galaxy heeft collection en versions; Go heeft list en latest.",
+        "kind": "resource, language, analyzer of converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, of de host van uw eigen registry"
+      },
+      "ecosystems": {
+        "binary": "Engine-binaries",
+        "provider": "Terraform-providers"
+      }
     }
   },
   "catalog": {

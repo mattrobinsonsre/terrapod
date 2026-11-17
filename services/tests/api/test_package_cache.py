@@ -281,52 +281,6 @@ class TestNpm:
         assert fetch.call_args.kwargs["accept"] == "application/vnd.npm.install-v1+json"
 
 
-class TestDisabled:
-    """A switched-off ecosystem is not mounted, so its routes do not exist.
-
-    Asserted by building the application *after* changing the setting, because
-    that is when the decision is now made: an ecosystem nobody wants is never
-    registered rather than registered and refusing. Patching the router module's
-    `settings` no longer has any effect — the decision lives in
-    `services/capabilities.py`, which reads the real settings object.
-    """
-
-    @pytest.fixture(autouse=True)
-    def _restore(self):
-        from terrapod.config import settings
-
-        before = (
-            settings.registry.package_cache.enabled,
-            settings.registry.package_cache.pypi.enabled,
-        )
-        yield
-        (
-            settings.registry.package_cache.enabled,
-            settings.registry.package_cache.pypi.enabled,
-        ) = before
-
-    async def test_a_disabled_ecosystem_is_404(self) -> None:
-        from terrapod.config import settings
-
-        settings.registry.package_cache.enabled = True
-        settings.registry.package_cache.pypi.enabled = False
-
-        async with await _client(_app()) as c:
-            r = await c.get(f"{BASE}/pypi/simple/flask/", headers=AUTH)
-
-        assert r.status_code == 404
-
-    async def test_the_whole_cache_can_be_switched_off(self) -> None:
-        from terrapod.config import settings
-
-        settings.registry.package_cache.enabled = False
-
-        async with await _client(_app()) as c:
-            r = await c.get(f"{BASE}/npm/left-pad", headers=AUTH)
-
-        assert r.status_code == 404
-
-
 class TestAuthenticationIsRequired:
     """Every route, walked from the real table rather than a hand-written list.
 
@@ -417,6 +371,19 @@ class TestAuthenticationIsRequired:
             f"{BASE}/pulumi/pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
             None,
         ),
+        # The checksum database (#2589). `supported` is the one the toolchain asks
+        # FIRST, so an unauthenticated answer there is what would advertise this
+        # cache as an open sumdb relay before any module request is made.
+        "/api/v1/package-cache/go/sumdb/{host}/supported": (
+            "GET",
+            f"{BASE}/go/sumdb/sum.golang.org/supported",
+            None,
+        ),
+        "/api/v1/package-cache/go/sumdb/{host}/{path:path}": (
+            "GET",
+            f"{BASE}/go/sumdb/sum.golang.org/lookup/rsc.io/quote@v1.5.2",
+            None,
+        ),
         "/api/v1/package-cache/go/{module:path}/@v/list": (
             "GET",
             f"{BASE}/go/example.com/m/@v/list",
@@ -483,6 +450,69 @@ class TestAuthenticationIsRequired:
             "POST",
             "/api/v1/admin/package-cache/evict",
             {"ecosystem": "pypi"},
+        ),
+        # Operator uploads (#2599). The body is deliberately `None` for all of
+        # these: they take MULTIPART, and the gate below sends `json=`, so the
+        # request carries no form at all. That is the right shape here --
+        # `require_admin` is resolved before any body validation, so an anonymous
+        # or non-admin caller is refused without the handler ever seeing a part.
+        # A route that answered 422 instead would be one whose auth dependency
+        # the gate had not actually reached.
+        "/api/v1/admin/package-cache/pypi/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/pypi/artifacts",
+            None,
+        ),
+        # Index documents (#2599) -- the same auth gate as the artifact routes.
+        "/api/v1/admin/package-cache/npm/index": (
+            "POST",
+            "/api/v1/admin/package-cache/npm/index",
+            None,
+        ),
+        "/api/v1/admin/package-cache/nuget/index": (
+            "POST",
+            "/api/v1/admin/package-cache/nuget/index",
+            None,
+        ),
+        "/api/v1/admin/package-cache/go/index": (
+            "POST",
+            "/api/v1/admin/package-cache/go/index",
+            None,
+        ),
+        "/api/v1/admin/package-cache/galaxy/index": (
+            "POST",
+            "/api/v1/admin/package-cache/galaxy/index",
+            None,
+        ),
+        "/api/v1/admin/package-cache/npm/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/npm/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/nuget/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/nuget/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/go/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/go/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/galaxy/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/galaxy/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/pulumi/artifacts": (
+            "POST",
+            "/api/v1/admin/package-cache/pulumi/artifacts",
+            None,
+        ),
+        "/api/v1/admin/package-cache/{file_id}/verify": (
+            "POST",
+            "/api/v1/admin/package-cache/01a06dfc-9451-798c-bed0-348d71a4ac26/verify",
+            None,
         ),
     }
 
@@ -1047,7 +1077,6 @@ class TestEveryPackageCacheRouteRecordsItsDuration:
             assert router.route_class is mod.TimedRoute, router
 
         built = mod.build_router()
-        assert built is not None
         mounted = [r for r in built.routes if isinstance(r, APIRoute)]
         assert mounted, "no routes mounted"
         assert all(isinstance(r, mod.TimedRoute) for r in mounted)

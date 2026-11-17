@@ -64,6 +64,7 @@ first — most rows do not apply to most deployments.
 | [Check your provider sends `email_verified`](#an-oidc-login-needs-an-email-the-provider-vouches-for), and set `require_email_verified: false` if it does not | you use OIDC | a login whose claims omit the field is refused from 2.0, and some providers verify the address without sending it |
 | [Grant `admin` / `audit` deliberately](#an-idp-group-can-no-longer-grant-admin-or-audit) — the entry's `SELECT` runs on your current release | your administrators get their role from an IdP group name | a bare group name stops granting a built-in role at the upgrade, and the grant is what you would need in order to put it back |
 | [Supply a CA bundle, or pin `ssl_mode: require`](#cloud-iam-database-auth-verifies-the-server-by-default) | `database.auth_mode` is one of the cloud-IAM modes **and** you have not set `database.ssl_mode` | the mode becomes `verify-full`, and verification needs CA material the system trust store may not carry — the API then cannot reach its database at all. **This is the one row whose own section does not frame it as a sequencing step**; it reads as a configuration note and has the blast radius of one |
+| [Rotate your static encryption KEK to generated material](#a-weak-supplied-secret-now-fails-startup-and-the-kek-has-a-remedy-now) | `encryption.enabled: true`, `encryption.provider: static`, and the key is a passphrase somebody typed | `require_strong_secrets` defaults **on** from 2.0 and the refusal happens at provider construction, so the pod does not start. You cannot fix it forward by editing the key: the KEK derives from it, so a new value leaves every wrapped DEK unreadable. The rotation tool ships in 2.0, so **run it from the 2.0 image before you point the deployment at it**, or set the flag false to buy time |
 | [Upgrade every listener in every pool first, or set `require_listener_proof_of_possession: false`](#listeners-must-prove-they-hold-their-certificates-private-key) | you run server-side execution and a pool may still hold a pre-2.0 listener image | a listener that does not sign gets `401` on every call including the event stream, so **the pool goes quiet rather than noisy**: nothing connects, nothing claims a run, and no error says why |
 
 ### Before you upgrade, or something breaks quietly
@@ -71,8 +72,10 @@ first — most rows do not apply to most deployments.
 | Do this | If | Why it cannot wait |
 |---|---|---|
 | Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
+| [Warm the Go checksum database, or set `sumdb_upstream` empty](#go-module-hashes-are-verified-against-the-checksum-database) | `registry.cache_only: true` **and** any workspace runs a Pulumi program written in Go | the runner verifies module hashes against the checksum database from 2.0, and Terrapod mirrors it — but **a sealed node cannot fill a miss**, so until it is warmed every Go dependency install fails rather than degrading. Warming it needs egress, which is what you no longer have once sealed |
+| [Unseal, re-warm, re-seal](#if-you-run-a-sealed-deployment-registrycache_only-true-read-this-before-upgrading) | `registry.cache_only: true` | artifacts cached before 2.0 are re-fetched once to verify them, and **a miss cannot be filled while sealed** — so between the upgrade and a re-warm, runs needing a cached package fail. Nothing is deleted, so re-warming later recovers everything, but the window is a real outage for those runs |
 | Move automation off the shapes that change: [a `status == "planning"` branch](#a-run-held-after-its-plan-reports-terraform-enterprises-statuses), [`ListRunPolicyEvaluations` and `IsBlocking()`](#policyevaluation-becomes-policycheck-in-the-go-sdk), and [a literal `queued` or `canceling` read from `/api/tfe/v2`](#a-runs-status-on-apitfev2-is-always-one-go-tfe-defines) | you have scripts or Go programs that read a run's status or its policy results | each is silent: a branch that no longer fires, a `switch` that falls through every case. The first two can be tried ahead of time on your current release |
-| [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status), and move bookmarked `status:locked` / `status:unhealthy` filters | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked`, or you share filter URLs | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then |
+| [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status) | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked` | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then. Bookmarked and shared filters need nothing: the page [rewrites them when it loads](#old-filters-are-rewritten-when-the-page-loads) |
 | [Check your own EE images can function as uid 1000](#an-execution-environment-must-run-as-uid-1000) | you set `api.config.ansible.execution_environments`. Terrapod's own published images need nothing | the sidecar's startup probe asserts it, so a non-conforming image fails at pod start — which is better than mid-playbook, but it is still every configure on that workspace |
 | [Grant module `registry:read`](#downloading-a-protected-configuration-version-archive-needs-module-registryread-too) | anyone downloads configuration-version archives from workspaces provisioned by a **self-contained** catalog item | the grant exists on your current release, so doing it first means nobody meets the new `403` |
 | [Point consumers at the catalog surface](#a-human-read-of-a-catalog-instances-variables-no-longer-returns-their-values) | a script or an agent reads `/variables` on a catalog-provisioned workspace and uses the values | the route, the attribute names and the status code are all unchanged — only the content becomes `null`, so nothing reports it |
@@ -86,7 +89,7 @@ first — most rows do not apply to most deployments.
 | Decide | Why it is a decision rather than a step |
 |---|---|
 | [How many API replicas to run through the rollout](#two-columns-are-renamed-so-the-api-rollout-has-a-brief-window-of-errors) | two columns are renamed in place, so between the pre-upgrade migration hook and the last old pod being replaced there are replicas selecting a column that is gone. It is seconds to a couple of minutes and it self-heals — but the mitigation is to scale the API to **one** replica, and a single replica is replaced rather than overlapped, so there is no window at all. That has to be chosen before you begin, not after you notice |
-| [Whether `require_strong_secrets` stays on](#terrapod-owns-the-token-signing-key-and-a-used-deployment-adopts-its-old-one) | a deployment that has executed runs **adopts** its old derived signing key, and that switch now fires on an adopted key — which is exactly the state the upgrade lands in. So either supply `api.tokenSigningKey` at the same time as the upgrade, or leave the switch off until you have |
+| [Expect runs in flight to fail across the restart](#terrapod-owns-the-token-signing-key-and-a-derived-one-is-replaced-rather-than-adopted) | this deployment has ever executed a run | a signing key derived from the database URL is now **replaced** on startup rather than adopted, which is what lets `require_strong_secrets` default on. The four token families that share it are all short-lived, so what breaks is bounded — runs executing across the restart fail their API calls and need re-running, and a run task answered after the upgrade fails its callback. Nothing stored is affected. There is nothing to do beforehand except choose when to take the restart |
 | [Whether you may need to roll back](#a-variable-is-identified-by-its-category-and-key-together) | the downgrade removes variables a 1.x schema cannot represent — the surplus when one key is held in two categories — keeping the oldest row per key and printing each removal. It is a rollback that costs something rather than one that refuses, which is the right trade and worth knowing in advance |
 
 ### Only possible after the upgrade
@@ -96,7 +99,7 @@ first — most rows do not apply to most deployments.
 | [Find the API tokens with no recorded provider and re-mint them](#an-api-tokens-roles-are-resolved-against-the-provider-it-was-minted-under) | that entry's `SELECT` reads `api_tokens.identity_provider`, and the column is **added by a 2.0 migration** — so the query cannot run until the migration has. Until they are re-minted, automation using one resolves to no roles and gets `403` |
 | Confirm an SSO login works, then [remove the old callback URLs from your IdP](#sso-callback-urls-move-to-apiv1--re-register-them-with-your-idp-first) | with both values registered the upgrade is a no-op at the IdP, and the old ones are what a fallback to `legacy_callback_url: true` would need. Removing them is the last step, and it is optional |
 | [Remove `require_listener_proof_of_possession: false`](#listeners-must-prove-they-hold-their-certificates-private-key) once every pool is on a 2.0 listener | it is a relaxation held open for the rollout, and it is the kind that stays set for a year if nobody writes it down |
-| [Delete the old `<release>-token-signing` Secret](#terrapod-owns-the-token-signing-key-and-a-used-deployment-adopts-its-old-one) — **only after confirming you do not reference it** from `api.tokenSigningKey.existingSecret` | Helm leaves it behind on purpose (`helm.sh/resource-policy: keep`). It is inert once you are on 2.0 **unless it is the key you supply**, in which case it is live |
+| [Delete the old `<release>-token-signing` Secret](#terrapod-owns-the-token-signing-key-and-a-derived-one-is-replaced-rather-than-adopted) — **only after confirming you do not reference it** from `api.tokenSigningKey.existingSecret` | Helm leaves it behind on purpose (`helm.sh/resource-policy: keep`). It is inert once you are on 2.0 **unless it is the key you supply**, in which case it is live |
 
 Two things to expect rather than do: [sessions open across the upgrade are capped
 from their own sign-in
@@ -130,6 +133,325 @@ Worth saying, because both look like upgrade steps and are not:
   does promise.
 
 ## Breaking changes
+
+### Go module hashes are verified against the checksum database
+
+A run used to set `GOSUMDB=off`. From 2.0 it verifies every module hash against
+the Go checksum database, which **Terrapod now mirrors** — the module-proxy
+protocol carries it under `/sumdb/<host>/`, so it is served from your own cache
+rather than being a second upstream a runner has to reach.
+
+**Why it changed.** The reason for `off` was that the program's own `go.sum` is
+enforced by the `go` command anyway. That is true of a module the program has
+already *pinned* and false of one absent from the file: measured against go1.27.3
+with a cold module cache, `go mod download` with `GOSUMDB=off` and no `go.sum`
+entry exits 0 and **writes the hash of whatever the proxy served**. A run executes
+exactly that command against exactly this cache, so an incomplete `go.sum`
+recorded Terrapod's own bytes as authoritative.
+
+**Most deployments have nothing to do.** An unsealed deployment fetches the
+database through the cache on first use, like any other upstream content.
+
+> **If you run sealed (`registry.cache_only: true`) and any workspace runs a
+> Pulumi program written in Go, warm the checksum database before sealing.** A
+> miss cannot be filled while sealed, so the dependency install fails rather than
+> quietly skipping the check. This is the same shape as the re-warm entry above
+> and is best done in the same window.
+
+To run without it, set the database empty:
+
+```yaml
+api:
+  config:
+    registry:
+      package_cache:
+        go:
+          sumdb_upstream: ""
+```
+
+That restores the pre-2.0 behaviour exactly, including the gap: a module missing
+from `go.sum` is cached and used unverified. The chart renders the runner's
+`GOSUMDB` from this value, so there is one place to set it rather than two that
+can disagree.
+
+### A weak supplied secret now fails startup, and the KEK has a remedy now
+
+`require_strong_secrets` defaults to **`true`** from 2.0. It fires on a secret this
+deployment was *given* and a strength estimate rejects: a configured
+`api.tokenSigningKey`, or a static encryption KEK that is a passphrase somebody
+typed rather than generated material (GHSA-hc47-q72v-4vcm).
+
+**Most deployments have nothing to do.** It does not fire on a signing key you never
+set — Terrapod generates and persists its own — and it does not fire on a KMS-backed
+KEK (Vault Transit, AWS KMS), where the key material never came from you. It also no
+longer fires on a signing key derived from the database URL, because such a key is
+now *replaced* with a generated one on startup rather than adopted.
+
+One case needs action before the upgrade, and it is the reason this default was off
+until now:
+
+> **If `encryption.provider` is `static` and the key is a typed passphrase, the pod
+> will not start.** The refusal happens at provider construction, before anything
+> serves. And you cannot fix it forward by editing the key — the KEK is derived from
+> that secret, so a new value leaves every already-wrapped DEK unable to unwrap,
+> which is unrecoverable rather than inconvenient.
+
+What changed is that there is now a remedy. `terrapod-kek-rotate` re-wraps every DEK
+from the old secret to a new one:
+
+```sh
+TERRAPOD_ENCRYPTION__STATIC_KEY="<your current key>" \
+TERRAPOD_KEK_ROTATE_NEW_SECRET="$(openssl rand -base64 32)" \
+  python -m terrapod.cli.kek_rotate
+```
+
+Then set `encryption.static_key` to the new secret and restart.
+
+**This is bounded work, not a re-encryption.** `crypto_keys` holds one row per DEK
+version — a handful — and the DEKs themselves do not change, so nothing encrypted
+under them is touched. It is not `encryption_migrate`, which re-keys *columns* and
+walks the estate.
+
+Three things about the tool worth knowing before you run it:
+
+- **It writes nothing until every new wrap has been read back.** Each DEK is
+  unwrapped under the old secret, its canary checked, re-wrapped, and the re-wrap
+  unwrapped again and compared — and only then, in one transaction, are the rows
+  replaced. A partial rotation is the worst outcome available (some DEKs under each
+  secret, with no single secret that reads them all), so it is all or nothing.
+- **It refuses a weak *new* secret**, because rotating to one would leave you exactly
+  where you started and then be refused at startup anyway.
+- **Keep the old secret until the restart is confirmed.** Backups taken before the
+  rotation are still wrapped under it, and it is the only thing that reads them.
+
+**The sequencing matters and is easy to get wrong:** the tool ships *in* 2.0. Run it
+from the 2.0 image (a one-off job or `kubectl run` against the same database) while
+your deployment is still on 1.x, then upgrade. If you would rather not, setting
+`api.config.require_strong_secrets: false` keeps 1.x behaviour and the upgrade
+proceeds — at the cost of keeping a KEK an attacker holding a backup can guess at one
+hash per attempt, which is the exposure this default exists to close.
+
+### New wraps are salted and stretched
+
+Independently of the flag: a static-KEK wrap written from 2.0 is `v2` — scrypt over
+the passphrase with a per-wrap salt, instead of a bare unsalted SHA-256. **Wraps
+written before 2.0 are still read**, so there is nothing to do and no migration;
+every DEK moves to the new format the next time it is wrapped, which a rotation does.
+Nothing about this changes what a DEK decrypts.
+
+
+
+### Artifacts cached before 2.0 are re-fetched once, to verify them
+
+The pull-through package cache now checks every artifact against the digest its own
+upstream publishes, before storing it (PyPI, npm, Galaxy and NuGet). Artifacts cached
+*before* that existed were admitted without any such check, and a cache hit is served
+without re-checking — so they would be served unverified for ever while everything fetched
+afterwards was verified, with no way for you or us to tell the two populations apart.
+
+So each row now records **how** it was admitted, and a row that records nothing is treated
+as a miss: the artifact is re-fetched once, verified, and the row rewritten. This is lazy
+and per artifact, on next use. **No action is required and nothing is deleted** — expect one
+extra upstream fetch per artifact the first time it is used after the upgrade.
+
+#### If you run a sealed deployment (`registry.cache_only: true`), read this before upgrading
+
+A miss cannot be filled while sealed, and a pre-2.0 artifact is a miss until it has been
+re-fetched. **A sealed deployment will therefore refuse to serve its existing cached
+artifacts after this upgrade**, and the refusal names the package and says the node is
+sealed.
+
+Your upgrade becomes the warm flow you already use, run once more:
+
+1. **Unseal** — set `registry.cache_only: false`.
+2. **Re-warm** — submit the bulk warm with the set you need, exactly as you did before
+   sealing. Each artifact is fetched once and verified, and its row is rewritten.
+3. **Re-seal** — set `registry.cache_only: true` again.
+
+Doing it in that order means nothing is ever unavailable. Upgrading while sealed is not
+destructive — the rows are left in place, so re-warming later recovers everything — but
+between the upgrade and the re-warm, runs that need a cached package will fail.
+
+A deployment with ordinary outbound reach needs none of this; it re-verifies as it goes.
+
+### `registry.provider_cache.verify: off` is removed
+
+If your values set it, **change it before you upgrade** — the value is no longer in the
+schema, so `helm lint` and `helm upgrade` reject it and the API refuses to start.
+
+| you had | set instead |
+|---|---|
+| upstream signs and you turned verification off anyway | remove the key; `signature` is the default |
+| your registry or mirror serves checksums but no signatures | `verify: checksum` |
+| *some* providers you use carry no signature material | keep `signature` and set `allow_unsigned: true` — it degrades to a shasum check for those providers only, with a warning |
+
+**Why it is gone rather than deprecated.** A `network_mirror` carries no signature
+verification of its own: terraform and tofu attach only a hash check on that path, and the
+hashes they check are the ones the mirror itself declares. Terrapod's admission-time
+verification is therefore the **only** publisher-provenance check anywhere in the chain for
+a third-party provider — so `verify: off` left a deployment strictly worse off than not
+using the provider cache at all, while reading like an ordinary compatibility switch. No
+configuration it enabled is unreachable through `checksum` or `allow_unsigned`.
+
+`registry.platform_tools.verify: off` is **unchanged** and still available: Checkov
+publishes no checksum file, so an internal mirror that cannot serve a GitHub-shaped release
+API genuinely needs it.
+
+### Every cache is always on, and the enabled flags are removed
+
+**Affects:** every deployment, but only three of the keys below can be in a
+1.x `values.yaml`. `api.config.registry.enabled`,
+`api.config.registry.provider_cache.enabled` and
+`api.config.registry.binary_cache.enabled` shipped in the 1.x chart, so **if you
+set any of them, remove them before you upgrade.** The rest —
+`registry.oci.enabled`, `registry.package_cache.enabled` and its six
+per-ecosystem flags — existed only on `main` during 2.0 development; an upgrade
+from 1.x has nothing to remove there.
+
+Every cache and the private registry are now **unconditional**. Not "on by
+default" — the fields are gone, so there is nothing to set.
+
+```yaml
+# remove every one of these lines
+api:
+  config:
+    registry:
+      enabled: true              # shipped in 1.x
+      binary_cache:
+        enabled: true            # shipped in 1.x
+      provider_cache:
+        enabled: true            # shipped in 1.x
+      oci:
+        enabled: true            # 2.0 pre-release only
+      package_cache:
+        enabled: true            # 2.0 pre-release only
+        pypi:
+          enabled: true          # 2.0 pre-release only -- and the same for
+        npm:                     # npm, go, nuget, galaxy and pulumi
+          enabled: true
+```
+
+**A leftover key fails loudly in the chart and silently in the API, so remove it
+from your values rather than relying on either.** `values.schema.json` declares
+`additionalProperties: false`, so a `values.yaml` that still sets one of these
+**fails `helm lint` and `helm upgrade`** instead of ignoring it — which is the
+outcome you want, because it tells you at upgrade time rather than leaving dead
+configuration behind. The API is the opposite: these config models ignore keys
+they do not declare (`extra="ignore"`), so the same setting delivered through a
+`TERRAPOD_*` environment variable or a hand-written ConfigMap is **accepted and
+silently discarded**. Nothing warns. If you configure Terrapod by either of those
+routes, grep for these keys yourself — the chart cannot catch what it did not
+render.
+
+**Nothing is lost and nothing needs re-enabling.** Everything already cached or
+pushed stays exactly where it is. If you had a cache switched off, the only change
+is that its routes are now mounted and it will serve and fill again.
+
+**Why they are gone rather than deprecated**, because each reason is a defect
+that was reachable in configuration:
+
+1. **A cache that is off is a surface half-present, not a smaller deployment.**
+   The shared routes under `/admin/package-cache` are about the cache rather than
+   about an ecosystem, so some stayed mounted while others did not: that admin
+   namespace answered for four routes and was absent for a fifth. An upload route
+   could store an operator-vetted artifact into a cache nothing would ever serve.
+2. **A cache is part of what Terrapod is, not an optional feature.** The code
+   already said so — the capability table stated that Terraform's own caches "are
+   what Terrapod is, not an optional engine's supporting cast, and must never
+   become gateable" — and then conceded, in the parenthesis immediately after,
+   that they have their own `enabled` flags anyway.
+3. **The container registry is load-bearing for Ansible.** Resolving which
+   ansible-core lines a deployment can run is a tag listing through `/v2/`, so a
+   deployment with `registry.oci.enabled: false` could not run an Ansible
+   configure operation at all. Calling it an optional capability was wrong.
+4. **Six independent switches were sixty-four configurations**, of which one was
+   ever exercised. The other sixty-three were reachable by an operator and tested
+   by nobody. `api.config.registry.enabled` was worse than untested: **nothing
+   read it**, so an operator who set it to `false` got a private registry that
+   served anyway.
+
+**A cache you do not use already costs nothing**, which is why there was nothing
+to buy by switching one off. A proxy does no background work per ecosystem and an
+empty cache holds no storage; an engine's CLI is fetched only when a run of that
+engine happens. A Terraform-and-OpenTofu deployment never sends a request to the
+Pulumi or Galaxy proxies and never pushes an execution environment.
+
+**Two `enabled` keys under `registry` survive, and neither is a cache**, so do not
+remove them:
+
+| key | what it is |
+|---|---|
+| `api.config.registry.oci.gc.enabled` | A blob-reclamation sweep, not the registry serving. Turning it off makes no surface half-present — the registry simply only ever grows. Still available, still `true` by default |
+| `api.config.registry.module_interface.enabled` | Publish-time extraction of a module's inputs and outputs. A real feature with real readers, not a cache |
+
+What bounds a cache now is where it may fetch from — `upstream` per ecosystem,
+`provider_cache.upstream_registries`, the `binary_cache` mirror URLs — and whether
+it may reach upstream at all, with `api.config.registry.cache_only`. What
+reclaims its space is the scheduled retention sweep under
+`api.config.artifact_retention`. None of those makes a route disappear. See
+[Caches](caches.md), [package-cache.md](package-cache.md#a-proxy-cannot-be-turned-off)
+and [oci-registry.md](oci-registry.md#the-registry-cannot-be-turned-off).
+
+### `PackageCacheSource.Enabled` is removed from the Go SDK
+
+**Affects:** a Go consumer of `go-terrapod` that reads the warm-ahead upstream
+listing. This is a **compile break**, not a behaviour change — the field is gone
+from the struct, so code referencing it no longer builds.
+
+```go
+// before
+for _, s := range sources {
+    if !s.Enabled {
+        continue // never taken
+    }
+    warmFrom(s.Upstream)
+}
+
+// after
+for _, s := range sources {
+    warmFrom(s.Upstream)
+}
+```
+
+`PackageCacheSources()` still returns one entry per ecosystem with `Ecosystem`,
+`Upstream`, `Mirrors` and `ResolvesLatest`. Only `Enabled` is gone, and the
+`enabled` attribute goes with it from the response.
+
+**Delete the branch rather than replacing the field.** Once every cache is always
+on (above), the field could only ever read `true`, so any `if !s.Enabled` arm was
+already unreachable — the web panel's own `disabled={!s.enabled}` branch never
+rendered. A field that cannot vary is not information; it is an invitation to
+branch on something that will never happen. Nothing replaces it, and there is no
+condition to test before warming an ecosystem.
+
+If your code logged or displayed a "switched off" state from this field, that
+state no longer exists.
+
+### Cloud-identity minting is strict by default: `require_phase` and `require_assigned_pool`
+
+Both now default to **true**. Each refuses to mint a run identity in a case that was
+previously allowed, so a trust policy that relied on the permissive behaviour needs checking
+first.
+
+**`auth.oidc_issuer.require_phase: true`** — an identity is refused for a run whose runner
+token carries no `phase` claim, and such a token is no longer issued. An unphased token
+exists only for a listener predating the phase claim, which means **v1.10 or earlier**. That
+was a supported configuration when the switch was added and is not one in 2.0, so the
+previous reason for defaulting off has expired. **Before upgrading:** confirm every listener
+is on v1.10 or later. An unphased token yields an identity with no `phase` claim and an
+unphased `sub` — a shape every trust policy has to remember to exclude, and a wildcard that
+forgets to is how a plan-phase run reaches an apply-phase role.
+
+**`auth.oidc_issuer.require_assigned_pool: true`** — an identity is refused for a run whose
+executing agent pool has left the workspace's pool set. A run snapshots its candidate pools
+at creation, so detaching a pool mid-flight previously left that run claimable by a pool the
+workspace no longer has. The flip trades a narrow mis-issuance window for a narrow
+run-failure window, which is the right way round for a credential. It does **not** constrain
+multi-pool routing: every pool in a workspace's set is a legitimate executor and passes.
+
+Set either back to `false` if you need the old behaviour while you adjust, but treat that as
+temporary — the refusals exist because the permissive shapes are the ones a trust policy
+silently accepts.
 
 ### `TF_VAR_terrapod_run_phase` is no longer exported
 
@@ -407,9 +729,10 @@ are both still answered next to the thing you did, without a comment per push.
 ### The workspace filter has `flag:` and `locked:`, and `status:` is only the run's status
 
 **Affects:** anyone who bookmarks or shares a Workspaces filter containing
-`status:locked` or `status:unhealthy`, and any deployment that uses `flag` or
-`locked` as a **label key**. It does not change the HTTP API, and it changes no
-stored data.
+`status:locked`, `status:unhealthy`, `status:drifted`, `status:state-diverged` or
+`status:vcs-error` (the page carries these over, with a few differences below),
+and any deployment that uses `flag` or `locked` as a **label key**. It does not
+change the HTTP API, and it changes no stored data.
 
 `status:` used to carry two values that were not statuses at all. `status:locked`
 matched a workspace's manual lock, and `status:unhealthy` matched "has at least
@@ -420,17 +743,60 @@ impossible to let two `status:` terms mean "either": `status:locked status:error
 was "locked **and** errored".
 
 They are gone from `status:`, which now means only the run's status (thirteen
-values, exactly one per workspace):
+values, at most one per workspace; a workspace with no run matches none of them).
+`needs-confirm` is a run that has planned and is not plan-only, so it is waiting
+for someone to confirm it, and `planned` is a plan-only run that has planned:
 
 | Before | Now |
 |---|---|
 | `status:locked` | `locked:true` (and `locked:false` comes with it) |
-| `status:unhealthy` | `flag:state-diverged flag:no-agent-pool flag:no-live-agent-pool flag:vcs-error flag:run-errored flag:drifted flag:drift-errored` |
+| `status:unhealthy` | `flag:state-diverged flag:no-agent-pool flag:no-live-agent-pool flag:vcs-error flag:run-errored flag:drifted flag:drift-errored` (all **seven** health conditions) |
+| `status:drifted` | `flag:drifted` |
+| `status:state-diverged` | `flag:state-diverged` |
+| `status:vcs-error` | `flag:vcs-error` |
 
 The **Health Issues** and **Locked** indicators on the workspace list insert
 exactly these, so clicking one shows what it means and lets you delete a condition
 from it. The `flag:` terms union, so the result is the set `status:unhealthy`
 matched.
+
+#### Old filters are rewritten when the page loads
+
+A filter opened from a bookmark, a shared link or the tab's stored filter is
+rewritten once, on load, using the table above, and the address bar then shows the
+new form. Every other term is kept as written, a replacement term the filter
+already has is not added twice, and a filter with none of these spellings is not
+changed by the rewrite. Only load rewrites: a `status:drifted` typed by hand
+afterwards is not carried over, and matches nothing (see the last point below).
+Four things are not the same as before:
+
+- **The three drift spellings are not an exact identity.** `status:` used to match
+  the status the pill shows, and `flag:` reads the server's health condition. So
+  `status:drifted` missed a drifted workspace whose pill showed `needs-confirm`,
+  `state-diverged` or `vcs-error`, and matched a stale `drift-status` with drift
+  detection off. After the rewrite it finds the first and no longer matches the
+  second, which is the correction the Flags dropdown already made.
+- **Two rewritten terms now mean "either".** `status:` terms used to intersect, and
+  a workspace has one pill, so `status:drifted status:vcs-error` matched nothing;
+  it becomes `flag:drifted flag:vcs-error`, which is drifted **or** VCS error.
+  `status:unhealthy status:drifted` was "unhealthy and showing drifted" and is now
+  every health condition, which is the same set as `status:unhealthy` alone. A
+  rewritten term next to a run status still intersects, so
+  `status:drifted status:errored` is now a drifted workspace whose latest run
+  errored, where it used to match nothing, and `status:locked status:errored` and
+  `status:unhealthy status:errored` keep their meaning.
+- **`status:` is the run's own status, whatever the pill shows.** `status:errored`
+  used to miss an errored run on a workspace whose pill showed `drifted`,
+  `state-diverged`, `vcs-error` or `needs-confirm`; it now finds it. The Status
+  dropdown counts use the same rule, so the number beside a row is what ticking it
+  matches.
+- **A `status:` or `flag:` value its dropdown does not offer matches nothing.**
+  That is a typo such as `status:erored`, and also a removed spelling typed by hand
+  after the page has loaded. A `status:` typo used to be ignored whenever another
+  `status:` term was present, which widened `status:erored status:applied` to every
+  applied workspace; now the list is empty and the term is in the filter bar, and
+  `flag:nope flag:drifted` is empty too rather than every drifted workspace. The
+  Status and Flags badges count only the distinct values their own dropdown offers.
 
 **Two label keys become reserved.** `flag` and `locked` can no longer be used as
 label keys, for the same reason `status` and `owner` cannot. `locked` was released
@@ -1044,6 +1410,36 @@ prefixes is ignored rather than taken as a role name. That is what the setting
 always read as, and it narrows rather than widens — but if you relied on the
 pass-through, those roles stop arriving.
 
+### Listeners identify by certificate fingerprint, not by sending the certificate
+
+**Affects:** nobody, in the sense that there is nothing to do. Recorded because it
+changes what is on the wire.
+
+A listener used to send its whole certificate, base64-encoded, in
+`X-Terrapod-Client-Cert` on **every** request. It now sends the certificate's SHA-256
+fingerprint in `X-Terrapod-Client-Cert-Fingerprint` instead. The API issued that
+certificate, so at issuance it records the public key and the expiry against the
+fingerprint — which is everything the certificate was being used to carry.
+
+**No configuration, and no upgrade order.** A listener learns which form to send from
+the join and renew responses that already give it its identity. An older API does not
+ask, so an older or newer listener talking to it keeps sending certificates; a newer API
+still accepts certificates, so an older listener works unchanged. A mixed pool is fine
+in either direction.
+
+**Nothing is weakened.** Expiry is still checked against the recorded value by the same
+clock rather than left to a cache TTL, and proof of possession is enforced identically —
+a fingerprint is public material on every request, exactly as replayable as the
+certificate it replaces. What goes away is X.509 parsing of attacker-supplied bytes in
+the authentication path.
+
+**Why it was worth doing**: it is what makes a post-quantum CA possible. An ML-DSA-65
+certificate is ~10 KB base64-encoded, over nginx's default 8 KB per-header buffer, and
+ML-DSA-87 with its signature header exceeds Node's 16 KiB total. With only the signature
+header left, every ML-DSA size fits. See
+[post-quantum readiness](post-quantum.md) and
+[runners.md](runners.md#identifying-by-fingerprint-rather-than-by-certificate).
+
 ### Listeners must prove they hold their certificate's private key
 
 **Affects:** any pool still running a listener image older than 2.0.
@@ -1191,7 +1587,7 @@ than clearing it. Set it on one of them, or on all of them to the same value.
 The UI shows a pin read-only. A `sub` is an opaque provider-issued string, so it is
 set as code or through the API rather than typed into a form.
 
-### Terrapod owns the token signing key, and a used deployment adopts its old one
+### Terrapod owns the token signing key, and a derived one is replaced rather than adopted
 
 **Affects:** every deployment. Most need to do nothing before upgrading.
 
@@ -1211,12 +1607,28 @@ from the database URL, so **startup warns until you replace it**. A deployment
 that has never executed a run has nothing in flight and generates a strong key
 immediately.
 
-**What to do before upgrading:** nothing, unless you set
-`api.config.require_strong_secrets`. That switch used to fire whenever no key
-was *configured*; it now fires on an adopted key, which is the state an upgrade
-of a used deployment lands in. So either supply a key at the same time as the
-upgrade, or leave the switch off until you have. An unset `api.tokenSigningKey`
-is the normal, strong case from here on and the switch does not object to it.
+**What to do before upgrading: nothing.** `api.config.require_strong_secrets` is
+on by default from 2.0, and it is safe to be, because the case that used to make
+it unsafe is gone. A key derived from the database URL is now **replaced with a
+generated one on the first startup** rather than adopted, so no deployment is left
+holding one for the switch to object to. An unset `api.tokenSigningKey` is the
+normal, strong case and is not reported at all.
+
+**What that restart costs**, so it is not a surprise: replacing the key
+invalidates every token minted under the old one. Four short-lived families share
+it — runner tokens, run-task callback tokens, download tickets and Slack link
+tokens — so **runs executing across the restart fail their API calls and need
+re-running**, and a run task dispatched before the upgrade and answered after it
+fails its HMAC. Download tickets and Slack links are minutes-long and will simply
+be re-issued. **Nothing stored is affected**: this key protects no data at rest.
+The row holding it is itself an encrypted column, so it is protected *by* the
+encryption key rather than the other way round, and no other encrypted column is
+touched.
+
+If you would rather control the key yourself, supplying `api.tokenSigningKey`
+still wins on every startup and is never copied into Terrapod's own store — then
+the replacement above never happens, because a configured key is read before the
+table is.
 
 **If you already supply `api.tokenSigningKey.existingSecret`, nothing changes.**
 A supplied key still wins, on every startup, and Terrapod does not read its
@@ -1280,13 +1692,14 @@ unaffected either way.
 | creating a workspace with a disabled engine was refused | accepted; the engine must simply be one Terrapod can run |
 | the Pulumi service surface was unmounted | always mounted (nothing there is reachable without a Pulumi workspace to name) |
 
-**Per-capability switches are unaffected and are what to use instead.** If your
-reason for switching an engine off was to stop a *surface* serving, that control
-survives and is unchanged — `api.config.registry.oci.enabled` for the container
-registry, and `api.config.registry.package_cache.enabled` plus its six
-per-ecosystem flags (`pypi`, `npm`, `galaxy`, `pulumi`, `go`, `nuget`) for the
-package proxies. Each of those is read, and switching one off unmounts its
-routes rather than leaving them answering 404.
+**There are no per-capability switches either, so there is nothing to use
+instead.** An earlier revision of this guide pointed here at
+`api.config.registry.oci.enabled` and `api.config.registry.package_cache.enabled`
+as the surviving way to stop a *surface* serving. Those are now removed too — see
+[Every cache is always on](#every-cache-is-always-on-and-the-enabled-flags-are-removed).
+If your reason for switching an engine off was to shrink the surface, the answer
+is that there is nothing to shrink: a cache or proxy you never call does no
+background work and holds no storage.
 
 ### `api.config.default_ansible_version` is removed
 

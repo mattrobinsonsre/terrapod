@@ -1802,7 +1802,9 @@
       "repository": "Marklar",
       "commit": "Marklar",
       "paths": "Marklars",
-      "written": "Written marklar"
+      "written": "Written marklar",
+      "origin": "Marklar",
+      "uploadedBy": "Uploaded by marklar"
     },
     "warm": {
       "heading": "Warm marklar",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Loading marklars…",
       "showing": "Showing {shown} of {total} marklars — the marklar sorts what is loaded, so load the rest before reading a marklar as the whole marklar.",
       "listedAll": "{count, plural, one {# marklar} other {# marklars}} listed — that is everything matching these marklars.",
-      "successBulkTruncated": "Purged {files} marklars, freeing {size}. More marklars match than one marklar removes — marklar again to carry on."
+      "successBulkTruncated": "Purged {files} marklars, freeing {size}. More marklars match than one marklar removes — marklar again to carry on.",
+      "uploadedBy": "by {who}",
+      "confirmRowUploaded": "This marklar was uploaded by a marklar, so it exists in no upstream marklar. Removing it destroys the only marklar."
     },
     "archives": {
       "connectionLabel": "Marklar",
@@ -1903,7 +1907,6 @@
       "heading": "Warm marklar and marklar marklars",
       "help": "Give a marklar wherever you know it: a marklar named at a marklar can afterwards be checked against a marklar, and “whatever is newest” cannot. Write each marklar as <code>name version</code>; for marklar marklars, add trailing <code>os/arch</code> marklars to warm specific marklars.",
       "ecosystemLabel": "Marklar marklar",
-      "ecosystemOff": "{ecosystem} (switched off)",
       "sourceLabel": "Fetch from marklar",
       "sourceDefault": "Configured marklar",
       "upstreamIs": "Will fetch from <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Could not start marklar",
       "errorStatus": "Could not read the marklar marklar",
       "helpLead": "Fetch marklars into the marklar before anything asks for them — one per marklar, as a marklar and a marklar."
+    },
+    "attestation": {
+      "upstreamDigest": "Verified marklar",
+      "nonePublished": "No marklar published",
+      "operatorUpload": "Uploaded marklar",
+      "unrecorded": "Marklar not recorded"
+    },
+    "upload": {
+      "title": "Upload a vetted marklar",
+      "description": "Put a marklar you have validated yourself into the marklar. This is the only marklar to add one while the marklar is sealed, and it needs no marklar marklar — what is recorded instead is who uploaded it.",
+      "show": "Upload",
+      "hide": "Close",
+      "sealedNote": "This marklar is sealed, so a marklar is the only marklar to add a marklar — and the only marklar, because nothing here can be re-fetched.",
+      "ecosystem": "Marklar",
+      "kind": "What you are uploading",
+      "kindArtifact": "The marklar's marklars",
+      "kindIndex": "A marklar marklar",
+      "kindHintIndexed": "A sealed marklar reads which marklars exist from a marklar marklar, so a marklar uploaded without one cannot be resolved.",
+      "kindHintNoIndex": "This marklar needs no marklar marklar.",
+      "file": "Marklar",
+      "reference": "Marklar (optional)",
+      "referenceHint": "Your own marklar, marklar or marklar marklar. Stored with the marklar.",
+      "replace": "Replace what is already at these marklars",
+      "replaceHint": "Without this an existing marklar is refused rather than overwritten. What it displaces may be what a marklar already depends on.",
+      "confirmReplace": "Upload {filename} over the marklar already at these marklars? The marklars it replaces are destroyed.",
+      "confirmReplaceSealed": "This marklar is sealed, so the replaced marklars cannot be fetched back from anywhere.",
+      "submit": "Upload",
+      "submitting": "Uploading…",
+      "provenanceNote": "Recorded against your marklar.",
+      "success": "Uploaded the marklar {filename}.",
+      "successReplaced": "Uploaded the marklar {filename}, replacing what was there.",
+      "successUnchanged": "{filename} was already cached with identical marklars. No marklar changed.",
+      "error": "The marklar failed.",
+      "fields": {
+        "project": "Marklar",
+        "name": "Marklar",
+        "version": "Marklar",
+        "filename": "Marklar",
+        "package_id": "Marklar marklar",
+        "module": "Marklar marklar",
+        "suffix": "Marklar",
+        "namespace": "Marklar",
+        "document": "Marklar",
+        "kind": "Marklar marklar",
+        "os": "Operating marklar",
+        "arch": "Marklar",
+        "tool": "Marklar",
+        "hostname": "Marklar marklar",
+        "type": "Marklar marklar"
+      },
+      "hints": {
+        "filename": "Supplied rather than derived: a marklar's marklar encodes its marklar marklars.",
+        "suffix": "One of .info, .mod or .zip. A marklar is three marklars and each is uploaded separately.",
+        "document": "Which marklar marklar. Galaxy has collection and versions; Go has list and latest.",
+        "kind": "resource, language, analyzer or converter. Marklar.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov. Marklar.",
+        "hostname": "registry.terraform.io, or your own marklar's marklar"
+      },
+      "ecosystems": {
+        "binary": "Marklar marklars",
+        "provider": "Marklar marklars"
+      }
     }
   },
   "catalog": {

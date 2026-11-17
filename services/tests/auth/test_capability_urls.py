@@ -117,3 +117,94 @@ class TestAuditSafety:
         tampered = f"cap-{body}.not-a-signature"
         assert cu.describe_for_logging(tampered) == "plan-log:run-abc"
         assert cu.verify(tampered, expect_kind=cu.KIND_PLAN_LOG) is None
+
+
+class TestCapabilitiesAcrossACARotation:
+    """The non-certificate half of dual trust (#2602), and the easiest to miss.
+
+    The capability key is DERIVED from the CA private key, so rotating the CA changes
+    it and every outstanding capability URL stops verifying. `DEFAULT_TTL_SECONDS` is
+    25 hours and `LogReader` never re-reads its URL, so a plan log streaming across a
+    rotation would freeze with no way to renew -- for a reason having nothing to do
+    with listener certificates, which is why the certificate path's trust set alone
+    does not cover it.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _isolated(self):
+        """Own the trust set, and make `get_ca` follow it as production does.
+
+        The module-level `_ca` fixture pins `get_ca` to one fixed CA for this whole
+        file, which is right for every other test here and wrong for these: with it
+        in place, minting and verifying both use that CA whatever the trust set says,
+        so a rotation test would pass while asserting nothing. Patching `get_ca` to
+        read `_cas[0]` is what the real `get_ca` does.
+        """
+        from terrapod.auth import ca as ca_module
+
+        before = list(ca_module._cas)
+        with patch("terrapod.auth.ca.get_ca", side_effect=lambda: ca_module._cas[0]):
+            yield
+        ca_module._cas = before
+
+    def test_a_capability_minted_before_a_rotation_still_verifies_during_the_window(self):
+        """What a streaming log needs. Without this, rotating a CA silently breaks
+        every log a browser or `LogReader` is in the middle of reading."""
+        from terrapod.auth import ca as ca_module
+
+        old = ca_module.CertificateAuthority.generate()
+        ca_module._cas = [old]
+        cap = cu.mint("plan-log", "run-abc")
+
+        # Rotate: a new signer, the old one still trusted.
+        new = ca_module.CertificateAuthority.generate()
+        ca_module._cas = [new, old]
+
+        assert cu.verify(cap, expect_kind="plan-log") == "run-abc"
+
+    def test_a_capability_minted_AFTER_the_rotation_verifies_too(self):
+        """The obvious half, asserted so the test above cannot pass by accepting
+        everything."""
+        from terrapod.auth import ca as ca_module
+
+        old = ca_module.CertificateAuthority.generate()
+        new = ca_module.CertificateAuthority.generate()
+        ca_module._cas = [new, old]
+        assert cu.verify(cu.mint("plan-log", "run-def"), expect_kind="plan-log") == "run-def"
+
+    def test_once_the_window_CLOSES_the_old_capability_is_refused(self):
+        """A rotation has to actually rotate. The window is the certificate one, far
+        shorter than the 25-hour capability TTL, and that is deliberate: matching the
+        capability TTL would keep a rotated-away key usable for a day."""
+        import datetime as _dt
+        from unittest.mock import patch
+
+        from terrapod.auth import ca as ca_module
+
+        old = ca_module.CertificateAuthority.generate()
+        ca_module._cas = [old]
+        cap = cu.mint("plan-log", "run-abc")
+
+        new = ca_module.CertificateAuthority.generate()
+        ca_module._cas = [new, old]
+
+        far_past = _dt.datetime.now(_dt.UTC) - _dt.timedelta(days=2)
+        with patch.object(
+            type(new.ca_cert), "not_valid_before_utc", property(lambda _self: far_past)
+        ):
+            assert cu.verify(cap, expect_kind="plan-log") is None
+
+    def test_a_capability_from_a_CA_OUTSIDE_the_set_is_refused(self):
+        """Otherwise the tests above would pass over a verifier that accepted
+        anything signed by anyone."""
+        from terrapod.auth import ca as ca_module
+
+        stranger = ca_module.CertificateAuthority.generate()
+        ca_module._cas = [stranger]
+        cap = cu.mint("plan-log", "run-abc")
+
+        ca_module._cas = [
+            ca_module.CertificateAuthority.generate(),
+            ca_module.CertificateAuthority.generate(),
+        ]
+        assert cu.verify(cap, expect_kind="plan-log") is None

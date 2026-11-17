@@ -48,7 +48,10 @@ def test_new_dek_is_32_bytes():
 
 @pytest.mark.asyncio
 async def test_static_provider_wrap_unwrap():
-    p = StaticKEKProvider("a-strong-master-passphrase")
+    # `strict=False` because this is about the wrap mechanics, not strength: a typed
+    # passphrase is refused by default from 2.0 (`require_strong_secrets`), and a
+    # generated secret here would just be noise in a test that does not care.
+    p = StaticKEKProvider("a-strong-master-passphrase", strict=False)
     dek = envelope.new_dek()
     wrapped = await p.wrap(dek)
     assert wrapped != dek.hex()  # opaque, not the raw key
@@ -58,9 +61,9 @@ async def test_static_provider_wrap_unwrap():
 @pytest.mark.asyncio
 async def test_static_provider_wrong_master_cannot_unwrap():
     dek = envelope.new_dek()
-    wrapped = await StaticKEKProvider("master-A").wrap(dek)
+    wrapped = await StaticKEKProvider("master-A", strict=False).wrap(dek)
     with pytest.raises(InvalidTag):
-        await StaticKEKProvider("master-B").unwrap(wrapped)
+        await StaticKEKProvider("master-B", strict=False).unwrap(wrapped)
 
 
 def test_static_provider_requires_key():

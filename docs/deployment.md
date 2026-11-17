@@ -127,11 +127,12 @@ api:
             groups_claim: "groups"
 
     registry:
-      enabled: true
+      # The registry and every cache are always on and need nothing set here.
+      # What you may want is where they fetch from:
       provider_cache:
-        enabled: true
-      binary_cache:
-        enabled: true
+        upstream_registries:
+          - registry.terraform.io
+          - registry.opentofu.org
 
     vcs:
       enabled: true
@@ -263,11 +264,25 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 
 ### Registry & Caching
 
+**There is nothing here to switch on.** The private registry and every
+pull-through cache are part of what Terrapod is, so they have no `enabled` key —
+they are always serving. What you configure is *where* they fetch from and *what*
+they are willing to serve.
+
 | Value | Default | Description |
 |---|---|---|
-| `api.config.registry.enabled` | `true` | Enable private registry |
-| `api.config.registry.provider_cache.enabled` | `true` | Enable provider caching |
-| `api.config.registry.binary_cache.enabled` | `true` | Enable binary caching |
+| `api.config.registry.cache_only` | `false` | Seal upstream fetching for every cache. A cold artifact becomes an actionable 404 instead of a timeout — see [sealed deployments](caches.md#sealed-deployments) |
+| `api.config.registry.provider_cache.upstream_registries` | `registry.terraform.io`, `registry.opentofu.org` | Which provider registries may be pulled through. Point at an internal mirror to cache that instead |
+| `api.config.registry.binary_cache.tofu_mirror_url` | OpenTofu releases | Where engine binaries come from. `terraform_mirror_url` and `terragrunt_mirror_url` are the siblings |
+| `api.config.registry.content_allowlist` | off | *What* this deployment will serve, as opposed to where it fetches from |
+| `api.config.registry.module_interface.enabled` | `true` | Extract a module's inputs and outputs at publish time. A feature rather than a cache, so this one really is optional |
+
+Retention — how long a cached artifact survives before the scheduled sweep
+reclaims it — is under
+[`artifact_retention`](#artifact-retention) below. The container registry and the
+language-package proxies have their own settings, in
+[oci-registry.md](oci-registry.md#configuration) and
+[package-cache.md](package-cache.md#configuration).
 
 ### VCS
 

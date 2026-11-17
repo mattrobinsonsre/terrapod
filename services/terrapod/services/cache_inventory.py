@@ -166,6 +166,16 @@ async def package_totals(db: AsyncSession) -> list[EcosystemTotal]:
     ]
 
 
+async def get_package_file(db: AsyncSession, file_id: str) -> CachedPackageFile | None:
+    """One cached artifact row by id, or None.
+
+    Here rather than in the router so the malformed-id case is handled the way
+    `delete_package_file` handles it — by the same lookup, in the same module —
+    rather than each route reinventing what a bad uuid means.
+    """
+    return await db.get(CachedPackageFile, file_id)
+
+
 async def delete_package_file(db: AsyncSession, storage: ObjectStore, file_id: str) -> bool:
     """Evict one artifact. Returns False when the row is already gone.
 
