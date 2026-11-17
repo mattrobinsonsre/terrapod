@@ -3245,7 +3245,10 @@ Rejected with `422`: an unparseable rule; a non-object rule; `all: true` (use
 explicit assignment, and would produce a rule whose membership never
 re-evaluates); a rule on a set that is already `global`; and a rule whose
 dimensions are all blank -- `{"name_prefix": ""}` selects nothing meaningful and
-would otherwise match every workspace.
+would otherwise match every workspace. `exclude` (the bulk-update selector's
+exclusion list) is not supported in assignment rules yet: a rule carrying it is
+a `422` reading `assignment-rule cannot select on exclude`, because an entry
+could select on a dimension a rule refuses.
 
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
@@ -4248,6 +4251,35 @@ Resolve a structured filter to the matching workspaces — no side effects (the 
 
 Dimensions are **AND-combined** (narrower = safer). An empty/omitted `filter` is a `422` (typo guard); matching the whole fleet requires explicit `"all": true`. Returns `{matched, workspaces:[...]}`.
 
+#### Excluding workspaces
+
+`exclude` is a list of selectors, each taking the same dimensions as `filter` (AND-combined within an entry). A workspace is removed from the match if it matches **any** entry. `"all": true` still skips the positive dimensions but applies `exclude`, so it is the way to say "everything except":
+
+```json
+{ "filter": {
+    "all": true,
+    "exclude": [
+      { "labels": {"tier": "prod"} },
+      { "name-prefix": "legacy-", "locked": true }
+    ] } }
+```
+
+Refused with `422`:
+
+- `exclude` with no positive dimension and no `"all": true` — it is never a selector on its own.
+- an entry that sets no selector: it is empty, or only a blank `name_prefix`/`name_glob` (`exclude[N] sets no selector`). `{"owner_email": ""}` is a valid selector (unowned workspaces).
+- an entry that sets `all` or nests `exclude` (`exclude[N]: 'all' and 'exclude' are not allowed in an exclude entry`).
+- an `exclude` that is not a list, or an entry that is not an object. `[]` and `null` both mean "no exclusion".
+
+When the filter has an `exclude`, the response also carries:
+
+| Key | Meaning |
+|---|---|
+| `excluded` | How many workspaces the exclusion removed from the match. |
+| `exclude_empty` | Indexes of `exclude` entries that match no workspace anywhere in the fleet, or that name a `workspace_ids` entry that does not exist — usually a typo that is protecting nothing. |
+
+Both keys are omitted when the filter has no `exclude`. They are also on a [bulk-update](#bulk-update) dry run and apply response.
+
 ### Bulk Update
 
 ```
@@ -4311,7 +4343,9 @@ Semantics:
 - **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows). **One qualification, for `oidc-audiences` only:** writing it triggers nothing, but a run already sitting in `planned` on a matched workspace is auto-**discarded** the next time anyone tries to confirm it, by the cloud-identity staleness guard above — the identity it would present is no longer the one its plan was reviewed under. So a fleet-wide audience edit can invalidate every pending apply across the matched set at once. That is the guard working as designed (it fails before the apply rather than at the cloud's token exchange mid-apply), but it is a side effect of a "pure settings write", so plan the edit for a quiet moment and expect to re-plan. Nothing is applied, and no run is queued.
 - Per-workspace audit entries.
 
-Response: dry-run `{dry_run:true, matched, would_change:[{id,name,diff}], unchanged}`; apply `{dry_run:false, matched, applied, changes, unchanged, errors:[]}`; any failure ⇒ `409`/`422` and **nothing applied**.
+- **`filter` takes `exclude`** exactly as [Search](#search) does. A dry run reports it (`excluded`, `exclude_empty`) and still succeeds, so a mistyped entry shows up in the preview; an apply is **refused with `422`** if any entry matches no workspace fleet-wide — `exclude[N] matches no workspace; an exclusion that matches nothing protects nothing` (several empty entries are listed together: `exclude[0], exclude[2] match no workspace; …`) — or names a workspace id that does not exist (`exclude[N] names workspace ids that do not exist: ws-x, ws-y; …`), with zero mutation. The check is fleet-wide, not against the matched set, so an entry that merely overlaps nothing the positive filter selected is accepted.
+
+Response: dry-run `{dry_run:true, matched, would_change:[{id,name,diff}], unchanged}`, plus `excluded` and `exclude_empty` when the filter has an `exclude`; apply `{dry_run:false, matched, applied, changes, unchanged, errors:[]}`, plus `excluded` and `exclude_empty` (always `[]` on a successful apply) when the filter has an `exclude`; any failure ⇒ `409`/`422` and **nothing applied**.
 
 ---
 
