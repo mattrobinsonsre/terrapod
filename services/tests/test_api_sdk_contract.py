@@ -92,9 +92,8 @@ WORKSPACE_API_ONLY: frozenset[str] = frozenset(
         # state-diverged / vcs-last-error / drift-status, all of which
         # ARE in the SDK individually.
         "health-conditions",
-        # Nested relationship-y object describing the most recent run;
-        # the SDK exposes runs as a separate concept rather than
-        # embedding them on Workspace.
+        # The SDK reads it (`Workspace.LatestRun`); the provider does not,
+        # since run state is not configuration.
         "latest-run",
         # TFE-surface only, and DERIVED: `resolve_auto_apply_mode(ws) !=
         # "never"`. The stored column is gone (#2503) -- `auto_apply_mode` is
