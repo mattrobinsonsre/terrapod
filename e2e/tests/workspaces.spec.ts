@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { getStoredToken, createWorkspace, seedRun, uniqueName } from "../helpers/api";
+import { getStoredToken, createWorkspace, lockWorkspace, seedRun, uniqueName } from "../helpers/api";
 
 // Scope the list to one test's own rows. On a busy list the table can keep rows the
 // filter excludes (it does on upstream main too: "Showing 2 of N" above more than
@@ -220,6 +220,44 @@ test.describe("Workspaces", () => {
     await expect(filter).toHaveValue("status:applied");
   });
 
+  test("an old status: bookmark is rewritten once on load and keeps its meaning", async ({ page }) => {
+    // Agent mode with no pool carries a `no_agent_pool` condition, so it is "unhealthy".
+    const prefix = uniqueName("e2e-legacy");
+    const token = getStoredToken();
+    const lockedUnhealthy = `${prefix}-locked-bad`;
+    const unlockedUnhealthy = `${prefix}-open-bad`;
+    const lockedPlain = `${prefix}-locked-ok`;
+    const bad = await createWorkspace(token, lockedUnhealthy, { "execution-mode": "agent" });
+    await createWorkspace(token, unlockedUnhealthy, { "execution-mode": "agent" });
+    const ok = await createWorkspace(token, lockedPlain);
+    await lockWorkspace(token, bad);
+    await lockWorkspace(token, ok);
+
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto(`/workspaces?q=${encodeURIComponent(`${prefix} status:locked status:unhealthy`)}`);
+
+    await expect(page.getByRole("link", { name: lockedUnhealthy })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("link", { name: unlockedUnhealthy })).toBeHidden();
+    await expect(page.getByRole("link", { name: lockedPlain })).toBeHidden();
+
+    await expect(filter).toHaveValue(/locked:true/);
+    await expect(filter).toHaveValue(/flag:no-agent-pool/);
+    await expect(filter).not.toHaveValue(/status:/);
+    await expect.poll(() => new URL(page.url()).searchParams.get("q") ?? "").not.toContain("status:");
+    expect(new URL(page.url()).searchParams.get("q")).toContain("locked:true");
+  });
+
+  test("an old status: filter held in the tab is rewritten on load", async ({ page }) => {
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await page.goto("/settings/tokens");
+    await page.evaluate(() => sessionStorage.setItem("terrapod:workspace-filter", "status:locked"));
+    await page.goto("/workspaces");
+    await expect(filter).toHaveValue("locked:true");
+    await expect
+      .poll(() => page.evaluate(() => sessionStorage.getItem("terrapod:workspace-filter")))
+      .toBe("locked:true");
+  });
+
   // A refusal takes the not-ok branch; a body that is not JSON takes the catch. Neither may drop
   // an engine the URL asked for (a transport failure would too, but apiFetch retries those for seconds).
   for (const [name, reply] of [
@@ -237,6 +275,19 @@ test.describe("Workspaces", () => {
       expect(await page.evaluate(() => sessionStorage.getItem("terrapod:workspace-engine"))).toBe("terraform");
     });
   }
+
+  test("changing the grouping keeps the engine and the filter in the URL", async ({ page }) => {
+    await page.goto("/workspaces?q=env%3Aprod&engine=terraform");
+    await expect(page.locator('input[aria-label="Filter workspaces"]')).toHaveValue("env:prod");
+
+    await page.getByRole("button", { name: "Group", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: "Repository", exact: true }).click();
+
+    await expect.poll(() => new URL(page.url()).searchParams.get("group")).toBe("repo");
+    const params = new URL(page.url()).searchParams;
+    expect(params.get("engine")).toBe("terraform");
+    expect(params.get("q")).toBe("env:prod");
+  });
 
   test("a second tab does not inherit or overwrite the first tab's filter", async ({ page, context }) => {
     const filter = page.locator('input[aria-label="Filter workspaces"]');
@@ -520,8 +571,8 @@ test.describe("Workspaces", () => {
   test("the dropdowns union their own selections and typed terms intersect", async ({
     page,
   }) => {
-    // Three workspaces in one name scope: two with a different condition each
-    // (no_agent_pool via agent mode with no pool), one with none.
+    // Two workspaces in one name scope: one with a condition (no_agent_pool,
+    // via agent mode with no pool), one with none.
     const prefix = uniqueName("e2e-or");
     const token = getStoredToken();
     const noPool = `${prefix}-nopool`;
@@ -563,6 +614,8 @@ test.describe("Workspaces", () => {
     await page.getByRole("menuitemcheckbox", { name: /VCS error/ }).click();
     await expect(filter).toHaveValue(/flag:drifted/);
     await expect(filter).toHaveValue(/flag:vcs-error/);
+    await expect(page.getByTestId("ws-flags-count")).toHaveText("2");
+    await expect(page.getByTestId("ws-status-count")).toHaveCount(0);
   });
 
   test("selecting workspaces offers bulk actions, and Plan runs on each one", async ({ page }) => {
