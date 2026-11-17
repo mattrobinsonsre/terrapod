@@ -209,10 +209,10 @@ func TestPackageCacheSources(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[
 		  {"type":"package-cache-sources","id":"galaxy","attributes":{
-		     "ecosystem":"galaxy","enabled":true,"upstream":"https://galaxy.ansible.com",
+		     "ecosystem":"galaxy","upstream":"https://galaxy.ansible.com",
 		     "mirrors":{"hub":"https://hub.example/galaxy"},"resolves-latest":true}},
 		  {"type":"package-cache-sources","id":"pulumi","attributes":{
-		     "ecosystem":"pulumi","enabled":true,"upstream":"https://get.pulumi.com",
+		     "ecosystem":"pulumi","upstream":"https://get.pulumi.com",
 		     "mirrors":{},"resolves-latest":false}}
 		],"meta":{"max-items":500,"sealed":true}}`))
 	}))

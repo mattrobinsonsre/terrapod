@@ -635,9 +635,33 @@ async def _cleanup_package_cache(
     Access-based, like the other pull-through caches: a package every run
     installs would otherwise be evicted for being old and re-fetched immediately,
     which is worse than not expiring it at all.
+
+    **An OPERATOR UPLOAD is never reaped here (#2599).** Every other row in this
+    table is a copy of something a registry still serves, so deleting it costs a
+    slower run later and nothing else -- which is the whole premise of an
+    age-based sweep. An uploaded artifact exists upstream NOWHERE: it is an
+    internal package, a patched build, something no upstream key covers. Reaping
+    one destroys the only copy, and it does so in a background task, days after
+    anybody chose anything, for no better reason than that nothing happened to
+    pull it recently.
+
+    Age is not evidence an upload is unwanted. A deliberate removal is still
+    available -- the admin eviction route takes it by id, and the UI warns that
+    it is the only copy -- so this exclusion withholds nothing an operator asked
+    for. It withholds the one deletion nobody asked for.
+
+    **This is NOT redundant with the sealed-mode skip above, which is the reason
+    it is easy to delete.** `cache_only` already skips this whole category, so a
+    sealed node was never at risk. The exposure is the UNSEALED one, and it is
+    the documented flow rather than an edge case: `seed-then-seal` has an
+    operator upload what the deployment will need and seal afterwards, so the
+    uploads sit on a node where this sweep still runs, for as long as that
+    preparation takes. A deployment that stays unsealed and uses uploads for its
+    internal packages is exposed for ever.
     """
     from terrapod.api.metrics import RETENTION_DELETED
     from terrapod.db.models import CachedPackageFile
+    from terrapod.services.package_cache.substrate import ATTEST_OPERATOR_UPLOAD
 
     cutoff = datetime.now(UTC) - timedelta(days=retention_days)
     deleted = 0
@@ -645,6 +669,12 @@ async def _cleanup_package_cache(
     result = await db.execute(
         select(CachedPackageFile)
         .where(CachedPackageFile.last_accessed_at < cutoff)
+        # Spares an upload however long it has sat unused. `is_distinct_from`
+        # rather than `!=`, because the column is NULL for every row written
+        # before the attestation existed and `!= 'operator-upload'` is NULL --
+        # never true -- for those, which would spare the whole legacy cache
+        # instead of just the uploads.
+        .where(CachedPackageFile.attestation.is_distinct_from(ATTEST_OPERATOR_UPLOAD))
         .limit(batch_size)
     )
     entries = list(result.scalars().all())

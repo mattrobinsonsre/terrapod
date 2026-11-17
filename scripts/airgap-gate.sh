@@ -40,19 +40,6 @@
 
 set -euo pipefail
 
-# `--gated-off` asserts the other half of the capability flags (#1986): with the
-# container registry and the package cache switched off, those surfaces are
-# *absent* rather than answering 404, while terraform's own surfaces still
-# answer. It needs no clients, only a stack booted with the flags off.
-#
-# There is no engine on/off switch any more — the engine gate this mode was
-# written for (#1429) is withdrawn. The per-capability flags that survived carry
-# the same requirement, and for the same reason: the registry originally shipped
-# an `enabled` flag nothing read, so `enabled: false` stopped two scheduled
-# tasks while /v2/ served push, pull and mirror.
-MODE="run"
-if [ "${1:-}" = "--gated-off" ]; then MODE="gated-off"; shift; fi
-
 BASE="${1:-http://localhost:3000}"
 NET="tp-airgap-$$"
 PREFIX="/api/terrapod/v1/package-cache"
@@ -75,53 +62,6 @@ bad()  { FAIL=$((FAIL + 1)); RESULTS+=("FAIL  $*"); printf '  \033[31mFAIL\033[0
 # A skip is recorded and printed, never silently dropped: a row that cannot run
 # here must be visible in the summary, or the gate quietly shrinks over time.
 skip() { RESULTS+=("SKIP  $*"); printf '  \033[33mSKIP\033[0m  %s\n' "$*"; }
-
-
-# ── gated-off mode ─────────────────────────────────────────────────────
-
-if [ "$MODE" = "gated-off" ]; then
-  note "Capability flags: the container registry and the package cache disabled"
-  curl -sf "$BASE/" >/dev/null || { echo "no stack at $BASE"; exit 1; }
-
-  schema="$(curl -sf "$BASE/api/openapi.json")" || { echo "no schema"; exit 1; }
-  counts="$(printf '%s' "$schema" | python3 -c "
-import json, sys
-paths = list(json.load(sys.stdin).get('paths', {}))
-print(sum('/package-cache/' in p for p in paths),
-      sum(p.startswith('/v2/') for p in paths),
-      sum('/providers/' in p for p in paths),
-      sum('registry-modules' in p for p in paths),
-      sum('binary-cache' in p for p in paths))
-")"
-  read -r pkg oci prov mods bins <<<"$counts"
-
-  # Absent, not 404ing. A route that still exists and answers 404 would look
-  # identical from the outside; the schema is what distinguishes them.
-  [ "$pkg" -eq 0 ] && ok "package-cache routes absent from the schema ($pkg)" \
-                   || bad "package-cache routes still registered ($pkg)"
-  [ "$oci" -eq 0 ] && ok "OCI /v2/ routes absent from the schema ($oci)" \
-                   || bad "OCI /v2/ routes still registered ($oci)"
-
-  # ...while terraform's own surfaces are untouched. Without this half, deleting
-  # every route would pass.
-  [ "$prov" -gt 0 ] && ok "provider mirror still registered ($prov)" \
-                    || bad "provider mirror disappeared ($prov)"
-  [ "$mods" -gt 0 ] && ok "module registry still registered ($mods)" \
-                    || bad "module registry disappeared ($mods)"
-  [ "$bins" -gt 0 ] && ok "engine binary cache still registered ($bins)" \
-                    || bad "engine binary cache disappeared ($bins)"
-
-  # And the deployed path agrees with the schema.
-  code="$(curl -s -o /dev/null -w '%{http_code}' "$BASE$PREFIX/pypi/simple/six/")"
-  [ "$code" = "404" ] && ok "a gated-off path 404s through the BFF ($code)" \
-                      || bad "a gated-off path answered $code, expected 404"
-
-  note "Result"
-  printf '  %s\n' "${RESULTS[@]}"
-  printf '\n  %d passed, %d failed\n' "$PASS" "$FAIL"
-  [ "$FAIL" -eq 0 ] || exit 1
-  exit 0
-fi
 
 # ── stack + credentials ────────────────────────────────────────────────
 

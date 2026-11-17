@@ -1802,7 +1802,9 @@
       "repository": "Repozitry",
       "commit": "Kommit",
       "paths": "Pathz",
-      "written": "Writed"
+      "written": "Writed",
+      "origin": "Origen",
+      "uploadedBy": "Uplodid by"
     },
     "warm": {
       "heading": "Warm cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Loadin…",
       "showing": "Showin {shown} ov {total} — teh tabel sortz wat iz loadd, so load teh rest b4 u reedz a sort liek it iz teh hole cache.",
       "listedAll": "{count, plural, one {# artifaktz} other {# artifaktz}} listd — dat iz evrythin wot matchez deez filterz.",
-      "successBulkTruncated": "Purjd {files} artifaktz, freein {size}. Moar matchez den 1 purj takez — purj agen 2 keep goin."
+      "successBulkTruncated": "Purjd {files} artifaktz, freein {size}. Moar matchez den 1 purj takez — purj agen 2 keep goin.",
+      "uploadedBy": "by {who}",
+      "confirmRowUploaded": "Dis artifakt wuz uplodid by a operator, so it livez in no upstreem registree. If u remoov it, teh only copy iz gon forevr. oh noes."
     },
     "archives": {
       "connectionLabel": "Konnekshun",
@@ -1903,7 +1907,6 @@
       "heading": "Warm teh packige an imij cachez",
       "help": "Giv a vershun wenevr u noes it: a warm namd at a vershun can be checkd agin a lockfyle aftr, an “whatevr iz newist” cannot. Rite evry line liek <code>name version</code>; fer Pulumi pluginz, add trailin <code>os/arch</code> tokenz ta warm speshul platformz.",
       "ecosystemLabel": "Artifakt kynd",
-      "ecosystemOff": "{ecosystem} (switchd off)",
       "sourceLabel": "Grab frum",
       "sourceDefault": "Teh configurd upstreem",
       "upstreamIs": "Wil grab frum <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Could not start teh warmin",
       "errorStatus": "Could not haz teh warmin job",
       "helpLead": "Grab artifaktz into teh cache b4 anyfing askz fer dem — one per line, liek a naem an a vershun."
+    },
+    "attestation": {
+      "upstreamDigest": "Chekd",
+      "nonePublished": "No dijest publishd",
+      "operatorUpload": "Uplodid",
+      "unrecorded": "Not writd down"
+    },
+    "upload": {
+      "title": "Uplode a artifakt u chekd",
+      "description": "Put a artifakt u validatid urself intu teh cache. Dis iz teh only way 2 add wun wile teh node iz seeld up, an it needz no publishr signachur — wut getz writd down insted iz hoo uplodid it.",
+      "show": "Uplode",
+      "hide": "Cloze",
+      "sealedNote": "Dis node iz seeld up, so a uplode iz teh only way 2 add a artifakt — an teh only copy, cuz nuffin heer can be fetchd agin.",
+      "ecosystem": "Cashe",
+      "kind": "Wat u iz uplodin",
+      "kindArtifact": "Teh artifakt's bytez",
+      "kindIndex": "A index dokyument",
+      "kindHintIndexed": "A seeld node reedz wich vershunz existz frum a index dokyument, so a artifakt uplodid wifout wun can not be resolvd.",
+      "kindHintNoIndex": "Dis cache needz no index dokyument.",
+      "file": "Fyle",
+      "reference": "Referenz (optionul)",
+      "referenceHint": "Ur own tikkit, chanj or approovul id. Stord wif teh uplode.",
+      "replace": "Replaec wut iz alreddy at deez coordinatez",
+      "replaceHint": "Wifout dis a existin artifakt getz refuzd insted of writd ovr. Wut it shovez out mite be wut a run alreddy needz. srsly.",
+      "confirmReplace": "Uplode {filename} ovr teh artifakt alreddy at deez coordinatez? Teh bytez it replaecez getz destroyd.",
+      "confirmReplaceSealed": "Dis node iz seeld up, so teh replaecd bytez can not be fetchd bak frum anywhere.",
+      "submit": "Uplode",
+      "submitting": "Uplodin…",
+      "provenanceNote": "Writd down agenst ur akownt.",
+      "success": "Uplodid {filename}. yay",
+      "successReplaced": "Uplodid {filename}, replaecin wut wuz ther.",
+      "successUnchanged": "{filename} wuz alreddy cachd wif identikal bytez. Nuffin chanjd.",
+      "error": "Teh uplode failz. oh noes.",
+      "fields": {
+        "project": "Projekt",
+        "name": "Naym",
+        "version": "Vershun",
+        "filename": "Filenaym",
+        "package_id": "Packige id",
+        "module": "Modul paff",
+        "suffix": "Fyle",
+        "namespace": "Naymspace",
+        "document": "Dokyument",
+        "kind": "Plugin kynd",
+        "os": "Operatin sistem",
+        "arch": "Arkitekchur",
+        "tool": "Toolz",
+        "hostname": "Registree host",
+        "type": "Providr type"
+      },
+      "hints": {
+        "filename": "Givd 2 us insted of gessd: a wheel's naym haz its compatibilitee tagz baekd in.",
+        "suffix": "Wun of .info, .mod or .zip. A vershun iz three fylez an each wun getz uplodid separatly.",
+        "document": "Wich index dokyument. Galaxy haz collection an versions; Go haz list an latest.",
+        "kind": "resource, language, analyzer or converter. kthx",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov. kthx",
+        "hostname": "registry.terraform.io, or ur own registree's host"
+      },
+      "ecosystems": {
+        "binary": "Enginz binariez",
+        "provider": "Terraform providrs"
+      }
     }
   },
   "catalog": {

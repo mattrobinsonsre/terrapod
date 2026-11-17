@@ -1802,7 +1802,9 @@
       "repository": "Repositório",
       "commit": "Commit",
       "paths": "Caminhos",
-      "written": "Escrito"
+      "written": "Escrito",
+      "origin": "Origem",
+      "uploadedBy": "Carregado por"
     },
     "warm": {
       "heading": "Aquecer cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "A carregar…",
       "showing": "A mostrar {shown} de {total} — a tabela ordena o que está carregado, por isso carregue o resto antes de ler uma ordenação como toda a cache.",
       "listedAll": "{count, plural, one {# artefacto listado} other {# artefactos listados}} — é tudo o que corresponde a estes filtros.",
-      "successBulkTruncated": "{files} artefactos expurgados, libertando {size}. Correspondem mais do que um expurgo remove — expurgue de novo para continuar."
+      "successBulkTruncated": "{files} artefactos expurgados, libertando {size}. Correspondem mais do que um expurgo remove — expurgue de novo para continuar.",
+      "uploadedBy": "por {who}",
+      "confirmRowUploaded": "Este artefacto foi carregado por um operador, pelo que não existe em nenhum registo de origem. Removê-lo destrói a única cópia."
     },
     "archives": {
       "connectionLabel": "Ligação",
@@ -1903,7 +1907,6 @@
       "heading": "Aquecer as caches de pacotes e de imagens",
       "help": "Indique uma versão sempre que a souber: um aquecimento indicado com versão pode depois ser confrontado com um ficheiro de bloqueio, e “o que for mais recente” não pode. Escreva cada linha na forma <code>nome versão</code>; para plug-ins do Pulumi, acrescente tokens <code>os/arch</code> no fim para aquecer plataformas específicas.",
       "ecosystemLabel": "Tipo de artefacto",
-      "ecosystemOff": "{ecosystem} (desativado)",
       "sourceLabel": "Descarregar de",
       "sourceDefault": "Origem configurada",
       "upstreamIs": "Será descarregado de <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Não foi possível iniciar o aquecimento",
       "errorStatus": "Não foi possível ler a tarefa de aquecimento",
       "helpLead": "Descarregue os artefactos para a cache antes que algo os peça — um por linha, com um nome e uma versão."
+    },
+    "attestation": {
+      "upstreamDigest": "Verificado",
+      "nonePublished": "Nenhuma soma de verificação publicada",
+      "operatorUpload": "Carregado",
+      "unrecorded": "Não registado"
+    },
+    "upload": {
+      "title": "Carregar um artefacto revisto",
+      "description": "Coloque na cache um artefacto que validou você mesmo. É a única forma de adicionar um enquanto o nó está selado, e não exige assinatura do editor — o que fica registado, em vez disso, é quem o carregou.",
+      "show": "Carregar",
+      "hide": "Fechar",
+      "sealedNote": "Este nó está selado, pelo que um carregamento é a única forma de adicionar um artefacto — e a única cópia, porque nada aqui pode ser descarregado novamente.",
+      "ecosystem": "Cache",
+      "kind": "O que está a carregar",
+      "kindArtifact": "Os bytes do artefacto",
+      "kindIndex": "Um documento de índice",
+      "kindHintIndexed": "Um nó selado descobre que versões existem a partir de um documento de índice, pelo que um artefacto carregado sem ele não pode ser resolvido.",
+      "kindHintNoIndex": "Esta cache não precisa de documento de índice.",
+      "file": "Ficheiro",
+      "reference": "Referência (opcional)",
+      "referenceHint": "O seu próprio ticket, alteração ou id de aprovação. Guardado junto com o carregamento.",
+      "replace": "Substituir o que já está nestas coordenadas",
+      "replaceHint": "Sem isto, um artefacto existente é recusado em vez de ser sobrescrito. O que for deslocado pode ser precisamente aquilo de que uma execução já depende.",
+      "confirmReplace": "Carregar {filename} sobre o artefacto que já está nestas coordenadas? Os bytes que substitui são destruídos.",
+      "confirmReplaceSealed": "Este nó está selado, pelo que os bytes substituídos não podem ser obtidos de nenhum lado.",
+      "submit": "Carregar",
+      "submitting": "A carregar…",
+      "provenanceNote": "Registado na sua conta.",
+      "success": "{filename} carregado.",
+      "successReplaced": "{filename} carregado, substituindo o que lá estava.",
+      "successUnchanged": "{filename} já estava na cache com bytes idênticos. Nada mudou.",
+      "error": "O carregamento falhou.",
+      "fields": {
+        "project": "Projeto",
+        "name": "Nome",
+        "version": "Versão",
+        "filename": "Nome do ficheiro",
+        "package_id": "Id do pacote",
+        "module": "Caminho do módulo",
+        "suffix": "Ficheiro",
+        "namespace": "Namespace",
+        "document": "Documento",
+        "kind": "Tipo de plugin",
+        "os": "Sistema operativo",
+        "arch": "Arquitetura",
+        "tool": "Ferramenta",
+        "hostname": "Host do registo",
+        "type": "Tipo de provider"
+      },
+      "hints": {
+        "filename": "Fornecido em vez de derivado: o nome de um wheel contém em si as suas etiquetas de compatibilidade.",
+        "suffix": "Um de .info, .mod ou .zip. Uma versão são três ficheiros e cada um é carregado separadamente.",
+        "document": "Que documento de índice. O Galaxy tem collection e versions; o Go tem list e latest.",
+        "kind": "resource, language, analyzer ou converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, ou o host do seu próprio registo"
+      },
+      "ecosystems": {
+        "binary": "Binários do motor",
+        "provider": "Providers do Terraform"
+      }
     }
   },
   "catalog": {

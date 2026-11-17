@@ -1802,7 +1802,9 @@
       "repository": "Depot",
       "commit": "Kommittering",
       "paths": "Stier",
-      "written": "Skrevet"
+      "written": "Skrevet",
+      "origin": "Opphav",
+      "uploadedBy": "Lastet opp av"
     },
     "warm": {
       "heading": "Varm opp buffer",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Laster …",
       "showing": "Viser {shown} av {total} – tabellen sorterer det som er lastet, så last inn resten før du leser en sortering som hele bufferen.",
       "listedAll": "{count, plural, one {# artefakt} other {# artefakter}} vist – det er alt som passer disse filtrene.",
-      "successBulkTruncated": "Tømte {files} artefakter og frigjorde {size}. Flere passer enn én tømming fjerner – tøm på nytt for å fortsette."
+      "successBulkTruncated": "Tømte {files} artefakter og frigjorde {size}. Flere passer enn én tømming fjerner – tøm på nytt for å fortsette.",
+      "uploadedBy": "av {who}",
+      "confirmRowUploaded": "Dette artefaktet ble lastet opp av en operatør og finnes derfor ikke i noe oppstrømsregister. Hvis du fjerner det, ødelegges den eneste kopien."
     },
     "archives": {
       "connectionLabel": "Tilkobling",
@@ -1903,7 +1907,6 @@
       "heading": "Varm opp pakke- og image-buffere",
       "help": "Oppgi en versjon der den er kjent: en oppvarming som navngir en versjon, kan etterpå kontrolleres mot en låsefil, «hva som nå er nyest» kan ikke. Skriv hver linje som <code>navn versjon</code>; for Pulumi-plugins legger du til etterfølgende <code>os/arch</code>-tokener for å varme opp bestemte plattformer.",
       "ecosystemLabel": "Artefakttype",
-      "ecosystemOff": "{ecosystem} (slått av)",
       "sourceLabel": "Hent fra",
       "sourceDefault": "Konfigurert oppstrømskilde",
       "upstreamIs": "Hentes fra <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Kunne ikke starte oppvarmingen",
       "errorStatus": "Kunne ikke lese oppvarmingsjobben",
       "helpLead": "Hent artefakter inn i bufferen før noe ber om dem – én per linje, som et navn og en versjon."
+    },
+    "attestation": {
+      "upstreamDigest": "Verifisert",
+      "nonePublished": "Ingen kontrollsum publisert",
+      "operatorUpload": "Lastet opp",
+      "unrecorded": "Ikke registrert"
+    },
+    "upload": {
+      "title": "Last opp et kontrollert artefakt",
+      "description": "Legg inn et artefakt du selv har validert i bufferen. Det er den eneste måten å legge til ett på mens noden er forseglet, og det krever ingen signatur fra utgiveren – i stedet registreres det hvem som lastet det opp.",
+      "show": "Last opp",
+      "hide": "Lukk",
+      "sealedNote": "Denne noden er forseglet, så opplasting er den eneste måten å legge til et artefakt – og den eneste kopien, for ingenting her kan hentes på nytt.",
+      "ecosystem": "Buffer",
+      "kind": "Hva du laster opp",
+      "kindArtifact": "Artefaktets bytes",
+      "kindIndex": "Et indeksdokument",
+      "kindHintIndexed": "En forseglet node leser i et indeksdokument hvilke versjoner som finnes, så et artefakt som lastes opp uten ett, kan ikke slås opp.",
+      "kindHintNoIndex": "Denne bufferen trenger ikke noe indeksdokument.",
+      "file": "Fil",
+      "reference": "Referanse (valgfritt)",
+      "referenceHint": "Din egen sak-, endrings- eller godkjennings-id. Lagres sammen med opplastingen.",
+      "replace": "Erstatt det som allerede ligger på disse koordinatene",
+      "replaceHint": "Uten dette avvises et eksisterende artefakt i stedet for å bli overskrevet. Det som fortrenges, kan være nettopp det en kjøring allerede er avhengig av.",
+      "confirmReplace": "Laste opp {filename} over artefaktet som allerede ligger på disse koordinatene? De bytene det erstatter, blir ødelagt.",
+      "confirmReplaceSealed": "Denne noden er forseglet, så de erstattede bytene kan ikke hentes tilbake noe sted.",
+      "submit": "Last opp",
+      "submitting": "Laster opp…",
+      "provenanceNote": "Registreres på kontoen din.",
+      "success": "{filename} lastet opp.",
+      "successReplaced": "{filename} lastet opp og erstattet det som var der.",
+      "successUnchanged": "{filename} var allerede bufret med identiske bytes. Ingenting ble endret.",
+      "error": "Opplastingen mislyktes.",
+      "fields": {
+        "project": "Prosjekt",
+        "name": "Navn",
+        "version": "Versjon",
+        "filename": "Filnavn",
+        "package_id": "Pakke-id",
+        "module": "Modulsti",
+        "suffix": "Fil",
+        "namespace": "Navnerom",
+        "document": "Dokument",
+        "kind": "Plugintype",
+        "os": "Operativsystem",
+        "arch": "Arkitektur",
+        "tool": "Verktøy",
+        "hostname": "Registervert",
+        "type": "Leverandørtype"
+      },
+      "hints": {
+        "filename": "Oppgis i stedet for å utledes: navnet på et wheel koder kompatibilitetsmerkene.",
+        "suffix": "Én av .info, .mod eller .zip. En versjon er tre filer, og hver lastes opp separat.",
+        "document": "Hvilket indeksdokument. Galaxy har collection og versions; Go har list og latest.",
+        "kind": "resource, language, analyzer eller converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, eller verten til ditt eget register"
+      },
+      "ecosystems": {
+        "binary": "Motorbinærfiler",
+        "provider": "Terraform-leverandører"
+      }
     }
   },
   "catalog": {

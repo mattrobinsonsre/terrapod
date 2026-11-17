@@ -11,32 +11,19 @@ shown a number smaller than the problem. For the package cache that is a `GROUP
 BY` in the database; for the archive cache there is nothing to group, so the walk
 carries a ceiling and the response says when it hit it.
 
-**Several routers, because this surface is gated at three different grains.** The
-package cache
-is an optional capability (`registry.package_cache.enabled`) and the convention
-this repository enforces is that a switched-off capability's surface is ABSENT
-rather than answering 404 -- `scripts/airgap-gate.sh --gated-off` asserts it
-against a running stack, and `oci_admin` is the direct precedent: its comment
-reads "it exists only for the registry, so it goes when the registry does".
-`POST /admin/package-cache/warm` already behaves that way, so mounting these four
-unconditionally made that namespace half-present -- four routes visible and the
-fifth gone, which is worse than either consistent answer. The VCS archive cache
-has no capability flag at all (it is part of what Terrapod is, like the provider
-mirror), so its routes are unconditional.
+**Several routers, and all of them mount unconditionally.** This surface used to
+be gated at three grains -- the package cache as a whole, each ecosystem, and
+the operator-upload routes -- and the gating is what produced the defects it was
+meant to prevent. Mounting four of five routes left the namespace half-present,
+four answering and the fifth absent. One level in, a deployment with PyPI
+switched off still offered somewhere to PUT a PyPI artifact it would never
+serve: stored, recorded and unreachable.
 
-The third grain is the **operator-upload** routes (#2599), one per ecosystem on
-its own router, because an upload is for one cache rather than for the cache: it
-goes with `registry.package_cache.<eco>.enabled`. On the shared router a
-deployment that had switched PyPI off still offered somewhere to put a PyPI
-artifact it would never serve -- the same half-present namespace, one level in.
-`build_upload_router` mounts whichever of them this deployment serves.
-
-The capability's own documented meaning is what makes gating these right rather
-than merely tidy: `services/capabilities.py` states that turning one off "stops
-serving and stops its background work; stored images and cached artifacts stay
-where they are and come back untouched when it is turned back on". Off is a
-pause, not a decommission -- so there is no state an operator is locked out of,
-only a surface that is quiet while the thing it describes is.
+The flags are gone on the 2.0 line, every cache included, so there is nothing
+left to decide. A cache is part of what Terrapod is -- as the VCS archive cache
+and the provider mirror always were -- rather than a feature an operator turns
+on. The routers stay separate only because they carry different prefixes and
+RBAC, not because anything chooses between them.
 """
 
 from __future__ import annotations
@@ -58,7 +45,6 @@ from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import cache_inventory
-from terrapod.services.capabilities import capability_enabled
 from terrapod.services.package_cache import (
     galaxy,
     goproxy,
@@ -74,28 +60,18 @@ from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
 
-#: The package cache's admin surface, mounted only while that capability serves.
-#: See the module docstring: this is the gated half.
+#: The package cache's admin surface. Separate from `router` only because the
+#: two carry different prefixes, not because anything chooses between them.
 package_router = APIRouter(tags=["cache-admin"])
 
-#: The VCS archive cache's admin surface, always mounted.
+#: The VCS archive cache's admin surface.
 router = APIRouter(tags=["cache-admin"])
 
-#: One upload router per ecosystem, mounted only while THAT ecosystem serves.
+#: One upload router per ecosystem.
 #:
-#: Separate from `package_router` because the gating is finer: the listing, the
-#: totals, the evictions and the verify route are about the cache as a whole and
-#: go with `registry.package_cache.enabled`, while an upload is for one ecosystem
-#: and must go with `registry.package_cache.<eco>.enabled`. Leaving them on the
-#: shared router left a deployment that had switched PyPI off still offering
-#: `POST .../package-cache/pypi/artifacts` -- an endpoint to put an artifact into
-#: a cache that will not serve it, which `tests/api/test_capability_gating_
-#: endpoints.py` refuses by name.
-#:
-#: Six routers and a factory rather than one router and six `if`s inside a
-#: handler, for the reason `package_cache.build_router` gives: a switched-off
-#: capability's surface is ABSENT, not present-and-refusing, so it must not reach
-#: the schema either.
+#: Six rather than one, kept from when each was mounted on its own ecosystem's
+#: flag. Those flags are gone and all six mount together now, so the split buys
+#: only a per-ecosystem tag in the schema.
 pypi_upload_router = APIRouter(tags=["cache-admin"])
 npm_upload_router = APIRouter(tags=["cache-admin"])
 nuget_upload_router = APIRouter(tags=["cache-admin"])
@@ -104,29 +80,30 @@ galaxy_upload_router = APIRouter(tags=["cache-admin"])
 pulumi_upload_router = APIRouter(tags=["cache-admin"])
 
 
-def build_upload_router() -> APIRouter | None:
-    """The upload routes for the ecosystems this deployment actually serves.
+def build_upload_router() -> APIRouter:
+    """Every ecosystem's upload routes. All six, always.
 
-    None when it serves none of them, so the application mounts nothing — mirroring
-    `package_cache.build_router`, including being a factory rather than a
-    module-level aggregate so building the application twice in one process (which
-    the tests do constantly) cannot accumulate duplicate routes.
+    This used to mount per ecosystem and could return None. That produced the
+    defect it was meant to prevent from the other direction: an upload route for
+    a cache the deployment would not serve, storing an artifact nothing could
+    ever hand out. With no cache switchable off there is nothing to mirror and
+    nothing to decide.
+
+    Still a factory rather than a module-level aggregate, so building the
+    application twice in one process (which the tests do constantly) cannot
+    accumulate duplicate routes.
     """
-    pairs = (
-        ("pypi", pypi_upload_router),
-        ("npm", npm_upload_router),
-        ("nuget", nuget_upload_router),
-        ("go", go_upload_router),
-        ("galaxy", galaxy_upload_router),
-        ("pulumi", pulumi_upload_router),
-    )
     aggregate = APIRouter()
-    mounted = False
-    for capability, upload_router in pairs:
-        if capability_enabled(capability):
-            aggregate.include_router(upload_router)
-            mounted = True
-    return aggregate if mounted else None
+    for upload_router in (
+        pypi_upload_router,
+        npm_upload_router,
+        nuget_upload_router,
+        go_upload_router,
+        galaxy_upload_router,
+        pulumi_upload_router,
+    ):
+        aggregate.include_router(upload_router)
+    return aggregate
 
 
 class PackageEvictRequest(BaseModel):
@@ -209,8 +186,8 @@ def _sealed_note() -> dict[str, object]:
 
 # ── package cache ──────────────────────────────────────────────────────────
 #
-# On `package_router`: these go when `registry.package_cache.enabled` does.
-# A new route here belongs on that router, and needs a sample request in
+# On `package_router`. A new route here belongs on that router, and needs a
+# sample request in
 # `tests/api/test_package_cache.py::SAMPLES` -- the auth gate there walks
 # every route whose path carries `package-cache` and fails on one it has no
 # sample for, which is how it stays unable to skip a new endpoint.
@@ -800,8 +777,7 @@ async def verify_package_cache_file(
 
 # ── VCS archive cache ──────────────────────────────────────────────────────
 #
-# On `router`: unconditional. The archive cache has no capability flag, so
-# there is nothing for these to be gated on.
+# On `router`: the archive cache's own routes.
 
 
 @router.get("/admin/vcs-archive-cache")

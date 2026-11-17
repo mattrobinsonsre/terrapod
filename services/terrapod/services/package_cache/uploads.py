@@ -51,6 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import CachedPackageFile
 from terrapod.logging_config import get_logger
+from terrapod.services import cache_admission
 from terrapod.storage import keys
 from terrapod.storage.protocol import ObjectNotFoundError, ObjectStore
 
@@ -245,10 +246,17 @@ async def _admit_over(
     replace: bool,
 ) -> Admission:
     """Admit an upload at coordinates something already occupies."""
-    same_bytes = (
-        existing.attestation == substrate.ATTEST_OPERATOR_UPLOAD and existing.digest == digest
+    # The rule itself lives in `cache_admission` because three caches share it and
+    # none of them shares a row shape. Keeping it there is what stops the binary
+    # and provider caches drifting from this one (#2599).
+    outcome = cache_admission.decide(
+        occupied=True,
+        existing_is_upload=existing.attestation == substrate.ATTEST_OPERATOR_UPLOAD,
+        existing_digest=existing.digest or "",
+        new_digest=digest,
+        replace=replace,
     )
-    if same_bytes and not replace:
+    if outcome is cache_admission.Outcome.UNCHANGED:
         # Re-uploading the identical artifact is not a replacement, so it is not
         # refused: the operator is re-asserting what is already recorded. The
         # object is written again because that is also the repair for one that
@@ -269,7 +277,7 @@ async def _admit_over(
             by=uploaded_by,
         )
         return Admission(record=existing, unchanged=True)
-    if not replace:
+    if outcome is cache_admission.Outcome.CONFLICT:
         raise UploadConflict(existing)
 
     previous = existing.digest

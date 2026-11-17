@@ -33,6 +33,9 @@ type WorkspaceFilter struct {
 	Locked           *bool  `json:"locked,omitempty"`
 	HasVCS           *bool  `json:"has_vcs,omitempty"`
 	All              bool   `json:"all,omitempty"`
+	// Exclude removes every workspace matching any entry from the result.
+	// Entries use the same dimensions as the filter.
+	Exclude []WorkspaceFilter `json:"exclude,omitempty"`
 }
 
 // WorkspaceSummary is the trimmed workspace shape returned by the bulk
@@ -71,6 +74,10 @@ func (s *WorkspaceSummary) UnmarshalJSON(data []byte) error {
 type SearchWorkspacesResult struct {
 	Matched    int                `json:"matched"`
 	Workspaces []WorkspaceSummary `json:"workspaces"`
+	// Excluded counts workspaces removed by Exclude; ExcludeEmpty lists the
+	// indexes of Exclude entries that match no workspace.
+	Excluded     int   `json:"excluded,omitempty"`
+	ExcludeEmpty []int `json:"exclude_empty,omitempty"`
 }
 
 // SearchWorkspaces resolves a structured filter to the matching workspaces
@@ -109,6 +116,9 @@ type BulkUpdateResult struct {
 	WouldChange []WorkspaceChange `json:"would_change,omitempty"`
 	Unchanged   []WorkspaceChange `json:"unchanged,omitempty"`
 	Errors      []string          `json:"errors,omitempty"`
+	// Excluded and ExcludeEmpty mirror SearchWorkspacesResult.
+	Excluded     int   `json:"excluded,omitempty"`
+	ExcludeEmpty []int `json:"exclude_empty,omitempty"`
 }
 
 // BulkUpdateWorkspaces applies `update` to every workspace matching
