@@ -59,6 +59,10 @@ data:
     credentials_secret_name: {{ include "terrapod.listenerCredentialsSecretName" . | quote }}
     health_port: {{ .Values.listener.healthPort | default 8081 | int64 }}
     public_api_url: {{ .Values.listener.publicApiUrl | default .Values.api.config.external_url | default "" | quote }}
+    # Derived from the API's own setting rather than duplicated: the cache that
+    # SERVES the checksum database is configured there, and a runner pointed at a
+    # different one would verify against a database this deployment does not mirror.
+    go_sumdb: {{ regexFind "[^/]+$" (dig "registry" "package_cache" "go" "sumdb_upstream" "https://sum.golang.org" (.Values.api.config | default dict)) | quote }}
     listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | int64 }}
     heartbeat_interval: {{ .Values.listener.heartbeatInterval | default 60 | int64 }}
     max_concurrent: {{ .Values.listener.maxConcurrent | default 3 | int64 }}

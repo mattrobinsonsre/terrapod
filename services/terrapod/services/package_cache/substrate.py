@@ -203,27 +203,26 @@ _ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
 #: module:
 #:
 #:   goproxy          the module proxy serves no digest at all (`.ziphash` and
-#:                    `.zip.sha256` are both 404), so there is nothing per-file to
-#:                    require here and the ecosystem cannot join this set. The
-#:                    authoritative hash lives in the checksum database -- a THIRD
-#:                    upstream a sealed deployment cannot reach, which is why the
-#:                    runner sets `GOSUMDB=off` (that turns off the database
-#:                    lookup, NOT the `go.sum` check).
+#:                    `.zip.sha256` are both 404), so there is nothing per-file
+#:                    to require here and the ecosystem cannot join this set.
+#:                    The authoritative hash lives in the Go checksum database,
+#:                    which this deployment MIRRORS under `/sumdb/<host>/`
+#:                    (#2589) -- so the verification happens, it is simply the
+#:                    toolchain checking the transparency log through us rather
+#:                    than us comparing a digest at fetch time.
 #:
-#:                    **This used to go on to say the consumer verifies with a
-#:                    stronger control, because the `go` command "enforces
-#:                    `go.sum` against every module it downloads", and conclude
-#:                    that a sumdb client here would duplicate a check the
-#:                    consumer makes anyway. That was true of a module the program
-#:                    has already PINNED and false of one absent from the file.**
-#:                    Measured, go1.27.3, cold module cache: `go mod download`
-#:                    with `GOSUMDB=off` and no `go.sum` entry exits 0 and WRITES
-#:                    the hash of whatever the proxy served. So a program whose
-#:                    `go.sum` is incomplete records OUR bytes as authoritative,
-#:                    and the residual gap is real rather than covered. The
-#:                    correction is left visible because a reason that reads as
-#:                    considered is what stops the next person looking.
-#:                    Recorded in full on `goproxy.artifact_for`.
+#:                    **This used to say the database was a third upstream a
+#:                    sealed deployment could not reach, and that the consumer
+#:                    verified with a stronger control anyway because the `go`
+#:                    command "enforces `go.sum` against every module it
+#:                    downloads". The first half is no longer true now that it is
+#:                    mirrored; the second was only ever true of a module the
+#:                    program had already PINNED.** Measured, go1.27.3, cold
+#:                    module cache: `go mod download` with `GOSUMDB=off` and no
+#:                    `go.sum` entry exits 0 and WRITES the hash of whatever the
+#:                    proxy served. The correction is left visible because a
+#:                    reason that reads as considered is what stops the next
+#:                    person looking.
 #:   pulumi_plugins   get.pulumi.com publishes nothing beside the tarball (403
 #:                    for `.sha256` and `SHA256SUMS`), so a Pulumi-published
 #:                    plugin is admitted and recorded honestly. **Terrapod's own

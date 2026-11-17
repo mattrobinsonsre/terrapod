@@ -110,23 +110,27 @@ publish nothing beside the artifact and are recorded `none-published`:
 
 - **Go modules.** The proxy protocol serves no digest (`.ziphash` and
   `.zip.sha256` are both 404). For every module your program has **already
-  pinned**, nothing is lost by that, because the consumer verifies with a
-  stronger control: the hashes in its committed `go.sum` are enforced by the `go`
-  command, and they were pinned by the program's author rather than asserted by
-  whichever proxy answered. The only other source is the Go checksum database — a
-  third upstream a sealed deployment cannot reach, which is why a run sets
-  `GOSUMDB=off` (that turns off the *database lookup*, not the `go.sum` check).
-  For a pinned module, a client for it here would duplicate a check your program
-  makes anyway.
+  pinned**, the verification happens elsewhere: against the Go **checksum
+  database**, which Terrapod mirrors under `/sumdb/<host>/` so a run checks every
+  module hash against the public transparency log. On by default from 2.0.
 
-  **A module that is NOT in your `go.sum` is a different case, so keep that file
-  complete.** Measured against go1.27.3 with a cold module cache: `go mod
-  download` with `GOSUMDB=off` and no `go.sum` entry exits 0 and *writes* the hash
-  of whatever the proxy served — it does not error, and nothing independent checks
-  it. A run executes exactly that command against this cache, so an incomplete
-  `go.sum` records our bytes as authoritative. Commit a complete `go.sum`
-  (`go mod tidy` with the checksum database reachable, before you seal) and this
-  does not arise.
+  Before 2.0 a run set `GOSUMDB=off`, because the database was a third upstream a
+  sealed deployment could not reach. Mirroring it through this cache removed that
+  constraint — and the reason given for leaving it off did not survive a
+  measurement. It said the consumer verifies with a stronger control: the hashes
+  in its committed `go.sum`, pinned by the program's author rather than asserted
+  by whichever proxy answered. **True of a module already pinned, and false of one
+  absent from the file.** Measured against go1.27.3 with a cold module cache:
+  `go mod download` with `GOSUMDB=off` and no `go.sum` entry exits 0 and *writes*
+  the hash of whatever the proxy served — it does not error, and nothing
+  independent checks it. A run executes exactly that command against this cache,
+  so an incomplete `go.sum` recorded our bytes as authoritative.
+
+  **A sealed deployment must warm the checksum database before sealing.** A miss
+  cannot be filled while sealed, so the dependency install fails rather than
+  degrading. To run without it, set
+  `api.config.registry.package_cache.go.sumdb_upstream` empty — which restores the
+  pre-2.0 behaviour, including the gap above.
 - **Pulumi plugins** published by Pulumi. `get.pulumi.com` publishes nothing
   beside a tarball (`.sha256` and `SHA256SUMS` are both 403). **Terrapod's own
   bridged plugin is the exception and *is* verified** — see
@@ -805,17 +809,21 @@ guarantee.
 
 **Nothing here is verified at fetch time, deliberately**, and a cached row says
 `none-published`. For a module your program has **already pinned**, your
-toolchain verifies it with a stronger control than ours would be: the hashes in
-your committed `go.sum` are enforced by the `go` command, pinned by the program's
-author rather than asserted by whichever proxy answered. The proxy protocol
-publishes no digest beside these files, and the only other source is the checksum
-database — a third upstream a sealed deployment cannot reach, which is why a run
-sets `GOSUMDB=off`. That turns off the *database lookup* and nothing else; the
-`go.sum` check is untouched.
+toolchain verifies it against the Go **checksum database**, which Terrapod
+mirrors for you under `/sumdb/<host>/` — so the hash is checked against the
+public transparency log rather than taken from whichever proxy answered. The
+proxy protocol publishes no digest beside these files, so this is where the
+verification lives.
 
-**Keep `go.sum` complete.** A module missing from it is *not* covered: with
-`GOSUMDB=off`, `go mod download` writes the hash of whatever the proxy served and
-exits 0 (measured, go1.27.3, cold cache). See
+This is on by default from 2.0. Before that a run set `GOSUMDB=off`, because the
+database was a third upstream a sealed deployment could not reach; mirroring it
+through this cache is what removed that constraint.
+
+**A complete `go.sum` is still worth having, and it is no longer the only thing
+between you and an unverified module.** With `GOSUMDB=off`, a module missing from
+`go.sum` is not covered at all: `go mod download` writes the hash of whatever the
+proxy served and exits 0 (measured, go1.27.3, cold cache). With the database on,
+that module is checked against the log. See
 [What Terrapod checks before it caches anything](#what-terrapod-checks-before-it-caches-anything).
 
 Uppercase in a module path is escaped — `github.com/BurntSushi/toml` is fetched

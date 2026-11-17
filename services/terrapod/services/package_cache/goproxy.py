@@ -38,6 +38,7 @@ either of which breaks common modules if guessed:
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 
 import httpx
 
@@ -115,44 +116,33 @@ def artifact_for(module: str, version: str, suffix: str, *, base: str | None = N
         version=version,
         filename=f"{version}{suffix}",
         upstream_url=f"{root}/{module}/@v/{version}{suffix}",
-        # No digest, and the reason is not that nobody checks -- **the consumer
-        # already does, with a stronger control than a fetch-time digest would
-        # be (#2589).**
+        # No digest HERE, and no longer because nobody can check: the proxy
+        # protocol publishes none alongside these files (`.ziphash` and
+        # `.zip.sha256` are both 404 -- measured), so the authoritative hash
+        # lives in the Go checksum database and nowhere else.
         #
-        # The proxy protocol publishes none alongside these files (`.ziphash`
-        # and `.zip.sha256` are both 404 -- measured), and the authoritative
-        # hash lives in the Go checksum database: a THIRD upstream, which a
-        # sealed deployment cannot reach, which is why
-        # `runner/phases/pulumi_deps.py::go_env` sets `GOSUMDB=off`. That turns
-        # off the DATABASE LOOKUP and nothing else, and for every module the
-        # program has already pinned that is enough: the hashes in its own
-        # **`go.sum`** are enforced by the `go` command, and they were pinned by
-        # the program's author rather than asserted by whichever proxy answered.
-        # For those, a checksum-database client here would duplicate a check the
-        # consumer makes anyway, against an upstream we have deliberately
-        # stopped reaching.
+        # **That database is now MIRRORED through this cache** (#2589). It used
+        # to be a third upstream a sealed deployment could not reach, which is
+        # why the runner ran with `GOSUMDB=off`; the module-proxy protocol
+        # carries it under `/sumdb/<host>/`, so it is cached content like
+        # everything else here and the check is back on by default.
         #
-        # **It is NOT enough for a module absent from that `go.sum`, and this
-        # comment used to claim otherwise.** Measured against go1.27.3 with a
-        # cold module cache: `go mod download` with `GOSUMDB=off` and no
-        # `go.sum` exits 0 and WRITES the hash of whatever the proxy served --
-        # it does not error, and nothing independent checks it. The runner runs
-        # exactly that command against exactly this cache, so a program whose
-        # `go.sum` is incomplete records our bytes as authoritative. The old
+        # Why that matters, and why the old reason for leaving it off was wrong:
+        # the `go` command enforces the hashes in a program's committed `go.sum`,
+        # which covers every module the author has PINNED. For anything absent
+        # from that file it does not -- measured against go1.27.3 with a cold
+        # module cache, `go mod download` with `GOSUMDB=off` and no `go.sum`
+        # entry exits 0 and WRITES the hash of whatever the proxy served. The
+        # runner runs exactly that command against exactly this cache, so an
+        # incomplete `go.sum` recorded our own bytes as authoritative. The old
         # wording -- "enforced against every module it downloads" -- was true of
         # the pinned case and false of this one, which is the direction that
         # reads as there being nothing left to do.
         #
-        # Mirroring `sum.golang.org` through this cache is what would close it
-        # (#2589 Gap A). That is a scope decision rather than an oversight and it
-        # is recorded on the issue; what is not defensible is leaving a reason
-        # here that says the gap does not exist.
-        #
-        # The row therefore records `none-published`, which is a declaration
-        # about this ecosystem rather than an absence of information about the
-        # row. Claiming a digest here would imply a check we do not perform;
-        # leaving the reason out would let a later reader read a measured
-        # decision as an oversight and go looking for a sumdb client to write.
+        # The row still records `none-published`, and that is now a statement
+        # about THIS artifact rather than about the ecosystem: the bytes carry no
+        # publisher digest, and what verifies them is the transparency log the
+        # toolchain checks them against, not a digest we could have stored.
         digest="",
         content_type=_CONTENT_TYPES[suffix],
     )
@@ -280,3 +270,89 @@ def document_artifact(module: str, name: str) -> Artifact:
         upstream_url="",
         content_type="text/plain; charset=UTF-8",
     )
+
+
+# --- The checksum database (#2589) ---------------------------------------
+#
+# The module-proxy protocol carries the Go checksum database under
+# `/sumdb/<host>/...`, which is what makes the database mirrorable rather than a
+# second upstream. Measured against go1.27.3 through a logging proxy, a cold
+# `go mod tidy` asks for, in order:
+#
+#     /sumdb/sum.golang.org/supported            <- proxy-side; 200 means "I serve this"
+#     /sumdb/sum.golang.org/tile/8/0/x274/929.p/152
+#     /sumdb/sum.golang.org/lookup/rsc.io/quote@v1.5.2
+#     ... more tiles, interleaved with the module files
+#
+# `supported` exists ONLY on the proxy -- the real sum.golang.org answers 404 for
+# it -- so answering it is how we tell the toolchain to route the database here.
+# Everything else is passed through and cached: a tile is immutable content at a
+# fixed position in the log, and a lookup is an append-only entry, so neither
+# needs an expiry.
+
+SUMDB_PREFIX = "sumdb"
+
+
+def sumdb_host() -> str:
+    """The checksum database host this cache mirrors, or "" when it serves none."""
+    raw = (settings.registry.package_cache.go.sumdb_upstream or "").strip()
+    if not raw:
+        return ""
+    return urlparse(raw if "://" in raw else f"https://{raw}").hostname or ""
+
+
+def sumdb_enabled() -> bool:
+    return bool(sumdb_host())
+
+
+def valid_sumdb_path(path: str) -> bool:
+    """Whether a sumdb path is one we will fetch and store.
+
+    Refuses anything that could climb out of the cache prefix. The path becomes
+    part of an object key (`package_cache_key` leaves slashes intact, by design,
+    so the hierarchy is the grouping), which is exactly why `..` and an absolute
+    path have to be refused here rather than relied on being harmless later.
+    """
+    path = (path or "").strip()
+    if not path or path.startswith("/") or path.endswith("/"):
+        return False
+    if any(seg in ("", ".", "..") for seg in path.split("/")):
+        return False
+    # The toolchain asks only for `lookup/...` and `tile/...`. Refusing the rest
+    # keeps this from becoming a general proxy to the sumdb host.
+    return path.startswith(("lookup/", "tile/"))
+
+
+def sumdb_artifact(path: str) -> Artifact:
+    """The cache entry for one sumdb response."""
+    host = sumdb_host()
+    return Artifact(
+        ecosystem=ECOSYSTEM,
+        name=f"{SUMDB_PREFIX}/{host}",
+        version="",
+        filename=path,
+        upstream_url=f"{(settings.registry.package_cache.go.sumdb_upstream or '').rstrip('/')}/{path}",
+        content_type="text/plain; charset=UTF-8",
+    )
+
+
+async def fetch_sumdb(path: str) -> bytes:
+    """Fetch one sumdb response from the configured database."""
+    base = (settings.registry.package_cache.go.sumdb_upstream or "").rstrip("/")
+    url = f"{base}/{path}"
+    client = httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
+    try:
+        response = await arequest_with_retry(client, "GET", url)
+    except httpx.HTTPError as exc:
+        raise UpstreamError(f"could not reach {url}: {exc}") from exc
+    finally:
+        await client.aclose()
+
+    if response.status_code in (404, 410):
+        # A lookup for a module the database has never seen. Normal, and the
+        # toolchain treats it as "this module is not in the log" rather than as
+        # a fault, so it must not become a 5xx.
+        raise NotFoundUpstream(path)
+    if response.status_code >= 400:
+        raise UpstreamError(f"upstream returned {response.status_code} for {url}")
+    return response.content

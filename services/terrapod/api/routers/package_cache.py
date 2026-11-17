@@ -1217,6 +1217,81 @@ async def _go_document(module: str, doc: str, db: AsyncSession, storage: ObjectS
     return Response(content=raw, media_type="text/plain; charset=UTF-8")
 
 
+@go_router.get("/go/sumdb/{host}/supported")
+async def go_sumdb_supported(
+    host: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+) -> Response:
+    """Tell the toolchain whether this proxy serves that checksum database.
+
+    Proxy-side only -- the real sum.golang.org answers 404 for `/supported` --
+    and it is what routes the database through this cache instead of making it a
+    second upstream. A 200 with an empty body means yes; a 404 means the `go`
+    command contacts the database directly, which a sealed node cannot do.
+
+    Registered BEFORE the `{module:path}` routes below, which are greedy enough
+    to swallow this path if they are matched first.
+    """
+    if not goproxy.sumdb_enabled() or host != goproxy.sumdb_host():
+        raise HTTPException(status_code=404, detail="Not found")
+    return Response(status_code=200)
+
+
+@go_router.get("/go/sumdb/{host}/{path:path}")
+async def go_sumdb_document(
+    host: str,
+    path: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Serve one checksum-database response, cached so a sealed node still verifies.
+
+    A tile is immutable content at a fixed position in the log and a lookup is an
+    append-only entry, so neither is given an expiry: re-fetching either returns
+    the same bytes.
+    """
+    if not goproxy.sumdb_enabled() or host != goproxy.sumdb_host():
+        raise HTTPException(status_code=404, detail="Not found")
+    if not goproxy.valid_sumdb_path(path):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    artifact = goproxy.sumdb_artifact(path)
+
+    if sealed():
+        raw = await load_document(db, storage, artifact.ecosystem, artifact.name, artifact.filename)
+        if raw is None:
+            # The one place this differs from a module document: a miss here is
+            # not a normal probe, it is the verification the runner is relying on
+            # being unavailable. Saying so beats a bare 404 the toolchain reports
+            # as an unreachable checksum database.
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"checksum database entry {path!r} is not cached and this node is "
+                    f"sealed, so it cannot be fetched. Warm the Go checksum database "
+                    f"before sealing, or set registry.package_cache.go.sumdb_upstream "
+                    f"empty to run without it."
+                ),
+            )
+        return Response(content=raw, media_type="text/plain; charset=UTF-8")
+
+    try:
+        raw = await goproxy.fetch_sumdb(path)
+    except NotFoundUpstream:
+        raise HTTPException(status_code=404, detail="Not found") from None
+    except UpstreamError as exc:
+        raise _upstream_failure(exc) from exc
+
+    # Best-effort: failing to cache must not fail a request about to succeed.
+    try:
+        await store_document(db, storage, artifact, raw)
+    except Exception:
+        logger.warning("Could not cache Go checksum-database entry", path=path, exc_info=True)
+
+    return Response(content=raw, media_type="text/plain; charset=UTF-8")
+
+
 @go_router.get("/go/{module:path}/@v/list")
 async def go_version_list(
     module: str,

@@ -2171,6 +2171,10 @@
                         "type": "string",
                         "format": "uri"
                       }
+                    },
+                    "sumdb_upstream": {
+                      "type": "string",
+                      "description": "The Go checksum database to mirror through this cache; empty serves none."
                     }
                   }
                 },

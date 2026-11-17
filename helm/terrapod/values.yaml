@@ -740,6 +740,22 @@ api:
           upstream: https://proxy.golang.org
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
+          # The Go checksum database, SERVED THROUGH THIS CACHE rather than
+          # reached directly: the module-proxy protocol carries it under
+          # /sumdb/<host>/, which is what stops it being a second upstream and
+          # lets the runner verify module hashes again (#2589).
+          #
+          # It matters for a module ABSENT from the program's own go.sum. The
+          # `go` command enforces go.sum against what the program has PINNED,
+          # and for anything else -- measured, go1.27.3, cold module cache --
+          # `go mod download` with GOSUMDB=off exits 0 and records the hash of
+          # whatever the proxy served.
+          #
+          # SEALED DEPLOYMENTS: warm the checksum database before sealing. A
+          # miss cannot be filled while sealed, so the dependency install fails
+          # rather than degrading. Set this empty to run without the database,
+          # which is what this deployment did before 2.0.
+          sumdb_upstream: https://sum.golang.org
         # NuGet V3 flat container. Pulumi-only (C# SDK programs). Point a
         # nuget.config packageSource at this proxy's index.json.
         nuget:
