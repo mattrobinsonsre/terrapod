@@ -1845,30 +1845,40 @@ jobs:
           echo "signing key: never minted by the chart, referenced when supplied, absent otherwise"
 
 
-      - name: (helm-smoke) The strong-secrets switch reaches the pod and stays off by default
+      - name: (helm-smoke) The strong-secrets switch reaches the pod and is ON by default
         run: |
           # Config-channel contract for GHSA-hc47-q72v-4vcm. The switch decides
           # whether the API refuses to start on a weak signing key or a
           # passphrase KEK, so a render line that goes missing is not cosmetic:
-          # an operator sets it, the pod never sees it, and the code default
-          # (off) silently wins while they believe enforcement is on.
+          # an operator sets it, the pod never sees it, and the rendered value
+          # silently disagrees with what they believe is configured.
           out=$(helm template ./helm/terrapod -f helm/terrapod/values.yaml)
           echo "$out" | grep -q 'require_strong_secrets:' \
             || { echo "require_strong_secrets is not rendered into the ConfigMap"; exit 1; }
-          # Default must stay OFF on this line: a deployment already running on a
-          # weak secret has its data encrypted under that key, so refusing to boot
-          # on a patch upgrade is worse than the weakness it reports.
-          echo "$out" | grep -q 'require_strong_secrets: false' \
-            || { echo "require_strong_secrets must default to false here"; exit 1; }
-          # And turning it on must actually reach the pod.
-          on=$(helm template ./helm/terrapod --set api.config.require_strong_secrets=true)
-          echo "$on" | grep -q 'require_strong_secrets: true' \
-            || { echo "setting it true does not reach the ConfigMap"; exit 1; }
+          # ON by default from 2.0, and this assertion used to require the
+          # opposite. Both halves of the reason it gave have changed:
+          #
+          #   "a deployment already running on a weak secret has its data
+          #    encrypted under that key"  -- true, and `terrapod-kek-rotate` now
+          #    re-wraps every DEK onto a new secret, so the operator has a way
+          #    forward rather than a choice between a weak KEK and no boot.
+          #
+          #   "refusing to boot on a patch upgrade" -- this is a MAJOR, which is
+          #    where a default may change, and the upgrade note carries the
+          #    pre-flight check.
+          echo "$out" | grep -q 'require_strong_secrets: true' \
+            || { echo "require_strong_secrets must default to true from 2.0"; exit 1; }
+          # The escape hatch has to keep reaching the pod, or an operator who
+          # cannot rotate yet has no way to upgrade at all. `dig` is what makes a
+          # false survive; `| default` would render the default over it.
+          off=$(helm template ./helm/terrapod --set api.config.require_strong_secrets=false)
+          echo "$off" | grep -q 'require_strong_secrets: false' \
+            || { echo "setting it false does not reach the ConfigMap -- the escape hatch is gone"; exit 1; }
           # It is policy, not a credential -- it belongs in the ConfigMap and
           # must never be smuggled in as a TERRAPOD_* env var (house rule).
           echo "$out" | grep -q 'TERRAPOD_REQUIRE_STRONG_SECRETS' \
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
-          echo "the strong-secrets switch renders, defaults off, and is ConfigMap-only"
+          echo "the strong-secrets switch renders, defaults on, keeps its escape hatch, and is ConfigMap-only"
 
 
       - name: (helm-smoke) The GitLab git-credential switch renders, on every profile, and stays off
