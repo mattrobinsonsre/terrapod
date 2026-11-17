@@ -4883,6 +4883,49 @@ See [Cache pre-population](registry.md#cache-pre-population).
 DELETE /api/v1/admin/binary-cache/{tool}/{version}
 ```
 
+### Upload a Vetted Binary (Admin)
+
+```
+POST /api/v1/admin/binary-cache/artifacts
+```
+
+`multipart/form-data`: `tool`, `version`, `os`, `arch`, `file`, and optionally
+`reference` (your own ticket or approval id) and `replace`.
+
+The only posture that works while the deployment is sealed, and for the engine
+binary the one that has to work before any other matters -- a deployment that
+cannot fetch `tofu` cannot run at all. No publisher signature is required and
+requiring one would defeat the purpose, since the likeliest upload is something
+built or patched in-house that no upstream key covers. What stands in for it is
+the record: `attestation` reads `operator-upload`, beside who uploaded it.
+
+An artifact already held at these coordinates is a `409` unless `replace` is
+set. `meta` reports `replaced`, `unchanged` and, on a replacement,
+`previous-digest`.
+
+See [Uploading into the binary and provider caches](caches.md#uploading-into-the-binary-and-provider-caches).
+
+### Upload a Vetted Provider (Admin)
+
+```
+POST /api/v1/admin/provider-cache/artifacts
+```
+
+`multipart/form-data`: `hostname`, `namespace`, `type`, `version`, `os`, `arch`,
+`file`, and optionally `reference` and `replace`.
+
+**The `h1:` hash is computed from the archive and is never accepted from the
+uploader.** That is the trust gate rather than a convenience: `terraform init`
+checks a provider against the lock file, so a caller able to supply the hash
+alongside the bytes could supply one matching bytes nobody vetted, and `init`
+would accept them against a lock file that looks perfectly correct. A file that
+is not a readable zip is refused rather than stored, because no engine could
+install it.
+
+The response attribute is **`provider-type`**, not `type`, although the form
+field is `type` -- in JSON:API the resource's own `type` is a reserved member of
+the resource object. The listing route uses the same spelling.
+
 ## Cache Administration
 
 Terrapod keeps four pull-through caches. The CLI-binary and provider caches are
