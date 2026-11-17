@@ -498,23 +498,44 @@ def _install_dotnet(cfg, program_dir: Path, *, child_grace: float, log_file: str
         )
 
 
-def go_env(port: int) -> dict[str, str]:
-    """Go settings the read-only filesystem, the shim and a sealed cache need."""
-    return {
+def go_env(port: int, *, sumdb: str = "") -> dict[str, str]:
+    """Go settings the read-only filesystem, the shim and a sealed cache need.
+
+    `sumdb` is the checksum database to verify module hashes against, and it is
+    served through the shim rather than reached directly -- the module-proxy
+    protocol carries the database under `/sumdb/<host>/`, so it is cached content
+    like everything else here rather than the second upstream it used to be.
+
+    This ran with `GOSUMDB=off` until #2589, and the reason given was that the
+    program's own `go.sum` is verified anyway. That is true of a module the
+    program has already PINNED and false of one absent from the file: measured on
+    go1.27.3 with a cold module cache, `go mod download` with `GOSUMDB=off` and no
+    `go.sum` entry exits 0 and WRITES the hash of whatever the proxy served. The
+    runner runs exactly that command against exactly this cache, so an incomplete
+    `go.sum` recorded our bytes as authoritative.
+
+    An empty `sumdb` restores the old behaviour, for a deployment that serves no
+    checksum database.
+    """
+    env = {
         # No credentials here, and none needed: the shim carries them.
         "GOPROXY": f"http://127.0.0.1:{port}",
         # Everything Go writes has to land on one of the three writable mounts.
         "GOMODCACHE": "/tmp/go/pkg/mod",
         "GOCACHE": "/tmp/go/cache",
         "GOPATH": "/tmp/go",
-        # The checksum database is a second upstream, which a sealed deployment
-        # cannot reach. The module hashes in the program's own go.sum are still
-        # verified -- that check is not what this turns off.
-        "GOSUMDB": "off",
+        "GOSUMDB": sumdb or "off",
         # Otherwise a go.mod naming a newer toolchain makes the go command fetch
         # one, from upstream, outside the proxy.
         "GOTOOLCHAIN": "local",
     }
+    if sumdb:
+        # `GOFLAGS`/`GOPRIVATE` are left alone deliberately: GOPRIVATE and
+        # GONOSUMDB exempt matching modules from the database, which is the
+        # opposite of what this turns on.
+        env["GONOSUMDB"] = ""
+        env["GOPRIVATE"] = ""
+    return env
 
 
 def _install_go(cfg, program_dir: Path, *, child_grace: float, log_file: str, log) -> None:  # type: ignore[no-untyped-def]
@@ -531,7 +552,7 @@ def _install_go(cfg, program_dir: Path, *, child_grace: float, log_file: str, lo
     proxy.start()
     log.info("module proxy listening", port=proxy.port)
     try:
-        os.environ.update(go_env(proxy.port))
+        os.environ.update(go_env(proxy.port, sumdb=cfg.go_sumdb or ""))
         result = exec_subprocess.run(
             [str(go), "mod", "download"],
             log_file=log_file,

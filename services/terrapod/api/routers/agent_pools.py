@@ -392,6 +392,105 @@ async def list_pools(
     return JSONResponse(content={"data": page_items, "meta": meta})
 
 
+def _ca_algorithm_name(ca) -> str:
+    """The `ca_algorithm` value that would produce this CA's key type.
+
+    Derived from the key rather than read from configuration, because an existing CA's
+    algorithm is a property of the stored key and the setting may since have changed.
+    """
+    from terrapod.auth.ca import _ALGORITHMS
+
+    for name, key_type in _ALGORITHMS.items():
+        if isinstance(ca.ca_key, key_type):
+            return name
+    return "unknown"
+
+
+@router.get("/listener-ca")
+async def list_listener_cas(
+    user: AuthenticatedUser = Depends(require_admin),
+) -> JSONResponse:
+    """The CAs this node trusts for listener certificates, newest first.
+
+    Admin-only: it names the fingerprints a listener certificate must chain to, which
+    is deployment-wide trust information rather than anything workspace-scoped.
+
+    More than one entry means a rotation is in flight. The set is derived from the
+    certificates themselves rather than stored, so there is no retirement to go
+    stale: a predecessor stops being trusted one listener-certificate lifetime after
+    the current CA started signing, whether or not anyone remembers.
+
+    Node-local by design (#1143), so a peer in an HA pair answers with its OWN CAs
+    and the two legitimately differ.
+    """
+    from terrapod.auth.ca import get_certificate_fingerprint, trusted_cas
+
+    cas = trusted_cas()
+    signer = cas[0]
+    return JSONResponse(
+        content={
+            "data": [
+                {
+                    "type": "listener-cas",
+                    "id": get_certificate_fingerprint(ca.ca_cert),
+                    "attributes": {
+                        "fingerprint": get_certificate_fingerprint(ca.ca_cert),
+                        "algorithm": _ca_algorithm_name(ca),
+                        "created-at": _rfc3339(ca.ca_cert.not_valid_before_utc),
+                        "expires-at": _rfc3339(ca.ca_cert.not_valid_after_utc),
+                        "signing": ca is signer,
+                    },
+                }
+                for ca in cas
+            ],
+            "meta": {"rotation-in-progress": len(cas) > 1},
+        }
+    )
+
+
+@router.post("/listener-ca/actions/rotate", status_code=201)
+async def rotate_listener_ca(
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Generate a new listener CA, which takes over signing, keeping the old trusted.
+
+    **Nothing goes offline.** The previous CA stays trusted for one listener
+    certificate lifetime -- exactly as long as anything it issued can still be live --
+    and listeners pick up a certificate from the new chain on their own renewal cycle,
+    at half that. No re-join, no restart.
+
+    The new CA uses `api.config.agent_pools.ca_algorithm`, so this is how a deployment
+    moves to ML-DSA: that setting is read only when a CA is generated, and this is the
+    generating path.
+
+    **Two things this also rotates**, because both derive from the CA private key and
+    an operator should not discover them afterwards: capability URLs minted before the
+    rotation stop verifying once the window closes (they are accepted during it), and
+    on an HA pair each node has its own CA, so this rotates THIS node's.
+    """
+    from terrapod.auth.ca import get_certificate_fingerprint, rotate_ca, trusted_cas
+
+    ca = await rotate_ca(db)
+    return JSONResponse(
+        status_code=201,
+        content={
+            "data": {
+                "type": "listener-cas",
+                "id": get_certificate_fingerprint(ca.ca_cert),
+                "attributes": {
+                    "fingerprint": get_certificate_fingerprint(ca.ca_cert),
+                    "algorithm": _ca_algorithm_name(ca),
+                    "created-at": _rfc3339(ca.ca_cert.not_valid_before_utc),
+                    "expires-at": _rfc3339(ca.ca_cert.not_valid_after_utc),
+                    "signing": True,
+                },
+            },
+            "meta": {"trusted-count": len(trusted_cas())},
+        },
+    )
+
+
 @router.post("/agent-pools", status_code=201)
 async def create_pool(
     body: dict = Body(...),

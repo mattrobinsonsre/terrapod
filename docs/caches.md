@@ -292,6 +292,64 @@ fail.
 
 ---
 
+## Uploading into the binary and provider caches
+
+An air-gapped deployment cannot fetch either of these, and they are the two it
+can least do without: without an engine binary it cannot run at all, and without
+providers `init` cannot resolve. So both caches accept a vetted artifact
+directly, the same third posture the package cache offers.
+
+Everything that governs a package upload governs these too, and is not repeated
+here: platform `admin` is required, it works while sealed, the record says who
+uploaded it, a replacement is deliberate, and nothing is gated on a scan of
+ours. See [Uploading a vetted
+artifact](package-cache.md#uploading-a-vetted-artifact) for all of that.
+
+What differs is worth knowing before you use them.
+
+**They are separate caches, not ecosystems.** Each has its own route with no
+ecosystem segment:
+
+```sh
+curl -X POST https://terrapod.example.com/api/v1/admin/binary-cache/artifacts \
+  -H "Authorization: Bearer $TOKEN" \
+  -F tool=tofu -F version=1.9.0 -F os=linux -F arch=arm64 \
+  -F reference=CHG-4821 \
+  -F file=@tofu_1.9.0_linux_arm64.zip
+
+curl -X POST https://terrapod.example.com/api/v1/admin/provider-cache/artifacts \
+  -H "Authorization: Bearer $TOKEN" \
+  -F hostname=registry.terraform.io -F namespace=hashicorp -F type=aws \
+  -F version=5.0.0 -F os=linux -F arch=amd64 \
+  -F file=@terraform-provider-aws_5.0.0_linux_amd64.zip
+```
+
+**The binary is executed on every run, which makes its provenance the most
+consequential thing the listing says.** On the fetch path a binary is checked
+against the publisher's signed `SHA256SUMS`; an upload replaces that check with
+a person's judgement, and `attestation` reading `operator-upload` is how anyone
+looking later can tell which of the two happened.
+
+**A provider's `h1:` hash is computed here, from the archive, and never taken
+from you.** This is the one upload whose bytes the *consumer* verifies —
+`terraform init` checks the hash against `.terraform.lock.hcl`. If the hash
+could be supplied alongside the bytes, it could be a hash matching bytes nobody
+vetted, and `init` would accept them against a lock file that looks correct. For
+the same reason a file that is not a readable zip is refused outright rather
+than stored: no engine could install it, and a present-but-uninstallable
+provider is worse than an absent one.
+
+**Neither takes an index document.** The binary cache answers "what versions
+exist" from the rows it holds, as PyPI does, so an upload is advertised the
+moment it exists. Providers are addressed by their coordinates and have no index
+to populate. So unlike npm, Galaxy and NuGet there is no second upload to
+remember, and no way to leave an artifact present and unresolvable.
+
+**From the admin UI**, both appear in the same upload form as the package
+ecosystems, as *Engine binaries* and *Terraform providers*. The form asks only
+for the coordinates each route reads; there is no hash field for a provider,
+because there is nothing for you to supply.
+
 ## The package cache
 
 ### Listing cached artifacts
@@ -643,7 +701,7 @@ that hid it behind one call would put the unbounded work straight back.
 
 ## Where the two caches differ, and why
 
-Three differences between the package cache and the VCS archive cache are
+Four differences between the package cache and the VCS archive cache are
 deliberate, and each follows from one fact: **the package cache has a row per
 artifact and the archive cache has none.** They are not an inconsistency waiting
 to be tidied, and expecting either to behave like the other will mislead you.
@@ -654,7 +712,6 @@ to be tidied, and expecting either to behave like the other will mislead you.
 | **Age filter** | **last access** (`last-accessed-at`) | **write time** (`last-modified`) |
 | **Totals** | exact, aggregated in the database | a bounded walk, with **`meta.truncated`** when it hit the ceiling |
 | **Resuming a bulk eviction** | repeat the same request — the artifacts that matched are the ones that went | pass `next-cursor` back as `after`, or the window restarts in the same place |
-| **When the capability is off** | the routes are **not there** | the routes stay |
 
 1. **The archive listing uses a key cursor.** There are no rows to offset into; a
    page comes from a storage walk, and object storage lists keys in
@@ -680,24 +737,27 @@ Two smaller consequences of the same fact, so they do not surprise you: the
 archive delete is idempotent where the package delete 404s, and an archive key
 that does not parse appears in the listing but not in the totals.
 
-The fourth row has a different cause, and it is worth knowing before you go
-looking for a route that is not there. The package cache is an **optional
-capability**: with `api.config.registry.package_cache.enabled` set to `false`
-every route under `/admin/package-cache` is absent — a 404 as an unrouted path,
-not a route that exists and refuses — because that is what a switched-off
-capability means everywhere in Terrapod (the container registry behaves the same
-way, and `scripts/airgap-gate.sh --gated-off` holds it to that against a running
-stack). The admin page says so in place of the section rather than reporting an
-error. The VCS archive cache has no such flag — it is part of what Terrapod is,
-like the provider mirror and the module registry — so its routes are always
-there.
+The table used to carry a fifth row, and it is gone: **no cache can be turned
+off any more, so no route here is ever missing.** Every cache is part of what
+Terrapod is, like the provider mirror and the module registry, and all four sets
+of routes are always mounted.
 
-**Nothing is locked away while a capability is off.** Turning one off stops it
-serving and stops its background work; everything already cached stays exactly
-where it is and is listed again the moment it is turned back on. So the way to
-inspect or purge a switched-off package cache is to turn it on, do the work, and
-turn it off again — and if the goal is to reclaim the space without serving
-anything, the scheduled retention sweep still runs.
+Until 2.0 the package cache was an *optional capability*: with
+api.config.registry.package_cache.enabled set to `false`, every route under
+`/admin/package-cache` was absent — a 404 as an unrouted path rather than a route
+that exists and refuses. That is worth knowing because of what it cost rather
+than as history. The shared routes on that prefix are about the cache rather than
+about an ecosystem, so some of them stayed mounted while others did not, leaving
+**that admin namespace answering for four routes and absent for a fifth**; and an
+upload route could store a vetted artifact into a cache nothing would ever serve.
+A cache that is off is a surface half-present rather than a smaller deployment.
+
+The flags are **removed** — see
+[Upgrading to 2.0](upgrading-to-2.0.md#every-cache-is-always-on-and-the-enabled-flags-are-removed) if your `values.yaml`
+still sets one. Nothing replaces them: what bounds a cache now is where it may
+fetch from (`upstream` per ecosystem) and whether it may reach upstream at all
+(`api.config.registry.cache_only`), and what reclaims its space is the scheduled
+retention sweep. None of those makes a route disappear.
 
 ---
 
@@ -717,6 +777,15 @@ a package-cache eviction as a deletion: confirm you can re-warm it (with
 is itself refused on a sealed node — so "I will re-warm it afterwards" is only a
 plan if you unseal first.
 
+**One exception, and it is the only way to put a package-cache artifact back
+without unsealing: an operator can UPLOAD it.** Uploading is not an upstream
+fetch, so it is not refused while sealed — see
+[Uploading a vetted artifact](package-cache.md#uploading-a-vetted-artifact). It
+is a different claim from a warm rather than a convenient substitute: the record
+says the artifact was vetted and supplied by a named person rather than fetched
+and verified against what a registry published. It does not apply to the binary
+or provider caches, which have no upload path.
+
 The VCS archive cache is unaffected. Sealing forbids reaching a package registry,
 not reaching your own VCS, so an evicted archive is re-fetched by the next poll
 or run as normal.
@@ -735,5 +804,7 @@ or run as normal.
   path narrowing decides which workspaces share an entry.
 - [Container registry](oci-registry.md) — the one that is a store as well as a
   mirror, and is garbage-collected rather than evicted.
-- [API Reference](api-reference.md#cache-administration) — the eight routes with
-  their request and response shapes.
+- [API Reference](api-reference.md#cache-administration) — every route on this
+  surface with its request and response shapes, including the per-cache
+  [upload](api-reference.md#upload-a-vetted-artifact-admin) and
+  [verify](api-reference.md#verify-a-cached-artifact-admin) endpoints.

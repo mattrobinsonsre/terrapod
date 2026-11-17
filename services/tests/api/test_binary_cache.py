@@ -56,6 +56,16 @@ def _cached_binary():
     e.shasum = "abc123"
     e.download_url = "https://example.test/terraform_1.9.0.zip"
     e.cached_at = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
+    # Provenance (#2599), set explicitly because the listing serialises it and an
+    # unset MagicMock attribute reaches `json.dumps` as a MagicMock rather than as
+    # None. A FETCHED row carries none of it -- which is the asymmetry that makes
+    # an operator upload visible in the first place -- so these are the honest
+    # values for this fixture, not placeholders.
+    e.attestation = None
+    e.uploaded_by = None
+    e.upload_reference = None
+    e.replaced_digest = None
+    e.replaced_at = None
     return e
 
 
@@ -70,6 +80,15 @@ def _cached_provider():
     e.arch = "amd64"
     e.shasum = "deadbeef"
     e.cached_at = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
+    # Provenance (#2599), as on `_cached_binary` above and for the same reason:
+    # the listing serialises it, and an unset MagicMock attribute reaches
+    # `json.dumps` as a MagicMock rather than as None. None is the honest value
+    # for a FETCHED row -- the asymmetry is what makes an upload visible.
+    e.attestation = None
+    e.uploaded_by = None
+    e.upload_reference = None
+    e.replaced_digest = None
+    e.replaced_at = None
     return e
 
 
@@ -100,16 +119,6 @@ class TestDownloadBinary:
             resp = await c.get(_DL, headers=_AUTH)
         assert resp.status_code == 302
         assert resp.headers["location"] == "https://example.test/terraform_1.9.0.zip"
-
-    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
-    @patch("terrapod.api.app.init_redis")
-    @patch("terrapod.api.app.init_db")
-    async def test_disabled_cache_returns_404(self, *mocks):
-        app = _make_app(_user(roles=["everyone"]))
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            with patch.object(settings.registry.binary_cache, "enabled", False):
-                resp = await c.get(_DL, headers=_AUTH)
-        assert resp.status_code == 404
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

@@ -1772,6 +1772,42 @@ This is **by design** — sealed mode guarantees no upstream fetch ever happens,
 
 ---
 
+## An uploaded artifact stops serving — 503 "not those bytes" / "uploaded again"
+
+**Symptom**: an install that was working fails with a **503** from a package proxy naming one artifact, an uploader and either *"Refusing to serve it: an uploaded artifact's recorded digest is the whole of its integrity story, and these are not those bytes"* or *"its object is missing from storage … it has to be uploaded again"*. Other packages keep serving.
+
+This is the [operator-upload](package-cache.md#uploading-a-vetted-artifact) posture refusing rather than guessing. The stored object no longer agrees with the record for an artifact somebody vetted, and the record is the only thing that can say what it should be — there is no upstream for an upload.
+
+**It is a 503 and not a 404 deliberately**, and it is not a cache miss. Reporting a miss would have one of two wrong outcomes: unsealed, the miss is filled from upstream, silently replacing vetted content with unvetted under the coordinates the operator curated; sealed, the miss deletes the row, discarding the only record of what should be there.
+
+### Diagnosis
+
+1. **Read the artifact out of the message** — it names the ecosystem, the package, the filename and `uploaded_by`, which is the person to ask what was approved.
+2. **Confirm it against the record**: `GET /api/v1/admin/package-cache?ecosystem=<eco>&name=<name>`. An uploaded artifact reads `attestation: operator-upload` with `uploaded-by`, `upload-reference` and the `digest` computed when it arrived.
+3. **Get the verdict**: `POST /api/v1/admin/package-cache/{id}/verify` re-reads the object and re-hashes it. `ok: false` with `stored-size` differing says the bytes are not the approved ones; `ok: false` with the object missing says the blob is gone. `ok: null` means the row never carried a digest, so it is not an upload and this runbook is the wrong one.
+4. **Ask whether the blob store is the one you think it is.** The commonest cause is a **failover onto a node whose object storage was not replicated**: the ledger replicates completely, so the follower knows exactly what should be there and holds none of it. Check the storage backend's configuration and whether this cache's objects are in the replicated set.
+5. A deliberate `replace` in flight produces the same refusal for a moment, between the row being rewritten and the object landing. `replaced-at` on the row says whether one just happened.
+
+### Resolution
+
+1. **Re-upload the artifact** — the same coordinates, the same bytes. An upload of the identical artifact is not a replacement, is not refused, and re-writes the object, which is the one repair available for something with no upstream:
+   ```sh
+   curl -X POST -H "$AUTH" \
+     https://terrapod.example.com/api/v1/admin/package-cache/pypi/artifacts \
+     -F project=<project> -F filename=<filename> -F file=@<the approved file>
+   ```
+   Verify again afterwards and expect `ok: true`.
+2. **If the bytes you have are NOT the approved ones**, do not upload them to clear the error. `replaced-digest` and your own `upload-reference` are what identify what was approved; go back to that before serving anything.
+3. **Fix the cause, not the artifact.** If this followed a failover, storage-layer replication of this cache is the fix — an uploaded artifact cannot be re-fetched from anywhere, so for a sealed deployment replicating it is a requirement rather than a choice, and without it recovery is re-uploading the whole curated set.
+
+### Verification
+
+- `POST .../verify` returns `ok: true` with `computed-digest` equal to `recorded-digest`.
+- The failing install resolves; the proxy answers a redirect rather than a 503.
+- `GET /api/v1/admin/package-cache` still shows `attestation: operator-upload` and the original `uploaded-by`, which a re-upload of identical bytes leaves alone.
+
+---
+
 ## API Down / Not Ready
 
 Fires from the bundled `TerrapodAPIDown` alert: no `terrapod-api` scrape target has been healthy for 2 minutes. The platform is unavailable to the UI, CLI, runners, and listeners.

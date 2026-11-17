@@ -110,6 +110,44 @@ async def _claim_nonce(nonce: str) -> None:
         raise ProofOfPossessionError("nonce has already been used")
 
 
+async def verify_request_with_key(
+    public_key,
+    *,
+    method: str,
+    path: str,
+    timestamp: str,
+    nonce: str,
+    signature: str,
+    subject: str = "the registered key",
+) -> None:
+    """`verify_request`, for a caller that holds the public key and not the certificate.
+
+    This is the whole of what proof-of-possession ever needed -- the certificate was
+    only ever a container for it, and `verify_request` below reaches straight through
+    to `.public_key()`. Taking the key directly is what lets a request authenticate on
+    a fingerprint instead of carrying its certificate on every call (#2602): the API
+    issued that certificate and recorded its key, so it does not need to be handed it
+    back to verify a signature.
+
+    `subject` is the noun the refusal names, because the two callers have different
+    things to point at: a request carrying a fingerprint has no certificate in it,
+    while one carrying a certificate does, and telling the second that a signature
+    "does not match the registered key" sends its author looking for the wrong thing.
+    """
+    _check_timestamp(timestamp)
+    try:
+        raw = base64.b64decode(signature, validate=True)
+    except Exception:
+        raise ProofOfPossessionError("signature is not valid base64") from None
+    try:
+        public_key.verify(raw, canonical_request(method, path, timestamp, nonce))
+    except (InvalidSignature, Exception) as exc:
+        if isinstance(exc, InvalidSignature):
+            raise ProofOfPossessionError(f"signature does not match {subject}") from None
+        raise ProofOfPossessionError("signature could not be verified") from None
+    await _claim_nonce(nonce)
+
+
 async def verify_request(
     cert,
     *,
@@ -121,20 +159,24 @@ async def verify_request(
 ) -> None:
     """Raise `ProofOfPossessionError` unless the caller holds the private key.
 
-    Order matters: the cheap, stateless checks run before the Redis round trip,
-    and the nonce is spent only once the signature has verified. Spending it
-    first would let an unauthenticated caller burn a victim's nonce and have the
-    victim's own retry rejected as a replay.
+    A thin shim over `verify_request_with_key`, which holds the actual checks.
+    **Delegating rather than repeating them is deliberate**: two copies of one
+    signature check is how the copies come to disagree, and this repository has met
+    that defect often enough to treat it as a rule. The certificate is only ever a
+    container for the public key here, so there is nothing for a second
+    implementation to do differently except go wrong.
+
+    Order matters, and is enforced in the delegate: the cheap, stateless checks run
+    before the Redis round trip, and the nonce is spent only once the signature has
+    verified. Spending it first would let an unauthenticated caller burn a victim's
+    nonce and have the victim's own retry rejected as a replay.
     """
-    _check_timestamp(timestamp)
-    try:
-        raw = base64.b64decode(signature, validate=True)
-    except Exception:
-        raise ProofOfPossessionError("signature is not valid base64") from None
-    try:
-        cert.public_key().verify(raw, canonical_request(method, path, timestamp, nonce))
-    except (InvalidSignature, Exception) as exc:
-        if isinstance(exc, InvalidSignature):
-            raise ProofOfPossessionError("signature does not match this certificate") from None
-        raise ProofOfPossessionError("signature could not be verified") from None
-    await _claim_nonce(nonce)
+    await verify_request_with_key(
+        cert.public_key(),
+        subject="this certificate",
+        method=method,
+        path=path,
+        timestamp=timestamp,
+        nonce=nonce,
+        signature=signature,
+    )

@@ -31,6 +31,8 @@ from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    CoordinateError,
+    Coordinates,
     NotFoundUpstream,
     UpstreamError,
 )
@@ -132,6 +134,102 @@ def versions_artifact(package_id: str) -> Artifact:
     )
 
 
+def index_coordinates(package_id: str) -> Coordinates:
+    """Where an operator-uploaded NuGet versions index is served from.
+
+    A sealed node answers the flat container's version list from this document, so an
+    uploaded `.nupkg` without one is present and unresolvable -- `dotnet restore` is
+    told the package is not cached.
+
+    The name is normalised the same way the serve path normalises it, because NuGet
+    addresses packages case-insensitively and a document stored under a different
+    case is one no restore ever asks for.
+    """
+    lower = normalise(package_id or "")
+    if not valid_id(lower):
+        raise CoordinateError(f"package id {package_id!r} is not one NuGet would address")
+    return Coordinates(
+        name=lower, version="", filename=VERSIONS_DOC, content_type="application/json"
+    )
+
+
+def upload_coordinates(package_id: str, version: str) -> Coordinates:
+    """Where an operator-uploaded `.nupkg` is served from.
+
+    The filename is derived the same way `package_artifact` derives it, so an
+    upload and a fetch of the same package land on the same row. Validated with
+    this module's own `valid_id` / `valid_version` and **never against the
+    upstream flat container** (#2599): an internal package is the normal case
+    for an uploaded NuGet artifact.
+    """
+    package_id = (package_id or "").strip()
+    version = (version or "").strip()
+    if not valid_id(package_id):
+        raise CoordinateError(
+            f"package id {package_id!r} is not a NuGet id (letters, digits, '.', '-' and '_')"
+        )
+    if not valid_version(version):
+        raise CoordinateError(f"version {version!r} is not a NuGet version")
+    lower = normalise(package_id)
+    return Coordinates(
+        name=lower,
+        version=version,
+        filename=f"{lower}.{version}.nupkg",
+    )
+
+
+def registration_base() -> str:
+    return settings.registry.package_cache.nuget.registration_upstream.rstrip("/")
+
+
+async def resolve_digest(package_id: str, version: str, client: httpx.AsyncClient) -> str:
+    """Upstream's `packageHash` for one package, as an SRI-style digest.
+
+    Two requests, because NuGet puts the digest two hops from the download. The
+    registration leaf names a `catalogEntry`, and the digest is on that; the leaf
+    may also inline the entry, so both shapes are handled rather than assumed.
+
+    Returned as ``<algo>-<base64>`` because `packageHash` IS base64 and that is
+    the form `substrate._parse_digest` already reads for npm's SRI. The algorithm
+    comes from `packageHashAlgorithm` rather than being assumed to be SHA-512: it
+    is upstream's statement about its own digest, and a wrong guess here would
+    compare a SHA-512 against a SHA-256 computation and refuse every package.
+
+    Raises `UpstreamError` on anything it cannot read. Failing closed is the point
+    -- the caller treats an empty digest as "nothing published", which for NuGet
+    is never true and would cache the package unverified.
+    """
+    lower = normalise(package_id)
+    leaf = f"{registration_base()}/{lower}/{version}.json"
+    try:
+        response = await arequest_with_retry(client, "GET", leaf)
+        if response.status_code == 404:
+            raise NotFoundUpstream(f"{package_id} {version}")
+        if response.status_code >= 400:
+            raise UpstreamError(f"upstream returned {response.status_code} for {leaf}")
+        entry = response.json().get("catalogEntry")
+
+        # A URL in the gz-semver2 registrations, inline in some others.
+        if isinstance(entry, str):
+            response = await arequest_with_retry(client, "GET", entry)
+            if response.status_code >= 400:
+                raise UpstreamError(f"upstream returned {response.status_code} for {entry}")
+            entry = response.json()
+    except httpx.HTTPError as exc:
+        raise UpstreamError(f"could not reach the NuGet registration for {lower}: {exc}") from exc
+
+    if not isinstance(entry, dict):
+        raise UpstreamError(f"NuGet registration for {lower} {version} has no catalogEntry")
+
+    digest = entry.get("packageHash")
+    algorithm = entry.get("packageHashAlgorithm")
+    if not isinstance(digest, str) or not digest:
+        raise UpstreamError(f"NuGet published no packageHash for {lower} {version}")
+    if not isinstance(algorithm, str) or not algorithm:
+        raise UpstreamError(f"NuGet published no packageHashAlgorithm for {lower} {version}")
+    return f"{algorithm.lower()}-{digest}"
+
+
 def package_artifact(package_id: str, version: str, *, base: str | None = None) -> Artifact:
     """One `.nupkg`, addressed exactly as the client asks for it.
 
@@ -148,8 +246,11 @@ def package_artifact(package_id: str, version: str, *, base: str | None = None) 
         version=version,
         filename=filename,
         upstream_url=f"{root}/{lower}/{version}/{filename}",
-        # The flat container publishes no digest beside the package; the client
-        # verifies against the versions document and its own signature checks.
+        # The flat container publishes no digest beside the package, so there is
+        # nothing to carry here. `digest_resolver` fetches it from the registration
+        # index on a MISS -- never during construction, which happens on every
+        # request including a cache hit.
         digest="",
+        digest_resolver=lambda client: resolve_digest(package_id, version, client),
         content_type="application/octet-stream",
     )

@@ -1,5 +1,6 @@
 """Agent pool, join token, and listener management service."""
 
+import base64
 import hashlib
 import secrets
 import uuid
@@ -214,6 +215,19 @@ _POOL_LISTENERS_PREFIX = "tp:pool_listeners:"
 _LISTENER_NAME_PREFIX = "tp:listener_name:"
 _LISTENER_POD_PREFIX = "tp:listener_pod:"
 _LISTENER_FP_PREFIX = "tp:listener_fp:"
+#: Fingerprint -> the certificate we issued under it (#2602). Keyed on the
+#: FINGERPRINT ALONE, deliberately, because it answers the question a request
+#: carrying only a fingerprint has to ask: whose certificate is this, and what
+#: key does its proof-of-possession verify against. `_LISTENER_FP_PREFIX` cannot,
+#: because forming that key already requires knowing the listener.
+#:
+#: Holding the public key rather than the certificate is sufficient and smaller:
+#: proof-of-possession only ever reaches `cert.public_key()`. The expiry is stored
+#: beside it so a request is refused by the same clock as before rather than by
+#: Redis eviction -- a TTL carries 60s of deliberate slack, and leaning on it
+#: would make the auth boundary a property of the cache rather than of the
+#: certificate.
+_LISTENER_CERT_PREFIX = "tp:listener_cert:"
 
 
 def _fingerprint_ttl(cert) -> int:
@@ -236,6 +250,50 @@ async def _register_fingerprint(listener_id: str, fingerprint: str, ttl: int) ->
     """
     redis = get_redis_client()
     await redis.setex(f"{_LISTENER_FP_PREFIX}{listener_id}:{fingerprint}", ttl, "1")
+
+
+async def _register_certificate(listener_id: str, fingerprint: str, cert, ttl: int) -> None:
+    """Record the certificate we just issued, so a fingerprint alone can authenticate.
+
+    Written at join and at renew beside `_register_fingerprint`, with the same TTL,
+    so the two key families expire together and a listener that can present a
+    fingerprint can always be resolved for as long as that fingerprint is valid.
+
+    The public key is stored as SPKI DER rather than the certificate PEM: it is what
+    proof-of-possession needs, it is a fraction of the size, and for a post-quantum
+    CA that difference is the point of #2602 -- an ML-DSA-65 certificate is ~5.5 KB
+    where its public key is a fraction of that, and the certificate was previously
+    being sent on EVERY request.
+    """
+    from cryptography.hazmat.primitives import serialization
+
+    redis = get_redis_client()
+    spki = cert.public_key().public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    await redis.hset(
+        f"{_LISTENER_CERT_PREFIX}{fingerprint}",
+        mapping={
+            "listener_id": listener_id,
+            "public_key": base64.b64encode(spki).decode(),
+            "not_after": cert.not_valid_after_utc.isoformat(),
+        },
+    )
+    await redis.expire(f"{_LISTENER_CERT_PREFIX}{fingerprint}", ttl)
+
+
+async def lookup_certificate(fingerprint: str) -> dict | None:
+    """The record written by `_register_certificate`, or None.
+
+    None means "we have no record of issuing this", which is the only honest
+    answer and is refused by the caller. It covers a forged fingerprint, one whose
+    TTL has passed, and one issued by a node whose Redis this is not -- all three
+    being cases where this API cannot vouch for the holder.
+    """
+    redis = get_redis_client()
+    record = await redis.hgetall(f"{_LISTENER_CERT_PREFIX}{fingerprint}")
+    return record or None
 
 
 async def is_fingerprint_valid(
@@ -409,6 +467,7 @@ async def join_listener(
         # Ensure pool set membership (may have changed pools)
         await redis.sadd(f"{_POOL_LISTENERS_PREFIX}{pool.id}", listener_id)
         await _register_fingerprint(listener_id, fingerprint, fp_ttl)
+        await _register_certificate(listener_id, fingerprint, cert, fp_ttl)
         logger.info(
             "Listener re-joined (updated existing)",
             listener=name,
@@ -437,6 +496,7 @@ async def join_listener(
         # Pool index
         await redis.sadd(f"{_POOL_LISTENERS_PREFIX}{pool.id}", listener_id)
         await _register_fingerprint(listener_id, fingerprint, fp_ttl)
+        await _register_certificate(listener_id, fingerprint, cert, fp_ttl)
         logger.info(
             "Listener joined",
             listener=name,
@@ -453,6 +513,14 @@ async def join_listener(
         "certificate": serialize_certificate(cert).decode(),
         "private_key": serialize_private_key(private_key).decode(),
         "ca_certificate": ca.ca_cert_pem,
+        # What this API wants on subsequent requests (#2602). A listener that does
+        # not understand the value ignores it and keeps sending its certificate,
+        # which this API still accepts -- and a listener that DOES understand it
+        # learns the answer from the same round trip that gave it its identity, so
+        # the header change needs no capability negotiation, no config flag and no
+        # upgrade order. An older API omits the field entirely, which reads as
+        # "keep sending the certificate" and is correct.
+        "cert_header_mode": "fingerprint",
     }
 
 
@@ -648,6 +716,7 @@ async def renew_listener_certificate(
     fingerprint = get_certificate_fingerprint(cert)
 
     await _register_fingerprint(listener_id, fingerprint, _fingerprint_ttl(cert))
+    await _register_certificate(listener_id, fingerprint, cert, _fingerprint_ttl(cert))
 
     key = f"{_LISTENER_PREFIX}{listener_id}"
     await redis.hset(
@@ -669,6 +738,10 @@ async def renew_listener_certificate(
         "certificate": serialize_certificate(cert).decode(),
         "private_key": serialize_private_key(private_key).decode(),
         "ca_certificate": ca.ca_cert_pem,
+        # See the join response: renew advertises it too, so a listener that joined
+        # against an older API picks the fingerprint form up at its next renewal
+        # rather than only on a re-join.
+        "cert_header_mode": "fingerprint",
     }
 
 

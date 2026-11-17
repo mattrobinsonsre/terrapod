@@ -20,10 +20,12 @@ Three constraints shape the code more than the protocol does:
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hashlib
 import os
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -36,6 +38,7 @@ from terrapod.config import settings
 from terrapod.db.models import CachedPackageFile
 from terrapod.http_retry import DEFAULT_RETRIES, retry_delay_seconds
 from terrapod.logging_config import get_logger
+from terrapod.services.package_cache import content_allowlist
 from terrapod.storage import keys
 from terrapod.storage.protocol import ObjectStore
 
@@ -62,13 +65,54 @@ class NotFoundUpstream(RuntimeError):
     """Upstream says this artifact does not exist."""
 
 
+class UploadedArtifactUnavailable(RuntimeError):
+    """An operator-uploaded artifact's object is gone, or is not what was recorded.
+
+    Raised rather than reported as a cache miss, and that distinction is the whole
+    of it (#2599). A miss has two outcomes and both are wrong here:
+
+    * unsealed, a miss is filled from upstream -- which would silently replace a
+      vetted artifact with one nobody vetted, under the coordinates the operator
+      curated. That is the posture defeated by its own cache;
+    * sealed, a miss deletes the row (the object is gone, so the row promises
+      nothing) -- which discards the operator's own record of what should be
+      there, leaving nothing to tell them what to re-upload.
+
+    So the row is left exactly as it is and the request fails saying what is
+    wrong. This is also what a failover onto a follower whose blob store was not
+    replicated looks like: the ledger is complete and the bytes are not, and an
+    honest 503 naming the artifact is the only useful thing to say.
+    """
+
+
+class DigestMismatch(RuntimeError):
+    """The bytes upstream served are not the bytes upstream published a digest for.
+
+    Fail-closed and never cached: a mismatch is either a corrupted transfer or a
+    substituted artifact, and there is no way to tell which from here. The one
+    thing that must not happen is serving it to a runner and finding out later.
+    """
+
+
+#: Resolves upstream's published digest on a miss. Takes the client already open
+#: for the download so an ecosystem's extra request shares its connection pool and
+#: its retry policy rather than opening a second one.
+DigestResolver = Callable[[httpx.AsyncClient], Awaitable[str]]
+
+
 @dataclass(frozen=True)
 class Artifact:
     """What an ecosystem hands the substrate to fetch and cache.
 
-    `digest` is upstream's own, in the form the ecosystem publishes it, and is
-    recorded rather than verified here — the client checks it, and that is the
-    point (see the package docstring).
+    `digest` is upstream's own, in the form the ecosystem publishes it
+    (``<algo>:<hex>`` or SRI ``<algo>-<base64>``), and it is **verified** here
+    before the artifact is stored — see `_parse_digest` and `_DIGEST_REQUIRED`.
+
+    It used to be recorded and not checked, on the grounds that the client checks
+    it. That was only ever half true: `pip install` verifies nothing without
+    `--require-hashes` or a hash-pinned lock, so for the commonest case in the
+    commonest ecosystem there was no check anywhere. Validating what we cache is
+    the job (#2589).
     """
 
     ecosystem: str
@@ -77,6 +121,58 @@ class Artifact:
     filename: str
     upstream_url: str
     digest: str = ""
+    content_type: str = "application/octet-stream"
+    #: Fetch upstream's digest, for an artifact whose publisher puts it somewhere
+    #: other than the index the download URL came from -- NuGet's `catalogEntry`,
+    #: and the `SHA256SUMS` manifest on the release carrying Terrapod's own
+    #: bridged Pulumi plugin.
+    #:
+    #: Per ARTIFACT rather than per ecosystem, which is what lets a requirement
+    #: apply to one plugin out of an ecosystem that publishes nothing for the
+    #: rest (`pulumi_plugins.is_first_party`). `_DIGEST_REQUIRED` cannot express
+    #: that, because it matches on `Artifact.ecosystem`.
+    #:
+    #: Called ONLY from `fetch_and_cache`, which is the miss path, and only when
+    #: `digest` is empty. That placement is the whole of the design: an Artifact is
+    #: constructed on EVERY request including a cache hit, so resolving a digest
+    #: during construction would put an upstream round-trip on the hit path and
+    #: break `cache_only` outright -- a sealed node serves hits with no egress at
+    #: all. On the miss path there is no such tension, because a miss already
+    #: requires egress and `fetch_and_cache` refuses before anything else when
+    #: sealed.
+    digest_resolver: DigestResolver | None = None
+
+
+class CoordinateError(ValueError):
+    """The coordinates an upload supplied are not ones this ecosystem addresses.
+
+    Checked against the ecosystem's OWN naming rules and **never against an
+    upstream index** (#2599): an operator must be able to upload a patched
+    provider, an internal collection or a rebuilt binary that upstream has never
+    published, and validating against upstream would fail the feature for its
+    most important case. What is checked is what has to be: these values become a
+    cache key and a storage path, so a separator or a `..` in one is refused.
+    """
+
+
+@dataclass(frozen=True)
+class Coordinates:
+    """Where an uploaded artifact is served from, in the cache's own terms.
+
+    The upload-side peer of :class:`Artifact`, and deliberately the same
+    `(name, version, filename)` triple each ecosystem's own `artifact_for`
+    produces on the fetch path: an upload is that cache key arrived at from the
+    other direction. It carries no URL, because there is no upstream to reach.
+
+    Built by `upload_coordinates` in each ecosystem module rather than by one
+    validator switching on a kind — every ecosystem already defines its own
+    naming, normalisation and filename convention here, and a second copy of
+    those rules somewhere central is how the two come to disagree.
+    """
+
+    name: str
+    version: str
+    filename: str
     content_type: str = "application/octet-stream"
 
 
@@ -93,9 +189,143 @@ def _resolve_tmpdir() -> str | None:
     return None
 
 
-def _digest_file(path: str) -> tuple[int, str]:
-    """Size and sha256 of a file on disk. Runs in a thread — never inline."""
-    hasher = hashlib.sha256()
+#: Digest algorithms we will check, mapped to their hashlib names. An algorithm
+#: an ecosystem publishes that is NOT here is refused rather than skipped: a
+#: digest we cannot compute is not a weaker check, it is no check, and treating
+#: it as the latter is how an unverified artifact gets cached quietly.
+_ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
+
+#: Ecosystems whose upstream publishes a per-file digest, so an artifact arriving
+#: WITHOUT one is refused rather than cached unverified.
+#:
+#: Absence from this set is a declaration, not an oversight. Each absent
+#: ecosystem has had its upstream measured and the reason is recorded in its own
+#: module:
+#:
+#:   goproxy          the module proxy serves no digest at all (`.ziphash` and
+#:                    `.zip.sha256` are both 404), so there is nothing per-file
+#:                    to require here and the ecosystem cannot join this set.
+#:                    The authoritative hash lives in the Go checksum database,
+#:                    which this deployment MIRRORS under `/sumdb/<host>/`
+#:                    (#2589) -- so the verification happens, it is simply the
+#:                    toolchain checking the transparency log through us rather
+#:                    than us comparing a digest at fetch time.
+#:
+#:                    **This used to say the database was a third upstream a
+#:                    sealed deployment could not reach, and that the consumer
+#:                    verified with a stronger control anyway because the `go`
+#:                    command "enforces `go.sum` against every module it
+#:                    downloads". The first half is no longer true now that it is
+#:                    mirrored; the second was only ever true of a module the
+#:                    program had already PINNED.** Measured, go1.27.3, cold
+#:                    module cache: `go mod download` with `GOSUMDB=off` and no
+#:                    `go.sum` entry exits 0 and WRITES the hash of whatever the
+#:                    proxy served. The correction is left visible because a
+#:                    reason that reads as considered is what stops the next
+#:                    person looking.
+#:   pulumi_plugins   get.pulumi.com publishes nothing beside the tarball (403
+#:                    for `.sha256` and `SHA256SUMS`), so a Pulumi-published
+#:                    plugin is admitted and recorded honestly. **Terrapod's own
+#:                    plugin is the exception and IS required**: we are its
+#:                    publisher, its release carries a `SHA256SUMS` manifest, and
+#:                    `pulumi_plugins.resolve_first_party_digest` refuses the
+#:                    fetch when that manifest is absent or does not list the
+#:                    asset. That requirement is enforced in the module rather
+#:                    than by joining this set, because this set matches on
+#:                    `Artifact.ecosystem` -- `"pulumi"` here would demand a
+#:                    digest for `random` and `aws-native` too and break every
+#:                    Pulumi-published plugin.
+#:
+#: So absence from this set is per-ECOSYSTEM and says nothing about whether some
+#: artifact within it is verified: a required digest that applies to one artifact
+#: rather than to the whole ecosystem belongs in that ecosystem's module, where
+#: the predicate identifying it already lives.
+#:
+#: Where an ecosystem's digest does live at a SEPARATE upstream that is not an
+#: obstacle: `digest_resolver` fetches it on the MISS path, where egress is
+#: already required, so there is no case of reaching the artifact and not its
+#: digest -- a sealed node fetches neither. NuGet is wired exactly that way, and
+#: so is the first-party Pulumi plugin.
+#:
+#: Adding an ecosystem here without wiring its digest breaks that ecosystem
+#: loudly, which is the intended direction.
+_DIGEST_REQUIRED = frozenset({"pypi", "npm", "galaxy", "nuget"})
+
+#: What `CachedPackageFile.attestation` may say about how a row was admitted. The
+#: vocabulary the artifact ledger uses (#2589), so it is additive from here.
+#:
+#: NULL is not in this set and is the load-bearing value: it means a build that
+#: recorded nothing admitted the row, which is to say before verification existed.
+#: `lookup_present` treats that as a miss.
+ATTEST_UPSTREAM_DIGEST = "upstream-digest"
+#: The ecosystem's upstream publishes no per-file digest anywhere we can reach --
+#: goproxy and pulumi_plugins today, each with its reason recorded above. Admitted
+#: deliberately and recorded honestly rather than left looking verified.
+ATTEST_NONE_PUBLISHED = "none-published"
+#: An operator uploaded these bytes having vetted them with their own process
+#: (#2599). There is no upstream digest to check against and asking for one would
+#: defeat the posture -- the likeliest upload is something they built, patched or
+#: re-packaged, which no publisher key covers. What stands in for it is
+#: provenance: `uploaded_by`, `cached_at` and `upload_reference` name who
+#: asserted what, and `digest` is the digest computed on receipt.
+#:
+#: It is a distinct value rather than reusing either of the others because an
+#: uploaded artifact must never read as fetched-and-verified in the record: that
+#: would make the ledger lie about the one thing on it that matters.
+ATTEST_OPERATOR_UPLOAD = "operator-upload"
+ATTESTATIONS = frozenset({ATTEST_UPSTREAM_DIGEST, ATTEST_NONE_PUBLISHED, ATTEST_OPERATOR_UPLOAD})
+
+
+def _parse_digest(declared: str) -> tuple[str, str] | None:
+    """`(hashlib algorithm, lowercase hex)` from upstream's published form.
+
+    Two forms, because the ecosystems genuinely differ and normalising them in
+    one place beats four partial parsers:
+
+    * ``<algo>:<hex>`` — PyPI and Galaxy, and npm's legacy `shasum`.
+    * ``<algo>-<base64>`` — Subresource Integrity, which is what npm's
+      `integrity` is. Note the separator is a DASH, so a parser that splits on
+      ``:`` alone silently sees no digest at all for every npm package.
+
+    Returns None when there is nothing to parse. Raises when there is something
+    and we cannot read it — an unparseable digest is a reason to stop, not to
+    proceed unverified.
+    """
+    declared = (declared or "").strip()
+    if not declared:
+        return None
+
+    if ":" in declared:
+        algo, _, value = declared.partition(":")
+        try:
+            raw = bytes.fromhex(value.strip())
+        except ValueError as exc:
+            raise DigestMismatch(f"digest {declared!r} is not hex") from exc
+    elif "-" in declared:
+        algo, _, value = declared.partition("-")
+        try:
+            raw = base64.b64decode(value.strip(), validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise DigestMismatch(f"digest {declared!r} is not base64") from exc
+    else:
+        raise DigestMismatch(f"digest {declared!r} is in no form we recognise")
+
+    name = _ALGOS.get(algo.strip().lower())
+    if name is None:
+        raise DigestMismatch(
+            f"digest {declared!r} uses algorithm {algo!r}, which we do not compute"
+        )
+    if len(raw) != hashlib.new(name).digest_size:
+        raise DigestMismatch(
+            f"digest {declared!r} is {len(raw)} bytes, not the "
+            f"{hashlib.new(name).digest_size} a {name} digest is"
+        )
+    return name, raw.hex()
+
+
+def _digest_file(path: str, algorithm: str = "sha256") -> tuple[int, str]:
+    """Size and digest of a file on disk. Runs in a thread — never inline."""
+    hasher = hashlib.new(algorithm)
     size = 0
     with open(path, "rb") as handle:
         while chunk := handle.read(_CHUNK):
@@ -221,6 +451,17 @@ async def fetch_and_cache(
             f"sealing, or unset registry.cache_only."
         )
 
+    # BEFORE the fetch, not after it (#2589). The control is about what this
+    # deployment is willing to serve, and an artifact that has already been
+    # downloaded has already been reached for -- the refusal has to happen while
+    # it still means something. It sits here rather than in each ecosystem module
+    # because this is the one pull-through point all six share, so a cache added
+    # later is covered without anybody remembering to add it.
+    #
+    # Deliberately AFTER the sealed check: a sealed node fetches nothing at all,
+    # so its own error is the more useful one and this would only mask it.
+    content_allowlist.check(artifact.ecosystem, artifact.name, artifact.filename)
+
     key = keys.package_cache_key(artifact.ecosystem, artifact.name, artifact.filename)
     owns_client = client is None
     client = client or httpx.AsyncClient(follow_redirects=True, timeout=_TIMEOUT)
@@ -233,7 +474,36 @@ async def fetch_and_cache(
         except httpx.HTTPError as exc:
             raise UpstreamError(f"could not reach {artifact.upstream_url}: {exc}") from exc
 
-        size, _sha256 = await asyncio.to_thread(_digest_file, tmp_path)
+        # Verify BEFORE storing. An artifact that fails must never reach the
+        # object store, because `lookup` gates serving on the row and the row is
+        # written from here -- but a half-stored object is still a thing a future
+        # bug or a manual read could serve, and the cost of not storing it is one
+        # re-fetch.
+        declared = artifact.digest
+        if not declared and artifact.digest_resolver is not None:
+            # One extra request, on a miss only. If the digest source is
+            # unreachable while the artifact source is up we fail closed below --
+            # a transient, and `arequest_with_retry` has already had its go at it.
+            declared = await artifact.digest_resolver(client)
+
+        expected = _parse_digest(declared)
+        if expected is None and artifact.ecosystem in _DIGEST_REQUIRED:
+            raise DigestMismatch(
+                f"{artifact.ecosystem} published no digest for {artifact.name} "
+                f"{artifact.filename}, and this ecosystem's upstream always does. "
+                "Refusing to cache it: an absent digest here means the index was "
+                "not the one we expect, not that the artifact is fine."
+            )
+
+        algorithm = expected[0] if expected else "sha256"
+        size, computed = await asyncio.to_thread(_digest_file, tmp_path, algorithm)
+        if expected is not None and computed != expected[1]:
+            raise DigestMismatch(
+                f"{artifact.ecosystem} {artifact.name} {artifact.filename}: upstream "
+                f"published {algorithm}:{expected[1]} and served bytes whose "
+                f"{algorithm} is {computed}. Not cached."
+            )
+
         await storage.put_stream(key, _file_chunks(tmp_path), content_type=artifact.content_type)
     finally:
         # The PVC is shared and finite; a failed fetch must not leave its partial
@@ -252,18 +522,37 @@ async def fetch_and_cache(
         filename=artifact.filename,
         storage_key=key,
         size=size,
-        digest=artifact.digest,
+        # What was VERIFIED, which for a resolved digest is not what the
+        # Artifact was constructed with.
+        digest=declared,
+        attestation=(ATTEST_UPSTREAM_DIGEST if expected is not None else ATTEST_NONE_PUBLISHED),
     )
     db.add(record)
     try:
         await db.flush()
     except IntegrityError:
-        # Lost the race. The winner stored identical bytes at the identical key,
-        # so its row is as good as ours.
+        # Either we lost a race, or the row is a legacy one carrying no attestation
+        # -- which is the COMMON case here, not an edge: `lookup_present` sends
+        # every unattested row down the miss path, and that row is still present, so
+        # the insert above is always a duplicate for one.
         await db.rollback()
         existing = await lookup(db, artifact.ecosystem, artifact.name, artifact.filename)
         if existing is None:  # pragma: no cover — the constraint says otherwise
             raise
+        if existing.attestation is None:
+            # Re-verified just now, so rewrite the row with what was actually
+            # checked. Returning it unchanged would re-download the artifact on
+            # every single request and still serve a row nobody can vouch for --
+            # which is the bug this branch existed to avoid, arriving the other way
+            # round.
+            existing.digest = declared
+            existing.attestation = (
+                ATTEST_UPSTREAM_DIGEST if expected is not None else ATTEST_NONE_PUBLISHED
+            )
+            existing.size = size
+            await db.flush()
+        # Otherwise we lost a race: the winner stored identical bytes at the
+        # identical key, so its row is as good as ours.
         return existing
 
     logger.info(
@@ -294,7 +583,42 @@ async def lookup_present(
     record = await lookup(db, ecosystem, name, filename)
     if record is None:
         return None
-    if not await storage.exists(record.storage_key):
+    if record.attestation is None:
+        # Admitted by a build that recorded nothing, i.e. before this cache verified
+        # anything. Serving it would mean an operator cannot tell a verified artifact
+        # from one that merely arrived, so it is a miss: re-fetched once, verified
+        # under the current rules, and the row rewritten with what was checked.
+        #
+        # The row is left in place rather than deleted, which matters in two ways.
+        # `fetch_and_cache` rewrites it once the artifact has been re-verified, so
+        # the transition happens exactly once per artifact. And deleting here would
+        # be destructive under `cache_only`: the re-fetch cannot succeed while
+        # sealed, so the row would be gone for good rather than merely unserved.
+        logger.info(
+            "Cached package row carries no attestation; re-fetching to verify it",
+            ecosystem=ecosystem,
+            name=name,
+            filename=filename,
+        )
+        return None
+    if record.attestation == ATTEST_OPERATOR_UPLOAD:
+        # An uploaded artifact gets the strictest check this path can afford, for
+        # the reason the issue states as a requirement rather than a caveat: a
+        # fetched artifact can be re-verified any time, because the publisher's
+        # material is still upstream, and an uploaded one cannot be re-verified
+        # against anything at all. So the digest recorded on receipt is its whole
+        # integrity story, and never looking at it again is the one thing "we
+        # trust the operator vetted it" must not become.
+        #
+        # What a REDIRECT permits is a metadata check: every read here ends in a
+        # redirect to object storage, so the API never sees the bytes and cannot
+        # hash them per request. `head` costs the same round trip as `exists`
+        # (on S3 `exists` IS a head_object), and a size that no longer matches
+        # catches a truncated write or a substitution of a different length.
+        # `POST /admin/package-cache/{id}/verify` is the full digest check, on
+        # demand; `uploads.verify_object` is what it calls.
+        await _check_uploaded_object(storage, record, ecosystem, name, filename)
+    elif not await storage.exists(record.storage_key):
         logger.warning(
             "Cached package row has no object; treating as a miss",
             ecosystem=ecosystem,
@@ -306,6 +630,39 @@ async def lookup_present(
         return None
     await touch(db, record)
     return record
+
+
+async def _check_uploaded_object(
+    storage: ObjectStore,
+    record: CachedPackageFile,
+    ecosystem: str,
+    name: str,
+    filename: str,
+) -> None:
+    """Refuse to serve an uploaded artifact whose object disagrees with its row.
+
+    Raises :class:`UploadedArtifactUnavailable`; see that class for why this is
+    not a miss. Split out so the serve path reads as one decision and so the
+    refusal can be driven directly in a test.
+    """
+    from terrapod.storage.protocol import ObjectNotFoundError
+
+    try:
+        meta = await storage.head(record.storage_key)
+    except ObjectNotFoundError as exc:
+        raise UploadedArtifactUnavailable(
+            f"{ecosystem} {name} {filename} was uploaded by "
+            f"{record.uploaded_by or 'an operator'} and its object is missing from "
+            "storage. It cannot be re-fetched -- there is no upstream for an "
+            "uploaded artifact -- so it has to be uploaded again."
+        ) from exc
+    if meta.size_bytes != record.size:
+        raise UploadedArtifactUnavailable(
+            f"{ecosystem} {name} {filename} was uploaded as {record.size} bytes "
+            f"({record.digest}) and the stored object is now {meta.size_bytes}. "
+            "Refusing to serve it: an uploaded artifact's recorded digest is the "
+            "whole of its integrity story, and these are not those bytes."
+        )
 
 
 async def get_or_fetch(

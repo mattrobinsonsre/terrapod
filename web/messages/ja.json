@@ -1802,7 +1802,9 @@
       "repository": "リポジトリ",
       "commit": "コミット",
       "paths": "パス",
-      "written": "書き込み日時"
+      "written": "書き込み日時",
+      "origin": "由来",
+      "uploadedBy": "アップロード者"
     },
     "warm": {
       "heading": "キャッシュのウォームアップ",
@@ -1869,7 +1871,9 @@
       "loadingMore": "読み込み中…",
       "showing": "{total} 件のうち {shown} 件を表示しています。この表は読み込み済みの分だけを並べ替えるため、並び順をキャッシュ全体として読む前に残りを読み込んでください。",
       "listedAll": "{count, plural, other {#件の成果物}}を表示しました。これがこの絞り込みに一致するすべてです。",
-      "successBulkTruncated": "{files} 件の成果物をパージし、{size} を解放しました。1 回のパージで取り除ける数より多く一致しています。続けるにはもう一度パージしてください。"
+      "successBulkTruncated": "{files} 件の成果物をパージし、{size} を解放しました。1 回のパージで取り除ける数より多く一致しています。続けるにはもう一度パージしてください。",
+      "uploadedBy": "{who} による",
+      "confirmRowUploaded": "この成果物は運用者がアップロードしたもので、上流のレジストリには存在しません。削除すると唯一のコピーが失われます。"
     },
     "archives": {
       "connectionLabel": "接続",
@@ -1903,7 +1907,6 @@
       "heading": "パッケージとイメージのキャッシュをウォームアップ",
       "help": "バージョンが分かるものには必ず指定してください。バージョンを指定したウォームアップは後からロックファイルと照合できますが、「いちばん新しいもの」では照合できません。各行は <code>名前 バージョン</code> の形式で記述します。Pulumi プラグインでは、末尾に <code>os/arch</code> トークンを付けると特定のプラットフォームをウォームアップできます。",
       "ecosystemLabel": "成果物の種類",
-      "ecosystemOff": "{ecosystem}（無効）",
       "sourceLabel": "取得元",
       "sourceDefault": "設定済みの上流",
       "upstreamIs": "<code>{url}</code> から取得します。",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "ウォームアップを開始できませんでした",
       "errorStatus": "ウォームアップのジョブを読み取れませんでした",
       "helpLead": "何かが要求する前に成果物をキャッシュへ取り込みます — 1行に1つ、名前とバージョンを記述します。"
+    },
+    "attestation": {
+      "upstreamDigest": "検証済み",
+      "nonePublished": "ダイジェスト未公開",
+      "operatorUpload": "アップロード済み",
+      "unrecorded": "記録なし"
+    },
+    "upload": {
+      "title": "精査済みの成果物をアップロード",
+      "description": "自分で検証した成果物をキャッシュに入れます。ノードがシール済みの間に成果物を追加できる唯一の方法で、公開者の署名は不要です — 代わりに記録されるのは、誰がアップロードしたかです。",
+      "show": "アップロード",
+      "hide": "閉じる",
+      "sealedNote": "このノードはシール済みのため、成果物を追加できるのはアップロードだけです。そしてそれが唯一のコピーになります。ここでは何も再取得できないためです。",
+      "ecosystem": "キャッシュ",
+      "kind": "アップロードするもの",
+      "kindArtifact": "成果物のバイト列",
+      "kindIndex": "インデックスドキュメント",
+      "kindHintIndexed": "シール済みのノードは、どのバージョンが存在するかをインデックスドキュメントから読み取ります。そのため、インデックスドキュメントなしでアップロードした成果物は解決できません。",
+      "kindHintNoIndex": "このキャッシュにインデックスドキュメントは不要です。",
+      "file": "ファイル",
+      "reference": "参照（任意）",
+      "referenceHint": "自分のチケット、変更、または承認の ID。アップロードとともに保存されます。",
+      "replace": "この座標にすでにあるものを置き換える",
+      "replaceHint": "これを指定しない場合、既存の成果物は上書きされず拒否されます。押し出されるものは、実行がすでに依存しているものかもしれません。",
+      "confirmReplace": "この座標にすでにある成果物の上に {filename} をアップロードしますか？置き換えられるバイト列は破棄されます。",
+      "confirmReplaceSealed": "このノードはシール済みのため、置き換えられたバイト列はどこからも取り戻せません。",
+      "submit": "アップロード",
+      "submitting": "アップロード中…",
+      "provenanceNote": "あなたのアカウントに対して記録されます。",
+      "success": "{filename} をアップロードしました。",
+      "successReplaced": "{filename} をアップロードし、そこにあったものを置き換えました。",
+      "successUnchanged": "{filename} は同一のバイト列ですでにキャッシュされていました。変更はありません。",
+      "error": "アップロードに失敗しました。",
+      "fields": {
+        "project": "プロジェクト",
+        "name": "名前",
+        "version": "バージョン",
+        "filename": "ファイル名",
+        "package_id": "パッケージ ID",
+        "module": "モジュールパス",
+        "suffix": "ファイル",
+        "namespace": "ネームスペース",
+        "document": "ドキュメント",
+        "kind": "プラグインの種類",
+        "os": "オペレーティングシステム",
+        "arch": "アーキテクチャ",
+        "tool": "ツール",
+        "hostname": "レジストリホスト",
+        "type": "プロバイダー種別"
+      },
+      "hints": {
+        "filename": "導出ではなく指定します。wheel のファイル名は互換性タグを符号化しています。",
+        "suffix": ".info、.mod、.zip のいずれか。1 つのバージョンは 3 つのファイルで構成され、それぞれ個別にアップロードします。",
+        "document": "どのインデックスドキュメントか。Galaxy には collection と versions、Go には list と latest があります。",
+        "kind": "resource、language、analyzer、converter のいずれか。",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io、または自分のレジストリのホスト"
+      },
+      "ecosystems": {
+        "binary": "エンジンバイナリ",
+        "provider": "Terraform プロバイダー"
+      }
     }
   },
   "catalog": {

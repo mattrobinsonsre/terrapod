@@ -2918,4 +2918,41 @@ test.describe('Workspace form sections (#2253)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('the operator upload form is usable at phone width (#2599)', async ({ page }) => {
+    // The form is a grid of coordinate inputs plus a file picker, which is the
+    // shape most likely to push a phone sideways: a file input renders its own
+    // button whose width the page does not control, and `sm:grid-cols-2` has to
+    // collapse to one column below that.
+    await page.goto('/admin/binary-cache')
+    await expect(page.getByTestId('package-cache-section')).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    await page.getByTestId('package-upload-toggle').click()
+    await expect(page.getByTestId('package-upload-ecosystem')).toBeVisible()
+    // Open is the state that matters -- a collapsed form cannot overflow.
+    await expectNoHorizontalPageScroll(page)
+
+    // The ecosystem with the MOST coordinate fields (pulumi has five) is the
+    // widest the grid ever gets.
+    await page.getByTestId('package-upload-ecosystem').selectOption('pulumi')
+    await expect(page.getByTestId('package-upload-field-arch')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // A long value in a monospace input must scroll inside the input rather
+    // than widen the page.
+    await page
+      .getByTestId('package-upload-field-name')
+      .fill('a-very-long-plugin-name-that-would-widen-an-unconstrained-input')
+    await expectNoHorizontalPageScroll(page)
+
+    // The kind select is disabled where the ecosystem has no index document,
+    // and enabled where it has one -- both directions, because a control that
+    // is always disabled offers nothing and one always enabled posts to a route
+    // that does not exist.
+    await expect(page.getByTestId('package-upload-kind')).toBeDisabled()
+    await page.getByTestId('package-upload-ecosystem').selectOption('npm')
+    await expect(page.getByTestId('package-upload-kind')).toBeEnabled()
+    await expectNoHorizontalPageScroll(page)
+  })
+
 })

@@ -21,7 +21,20 @@ Endpoints:
     DELETE /api/terrapod/v1/admin/provider-cache/{hostname}/{namespace}/{type}/{version}      — purge provider
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import asyncio
+import os
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -158,12 +171,6 @@ async def download_binary(
     to fetch the exact binary version needed for a workspace.
     Requires authentication (runner token, API token, or session).
     """
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Binary cache is disabled",
-        )
-
     try:
         resolved = await resolve_version(tool, version)
         url = await get_or_cache_binary(db, storage, tool, resolved, os, arch)
@@ -207,10 +214,6 @@ async def get_binary_sha256sums(
     against the publisher's signature with its own pinned key. Lazily warmed
     from upstream if not yet persisted. Same source as the binary (cache path).
     """
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Binary cache is disabled"
-        )
     try:
         resolved = await resolve_version(tool, version)
         manifest, _sig = await get_or_cache_sums(storage, tool, resolved)
@@ -238,10 +241,6 @@ async def get_binary_sha256sums_sig(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Serve the detached GPG signature over the SHA256SUMS manifest (#607)."""
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Binary cache is disabled"
-        )
     try:
         resolved = await resolve_version(tool, version)
         _manifest, sig = await get_or_cache_sums(storage, tool, resolved)
@@ -285,12 +284,132 @@ async def list_cached_binaries_endpoint(
                 "shasum": e.shasum,
                 "download-url": e.download_url,
                 "cached-at": rfc3339(e.cached_at),
+                # Provenance (#2599). A binary is EXECUTED on every run, so where
+                # it came from is the most consequential thing this listing says:
+                # `operator-upload` means a person vouched for it instead of the
+                # publisher's signed SHA256SUMS the fetch path checks.
+                "attestation": e.attestation,
+                "uploaded-by": e.uploaded_by,
+                "upload-reference": e.upload_reference,
+                "replaced-digest": e.replaced_digest,
+                "replaced-at": rfc3339(e.replaced_at) if e.replaced_at else None,
             },
         }
         for e in entries
     ]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
+
+
+@router.post("/admin/binary-cache/artifacts", status_code=201)
+async def upload_binary_artifact(
+    tool: str = Form(..., description="tofu, terraform, terragrunt, opa, trivy, checkov, ..."),
+    version: str = Form(..., description="The exact version, as the publisher names it."),
+    os_: str = Form(..., alias="os", description="linux, darwin, windows."),
+    arch: str = Form(..., description="amd64, arm64."),
+    file: UploadFile = File(..., description="The binary's bytes."),
+    reference: str = Form(
+        "", description="Free text: the operator's own ticket or approval record."
+    ),
+    replace: bool = Form(
+        False,
+        description=(
+            "Overwrite a binary already at these coordinates. Without it such an upload "
+            "is refused with 409, because what it would displace is what every run on "
+            "this version executes."
+        ),
+    ),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Put an engine or platform-tool binary an operator vetted into the cache.
+
+    **This is the most consequential upload Terrapod accepts: the binary is
+    executed on every run.** The fetch path verifies one against the publisher's
+    signed SHA256SUMS before recording it (#607) and an upload has no signature to
+    check -- which is the posture, not a hole in it. What stands in for the
+    signature is provenance: the row records `operator-upload`, who uploaded it,
+    and their reference, so an audit names the person who vouched rather than
+    assuming a publisher relationship nobody re-checks.
+
+    It is also the upload a sealed deployment most needs: without it a sealed node
+    cannot be given `tofu` itself, and no run can execute at all.
+    """
+    # An upload into a cache this deployment will not serve is the
+    # half-present surface the convention forbids: the artifact would be
+    # stored, recorded, and unreachable. Every sibling route on this cache
+    # refuses the same way, so this one must too.
+    from terrapod.api.routers.cache_admin import _sealed_note
+    from terrapod.api.upload_stream import stream_upload_to_tempfile
+    from terrapod.services import binary_cache_uploads, cache_admission
+    from terrapod.services.package_cache import substrate, uploads
+
+    tmp_path, size = await stream_upload_to_tempfile(
+        file, suffix=".binary-upload", max_bytes=uploads.MAX_UPLOAD_BYTES
+    )
+    try:
+        if size == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Empty upload. The binary's bytes go in the `file` part; the "
+                    "coordinates are the other form fields."
+                ),
+            )
+        try:
+            record, outcome, previous = await binary_cache_uploads.admit(
+                db,
+                storage,
+                tool=tool,
+                version=version,
+                os_=os_,
+                arch=arch,
+                tmp_path=tmp_path,
+                uploaded_by=user.email or "",
+                reference=reference,
+                replace=replace,
+            )
+        except substrate.CoordinateError as exc:
+            # 422, not 404: the request is well-formed and the coordinates are not
+            # ones this cache can address.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except binary_cache_uploads.BinaryUploadConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        replaced = outcome is cache_admission.Outcome.REPLACE
+        unchanged = outcome is cache_admission.Outcome.UNCHANGED
+        meta: dict[str, object] = {"replaced": replaced, "unchanged": unchanged}
+        if replaced:
+            meta["previous-digest"] = previous
+            # A replacement DELETED bytes that a sealed node cannot fetch back.
+            meta.update(_sealed_note())
+        body = {
+            "data": {
+                "id": str(record.id),
+                "type": "cached-binaries",
+                "attributes": {
+                    "tool": record.tool,
+                    "version": record.version,
+                    "os": record.os,
+                    "arch": record.arch,
+                    "shasum": record.shasum,
+                    "attestation": record.attestation,
+                    "uploaded-by": record.uploaded_by,
+                    "upload-reference": record.upload_reference,
+                    "cached-at": rfc3339(record.cached_at),
+                },
+            },
+            "meta": meta,
+        }
+        await db.commit()
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+
+    return JSONResponse(status_code=200 if (replaced or unchanged) else 201, content=body)
 
 
 @router.post("/admin/binary-cache/warm")
@@ -301,12 +420,6 @@ async def warm_binary_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Pre-warm a specific binary version into the cache."""
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Binary cache is disabled",
-        )
-
     try:
         url = await warm_binary(db, storage, body.tool, body.version, body.os, body.arch)
     except CacheOnlyError as e:
@@ -415,12 +528,144 @@ async def list_cached_providers_endpoint(
                 "arch": e.arch,
                 "shasum": e.shasum,
                 "cached-at": rfc3339(e.cached_at),
+                # Provenance (#2599). For a provider the h1 is what `terraform
+                # init` checks, so "who vouched for these bytes" is the question
+                # an audit asks of this listing.
+                "attestation": e.attestation,
+                "uploaded-by": e.uploaded_by,
+                "upload-reference": e.upload_reference,
+                "replaced-digest": e.replaced_digest,
+                "replaced-at": rfc3339(e.replaced_at) if e.replaced_at else None,
             },
         }
         for e in entries
     ]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
+
+
+@router.post("/admin/provider-cache/artifacts", status_code=201)
+async def upload_provider_artifact(
+    hostname: str = Form(..., description="The registry host, e.g. registry.terraform.io."),
+    namespace: str = Form(..., description="The publisher namespace, e.g. hashicorp."),
+    type_: str = Form(..., alias="type", description="The provider type, e.g. aws."),
+    version: str = Form(..., description="The version, without a leading v."),
+    os_: str = Form(..., alias="os", description="linux, darwin, windows."),
+    arch: str = Form(..., description="amd64, arm64."),
+    file: UploadFile = File(..., description="The publisher's provider .zip."),
+    reference: str = Form(
+        "", description="Free text: the operator's own ticket or approval record."
+    ),
+    replace: bool = Form(
+        False,
+        description=(
+            "Overwrite an archive already at these coordinates. Without it such an "
+            "upload is refused with 409, because what it would displace may be what a "
+            "run already depends on."
+        ),
+    ),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Put a provider archive an operator vetted into the cache.
+
+    The other half of what a sealed deployment needs: given `tofu` and no
+    providers, a run still cannot plan anything.
+
+    **The h1 hash is computed from the uploaded zip, never accepted from the
+    uploader.** It is what `terraform init` compares a provider against via a
+    workspace's `.terraform.lock.hcl`, so a hand-supplied value that did not match
+    would surface as an unexplained `init` failure on somebody else's workspace.
+    Computing it also validates the archive: a file that is not a readable zip
+    cannot produce one and is refused before anything is stored.
+    """
+    # Same reason as the binary upload: `provider_mirror` refuses every
+    # read when this is off, so accepting a write would leave an operator
+    # with a vetted provider nothing can install.
+    from terrapod.api.routers.cache_admin import _sealed_note
+    from terrapod.api.upload_stream import stream_upload_to_tempfile
+    from terrapod.services import cache_admission, provider_cache_uploads
+    from terrapod.services.package_cache import substrate, uploads
+
+    tmp_path, size = await stream_upload_to_tempfile(
+        file, suffix=".provider-upload", max_bytes=uploads.MAX_UPLOAD_BYTES
+    )
+    try:
+        if size == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Empty upload. The archive's bytes go in the `file` part; the "
+                    "coordinates are the other form fields."
+                ),
+            )
+        try:
+            record, outcome, previous = await provider_cache_uploads.admit(
+                db,
+                storage,
+                hostname=hostname,
+                namespace=namespace,
+                type_=type_,
+                version=version,
+                os_=os_,
+                arch=arch,
+                tmp_path=tmp_path,
+                uploaded_by=user.email or "",
+                reference=reference,
+                replace=replace,
+            )
+        except substrate.CoordinateError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except provider_cache_uploads.NotAProviderArchive as exc:
+            # 422 rather than 400: the request is well-formed and the BYTES are
+            # not a provider archive, which is a statement about the content.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except provider_cache_uploads.ProviderUploadConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        replaced = outcome is cache_admission.Outcome.REPLACE
+        unchanged = outcome is cache_admission.Outcome.UNCHANGED
+        meta: dict[str, object] = {"replaced": replaced, "unchanged": unchanged}
+        if replaced:
+            meta["previous-digest"] = previous
+            meta.update(_sealed_note())
+        body = {
+            "data": {
+                "id": str(record.id),
+                "type": "cached-providers",
+                "attributes": {
+                    "hostname": record.hostname,
+                    "namespace": record.namespace,
+                    # `provider-type`, not `type`: in JSON:API the resource's own
+                    # `type` is a reserved member of the resource object, so an
+                    # attribute of the same name is ambiguous to a client walking
+                    # the document. The listing route already made that call, and
+                    # one resource must not answer to two names depending on which
+                    # route returned it.
+                    "provider-type": record.type,
+                    "version": record.version,
+                    "os": record.os,
+                    "arch": record.arch,
+                    "filename": record.filename,
+                    "shasum": record.shasum,
+                    "h1-hash": record.h1_hash,
+                    "attestation": record.attestation,
+                    "uploaded-by": record.uploaded_by,
+                    "upload-reference": record.upload_reference,
+                    "cached-at": rfc3339(record.cached_at),
+                },
+            },
+            "meta": meta,
+        }
+        await db.commit()
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+
+    return JSONResponse(status_code=200 if (replaced or unchanged) else 201, content=body)
 
 
 @router.delete("/admin/provider-cache/{hostname}/{namespace}/{type}/{version}")

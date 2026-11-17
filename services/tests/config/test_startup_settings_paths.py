@@ -42,8 +42,8 @@ def _settings_chains(tree: ast.AST) -> set[str]:
             found.add(".".join(reversed(parts)))
 
     # Keep only the longest form of each chain: walking the AST yields
-    # `registry.oci` as well as `registry.oci.enabled`, and resolving the leaf
-    # covers its prefixes anyway.
+    # `registry.oci` and `registry.oci.gc` as well as `registry.oci.gc.enabled`,
+    # and resolving the leaf covers its prefixes anyway.
     return {c for c in found if not any(o != c and o.startswith(c + ".") for o in found)}
 
 

@@ -1308,3 +1308,88 @@ class TestLiveListenerPodCount:
             AsyncMock(return_value={}),
         ):
             assert await _live_listener_pod_count([self._listener("aaa")]) == 0
+
+
+class TestTheListenerCARoutes:
+    """#2602 (c): listing the trust set, and rotating the CA.
+
+    Both are admin-only because they are deployment-wide trust, not anything a
+    workspace scopes -- the listing names the fingerprints a listener certificate
+    must chain to, and the rotation decides what the whole fleet trusts next.
+    """
+
+    async def test_listing_requires_admin(self):
+        """A non-admin gets 403, not a filtered list. There is nothing to filter:
+        the trust set is one per node, so a partial answer would be a fiction."""
+        user = _user()
+        app, _ = _make_app(user, is_admin=False)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            for path in ("/api/v1/listener-ca", "/api/terrapod/v1/listener-ca"):
+                assert (await client.get(path)).status_code == 403, path
+
+    async def test_rotating_requires_admin(self):
+        user = _user()
+        app, _ = _make_app(user, is_admin=False)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            for path in (
+                "/api/v1/listener-ca/actions/rotate",
+                "/api/terrapod/v1/listener-ca/actions/rotate",
+            ):
+                assert (await client.post(path)).status_code == 403, path
+
+    async def test_the_listing_marks_exactly_one_ca_as_signing(self):
+        """Two trusted CAs, one signer. A listing that marked both would tell an
+        operator mid-rotation that two keys are issuing, which is not true and is the
+        thing they would check first if a listener were refused."""
+        from terrapod.auth import ca as ca_module
+
+        user = _user()
+        app, _ = _make_app(user, is_admin=True)
+        before = list(ca_module._cas)
+        new = ca_module.CertificateAuthority.generate()
+        old = ca_module.CertificateAuthority.generate()
+        ca_module._cas = [new, old]
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                res = await client.get("/api/v1/listener-ca")
+                assert res.status_code == 200
+                body = res.json()
+        finally:
+            ca_module._cas = before
+
+        signing = [e for e in body["data"] if e["attributes"]["signing"]]
+        assert len(signing) == 1, "exactly one CA signs, whatever the trust set holds"
+        assert body["meta"]["rotation-in-progress"] is True
+        assert len(body["data"]) == 2
+
+    async def test_the_listing_reports_each_cas_own_algorithm(self):
+        """Derived from the key, not from the setting -- an existing CA keeps its own
+        algorithm, so reading the setting here would misreport it after a change."""
+        from terrapod.auth import ca as ca_module
+
+        user = _user()
+        app, _ = _make_app(user, is_admin=True)
+        before = list(ca_module._cas)
+        ca_module._cas = [
+            ca_module.CertificateAuthority.generate(algorithm="mldsa65"),
+            ca_module.CertificateAuthority.generate(algorithm="ed25519"),
+        ]
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                body = (await client.get("/api/v1/listener-ca")).json()
+        finally:
+            ca_module._cas = before
+
+        algorithms = [e["attributes"]["algorithm"] for e in body["data"]]
+        assert algorithms == ["mldsa65", "ed25519"], algorithms
+
+    async def test_a_single_ca_reports_no_rotation_in_progress(self):
+        """The common path. An operator checking whether a rotation is still running
+        needs this to be false when it is not."""
+        user = _user()
+        app, _ = _make_app(user, is_admin=True)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            body = (await client.get("/api/v1/listener-ca")).json()
+        assert body["meta"]["rotation-in-progress"] is False
+        assert len(body["data"]) == 1
+        assert body["data"][0]["attributes"]["signing"] is True

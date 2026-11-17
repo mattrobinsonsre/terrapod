@@ -4,6 +4,12 @@ This guide covers production security hardening for Terrapod deployments. It ass
 
 ## TLS Configuration
 
+> **Post-quantum key exchange.** Inbound TLS is terminated by your own proxy or Ingress,
+> so hybrid key exchange (`X25519MLKEM768`) is enabled there rather than in Terrapod.
+> Terrapod's own outbound connections pin no groups or curves, so they already offer
+> whatever hybrid group the runtime supports. See
+> [Post-quantum readiness](post-quantum.md) for the full inventory.
+
 ### Database (PostgreSQL)
 
 Use `sslmode=verify-full` in the database connection URL to enforce TLS with certificate validation:

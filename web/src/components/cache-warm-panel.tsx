@@ -49,7 +49,6 @@ const OCI = 'oci'
 
 interface SourceInfo {
   ecosystem: string
-  enabled: boolean
   upstream: string
   mirrors: Record<string, string>
   'resolves-latest': boolean
@@ -298,10 +297,8 @@ export function CacheWarmPanel({
                     className="w-full px-3 py-2 rounded-lg bg-slate-900/70 border border-slate-700 text-sm text-slate-200"
                   >
                     {sources.map((s) => (
-                      <option key={s.ecosystem} value={s.ecosystem} disabled={!s.enabled}>
-                        {s.enabled
-                          ? s.ecosystem
-                          : t('warmAhead.ecosystemOff', { ecosystem: s.ecosystem })}
+                      <option key={s.ecosystem} value={s.ecosystem}>
+                        {s.ecosystem}
                       </option>
                     ))}
                   </select>

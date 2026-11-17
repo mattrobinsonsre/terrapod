@@ -7,9 +7,11 @@ either column**. A workspace declaring `plan_apply_enabled=False` still
 accepted and dispatched a plan and an apply, from all fifteen run creators.
 
 That is the flag-nothing-reads defect, on a column an operator had deliberately
-set. `test_capabilities.TestEveryFlagIsRead` exists to catch exactly this
-class and could not see it, because it is derived from the `CAPABILITIES`
-table and these are two ordinary workspace columns.
+set. The gate written to catch exactly this class could not see it: it was
+derived from the registry's own capability table, and these are two ordinary
+workspace columns. (That gate is gone with the cache-disable flags it was
+derived from -- which does not retire the lesson, only its subject: a derived
+gate's DERIVATION decides what it is blind to.)
 
 So there are two gates here, and they guard different halves:
 

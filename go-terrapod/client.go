@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -316,6 +318,60 @@ func (c *Client) Put(ctx context.Context, path string, payload []byte) ([]byte, 
 // are still expected to be JSON:API envelopes.
 func (c *Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error) {
 	body, status, err := c.doWithContentType(ctx, http.MethodPut, path, payload, contentType)
+	if err != nil {
+		return nil, err
+	}
+	if status < 200 || status >= 300 {
+		return nil, classifyError(status, body)
+	}
+	return body, nil
+}
+
+// PostMultipart performs a multipart/form-data POST, used for the operator
+// upload routes, which take an artifact's bytes in a `file` part and its
+// coordinates as the other fields.
+//
+// The body is assembled in memory rather than streamed. That is a deliberate
+// bound rather than an oversight: the retry in `doWithContentType` replays the
+// body, and a streamed reader cannot be replayed, so a streaming client would
+// have to give up either the retry every outbound call in this SDK is required
+// to have, or the ability to report a transient failure as one. The server caps
+// an upload well inside what a process can hold, and the two existing upload
+// families (`UploadProviderPlatform`, `UploadModuleVersion`) already take their
+// bytes the same way.
+func (c *Client) PostMultipart(
+	ctx context.Context,
+	path string,
+	fields map[string]string,
+	fileField, fileName string,
+	content []byte,
+) ([]byte, error) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	// Sorted so the body is byte-identical for identical input, which is what
+	// lets a test assert on it and a retry send the same bytes twice.
+	names := make([]string, 0, len(fields))
+	for k := range fields {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	for _, k := range names {
+		if err := w.WriteField(k, fields[k]); err != nil {
+			return nil, fmt.Errorf("write field %q: %w", k, err)
+		}
+	}
+	part, err := w.CreateFormFile(fileField, fileName)
+	if err != nil {
+		return nil, fmt.Errorf("create %q part: %w", fileField, err)
+	}
+	if _, err := part.Write(content); err != nil {
+		return nil, fmt.Errorf("write %q part: %w", fileField, err)
+	}
+	if err := w.Close(); err != nil {
+		return nil, fmt.Errorf("close multipart body: %w", err)
+	}
+
+	body, status, err := c.doWithContentType(ctx, http.MethodPost, path, buf.Bytes(), w.FormDataContentType())
 	if err != nil {
 		return nil, err
 	}

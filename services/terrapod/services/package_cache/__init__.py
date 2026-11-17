@@ -13,10 +13,23 @@ genuinely differs is the *index* — a PEP 503 HTML list of links versus an npm
 packument — and those stay as plain per-ecosystem modules rather than being
 forced through an interface invented from two examples.
 
-**Not a trust boundary, deliberately.** Nothing here re-hashes or re-signs. The
-index rewrite changes the *URL* and leaves upstream's integrity metadata exactly
-as published — npm's `dist.integrity`, PyPI's `#sha256=` fragment — so the client
-verifies our bytes against the hash the upstream author published. A corrupted or
-substituted artifact fails at the client, where it should, rather than being
-laundered into legitimacy by our re-signing it.
+**Verified at admission, and still not re-signed.** Two separate things, and the
+distinction is the whole of the trust model.
+
+What we DO: every artifact is checked against the digest its own upstream
+published, before it is stored (:func:`substrate.fetch_and_cache`). A mismatch is
+refused and nothing is cached. This is the job — validating the objects we hand a
+runner (#2589).
+
+What we deliberately do NOT do: re-hash or re-sign. The index rewrite changes the
+*URL* and leaves upstream's integrity metadata exactly as published — npm's
+`dist.integrity`, PyPI's `#sha256=` fragment — so a client that checks also
+checks against the upstream author's own hash rather than against an assertion of
+ours. Two independent checks of the same claim; nothing laundered into legitimacy
+by our re-signing it.
+
+This paragraph used to say the client's check was the point and ours unnecessary.
+That was only half true: `pip install` verifies nothing without `--require-hashes`
+or a hash-pinned lock, so in the commonest case in the commonest ecosystem there
+was no check anywhere.
 """

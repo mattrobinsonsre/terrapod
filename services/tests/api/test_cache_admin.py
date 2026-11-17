@@ -13,12 +13,14 @@ archive totals' `truncated`.
 
 from __future__ import annotations
 
+import inspect
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import APIRouter
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -40,6 +42,28 @@ ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/api/v1/admin/package-cache/totals"),
     ("DELETE", "/api/v1/admin/package-cache/f1"),
     ("POST", "/api/v1/admin/package-cache/evict"),
+    # Operator uploads (#2599). One per cache, because each ecosystem's own
+    # `upload_coordinates` is where its naming scheme already lives. Who may put
+    # bytes into what this deployment serves is a deployment-wide trust
+    # assertion, so these are held to the same admin gate as the eviction routes
+    # below -- which is what the two loops in `TestTheAdminGate` assert for each
+    # of them in turn.
+    ("POST", "/api/v1/admin/package-cache/pypi/artifacts"),
+    # Index documents (#2599). An artifact upload supplies BYTES; three of the six
+    # ecosystems answer "what versions exist" from a cached document and nowhere
+    # else, so without one a vetted artifact is present and unresolvable on the
+    # sealed node the feature exists for. PyPI builds its sealed index from rows and
+    # Pulumi is filename-addressed, so neither has one.
+    ("POST", "/api/v1/admin/package-cache/npm/index"),
+    ("POST", "/api/v1/admin/package-cache/nuget/index"),
+    ("POST", "/api/v1/admin/package-cache/go/index"),
+    ("POST", "/api/v1/admin/package-cache/galaxy/index"),
+    ("POST", "/api/v1/admin/package-cache/npm/artifacts"),
+    ("POST", "/api/v1/admin/package-cache/nuget/artifacts"),
+    ("POST", "/api/v1/admin/package-cache/go/artifacts"),
+    ("POST", "/api/v1/admin/package-cache/galaxy/artifacts"),
+    ("POST", "/api/v1/admin/package-cache/pulumi/artifacts"),
+    ("POST", "/api/v1/admin/package-cache/f1/verify"),
     ("GET", "/api/v1/admin/vcs-archive-cache"),
     ("GET", "/api/v1/admin/vcs-archive-cache/totals"),
     ("DELETE", "/api/v1/admin/vcs-archive-cache?key=vcs_archives/c/o/r/a-full.tar.gz"),
@@ -91,6 +115,16 @@ def _file(**kw):
     row.digest = kw.get("digest", "sha256:abc")
     row.cached_at = kw.get("cached_at", datetime(2026, 11, 1, 9, 0, tzinfo=UTC))
     row.last_accessed_at = kw.get("last_accessed_at", datetime(2026, 11, 9, 9, 0, tzinfo=UTC))
+    # Set EXPLICITLY, including the Nones. The listing serialises these (#2599),
+    # and a MagicMock attribute left to default reaches `json.dumps` and raises
+    # `Object of type MagicMock is not JSON serializable` -- which names neither
+    # the attribute nor this fixture. They are not noise; delete one and the
+    # listing tests fail for a reason that reads as a routing bug.
+    row.attestation = kw.get("attestation", "upstream-digest")
+    row.uploaded_by = kw.get("uploaded_by", None)
+    row.upload_reference = kw.get("upload_reference", None)
+    row.replaced_digest = kw.get("replaced_digest", None)
+    row.replaced_at = kw.get("replaced_at", None)
     return row
 
 
@@ -157,17 +191,20 @@ class TestTheAdminGate:
         """
         from terrapod.api.routers import cache_admin
 
-        # BOTH routers. The module exports two -- the package half is mounted
-        # only while its capability serves -- so reading one of them would have
-        # halved this gate's subject the moment they were split, and halved it
-        # silently, which is the failure this test exists to be.
+        # EVERY router the module exposes, found by type rather than named.
+        # It exported two, then eight (#2599 added one upload router per
+        # ecosystem, because an upload goes with its own ecosystem's flag rather
+        # than with the cache's) -- and a list of names would have halved this
+        # gate's subject at the first split and halved it SILENTLY, which is the
+        # failure this test exists to be. Deriving it means the next router is
+        # covered the day it is written.
         live = [
             (sorted(r.methods)[0], r.path)
-            for router in (cache_admin.package_router, cache_admin.router)
+            for _, router in inspect.getmembers(cache_admin, lambda o: isinstance(o, APIRouter))
             for r in router.routes
             if getattr(r, "methods", None)
         ]
-        assert len(live) >= 8, (
+        assert len(live) >= 15, (
             f"only {len(live)} routes read off the router; the accessor has changed "
             "rather than the router having shrunk"
         )
@@ -197,69 +234,6 @@ class TestTheAdminGate:
         )
 
 
-class TestTheCapabilityGate:
-    """The package half goes with its capability; the archive half does not.
-
-    The convention is that a switched-off capability's surface is ABSENT rather
-    than answering 404 -- `scripts/airgap-gate.sh --gated-off` asserts it against
-    a running stack, and `oci_admin` is the precedent. These four routes were
-    mounted unconditionally when they were written, which left the
-    `/admin/package-cache/` namespace half-present: these answering and the
-    pre-existing `warm` route, on the same prefix, gone.
-
-    Asserted here as well as in the live gate because the live gate is an
-    expensive place to learn it, and because the live gate's matcher is
-    `'/package-cache/' in path` -- which does not even see `GET
-    /admin/package-cache`, the listing.
-    """
-
-    def _paths(self) -> list[str]:
-        from terrapod.api.app import create_application
-
-        return [getattr(r, "path", "") for r in create_application().routes]
-
-    #: The paths this module owns, derived from its own router so a fifth cannot
-    #: arrive outside this test's reach.
-    def _owned(self) -> set[str]:
-        from terrapod.api.routers import cache_admin
-
-        return {r.path for r in cache_admin.package_router.routes if getattr(r, "methods", None)}
-
-    def test_the_package_routes_are_absent_when_the_cache_is_off(self, monkeypatch):
-        from terrapod.config import settings
-
-        monkeypatch.setattr(settings.registry.package_cache, "enabled", False)
-        mounted = set(self._paths())
-        # Matched on the OWNED set rather than on the substring `package-cache`,
-        # because one route on that prefix is not ours and legitimately survives:
-        # `POST /admin/package-cache/warm` lives on the shared warm router, which
-        # stays mounted while the container registry is on so that
-        # `/admin/warm-jobs/{id}` remains reachable, and refuses per ecosystem
-        # with a 404 instead. Asserting the bare substring here would fail on a
-        # correct tree -- and would be a test about somebody else's router.
-        still_there = sorted(path for path in self._owned() if path in mounted)
-        assert still_there == [], f"still mounted with the capability off: {still_there}"
-        # ...and the bare listing specifically, because the live gate's own
-        # matcher (`'/package-cache/' in path`) cannot see a path that ENDS at
-        # the cache, so that one route would pass it either way.
-        assert "/api/v1/admin/package-cache" not in mounted
-
-    def test_the_archive_routes_stay_when_the_cache_is_off(self, monkeypatch):
-        """Without this half, unmounting everything would pass the test above."""
-        from terrapod.config import settings
-
-        monkeypatch.setattr(settings.registry.package_cache, "enabled", False)
-        assert [p for p in self._paths() if "vcs-archive-cache" in p] != []
-
-    def test_both_halves_are_there_when_the_cache_is_on(self, monkeypatch):
-        from terrapod.config import settings
-
-        monkeypatch.setattr(settings.registry.package_cache, "enabled", True)
-        paths = self._paths()
-        assert [p for p in paths if "admin/package-cache" in p] != []
-        assert [p for p in paths if "vcs-archive-cache" in p] != []
-
-
 @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
 @patch("terrapod.api.app.init_redis")
 @patch("terrapod.api.app.init_db")
@@ -278,6 +252,17 @@ class TestThePackageCacheRoutes:
             "filename": "community-general-9.2.0.tar.gz",
             "size": 1234,
             "digest": "sha256:abc",
+            # How the row was admitted, and the provenance of an operator upload
+            # (#2599). `attestation` and `uploaded-by` are the load-bearing
+            # pair: an uploaded artifact must never be indistinguishable here
+            # from a fetched one, or the ledger lies about the one thing on it
+            # that matters. A fetched row carries no uploader, which is why
+            # these are asserted as null rather than omitted.
+            "attestation": "upstream-digest",
+            "uploaded-by": None,
+            "upload-reference": None,
+            "replaced-digest": None,
+            "replaced-at": None,
             "cached-at": "2026-11-01T09:00:00Z",
             "last-accessed-at": "2026-11-09T09:00:00Z",
         }, "the wire shape changed; a consumer reads these names"

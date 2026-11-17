@@ -175,18 +175,51 @@ class TestTheStaticKekReportsItsMasterSecret:
         secret = base64.b64encode(os.urandom(32)).decode()
         assert StaticKEKProvider(secret, strict=True).id == "static"
 
-    async def test_the_derivation_is_unchanged_so_old_wraps_still_open(self):
-        """Salting or stretching would make every existing DEK unrecoverable."""
+    async def test_a_LEGACY_wrap_still_opens(self):
+        """The property that must hold for ever, and the one that was unrecoverable
+        if broken.
+
+        This test used to assert the DERIVATION was unchanged, on the grounds that
+        "salting or stretching would make every existing DEK unrecoverable". That
+        was true while there was only one format and is false now: a wrap carries a
+        version tag, so stretching NEW wraps costs nothing to old ones. What has to
+        keep working is reading the old ones, which is asserted directly here by
+        building a legacy wrap exactly as the pre-2.0 code did rather than by
+        inspecting an attribute.
+        """
         import hashlib
+
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
         from terrapod.crypto.providers import StaticKEKProvider
 
         secret = base64.b64encode(os.urandom(32)).decode()
         provider = StaticKEKProvider(secret, strict=True)
-        assert provider._kek == hashlib.sha256(secret.encode("utf-8")).digest()
-
         dek = os.urandom(32)
-        assert await provider.unwrap(await provider.wrap(dek)) == dek
+
+        legacy_kek = hashlib.sha256(secret.encode("utf-8")).digest()
+        nonce = os.urandom(12)
+        ct = AESGCM(legacy_kek).encrypt(nonce, dek, None)
+        legacy = f"{base64.b64encode(nonce).decode()}.{base64.b64encode(ct).decode()}"
+
+        assert await provider.unwrap(legacy) == dek
+
+    async def test_a_NEW_wrap_is_stretched_and_salted(self):
+        """The other half: a new wrap must not be the unsalted form, or the
+        advisory this addresses is still open for everything written from now on.
+        """
+        from terrapod.crypto.providers import _WRAP_V2, StaticKEKProvider
+
+        secret = base64.b64encode(os.urandom(32)).decode()
+        provider = StaticKEKProvider(secret, strict=True)
+        dek = os.urandom(32)
+
+        wrapped = await provider.wrap(dek)
+        assert wrapped.startswith(f"{_WRAP_V2}.")
+        assert await provider.unwrap(wrapped) == dek
+        # A fresh salt per wrap, so two wraps of one DEK differ. A fixed salt would
+        # still let one precomputation cover every wrap in the deployment.
+        assert wrapped != await provider.wrap(dek)
 
     def test_an_empty_master_secret_is_still_refused(self):
         from terrapod.crypto.providers import StaticKEKProvider

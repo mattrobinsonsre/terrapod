@@ -121,6 +121,14 @@ The retention system enforces several invariants to prevent data loss:
 
 ### Cache Entries (Provider, Binary & Package)
 
+- **An operator-uploaded artifact is never reaped by age.** Every other row in
+  these caches is a copy of something a registry still serves, so evicting one
+  costs a slower run later and nothing else — which is what makes an age-based
+  sweep safe. An uploaded artifact exists upstream nowhere, so reaping it
+  destroys the only copy. This is separate from the sealed-mode skip below and
+  not made redundant by it: the exposure is the *unsealed* node, which is where
+  `seed-then-seal` has an operator put the uploads in the first place. Removing
+  one is still possible deliberately, through the admin eviction route.
 - **Retention is based on last access time, not creation time.** A cached binary, provider or package that is actively used by runners will have its `last_accessed_at` timestamp refreshed on every cache hit. Only entries that haven't been accessed within the retention window are deleted.
 - This ensures frequently-used cache entries are preserved regardless of age, while entries that were cached once and never used again are cleaned up.
 - **All three are skipped entirely in sealed (cache-only) mode.** With `registry.cache_only: true` nothing may be fetched from upstream, so evicting an artifact would lose it permanently rather than cost a re-fetch. The provider, binary and package caches are therefore left alone while sealed; no other category is affected. See [Sealed (cache-only) mode](runbooks.md#sealed-cache-only-mode--runs-failing-with-cache-miss-404).

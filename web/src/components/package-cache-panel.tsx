@@ -10,6 +10,7 @@ import { StatChip } from '@/components/stat-chip'
 import { apiFetch, parseApiError } from '@/lib/api'
 import { formatBytes } from '@/lib/format-bytes'
 import { withSealedWarning } from '@/lib/cache-sealed'
+import { PackageUploadPanel } from '@/components/package-upload-panel'
 import { useConfirm } from '@/lib/use-confirm'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useSortable } from '@/lib/use-sortable'
@@ -56,6 +57,16 @@ interface CachedPackageFile {
     digest: string
     'cached-at': string | null
     'last-accessed-at': string | null
+    /** How the artifact was admitted: `upstream-digest`, `none-published`,
+     *  `operator-upload`, or absent for a row written before this was recorded.
+     *  Absent is NOT "unverified" -- such a row is re-fetched on the next
+     *  request rather than served -- so it is shown as unrecorded rather than
+     *  as a finding. */
+    attestation?: string | null
+    'uploaded-by'?: string | null
+    'upload-reference'?: string | null
+    'replaced-at'?: string | null
+    'replaced-digest'?: string | null
   }
 }
 
@@ -64,7 +75,38 @@ interface PackageTotal {
   attributes: { ecosystem: string; files: number; bytes: number }
 }
 
-type SortKey = 'ecosystem' | 'name' | 'version' | 'filename' | 'size' | 'last-accessed-at'
+type SortKey = 'ecosystem' | 'name' | 'version' | 'filename' | 'size' | 'last-accessed-at' | 'attestation'
+
+/** How an artifact got here, as a badge.
+ *
+ *  Four states, and the distinction that matters is between the last two: an
+ *  `operator-upload` is the only one that exists upstream NOWHERE, so it is the
+ *  only one an eviction destroys permanently, and an absent attestation is a row
+ *  written before this was recorded rather than a finding -- it is re-fetched and
+ *  re-verified on the next request, which is why it reads as unrecorded rather
+ *  than as unverified.
+ *
+ *  Colour is never the only signal: each state renders its own word, so the badge
+ *  is legible without it, and at phone width it is a labelled card field rather
+ *  than a cell. */
+const ATTESTATION_STYLE: Record<string, string> = {
+  'upstream-digest': 'bg-emerald-900/40 text-emerald-300',
+  'none-published': 'bg-slate-700/60 text-slate-300',
+  'operator-upload': 'bg-amber-900/40 text-amber-200',
+}
+
+function AttestationBadge({ value, label }: { value: string | null | undefined; label: string }) {
+  const key = value || 'unrecorded'
+  return (
+    <span
+      className={`inline-block shrink-0 rounded px-2 py-0.5 text-xs whitespace-nowrap ${
+        ATTESTATION_STYLE[key] ?? 'bg-slate-700/40 text-slate-400'
+      }`}
+    >
+      {label}
+    </span>
+  )
+}
 
 export function PackageCachePanel({
   onError,
@@ -76,6 +118,20 @@ export function PackageCachePanel({
   formatDate: (iso: string | null) => string
 }) {
   const t = useTranslations('adminBinaryCache')
+
+  /** The badge's word for an attestation. Inside the component because it needs
+   *  `t`, and one resolver because the table and the phone-width card must not
+   *  describe the same artifact differently. An unknown value is shown VERBATIM
+   *  rather than mapped to "unrecorded": a server newer than this page may have a
+   *  state we have no word for, and showing the raw value is honest where
+   *  claiming it is unrecorded would be a false negative. */
+  function attestationLabel(value: string | null | undefined): string {
+    if (!value) return t('attestation.unrecorded')
+    if (value === 'upstream-digest') return t('attestation.upstreamDigest')
+    if (value === 'none-published') return t('attestation.nonePublished')
+    if (value === 'operator-upload') return t('attestation.operatorUpload')
+    return value
+  }
   const locale = useLocale()
   const { confirmIrreversible } = useConfirm()
 
@@ -127,6 +183,10 @@ export function PackageCachePanel({
       case 'filename': return item.attributes.filename
       case 'size': return item.attributes.size
       case 'last-accessed-at': return item.attributes['last-accessed-at']
+      // The RAW value, not the translated label: sorting groups the operator
+      // uploads together, which is the question this column is for, and a label
+      // would order differently per locale for the same data.
+      case 'attestation': return item.attributes.attestation || ''
     }
   }, [])
   const { sortedItems, sortState, toggleSort } = useSortable<CachedPackageFile, SortKey>(
@@ -216,11 +276,19 @@ export function PackageCachePanel({
 
   async function purgeOne(entry: CachedPackageFile) {
     const a = entry.attributes
-    if (!confirmIrreversible(withSealedWarning(
-      t('packages.confirmRow', { name: a.name, version: a.version, filename: a.filename }),
+    // An operator upload exists upstream NOWHERE, so evicting one destroys the
+    // only copy however unsealed the node is -- a second, different warning
+    // from the sealed one, which is about the node rather than the artifact.
+    // Both can apply at once and the upload warning goes first, because it is
+    // the one that is true even on a node that can otherwise re-fetch.
+    const uploaded = a.attestation === 'operator-upload'
+    const base = t('packages.confirmRow', { name: a.name, version: a.version, filename: a.filename })
+    const prompt = withSealedWarning(
+      uploaded ? `${base}\n\n${t('packages.confirmRowUploaded')}` : base,
       sealed,
       t('sealedWarning'),
-    ))) return
+    )
+    if (!confirmIrreversible(prompt)) return
     try {
       const res = await apiFetch(`/api/v1/admin/package-cache/${entry.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(await parseApiError(res, t('packages.errorRow')))
@@ -439,6 +507,7 @@ export function PackageCachePanel({
                   <SortableHeader label={t('columns.filename')} sortKey="filename" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('columns.size')} sortKey="size" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('columns.lastAccessed')} sortKey="last-accessed-at" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label={t('columns.origin')} sortKey="attestation" sortState={sortState} onSort={toggleSort} />
                   <th className="text-end px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
                 </tr>
               </thead>
@@ -451,6 +520,17 @@ export function PackageCachePanel({
                     <td className="px-4 py-3 text-slate-400 font-mono text-xs break-all">{entry.attributes.filename}</td>
                     <td className="px-4 py-3 text-slate-400">{formatBytes(entry.attributes.size, locale)}</td>
                     <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(entry.attributes['last-accessed-at'])}</td>
+                    <td className="px-4 py-3">
+                      <AttestationBadge
+                        value={entry.attributes.attestation}
+                        label={attestationLabel(entry.attributes.attestation)}
+                      />
+                      {entry.attributes['uploaded-by'] ? (
+                        <div className="mt-1 text-xs text-slate-500 break-all">
+                          {t('packages.uploadedBy', { who: entry.attributes['uploaded-by'] })}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3 text-end">
                       <button
                         onClick={() => purgeOne(entry)}
@@ -478,6 +558,10 @@ export function PackageCachePanel({
                   { label: t('columns.filename'), value: entry.attributes.filename },
                   { label: t('columns.size'), value: formatBytes(entry.attributes.size, locale) },
                   { label: t('columns.lastAccessed'), value: formatDate(entry.attributes['last-accessed-at']) },
+                  { label: t('columns.origin'), value: attestationLabel(entry.attributes.attestation) },
+                  ...(entry.attributes['uploaded-by']
+                    ? [{ label: t('columns.uploadedBy'), value: entry.attributes['uploaded-by'] as string }]
+                    : []),
                 ]}
                 actions={
                   <button
@@ -519,6 +603,22 @@ export function PackageCachePanel({
       )}
         </>
       )}
+
+      {/* The upload form lives INSIDE this panel rather than beside it on the
+          page, for two reasons that are not cosmetic. `sealed` is this panel's
+          own state, read from the listing's `meta` -- rendering the form on the
+          page would mean a second request for the same fact, which could then
+          disagree with the warning this panel shows. And an upload has to
+          refresh THIS listing: without it an operator uploads an artifact and
+          does not see it, which reads as the upload having failed. */}
+      <PackageUploadPanel
+        sealed={sealed}
+        onError={onError}
+        onSuccess={(message) => {
+          onSuccess(message)
+          void load()
+        }}
+      />
     </section>
   )
 }

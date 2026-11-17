@@ -548,6 +548,17 @@ multi-language implementation ships in the same PR**:
   they are not prose, and renaming them would break the contract gates.
 - **Branches** — feature branches off `main`; never push directly to `main`;
   never stack a PR on another open feature branch (always base on `main`).
+- **Draft until it is ready to merge** — open a pull request as a **draft** while
+  it is still moving, and mark it ready for review when you consider it
+  mergeable. "Ready for review" is read here as "this can land once it is
+  green", so a non-draft PR is one a maintainer may merge. If you would rather
+  not use drafts, leave it open and post a comment when it is ready; an open,
+  non-draft PR with no such comment is treated as still in progress. The
+  reciprocal rule binds maintainers: **do not merge while your own review
+  findings on that PR are outstanding** — if something has to land before they
+  are addressed, say so on the PR and open the follow-up yourself rather than
+  leaving the author to reopen their own review points as fresh issues, which is
+  what happened the first time this was got wrong.
 - **Merging — this repo requires branches to be up to date with `main`.** The
   moment one PR merges, `main` advances and **every other open PR becomes
   out-of-date and un-mergeable** until it is updated (`gh pr update-branch`).

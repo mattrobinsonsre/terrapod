@@ -57,13 +57,17 @@ def _hit():
 
 
 class TestTheSetOfEcosystems:
-    """The three places that enumerate ecosystems must agree.
+    """The two places that enumerate ecosystems must agree.
 
-    They are deliberately separate — a cached artifact's ecosystem, a gated
-    capability and a warmable thing are three different questions — which is
-    exactly why nothing stops them drifting apart. That drift is what #2486
-    was: the column documented six, the capabilities table carried six, and the
-    warmer dispatched on two of them plus `oci`.
+    They are deliberately separate — a cached artifact's ecosystem and a
+    warmable thing are different questions — which is exactly why nothing stops
+    them drifting apart. That drift is what #2486 was: the column documented
+    six and the warmer dispatched on two of them plus `oci`.
+
+    There were three until the cache-disable flags went: a gated capability was
+    the third, and `services/capabilities.py` carried its own six-entry table
+    for this to be held against. Every cache now serves unconditionally, so
+    there is no third enumeration left to drift.
     """
 
     def test_every_package_ecosystem_has_a_handler(self) -> None:
@@ -72,11 +76,6 @@ class TestTheSetOfEcosystems:
 
     def test_every_handler_is_an_ecosystem(self) -> None:
         assert set(_HANDLERS) == set(ECOSYSTEMS)
-
-    def test_it_matches_the_capabilities_table(self) -> None:
-        from terrapod.services.capabilities import CAPABILITIES
-
-        assert set(ECOSYSTEMS) == set(CAPABILITIES)
 
     def test_it_matches_the_column_the_cache_is_keyed_by(self) -> None:
         # Read from the SOURCE, because the list lives in a `#:` comment above
