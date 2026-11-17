@@ -1907,7 +1907,6 @@
       "heading": "Rozgrzej pamięci podręczne pakietów i obrazów",
       "help": "Podawaj wersję wszędzie tam, gdzie ją znasz: rozgrzewanie wskazane z wersją można potem sprawdzić względem pliku blokady, a „cokolwiek jest najnowsze” — nie. Każdy wiersz zapisuj jako <code>nazwa wersja</code>; w przypadku wtyczek Pulumi dodaj na końcu tokeny <code>os/arch</code>, aby rozgrzać konkretne platformy.",
       "ecosystemLabel": "Rodzaj artefaktu",
-      "ecosystemOff": "{ecosystem} (wyłączone)",
       "sourceLabel": "Pobieraj z",
       "sourceDefault": "Skonfigurowane źródło nadrzędne",
       "upstreamIs": "Zostanie pobrane z <code>{url}</code>.",

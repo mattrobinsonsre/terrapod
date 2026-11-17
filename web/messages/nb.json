@@ -1907,7 +1907,6 @@
       "heading": "Varm opp pakke- og image-buffere",
       "help": "Oppgi en versjon der den er kjent: en oppvarming som navngir en versjon, kan etterpå kontrolleres mot en låsefil, «hva som nå er nyest» kan ikke. Skriv hver linje som <code>navn versjon</code>; for Pulumi-plugins legger du til etterfølgende <code>os/arch</code>-tokener for å varme opp bestemte plattformer.",
       "ecosystemLabel": "Artefakttype",
-      "ecosystemOff": "{ecosystem} (slått av)",
       "sourceLabel": "Hent fra",
       "sourceDefault": "Konfigurert oppstrømskilde",
       "upstreamIs": "Hentes fra <code>{url}</code>.",

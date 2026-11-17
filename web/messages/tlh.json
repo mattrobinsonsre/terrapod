@@ -1907,7 +1907,6 @@
       "heading": "De' mIllogh je nge'wI'mey tujmoH",
       "help": "mI' DaSovDI' yIper: mI' ghajbogh tujmoHwI' ngaQmoHwI' teywI' nuDlaHlu', 'ach «chu'qu'bogh Doch» nuDlaHbe'lu'. Hoch tlhegh <code>pong mI''</code> rurnIS; Pulumi chenmoHwI'meyvaD Qav <code>os/arch</code> mu'mey yIchel, wIvlu'bogh qachmey tujmoHmeH.",
       "ecosystemLabel": "jan Segh",
-      "ecosystemOff": "{ecosystem} (chu'Ha'lu'pu')",
       "sourceLabel": "ghelmeH mung",
       "sourceDefault": "ghunlu'pu'bogh mung",
       "upstreamIs": "ghelmeH mung: <code>{url}</code>.",

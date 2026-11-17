@@ -1907,7 +1907,6 @@
       "heading": "패키지 및 이미지 캐시 워밍",
       "help": "버전을 아는 경우에는 반드시 적어 주세요. 버전을 지정한 워밍은 나중에 잠금 파일과 대조할 수 있지만 “무엇이든 최신인 것”은 대조할 수 없습니다. 각 줄은 <code>이름 버전</code> 형식으로 적습니다. Pulumi 플러그인은 뒤에 <code>os/arch</code> 토큰을 붙이면 특정 플랫폼을 워밍할 수 있습니다.",
       "ecosystemLabel": "아티팩트 종류",
-      "ecosystemOff": "{ecosystem}(꺼짐)",
       "sourceLabel": "가져올 위치",
       "sourceDefault": "구성된 업스트림",
       "upstreamIs": "<code>{url}</code>에서 가져옵니다.",

@@ -327,7 +327,6 @@
   ],
   "cache_warm.package_cache_sources": [
     "ecosystem",
-    "enabled",
     "mirrors",
     "resolves-latest",
     "upstream"

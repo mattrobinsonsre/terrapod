@@ -4946,11 +4946,10 @@ walkthrough, see [Caches](caches.md).
 > having no database table; see
 > [Where the two caches differ](caches.md#where-the-two-caches-differ-and-why).
 
-> **Every package-cache route is absent when the package cache is.** With
-> `api.config.registry.package_cache.enabled` set to `false` none of them is
-> registered at all — a 404 as an unrouted path, which is what a switched-off
-> capability means everywhere in Terrapod. The archive routes have no such flag
-> and are always there. Nothing cached is lost while a capability is off; see
+> **Every route here is always registered.** No cache has an `enabled` flag —
+> the package-cache ones were removed in 2.0, so there is no configuration under
+> which one of these answers 404 as an unrouted path while its siblings serve.
+> That half-present namespace is the defect the removal closed; see
 > [Caches](caches.md#where-the-two-caches-differ-and-why).
 
 ### List Cached Package Artifacts (Admin)
@@ -5393,8 +5392,9 @@ with a job id — a real dependency closure outlives a request.
 | `source` | a **label** from `mirrors` above, to warm from instead of `upstream`. Never a URL — an undeclared label is a 422 naming the declared ones |
 | `platforms` | `os/arch` pairs, `pulumi` only. Omitted, the runner's own `linux/amd64` and `linux/arm64` |
 
-At most 500 items per submission (422 beyond it). An unknown ecosystem is a 422;
-an ecosystem whose proxy is switched off is a 404.
+At most 500 items per submission (422 beyond it). An unknown ecosystem is a 422.
+Every one of the six proxies is always serving — none can be switched off — so a
+known ecosystem is never refused for being unavailable.
 
 ```json
 {

@@ -2507,30 +2507,42 @@ jobs:
               --namespace terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379)
-          echo "$out" | grep -q "oci:" || { echo "FAIL: registry.oci did not render into config.yaml (#1986)"; exit 1; }
-          echo "$out" | grep -q "package_cache:" || { echo "FAIL: registry.package_cache did not render into config.yaml (#1986)"; exit 1; }
-          # `false` is the whole point of these keys, and Helm's `with` treats it as
-          # empty — a template using it drops the key silently, the code default
-          # (true) wins, and a capability an operator switched off still serves.
-          off=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
-            template terrapod helm/terrapod \
-              --namespace terrapod \
-              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
-              --set redis.url=redis://redis:6379 \
-              --set api.config.registry.oci.enabled=false \
-              --set api.config.registry.package_cache.pypi.enabled=false \
-              --set api.config.registry.package_cache.npm.enabled=false \
-              --set api.config.registry.package_cache.galaxy.enabled=false \
-              --set api.config.registry.package_cache.pulumi.enabled=false \
-              --set api.config.registry.package_cache.go.enabled=false \
-              --set api.config.registry.package_cache.nuget.enabled=false)
-          # Counted, not grepped one at a time: `enabled: false` occurs elsewhere in
-          # the document, so the count within the registry block is what proves all
-          # seven arrived. None of the seven is false by default, so the delta is
-          # unambiguous and a single dropped flag fails this.
-          got=$(echo "$off" | sed -n '/^    registry:/,/^      provider_cache:/p' | grep -c "enabled: false")
-          [ "$got" = "7" ] || { echo "FAIL: $got of 7 capability flags rendered as false — a flag Helm dropped silently means the capability still serves (#1986)"; echo "$off" | sed -n '/^    registry:/,/^      provider_cache:/p'; exit 1; }
-          echo "Capability flags render OK, including false"
+          echo "$out" | grep -q "oci:" || { echo "FAIL: registry.oci did not render into config.yaml"; exit 1; }
+          echo "$out" | grep -q "package_cache:" || { echo "FAIL: registry.package_cache did not render into config.yaml"; exit 1; }
+          # The inverse assertion, now that every cache is unconditionally on: the
+          # `enabled` keys are GONE, so an operator's leftover flag must be REFUSED
+          # rather than silently ignored. `values.schema.json` is
+          # `additionalProperties: false`, so the schema is what refuses it — and a
+          # removal that forgot the schema would leave the key accepted and inert,
+          # which is the quietest possible way to mislead an upgrade.
+          for key in registry.enabled \
+                     registry.oci.enabled \
+                     registry.binary_cache.enabled \
+                     registry.provider_cache.enabled \
+                     registry.package_cache.enabled \
+                     registry.package_cache.pypi.enabled; do
+            if docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+                 template terrapod helm/terrapod \
+                   --namespace terrapod \
+                   --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+                   --set redis.url=redis://redis:6379 \
+                   --set "api.config.$key=false" >/dev/null 2>&1; then
+              echo "FAIL: api.config.$key was ACCEPTED — the key is removed, so the schema must refuse it"
+              exit 1
+            fi
+          done
+          # And the two flags that legitimately survive must still be settable, or
+          # this check could be satisfied by refusing everything.
+          for key in registry.oci.gc.enabled registry.module_interface.enabled; do
+            docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+              template terrapod helm/terrapod \
+                --namespace terrapod \
+                --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+                --set redis.url=redis://redis:6379 \
+                --set "api.config.$key=false" >/dev/null 2>&1 \
+              || { echo "FAIL: api.config.$key was refused — it is a kept flag"; exit 1; }
+          done
+          echo "Cache blocks render; removed flags refused; kept flags settable"
 
 
       - name: (helm-smoke) OCI garbage collection renders into config.yaml (#1419)
@@ -2775,14 +2787,20 @@ jobs:
           echo "$hook" | grep -q "path: /api/v1/vcs-events" || { echo "FAIL: webhookIngress missing canonical vcs-events path (#1529)"; exit 1; }
           echo "$hook" | grep -q "path: /api/v1/task-stage-results" || { echo "FAIL: webhookIngress missing canonical task-stage-results path (#1529)"; exit 1; }
           echo "$hook" | grep -q "path: /api/terrapod/v1/vcs-events" || { echo "FAIL: webhookIngress dropped the deprecated alias path — already-registered webhooks would stop routing (#1529)"; exit 1; }
-          # Capability flags (#1986): there is no engine switch, but each optional
-          # surface keeps its own flag and those must reach the pod — a flag nothing
-          # delivers is the defect the OCI registry shipped with, where
-          # `enabled: false` stopped the scheduled tasks and /v2/ served on.
-          echo "$out" | grep -q "oci:" || { echo "FAIL: registry.oci not rendered into config.yaml (#1986)"; exit 1; }
-          echo "$out" | grep -q "package_cache:" || { echo "FAIL: registry.package_cache not rendered into config.yaml (#1986)"; exit 1; }
-          off=$(helm template ./helm/terrapod --set api.config.registry.package_cache.pulumi.enabled=false)
-          echo "$off" | sed -n '/        pulumi:/,/        go:/p' | grep -q "enabled: false" || { echo "FAIL: package_cache.pulumi.enabled=false did not render — the proxy would go on serving (#1986)"; exit 1; }
+          # The cache blocks still have to REACH the pod, even with no `enabled` in
+          # them: their `upstream` and `mirrors` are what point a proxy somewhere
+          # other than the public registry, and a block that never renders leaves
+          # the code defaults in charge while an operator's values look applied.
+          echo "$out" | grep -q "oci:" || { echo "FAIL: registry.oci not rendered into config.yaml"; exit 1; }
+          echo "$out" | grep -q "package_cache:" || { echo "FAIL: registry.package_cache not rendered into config.yaml"; exit 1; }
+          # And no cache carries an `enabled` any more. Asserted on the rendered
+          # document rather than on the template, because a stray render line would
+          # emit a key `Settings` now ignores (pydantic defaults to extra="ignore"),
+          # so nothing downstream would complain.
+          for block in oci package_cache provider_cache binary_cache; do
+            echo "$out" | sed -n "/^      $block:/,/^      [a-z_]*:/p" | grep -q "^        enabled:" \
+              && { echo "FAIL: registry.$block still renders an enabled key"; exit 1; }
+          done
           # The Pulumi CLI is a platform tool, not a baked-in binary (#1523): a
           # Terraform-only deployment should not carry another engine's binary, and
           # a missing render line leaves the version inert with the code default
@@ -5019,24 +5037,6 @@ jobs:
       # would pass while testing nothing.
       - name: Real clients, with and without a route to the internet
         run: scripts/airgap-gate.sh http://localhost:3000
-
-      # The other half of the capability flags (#1986): switched off, these
-      # surfaces are ABSENT rather than answering 404, while terraform's own
-      # provider mirror, module registry and binary cache still answer. Asserted
-      # per-PR in unit tests; asserting it against a running stack is what makes
-      # it true rather than believed.
-      - name: Restart with the registry and package cache switched off
-        run: |
-          TERRAPOD_FS_BASE_URL=http://web:3000 \
-          TERRAPOD_OCI_ENABLED=false TERRAPOD_PACKAGE_CACHE_ENABLED=false \
-            docker compose -f e2e/docker-compose.e2e.yml up -d
-          for _ in $(seq 1 30); do
-            curl -sf http://localhost:3000/ >/dev/null 2>&1 && break
-            sleep 4
-          done
-
-      - name: Switched-off surfaces are absent, terraform's still answer
-        run: scripts/airgap-gate.sh --gated-off http://localhost:3000
 
       - name: Stack logs on failure
         if: failure()

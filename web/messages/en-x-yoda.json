@@ -1907,7 +1907,6 @@
       "heading": "Package and image caches, warm them",
       "help": "A version wherever you know it, give: against a lockfile, a warm named at a version afterwards checked can be, and “whatever is newest” cannot. As <code>name version</code>, each line write; for Pulumi plugins, trailing <code>os/arch</code> tokens add, specific platforms to warm.",
       "ecosystemLabel": "Kind, artifact",
-      "ecosystemOff": "{ecosystem} (off, switched)",
       "sourceLabel": "From, fetch",
       "sourceDefault": "Upstream, configured",
       "upstreamIs": "From <code>{url}</code>, fetch it will.",

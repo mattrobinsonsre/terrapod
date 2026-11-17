@@ -848,7 +848,6 @@ field PackageCacheListOptions.Name string
 field PackageCacheListOptions.PageNumber int
 field PackageCacheListOptions.PageSize int
 field PackageCacheSource.Ecosystem string `json:"ecosystem"`
-field PackageCacheSource.Enabled bool `json:"enabled"`
 field PackageCacheSource.Mirrors map[string]string `json:"mirrors"`
 field PackageCacheSource.ResolvesLatest bool `json:"resolves-latest"`
 field PackageCacheSource.Upstream string `json:"upstream"`

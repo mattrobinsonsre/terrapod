@@ -15,12 +15,11 @@ Endpoints:
     GET  /v1/providers/{hostname}/{namespace}/{type}/{version}.json   — platform archives
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
-from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.provider_cache_service import (
@@ -47,12 +46,6 @@ async def provider_versions_mirror(
     Returns the index.json format expected by terraform's network mirror.
     Requires authentication (runner token, API token, or session).
     """
-    if not settings.registry.provider_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Provider cache is disabled",
-        )
-
     result = await get_or_fetch_versions(db, hostname, namespace, type)
     return JSONResponse(content=result)
 
@@ -74,12 +67,6 @@ async def provider_platforms_mirror(
     storage URLs; other platforms get upstream direct download URLs.
     Requires authentication (runner token, API token, or session).
     """
-    if not settings.registry.provider_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Provider cache is disabled",
-        )
-
     result = await get_or_fetch_platforms(db, storage, hostname, namespace, type, version)
     await db.commit()
     return JSONResponse(content=result)

@@ -1907,7 +1907,6 @@
       "heading": "Precarica le cache di pacchetti e immagini",
       "help": "Indica una versione ogni volta che la conosci: un precaricamento indicato a una versione può poi essere confrontato con un file di lock, mentre «qualunque sia la più recente» no. Scrivi ogni riga nella forma <code>nome versione</code>; per i plugin Pulumi, aggiungi token <code>os/arch</code> finali per precaricare piattaforme specifiche.",
       "ecosystemLabel": "Tipo di artefatto",
-      "ecosystemOff": "{ecosystem} (disattivato)",
       "sourceLabel": "Scarica da",
       "sourceDefault": "Upstream configurato",
       "upstreamIs": "Verrà scaricato da <code>{url}</code>.",

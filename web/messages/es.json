@@ -1907,7 +1907,6 @@
       "heading": "Precalentar cachés de paquetes e imágenes",
       "help": "Indique una versión siempre que la conozca: un precalentamiento nombrado con versión se puede comprobar después contra un archivo de bloqueo, y «lo más reciente que haya» no. Escriba cada línea como <code>nombre versión</code>; para los plugins de Pulumi, añada tokens <code>os/arch</code> al final para precalentar plataformas concretas.",
       "ecosystemLabel": "Tipo de artefacto",
-      "ecosystemOff": "{ecosystem} (desactivado)",
       "sourceLabel": "Obtener de",
       "sourceDefault": "Origen configurado",
       "upstreamIs": "Se obtendrá de <code>{url}</code>.",

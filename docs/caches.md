@@ -701,7 +701,7 @@ that hid it behind one call would put the unbounded work straight back.
 
 ## Where the two caches differ, and why
 
-Three differences between the package cache and the VCS archive cache are
+Four differences between the package cache and the VCS archive cache are
 deliberate, and each follows from one fact: **the package cache has a row per
 artifact and the archive cache has none.** They are not an inconsistency waiting
 to be tidied, and expecting either to behave like the other will mislead you.
@@ -712,7 +712,6 @@ to be tidied, and expecting either to behave like the other will mislead you.
 | **Age filter** | **last access** (`last-accessed-at`) | **write time** (`last-modified`) |
 | **Totals** | exact, aggregated in the database | a bounded walk, with **`meta.truncated`** when it hit the ceiling |
 | **Resuming a bulk eviction** | repeat the same request — the artifacts that matched are the ones that went | pass `next-cursor` back as `after`, or the window restarts in the same place |
-| **When the capability is off** | the routes are **not there** | the routes stay |
 
 1. **The archive listing uses a key cursor.** There are no rows to offset into; a
    page comes from a storage walk, and object storage lists keys in
@@ -738,24 +737,27 @@ Two smaller consequences of the same fact, so they do not surprise you: the
 archive delete is idempotent where the package delete 404s, and an archive key
 that does not parse appears in the listing but not in the totals.
 
-The fourth row has a different cause, and it is worth knowing before you go
-looking for a route that is not there. The package cache is an **optional
-capability**: with `api.config.registry.package_cache.enabled` set to `false`
-every route under `/admin/package-cache` is absent — a 404 as an unrouted path,
-not a route that exists and refuses — because that is what a switched-off
-capability means everywhere in Terrapod (the container registry behaves the same
-way, and `scripts/airgap-gate.sh --gated-off` holds it to that against a running
-stack). The admin page says so in place of the section rather than reporting an
-error. The VCS archive cache has no such flag — it is part of what Terrapod is,
-like the provider mirror and the module registry — so its routes are always
-there.
+The table used to carry a fifth row, and it is gone: **no cache can be turned
+off any more, so no route here is ever missing.** Every cache is part of what
+Terrapod is, like the provider mirror and the module registry, and all four sets
+of routes are always mounted.
 
-**Nothing is locked away while a capability is off.** Turning one off stops it
-serving and stops its background work; everything already cached stays exactly
-where it is and is listed again the moment it is turned back on. So the way to
-inspect or purge a switched-off package cache is to turn it on, do the work, and
-turn it off again — and if the goal is to reclaim the space without serving
-anything, the scheduled retention sweep still runs.
+Until 2.0 the package cache was an *optional capability*: with
+api.config.registry.package_cache.enabled set to `false`, every route under
+`/admin/package-cache` was absent — a 404 as an unrouted path rather than a route
+that exists and refuses. That is worth knowing because of what it cost rather
+than as history. The shared routes on that prefix are about the cache rather than
+about an ecosystem, so some of them stayed mounted while others did not, leaving
+**that admin namespace answering for four routes and absent for a fifth**; and an
+upload route could store a vetted artifact into a cache nothing would ever serve.
+A cache that is off is a surface half-present rather than a smaller deployment.
+
+The flags are **removed** — see
+[Upgrading to 2.0](upgrading-to-2.0.md#every-cache-is-always-on-and-the-enabled-flags-are-removed) if your `values.yaml`
+still sets one. Nothing replaces them: what bounds a cache now is where it may
+fetch from (`upstream` per ecosystem) and whether it may reach upstream at all
+(`api.config.registry.cache_only`), and what reclaims its space is the scheduled
+retention sweep. None of those makes a route disappear.
 
 ---
 

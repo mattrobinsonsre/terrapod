@@ -1907,7 +1907,6 @@
       "heading": "预热软件包与镜像缓存",
       "help": "只要知道版本就请写上：指定了版本的预热此后可以与锁文件比对，而“最新的那个”无法比对。每行按 <code>名称 版本</code> 的格式书写；对于 Pulumi 插件，在末尾加上 <code>os/arch</code> 令牌可预热特定平台。",
       "ecosystemLabel": "构件类型",
-      "ecosystemOff": "{ecosystem}（已关闭）",
       "sourceLabel": "获取来源",
       "sourceDefault": "已配置的上游",
       "upstreamIs": "将从 <code>{url}</code> 获取。",

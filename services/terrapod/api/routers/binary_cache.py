@@ -171,12 +171,6 @@ async def download_binary(
     to fetch the exact binary version needed for a workspace.
     Requires authentication (runner token, API token, or session).
     """
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Binary cache is disabled",
-        )
-
     try:
         resolved = await resolve_version(tool, version)
         url = await get_or_cache_binary(db, storage, tool, resolved, os, arch)
@@ -220,10 +214,6 @@ async def get_binary_sha256sums(
     against the publisher's signature with its own pinned key. Lazily warmed
     from upstream if not yet persisted. Same source as the binary (cache path).
     """
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Binary cache is disabled"
-        )
     try:
         resolved = await resolve_version(tool, version)
         manifest, _sig = await get_or_cache_sums(storage, tool, resolved)
@@ -251,10 +241,6 @@ async def get_binary_sha256sums_sig(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Serve the detached GPG signature over the SHA256SUMS manifest (#607)."""
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Binary cache is disabled"
-        )
     try:
         resolved = await resolve_version(tool, version)
         _manifest, sig = await get_or_cache_sums(storage, tool, resolved)
@@ -354,12 +340,6 @@ async def upload_binary_artifact(
     # half-present surface the convention forbids: the artifact would be
     # stored, recorded, and unreachable. Every sibling route on this cache
     # refuses the same way, so this one must too.
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Binary cache is disabled",
-        )
-
     from terrapod.api.routers.cache_admin import _sealed_note
     from terrapod.api.upload_stream import stream_upload_to_tempfile
     from terrapod.services import binary_cache_uploads, cache_admission
@@ -440,12 +420,6 @@ async def warm_binary_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Pre-warm a specific binary version into the cache."""
-    if not settings.registry.binary_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Binary cache is disabled",
-        )
-
     try:
         url = await warm_binary(db, storage, body.tool, body.version, body.os, body.arch)
     except CacheOnlyError as e:
@@ -609,12 +583,6 @@ async def upload_provider_artifact(
     # Same reason as the binary upload: `provider_mirror` refuses every
     # read when this is off, so accepting a write would leave an operator
     # with a vetted provider nothing can install.
-    if not settings.registry.provider_cache.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Provider cache is disabled",
-        )
-
     from terrapod.api.routers.cache_admin import _sealed_note
     from terrapod.api.upload_stream import stream_upload_to_tempfile
     from terrapod.services import cache_admission, provider_cache_uploads

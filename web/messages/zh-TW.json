@@ -1907,7 +1907,6 @@
       "heading": "預熱套件與映像快取",
       "help": "只要知道版本就請寫上：指定了版本的預熱日後可以與鎖定檔比對，而「最新的那個」無法比對。每行按 <code>名稱 版本</code> 的格式書寫；對於 Pulumi 外掛，在末尾加上 <code>os/arch</code> 令牌可預熱特定平台。",
       "ecosystemLabel": "構件類型",
-      "ecosystemOff": "{ecosystem}（已關閉）",
       "sourceLabel": "取得來源",
       "sourceDefault": "已設定的上游",
       "upstreamIs": "將從 <code>{url}</code> 取得。",

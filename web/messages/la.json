@@ -1907,7 +1907,6 @@
       "heading": "Promptuaria fasciculorum et imaginum calefacere",
       "help": "Versionem da quotiens eam nosti: calefactio cum versione nominata postea ad lockfile comparari potest, «quidquid novissimum est» non potest. Scribe quamque lineam ut <code>nomen versio</code>; pro interpolamentis Pulumi, signa <code>os/arch</code> in fine adde ut certos suggestus calefacias.",
       "ecosystemLabel": "Genus artificii",
-      "ecosystemOff": "{ecosystem} (exstinctum)",
       "sourceLabel": "Petere ex",
       "sourceDefault": "Superior configuratus",
       "upstreamIs": "Ex <code>{url}</code> petetur.",
