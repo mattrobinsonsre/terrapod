@@ -1802,7 +1802,9 @@
       "repository": "R3p05170ry",
       "commit": "C0mm17",
       "paths": "P47h5",
-      "written": "Wr1773n"
+      "written": "Wr1773n",
+      "origin": "0r1g1n",
+      "uploadedBy": "Upl04d3d by"
     },
     "warm": {
       "heading": "W4rm c4ch3",
@@ -1869,7 +1871,9 @@
       "loadingMore": "L04d1ng…",
       "showing": "5h0w1ng {shown} 0f {total} — 7h3 74bl3 50r75 wh47 15 l04d3d, 50 l04d 7h3 r357 b3f0r3 r34d1ng 4n 0rd3r 45 7h3 wh0l3 c4ch3.",
       "listedAll": "{count, plural, one {# 4r71f4c7} other {# 4r71f4c75}} l1573d — 7h47 15 3v3ry7h1ng m47ch1ng 7h353 f1l73r5.",
-      "successBulkTruncated": "Purg3d {files} 4r71f4c75, fr331ng {size}. M0r3 m47ch 7h4n 0n3 purg3 r3m0v35 — purg3 4g41n 70 c4rry 0n."
+      "successBulkTruncated": "Purg3d {files} 4r71f4c75, fr331ng {size}. M0r3 m47ch 7h4n 0n3 purg3 r3m0v35 — purg3 4g41n 70 c4rry 0n.",
+      "uploadedBy": "by {who}",
+      "confirmRowUploaded": "7h15 4r71f4c7 w45 upl04d3d by 4n 0p3r470r, 50 17 3x1575 1n n0 up57r34m r3g157ry. R3m0v1ng 17 d357r0y5 7h3 0nly c0py."
     },
     "archives": {
       "connectionLabel": "C0nn3c710n",
@@ -1903,7 +1907,6 @@
       "heading": "W4rm p4ck4g3 4nd 1m4g3 c4ch35",
       "help": "G1v3 4 v3r510n wh3r3v3r y0u kn0w 17: 4 w4rm n4m3d 47 4 v3r510n c4n 4f73rw4rd5 b3 ch3ck3d 4g41n57 4 l0ckf1l3, 4nd “wh473v3r 15 n3w357” c4nn07. Wr173 34ch l1n3 45 <code>n4m3 v3r510n</code>; f0r Pulum1 plug1n5, 4dd 7r41l1ng <code>05/4rch</code> 70k3n5 70 w4rm 5p3c1f1c pl47f0rm5.",
       "ecosystemLabel": "4r71f4c7 k1nd",
-      "ecosystemOff": "{ecosystem} (5w17ch3d 0ff)",
       "sourceLabel": "F37ch fr0m",
       "sourceDefault": "C0nf1gur3d up57r34m",
       "upstreamIs": "W1ll f37ch fr0m <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "C0uld n07 574r7 w4rm1ng",
       "errorStatus": "C0uld n07 r34d 7h3 w4rm1ng j0b",
       "helpLead": "F37ch 4r71f4c75 1n70 7h3 c4ch3 b3f0r3 4ny7h1ng 45k5 f0r 7h3m — 0n3 p3r l1n3, 45 4 n4m3 4nd 4 v3r510n."
+    },
+    "attestation": {
+      "upstreamDigest": "V3r1f13d",
+      "nonePublished": "N0 d1g357 publ15h3d",
+      "operatorUpload": "Upl04d3d",
+      "unrecorded": "N07 r3c0rd3d"
+    },
+    "upload": {
+      "title": "Upl04d 4 v3773d 4r71f4c7",
+      "description": "Pu7 4n 4r71f4c7 y0u h4v3 v4l1d473d y0ur53lf 1n70 7h3 c4ch3. 7h15 15 7h3 0nly w4y 70 4dd 0n3 wh1l3 7h3 n0d3 15 534l3d, 4nd 17 n33d5 n0 publ15h3r 51gn47ur3 — wh47 15 r3c0rd3d 1n5734d 15 wh0 upl04d3d 17.",
+      "show": "Upl04d",
+      "hide": "Cl053",
+      "sealedNote": "7h15 n0d3 15 534l3d, 50 4n upl04d 15 7h3 0nly w4y 70 4dd 4n 4r71f4c7 — 4nd 7h3 0nly c0py, b3c4u53 n07h1ng h3r3 c4n b3 r3-f37ch3d.",
+      "ecosystem": "C4ch3",
+      "kind": "Wh47 y0u 4r3 upl04d1ng",
+      "kindArtifact": "7h3 4r71f4c7'5 by735",
+      "kindIndex": "4n 1nd3x d0cum3n7",
+      "kindHintIndexed": "4 534l3d n0d3 r34d5 wh1ch v3r510n5 3x157 fr0m 4n 1nd3x d0cum3n7, 50 4n 4r71f4c7 upl04d3d w17h0u7 0n3 c4nn07 b3 r350lv3d.",
+      "kindHintNoIndex": "7h15 c4ch3 n33d5 n0 1nd3x d0cum3n7.",
+      "file": "F1l3",
+      "reference": "R3f3r3nc3 (0p710n4l)",
+      "referenceHint": "Y0ur 0wn 71ck37, ch4ng3 0r 4ppr0v4l 1d. 570r3d w17h 7h3 upl04d.",
+      "replace": "R3pl4c3 wh47 15 4lr34dy 47 7h353 c00rd1n4735",
+      "replaceHint": "W17h0u7 7h15 4n 3x1571ng 4r71f4c7 15 r3fu53d r47h3r 7h4n 0v3rwr1773n. Wh47 17 d15pl4c35 m4y b3 wh47 4 run 4lr34dy d3p3nd5 0n.",
+      "confirmReplace": "Upl04d {filename} 0v3r 7h3 4r71f4c7 4lr34dy 47 7h353 c00rd1n4735? 7h3 by735 17 r3pl4c35 4r3 d357r0y3d.",
+      "confirmReplaceSealed": "7h15 n0d3 15 534l3d, 50 7h3 r3pl4c3d by735 c4nn07 b3 f37ch3d b4ck fr0m 4nywh3r3.",
+      "submit": "Upl04d",
+      "submitting": "Upl04d1ng…",
+      "provenanceNote": "R3c0rd3d 4g41n57 y0ur 4cc0un7.",
+      "success": "Upl04d3d {filename}.",
+      "successReplaced": "Upl04d3d {filename}, r3pl4c1ng wh47 w45 7h3r3.",
+      "successUnchanged": "{filename} w45 4lr34dy c4ch3d w17h 1d3n71c4l by735. N07h1ng ch4ng3d.",
+      "error": "7h3 upl04d f41l3d.",
+      "fields": {
+        "project": "Pr0j3c7",
+        "name": "N4m3",
+        "version": "V3r510n",
+        "filename": "F1l3n4m3",
+        "package_id": "P4ck4g3 1d",
+        "module": "M0dul3 p47h",
+        "suffix": "F1l3",
+        "namespace": "N4m35p4c3",
+        "document": "D0cum3n7",
+        "kind": "Plug1n k1nd",
+        "os": "0p3r471ng 5y573m",
+        "arch": "4rch173c7ur3",
+        "tool": "700l",
+        "hostname": "R3g157ry h057",
+        "type": "Pr0v1d3r 7yp3"
+      },
+      "hints": {
+        "filename": "5uppl13d r47h3r 7h4n d3r1v3d: 4 wh33l'5 n4m3 3nc0d35 175 c0mp471b1l17y 74g5.",
+        "suffix": "0n3 0f .1nf0, .m0d 0r .z1p. 4 v3r510n 15 7hr33 f1l35 4nd 34ch 15 upl04d3d 53p4r473ly.",
+        "document": "Wh1ch 1nd3x d0cum3n7. G4l4xy h45 c0ll3c710n 4nd v3r510n5; G0 h45 l157 4nd l47357.",
+        "kind": "r350urc3, l4ngu4g3, 4n4lyz3r 0r c0nv3r73r.",
+        "tool": "70fu, 73rr4f0rm, 73rr4grun7, 0p4, 7r1vy, ch3ck0v",
+        "hostname": "r3g157ry.73rr4f0rm.10, 0r y0ur 0wn r3g157ry'5 h057"
+      },
+      "ecosystems": {
+        "binary": "3ng1n3 b1n4r135",
+        "provider": "73rr4f0rm pr0v1d3r5"
+      }
     }
   },
   "catalog": {

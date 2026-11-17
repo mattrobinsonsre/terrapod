@@ -38,6 +38,7 @@ from terrapod.config import settings
 from terrapod.db.models import CachedPackageFile
 from terrapod.http_retry import DEFAULT_RETRIES, retry_delay_seconds
 from terrapod.logging_config import get_logger
+from terrapod.services.package_cache import content_allowlist
 from terrapod.storage import keys
 from terrapod.storage.protocol import ObjectStore
 
@@ -202,18 +203,26 @@ _ALGOS = {"sha256": "sha256", "sha512": "sha512", "sha1": "sha1"}
 #: module:
 #:
 #:   goproxy          the module proxy serves no digest at all (`.ziphash` and
-#:                    `.zip.sha256` are both 404), and **the consumer already
-#:                    verifies with a stronger control**: a Go program carries a
-#:                    committed `go.sum` and the `go` command enforces it against
-#:                    every module it downloads, pinned by the program's author
-#:                    rather than asserted by whichever proxy answered. The
-#:                    authoritative hash otherwise lives in the checksum
-#:                    database -- a THIRD upstream a sealed deployment cannot
-#:                    reach, which is why the runner sets `GOSUMDB=off` (that
-#:                    turns off the database lookup, NOT the `go.sum` check). A
-#:                    sumdb client here would duplicate the consumer's check
-#:                    against an upstream we have deliberately stopped reaching.
-#:                    Recorded in full on `goproxy.artifact_for`.
+#:                    `.zip.sha256` are both 404), so there is nothing per-file
+#:                    to require here and the ecosystem cannot join this set.
+#:                    The authoritative hash lives in the Go checksum database,
+#:                    which this deployment MIRRORS under `/sumdb/<host>/`
+#:                    (#2589) -- so the verification happens, it is simply the
+#:                    toolchain checking the transparency log through us rather
+#:                    than us comparing a digest at fetch time.
+#:
+#:                    **This used to say the database was a third upstream a
+#:                    sealed deployment could not reach, and that the consumer
+#:                    verified with a stronger control anyway because the `go`
+#:                    command "enforces `go.sum` against every module it
+#:                    downloads". The first half is no longer true now that it is
+#:                    mirrored; the second was only ever true of a module the
+#:                    program had already PINNED.** Measured, go1.27.3, cold
+#:                    module cache: `go mod download` with `GOSUMDB=off` and no
+#:                    `go.sum` entry exits 0 and WRITES the hash of whatever the
+#:                    proxy served. The correction is left visible because a
+#:                    reason that reads as considered is what stops the next
+#:                    person looking.
 #:   pulumi_plugins   get.pulumi.com publishes nothing beside the tarball (403
 #:                    for `.sha256` and `SHA256SUMS`), so a Pulumi-published
 #:                    plugin is admitted and recorded honestly. **Terrapod's own
@@ -441,6 +450,17 @@ async def fetch_and_cache(
             f"cached, and this node is sealed (registry.cache_only). Warm it before "
             f"sealing, or unset registry.cache_only."
         )
+
+    # BEFORE the fetch, not after it (#2589). The control is about what this
+    # deployment is willing to serve, and an artifact that has already been
+    # downloaded has already been reached for -- the refusal has to happen while
+    # it still means something. It sits here rather than in each ecosystem module
+    # because this is the one pull-through point all six share, so a cache added
+    # later is covered without anybody remembering to add it.
+    #
+    # Deliberately AFTER the sealed check: a sealed node fetches nothing at all,
+    # so its own error is the more useful one and this would only mask it.
+    content_allowlist.check(artifact.ecosystem, artifact.name, artifact.filename)
 
     key = keys.package_cache_key(artifact.ecosystem, artifact.name, artifact.filename)
     owns_client = client is None

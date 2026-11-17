@@ -165,23 +165,6 @@ class TestWarmFromManifest:
         )
         assert summary.succeeded == 2
 
-    async def test_disabled_binary_cache_marks_failed_not_skipped(self):
-        db, storage = _db(), AsyncMock()
-        with patch.object(
-            cache_warm_service.binary_cache_service, "warm_binary", new_callable=AsyncMock
-        ) as mock_warm:
-            with patch.object(cache_warm_service.settings.registry.binary_cache, "enabled", False):
-                summary = await warm_from_manifest(
-                    db,
-                    storage,
-                    [WarmBinaryEntry(tool="tofu", version="1.9.0")],
-                    [],
-                    include_platform_tools=False,
-                )
-        mock_warm.assert_not_called()
-        assert summary.failed == 2
-        assert all("disabled" in r.error for r in summary.results)
-
 
 class TestWarmEntryValidation:
     def test_valid_provider_source_coordinates(self):

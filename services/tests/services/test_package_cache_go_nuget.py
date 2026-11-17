@@ -136,20 +136,26 @@ class TestGoArtifacts:
 
 
 class TestWhyGoIsNotVerifiedHere:
-    """The decision is a measurement, so losing its reason is losing the decision.
+    """Why no fetch-time digest here, and where the verification actually is.
 
-    **The consumer already verifies, with a stronger control than a fetch-time
-    digest would be.** A Go program carries a committed `go.sum` and the `go`
-    command enforces it against every module it downloads -- pinned by the
-    program's author rather than asserted by whichever proxy answered. The
-    authoritative hash otherwise lives in the Go checksum database, a THIRD
-    upstream a sealed deployment cannot reach, which is why the runner sets
-    `GOSUMDB=off` (that turns off the database LOOKUP, not the `go.sum` check).
+    The proxy protocol publishes none (`.ziphash` and `.zip.sha256` are both 404
+    -- measured), so there is nothing per-file to compare against and the
+    ecosystem cannot join `_DIGEST_REQUIRED`. The authoritative hash lives in the
+    Go checksum database, and from #2589 **this deployment MIRRORS that database**
+    under `/sumdb/<host>/` -- so the hash IS checked, by the toolchain against the
+    transparency log, rather than by us against a digest we never receive.
 
-    Without that written down, the only evidence is a 404 against
-    `.zip.sha256`, which reads as an unfinished job rather than a closed
-    question -- and the next person writes a sumdb client that duplicates the
-    consumer's check against an upstream we deliberately stopped reaching.
+    **This docstring used to end differently, and the change is the point.** It
+    said the database was a third upstream a sealed deployment could not reach,
+    which is why the runner set `GOSUMDB=off`, and that the consumer verified with
+    a stronger control anyway. The first half stopped being true when the mirror
+    landed. The second was only ever true of a module the program had already
+    PINNED: measured, go1.27.3, cold module cache, `go mod download` with
+    `GOSUMDB=off` and no `go.sum` entry exits 0 and WRITES the hash of whatever
+    the proxy served.
+
+    Without that written down, the only evidence is a 404 against `.zip.sha256`,
+    which reads as an unfinished job rather than a closed question.
     """
 
     def test_the_ecosystem_is_outside_the_required_set(self) -> None:
@@ -389,3 +395,85 @@ class TestNuGetDigestResolution:
         async with self._client(handler) as client:
             with pytest.raises(NotFoundUpstream):
                 await nuget.resolve_digest("A", "1.0.0", client)
+
+
+class TestTheChecksumDatabaseMirror:
+    """The sumdb is mirrorable through this very cache, which is what lets the
+    check come back on (#2589).
+
+    The protocol here was measured against go1.27.3 through a logging proxy
+    rather than read from documentation, because the one endpoint that makes it
+    work -- `/sumdb/<host>/supported` -- exists only on the PROXY: the real
+    sum.golang.org answers 404 for it. A cold `go mod tidy` asks for `supported`
+    first, then interleaves `tile/...` and `lookup/...` with the module files.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _sumdb(self):
+        before = settings.registry.package_cache.go.sumdb_upstream
+        settings.registry.package_cache.go.sumdb_upstream = "https://sum.golang.org"
+        yield
+        settings.registry.package_cache.go.sumdb_upstream = before
+
+    def test_the_host_is_derived_from_the_configured_database(self) -> None:
+        assert goproxy.sumdb_host() == "sum.golang.org"
+        assert goproxy.sumdb_enabled() is True
+
+    def test_an_empty_setting_serves_no_database(self) -> None:
+        """The operator's way to run without it, and it must not be defaulted over."""
+        settings.registry.package_cache.go.sumdb_upstream = ""
+        assert goproxy.sumdb_host() == ""
+        assert goproxy.sumdb_enabled() is False
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "lookup/rsc.io/quote@v1.5.2",
+            "tile/8/0/x274/929.p/152",
+            "tile/8/1/x001/073",
+            "tile/8/2/004.p/49",
+        ],
+    )
+    def test_the_paths_a_real_go_command_asks_for_are_served(self, path: str) -> None:
+        assert goproxy.valid_sumdb_path(path) is True
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "../etc/passwd",
+            "tile/../../escape",
+            "/absolute",
+            "lookup/",
+            "",
+            "   ",
+            "lookup//double",
+            "./relative",
+        ],
+    )
+    def test_a_path_that_could_climb_out_of_the_cache_is_refused(self, path: str) -> None:
+        """The path becomes part of an object key, and `package_cache_key` leaves
+        slashes intact by design -- the hierarchy IS the grouping. So traversal has
+        to be refused here rather than relied on being harmless downstream."""
+        assert goproxy.valid_sumdb_path(path) is False
+
+    @pytest.mark.parametrize("path", ["supported", "latest", "evil", "config/x"])
+    def test_only_lookup_and_tile_are_proxied(self, path: str) -> None:
+        """Refusing the rest keeps this from becoming a general proxy to the
+        checksum-database host. `supported` is answered by its own route and is
+        never fetched upstream -- the real database 404s it."""
+        assert goproxy.valid_sumdb_path(path) is False
+
+    def test_the_cache_entry_keeps_the_path_hierarchy(self) -> None:
+        a = goproxy.sumdb_artifact("tile/8/0/x274/929.p/152")
+        assert a.ecosystem == "go"
+        assert a.name == "sumdb/sum.golang.org"
+        assert a.filename == "tile/8/0/x274/929.p/152"
+        assert a.upstream_url == "https://sum.golang.org/tile/8/0/x274/929.p/152"
+
+    def test_the_database_host_is_not_confusable_with_a_module(self) -> None:
+        """`sumdb/...` must not be addressable as a module path, or the two
+        namespaces would share a cache prefix."""
+        a = goproxy.sumdb_artifact("lookup/rsc.io/quote@v1.5.2")
+        m = goproxy.document_artifact("rsc.io/quote", goproxy.LIST_DOC)
+        assert a.name != m.name
+        assert a.name.startswith(f"{goproxy.SUMDB_PREFIX}/")

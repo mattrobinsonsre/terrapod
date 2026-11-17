@@ -1802,7 +1802,9 @@
       "repository": "Repository",
       "commit": "Commit",
       "paths": "Pfade",
-      "written": "Geschrieben"
+      "written": "Geschrieben",
+      "origin": "Herkunft",
+      "uploadedBy": "Hochgeladen von"
     },
     "warm": {
       "heading": "Zwischenspeicher vorwärmen",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Wird geladen …",
       "showing": "{shown} von {total} werden angezeigt – die Tabelle sortiert nur das Geladene, laden Sie also den Rest, bevor Sie eine Reihenfolge als den gesamten Zwischenspeicher lesen.",
       "listedAll": "{count, plural, one {# Artefakt} other {# Artefakte}} aufgeführt – das ist alles, was auf diese Filter passt.",
-      "successBulkTruncated": "{files} Artefakte gelöscht, {size} freigegeben. Es passen mehr darauf, als ein Löschvorgang entfernt – noch einmal löschen, um fortzufahren."
+      "successBulkTruncated": "{files} Artefakte gelöscht, {size} freigegeben. Es passen mehr darauf, als ein Löschvorgang entfernt – noch einmal löschen, um fortzufahren.",
+      "uploadedBy": "von {who}",
+      "confirmRowUploaded": "Dieses Artefakt wurde von einem Operator hochgeladen und existiert daher in keiner Upstream-Registry. Wenn Sie es entfernen, wird die einzige Kopie zerstört."
     },
     "archives": {
       "connectionLabel": "Verbindung",
@@ -1903,7 +1907,6 @@
       "heading": "Paket- und Image-Caches vorwärmen",
       "help": "Geben Sie eine Version an, wo immer Sie sie kennen: Ein mit Version benanntes Vorwärmen lässt sich später gegen eine Lockdatei prüfen, „was auch immer das Neueste ist“ nicht. Schreiben Sie jede Zeile als <code>Name Version</code>; für Pulumi-Plugins hängen Sie <code>os/arch</code>-Token an, um bestimmte Plattformen vorzuwärmen.",
       "ecosystemLabel": "Artefaktart",
-      "ecosystemOff": "{ecosystem} (abgeschaltet)",
       "sourceLabel": "Beziehen von",
       "sourceDefault": "Konfigurierte Quelle",
       "upstreamIs": "Wird von <code>{url}</code> geholt.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Das Vorwärmen konnte nicht gestartet werden",
       "errorStatus": "Der Vorwärm-Auftrag konnte nicht gelesen werden",
       "helpLead": "Artefakte in den Cache holen, bevor sie angefordert werden — eines pro Zeile, als Name und Version."
+    },
+    "attestation": {
+      "upstreamDigest": "Verifiziert",
+      "nonePublished": "Keine Prüfsumme veröffentlicht",
+      "operatorUpload": "Hochgeladen",
+      "unrecorded": "Nicht erfasst"
+    },
+    "upload": {
+      "title": "Ein geprüftes Artefakt hochladen",
+      "description": "Legen Sie ein Artefakt, das Sie selbst validiert haben, in den Zwischenspeicher. Nur so lässt sich eines hinzufügen, während der Knoten versiegelt ist, und es ist keine Signatur des Herausgebers erforderlich – erfasst wird stattdessen, wer es hochgeladen hat.",
+      "show": "Hochladen",
+      "hide": "Schließen",
+      "sealedNote": "Dieser Knoten ist versiegelt, ein Upload ist also die einzige Möglichkeit, ein Artefakt hinzuzufügen – und die einzige Kopie, denn hier kann nichts erneut abgerufen werden.",
+      "ecosystem": "Zwischenspeicher",
+      "kind": "Was Sie hochladen",
+      "kindArtifact": "Die Bytes des Artefakts",
+      "kindIndex": "Ein Indexdokument",
+      "kindHintIndexed": "Ein versiegelter Knoten liest aus einem Indexdokument, welche Versionen existieren; ein ohne Indexdokument hochgeladenes Artefakt kann daher nicht aufgelöst werden.",
+      "kindHintNoIndex": "Dieser Zwischenspeicher benötigt kein Indexdokument.",
+      "file": "Datei",
+      "reference": "Referenz (optional)",
+      "referenceHint": "Ihre eigene Ticket-, Änderungs- oder Genehmigungs-ID. Wird mit dem Upload gespeichert.",
+      "replace": "Ersetzen, was an diesen Koordinaten bereits liegt",
+      "replaceHint": "Ohne dies wird ein vorhandenes Artefakt abgelehnt statt überschrieben. Was dabei verdrängt wird, kann genau das sein, worauf eine Ausführung bereits angewiesen ist.",
+      "confirmReplace": "{filename} über das Artefakt hochladen, das an diesen Koordinaten bereits liegt? Die ersetzten Bytes werden zerstört.",
+      "confirmReplaceSealed": "Dieser Knoten ist versiegelt, die ersetzten Bytes können also von nirgendwo zurückgeholt werden.",
+      "submit": "Hochladen",
+      "submitting": "Wird hochgeladen…",
+      "provenanceNote": "Unter Ihrem Konto erfasst.",
+      "success": "{filename} hochgeladen.",
+      "successReplaced": "{filename} hochgeladen; das Vorhandene wurde ersetzt.",
+      "successUnchanged": "{filename} war mit identischen Bytes bereits zwischengespeichert. Nichts geändert.",
+      "error": "Der Upload ist fehlgeschlagen.",
+      "fields": {
+        "project": "Projekt",
+        "name": "Name",
+        "version": "Version",
+        "filename": "Dateiname",
+        "package_id": "Paket-ID",
+        "module": "Modulpfad",
+        "suffix": "Datei",
+        "namespace": "Namespace",
+        "document": "Dokument",
+        "kind": "Plugin-Typ",
+        "os": "Betriebssystem",
+        "arch": "Architektur",
+        "tool": "Werkzeug",
+        "hostname": "Registry-Host",
+        "type": "Anbietertyp"
+      },
+      "hints": {
+        "filename": "Angegeben statt abgeleitet: Der Name eines Wheels kodiert seine Kompatibilitäts-Tags.",
+        "suffix": "Eines von .info, .mod oder .zip. Eine Version besteht aus drei Dateien, die jeweils einzeln hochgeladen werden.",
+        "document": "Welches Indexdokument. Galaxy hat collection und versions; Go hat list und latest.",
+        "kind": "resource, language, analyzer oder converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io oder der Host Ihrer eigenen Registry"
+      },
+      "ecosystems": {
+        "binary": "Engine-Binärdateien",
+        "provider": "Terraform-Anbieter"
+      }
     }
   },
   "catalog": {

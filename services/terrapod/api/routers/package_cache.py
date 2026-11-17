@@ -44,7 +44,6 @@ from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import registry_collection_service as collections
-from terrapod.services.capabilities import capability_enabled
 from terrapod.services.package_cache import (
     galaxy,
     goproxy,
@@ -1217,6 +1216,81 @@ async def _go_document(module: str, doc: str, db: AsyncSession, storage: ObjectS
     return Response(content=raw, media_type="text/plain; charset=UTF-8")
 
 
+@go_router.get("/go/sumdb/{host}/supported")
+async def go_sumdb_supported(
+    host: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+) -> Response:
+    """Tell the toolchain whether this proxy serves that checksum database.
+
+    Proxy-side only -- the real sum.golang.org answers 404 for `/supported` --
+    and it is what routes the database through this cache instead of making it a
+    second upstream. A 200 with an empty body means yes; a 404 means the `go`
+    command contacts the database directly, which a sealed node cannot do.
+
+    Registered BEFORE the `{module:path}` routes below, which are greedy enough
+    to swallow this path if they are matched first.
+    """
+    if not goproxy.sumdb_enabled() or host != goproxy.sumdb_host():
+        raise HTTPException(status_code=404, detail="Not found")
+    return Response(status_code=200)
+
+
+@go_router.get("/go/sumdb/{host}/{path:path}")
+async def go_sumdb_document(
+    host: str,
+    path: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Serve one checksum-database response, cached so a sealed node still verifies.
+
+    A tile is immutable content at a fixed position in the log and a lookup is an
+    append-only entry, so neither is given an expiry: re-fetching either returns
+    the same bytes.
+    """
+    if not goproxy.sumdb_enabled() or host != goproxy.sumdb_host():
+        raise HTTPException(status_code=404, detail="Not found")
+    if not goproxy.valid_sumdb_path(path):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    artifact = goproxy.sumdb_artifact(path)
+
+    if sealed():
+        raw = await load_document(db, storage, artifact.ecosystem, artifact.name, artifact.filename)
+        if raw is None:
+            # The one place this differs from a module document: a miss here is
+            # not a normal probe, it is the verification the runner is relying on
+            # being unavailable. Saying so beats a bare 404 the toolchain reports
+            # as an unreachable checksum database.
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"checksum database entry {path!r} is not cached and this node is "
+                    f"sealed, so it cannot be fetched. Warm the Go checksum database "
+                    f"before sealing, or set registry.package_cache.go.sumdb_upstream "
+                    f"empty to run without it."
+                ),
+            )
+        return Response(content=raw, media_type="text/plain; charset=UTF-8")
+
+    try:
+        raw = await goproxy.fetch_sumdb(path)
+    except NotFoundUpstream:
+        raise HTTPException(status_code=404, detail="Not found") from None
+    except UpstreamError as exc:
+        raise _upstream_failure(exc) from exc
+
+    # Best-effort: failing to cache must not fail a request about to succeed.
+    try:
+        await store_document(db, storage, artifact, raw)
+    except Exception:
+        logger.warning("Could not cache Go checksum-database entry", path=path, exc_info=True)
+
+    return Response(content=raw, media_type="text/plain; charset=UTF-8")
+
+
 @go_router.get("/go/{module:path}/@v/list")
 async def go_version_list(
     module: str,
@@ -1384,37 +1458,25 @@ async def _redirect_to_object(storage: ObjectStore, key: str) -> Response:
     return RedirectResponse(url=presigned.url, status_code=302)
 
 
-def build_router() -> APIRouter | None:
-    """The package-cache routes for the ecosystems this deployment offers (#1429).
+def build_router() -> APIRouter:
+    """Every package-cache route. All six ecosystems, always.
 
-    Returns None when none of them are, so the application mounts nothing at all —
-    the routes do not exist, rather than existing and refusing. That is the
-    difference between a surface an operator has switched off and one that answers
-    every request with a 404 while still appearing in the schema, and it is what
-    keeps a terraform-only install free of endpoints it has no use for.
+    This used to mount per ecosystem and could return None, so a deployment
+    could serve some proxies and not others, or none. That is gone: a cache is
+    infrastructure rather than a feature, and a cache that is off is a surface
+    half-present -- which is how an uploaded artifact came to be storable into a
+    cache nothing would serve.
+
+    Removing the choice removes the combinations with it. Six independent
+    switches are sixty-four configurations, of which exactly one was ever
+    exercised, and the other sixty-three were reachable by an operator and
+    tested by nobody.
 
     A factory rather than mutating a module-level router, so building the
     application twice in one process (which the tests do constantly) cannot
     accumulate duplicate routes.
     """
     aggregate = APIRouter(prefix="/package-cache", tags=["package-cache"], route_class=TimedRoute)
-    mounted = False
-    if capability_enabled("pypi"):
-        aggregate.include_router(pypi_router)
-        mounted = True
-    if capability_enabled("npm"):
-        aggregate.include_router(npm_router)
-        mounted = True
-    if capability_enabled("galaxy"):
-        aggregate.include_router(galaxy_router)
-        mounted = True
-    if capability_enabled("pulumi"):
-        aggregate.include_router(pulumi_router)
-        mounted = True
-    if capability_enabled("go"):
-        aggregate.include_router(go_router)
-        mounted = True
-    if capability_enabled("nuget"):
-        aggregate.include_router(nuget_router)
-        mounted = True
-    return aggregate if mounted else None
+    for router in (pypi_router, npm_router, galaxy_router, pulumi_router, go_router, nuget_router):
+        aggregate.include_router(router)
+    return aggregate

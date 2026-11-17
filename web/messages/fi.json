@@ -1802,7 +1802,9 @@
       "repository": "Repositorio",
       "commit": "Commit",
       "paths": "Polut",
-      "written": "Kirjoitettu"
+      "written": "Kirjoitettu",
+      "origin": "Alkuperä",
+      "uploadedBy": "Ladannut"
     },
     "warm": {
       "heading": "Lämmitä välimuisti",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Ladataan…",
       "showing": "Näytetään {shown}/{total} — taulukko järjestää vain ladatun, joten lataa loput ennen kuin luet järjestyksen koko välimuistina.",
       "listedAll": "{count, plural, one {# artefakti} other {# artefaktia}} luettelossa — se on kaikki, mikä vastaa näitä suodattimia.",
-      "successBulkTruncated": "Poistettiin {files} artefaktia ja vapautettiin {size}. Vastaavia on enemmän kuin yksi poisto poistaa — poista uudelleen jatkaaksesi."
+      "successBulkTruncated": "Poistettiin {files} artefaktia ja vapautettiin {size}. Vastaavia on enemmän kuin yksi poisto poistaa — poista uudelleen jatkaaksesi.",
+      "uploadedBy": "ladannut {who}",
+      "confirmRowUploaded": "Tämän artefaktin on ladannut ylläpitäjä, joten sitä ei ole missään ylävirran rekisterissä. Sen poistaminen tuhoaa ainoan kopion."
     },
     "archives": {
       "connectionLabel": "Yhteys",
@@ -1903,7 +1907,6 @@
       "heading": "Lämmitä paketti- ja vedosvälimuistit",
       "help": "Anna versio aina kun tiedät sen: versiolla nimetyn lämmityksen voi jälkikäteen tarkistaa lukkotiedostoa vasten, ”mikä sattuu olemaan uusin” ei käy siihen. Kirjoita jokainen rivi muodossa <code>nimi versio</code>; Pulumi-laajennuksille lisää loppuun <code>os/arch</code>-merkinnät, jotta tietyt alustat lämmitetään.",
       "ecosystemLabel": "Artefaktin laji",
-      "ecosystemOff": "{ecosystem} (pois käytöstä)",
       "sourceLabel": "Hae lähteestä",
       "sourceDefault": "Määritetty ylävirta",
       "upstreamIs": "Haetaan lähteestä <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Lämmitystä ei voitu käynnistää",
       "errorStatus": "Lämmitystyötä ei voitu lukea",
       "helpLead": "Hae artefaktit välimuistiin ennen kuin mikään pyytää niitä — yksi riviä kohden, nimenä ja versiona."
+    },
+    "attestation": {
+      "upstreamDigest": "Varmennettu",
+      "nonePublished": "Tiivistettä ei julkaistu",
+      "operatorUpload": "Ladattu",
+      "unrecorded": "Ei kirjattu"
+    },
+    "upload": {
+      "title": "Lataa tarkastettu artefakti",
+      "description": "Vie välimuistiin artefakti, jonka olet itse tarkastanut. Tämä on ainoa tapa lisätä artefakti solmun ollessa sinetöity, eikä se vaadi julkaisijan allekirjoitusta — sen sijaan kirjataan, kuka sen latasi.",
+      "show": "Lataa",
+      "hide": "Sulje",
+      "sealedNote": "Tämä solmu on sinetöity, joten lataaminen on ainoa tapa lisätä artefakti — ja samalla sen ainoa kopio, koska täältä ei voi hakea mitään uudelleen.",
+      "ecosystem": "Välimuisti",
+      "kind": "Mitä olet lataamassa",
+      "kindArtifact": "Artefaktin tavut",
+      "kindIndex": "Indeksidokumentti",
+      "kindHintIndexed": "Sinetöity solmu lukee olemassa olevat versiot indeksidokumentista, joten ilman sitä ladattua artefaktia ei voi ratkaista.",
+      "kindHintNoIndex": "Tämä välimuisti ei tarvitse indeksidokumenttia.",
+      "file": "Tiedosto",
+      "reference": "Viite (valinnainen)",
+      "referenceHint": "Oman tikettisi, muutoksesi tai hyväksyntäsi tunniste. Tallennetaan latauksen yhteyteen.",
+      "replace": "Korvaa se, mikä näissä koordinaateissa jo on",
+      "replaceHint": "Ilman tätä olemassa oleva artefakti hylätään eikä korvata. Se, minkä se syrjäyttää, voi olla juuri se, josta jokin ajo jo riippuu.",
+      "confirmReplace": "Ladataanko {filename} näissä koordinaateissa jo olevan artefaktin päälle? Korvatut tavut tuhoutuvat.",
+      "confirmReplaceSealed": "Tämä solmu on sinetöity, joten korvattuja tavuja ei voi hakea takaisin mistään.",
+      "submit": "Lataa",
+      "submitting": "Ladataan…",
+      "provenanceNote": "Kirjataan tilillesi.",
+      "success": "{filename} ladattu.",
+      "successReplaced": "{filename} ladattu, aiempi sisältö korvattiin.",
+      "successUnchanged": "{filename} oli jo välimuistissa identtisillä tavuilla. Mikään ei muuttunut.",
+      "error": "Lataus epäonnistui.",
+      "fields": {
+        "project": "Projekti",
+        "name": "Nimi",
+        "version": "Versio",
+        "filename": "Tiedostonimi",
+        "package_id": "Paketin tunniste",
+        "module": "Moduulin polku",
+        "suffix": "Tiedosto",
+        "namespace": "Nimiavaruus",
+        "document": "Dokumentti",
+        "kind": "Laajennuksen tyyppi",
+        "os": "Käyttöjärjestelmä",
+        "arch": "Arkkitehtuuri",
+        "tool": "Työkalu",
+        "hostname": "Rekisterin isäntä",
+        "type": "Palveluntarjoajan tyyppi"
+      },
+      "hints": {
+        "filename": "Annetaan, ei päätellä: wheel-tiedoston nimi koodaa sen yhteensopivuustunnisteet.",
+        "suffix": "Yksi näistä: .info, .mod tai .zip. Versio on kolme tiedostoa, ja kukin ladataan erikseen.",
+        "document": "Mikä indeksidokumentti. Galaxylla on collection ja versions; Golla on list ja latest.",
+        "kind": "resource, language, analyzer tai converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io tai oman rekisterisi isäntä"
+      },
+      "ecosystems": {
+        "binary": "Moottoribinaarit",
+        "provider": "Terraform-palveluntarjoajat"
+      }
     }
   },
   "catalog": {

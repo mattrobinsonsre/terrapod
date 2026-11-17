@@ -35,6 +35,48 @@ logger = get_logger(__name__)
 _NONCE_LEN = 12
 
 
+#: The version tag on a stretched wrap. A wrap with no tag is the legacy
+#: unsalted-sha256 format, which is still read and never written.
+_WRAP_V2 = "v2"
+
+#: 16 bytes, the scrypt convention.
+_SALT_LEN = 16
+
+#: scrypt parameters. n=2**15 keeps a single wrap around a tenth of a second on
+#: ordinary hardware -- unnoticeable next to a startup that already talks to a
+#: database, and about 32,768 times the cost per guess that the unsalted sha256
+#: it replaces imposed on an attacker holding a backup. r and p are the values
+#: RFC 7914 gives as the general-purpose choice.
+_SCRYPT_N = 2**15
+_SCRYPT_R = 8
+_SCRYPT_P = 1
+
+#: scrypt needs 128 * n * r * p bytes -- exactly 32 MiB for the parameters above.
+#: `maxmem=0` is OpenSSL's own 32 MB default, which these parameters sit just
+#: over, so a wrap fails with "memory limit exceeded" rather than being slow.
+#: Stated explicitly with headroom, so a later n bump fails a test rather than
+#: every wrap at run time.
+_SCRYPT_MAXMEM = 64 * 1024 * 1024
+
+
+def _stretch(secret: str, salt: bytes) -> bytes:
+    """Derive a 32-byte KEK from a passphrase and a per-wrap salt.
+
+    `hashlib.scrypt` rather than a `cryptography` KDF object: it is stdlib, it is
+    the same primitive, and it keeps this module importable without reaching for
+    a backend. The cost is deliberate -- see `_SCRYPT_N`.
+    """
+    return hashlib.scrypt(
+        secret.encode("utf-8"),
+        salt=salt,
+        n=_SCRYPT_N,
+        r=_SCRYPT_R,
+        p=_SCRYPT_P,
+        maxmem=_SCRYPT_MAXMEM,
+        dklen=32,
+    )
+
+
 @runtime_checkable
 class KEKProvider(Protocol):
     """Wrap/unwrap a DEK. ``id`` identifies the backend for diagnostics."""
@@ -77,7 +119,12 @@ class StaticKEKProvider:
         if not master_secret:
             raise ValueError("static encryption provider requires a master key")
         self._report_strength(master_secret, strict)
-        self._kek = hashlib.sha256(master_secret.encode("utf-8")).digest()
+        # The SECRET is kept rather than only its hash, because a v2 wrap stretches
+        # it against a fresh per-wrap salt and so cannot precompute one KEK.
+        self._secret = master_secret
+        # And the legacy KEK, because every wrap written before v2 existed is under
+        # it and a deployment that could not read those could decrypt nothing.
+        self._legacy_kek = hashlib.sha256(master_secret.encode("utf-8")).digest()
 
     @staticmethod
     def _report_strength(master_secret: str, strict: bool | None) -> None:
@@ -93,17 +140,44 @@ class StaticKEKProvider:
         logger.warning("weak static encryption key", problem=problem)
 
     async def wrap(self, dek: bytes) -> str:
+        """Wrap a DEK in the STRETCHED, versioned format (#2589).
+
+        Every new wrap is `v2`, with a per-wrap salt and scrypt between the
+        passphrase and the KEK. The legacy format is still READ (see `unwrap`)
+        but never written again, so a deployment migrates simply by rotating --
+        and the format itself records which it is, rather than being inferred.
+        """
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+        salt = os.urandom(_SALT_LEN)
+        kek = _stretch(self._secret, salt)
         nonce = os.urandom(_NONCE_LEN)
-        ct = AESGCM(self._kek).encrypt(nonce, dek, None)
-        return f"{_b64e(nonce)}.{_b64e(ct)}"
+        ct = AESGCM(kek).encrypt(nonce, dek, None)
+        return f"{_WRAP_V2}.{_b64e(salt)}.{_b64e(nonce)}.{_b64e(ct)}"
 
     async def unwrap(self, wrapped: str) -> bytes:
+        """Unwrap either format.
+
+        **Reading the legacy format is not optional and must not be removed.**
+        Every DEK wrapped before this existed is `nonce.ct` under the unsalted
+        `sha256(passphrase)`, and a deployment that could not read those could not
+        decrypt anything it already holds -- which is unrecoverable rather than
+        inconvenient. The version tag is what tells the two apart; a wrap with no
+        tag is legacy by construction, because `v2` is written with one.
+        """
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+        parts = wrapped.split(".")
+        if parts[0] == _WRAP_V2:
+            if len(parts) != 4:
+                raise ValueError("malformed v2 KEK wrap")
+            _, salt_b64, nonce_b64, ct_b64 = parts
+            kek = _stretch(self._secret, _b64d(salt_b64))
+            return AESGCM(kek).decrypt(_b64d(nonce_b64), _b64d(ct_b64), None)
+
+        # Legacy: unsalted sha256, no stretching. GHSA-hc47-q72v-4vcm.
         nonce_b64, ct_b64 = wrapped.split(".", 1)
-        return AESGCM(self._kek).decrypt(_b64d(nonce_b64), _b64d(ct_b64), None)
+        return AESGCM(self._legacy_kek).decrypt(_b64d(nonce_b64), _b64d(ct_b64), None)
 
 
 class VaultTransitKEKProvider:

@@ -284,51 +284,6 @@ class TestEverythingTheRequestCarriesReachesTheService:
         assert "16-byte cap" in resp.json()["detail"]
 
 
-class TestAnUploadRouteGoesWithItsOwnEcosystem:
-    """Gated FINER than the rest of its namespace, and the contrast is the test.
-
-    The listing, the totals, the evictions and verify are about the cache as a
-    whole and go with `registry.package_cache.enabled`. An upload is for ONE
-    ecosystem: offering a way to put an artifact into a cache this deployment
-    will not serve is exactly the half-present surface the convention forbids.
-
-    `tests/api/test_capability_gating_endpoints.py` asserts the absence
-    generically for every capability. What it cannot see is whether turning one
-    off took the others with it — unmounting all six would pass it.
-    """
-
-    def _paths(self) -> list[str]:
-        return [getattr(r, "path", "") for r in create_app().routes]
-
-    def test_turning_one_ecosystem_off_removes_only_its_upload_route(self, monkeypatch) -> None:
-        from terrapod.config import settings
-
-        monkeypatch.setattr(settings.registry.package_cache.pypi, "enabled", False)
-        paths = self._paths()
-
-        assert "/api/v1/admin/package-cache/pypi/artifacts" not in paths
-        assert "/api/v1/admin/package-cache/npm/artifacts" in paths
-
-    def test_the_shared_routes_stay_when_one_ecosystem_is_off(self, monkeypatch) -> None:
-        """They are about the cache rather than about an ecosystem, so they are
-        not an ecosystem's to switch off."""
-        from terrapod.config import settings
-
-        monkeypatch.setattr(settings.registry.package_cache.pypi, "enabled", False)
-        paths = self._paths()
-
-        assert "/api/v1/admin/package-cache" in paths
-        assert "/api/v1/admin/package-cache/{file_id}/verify" in paths
-
-    def test_every_upload_route_goes_when_the_cache_itself_is_off(self, monkeypatch) -> None:
-        from terrapod.config import settings
-
-        monkeypatch.setattr(settings.registry.package_cache, "enabled", False)
-        paths = self._paths()
-
-        assert [p for p in paths if p.endswith("/artifacts")] == []
-
-
 class TestWhatTheOperatorGetsBack:
     async def test_a_first_upload_is_201_and_says_who_uploaded_it(self) -> None:
         path, fields = FORMS["pypi"]
