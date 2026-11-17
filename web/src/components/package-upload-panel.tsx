@@ -252,7 +252,7 @@ export function PackageUploadPanel({
                 value={ecosystem}
                 onChange={(e) => pickEcosystem(e.target.value)}
                 data-testid="package-upload-ecosystem"
-                className="w-full min-w-0 min-h-11 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-base"
+                className="w-full min-w-0 min-h-11 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm"
               >
                 {SHAPES.map((s) => (
                   <option key={s.ecosystem} value={s.ecosystem}>
@@ -269,7 +269,7 @@ export function PackageUploadPanel({
                 onChange={(e) => setKind(e.target.value as 'artifact' | 'index')}
                 data-testid="package-upload-kind"
                 disabled={!hasIndex}
-                className="w-full min-w-0 min-h-11 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-base disabled:opacity-50"
+                className="w-full min-w-0 min-h-11 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm disabled:opacity-50"
               >
                 <option value="artifact">{t('upload.kindArtifact')}</option>
                 {hasIndex ? <option value="index">{t('upload.kindIndex')}</option> : null}
