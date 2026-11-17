@@ -196,12 +196,17 @@
   ],
   "binary_cache.list_cached_providers_endpoint": [
     "arch",
+    "attestation",
     "cached-at",
     "hostname",
     "namespace",
     "os",
     "provider-type",
+    "replaced-at",
+    "replaced-digest",
     "shasum",
+    "upload-reference",
+    "uploaded-by",
     "version"
   ],
   "binary_cache.platform_tool_versions": [
@@ -225,6 +230,26 @@
     "version"
   ],
   "binary_cache.upload_binary_artifact:meta": [
+    "previous-digest",
+    "replaced",
+    "unchanged"
+  ],
+  "binary_cache.upload_provider_artifact": [
+    "arch",
+    "attestation",
+    "cached-at",
+    "filename",
+    "h1-hash",
+    "hostname",
+    "namespace",
+    "os",
+    "shasum",
+    "type",
+    "upload-reference",
+    "uploaded-by",
+    "version"
+  ],
+  "binary_cache.upload_provider_artifact:meta": [
     "previous-digest",
     "replaced",
     "unchanged"

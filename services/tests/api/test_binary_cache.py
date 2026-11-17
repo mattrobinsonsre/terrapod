@@ -80,6 +80,15 @@ def _cached_provider():
     e.arch = "amd64"
     e.shasum = "deadbeef"
     e.cached_at = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
+    # Provenance (#2599), as on `_cached_binary` above and for the same reason:
+    # the listing serialises it, and an unset MagicMock attribute reaches
+    # `json.dumps` as a MagicMock rather than as None. None is the honest value
+    # for a FETCHED row -- the asymmetry is what makes an upload visible.
+    e.attestation = None
+    e.uploaded_by = None
+    e.upload_reference = None
+    e.replaced_digest = None
+    e.replaced_at = None
     return e
 
 

@@ -544,12 +544,135 @@ async def list_cached_providers_endpoint(
                 "arch": e.arch,
                 "shasum": e.shasum,
                 "cached-at": rfc3339(e.cached_at),
+                # Provenance (#2599). For a provider the h1 is what `terraform
+                # init` checks, so "who vouched for these bytes" is the question
+                # an audit asks of this listing.
+                "attestation": e.attestation,
+                "uploaded-by": e.uploaded_by,
+                "upload-reference": e.upload_reference,
+                "replaced-digest": e.replaced_digest,
+                "replaced-at": rfc3339(e.replaced_at) if e.replaced_at else None,
             },
         }
         for e in entries
     ]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
+
+
+@router.post("/admin/provider-cache/artifacts", status_code=201)
+async def upload_provider_artifact(
+    hostname: str = Form(..., description="The registry host, e.g. registry.terraform.io."),
+    namespace: str = Form(..., description="The publisher namespace, e.g. hashicorp."),
+    type_: str = Form(..., alias="type", description="The provider type, e.g. aws."),
+    version: str = Form(..., description="The version, without a leading v."),
+    os_: str = Form(..., alias="os", description="linux, darwin, windows."),
+    arch: str = Form(..., description="amd64, arm64."),
+    file: UploadFile = File(..., description="The publisher's provider .zip."),
+    reference: str = Form(
+        "", description="Free text: the operator's own ticket or approval record."
+    ),
+    replace: bool = Form(
+        False,
+        description=(
+            "Overwrite an archive already at these coordinates. Without it such an "
+            "upload is refused with 409, because what it would displace may be what a "
+            "run already depends on."
+        ),
+    ),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Put a provider archive an operator vetted into the cache.
+
+    The other half of what a sealed deployment needs: given `tofu` and no
+    providers, a run still cannot plan anything.
+
+    **The h1 hash is computed from the uploaded zip, never accepted from the
+    uploader.** It is what `terraform init` compares a provider against via a
+    workspace's `.terraform.lock.hcl`, so a hand-supplied value that did not match
+    would surface as an unexplained `init` failure on somebody else's workspace.
+    Computing it also validates the archive: a file that is not a readable zip
+    cannot produce one and is refused before anything is stored.
+    """
+    from terrapod.api.routers.cache_admin import _sealed_note
+    from terrapod.api.upload_stream import stream_upload_to_tempfile
+    from terrapod.services import cache_admission, provider_cache_uploads
+    from terrapod.services.package_cache import substrate, uploads
+
+    tmp_path, size = await stream_upload_to_tempfile(
+        file, suffix=".provider-upload", max_bytes=uploads.MAX_UPLOAD_BYTES
+    )
+    try:
+        if size == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Empty upload. The archive's bytes go in the `file` part; the "
+                    "coordinates are the other form fields."
+                ),
+            )
+        try:
+            record, outcome, previous = await provider_cache_uploads.admit(
+                db,
+                storage,
+                hostname=hostname,
+                namespace=namespace,
+                type_=type_,
+                version=version,
+                os_=os_,
+                arch=arch,
+                tmp_path=tmp_path,
+                uploaded_by=user.email or "",
+                reference=reference,
+                replace=replace,
+            )
+        except substrate.CoordinateError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except provider_cache_uploads.NotAProviderArchive as exc:
+            # 422 rather than 400: the request is well-formed and the BYTES are
+            # not a provider archive, which is a statement about the content.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except provider_cache_uploads.ProviderUploadConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        replaced = outcome is cache_admission.Outcome.REPLACE
+        unchanged = outcome is cache_admission.Outcome.UNCHANGED
+        meta: dict[str, object] = {"replaced": replaced, "unchanged": unchanged}
+        if replaced:
+            meta["previous-digest"] = previous
+            meta.update(_sealed_note())
+        body = {
+            "data": {
+                "id": str(record.id),
+                "type": "cached-provider-packages",
+                "attributes": {
+                    "hostname": record.hostname,
+                    "namespace": record.namespace,
+                    "type": record.type,
+                    "version": record.version,
+                    "os": record.os,
+                    "arch": record.arch,
+                    "filename": record.filename,
+                    "shasum": record.shasum,
+                    "h1-hash": record.h1_hash,
+                    "attestation": record.attestation,
+                    "uploaded-by": record.uploaded_by,
+                    "upload-reference": record.upload_reference,
+                    "cached-at": rfc3339(record.cached_at),
+                },
+            },
+            "meta": meta,
+        }
+        await db.commit()
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+
+    return JSONResponse(status_code=200 if (replaced or unchanged) else 201, content=body)
 
 
 @router.delete("/admin/provider-cache/{hostname}/{namespace}/{type}/{version}")
