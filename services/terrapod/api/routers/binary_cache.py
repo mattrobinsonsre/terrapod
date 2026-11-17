@@ -350,6 +350,16 @@ async def upload_binary_artifact(
     It is also the upload a sealed deployment most needs: without it a sealed node
     cannot be given `tofu` itself, and no run can execute at all.
     """
+    # An upload into a cache this deployment will not serve is the
+    # half-present surface the convention forbids: the artifact would be
+    # stored, recorded, and unreachable. Every sibling route on this cache
+    # refuses the same way, so this one must too.
+    if not settings.registry.binary_cache.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Binary cache is disabled",
+        )
+
     from terrapod.api.routers.cache_admin import _sealed_note
     from terrapod.api.upload_stream import stream_upload_to_tempfile
     from terrapod.services import binary_cache_uploads, cache_admission
@@ -596,6 +606,15 @@ async def upload_provider_artifact(
     Computing it also validates the archive: a file that is not a readable zip
     cannot produce one and is refused before anything is stored.
     """
+    # Same reason as the binary upload: `provider_mirror` refuses every
+    # read when this is off, so accepting a write would leave an operator
+    # with a vetted provider nothing can install.
+    if not settings.registry.provider_cache.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Provider cache is disabled",
+        )
+
     from terrapod.api.routers.cache_admin import _sealed_note
     from terrapod.api.upload_stream import stream_upload_to_tempfile
     from terrapod.services import cache_admission, provider_cache_uploads
