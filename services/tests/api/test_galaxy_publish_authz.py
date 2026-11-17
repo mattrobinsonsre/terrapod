@@ -21,28 +21,17 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.api.routers.package_cache import authenticate_package_request
-from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.storage import get_storage
 
 PUBLISH = "/api/v1/package-cache/galaxy/v3/artifacts/collections/"
 SIGNATURE = "/api/v1/package-cache/galaxy/v3/collections/victim/widgets/versions/1.0.0/signature"
 COORD = ("victim", "widgets", "1.0.0")
-
-
-@pytest.fixture(autouse=True)
-def _galaxy_on():
-    """Pin the capability on so a default change cannot mute these (#1986)."""
-    before = settings.registry.package_cache.galaxy.enabled
-    settings.registry.package_cache.galaxy.enabled = True
-    yield
-    settings.registry.package_cache.galaxy.enabled = before
 
 
 def _user(email: str = "stranger@example.com", roles=None, auth_method: str = "session"):

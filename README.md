@@ -123,13 +123,17 @@ either way. The provider mirror, the engine binary cache and the module registry
 are what Terrapod is.
 
 The supporting surfaces for Ansible and Pulumi work — the container registry and
-the PyPI, npm, Galaxy, Pulumi-plugin, Go and NuGet proxies — each keep their own
-Helm switch (`api.config.registry.oci.enabled`,
-`api.config.registry.package_cache.enabled` and one flag per ecosystem), for
-operators who want a smaller surface. Off means the routes are never registered,
-the background tasks never scheduled, and nothing in the UI or the API schema.
-Never destructive: anything already stored stays put and comes back untouched if
-you turn it on again.
+the PyPI, npm, Galaxy, Pulumi-plugin, Go and NuGet proxies — have **no switches
+either**, and need none: a cache costs nothing until a run asks it for something,
+so a deployment that only writes HCL never sends them a request. An empty proxy
+holds no storage and does no background work.
+
+They used to have one flag each. The flags are gone because a cache that is off
+is a *surface half-present* rather than a smaller deployment — and because the
+container registry turned out to be load-bearing for Ansible rather than optional
+beside it: resolving which ansible-core lines a deployment can run is a tag
+listing through it, so switching it off broke every Ansible configure operation
+for a reason nothing connected back to a registry switch.
 
 The one hard requirement is Kubernetes, and that's a low bar: Terrapod is a single Helm release, a one-node [k3s](https://k3s.io/) VM is plenty to start, and `make eval` spins up a throwaway [k3d](https://k3d.io/)/kind cluster in one command.
 

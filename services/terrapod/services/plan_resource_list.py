@@ -15,9 +15,9 @@ a log dump cannot.
 
 **Bounded by construction.** The list is capped when it is recorded, not when it
 is rendered: at most `MAX_ENTRIES` resources, `MAX_ATTRIBUTES` attributes per
-update, and `MAX_VALUE_LENGTH` characters per value, with a count of what was
-left out. The payload therefore cannot be large and then truncated, whatever the
-plan's size.
+update, `MAX_VALUE_LENGTH` characters per value and `MAX_NAME_LENGTH` per address
+or attribute path, with a count of what was left out. The payload therefore
+cannot be large and then truncated, whatever the plan's size.
 
 **Redaction.** Every value passes through the same two passes the AI summariser
 uses, for the same reason. Terraform marks sensitive attributes in
@@ -36,14 +36,19 @@ so `build_resource_list` returns None for it and the comment shows no list.
 from __future__ import annotations
 
 import json
+import math
+import re
 from collections.abc import Iterable
 from typing import Any
 
+from terrapod.logging_config import get_logger
 from terrapod.services.summary_redaction import (
     PLACEHOLDER,
     _redact_by_markers,
     marked_values,
 )
+
+logger = get_logger(__name__)
 
 #: What stands in for an attribute that does not exist yet.
 KNOWN_AFTER_APPLY = "(known after apply)"
@@ -66,6 +71,25 @@ MAX_ATTRIBUTES = 8
 #: Characters kept of one value. Long values (a policy document, a user-data
 #: script) are what make a plan unreadable in a comment.
 MAX_VALUE_LENGTH = 120
+
+#: Characters kept of a resource address or an attribute path.
+MAX_NAME_LENGTH = 200
+
+#: Scan steps one build may spend hiding secrets; past it everything is hidden.
+MAX_SCRUB_STEPS = 1_000_000
+
+#: Most registered secrets and escaped forms in one build; past it everything is hidden.
+MAX_LITERALS = 100_000
+
+#: Rounds of JSON escaping registered per secret. A deeper round leaves 2**depth backslashes in a row;
+#: while any secret is registered, a value, key, path or address holding such a run is hidden whole.
+MAX_ESCAPE_DEPTH = 4
+
+#: A secret longer than this gets no escaped forms, so one that JSON would escape hides everything.
+MAX_FORM_LENGTH = 64 * 1024
+
+#: Most escaped forms registered for one secret; past it everything is hidden.
+MAX_FORMS = 1024
 
 _TRUNCATED = "…"
 
@@ -95,6 +119,8 @@ def _union_markers(a: Any, b: Any) -> Any:
     """
     if a is True or b is True:
         return True
+    if isinstance(a, dict) and isinstance(b, list) or isinstance(a, list) and isinstance(b, dict):
+        return True  # The sides disagree on shape, so hide the whole node.
     if isinstance(a, dict) or isinstance(b, dict):
         da = a if isinstance(a, dict) else {}
         db = b if isinstance(b, dict) else {}
@@ -123,26 +149,56 @@ def _redacted(value: Any, markers: Any) -> Any:
     return _redact_by_markers(value, markers) if markers is not None else value
 
 
-def _unknown_paths(unknown: Any, prefix: str, out: set[str]) -> None:
-    """The dotted paths `after_unknown` flags as known only after apply."""
-    if unknown is True:
-        out.add(prefix)
-    elif isinstance(unknown, dict):
-        for key, sub in unknown.items():
-            _unknown_paths(sub, f"{prefix}.{key}" if prefix else str(key), out)
-    elif isinstance(unknown, list):
-        for i, sub in enumerate(unknown):
-            _unknown_paths(sub, f"{prefix}[{i}]", out)
+#: A position in a change: None at the top, else `(parent, dict key or list index)`.
+_Node = tuple[Any, str | int] | None
+
+
+def _segments(node: _Node) -> list[str | int]:
+    segments: list[str | int] = []
+    while node is not None:
+        node, segment = node
+        segments.append(segment)
+    segments.reverse()
+    return segments
+
+
+def _path(node: _Node) -> str:
+    """The dotted path to `node`, built only for a leaf that is recorded."""
+    parts: list[str] = []
+    written = False
+    for segment in _segments(node):
+        if isinstance(segment, int):
+            parts.append(f"[{segment}]")
+            written = True
+        else:
+            key = str(segment)
+            if written:
+                parts.append(".")
+            parts.append(key)
+            written = written or bool(key)
+    return "".join(parts) or "(value)"
+
+
+def _is_unknown(unknown: Any, node: _Node) -> bool:
+    """Whether `after_unknown` flags the value at `node` as known only after apply."""
+    for segment in _segments(node):
+        if isinstance(segment, int):
+            unknown = (
+                unknown[segment] if isinstance(unknown, list) and segment < len(unknown) else None
+            )
+        else:
+            unknown = unknown.get(segment) if isinstance(unknown, dict) else None
+    return unknown is True
 
 
 def _walk(
     before: Any,
     after: Any,
     markers: Any,
-    prefix: str,
-    out: list[tuple[str, Any, Any]],
+    node: _Node,
+    out: list[tuple[_Node, Any, Any]],
 ) -> None:
-    """Collect one `(path, before, after)` per leaf that differs.
+    """Collect one `(node, before, after)` per leaf that differs, comparing each leaf once.
 
     The comparison runs on the REAL values, and `markers` (the union of both
     sides', see `_union_markers`) decides only what is DISPLAYED. A node marked
@@ -157,10 +213,9 @@ def _walk(
     the container first and redacting afterwards is what used to let an added
     block's sensitive attribute through.
     """
-    if before == after:
-        return
     if markers is True:
-        out.append((prefix or "(value)", PLACEHOLDER, PLACEHOLDER))
+        if before != after:
+            out.append((node, PLACEHOLDER, PLACEHOLDER))
         return
     if isinstance(before, dict) and isinstance(after, dict):
         for key in sorted(set(before) | set(after), key=str):
@@ -168,7 +223,7 @@ def _walk(
                 before.get(key),
                 after.get(key),
                 markers.get(key) if isinstance(markers, dict) else None,
-                f"{prefix}.{key}" if prefix else str(key),
+                (node, key),
                 out,
             )
         return
@@ -178,97 +233,416 @@ def _walk(
                 before[i] if i < len(before) else None,
                 after[i] if i < len(after) else None,
                 markers[i] if isinstance(markers, list) and i < len(markers) else None,
-                f"{prefix}[{i}]",
+                (node, i),
                 out,
             )
         return
-    out.append((prefix or "(value)", _redacted(before, markers), _redacted(after, markers)))
+    if before != after:
+        out.append((node, _redacted(before, markers), _redacted(after, markers)))
+
+
+class _Budget:
+    """Scan steps left for one build; a spent budget hides everything after it."""
+
+    def __init__(self, remaining: float) -> None:
+        self.remaining = remaining
+        self.exhausted = False
+        self.reason: str | None = None
+
+    def fail(self, reason: str) -> None:
+        """Spend what is left, recording the first cap that ran out."""
+        if not self.exhausted:
+            self.reason = reason
+        self.remaining = min(self.remaining, 0)
+        self.exhausted = True
+
+
+def _shared(label: str, text: str, pos: int) -> int:
+    """Length of the common prefix of `label` and `text[pos:]`."""
+    if text.startswith(label, pos):
+        return len(label)
+    lo, hi = 0, min(len(label), len(text) - pos)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if text.startswith(label[:mid], pos):
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
 
 
 class _Scrubber:
-    """Removes known secrets from short strings, quickly, however many there are.
+    """Finds known secrets by walking a radix trie: first char -> (label, child or None)."""
 
-    A plan whose attributes are mostly marked sensitive yields a literal for every
-    marked value, so tens of thousands on a large one. Two obvious ways to apply
-    them both fail at that size: a `str.replace` per literal per string is
-    O(strings x literals) and held the interpreter for seconds, and compiling one
-    alternation of all of them costs more than the scrubbing it replaces.
+    def __init__(self, literals: list[str], budget: _Budget | None = None) -> None:
+        self.size = len(literals)
+        self.trie: dict[str, Any] = {}
+        self.too_deep = "\\" * 2**MAX_ESCAPE_DEPTH
+        budget = budget or _Budget(math.inf)
+        for literal in literals:
+            if budget.remaining <= 0:
+                break
+            budget.remaining -= 1 + self._insert(literal) // 128
+        if budget.remaining <= 0:
+            budget.fail("steps")
+        self.failed = budget.exhausted
 
-    What is rendered is small and bounded (25 entries, 8 attributes, 120
-    characters), so the cheap question is the reverse one: which literals occur
-    in THIS string? Every substring a literal could match is at most
-    `max_len` long, so the candidates are found by looking substrings up in a set,
-    and only those are replaced. The result is identical to replacing every
-    literal, longest first.
-    """
-
-    def __init__(self, literals: list[str]) -> None:
-        self.literals = set(literals)
-        self.lengths = sorted({len(x) for x in literals}, reverse=True)
+    def _insert(self, literal: str) -> int:
+        """Add `literal`, splitting an edge once at the common prefix; returns the chars handled."""
+        node = self.trie
+        pos = 0
+        handled = len(literal)
+        while pos < len(literal):
+            edge = node.get(literal[pos])
+            if edge is None:
+                node[literal[pos]] = (literal[pos:], None)
+                break
+            label, child = edge
+            shared = _shared(label, literal, pos)
+            if shared < len(label):
+                handled += len(label)
+                child = {label[shared]: (label[shared:], child)}
+                node[literal[pos]] = (label[:shared], child)
+            elif child is None:
+                child = {"": True}
+                node[literal[pos]] = (label, child)
+            node = child
+            pos += shared
+        else:
+            node[""] = True
+        return handled
 
     def __bool__(self) -> bool:
-        return bool(self.literals)
+        return self.size > 0 or self.failed
 
-    def hits(self, text: str) -> list[str]:
-        found: set[str] = set()
+    def _longest(self, text: str, i: int, left: float) -> tuple[int, int]:
+        """The longest literal length at `i` and the steps taken, walking at most `left`."""
+        node = self.trie
+        best = 0
+        k = i
+        steps = 1
+        while steps <= left and k < len(text):
+            edge = node.get(text[k])
+            if edge is None:
+                break
+            label, child = edge
+            if k + len(label) > len(text):
+                steps += 1
+                break
+            # the C-speed label compare is charged one step per 128 characters
+            steps += 1 + len(label) // 128
+            if not text.startswith(label, k):
+                break
+            k += len(label)
+            if child is None:
+                best = k - i
+                break
+            if "" in child:
+                best = k - i
+            node = child
+        return best, steps
+
+    def _extend(self, text: str, i: int, end: int, left: float) -> tuple[int, float]:
+        """End of the run of overlapping secrets that starts at `i` and reaches `end`."""
+        j = i + 1
+        while j < end:
+            if left <= 0:
+                return -1, left
+            if text[j] in self.trie:
+                length, steps = self._longest(text, j, left)
+                left -= steps
+                if left <= 0:
+                    return -1, left
+                end = max(end, j + length)
+            else:
+                left -= 1
+            j += 1
+        return end, left
+
+    def mask(self, text: str, limit: int | None, budget: _Budget) -> tuple[str, bool]:
+        """Hide runs of overlapping secrets; stop past `limit`; False if the budget ran out."""
+        parts: list[str] = []
+        produced = 0
+        plain = i = 0
         n = len(text)
-        for length in self.lengths:
-            if length > n:
+        left = budget.remaining
+        ok = True
+        while i < n and (limit is None or produced + i - plain <= limit):
+            if left <= 0:
+                ok = False
+                break
+            if text[i] not in self.trie:
+                i += 1
+                left -= 1
                 continue
-            for i in range(n - length + 1):
-                piece = text[i : i + length]
-                if piece in self.literals:
-                    found.add(piece)
-        return sorted(found, key=len, reverse=True)
+            length, steps = self._longest(text, i, left)
+            left -= steps
+            if left <= 0:
+                ok = False
+                break
+            if not length:
+                i += 1
+                continue
+            head = i - plain + len(PLACEHOLDER)
+            if limit is not None and produced + head > limit:
+                parts += [text[plain:i], PLACEHOLDER]
+                plain = i = n
+                break
+            end, left = self._extend(text, i, i + length, left)
+            if end < 0:
+                ok = False
+                break
+            parts += [text[plain:i], PLACEHOLDER]
+            produced += head
+            i = plain = end
+        budget.remaining = left
+        parts.append(text[plain:i])
+        if not ok:
+            budget.fail("steps")
+            parts.append(PLACEHOLDER)
+        return "".join(parts), ok
 
 
-def _compile(literals: list[str]) -> _Scrubber | None:
-    return _Scrubber(literals) if literals else None
+def _compile(literals: list[str], budget: _Budget | None = None) -> _Scrubber | None:
+    if not literals and not (budget and budget.exhausted):
+        return None
+    return _Scrubber(literals, budget)
 
 
-def _scrub(text: str, scrubber: _Scrubber | None) -> str:
-    """Remove every known secret from `text`, longest first, sparing placeholders.
+def _scrub(
+    text: str,
+    scrubber: _Scrubber | None,
+    limit: int | None = None,
+    budget: _Budget | None = None,
+) -> str:
+    """Hide every occurrence of every known secret in `text`, overlaps included.
 
-    Longest first matters: when one secret contains another, replacing the
-    shorter one first leaves the longer one's remaining characters exposed
-    beside a placeholder, which looks handled and is not.
-
-    **The placeholder is split out before matching and rejoined after.** With no
-    length floor, a one-character secret is a literal, and matching it inside the
-    text already redacted would rewrite the placeholder itself (`(sensitive
-    value)` has a `v` in it) and leave a fragment of the marker where the secret
-    was. Whatever is already the placeholder is not a place a secret can be.
+    Existing placeholders are split out first, so no secret can match inside one.
     """
     if not scrubber:
         return text
-    pieces = text.split(PLACEHOLDER)
-    for i, piece in enumerate(pieces):
-        for secret in scrubber.hits(piece):
-            piece = piece.replace(secret, PLACEHOLDER)
-        pieces[i] = piece
-    return PLACEHOLDER.join(pieces)
+    budget = budget or _Budget(math.inf)
+    out: list[str] = []
+    produced = 0
+    for index, piece in enumerate(text.split(PLACEHOLDER)):
+        if index:
+            out.append(PLACEHOLDER)
+            produced += len(PLACEHOLDER)
+        if limit is not None and produced > limit:
+            break
+        masked, ok = scrubber.mask(piece, None if limit is None else limit - produced, budget)
+        out.append(masked)
+        produced += len(masked)
+        if not ok:
+            break
+    return "".join(out)
 
 
-def _render_value(value: Any, literals: _Scrubber | None, unknown: bool = False) -> str:
-    """A compact one-line form of a leaf value, scrubbed and THEN capped.
+def _cap(text: str, scrubber: _Scrubber | None, limit: int, budget: _Budget | None = None) -> str:
+    """`text` scrubbed and THEN cut to `limit` characters plus a marker.
 
-    The order is the point. Capping first cut a secret that straddled the limit
-    in half, and the half no longer matched the literal, so its first characters
-    reached the comment. Scrubbing the whole value first means the cap can only
-    ever cut the placeholder.
+    Cutting first would split a secret at the limit and let its first characters through.
     """
+    text = _scrub(text, scrubber, limit, budget)
+    return text[:limit] + _TRUNCATED if len(text) > limit else text
+
+
+def _shallow(text: str, scrubber: _Scrubber | None) -> str:
+    """`text`, or the placeholder when it is escaped more deeply than the registered forms."""
+    return PLACEHOLDER if scrubber and scrubber.too_deep in text else text
+
+
+def _scrubbed_tree(value: Any, scrubber: _Scrubber, limit: int, budget: _Budget) -> Any:
+    """`value` with every string and dict key scrubbed, one step per node; the placeholder once spent."""
+    budget.remaining -= 1
+    if budget.remaining <= 0:
+        budget.fail("steps")
+        return PLACEHOLDER
+    if isinstance(value, str):
+        if scrubber.too_deep in value:
+            return PLACEHOLDER
+        return _scrub(value, scrubber, limit, budget) if value else value
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            key = _scrubbed_tree(str(k), scrubber, limit, budget)
+            out[key] = _scrubbed_tree(v, scrubber, limit, budget)
+            if budget.exhausted:
+                return PLACEHOLDER
+        return out
+    if isinstance(value, list):
+        items = []
+        for v in value:
+            items.append(_scrubbed_tree(v, scrubber, limit, budget))
+            if budget.exhausted:
+                return PLACEHOLDER
+        return items
+    return value
+
+
+def _render_value(
+    value: Any, literals: _Scrubber | None, budget: _Budget, unknown: bool = False
+) -> str:
+    """A compact one-line form of a leaf value, scrubbed and capped."""
     if unknown:
         return KNOWN_AFTER_APPLY
-    text = value if isinstance(value, str) else json.dumps(value, default=str, ensure_ascii=False)
-    text = _scrub(text, literals)
-    if len(text) > MAX_VALUE_LENGTH:
-        return text[:MAX_VALUE_LENGTH] + _TRUNCATED
+    if isinstance(value, str):
+        return _cap(_shallow(value, literals), literals, MAX_VALUE_LENGTH, budget)
+    if literals:
+        value = _scrubbed_tree(value, literals, MAX_VALUE_LENGTH, budget)
+        if budget.exhausted:
+            return PLACEHOLDER
+    text = json.dumps(value, default=str, ensure_ascii=False)
+    return _cap(text, literals, MAX_VALUE_LENGTH, budget)
+
+
+#: Characters whose JSON or Go-JSON escaped form differs from the raw one (ASCII JSON writes DEL too).
+_ENCODABLE = re.compile(r'["\\\x00-\x1f/<>&\u2028\u2029]|[^\x00-\x7e]')
+
+# Matched from the start of a backslash run, so an escaped backslash before `u` is not an escape.
+_HEX_ESCAPE = re.compile(r"(?<!\\)((?:\\\\)*)\\u([0-9a-f]{4})")
+
+_GO_ESCAPES = (
+    ("<", "\\u003c"),
+    (">", "\\u003e"),
+    ("&", "\\u0026"),
+    ("\u2028", "\\u2028"),
+    ("\u2029", "\\u2029"),
+)
+
+_CONTROL = re.compile("([\b\f])")
+
+_HTML = re.compile("[<>&]")
+
+_HEX_ESCAPED = re.compile("[^\b\t\n\f\r -~]")
+
+# JSON never writes a raw NUL, so it can separate pieces encoded together in one call.
+_PIECES = (('"\x00"\\b"\x00"', "\\u0008"), ('"\x00"\\f"\x00"', "\\u000c"))
+
+
+class _OutOfBudget(Exception):
+    """Raised while generating literals once the budget or a cap is spent; carries the cause."""
+
+
+def _json(text: str) -> str:
+    return json.dumps(text, ensure_ascii=False)[1:-1]
+
+
+def _json_ascii(text: str) -> str:
+    return json.dumps(text)[1:-1]
+
+
+def _html(text: str) -> str:
+    for raw, escaped in _GO_ESCAPES:
+        text = text.replace(raw, escaped)
     return text
 
 
-def _literals(values: Iterable[str]) -> list[str]:
-    """The secrets to match anywhere, longest first, with no length floor."""
-    return sorted({v for v in values if isinstance(v, str) and v}, key=len, reverse=True)
+def _go(text: str) -> str:
+    """Terraform's and OpenTofu's jsonencode (Go 1.22 on): JSON that also escapes < > &."""
+    return _html(_json(text))
+
+
+def _go_old(text: str) -> str:
+    """Older Go also wrote backspace and form feed as \\u0008 and \\u000c."""
+    out = json.dumps(_CONTROL.split(text), ensure_ascii=False, separators=("\x00", ":"))[2:-2]
+    for piece, escaped in _PIECES:
+        out = out.replace(piece, escaped)
+    return _html(out)
+
+
+def _go_ascii(text: str) -> str:
+    return _html(_json_ascii(text))
+
+
+def _slash(text: str) -> str:
+    return _json(text).replace("/", "\\/")
+
+
+def _upper_hex(text: str) -> str:
+    return _HEX_ESCAPE.sub(lambda m: m[1] + "\\u" + m[2].upper(), _json_ascii(text))
+
+
+def _flat(form: str) -> int:
+    return 1 + len(form) // 32
+
+
+def _per_control(form: str) -> int:
+    return _flat(form) + form.count("\b") + form.count("\f")
+
+
+def _per_escape(form: str) -> int:
+    return _flat(form) + 4 * _json_ascii(form).count("\\u")
+
+
+#: (encoder, cost in steps, pattern without which it repeats another encoder's output).
+#: A step is 32 characters of C-speed work or one control piece; each upper-hex callback costs 4.
+_ENCODERS = (
+    (_json, _flat, None),
+    (_json_ascii, _flat, None),
+    (_go, _flat, None),
+    (_go_old, _per_control, _CONTROL),
+    (_go_ascii, _flat, _HTML),
+    (_slash, _flat, None),
+    (_upper_hex, _per_escape, _HEX_ESCAPED),
+)
+
+
+def _add_forms(secret: str, found: set[str], budget: _Budget) -> None:
+    """Add `secret` and its escaped forms to `found`, charging each encoder run before it runs."""
+    found.add(secret)
+    if len(secret) > MAX_FORM_LENGTH:
+        if _ENCODABLE.search(secret):
+            raise _OutOfBudget("forms")
+        return
+    # A character grows less than 2**(depth + 3)-fold, so no real form is longer; one that is fails closed.
+    bound = MAX_FORM_LENGTH << (MAX_ESCAPE_DEPTH + 3)
+    seen = {secret}
+    level = {secret}
+    for _ in range(MAX_ESCAPE_DEPTH):
+        deeper: set[str] = set()
+        for form in sorted(level):
+            if not _ENCODABLE.search(form):
+                continue
+            for encode, cost, needs in _ENCODERS:
+                if needs and not needs.search(form):
+                    continue
+                budget.remaining -= cost(form)
+                if budget.remaining <= 0:
+                    raise _OutOfBudget("steps")
+                out = encode(form)
+                if out in seen:
+                    continue
+                if len(out) > bound:
+                    raise _OutOfBudget("forms")
+                seen.add(out)
+                deeper.add(out)
+                if len(seen) > MAX_FORMS + 1:
+                    raise _OutOfBudget("forms")
+                if len(found) + len(seen) > MAX_LITERALS:
+                    raise _OutOfBudget("literals")
+        level = deeper
+    found |= seen
+
+
+def _literals(values: Iterable[str], budget: _Budget | None = None) -> list[str]:
+    """The secrets to match anywhere, in every form they can take, with no length floor."""
+    budget = budget or _Budget(math.inf)
+    found: set[str] = set()
+    try:
+        for value in values:
+            if not isinstance(value, str) or not value:
+                continue
+            parts = {value}
+            if PLACEHOLDER in value:
+                parts |= {f for f in value.split(PLACEHOLDER) if f}
+            for part in parts:
+                _add_forms(part, found, budget)
+            if len(found) > MAX_LITERALS:
+                raise _OutOfBudget("literals")
+    except _OutOfBudget as stop:
+        budget.fail(stop.args[0])
+    return sorted(found, key=lambda x: (-len(x), x))
 
 
 async def strict_sensitive_literals(db: Any, run: Any) -> list[str]:
@@ -324,7 +698,8 @@ def build_resource_list(raw: bytes, extra_secrets: Iterable[str] = ()) -> dict |
     if not isinstance(changes, list):
         return None
 
-    literals = _compile(_literals([*marked_values(raw), *extra_secrets]))
+    budget = _Budget(MAX_SCRUB_STEPS)
+    literals = _compile(_literals([*marked_values(raw), *extra_secrets], budget), budget)
 
     entries: list[dict[str, Any]] = []
     total = 0
@@ -346,24 +721,26 @@ def build_resource_list(raw: bytes, extra_secrets: Iterable[str] = ()) -> dict |
         omitted_attributes = 0
         if action == "update":
             markers = _union_markers(change.get("before_sensitive"), change.get("after_sensitive"))
-            leaves: list[tuple[str, Any, Any]] = []
-            _walk(change.get("before"), change.get("after"), markers, "", leaves)
-            unknown: set[str] = set()
-            _unknown_paths(change.get("after_unknown"), "", unknown)
+            leaves: list[tuple[_Node, Any, Any]] = []
+            _walk(change.get("before"), change.get("after"), markers, None, leaves)
+            after_unknown = change.get("after_unknown")
             omitted_attributes = max(0, len(leaves) - MAX_ATTRIBUTES)
-            for path, b, a in leaves[:MAX_ATTRIBUTES]:
+            for node, b, a in leaves[:MAX_ATTRIBUTES]:
+                path = _path(node)
                 attributes.append(
                     {
-                        "path": _scrub(path, literals),
-                        "before": _render_value(b, literals),
-                        "after": _render_value(a, literals, unknown=path in unknown),
+                        "path": _cap(_shallow(path, literals), literals, MAX_NAME_LENGTH, budget),
+                        "before": _render_value(b, literals, budget),
+                        "after": _render_value(
+                            a, literals, budget, unknown=_is_unknown(after_unknown, node)
+                        ),
                     }
                 )
 
         importing = change.get("importing")
         entries.append(
             {
-                "address": _scrub(address, literals),
+                "address": _cap(_shallow(address, literals), literals, MAX_NAME_LENGTH, budget),
                 "action": action,
                 "attributes": attributes,
                 "attributes_omitted": omitted_attributes,
@@ -371,4 +748,6 @@ def build_resource_list(raw: bytes, extra_secrets: Iterable[str] = ()) -> dict |
             }
         )
 
+    if budget.exhausted:
+        logger.warning("plan_resource_list.scrub_budget_exhausted", reason=budget.reason)
     return {"entries": entries, "omitted": total - len(entries)}

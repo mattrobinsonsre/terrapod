@@ -98,6 +98,11 @@ RULE_DIMENSIONS_REFUSED: dict[str, str] = {
         "lock state is moved by the lock, unlock and force-unlock endpoints, which "
         "need only `workspace:lock`"
     ),
+    # Stopgap: an entry could carry a refused dimension; recursion replaces this.
+    "exclude": (
+        "exclude is not supported in assignment rules yet, because an entry may "
+        "select on a dimension that is itself refused"
+    ),
 }
 
 

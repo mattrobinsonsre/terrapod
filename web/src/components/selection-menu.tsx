@@ -5,15 +5,15 @@
  * actions the current selection can take.
  *
  * It is styled like the workspace page's run button (`RunKindSplitButton`), and
- * reuses its keyboard handling (`aria-haspopup`, `role="menu"`, arrow keys,
- * Escape returning focus to the trigger, a click outside closing), but it is a
- * different component on purpose, for one reason. That component is structurally
- * a primary action plus a caret, and it DERIVES the primary: "the most complete
- * option the workspace declares". That is right for one workspace and wrong for
- * an arbitrary selection, where there is no most-complete action and a loud
- * default applying across a dozen workspaces is the outcome to avoid. So this has
- * no default action: pressing it anywhere opens the menu, and that is all it
- * does. Every action lives inside.
+ * follows the WAI-ARIA menu-button keyboard pattern (`aria-haspopup`,
+ * `role="menu"`, arrow keys, Home and End, Escape and Tab returning focus to the
+ * trigger, a click outside closing), but it is a different component on purpose,
+ * for one reason. That component is structurally a primary action plus a caret,
+ * and it DERIVES the primary: "the most complete option the workspace declares".
+ * That is right for one workspace and wrong for an arbitrary selection, where
+ * there is no most-complete action and a loud default applying across a dozen
+ * workspaces is the outcome to avoid. So this has no default action: pressing it
+ * anywhere opens the menu, and that is all it does. Every action lives inside.
  *
  * **The reason an action is unavailable is in the row, not in a tooltip.** Each
  * item reads `Apply · 9 of 12 eligible`, so it is readable with no interaction at
@@ -86,9 +86,15 @@ export function SelectionMenu({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       refs.current[(i - 1 + items.length) % items.length]?.focus()
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      refs.current[0]?.focus()
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      refs.current[items.length - 1]?.focus()
     } else if (e.key === 'Tab') {
-      // Tabbing out of a menu closes it, without stealing the focus move.
-      setOpen(false)
+      // No preventDefault: focus returns to the trigger, then the Tab moves on from it.
+      close(true)
     }
   }
 

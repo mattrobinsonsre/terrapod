@@ -1802,7 +1802,9 @@
       "repository": "Repositorium",
       "commit": "Commissum",
       "paths": "Semitae",
-      "written": "Scriptum"
+      "written": "Scriptum",
+      "origin": "Origo",
+      "uploadedBy": "Immissum a"
     },
     "warm": {
       "heading": "Promptuarium calefacere",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Legitur…",
       "showing": "{shown} ex {total} monstrantur — tabula ea sola ordinat quae lecta sunt, ergo cetera lege priusquam ordinem pro toto promptuario habeas.",
       "listedAll": "{count, plural, one {# artificium enumeratum} other {# artificia enumerata}} — id est omne quod his cribris congruit.",
-      "successBulkTruncated": "Purgata sunt {files} artificia, liberatis {size}. Plura congruunt quam una purgatio tollit — iterum purga ut pergas."
+      "successBulkTruncated": "Purgata sunt {files} artificia, liberatis {size}. Plura congruunt quam una purgatio tollit — iterum purga ut pergas.",
+      "uploadedBy": "a {who}",
+      "confirmRowUploaded": "Hoc artificium ab operatore immissum est, ideo in nullo tabulario superiore exstat. Si id removes, solum exemplar destruitur."
     },
     "archives": {
       "connectionLabel": "Nexus",
@@ -1903,7 +1907,6 @@
       "heading": "Promptuaria fasciculorum et imaginum calefacere",
       "help": "Versionem da quotiens eam nosti: calefactio cum versione nominata postea ad lockfile comparari potest, «quidquid novissimum est» non potest. Scribe quamque lineam ut <code>nomen versio</code>; pro interpolamentis Pulumi, signa <code>os/arch</code> in fine adde ut certos suggestus calefacias.",
       "ecosystemLabel": "Genus artificii",
-      "ecosystemOff": "{ecosystem} (exstinctum)",
       "sourceLabel": "Petere ex",
       "sourceDefault": "Superior configuratus",
       "upstreamIs": "Ex <code>{url}</code> petetur.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Calefactio incipi non potuit",
       "errorStatus": "Opus calefactionis legi non potuit",
       "helpLead": "Artificia in promptuarium pete priusquam quidquam ea postulet — unum per lineam, nomine et versione."
+    },
+    "attestation": {
+      "upstreamDigest": "Verificatum",
+      "nonePublished": "Nullum compendium editum",
+      "operatorUpload": "Immissum",
+      "unrecorded": "Non notatum"
+    },
+    "upload": {
+      "title": "Artificium probatum immittere",
+      "description": "Artificium quod ipse validavisti in promptuarium pone. Hic unus modus est unum addendi dum nodus obsignatus est, nec signum editoris requiritur — pro eo notatur quis id immiserit.",
+      "show": "Immittere",
+      "hide": "Claudere",
+      "sealedNote": "Hic nodus obsignatus est, itaque immissio unus modus est artificium addendi — et unicum exemplar, quia nihil hic iterum peti potest.",
+      "ecosystem": "Promptuarium",
+      "kind": "Quid immittis",
+      "kindArtifact": "Octeti artificii",
+      "kindIndex": "Documentum indicis",
+      "kindHintIndexed": "Nodus obsignatus ex documento indicis legit quae versiones exstent, itaque artificium sine eo immissum resolvi non potest.",
+      "kindHintNoIndex": "Hoc promptuarium documento indicis non eget.",
+      "file": "Plica",
+      "reference": "Referentia (optionalis)",
+      "referenceHint": "Tuus ipsius numerus libelli, mutationis vel approbationis. Cum immissione servatur.",
+      "replace": "Substituere id quod iam his coordinatis adest",
+      "replaceHint": "Sine hoc artificium exstans respuitur potius quam superscribitur. Quod depellitur id ipsum esse potest a quo exsecutio iam pendet.",
+      "confirmReplace": "{filename} super artificium quod iam his coordinatis adest immittere? Octeti quos substituit destruuntur.",
+      "confirmReplaceSealed": "Hic nodus obsignatus est, itaque octeti substituti nusquam recuperari possunt.",
+      "submit": "Immittere",
+      "submitting": "Immittitur…",
+      "provenanceNote": "Rationi tuae ascribitur.",
+      "success": "{filename} immissum.",
+      "successReplaced": "{filename} immissum, eo quod aderat substituto.",
+      "successUnchanged": "{filename} iam cum octetis identicis conditum erat. Nihil mutatum est.",
+      "error": "Immissio defecit.",
+      "fields": {
+        "project": "Proiectum",
+        "name": "Nomen",
+        "version": "Versio",
+        "filename": "Nomen plicae",
+        "package_id": "Numerus fasciculi",
+        "module": "Semita moduli",
+        "suffix": "Plica",
+        "namespace": "Spatium nominum",
+        "document": "Documentum",
+        "kind": "Genus interpolamenti",
+        "os": "Systema operandi",
+        "arch": "Architectura",
+        "tool": "Instrumentum",
+        "hostname": "Hospes tabularii",
+        "type": "Genus praebitoris"
+      },
+      "hints": {
+        "filename": "Datum potius quam derivatum: nomen ipsius wheel notas compatibilitatis in se continet.",
+        "suffix": "Unum ex .info, .mod vel .zip. Versio tres plicae est et singulae separatim immittuntur.",
+        "document": "Quod documentum indicis. Galaxy habet collection et versions; Go habet list et latest.",
+        "kind": "resource, language, analyzer vel converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, vel hospes tabularii tui proprii"
+      },
+      "ecosystems": {
+        "binary": "Binaria machinae",
+        "provider": "Praebitores Terraform"
+      }
     }
   },
   "catalog": {

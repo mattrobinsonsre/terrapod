@@ -802,7 +802,6 @@ api:
   config:
     registry:
       provider_cache:
-        enabled: true
         upstream_registries:
           - registry.terraform.io
           - registry.opentofu.org
@@ -884,7 +883,6 @@ api:
   config:
     registry:
       binary_cache:
-        enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
         tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
         terragrunt_mirror_url: "https://github.com/gruntwork-io/terragrunt/releases/download"
@@ -1179,12 +1177,9 @@ For fully air-gapped environments where runner Jobs have no internet access:
 api:
   config:
     registry:
-      enabled: true
+      # Nothing switches the registry or its caches on -- they always are.
       provider_cache:
-        enabled: true
         warm_on_first_request: true
-      binary_cache:
-        enabled: true
 ```
 
 Runner Jobs only need network access to the Terrapod API (internal cluster networking).
