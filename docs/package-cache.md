@@ -250,6 +250,62 @@ seal is refused with a 409 naming the setting, which is why the order matters an
 why the per-item outcomes are worth reading before you take the second step
 rather than after.
 
+## Restricting WHAT is served, not just where it comes from
+
+`registry.provider_cache.upstream_registries` restricts which **hosts** Terrapod
+reaches. Until now nothing restricted **what**: a workspace naming any package got
+it faithfully fetched, verified against the publisher's own digest, and served —
+verification working perfectly while an artifact signed by its own author executes.
+Verification answers *"is this what the publisher published"*. It has no opinion on
+whether this deployment wanted that publisher's package at all, and no amount of
+scanning closes that gap.
+
+`registry.content_allowlist` is that second control, and it is checked **before the
+fetch** at the one pull-through point all six package caches share — an artifact that
+has already been downloaded has already been reached for.
+
+```yaml
+api:
+  config:
+    registry:
+      content_allowlist:
+        mode: observe            # off (default) | observe | enforce
+        packages:                # globs applied to every cache
+          - "@acme/*"
+        ecosystems:              # and per-cache, unioned with the above
+          go:
+            - "github.com/acme/*"
+```
+
+### The three modes, and why it ships `off`
+
+| mode | what it does |
+|---|---|
+| `off` | the default. No allowlist, and **no per-fetch log line** — a control nobody configured must not fill the log, which is how a feature gets switched off wholesale before it is ever used |
+| `observe` | records what it **would** refuse and fetches it anyway |
+| `enforce` | refuses anything unmatched, fail-closed |
+
+**Run `observe` first.** Nobody can hand-write an allowlist for an estate they do not
+yet understand: deny-all is unusable on day one and allow-all makes the claim false.
+`observe` is what tells you what your own estate actually pulls, so promoting that set
+to `packages` is one review rather than an archaeology project. `enforce` then fails
+closed against a set you have already approved, rather than being a cliff you walk off
+on upgrade.
+
+**An empty list under `enforce` refuses everything, deliberately.** That is loud rather
+than silent — every fetch fails at once and the message names the setting and the way
+back. A mode that quietly permitted everything when the list was empty would make the
+whole posture a false claim, which is worse than an outage.
+
+Patterns are globs rather than regexes (so a mis-escaped `.` cannot silently match more
+than it reads as) and are matched case-insensitively, because every cache this guards
+either addresses packages case-insensitively or normalises before the check. A blank
+pattern matches **nothing** rather than everything — a stray blank line in a values file
+must not read as a wildcard.
+
+A refusal subclasses `PermissionError`, so a `except OSError` written for the network
+cannot swallow it and leave a policy decision looking like a flaky upstream.
+
 ## Uploading a vetted artifact
 
 Seed-then-seal pulls from a registry and trusts what it published. Some

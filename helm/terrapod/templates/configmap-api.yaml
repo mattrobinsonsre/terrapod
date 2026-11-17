@@ -271,6 +271,21 @@ data:
     {{- if .Values.api.config.registry }}
     registry:
       enabled: {{ .Values.api.config.registry.enabled }}
+      {{- with .Values.api.config.registry.content_allowlist }}
+      content_allowlist:
+        {{- if hasKey . "mode" }}
+        {{- /* Quoted: `off` is a YAML 1.1 boolean, so bare it reaches Pydantic
+               as False and the Literal refuses it -- an operator setting the
+               documented default would fail startup. */}}
+        mode: {{ .mode | quote }}
+        {{- end }}
+        {{- with .packages }}
+        packages: {{ toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .ecosystems }}
+        ecosystems: {{ toYaml . | nindent 10 }}
+        {{- end }}
+      {{- end }}
       {{- if hasKey .Values.api.config.registry "cache_only" }}
       cache_only: {{ .Values.api.config.registry.cache_only }}
       {{- end }}
