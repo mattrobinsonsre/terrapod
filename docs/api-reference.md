@@ -4108,7 +4108,9 @@ With `propagate`, the response carries the updated rule in `data` and the outcom
 
 In `meta.propagation`, a run task's `hmac-key` and a notification's `token` show as `<set>` or `<unset>`; every other spec key, including a notification's destination `url` (a credential for a chat webhook), is shown as stored in `customised`. `data` carries the rule's templates as [Show Rule](#show-rule) does. On a `dry_run`, `data` is the rule as it would be with the unsaved edit applied. A `dry_run` reports against the workspaces as they are now and rolls back; the real request re-judges them when it applies.
 
-No runs are triggered. One qualification, for `oidc-audiences` only: a run already in `planned` on an updated workspace is auto-discarded at its next confirm, as under [Bulk Update](#bulk-update).
+The scheduled-configure settings (`scheduled-configure-enabled`, `scheduled-configure-cron`, `scheduled-configure-timezone`) are judged as one unit: an edit to any of them judges all three, the unedited ones against the rule's own value, and a workspace that differs from the rule's previous schedule in any of the three is skipped for all of them and reported under `customised`. A workspace switched on by propagation records its baseline, so its first run is the next occurrence.
+
+No runs are triggered by the request. One qualification, for `oidc-audiences` only: a run already in `planned` on an updated workspace is auto-discarded at its next confirm, as under [Bulk Update](#bulk-update).
 
 **Not propagated** (never applied to an existing workspace): `name`, `name-template`, `vcs-connection-id`, `repo-url`, `branch`, `pattern`, `ignore-patterns`, `enabled`, `on-directory-delete`, `engine`, `owner-email` (setting an owner can grant admin), `execution-hook-templates` (no bulk-update support yet) and `storage-location` (fixed at creation: the workspace's objects live there), plus the rule's own bookkeeping (`id`, `created-at`, `updated-at`, `first-scan-at`).
 

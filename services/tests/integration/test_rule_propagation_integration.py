@@ -423,3 +423,92 @@ class TestPropagateOidcAudiences:
         assert exc.value.status_code == 422
         assert (await _workspaces(rule_id))["stale"].oidc_audiences == self.OLD
         assert await _audit_rows() == []
+
+
+class TestPropagateScheduledConfigure:
+    OFF = {
+        "scheduled_configure_enabled": False,
+        "scheduled_configure_cron": "",
+        "scheduled_configure_timezone": "UTC",
+    }
+    PREVIOUS = {
+        "scheduled-configure-enabled": False,
+        "scheduled-configure-cron": "",
+        "scheduled-configure-timezone": "UTC",
+    }
+    ON = {
+        "scheduled-configure-enabled": True,
+        "scheduled-configure-cron": "0 2 * * *",
+        "scheduled-configure-timezone": "UTC",
+    }
+
+    @staticmethod
+    def _trio(ws: Workspace) -> tuple:
+        return (
+            ws.scheduled_configure_enabled,
+            ws.scheduled_configure_cron,
+            ws.scheduled_configure_timezone,
+        )
+
+    async def _seed(self):
+        return await _seed(
+            {
+                "stale": dict(self.OFF),
+                "own-cron": {**self.OFF, "scheduled_configure_cron": "30 4 * * 1"},
+                "on": {
+                    "scheduled_configure_enabled": True,
+                    "scheduled_configure_cron": "0 2 * * *",
+                },
+            },
+            rule_columns=dict(self.OFF),
+        )
+
+    async def test_the_trio_is_applied_together_and_a_customised_workspace_keeps_its_own(self, app):
+        rule_id = await self._seed()
+
+        result = await _propagate(rule_id, self.PREVIOUS, self.ON)
+
+        ws = await _workspaces(rule_id)
+        assert self._trio(ws["stale"]) == (True, "0 2 * * *", "UTC")
+        assert ws["stale"].scheduled_configure_last_at is not None
+        assert self._trio(ws["own-cron"]) == (False, "30 4 * * 1", "UTC")
+        assert ws["own-cron"].scheduled_configure_last_at is None
+        assert [w["name"].split("-", 1)[1] for w in result.would_change] == ["stale"]
+        [own] = result.customised
+        assert own["name"].endswith("-own-cron")
+        assert set(own["fields"]) == {"scheduled-configure-enabled", "scheduled-configure-cron"}
+        assert own["fields"]["scheduled-configure-cron"] == {
+            "current": "30 4 * * 1",
+            "previous": "",
+            "new": "0 2 * * *",
+        }
+
+    async def test_a_workspace_already_on_the_new_schedule_is_unchanged(self, app):
+        rule_id = await self._seed()
+
+        result = await _propagate(rule_id, self.PREVIOUS, self.ON)
+
+        assert [w["name"].split("-", 1)[1] for w in result.unchanged] == ["on"]
+
+    async def test_a_dry_run_reports_the_schedule_and_changes_nothing(self, app):
+        rule_id = await self._seed()
+
+        result = await _propagate(rule_id, self.PREVIOUS, self.ON, dry_run=True)
+
+        assert result.dry_run is True
+        assert [w["name"].split("-", 1)[1] for w in result.would_change] == ["stale"]
+        assert self._trio((await _workspaces(rule_id))["stale"]) == (False, "", "UTC")
+
+    async def test_a_zone_edit_leaves_a_workspace_with_its_own_cron_in_its_own_zone(self, app):
+        rule_id = await self._seed()
+
+        await _propagate(
+            rule_id,
+            {"scheduled-configure-timezone": "UTC"},
+            {"scheduled-configure-timezone": "Europe/London"},
+        )
+
+        ws = await _workspaces(rule_id)
+        assert ws["own-cron"].scheduled_configure_timezone == "UTC"
+        assert ws["on"].scheduled_configure_timezone == "UTC"
+        assert ws["stale"].scheduled_configure_timezone == "Europe/London"

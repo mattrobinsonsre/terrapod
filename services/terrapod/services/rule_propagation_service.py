@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from fastapi import HTTPException
@@ -75,6 +75,9 @@ PROPAGATED_FIELDS: dict[str, str] = {
     "drift-detection-enabled": "drift-detection-enabled",
     "drift-detection-interval-seconds": "drift-detection-interval-seconds",
     "drift-ignore-rules": "drift-ignore-rules",
+    "scheduled-configure-enabled": "scheduled-configure-enabled",
+    "scheduled-configure-cron": "scheduled-configure-cron",
+    "scheduled-configure-timezone": "scheduled-configure-timezone",
     "plan-expiry-seconds": "plan-expiry-seconds",
     "slack-channel": "slack-channel",
     "debug-mode": "debug-mode",
@@ -107,6 +110,13 @@ NOT_PROPAGATED: dict[str, str] = {
 _POOL_FIELD = "agent-pool-id"
 _TEMPLATE_FIELDS = frozenset({"run-task-templates", "notification-templates"})
 
+#: Judged as one unit: a zone moves a cron's fire time and a flag switches it on.
+_SCHEDULE_FIELDS = (
+    "scheduled-configure-enabled",
+    "scheduled-configure-cron",
+    "scheduled-configure-timezone",
+)
+
 #: Rule attribute -> workspace column, where it is not the attribute with underscores.
 _COLUMN_OVERRIDES = {"terraform-version": "engine_version", "auto-apply": "auto_apply_mode"}
 
@@ -117,6 +127,8 @@ _STRING_FIELDS = frozenset(
         "ee-resource-cpu",
         "ee-resource-memory",
         "config-directory",
+        "scheduled-configure-cron",
+        "scheduled-configure-timezone",
         "default-playbook",
         "default-limit",
         "hard-limit",
@@ -257,6 +269,11 @@ def classify(
             )
         before, after = _normalise(field, previous[field]), _normalise(field, new[field])
         out.append(FieldVerdict(field, current, before, after, _verdict(current, before, after)))
+    group = [i for i, v in enumerate(out) if v.field in _SCHEDULE_FIELDS]
+    if any(out[i].verdict == "customised" for i in group):
+        for i in group:
+            if out[i].verdict == "apply":
+                out[i] = replace(out[i], verdict="customised")
     return out
 
 
@@ -380,6 +397,11 @@ async def propagate_rule_update(
     if aliases:
         raise ValueError(f"pass the stored spelling, not: {', '.join(aliases)}")
     new = {k: v for k, v in changed.items() if k in PROPAGATED_FIELDS}
+    if new.keys() & set(_SCHEDULE_FIELDS):
+        # An unedited member is the same before and after, so the rule's own value is both.
+        unedited = {n: getattr(rule, n.replace("-", "_")) for n in _SCHEDULE_FIELDS if n not in new}
+        new.update(unedited)
+        previous = {**previous, **unedited}
     if "oidc-audiences" in new:
         # Audiences pick the cloud trust a run token is minted for, so judge them here too.
         try:

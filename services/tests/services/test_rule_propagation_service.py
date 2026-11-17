@@ -494,6 +494,84 @@ class TestClassifyTemplates:
         assert verdicts(make_ws(resource_cpu="1"), {"resource-cpu": "1"}, {"resource-cpu": "2"})
 
 
+SCHEDULE_ON = {
+    "scheduled-configure-enabled": True,
+    "scheduled-configure-cron": "0 2 * * *",
+    "scheduled-configure-timezone": "UTC",
+}
+
+
+def schedule_columns(**overrides: Any) -> dict[str, Any]:
+    return {k.replace("-", "_"): v for k, v in {**SCHEDULE_ON, **overrides}.items()}
+
+
+def schedule_ws(**overrides: Any) -> SimpleNamespace:
+    return make_ws(**schedule_columns(**overrides))
+
+
+class TestClassifyScheduledConfigure:
+    def test_the_three_settings_propagate(self):
+        for name in SCHEDULE_ON:
+            assert name in PROPAGATED_FIELDS
+            assert name not in NOT_PROPAGATED
+
+    def test_a_workspace_on_the_previous_schedule_is_updated(self):
+        previous, new = dict(SCHEDULE_ON), {**SCHEDULE_ON, "scheduled-configure-cron": "0 3 * * *"}
+        assert verdicts(schedule_ws(), previous, new) == {
+            "scheduled-configure-enabled": "unchanged",
+            "scheduled-configure-cron": "apply",
+            "scheduled-configure-timezone": "unchanged",
+        }
+
+    def test_a_workspace_with_its_own_cron_is_customised(self):
+        previous, new = dict(SCHEDULE_ON), {**SCHEDULE_ON, "scheduled-configure-cron": "0 3 * * *"}
+        got = verdicts(schedule_ws(**{"scheduled-configure-cron": "30 4 * * 1"}), previous, new)
+        assert got["scheduled-configure-cron"] == "customised"
+
+    def test_a_zone_is_never_moved_under_a_workspace_with_its_own_cron(self):
+        previous = dict(SCHEDULE_ON)
+        new = {**SCHEDULE_ON, "scheduled-configure-timezone": "Europe/London"}
+        ws = schedule_ws(**{"scheduled-configure-cron": "30 4 * * 1"})
+        got = verdicts(ws, previous, new)
+        assert got["scheduled-configure-timezone"] == "customised"
+        assert got["scheduled-configure-cron"] == "customised"
+
+    def test_a_schedule_is_never_switched_on_under_a_workspace_with_its_own_cron(self):
+        previous = {**SCHEDULE_ON, "scheduled-configure-enabled": False}
+        ws = schedule_ws(**{"scheduled-configure-enabled": False, "scheduled-configure-cron": "x"})
+        got = verdicts(ws, previous, dict(SCHEDULE_ON))
+        assert got["scheduled-configure-enabled"] == "customised"
+
+    def test_a_disabled_workspace_is_not_handed_a_new_cron(self):
+        previous, new = dict(SCHEDULE_ON), {**SCHEDULE_ON, "scheduled-configure-cron": "0 3 * * *"}
+        got = verdicts(schedule_ws(**{"scheduled-configure-enabled": False}), previous, new)
+        assert got == {
+            "scheduled-configure-enabled": "customised",
+            "scheduled-configure-cron": "customised",
+            "scheduled-configure-timezone": "unchanged",
+        }
+
+    def test_a_workspace_on_the_previous_trio_takes_all_three(self):
+        previous = {
+            "scheduled-configure-enabled": False,
+            "scheduled-configure-cron": "",
+            "scheduled-configure-timezone": "UTC",
+        }
+        new = {
+            "scheduled-configure-enabled": True,
+            "scheduled-configure-cron": "0 2 * * *",
+            "scheduled-configure-timezone": "Europe/London",
+        }
+        ws = schedule_ws(**previous)
+        assert set(verdicts(ws, previous, new).values()) == {"apply"}
+
+    def test_an_unset_cron_is_the_same_whether_none_or_empty(self):
+        previous = {**SCHEDULE_ON, "scheduled-configure-cron": ""}
+        ws = schedule_ws(**{"scheduled-configure-cron": None})
+        new = {**previous, "scheduled-configure-cron": "0 2 * * *"}
+        assert verdicts(ws, previous, new)["scheduled-configure-cron"] == "apply"
+
+
 RULE = SimpleNamespace(id=uuid.UUID("01890000-0000-7000-8000-000000002549"))
 
 
@@ -531,6 +609,7 @@ async def propagate(
     dry_run: bool = False,
     skipped: int = 0,
     fake: FakeBulk | None = None,
+    rule: Any = RULE,
 ) -> tuple[PropagationResult, FakeBulk, MagicMock]:
     db = MagicMock()
     db.execute = AsyncMock(side_effect=[rows_result(workspaces), *extra_results])
@@ -538,7 +617,7 @@ async def propagate(
     fake = fake or FakeBulk()
     with patch.object(workspace_bulk, "apply_update_to_workspaces", fake):
         result = await propagate_rule_update(
-            db, RULE, previous, changed, admin_principal(), "req-2549", dry_run=dry_run
+            db, rule, previous, changed, admin_principal(), "req-2549", dry_run=dry_run
         )
     return result, fake, db
 
@@ -592,6 +671,71 @@ class TestPropagateOidcAudiences:
 
         assert fake.calls == [(["a"], {self.FIELD: self.VALID}, False)]
         assert [w["name"] for w in result.would_change] == ["a"]
+
+
+class TestPropagateScheduledConfigure:
+    """The three settings are judged as one unit; an unedited member is read off the rule."""
+
+    @staticmethod
+    def rule(**overrides: Any) -> SimpleNamespace:
+        return SimpleNamespace(id=RULE.id, **schedule_columns(**overrides))
+
+    async def test_an_edit_of_the_cron_alone_judges_the_whole_trio(self):
+        ws = rule_ws("a", **schedule_columns())
+        rule = self.rule(**{"scheduled-configure-cron": "0 3 * * *"})
+
+        result, fake, _ = await propagate(
+            [ws],
+            {"scheduled-configure-cron": "0 2 * * *"},
+            {"scheduled-configure-cron": "0 3 * * *"},
+            rule=rule,
+        )
+
+        assert fake.calls == [(["a"], {"scheduled-configure-cron": "0 3 * * *"}, False)]
+        assert result.customised == []
+
+    async def test_a_zone_edit_skips_a_workspace_whose_cron_is_its_own(self):
+        own = rule_ws("own", **schedule_columns(**{"scheduled-configure-cron": "30 4 * * 1"}))
+        rule = self.rule(**{"scheduled-configure-timezone": "Europe/London"})
+
+        result, fake, _ = await propagate(
+            [own],
+            {"scheduled-configure-timezone": "UTC"},
+            {"scheduled-configure-timezone": "Europe/London"},
+            rule=rule,
+        )
+
+        assert fake.calls == []
+        [entry] = result.customised
+        assert set(entry["fields"]) == {
+            "scheduled-configure-timezone",
+            "scheduled-configure-cron",
+        }
+        assert entry["fields"]["scheduled-configure-cron"]["current"] == "30 4 * * 1"
+
+    async def test_a_dry_run_reports_the_schedule_without_a_lock_on_the_edit(self):
+        ws = rule_ws("a", **schedule_columns())
+        rule = self.rule(**{"scheduled-configure-cron": "0 3 * * *"})
+
+        result, _, _ = await propagate(
+            [ws],
+            {"scheduled-configure-cron": "0 2 * * *"},
+            {"scheduled-configure-cron": "0 3 * * *"},
+            rule=rule,
+            dry_run=True,
+        )
+
+        assert result.dry_run is True
+        assert [w["name"] for w in result.would_change] == ["a"]
+
+    async def test_an_edit_touching_no_schedule_setting_never_reads_the_rule_schedule(self):
+        ws = rule_ws("a", engine_version="1.8")
+
+        _, fake, _ = await propagate(
+            [ws], {"engine-version": "1.8"}, {"engine-version": "1.9"}, rule=RULE
+        )
+
+        assert fake.calls == [(["a"], {"engine-version": "1.9"}, False)]
 
 
 class TestPropagationGroups:
