@@ -1907,7 +1907,6 @@
       "heading": "Förvärm paket- och image-cachar",
       "help": "Ange en version där den är känd: en förvärmning som namnger en version går sedan att stämma av mot en låsfil, ”vad som nu är nyast” gör det inte. Skriv varje rad som <code>namn version</code>; för Pulumi-plugins lägger du till efterföljande <code>os/arch</code>-tokens för att förvärma vissa plattformar.",
       "ecosystemLabel": "Artefakttyp",
-      "ecosystemOff": "{ecosystem} (avstängt)",
       "sourceLabel": "Hämta från",
       "sourceDefault": "Konfigurerad uppströmskälla",
       "upstreamIs": "Hämtas från <code>{url}</code>.",

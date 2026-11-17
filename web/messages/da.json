@@ -1907,7 +1907,6 @@
       "heading": "Opvarm pakke- og image-caches",
       "help": "Angiv en version, hvor den er kendt: en opvarmning, der nævner en version, kan bagefter holdes op mod en låsefil, »hvad der nu er nyest« kan ikke. Skriv hver linje som <code>navn version</code>; for Pulumi-plugins tilføjes efterfølgende <code>os/arch</code>-tokens for at opvarme bestemte platforme.",
       "ecosystemLabel": "Artefakttype",
-      "ecosystemOff": "{ecosystem} (slået fra)",
       "sourceLabel": "Hent fra",
       "sourceDefault": "Konfigureret upstream",
       "upstreamIs": "Hentes fra <code>{url}</code>.",

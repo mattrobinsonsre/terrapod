@@ -1907,7 +1907,6 @@
       "heading": "Paket ve imaj önbelleklerini ısıt",
       "help": "Bildiğiniz her yerde bir sürüm verin: sürümüyle adlandırılmış bir ısıtma sonradan bir kilit dosyasına karşı denetlenebilir, “en yenisi her neyse” denetlenemez. Her satırı <code>ad sürüm</code> biçiminde yazın; Pulumi eklentileri için, belirli platformları ısıtmak üzere sona <code>os/arch</code> belirteçleri ekleyin.",
       "ecosystemLabel": "Yapıt türü",
-      "ecosystemOff": "{ecosystem} (kapatılmış)",
       "sourceLabel": "Şuradan getir",
       "sourceDefault": "Yapılandırılmış yukarı akış",
       "upstreamIs": "<code>{url}</code> adresinden getirilecek.",

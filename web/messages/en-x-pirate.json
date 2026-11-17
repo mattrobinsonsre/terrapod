@@ -1907,7 +1907,6 @@
       "heading": "Warm th'' booty an'' likeness holds",
       "help": "Give a version wherever ye know it: a warm named at a version can be checked against a lockfile after, an'' “whatever be newest” cannot. Write each line as <code>name version</code>; fer Pulumi plugins, add trailin'' <code>os/arch</code> tokens t'' warm particular platforms.",
       "ecosystemLabel": "Kind o'' booty",
-      "ecosystemOff": "{ecosystem} (shut down)",
       "sourceLabel": "Haul from",
       "sourceDefault": "Th'' configured upstream",
       "upstreamIs": "Hauled from <code>{url}</code> she''ll be.",

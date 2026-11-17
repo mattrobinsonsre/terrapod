@@ -1907,7 +1907,6 @@
       "heading": "Lämmitä paketti- ja vedosvälimuistit",
       "help": "Anna versio aina kun tiedät sen: versiolla nimetyn lämmityksen voi jälkikäteen tarkistaa lukkotiedostoa vasten, ”mikä sattuu olemaan uusin” ei käy siihen. Kirjoita jokainen rivi muodossa <code>nimi versio</code>; Pulumi-laajennuksille lisää loppuun <code>os/arch</code>-merkinnät, jotta tietyt alustat lämmitetään.",
       "ecosystemLabel": "Artefaktin laji",
-      "ecosystemOff": "{ecosystem} (pois käytöstä)",
       "sourceLabel": "Hae lähteestä",
       "sourceDefault": "Määritetty ylävirta",
       "upstreamIs": "Haetaan lähteestä <code>{url}</code>.",

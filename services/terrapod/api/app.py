@@ -28,7 +28,6 @@ from terrapod.config import settings
 from terrapod.db.session import close_db, get_db_session, init_db
 from terrapod.logging_config import configure_logging, get_logger
 from terrapod.redis.client import close_redis, init_redis
-from terrapod.services.capabilities import capability_enabled
 from terrapod.storage import close_storage, init_storage
 
 from .errors import UPSTREAM_FAILURE_HEADER
@@ -618,7 +617,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # never `asyncio.create_task` (principle 11). Hourly: the grace period is
     # measured in hours, so collecting more often only re-examines blobs that are
     # still protected.
-    if capability_enabled("oci") and settings.registry.oci.gc.enabled:
+    if settings.registry.oci.gc.enabled:
 
         async def _oci_gc() -> None:
             from terrapod.services.oci.gc import collect
@@ -642,35 +641,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # others, a submission was accepted, returned a job id, and nothing was
     # ever registered to run it -- a job stuck at "queued" for ever, which
     # reads as a stalled scheduler rather than a missing handler.
-    from terrapod.services.warm_ahead import ECOSYSTEMS as WARMABLE
 
-    if any(capability_enabled(c) for c in WARMABLE):
+    async def _cache_warm(payload: dict) -> None:
+        from terrapod.services.warm_ahead import WarmItem, run_job
 
-        async def _cache_warm(payload: dict) -> None:
-            from terrapod.services.warm_ahead import WarmItem, run_job
+        items = [WarmItem(**i) for i in payload.get("items", [])]
+        await run_job(payload["job_id"], items)
 
-            items = [WarmItem(**i) for i in payload.get("items", [])]
-            await run_job(payload["job_id"], items)
+    register_trigger_handler(
+        "cache_warm",
+        handler=_cache_warm,
+        description="Warm the package and container caches ahead of a seal",
+    )
 
-        register_trigger_handler(
-            "cache_warm",
-            handler=_cache_warm,
-            description="Warm the package and container caches ahead of a seal",
-        )
+    async def _oci_upload_reaper() -> None:
+        from terrapod.services.oci.upload_service import reap_abandoned_sessions
 
-    if capability_enabled("oci"):
+        await reap_abandoned_sessions()
 
-        async def _oci_upload_reaper() -> None:
-            from terrapod.services.oci.upload_service import reap_abandoned_sessions
-
-            await reap_abandoned_sessions()
-
-        register_periodic_task(
-            "oci_upload_reaper",
-            interval_seconds=3600,
-            handler=_oci_upload_reaper,
-            description="Reap abandoned OCI blob uploads and their chunks",
-        )
+    register_periodic_task(
+        "oci_upload_reaper",
+        interval_seconds=3600,
+        handler=_oci_upload_reaper,
+        description="Reap abandoned OCI blob uploads and their chunks",
+    )
 
     # Encryption DEK refresh — multi-replica DEK propagation (no leader election).
     # Lets a DEK rotated on one replica become usable on all replicas without a
@@ -1498,20 +1492,19 @@ def create_application() -> FastAPI:
     # terraform-only deployment carries no registry, in its schema or anywhere
     # else. `GET /v2/` then 404s as an ordinary unrouted path, which is precisely
     # the "not a v2 registry" answer a container client probes for.
-    if capability_enabled("oci"):
-        from terrapod.api.routers.oci import oci_error_handler
-        from terrapod.api.routers.oci import router as oci_router
-        from terrapod.services.oci.errors import OCIError
+    from terrapod.api.routers.oci import oci_error_handler
+    from terrapod.api.routers.oci import router as oci_router
+    from terrapod.services.oci.errors import OCIError
 
-        app.include_router(oci_router)
-        app.add_exception_handler(OCIError, oci_error_handler)
+    app.include_router(oci_router)
+    app.add_exception_handler(OCIError, oci_error_handler)
 
-        # The operator surface — repository deletion, untagged listing, collect
-        # now (#1423). Native rather than /v2/, and mounted under the same gate:
-        # it exists only for the registry, so it goes when the registry does.
-        from terrapod.api.routers.oci_admin import router as oci_admin_router
+    # The operator surface — repository deletion, untagged listing, collect
+    # now (#1423). Native rather than /v2/, and mounted under the same gate:
+    # it exists only for the registry, so it goes when the registry does.
+    from terrapod.api.routers.oci_admin import router as oci_admin_router
 
-        include_terrapod(oci_admin_router)
+    include_terrapod(oci_admin_router)
 
     from terrapod.api.routers.binary_cache import router as binary_cache_router
 
@@ -1519,59 +1512,38 @@ def create_application() -> FastAPI:
 
     # Warm-ahead submission + status (#1420). One router for every cache so a
     # job's status stays reachable regardless of which of them is enabled.
-    from terrapod.services.warm_ahead import ECOSYSTEMS as WARMABLE
+    from terrapod.api.routers.cache_warm import router as cache_warm_router
 
-    if any(capability_enabled(c) for c in WARMABLE):
-        from terrapod.api.routers.cache_warm import router as cache_warm_router
-
-        include_terrapod(cache_warm_router)
+    include_terrapod(cache_warm_router)
 
     # Admin list, totals and eviction for the package cache and the VCS archive
-    # cache (#2474). Two routers, gated differently.
+    # cache (#2474), and the operator-upload routes with them.
     #
-    # The package half goes with its capability, like `oci_admin` above and like
-    # `POST /admin/package-cache/warm` in the router above this one: a
-    # switched-off capability's surface is ABSENT rather than answering 404, and
-    # `scripts/airgap-gate.sh --gated-off` asserts that against a running stack.
-    # Mounting these unconditionally left the `/admin/package-cache/` namespace
-    # half-present — four routes answering and the fifth gone — which is worse
-    # than either consistent answer. Nothing is locked away by this: a capability
-    # that is off has stopped serving, not been decommissioned, and the stored
-    # artifacts are still there when it comes back (`services/capabilities.py`).
-    #
-    # The archive half is unconditional because the VCS archive cache has no
-    # capability flag: it is part of what Terrapod is, like the provider mirror
-    # and the module registry, which the same gate asserts must keep answering.
+    # All unconditional. These were once gated per capability, and the gating is
+    # what produced the defects: a namespace half-present, four routes answering
+    # and a fifth gone, and an upload route that could store an artifact into a
+    # cache nothing would serve. A cache is part of what Terrapod is -- as the
+    # provider mirror and the module registry always were -- so there is nothing
+    # left to switch off and nothing to keep consistent.
+    from terrapod.api.routers.cache_admin import build_upload_router
     from terrapod.api.routers.cache_admin import package_router as cache_admin_package_router
     from terrapod.api.routers.cache_admin import router as cache_admin_router
 
-    if settings.registry.package_cache.enabled:
-        include_terrapod(cache_admin_package_router)
-        # The operator-upload routes are gated FINER than the rest of that
-        # namespace (#2599): one per ecosystem, with that ecosystem's own flag,
-        # because an upload is for one cache and offering a way to put an artifact
-        # into a cache this deployment will not serve is the half-present surface
-        # the comment above is about. `build_upload_router` returns None when no
-        # ecosystem is on, so nothing is mounted rather than an empty router.
-        from terrapod.api.routers.cache_admin import build_upload_router
-
-        upload_router = build_upload_router()
-        if upload_router is not None:
-            include_terrapod(upload_router)
+    include_terrapod(cache_admin_package_router)
+    include_terrapod(build_upload_router())
     include_terrapod(cache_admin_router)
 
     # Language package proxies — PyPI and npm (#1417). Native surface rather than
     # a root mount: both clients take their registry URL as configuration, so
     # unlike /v2/ there is no mandated prefix to honour, and the BFF's existing
     # /api/* route proxies them with no further wiring.
-    # Per ecosystem, for the same reason: PyPI serves both Pulumi and Ansible, npm
-    # only Pulumi, so the two are mounted independently and `build_router` returns
-    # nothing when neither engine wants them (#1429).
+    # All six ecosystems, always: `build_router` no longer returns None and no
+    # longer mounts per ecosystem. Which engines a deployment happens to run is
+    # not a reason for the proxy to be absent, and six switches were sixty-four
+    # configurations of which one was ever exercised.
     from terrapod.api.routers.package_cache import build_router as build_package_cache_router
 
-    package_cache_router = build_package_cache_router()
-    if package_cache_router is not None:
-        include_terrapod(package_cache_router)
+    include_terrapod(build_package_cache_router())
 
     # Cost-estimation pricesheet cache (#871) — runner-facing download + admin.
     from terrapod.api.routers.cost_estimation import router as cost_estimation_router

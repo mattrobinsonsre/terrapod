@@ -1907,7 +1907,6 @@
       "heading": "Předehřát cache balíčků a obrazů",
       "help": "Uvádějte verzi všude, kde ji znáte: předehřátí uvedené s verzí lze později ověřit proti lock souboru, „cokoli je nejnovější“ nikoli. Každý řádek zapište ve tvaru <code>název verze</code>; u pluginů Pulumi připojte na konec tokeny <code>os/arch</code>, chcete-li předehřát konkrétní platformy.",
       "ecosystemLabel": "Druh artefaktu",
-      "ecosystemOff": "{ecosystem} (vypnuto)",
       "sourceLabel": "Stahovat z",
       "sourceDefault": "Nakonfigurovaný upstream",
       "upstreamIs": "Bude staženo z <code>{url}</code>.",

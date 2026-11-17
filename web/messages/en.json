@@ -1914,7 +1914,6 @@
       "helpLead": "Fetch artifacts into the cache before anything asks for them — one per line, as a name and a version.",
       "help": "Give a version wherever you know it: a warm named at a version can afterwards be checked against a lockfile, and “whatever is newest” cannot. Write each line as <code>name version</code>; for Pulumi plugins, add trailing <code>os/arch</code> tokens to warm specific platforms.",
       "ecosystemLabel": "Artifact kind",
-      "ecosystemOff": "{ecosystem} (switched off)",
       "sourceLabel": "Fetch from",
       "sourceDefault": "Configured upstream",
       "upstreamIs": "Will fetch from <code>{url}</code>.",

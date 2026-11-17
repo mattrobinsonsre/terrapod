@@ -104,7 +104,6 @@ api:
   config:
     registry:
       oci:
-        enabled: true
         upstreams:
           - host: quay.io                      # anonymous
           - host: registry.example.com         # authenticated
@@ -309,7 +308,6 @@ mid-flight would destroy real work.
 
 | Value | Default | What it does |
 |---|---|---|
-| `api.config.registry.oci.enabled` | `true` | Serve the registry at `/v2/`. Disabling hides the surface; pushed images stay in storage and reappear if re-enabled. |
 | `api.config.registry.oci.upstreams` | `[]` | The pull-through allow-list. Empty means push-only. Each entry takes `host`, an optional `api_url` (where to fetch from, default `https://{host}`), and an optional `username` plus Secret-backed password. |
 | `api.config.registry.oci.upload_session_timeout_hours` | `24` | How long an in-progress upload may sit untouched before it is reaped with its chunks. |
 | `api.config.registry.oci.gc.enabled` | `true` | Collect unreferenced blobs. Off means the registry only ever grows: deleting a manifest un-references its layers but frees nothing, and there is no *blob* delete API — see [Deleting content](#deleting-content). |
@@ -378,26 +376,33 @@ outlives its subject deliberately, because destroying the record that an image w
 signed is not something a delete should do quietly.
 
 
-## Turning the registry off
+## The registry cannot be turned off
 
-This registry exists to serve Ansible execution environments. If you do not run
-Ansible, set `api.config.registry.oci.enabled: false` and it is not deployed at
-all — the `/v2/` routes are never registered, the collector and upload reaper
-never scheduled, and nothing appears in the UI or the OpenAPI schema.
+**There is no switch.** `/v2/` is always mounted.
+api.config.registry.oci.enabled is **removed** in 2.0 — if your `values.yaml`
+still sets it, see
+[Upgrading to 2.0](upgrading-to-2.0.md#every-cache-is-always-on-and-the-enabled-flags-are-removed).
 
-That flag is the only thing deciding it. There is **no engine on/off switch above
-it**: Terrapod offers every engine it can run, and a deployment that does not run
-Ansible simply never pushes an execution environment.
+It went because **the registry is load-bearing for Ansible, not an optional
+extra beside it.** Resolving which ansible-core lines a deployment can run is a
+tag listing through this registry, so a deployment with `/v2/` off could not run
+an Ansible configure operation at all — it would report no execution environments
+available and refuse every configure, for a reason an operator would have no way
+to connect back to a registry switch. Calling it an optional capability was
+simply wrong.
 
-**Never destructive.** Anything already pushed or mirrored stays in storage and
-returns untouched if you turn the registry on again.
+**Nothing is deployed by a registry you do not push to.** An empty registry holds
+no storage, the collector has nothing to collect, and the upload reaper has no
+sessions to reap. A deployment that never runs Ansible never pushes an execution
+environment and never notices `/v2/` is there.
 
-Off means *absent*, not present-and-refusing. A surface that 404s every request
-is still a surface — it sits in the schema, carries its dependencies, and reads
-to anyone auditing the deployment as something you do.
+What you *do* configure is the pull-through allow-list — `upstreams`, empty by
+default, which is the correct and air-gapped posture — and whether upstream may be
+reached at all, with `api.config.registry.cache_only`. Those bound what the
+registry will do; the mount is not negotiable.
 
 The package proxies have their own flags, documented in
-[package-cache.md](package-cache.md#turning-a-proxy-off). Terraform and
+[package-cache.md](package-cache.md#a-proxy-cannot-be-turned-off). Terraform and
 OpenTofu's own caches — the provider network mirror, the engine binary cache, the
 module registry — have no such switch: they are what Terrapod is, not an optional
 engine's supporting cast.

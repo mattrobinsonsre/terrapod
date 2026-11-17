@@ -1907,7 +1907,6 @@
       "heading": "Warm teh packige an imij cachez",
       "help": "Giv a vershun wenevr u noes it: a warm namd at a vershun can be checkd agin a lockfyle aftr, an “whatevr iz newist” cannot. Rite evry line liek <code>name version</code>; fer Pulumi pluginz, add trailin <code>os/arch</code> tokenz ta warm speshul platformz.",
       "ecosystemLabel": "Artifakt kynd",
-      "ecosystemOff": "{ecosystem} (switchd off)",
       "sourceLabel": "Grab frum",
       "sourceDefault": "Teh configurd upstreem",
       "upstreamIs": "Wil grab frum <code>{url}</code>.",

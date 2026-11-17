@@ -1889,9 +1889,6 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
             "cache_only": {
               "type": "boolean"
             },
@@ -1899,9 +1896,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "upstream_registries": {
                   "type": "array",
                   "items": {
@@ -1941,9 +1935,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "terraform_mirror_url": {
                   "type": "string"
                 },
@@ -2087,16 +2078,10 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "pypi": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2114,9 +2099,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2134,9 +2116,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2158,9 +2137,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2182,9 +2158,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2205,9 +2178,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
                     "upstream": {
                       "type": "string",
                       "format": "uri"
@@ -2227,9 +2197,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
                 "upload_session_timeout_hours": {
                   "type": "integer",
                   "minimum": 1

@@ -1907,7 +1907,6 @@
       "heading": "Aquecer as caches de pacotes e de imagens",
       "help": "Indique uma versão sempre que a souber: um aquecimento indicado com versão pode depois ser confrontado com um ficheiro de bloqueio, e “o que for mais recente” não pode. Escreva cada linha na forma <code>nome versão</code>; para plug-ins do Pulumi, acrescente tokens <code>os/arch</code> no fim para aquecer plataformas específicas.",
       "ecosystemLabel": "Tipo de artefacto",
-      "ecosystemOff": "{ecosystem} (desativado)",
       "sourceLabel": "Descarregar de",
       "sourceDefault": "Origem configurada",
       "upstreamIs": "Será descarregado de <code>{url}</code>.",

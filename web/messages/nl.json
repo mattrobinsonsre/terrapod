@@ -1907,7 +1907,6 @@
       "heading": "Pakket- en image-caches opwarmen",
       "help": "Geef een versie op waar die bekend is: een opwarming die een versie noemt, is later tegen een lockbestand te controleren, “wat het nieuwste ook is” niet. Schrijf elke regel als <code>naam versie</code>; voeg voor Pulumi-plugins achterliggende <code>os/arch</code>-tokens toe om specifieke platformen op te warmen.",
       "ecosystemLabel": "Artefactsoort",
-      "ecosystemOff": "{ecosystem} (uitgeschakeld)",
       "sourceLabel": "Ophalen van",
       "sourceDefault": "Geconfigureerde upstream",
       "upstreamIs": "Wordt opgehaald van <code>{url}</code>.",

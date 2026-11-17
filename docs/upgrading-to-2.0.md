@@ -297,6 +297,136 @@ configuration it enabled is unreachable through `checksum` or `allow_unsigned`.
 publishes no checksum file, so an internal mirror that cannot serve a GitHub-shaped release
 API genuinely needs it.
 
+### Every cache is always on, and the enabled flags are removed
+
+**Affects:** every deployment, but only three of the keys below can be in a
+1.x `values.yaml`. `api.config.registry.enabled`,
+`api.config.registry.provider_cache.enabled` and
+`api.config.registry.binary_cache.enabled` shipped in the 1.x chart, so **if you
+set any of them, remove them before you upgrade.** The rest —
+`registry.oci.enabled`, `registry.package_cache.enabled` and its six
+per-ecosystem flags — existed only on `main` during 2.0 development; an upgrade
+from 1.x has nothing to remove there.
+
+Every cache and the private registry are now **unconditional**. Not "on by
+default" — the fields are gone, so there is nothing to set.
+
+```yaml
+# remove every one of these lines
+api:
+  config:
+    registry:
+      enabled: true              # shipped in 1.x
+      binary_cache:
+        enabled: true            # shipped in 1.x
+      provider_cache:
+        enabled: true            # shipped in 1.x
+      oci:
+        enabled: true            # 2.0 pre-release only
+      package_cache:
+        enabled: true            # 2.0 pre-release only
+        pypi:
+          enabled: true          # 2.0 pre-release only -- and the same for
+        npm:                     # npm, go, nuget, galaxy and pulumi
+          enabled: true
+```
+
+**A leftover key fails loudly in the chart and silently in the API, so remove it
+from your values rather than relying on either.** `values.schema.json` declares
+`additionalProperties: false`, so a `values.yaml` that still sets one of these
+**fails `helm lint` and `helm upgrade`** instead of ignoring it — which is the
+outcome you want, because it tells you at upgrade time rather than leaving dead
+configuration behind. The API is the opposite: these config models ignore keys
+they do not declare (`extra="ignore"`), so the same setting delivered through a
+`TERRAPOD_*` environment variable or a hand-written ConfigMap is **accepted and
+silently discarded**. Nothing warns. If you configure Terrapod by either of those
+routes, grep for these keys yourself — the chart cannot catch what it did not
+render.
+
+**Nothing is lost and nothing needs re-enabling.** Everything already cached or
+pushed stays exactly where it is. If you had a cache switched off, the only change
+is that its routes are now mounted and it will serve and fill again.
+
+**Why they are gone rather than deprecated**, because each reason is a defect
+that was reachable in configuration:
+
+1. **A cache that is off is a surface half-present, not a smaller deployment.**
+   The shared routes under `/admin/package-cache` are about the cache rather than
+   about an ecosystem, so some stayed mounted while others did not: that admin
+   namespace answered for four routes and was absent for a fifth. An upload route
+   could store an operator-vetted artifact into a cache nothing would ever serve.
+2. **A cache is part of what Terrapod is, not an optional feature.** The code
+   already said so — the capability table stated that Terraform's own caches "are
+   what Terrapod is, not an optional engine's supporting cast, and must never
+   become gateable" — and then conceded, in the parenthesis immediately after,
+   that they have their own `enabled` flags anyway.
+3. **The container registry is load-bearing for Ansible.** Resolving which
+   ansible-core lines a deployment can run is a tag listing through `/v2/`, so a
+   deployment with `registry.oci.enabled: false` could not run an Ansible
+   configure operation at all. Calling it an optional capability was wrong.
+4. **Six independent switches were sixty-four configurations**, of which one was
+   ever exercised. The other sixty-three were reachable by an operator and tested
+   by nobody. `api.config.registry.enabled` was worse than untested: **nothing
+   read it**, so an operator who set it to `false` got a private registry that
+   served anyway.
+
+**A cache you do not use already costs nothing**, which is why there was nothing
+to buy by switching one off. A proxy does no background work per ecosystem and an
+empty cache holds no storage; an engine's CLI is fetched only when a run of that
+engine happens. A Terraform-and-OpenTofu deployment never sends a request to the
+Pulumi or Galaxy proxies and never pushes an execution environment.
+
+**Two `enabled` keys under `registry` survive, and neither is a cache**, so do not
+remove them:
+
+| key | what it is |
+|---|---|
+| `api.config.registry.oci.gc.enabled` | A blob-reclamation sweep, not the registry serving. Turning it off makes no surface half-present — the registry simply only ever grows. Still available, still `true` by default |
+| `api.config.registry.module_interface.enabled` | Publish-time extraction of a module's inputs and outputs. A real feature with real readers, not a cache |
+
+What bounds a cache now is where it may fetch from — `upstream` per ecosystem,
+`provider_cache.upstream_registries`, the `binary_cache` mirror URLs — and whether
+it may reach upstream at all, with `api.config.registry.cache_only`. What
+reclaims its space is the scheduled retention sweep under
+`api.config.artifact_retention`. None of those makes a route disappear. See
+[Caches](caches.md), [package-cache.md](package-cache.md#a-proxy-cannot-be-turned-off)
+and [oci-registry.md](oci-registry.md#the-registry-cannot-be-turned-off).
+
+### `PackageCacheSource.Enabled` is removed from the Go SDK
+
+**Affects:** a Go consumer of `go-terrapod` that reads the warm-ahead upstream
+listing. This is a **compile break**, not a behaviour change — the field is gone
+from the struct, so code referencing it no longer builds.
+
+```go
+// before
+for _, s := range sources {
+    if !s.Enabled {
+        continue // never taken
+    }
+    warmFrom(s.Upstream)
+}
+
+// after
+for _, s := range sources {
+    warmFrom(s.Upstream)
+}
+```
+
+`PackageCacheSources()` still returns one entry per ecosystem with `Ecosystem`,
+`Upstream`, `Mirrors` and `ResolvesLatest`. Only `Enabled` is gone, and the
+`enabled` attribute goes with it from the response.
+
+**Delete the branch rather than replacing the field.** Once every cache is always
+on (above), the field could only ever read `true`, so any `if !s.Enabled` arm was
+already unreachable — the web panel's own `disabled={!s.enabled}` branch never
+rendered. A field that cannot vary is not information; it is an invitation to
+branch on something that will never happen. Nothing replaces it, and there is no
+condition to test before warming an ecosystem.
+
+If your code logged or displayed a "switched off" state from this field, that
+state no longer exists.
+
 ### Cloud-identity minting is strict by default: `require_phase` and `require_assigned_pool`
 
 Both now default to **true**. Each refuses to mint a run identity in a case that was
@@ -1518,13 +1648,14 @@ unaffected either way.
 | creating a workspace with a disabled engine was refused | accepted; the engine must simply be one Terrapod can run |
 | the Pulumi service surface was unmounted | always mounted (nothing there is reachable without a Pulumi workspace to name) |
 
-**Per-capability switches are unaffected and are what to use instead.** If your
-reason for switching an engine off was to stop a *surface* serving, that control
-survives and is unchanged — `api.config.registry.oci.enabled` for the container
-registry, and `api.config.registry.package_cache.enabled` plus its six
-per-ecosystem flags (`pypi`, `npm`, `galaxy`, `pulumi`, `go`, `nuget`) for the
-package proxies. Each of those is read, and switching one off unmounts its
-routes rather than leaving them answering 404.
+**There are no per-capability switches either, so there is nothing to use
+instead.** An earlier revision of this guide pointed here at
+`api.config.registry.oci.enabled` and `api.config.registry.package_cache.enabled`
+as the surviving way to stop a *surface* serving. Those are now removed too — see
+[Every cache is always on](#every-cache-is-always-on-and-the-enabled-flags-are-removed).
+If your reason for switching an engine off was to shrink the surface, the answer
+is that there is nothing to shrink: a cache or proxy you never call does no
+background work and holds no storage.
 
 ### `api.config.default_ansible_version` is removed
 

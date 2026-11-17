@@ -44,7 +44,6 @@ from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import registry_collection_service as collections
-from terrapod.services.capabilities import capability_enabled
 from terrapod.services.package_cache import (
     galaxy,
     goproxy,
@@ -1459,37 +1458,25 @@ async def _redirect_to_object(storage: ObjectStore, key: str) -> Response:
     return RedirectResponse(url=presigned.url, status_code=302)
 
 
-def build_router() -> APIRouter | None:
-    """The package-cache routes for the ecosystems this deployment offers (#1429).
+def build_router() -> APIRouter:
+    """Every package-cache route. All six ecosystems, always.
 
-    Returns None when none of them are, so the application mounts nothing at all —
-    the routes do not exist, rather than existing and refusing. That is the
-    difference between a surface an operator has switched off and one that answers
-    every request with a 404 while still appearing in the schema, and it is what
-    keeps a terraform-only install free of endpoints it has no use for.
+    This used to mount per ecosystem and could return None, so a deployment
+    could serve some proxies and not others, or none. That is gone: a cache is
+    infrastructure rather than a feature, and a cache that is off is a surface
+    half-present -- which is how an uploaded artifact came to be storable into a
+    cache nothing would serve.
+
+    Removing the choice removes the combinations with it. Six independent
+    switches are sixty-four configurations, of which exactly one was ever
+    exercised, and the other sixty-three were reachable by an operator and
+    tested by nobody.
 
     A factory rather than mutating a module-level router, so building the
     application twice in one process (which the tests do constantly) cannot
     accumulate duplicate routes.
     """
     aggregate = APIRouter(prefix="/package-cache", tags=["package-cache"], route_class=TimedRoute)
-    mounted = False
-    if capability_enabled("pypi"):
-        aggregate.include_router(pypi_router)
-        mounted = True
-    if capability_enabled("npm"):
-        aggregate.include_router(npm_router)
-        mounted = True
-    if capability_enabled("galaxy"):
-        aggregate.include_router(galaxy_router)
-        mounted = True
-    if capability_enabled("pulumi"):
-        aggregate.include_router(pulumi_router)
-        mounted = True
-    if capability_enabled("go"):
-        aggregate.include_router(go_router)
-        mounted = True
-    if capability_enabled("nuget"):
-        aggregate.include_router(nuget_router)
-        mounted = True
-    return aggregate if mounted else None
+    for router in (pypi_router, npm_router, galaxy_router, pulumi_router, go_router, nuget_router):
+        aggregate.include_router(router)
+    return aggregate

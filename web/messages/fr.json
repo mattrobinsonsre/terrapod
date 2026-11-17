@@ -1907,7 +1907,6 @@
       "heading": "Préchauffer les caches de paquets et d''images",
       "help": "Indiquez une version chaque fois que vous la connaissez : un préchauffage nommé à une version peut ensuite être confronté à un fichier de verrouillage, alors que « le plus récent, quel qu''il soit » ne le peut pas. Écrivez chaque ligne sous la forme <code>nom version</code> ; pour les plugins Pulumi, ajoutez des jetons <code>os/arch</code> en suffixe afin de préchauffer des plateformes précises.",
       "ecosystemLabel": "Type d''artefact",
-      "ecosystemOff": "{ecosystem} (désactivé)",
       "sourceLabel": "Récupérer depuis",
       "sourceDefault": "Amont configuré",
       "upstreamIs": "Sera récupéré depuis <code>{url}</code>.",

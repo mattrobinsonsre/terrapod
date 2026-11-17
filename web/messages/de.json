@@ -1907,7 +1907,6 @@
       "heading": "Paket- und Image-Caches vorwärmen",
       "help": "Geben Sie eine Version an, wo immer Sie sie kennen: Ein mit Version benanntes Vorwärmen lässt sich später gegen eine Lockdatei prüfen, „was auch immer das Neueste ist“ nicht. Schreiben Sie jede Zeile als <code>Name Version</code>; für Pulumi-Plugins hängen Sie <code>os/arch</code>-Token an, um bestimmte Plattformen vorzuwärmen.",
       "ecosystemLabel": "Artefaktart",
-      "ecosystemOff": "{ecosystem} (abgeschaltet)",
       "sourceLabel": "Beziehen von",
       "sourceDefault": "Konfigurierte Quelle",
       "upstreamIs": "Wird von <code>{url}</code> geholt.",

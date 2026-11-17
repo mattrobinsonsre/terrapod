@@ -562,7 +562,6 @@ api:
 
     # Private Registry & Caching
     registry:
-      enabled: true
       # WHAT this deployment is willing to serve, as opposed to WHERE it fetches
       # from (#2589). provider_cache.upstream_registries restricts the hosts;
       # nothing restricted the content, so a workspace naming any package got it
@@ -593,7 +592,6 @@ api:
       # Container image registry (#1408). Serves execution environments and any
       # other image, both pushed by operators and mirrored from upstream, at /v2/.
       oci:
-        enabled: true
         # Registries Terrapod may pull through to. An ALLOW-LIST, not a
         # convenience: clients name the upstream in the first path component
         # (pulling <host>/quay.io/ansible/awx-ee mirrors quay.io/ansible/awx-ee),
@@ -686,9 +684,7 @@ api:
       # request-forgery surface. Point it at an internal mirror to pull through
       # that instead of the public registry.
       package_cache:
-        enabled: true
         pypi:
-          enabled: true
           upstream: https://pypi.org
           # Extra registries this ecosystem may be WARMED from, by label.
           # Serving always pulls through `upstream` above; these are reachable
@@ -706,7 +702,6 @@ api:
           #     hub: https://terrapod.hub.example/api/v1/packages/pypi
           mirrors: {}
         npm:
-          enabled: true
           upstream: https://registry.npmjs.org
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
@@ -715,7 +710,6 @@ api:
         # is on regardless: there is no engine on/off switch, and a proxy costs
         # nothing until a run of that engine asks it for something.
         pulumi:
-          enabled: true
           upstream: https://get.pulumi.com/releases/plugins
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
@@ -736,7 +730,6 @@ api:
         # switch to disable it with -- that was withdrawn (#1986) -- so turn this
         # off here if no Pulumi program uses the Go SDK. Point GOPROXY at it.
         go:
-          enabled: true
           upstream: https://proxy.golang.org
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
@@ -759,7 +752,6 @@ api:
         # NuGet V3 flat container. Pulumi-only (C# SDK programs). Point a
         # nuget.config packageSource at this proxy's index.json.
         nuget:
-          enabled: true
           upstream: https://api.nuget.org/v3-flatcontainer
           # Where NuGet publishes `packageHash` -- the only digest it publishes
           # anywhere, and so what a cached package is verified against. A second
@@ -774,12 +766,10 @@ api:
         # private collection publishing and signature verification, so unlike
         # the others it holds content that exists nowhere upstream.
         galaxy:
-          enabled: true
           upstream: https://galaxy.ansible.com
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
       provider_cache:
-        enabled: true
         upstream_registries:
           - registry.terraform.io
           - registry.opentofu.org
@@ -802,7 +792,6 @@ api:
         # (with a warning) for those providers instead of rejecting them.
         allow_unsigned: false
       binary_cache:
-        enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
         tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
         # Upstream download base for terragrunt binaries (bare per-platform

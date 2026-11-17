@@ -34,7 +34,6 @@ from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.config import settings
 from terrapod.logging_config import get_logger
 from terrapod.services import warm_ahead
-from terrapod.services.capabilities import capability_enabled
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.warm_ahead import MAX_ITEMS, WarmItem
 
@@ -155,7 +154,9 @@ async def package_cache_sources(
                 "id": ecosystem,
                 "attributes": {
                     "ecosystem": ecosystem,
-                    "enabled": info["enabled"],
+                    # No `enabled`: every cache serves, always. The field could
+                    # only read `true`, and `effective_sources` no longer emits
+                    # it -- reading it here was a KeyError, not a stale value.
                     "upstream": info["upstream"],
                     "mirrors": info["mirrors"],
                     "resolves-latest": info["resolves_latest"],
@@ -187,8 +188,6 @@ async def warm_packages(
                 status_code=422,
                 detail=f"Unknown ecosystem: {spec.ecosystem} (known: {known})",
             )
-        if not capability_enabled(spec.ecosystem):
-            raise HTTPException(status_code=404, detail=f"{spec.ecosystem} proxy is not enabled")
         if not spec.name:
             raise HTTPException(status_code=422, detail="Every item needs a name")
         if not spec.version and spec.ecosystem not in warm_ahead.RESOLVES_LATEST:
@@ -227,8 +226,6 @@ async def warm_images(
 ) -> dict:
     """Pull images through the mirror ahead of a seal, blobs included."""
     _reject_when_sealed()
-    if not capability_enabled("oci"):
-        raise HTTPException(status_code=404, detail="The container registry is not enabled")
 
     items: list[WarmItem] = []
     for reference in body.images:

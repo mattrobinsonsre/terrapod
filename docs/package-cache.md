@@ -170,8 +170,6 @@ off — pointing at an internal mirror if you have one — then seal.
 
 | Value | Default | What it does |
 |---|---|---|
-| `api.config.registry.package_cache.enabled` | `true` | Serve the proxies. All six at once. |
-| `...package_cache.{pypi,npm,galaxy,pulumi,go,nuget}.enabled` | `true` | Per ecosystem. Off means the routes are **never registered** — see [Turning a proxy off](#turning-a-proxy-off). Cached artifacts stay and reappear if re-enabled. |
 | `api.config.registry.package_cache.pypi.upstream` | `https://pypi.org` | Where to pull through to. Point it at an internal mirror to cache that instead. |
 | `api.config.registry.package_cache.npm.upstream` | `https://registry.npmjs.org` | As above. |
 | `api.config.registry.package_cache.galaxy.upstream` | `https://galaxy.ansible.com` | As above. |
@@ -872,32 +870,34 @@ bounded; a `.nupkg` at a version is **immutable** and needs no TTL.
 this only appears in local testing.
 
 
-## Turning a proxy off
+## A proxy cannot be turned off
 
-Every proxy is on by default and each has its own switch. There is **no engine
-on/off switch above them** — Terrapod offers every engine it can run, so these
-flags are the only thing that decides whether a proxy serves.
+**There is no switch, for any of the six, and none above them either.** Every
+proxy is always mounted and always serving. The package_cache.enabled flag
+and its six per-ecosystem siblings are **removed** in 2.0 — if your `values.yaml`
+still sets one, see
+[Upgrading to 2.0](upgrading-to-2.0.md#every-cache-is-always-on-and-the-enabled-flags-are-removed).
 
-| Proxy | Switch |
-|---|---|
-| all six at once | `api.config.registry.package_cache.enabled` |
-| PyPI | `api.config.registry.package_cache.pypi.enabled` |
-| npm | `api.config.registry.package_cache.npm.enabled` |
-| Galaxy | `api.config.registry.package_cache.galaxy.enabled` |
-| Pulumi plugins | `api.config.registry.package_cache.pulumi.enabled` |
-| Go modules | `api.config.registry.package_cache.go.enabled` |
-| NuGet | `api.config.registry.package_cache.nuget.enabled` |
+The flags went because a proxy that is off is a *surface half-present* rather
+than a smaller deployment. Six independent switches were sixty-four
+configurations, one of which was ever exercised; the other sixty-three were
+reachable by an operator and tested by nobody. And the shared routes under
+`/admin/package-cache` are about the cache rather than about an ecosystem, so
+they stayed mounted either way — which left that namespace answering for four
+routes and absent for a fifth, and an upload route able to store a vetted
+artifact into a proxy nothing would ever serve.
 
-Setting one to `false` means the routes are **never registered** — the proxy is
-absent from the API and from the OpenAPI schema, not mounted and answering 404.
-**That includes that ecosystem's [upload](#uploading-a-vetted-artifact) route**,
-which goes with its own flag rather than with the cache's: there is no point
-offering somewhere to put an artifact this deployment will not serve. The shared
-routes — the listing, the totals, the evictions and verify — are about the cache
-rather than about an ecosystem, so they stay.
-A surface that refuses every request is still a surface: it sits in the schema,
-carries its dependencies, and reads to anyone auditing the deployment as
-something you do.
+**Nothing is deployed by a proxy you do not use.** A proxy costs nothing until a
+run asks it for something: there is no background work per ecosystem, and an
+ecosystem with no cached artifacts holds no storage. A Terraform-and-OpenTofu
+deployment that never runs a Pulumi program or an Ansible collection simply never
+sends a request to those two.
+
+What you *do* configure is where each proxy fetches from — `upstream` per
+ecosystem, pointed at an internal mirror if you have one — and whether it may
+reach upstream at all, with `api.config.registry.cache_only`. Sealing is the
+control that actually bounds what a proxy will do; see
+[Sealed deployments](caches.md#sealed-deployments).
 
 **Never destructive.** Cached artifacts stay exactly where they are and come
 back untouched when you turn the proxy on again.

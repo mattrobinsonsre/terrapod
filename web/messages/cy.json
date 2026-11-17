@@ -1907,7 +1907,6 @@
       "heading": "Cynhesu storfeydd pecynnau a delweddau",
       "help": "Rhowch fersiwn lle bynnag y gwyddoch hi: gellir gwirio cynhesiad a enwyd wrth fersiwn wedyn yn erbyn ffeil glo, ond nid “beth bynnag sydd fwyaf newydd”. Ysgrifennwch bob llinell ar ffurf <code>enw fersiwn</code>; ar gyfer ategion Pulumi, ychwanegwch docynnau <code>os/arch</code> ar y diwedd i gynhesu platfformau penodol.",
       "ecosystemLabel": "Math o arteffact",
-      "ecosystemOff": "{ecosystem} (wedi'i ddiffodd)",
       "sourceLabel": "Nôl o",
       "sourceDefault": "Y ffynhonnell a ffurfweddwyd",
       "upstreamIs": "Caiff ei nôl o <code>{url}</code>.",

@@ -1208,7 +1208,6 @@ class WarmProviderEntry(BaseModel):
 class ProviderCacheConfig(BaseModel):
     """Provider binary caching (network mirror) configuration."""
 
-    enabled: bool = Field(default=True)
     upstream_registries: list[str] = Field(
         default=["registry.terraform.io", "registry.opentofu.org"]
     )
@@ -1247,7 +1246,6 @@ class ProviderCacheConfig(BaseModel):
 class BinaryCacheConfig(BaseModel):
     """Terraform/tofu CLI binary caching configuration."""
 
-    enabled: bool = Field(default=True)
     terraform_mirror_url: str = Field(default="https://releases.hashicorp.com/terraform")
     tofu_mirror_url: str = Field(default="https://github.com/opentofu/opentofu/releases/download")
     terragrunt_mirror_url: str = Field(
@@ -1554,11 +1552,6 @@ class OCIRegistryConfig(BaseModel):
     spec mandates that prefix.
     """
 
-    enabled: bool = Field(
-        default=True,
-        description="Serve the OCI registry at /v2/. Disabling it hides the surface "
-        "entirely; pushed images remain in storage and reappear if re-enabled.",
-    )
     upstreams: list[OCIUpstreamConfig] = Field(
         default_factory=list,
         description="Registries Terrapod may pull through to. **An allow-list, not a "
@@ -1603,11 +1596,6 @@ class OCIRegistryConfig(BaseModel):
 class PackageEcosystemConfig(BaseModel):
     """One language registry Terrapod proxies."""
 
-    enabled: bool = Field(
-        default=True,
-        description="Serve this ecosystem's proxy. Disabling it 404s the endpoints; "
-        "already-cached artifacts stay in storage and reappear if re-enabled.",
-    )
     upstream: str = Field(
         description="Base URL of the registry to pull through to. A single URL, not a "
         "list: unlike the container registry there is no client-chosen host here — the "
@@ -1726,11 +1714,6 @@ class PackageCacheConfig(BaseModel):
     resolve its dependency closure with no upstream reach.
     """
 
-    enabled: bool = Field(
-        default=True,
-        description="Serve the language package proxies. Point runners at them with "
-        "PIP_INDEX_URL and NPM_CONFIG_REGISTRY.",
-    )
     pypi: PackageEcosystemConfig = Field(
         default_factory=lambda: PackageEcosystemConfig(upstream="https://pypi.org"),
         description="PyPI (PEP 503/691 simple index). Serves Pulumi Python programs, "
@@ -1860,7 +1843,6 @@ class ContentAllowlistConfig(BaseModel):
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
-    enabled: bool = Field(default=True)
     content_allowlist: ContentAllowlistConfig = Field(default_factory=ContentAllowlistConfig)
     cache_only: bool = Field(
         default=False,
