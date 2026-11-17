@@ -174,10 +174,37 @@ the key is gone, encrypted rows can't be converted back.
     rotating, or rotate during low traffic.
 - **KEK rotation** — for `awskms` / `vault_transit`, the provider manages its own
   key versions transparently; Terrapod's wrapped DEKs keep working across the
-  CSP/Vault key rotation as long as the old version remains decryptable. For
-  `static`, rotating the master key means re-wrapping the DEKs under the new key
-  — do this as a deliberate, backed-up operation (and verify with the
-  [encryption doctor](#monitoring-decryptability--dont-get-surprised) after).
+  CSP/Vault key rotation as long as the old version remains decryptable.
+
+  For `static`, rotating the master key means re-wrapping the DEKs under the new
+  one, and there is a command for it:
+
+  ```sh
+  TERRAPOD_ENCRYPTION__STATIC_KEY="<your current key>" \
+  TERRAPOD_KEK_ROTATE_NEW_SECRET="$(openssl rand -base64 32)" \
+    python -m terrapod.cli.kek_rotate
+  ```
+
+  Then set `encryption.static_key` to the new secret and restart. **Keep the old
+  secret until that restart is confirmed** — backups taken before the rotation are
+  still wrapped under it, and it is the only thing that reads them. Verify with the
+  [encryption doctor](#monitoring-decryptability--dont-get-surprised) afterwards.
+
+  It is **bounded work, not a re-encryption**: `crypto_keys` holds one row per DEK
+  version and the DEKs themselves do not change, so nothing encrypted under them is
+  touched. Contrast `encryption_migrate`, which re-keys *columns* and walks the
+  estate.
+
+  It writes nothing until every new wrap has been read back — each DEK is unwrapped
+  under the old secret, its canary checked, re-wrapped, and the re-wrap unwrapped
+  again and compared — and only then are the rows replaced, in one transaction. A
+  partial rotation would leave some DEKs under each secret with no single secret that
+  reads them all, so it is all or nothing. It also refuses a weak *new* secret, since
+  rotating to one leaves you where you started.
+
+  This is the remedy that lets `require_strong_secrets` default on from 2.0; if your
+  static key is a typed passphrase, see
+  [Upgrading to 2.0](upgrading-to-2.0.md#a-weak-supplied-secret-now-fails-startup-and-the-kek-has-a-remedy-now).
 
 ## Monitoring decryptability — don't get surprised
 
@@ -227,6 +254,7 @@ See the [encryption key recovery runbook](runbooks.md#encryption-key-lost-or-unu
 
 ## See also
 
+- [Post-quantum readiness](post-quantum.md) — the DEK path is AES-256-GCM, so it is already quantum-resistant; that page says what is not
 - [Cloud Credentials](cloud-credentials.md) — the at-rest encryption baseline this sits on top of.
 - [Security Hardening](security-hardening.md) — the broader posture.
 - [Supply-chain verification](supply-chain-verification.md) — signed releases + verified dependencies.

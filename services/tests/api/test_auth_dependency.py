@@ -1,6 +1,7 @@
 """Tests for the unified auth dependency (session + API token + listener cert)."""
 
 import base64
+import datetime as dt
 import uuid
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -610,3 +611,209 @@ class TestTheRunnerTokenPhaseReachesThePrincipal:
         assert user is not None
         assert user.auth_method == "runner_token"
         assert user.run_phase == phase
+
+
+class TestAuthenticatingOnAFingerprintAlone:
+    """#2602: a request may carry its fingerprint instead of its whole certificate.
+
+    The property under test is a RELATIONSHIP between the two header forms -- that
+    they authenticate the same listener to the same identity, and that each is
+    refused for the same reasons -- so every fixture here instantiates BOTH. A
+    fixture exercising one form could not tell a working fingerprint path from one
+    that silently fell back to the certificate, which is the defect that matters.
+    """
+
+    @staticmethod
+    def _record(cert, listener_id: str) -> dict:
+        """What `_register_certificate` writes, built the way production builds it."""
+        from cryptography.hazmat.primitives import serialization
+
+        spki = cert.public_key().public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        return {
+            "listener_id": listener_id,
+            "public_key": base64.b64encode(spki).decode(),
+            "not_after": cert.not_valid_after_utc.isoformat(),
+        }
+
+    async def test_both_header_forms_reach_the_same_identity(self, _test_ca):
+        """The relationship that makes the change a migration rather than a rewrite."""
+        cert, key = _test_ca.issue_listener_certificate("listener-a", "pool-a")
+        lid = str(uuid.uuid4())
+        fp = get_certificate_fingerprint(cert)
+        listener = {"id": lid, "name": "listener-a", "pool_id": str(uuid.uuid4())}
+
+        with _pop(False):
+            with (
+                patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
+                patch(
+                    "terrapod.services.agent_pool_service.get_listener_by_name",
+                    AsyncMock(return_value=listener),
+                ),
+                patch(
+                    "terrapod.services.agent_pool_service.is_fingerprint_valid",
+                    AsyncMock(return_value=True),
+                ),
+                patch(
+                    "terrapod.services.agent_pool_service.lookup_certificate",
+                    AsyncMock(return_value=self._record(cert, lid)),
+                ),
+                patch(
+                    "terrapod.services.agent_pool_service.get_listener",
+                    AsyncMock(return_value=listener),
+                ),
+            ):
+                by_cert = await authenticate_listener(
+                    _StubRequest(headers={"x-terrapod-client-cert": _cert_header(cert)})
+                )
+                by_fp = await authenticate_listener(
+                    _StubRequest(headers={"x-terrapod-client-cert-fingerprint": fp})
+                )
+
+        assert by_cert.listener_id == by_fp.listener_id
+        assert by_cert.pool_id == by_fp.pool_id
+        assert by_cert.certificate_fingerprint == by_fp.certificate_fingerprint == fp
+
+    async def test_an_unknown_fingerprint_is_refused(self, _test_ca):
+        """No record means we never issued it -- the only honest reading, and the
+        case a forged header lands in.
+
+        Asserts the MESSAGE, not just the 401. Three different refusals can fire on
+        this path -- unknown fingerprint, unreadable record, unknown listener -- and a
+        status-only assertion cannot tell them apart: deleting this check entirely
+        still yields a 401, from the unreadable-record guard downstream, so the test
+        would pass over a gate that no longer exists.
+        """
+        with _pop(False):
+            with patch(
+                "terrapod.services.agent_pool_service.lookup_certificate",
+                AsyncMock(return_value=None),
+            ):
+                with pytest.raises(HTTPException) as exc:
+                    await authenticate_listener(
+                        _StubRequest(headers={"x-terrapod-client-cert-fingerprint": "ab" * 32})
+                    )
+        assert exc.value.status_code == 401
+        assert exc.value.detail == "Certificate fingerprint not registered", (
+            f"refused for the wrong reason: {exc.value.detail!r}"
+        )
+
+    async def test_expiry_is_checked_against_the_record_not_the_redis_ttl(self, _test_ca):
+        """The TTL carries 60s of deliberate clock-skew slack, so leaning on it would
+        make the auth boundary a property of the cache rather than the certificate.
+
+        The record here is PRESENT -- as it would be inside that slack window -- and
+        must still be refused on its own `not_after`.
+        """
+        cert, _ = _test_ca.issue_listener_certificate("listener-exp", "pool-a")
+        lid = str(uuid.uuid4())
+        record = self._record(cert, lid)
+        record["not_after"] = (dt.datetime.now(dt.UTC) - dt.timedelta(seconds=1)).isoformat()
+
+        with _pop(False):
+            with patch(
+                "terrapod.services.agent_pool_service.lookup_certificate",
+                AsyncMock(return_value=record),
+            ):
+                with pytest.raises(HTTPException) as exc:
+                    await authenticate_listener(
+                        _StubRequest(
+                            headers={
+                                "x-terrapod-client-cert-fingerprint": get_certificate_fingerprint(
+                                    cert
+                                )
+                            }
+                        )
+                    )
+        assert exc.value.status_code == 401
+        assert "expired" in exc.value.detail.lower()
+
+    async def test_proof_of_possession_is_enforced_on_the_fingerprint_path_too(self, _test_ca):
+        """The whole point of the gate: the fingerprint, like the certificate, is
+        public material that travels on the request and can be captured."""
+        cert, _ = _test_ca.issue_listener_certificate("listener-pop", "pool-a")
+        lid = str(uuid.uuid4())
+        listener = {"id": lid, "name": "listener-pop", "pool_id": str(uuid.uuid4())}
+
+        with _pop(True):
+            with (
+                patch(
+                    "terrapod.services.agent_pool_service.lookup_certificate",
+                    AsyncMock(return_value=self._record(cert, lid)),
+                ),
+                patch(
+                    "terrapod.services.agent_pool_service.get_listener",
+                    AsyncMock(return_value=listener),
+                ),
+            ):
+                with pytest.raises(HTTPException) as exc:
+                    await authenticate_listener(
+                        _StubRequest(
+                            headers={
+                                "x-terrapod-client-cert-fingerprint": get_certificate_fingerprint(
+                                    cert
+                                )
+                            }
+                        )
+                    )
+        assert exc.value.status_code == 401
+        assert "proof of possession" in exc.value.detail.lower()
+
+    async def test_a_signature_from_another_listeners_key_is_refused(self, _test_ca):
+        """Signed, well-formed, and by the wrong key -- so the stored public key is
+        doing the work rather than the signature merely being present."""
+        from terrapod.auth.ca import serialize_private_key
+        from terrapod.auth.listener_pop import (
+            NONCE_HEADER,
+            SIGNATURE_HEADER,
+            TIMESTAMP_HEADER,
+            sign_request,
+        )
+
+        cert, _ = _test_ca.issue_listener_certificate("listener-mine", "pool-a")
+        _, other_key = _test_ca.issue_listener_certificate("listener-other", "pool-a")
+        lid = str(uuid.uuid4())
+        listener = {"id": lid, "name": "listener-mine", "pool_id": str(uuid.uuid4())}
+        ts = str(int(dt.datetime.now(dt.UTC).timestamp()))
+        nonce = "n" * 24
+        sig = sign_request(serialize_private_key(other_key).decode(), "GET", "/api/v1/x", ts, nonce)
+
+        with _pop(True):
+            with (
+                patch(
+                    "terrapod.services.agent_pool_service.lookup_certificate",
+                    AsyncMock(return_value=self._record(cert, lid)),
+                ),
+                patch(
+                    "terrapod.services.agent_pool_service.get_listener",
+                    AsyncMock(return_value=listener),
+                ),
+                patch("terrapod.auth.listener_pop._claim_nonce", AsyncMock()),
+            ):
+                with pytest.raises(HTTPException) as exc:
+                    await authenticate_listener(
+                        _StubRequest(
+                            headers={
+                                "x-terrapod-client-cert-fingerprint": get_certificate_fingerprint(
+                                    cert
+                                ),
+                                TIMESTAMP_HEADER.lower(): ts,
+                                NONCE_HEADER.lower(): nonce,
+                                SIGNATURE_HEADER.lower(): sig,
+                            }
+                        )
+                    )
+        assert exc.value.status_code == 401
+        assert "proof of possession" in exc.value.detail.lower()
+
+    async def test_no_header_at_all_names_both_forms(self, _test_ca):
+        """A refusal that named only the certificate would send a listener author
+        looking for the header they deliberately stopped sending."""
+        with _pop(False):
+            with pytest.raises(HTTPException) as exc:
+                await authenticate_listener(_StubRequest(headers={}))
+        assert exc.value.status_code == 401
+        assert "fingerprint" in exc.value.detail.lower()
+        assert "x-terrapod-client-cert" in exc.value.detail.lower()

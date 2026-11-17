@@ -11,29 +11,28 @@ shown a number smaller than the problem. For the package cache that is a `GROUP
 BY` in the database; for the archive cache there is nothing to group, so the walk
 carries a ceiling and the response says when it hit it.
 
-**Two routers, because the two caches are gated differently.** The package cache
-is an optional capability (`registry.package_cache.enabled`) and the convention
-this repository enforces is that a switched-off capability's surface is ABSENT
-rather than answering 404 -- `scripts/airgap-gate.sh --gated-off` asserts it
-against a running stack, and `oci_admin` is the direct precedent: its comment
-reads "it exists only for the registry, so it goes when the registry does".
-`POST /admin/package-cache/warm` already behaves that way, so mounting these four
-unconditionally made that namespace half-present -- four routes visible and the
-fifth gone, which is worse than either consistent answer. The VCS archive cache
-has no capability flag at all (it is part of what Terrapod is, like the provider
-mirror), so its routes are unconditional.
+**Several routers, and all of them mount unconditionally.** This surface used to
+be gated at three grains -- the package cache as a whole, each ecosystem, and
+the operator-upload routes -- and the gating is what produced the defects it was
+meant to prevent. Mounting four of five routes left the namespace half-present,
+four answering and the fifth absent. One level in, a deployment with PyPI
+switched off still offered somewhere to PUT a PyPI artifact it would never
+serve: stored, recorded and unreachable.
 
-The capability's own documented meaning is what makes gating these right rather
-than merely tidy: `services/capabilities.py` states that turning one off "stops
-serving and stops its background work; stored images and cached artifacts stay
-where they are and come back untouched when it is turned back on". Off is a
-pause, not a decommission -- so there is no state an operator is locked out of,
-only a surface that is quiet while the thing it describes is.
+The flags are gone on the 2.0 line, every cache included, so there is nothing
+left to decide. A cache is part of what Terrapod is -- as the VCS archive cache
+and the provider mirror always were -- rather than a feature an operator turns
+on. The routers stay separate only because they carry different prefixes and
+RBAC, not because anything chooses between them.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+import asyncio
+import os
+from collections.abc import Callable
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,20 +41,69 @@ from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, parse_page_params
 from terrapod.api.serialization import rfc3339
 from terrapod.config import settings
+from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import cache_inventory
+from terrapod.services.package_cache import (
+    galaxy,
+    goproxy,
+    npm,
+    nuget,
+    pulumi_plugins,
+    pypi,
+    substrate,
+    uploads,
+)
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
 
-#: The package cache's admin surface, mounted only while that capability serves.
-#: See the module docstring: this is the gated half.
+#: The package cache's admin surface. Separate from `router` only because the
+#: two carry different prefixes, not because anything chooses between them.
 package_router = APIRouter(tags=["cache-admin"])
 
-#: The VCS archive cache's admin surface, always mounted.
+#: The VCS archive cache's admin surface.
 router = APIRouter(tags=["cache-admin"])
+
+#: One upload router per ecosystem.
+#:
+#: Six rather than one, kept from when each was mounted on its own ecosystem's
+#: flag. Those flags are gone and all six mount together now, so the split buys
+#: only a per-ecosystem tag in the schema.
+pypi_upload_router = APIRouter(tags=["cache-admin"])
+npm_upload_router = APIRouter(tags=["cache-admin"])
+nuget_upload_router = APIRouter(tags=["cache-admin"])
+go_upload_router = APIRouter(tags=["cache-admin"])
+galaxy_upload_router = APIRouter(tags=["cache-admin"])
+pulumi_upload_router = APIRouter(tags=["cache-admin"])
+
+
+def build_upload_router() -> APIRouter:
+    """Every ecosystem's upload routes. All six, always.
+
+    This used to mount per ecosystem and could return None. That produced the
+    defect it was meant to prevent from the other direction: an upload route for
+    a cache the deployment would not serve, storing an artifact nothing could
+    ever hand out. With no cache switchable off there is nothing to mirror and
+    nothing to decide.
+
+    Still a factory rather than a module-level aggregate, so building the
+    application twice in one process (which the tests do constantly) cannot
+    accumulate duplicate routes.
+    """
+    aggregate = APIRouter()
+    for upload_router in (
+        pypi_upload_router,
+        npm_upload_router,
+        nuget_upload_router,
+        go_upload_router,
+        galaxy_upload_router,
+        pulumi_upload_router,
+    ):
+        aggregate.include_router(upload_router)
+    return aggregate
 
 
 class PackageEvictRequest(BaseModel):
@@ -138,11 +186,54 @@ def _sealed_note() -> dict[str, object]:
 
 # ── package cache ──────────────────────────────────────────────────────────
 #
-# On `package_router`: these go when `registry.package_cache.enabled` does.
-# A new route here belongs on that router, and needs a sample request in
+# On `package_router`. A new route here belongs on that router, and needs a
+# sample request in
 # `tests/api/test_package_cache.py::SAMPLES` -- the auth gate there walks
 # every route whose path carries `package-cache` and fails on one it has no
 # sample for, which is how it stays unable to skip a new endpoint.
+
+
+def _package_file_json(row: CachedPackageFile) -> dict[str, object]:
+    """One cached artifact as JSON:API, for the listing and for an upload.
+
+    Shared by both deliberately: the upload response is the same resource the
+    listing shows, so a second hand-written copy of these attributes is how the
+    page an operator reads and the answer they get back come to disagree about
+    the same row.
+
+    **`attestation` and `uploaded-by` are the load-bearing pair** (#2599). An
+    uploaded artifact must never be indistinguishable from a fetched one here: if
+    a wheel an operator supplied reads as fetched-and-verified, the ledger is
+    lying about the one thing on it that matters.
+    """
+    return {
+        "id": str(row.id),
+        "type": "cached-package-files",
+        "attributes": {
+            "ecosystem": row.ecosystem,
+            "name": row.name,
+            "version": row.version,
+            "filename": row.filename,
+            "size": row.size,
+            # The digest this row's bytes were admitted against, in the form its
+            # SOURCE expresses it. For a fetched row that is upstream's own, so
+            # an operator can match it against what the registry published
+            # rather than against what we stored; for an upload there is no
+            # upstream, so it is the digest computed on receipt. `attestation`
+            # says which.
+            "digest": row.digest,
+            # How it was admitted -- `substrate.ATTESTATIONS`. NULL means a build
+            # that recorded nothing admitted it, which the serve path treats as
+            # a miss and re-verifies.
+            "attestation": row.attestation,
+            "uploaded-by": row.uploaded_by,
+            "upload-reference": row.upload_reference,
+            "replaced-digest": row.replaced_digest,
+            "replaced-at": rfc3339(row.replaced_at) if row.replaced_at else None,
+            "cached-at": rfc3339(row.cached_at),
+            "last-accessed-at": rfc3339(row.last_accessed_at),
+        },
+    }
 
 
 @package_router.get("/admin/package-cache")
@@ -169,26 +260,7 @@ async def list_package_cache(
     entries, total = await cache_inventory.list_package_files(
         db, ecosystem=ecosystem, name=name, limit=limit, offset=offset
     )
-    items = [
-        {
-            "id": str(e.id),
-            "type": "cached-package-files",
-            "attributes": {
-                "ecosystem": e.ecosystem,
-                "name": e.name,
-                "version": e.version,
-                "filename": e.filename,
-                "size": e.size,
-                # Upstream's own digest, as the ecosystem expresses it -- not
-                # one of ours, so an operator can match it against what the
-                # registry published rather than against what we stored.
-                "digest": e.digest,
-                "cached-at": rfc3339(e.cached_at),
-                "last-accessed-at": rfc3339(e.last_accessed_at),
-            },
-        }
-        for e in entries
-    ]
+    items = [_package_file_json(e) for e in entries]
     return JSONResponse(content={"data": items, "meta": build_meta(total, page_number, page_size)})
 
 
@@ -289,10 +361,423 @@ async def evict_package_cache(
     )
 
 
+# ── operator uploads ───────────────────────────────────────────────────────
+#
+# An operator uploads an artifact they have vetted with their own process, and a
+# sealed deployment then serves that and nothing else (#2599). The trust model is
+# `services/package_cache/uploads.py`; what belongs here is the surface.
+#
+# **One route per cache, not one taking a `kind`.** Settled on the issue, and for
+# a reason rather than as a style: each ecosystem already computes its cache key
+# from exactly the coordinates an upload must supply, so the validation stays
+# where that scheme is defined — `<ecosystem>.upload_coordinates` — instead of
+# one endpoint switching on six naming conventions it would then own a second
+# copy of. An upload is the same cache key arrived at from the other direction.
+#
+# **Admin, never workspace.** Who may put bytes into what this deployment serves
+# is a deployment-wide trust assertion. `require_admin` is also what makes the
+# Galaxy publish path's explicit runner-token refusal unnecessary here: a runner
+# token carries no platform role, so it cannot reach these at all.
+#
+# **These work while SEALED, which is the entire point.** A `cache_only`
+# deployment has no other way to get an artifact in, so nothing here consults
+# `substrate.sealed()` and nothing here reaches upstream — including to check
+# that the coordinates exist, which would fail the feature for its most
+# important case (a patched or internal artifact upstream never published).
+#
+# The request is multipart so a browser form can drive it unchanged; the BFF's
+# `/api/*` proxy is a Route Handler forwarding `request.body` with
+# `duplex: 'half'`, so a large artifact streams rather than being buffered.
+#
+# **Each of these is on its OWN router**, not on `package_router` with the rest of
+# the namespace, and `build_upload_router` is what mounts them. The gating is
+# finer: an upload is for one ecosystem, so it goes with
+# `registry.package_cache.<eco>.enabled` rather than with the cache's own flag.
+# On the shared router a deployment that had switched PyPI off still offered
+# somewhere to put a PyPI artifact it would never serve.
+
+
+async def _refuse_unparseable_json(tmp_path: str) -> None:
+    """Refuse an index document that is not JSON, naming the parse error.
+
+    Read in full rather than streamed: these are index documents, bounded by what a
+    registry publishes for one package, where the artifacts this module also admits
+    are not. `json.loads` on a multi-megabyte packument is still well inside what
+    rule 13 tolerates for an async handler, but it is run in a thread for the same
+    reason the digest is.
+    """
+    import asyncio
+    import json
+
+    def _parse() -> None:
+        with open(tmp_path, "rb") as fh:
+            json.loads(fh.read())
+
+    try:
+        await asyncio.to_thread(_parse)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"The index document is not valid JSON ({exc}). A sealed node PARSES "
+                "this to answer what versions exist, so one that does not parse would "
+                "fail every read rather than this upload."
+            ),
+        ) from exc
+
+
+async def _upload_artifact(
+    *,
+    ecosystem: str,
+    build: Callable[[], substrate.Coordinates],
+    file: UploadFile,
+    reference: str,
+    replace: bool,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+    storage: ObjectStore,
+) -> JSONResponse:
+    """Stream one uploaded artifact in, record who vouched for it, answer.
+
+    The plumbing every per-cache route shares. `build` is the ecosystem's own
+    `upload_coordinates` call, deferred so its refusal is translated once here
+    rather than in six identical `except` blocks.
+
+    The part is re-streamed to the ephemeral PVC rather than read into memory:
+    Starlette rolls a large multipart part over to the RAM-backed `/tmp`, which
+    is what rule 14 exists to keep large uploads out of.
+    """
+    try:
+        coordinates = build()
+    except substrate.CoordinateError as exc:
+        # 422, not 404: the request is well-formed and the coordinates are not
+        # ones this ecosystem can address. A 404 would imply we had looked
+        # somewhere for them, which is exactly what this path must not do.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    from terrapod.api.upload_stream import stream_upload_to_tempfile
+
+    tmp_path, size = await stream_upload_to_tempfile(
+        file, suffix=".package-upload", max_bytes=uploads.MAX_UPLOAD_BYTES
+    )
+    try:
+        if size == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Empty upload. The artifact's bytes go in the `file` part; "
+                    "the coordinates are the other form fields."
+                ),
+            )
+        if coordinates.content_type == "application/json":
+            # An index document is PARSED by the serve path, so one that does not
+            # parse is a 500 on every subsequent read rather than a bad upload. The
+            # check is keyed on the coordinates' own content type so an artifact
+            # upload -- a tarball, a wheel, a nupkg -- is never parsed as JSON, and
+            # go's `@v/list` is text and correctly exempt.
+            await _refuse_unparseable_json(tmp_path)
+        try:
+            admission = await uploads.admit(
+                db,
+                storage,
+                ecosystem=ecosystem,
+                coordinates=coordinates,
+                tmp_path=tmp_path,
+                uploaded_by=user.email or "",
+                reference=reference,
+                replace=replace,
+            )
+        except uploads.UploadConflict as exc:
+            # 409 naming what is there and who put it there. Requirement 4 on the
+            # issue: a replacement has to be asked for, because what it displaces
+            # may be what a run already depends on.
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        meta: dict[str, object] = {
+            "replaced": admission.replaced,
+            "unchanged": admission.unchanged,
+        }
+        if admission.replaced:
+            meta["previous-digest"] = admission.previous_digest
+            # A replacement DELETED the bytes that were there, and on a sealed
+            # node nothing can fetch them back -- which is precisely what
+            # `_sealed_note` says about an eviction. Omitted on a first upload
+            # and on an identical re-upload, because neither destroys anything.
+            meta.update(_sealed_note())
+        # Serialised before the commit: the row is already flushed, so its id is
+        # there, and reading an ORM attribute after a commit is the one place an
+        # async handler can trip over a lazy refresh.
+        body = {"data": _package_file_json(admission.record), "meta": meta}
+        await db.commit()
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+
+    return JSONResponse(
+        status_code=200 if (admission.replaced or admission.unchanged) else 201,
+        content=body,
+    )
+
+
+#: What every upload route takes besides its own coordinates.
+#:
+#: `replace` is the deliberateness of requirement 4 made explicit: without it an
+#: upload at coordinates that are already held is refused, so a repeat upload
+#: cannot silently overwrite something runs depend on. `reference` is the
+#: operator's own ticket or approval record, never interpreted.
+_REFERENCE = Form(
+    "",
+    description="Free text: the operator's own ticket or approval record for this artifact.",
+)
+_REPLACE = Form(
+    False,
+    description=(
+        "Overwrite an artifact already held at these coordinates. Without it such "
+        "an upload is refused with 409, because what it would displace may be what "
+        "a run already depends on. The displaced digest is recorded on the row."
+    ),
+)
+
+
+@pypi_upload_router.post("/admin/package-cache/pypi/artifacts", status_code=201)
+async def upload_pypi_artifact(
+    project: str = Form(..., description="The PyPI project name, before normalisation."),
+    filename: str = Form(
+        ...,
+        description=(
+            "The distribution's own filename, exactly as pip will ask for it "
+            "(`flask-3.0.0-py3-none-any.whl`). The version is read out of it."
+        ),
+    ),
+    file: UploadFile = File(..., description="The distribution's bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted wheel or sdist for the PyPI proxy to serve."""
+    return await _upload_artifact(
+        ecosystem=pypi.ECOSYSTEM,
+        build=lambda: pypi.upload_coordinates(project, filename),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@npm_upload_router.post("/admin/package-cache/npm/artifacts", status_code=201)
+async def upload_npm_artifact(
+    name: str = Form(..., description="The package name, scope and all (`@scope/pkg`)."),
+    version: str = Form(..., description="The version these bytes are."),
+    file: UploadFile = File(..., description="The tarball's bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted npm tarball.
+
+    The filename is derived rather than supplied, because npm's own registry
+    derives it and the serve path matches on the derived form — a supplied one
+    that differed would be stored at a key no install ever asks for.
+    """
+    return await _upload_artifact(
+        ecosystem=npm.ECOSYSTEM,
+        build=lambda: npm.upload_coordinates(name, version),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@nuget_upload_router.post("/admin/package-cache/nuget/artifacts", status_code=201)
+async def upload_nuget_artifact(
+    package_id: str = Form(..., description="The NuGet package id."),
+    version: str = Form(..., description="The version these bytes are."),
+    file: UploadFile = File(..., description="The `.nupkg` bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted `.nupkg`."""
+    return await _upload_artifact(
+        ecosystem=nuget.ECOSYSTEM,
+        build=lambda: nuget.upload_coordinates(package_id, version),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@go_upload_router.post("/admin/package-cache/go/artifacts", status_code=201)
+async def upload_go_artifact(
+    module: str = Form(..., description="The escaped module path."),
+    version: str = Form(..., description="The module version, starting `v`."),
+    suffix: str = Form(
+        ...,
+        description=(
+            "Which of the version's files this is: `.info`, `.mod` or `.zip`. A "
+            "module version is three artifacts to the proxy protocol and each is "
+            "uploaded in its own right -- `go mod download` needs all three."
+        ),
+    ),
+    file: UploadFile = File(..., description="That file's bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload one vetted file of a Go module version."""
+    return await _upload_artifact(
+        ecosystem=goproxy.ECOSYSTEM,
+        build=lambda: goproxy.upload_coordinates(module, version, suffix),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@galaxy_upload_router.post("/admin/package-cache/galaxy/artifacts", status_code=201)
+async def upload_galaxy_artifact(
+    namespace: str = Form(..., description="The collection namespace."),
+    name: str = Form(..., description="The collection name."),
+    version: str = Form(..., description="The version these bytes are."),
+    file: UploadFile = File(..., description="The collection tarball's bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted collection tarball into the Galaxy proxy's cache.
+
+    Not the same thing as `ansible-galaxy collection publish`, which publishes
+    into Terrapod's **native** collection registry and reads every coordinate out
+    of the archive. That path remains the right one for an operator who wants to
+    sign what they vetted, because `ansible-galaxy` then verifies the signature
+    against their own keyring — a stronger claim than a ledger entry, and the one
+    kind where it happens to be free.
+    """
+    return await _upload_artifact(
+        ecosystem=galaxy.ECOSYSTEM,
+        build=lambda: galaxy.upload_coordinates(namespace, name, version),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@pulumi_upload_router.post("/admin/package-cache/pulumi/artifacts", status_code=201)
+async def upload_pulumi_artifact(
+    kind: str = Form(..., description="The plugin kind, e.g. `resource`."),
+    name: str = Form(..., description="The plugin name, e.g. `aws`."),
+    version: str = Form(..., description="The plugin version, with or without a leading `v`."),
+    os_: str = Form(..., alias="os", description="The target OS, e.g. `linux`."),
+    arch: str = Form(..., description="The target architecture, e.g. `amd64`."),
+    file: UploadFile = File(..., description="The plugin tarball's bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted Pulumi plugin tarball for one platform."""
+    return await _upload_artifact(
+        ecosystem=pulumi_plugins.ECOSYSTEM,
+        build=lambda: pulumi_plugins.upload_coordinates(kind, name, version, os_, arch),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@package_router.post("/admin/package-cache/{file_id}/verify")
+async def verify_package_cache_file(
+    file_id: str,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Re-hash a cached artifact's stored object and compare it with its row.
+
+    **This is the check the serve path cannot do.** Every cache read ends in a
+    redirect to object storage, so the API never sees the bytes a client is
+    served and cannot hash them per request; what it can compare on the serve
+    path is the object's size against the row, which it does for an uploaded
+    artifact. This is the full digest check, on demand.
+
+    It matters most for an upload, and that asymmetry is a requirement rather
+    than a caveat: a fetched artifact can be re-verified any time because the
+    publisher's material is still upstream, while an uploaded one has nothing to
+    be re-verified against except the digest computed when it arrived. So that
+    digest is the whole of its integrity story, and this is the thing that stops
+    "we trust the operator vetted it" becoming "we never look at it again".
+
+    Reads the whole object, so for a multi-gigabyte artifact it takes as long as
+    reading a multi-gigabyte object takes. Nothing is changed either way: a
+    mismatch is reported, never repaired or evicted, because what to do about one
+    is the operator's decision and an uploaded artifact cannot be re-fetched.
+    """
+    try:
+        record = await cache_inventory.get_package_file(db, file_id)
+    except Exception as exc:  # a malformed uuid reaches the driver, not us
+        raise HTTPException(status_code=404, detail="no such cached artifact") from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="no such cached artifact")
+
+    result = await uploads.verify_object(storage, record)
+    return JSONResponse(
+        content={
+            "data": {
+                "id": str(record.id),
+                "type": "package-cache-verifications",
+                "attributes": {
+                    # `null` when there was nothing to verify against -- a
+                    # `none-published` row carries no digest, and "unverifiable"
+                    # is a third answer that must not read as a pass or a fail.
+                    "ok": result.ok,
+                    "detail": result.detail,
+                    "algorithm": result.algorithm,
+                    "recorded-digest": result.recorded,
+                    "computed-digest": result.computed,
+                    "recorded-size": result.recorded_size,
+                    "stored-size": result.stored_size,
+                    "attestation": record.attestation,
+                    "uploaded-by": record.uploaded_by,
+                },
+            }
+        }
+    )
+
+
 # ── VCS archive cache ──────────────────────────────────────────────────────
 #
-# On `router`: unconditional. The archive cache has no capability flag, so
-# there is nothing for these to be gated on.
+# On `router`: the archive cache's own routes.
 
 
 @router.get("/admin/vcs-archive-cache")
@@ -442,4 +927,135 @@ async def evict_vcs_archive_cache(
             "next-cursor": result.cursor,
             **_sealed_note(),
         }
+    )
+
+
+# ── Index documents ───────────────────────────────────────────────────
+#
+# An artifact upload supplies BYTES. For three of the six ecosystems that is not
+# enough to make the artifact reachable on the sealed node this feature exists for,
+# because a sealed node answers "what versions exist" from a cached index document
+# and nowhere else -- so a vetted artifact would be present, recorded, and
+# unresolvable, with the install told it is not cached.
+#
+# PyPI needs none of this: its sealed index is built from the rows it holds
+# (`pypi.index_from_cache`), so an upload is advertised the moment it exists. Pulumi
+# plugins are filename-addressed with no index at all. Go needs one only to DISCOVER
+# a version; a pinned `go mod download` asks for the three files directly.
+#
+# These share `_upload_artifact`, so provenance, the replace rule, the size cap and
+# the sealed-note behaviour are the same as for an artifact -- an index document an
+# operator curated is an assertion in exactly the same sense.
+
+
+@npm_upload_router.post("/admin/package-cache/npm/index", status_code=201)
+async def upload_npm_index(
+    name: str = Form(..., description="The package name, scope and all (`@scope/pkg`)."),
+    file: UploadFile = File(..., description="The packument JSON."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted npm packument, so a sealed node can resolve the package.
+
+    npm reads dependency RANGES from this document and from nowhere else, so without
+    one an uploaded tarball cannot be installed even though it is present: the sealed
+    index answers 404 saying the package is not cached.
+    """
+    return await _upload_artifact(
+        ecosystem=npm.ECOSYSTEM,
+        build=lambda: npm.index_coordinates(name),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@galaxy_upload_router.post("/admin/package-cache/galaxy/index", status_code=201)
+async def upload_galaxy_index(
+    namespace: str = Form(..., description="The collection namespace."),
+    name: str = Form(..., description="The collection name."),
+    document: str = Form(..., description="Which document: `collection` or `versions`."),
+    file: UploadFile = File(..., description="The document's JSON."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted collection index document.
+
+    Galaxy needs TWO, which is why this names one: a sealed node answers the
+    collection record from `collection.json` and the version list from
+    `versions.json`, each from its own cached document.
+    """
+    return await _upload_artifact(
+        ecosystem=galaxy.ECOSYSTEM,
+        build=lambda: galaxy.index_coordinates(namespace, name, document),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@nuget_upload_router.post("/admin/package-cache/nuget/index", status_code=201)
+async def upload_nuget_index(
+    package_id: str = Form(..., description="The package id; case is normalised."),
+    file: UploadFile = File(..., description="The versions index JSON."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted NuGet versions index, so a sealed node can restore the package."""
+    return await _upload_artifact(
+        ecosystem=nuget.ECOSYSTEM,
+        build=lambda: nuget.index_coordinates(package_id),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
+    )
+
+
+@go_upload_router.post("/admin/package-cache/go/index", status_code=201)
+async def upload_go_index(
+    module: str = Form(..., description="The module path, in its escaped form."),
+    document: str = Form(..., description="Which document: `list` or `latest`."),
+    file: UploadFile = File(..., description="The document's bytes."),
+    reference: str = _REFERENCE,
+    replace: bool = _REPLACE,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a vetted module index document.
+
+    Needed only to DISCOVER a version -- `go get module` with no version, or
+    `go list -m -versions`. A pinned `go mod download` asks for `.info`, `.mod` and
+    `.zip` directly and never consults these, so a deployment that pins everything
+    needs neither.
+
+    `list` is a newline-separated version list served as text; `latest` is JSON.
+    """
+    return await _upload_artifact(
+        ecosystem=goproxy.ECOSYSTEM,
+        build=lambda: goproxy.index_coordinates(module, document),
+        file=file,
+        reference=reference,
+        replace=replace,
+        user=user,
+        db=db,
+        storage=storage,
     )

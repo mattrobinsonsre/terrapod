@@ -30,6 +30,26 @@
     "token",
     "use-count"
   ],
+  "agent_pools.list_listener_cas": [
+    "algorithm",
+    "created-at",
+    "expires-at",
+    "fingerprint",
+    "signing"
+  ],
+  "agent_pools.list_listener_cas:meta": [
+    "rotation-in-progress"
+  ],
+  "agent_pools.rotate_listener_ca": [
+    "algorithm",
+    "created-at",
+    "expires-at",
+    "fingerprint",
+    "signing"
+  ],
+  "agent_pools.rotate_listener_ca:meta": [
+    "trusted-count"
+  ],
   "ai_policy._evaluation_json": [
     "created-at",
     "enforcement-level",
@@ -162,21 +182,31 @@
   ],
   "binary_cache.list_cached_binaries_endpoint": [
     "arch",
+    "attestation",
     "cached-at",
     "download-url",
     "os",
+    "replaced-at",
+    "replaced-digest",
     "shasum",
     "tool",
+    "upload-reference",
+    "uploaded-by",
     "version"
   ],
   "binary_cache.list_cached_providers_endpoint": [
     "arch",
+    "attestation",
     "cached-at",
     "hostname",
     "namespace",
     "os",
     "provider-type",
+    "replaced-at",
+    "replaced-digest",
     "shasum",
+    "upload-reference",
+    "uploaded-by",
     "version"
   ],
   "binary_cache.platform_tool_versions": [
@@ -188,15 +218,61 @@
     "pulumi-version",
     "trivy-version"
   ],
-  "cache_admin.list_package_cache": [
+  "binary_cache.upload_binary_artifact": [
+    "arch",
+    "attestation",
+    "cached-at",
+    "os",
+    "shasum",
+    "tool",
+    "upload-reference",
+    "uploaded-by",
+    "version"
+  ],
+  "binary_cache.upload_binary_artifact:meta": [
+    "previous-digest",
+    "replaced",
+    "unchanged"
+  ],
+  "binary_cache.upload_provider_artifact": [
+    "arch",
+    "attestation",
+    "cached-at",
+    "filename",
+    "h1-hash",
+    "hostname",
+    "namespace",
+    "os",
+    "provider-type",
+    "shasum",
+    "upload-reference",
+    "uploaded-by",
+    "version"
+  ],
+  "binary_cache.upload_provider_artifact:meta": [
+    "previous-digest",
+    "replaced",
+    "unchanged"
+  ],
+  "cache_admin._package_file_json": [
+    "attestation",
     "cached-at",
     "digest",
     "ecosystem",
     "filename",
     "last-accessed-at",
     "name",
+    "replaced-at",
+    "replaced-digest",
     "size",
+    "upload-reference",
+    "uploaded-by",
     "version"
+  ],
+  "cache_admin._upload_artifact:meta": [
+    "previous-digest",
+    "replaced",
+    "unchanged"
   ],
   "cache_admin.list_vcs_archive_cache": [
     "connection-id",
@@ -234,13 +310,23 @@
     "scan-limit",
     "truncated"
   ],
+  "cache_admin.verify_package_cache_file": [
+    "algorithm",
+    "attestation",
+    "computed-digest",
+    "detail",
+    "ok",
+    "recorded-digest",
+    "recorded-size",
+    "stored-size",
+    "uploaded-by"
+  ],
   "cache_warm._submit": [
     "status",
     "total"
   ],
   "cache_warm.package_cache_sources": [
     "ecosystem",
-    "enabled",
     "mirrors",
     "resolves-latest",
     "upstream"

@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+
+# The cfg fakes below carry `go_sumdb` because `pulumi_deps.go_env` reads it
+# directly rather than through a defaulted `getattr` (#2589). That is deliberate:
+# a defaulted read would turn a wiring break into a silently disabled checksum
+# database, which is the failure this feature exists to remove.
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -91,7 +96,9 @@ class TestTheNpmrc:
     """The credential goes in a file, never on a command line."""
 
     def _cfg(self):
-        return SimpleNamespace(api_url="https://terrapod.test", auth_token="runtok:abc")
+        return SimpleNamespace(
+            api_url="https://terrapod.test", auth_token="runtok:abc", go_sumdb="sum.golang.org"
+        )
 
     def test_it_points_at_terrapods_proxy(self, tmp_path):
         pulumi_deps.write_npmrc(tmp_path, "https://terrapod.test", "tok")
@@ -137,7 +144,9 @@ class TestInstalling:
     SECRET = "runtok-s3cr3t-9f21"
 
     def _cfg(self):
-        return SimpleNamespace(api_url="https://terrapod.test", auth_token=self.SECRET)
+        return SimpleNamespace(
+            api_url="https://terrapod.test", auth_token=self.SECRET, go_sumdb="sum.golang.org"
+        )
 
     def test_a_yaml_program_installs_nothing(self, tmp_path):
         d = _program(tmp_path, "runtime: yaml\n")
@@ -227,7 +236,9 @@ class TestPython:
     SECRET = "runtok-py-4c8e"
 
     def _cfg(self):
-        return SimpleNamespace(api_url="https://terrapod.test", auth_token=self.SECRET)
+        return SimpleNamespace(
+            api_url="https://terrapod.test", auth_token=self.SECRET, go_sumdb="sum.golang.org"
+        )
 
     def test_python_is_supported(self, tmp_path):
         got = pulumi_deps.classify(_program(tmp_path, "runtime: python\n"))
@@ -342,7 +353,9 @@ class TestGo:
     SECRET = "runtok-go-77b1"
 
     def _cfg(self):
-        return SimpleNamespace(api_url="http://terrapod-api:8000", auth_token=self.SECRET)
+        return SimpleNamespace(
+            api_url="http://terrapod-api:8000", auth_token=self.SECRET, go_sumdb="sum.golang.org"
+        )
 
     def test_go_is_supported(self, tmp_path):
         assert pulumi_deps.classify(_program(tmp_path, "runtime: go\n")).supported is True
@@ -363,10 +376,41 @@ class TestGo:
         # outside the proxy — which a sealed deployment cannot do.
         assert pulumi_deps.go_env(1)["GOTOOLCHAIN"] == "local"
 
-    def test_the_checksum_database_is_off(self):
-        # A second upstream a sealed deployment cannot reach. go.sum still
-        # verifies the module hashes; that is not what this turns off.
+    def test_the_checksum_database_is_verified_against_when_one_is_served(self):
+        """It used to be unconditionally `off`, and the reason given was that the
+        program's own `go.sum` is verified anyway. That is true of a module the
+        program has already PINNED and false of one absent from the file --
+        measured on go1.27.3, `go mod download` with `GOSUMDB=off` and no `go.sum`
+        entry exits 0 and WRITES the hash of whatever the proxy served (#2589).
+
+        It is no longer a second upstream: the module-proxy protocol carries the
+        database under `/sumdb/<host>/`, so this deployment serves it.
+        """
+        assert pulumi_deps.go_env(1, sumdb="sum.golang.org")["GOSUMDB"] == "sum.golang.org"
+
+    def test_no_database_means_off_rather_than_a_broken_setting(self):
+        """An operator serving no checksum database gets the old behaviour, not a
+        `GOSUMDB` naming a host nothing mirrors -- which would send the toolchain
+        to the real database and fail on a sealed node."""
+        assert pulumi_deps.go_env(1, sumdb="")["GOSUMDB"] == "off"
         assert pulumi_deps.go_env(1)["GOSUMDB"] == "off"
+
+    def test_nothing_exempts_a_module_from_the_database_once_it_is_on(self):
+        """`GOPRIVATE` and `GONOSUMDB` exempt matching modules from the checksum
+        database, which is the opposite of what turning it on is for. Inheriting
+        either from the image or the environment would silently hollow it out."""
+        env = pulumi_deps.go_env(1, sumdb="sum.golang.org")
+        assert env["GONOSUMDB"] == ""
+        assert env["GOPRIVATE"] == ""
+
+    def test_the_database_is_reached_through_the_shim_not_directly(self):
+        """The whole point: GOPROXY is the loopback shim, and the sumdb rides the
+        same protocol, so a sealed node needs no egress for either."""
+        env = pulumi_deps.go_env(45123, sumdb="sum.golang.org")
+        assert env["GOPROXY"] == "http://127.0.0.1:45123"
+        assert env["GOSUMDB"] == "sum.golang.org"
+        # No GONOSUMCHECK / GOINSECURE / direct fallback smuggled in.
+        assert "GOFLAGS" not in env
 
     def test_the_shim_forwards_with_the_token_and_serves_the_body(self):
         import urllib.request
@@ -492,7 +536,7 @@ class TestTheToolchainIsOnPath:
             pulumi_deps.exec_subprocess, "run", lambda *a, **k: MagicMock(exit_code=0)
         )
         pulumi_deps.install(
-            SimpleNamespace(api_url="http://a", auth_token="t"),
+            SimpleNamespace(api_url="http://a", auth_token="t", go_sumdb="sum.golang.org"),
             d,
             child_grace=5,
             log_file="/dev/null",
@@ -513,7 +557,9 @@ class TestDotnet:
     SECRET = "runtok-net-3a90"
 
     def _cfg(self):
-        return SimpleNamespace(api_url="http://terrapod-api:8000", auth_token=self.SECRET)
+        return SimpleNamespace(
+            api_url="http://terrapod-api:8000", auth_token=self.SECRET, go_sumdb="sum.golang.org"
+        )
 
     def test_dotnet_is_supported(self, tmp_path):
         assert pulumi_deps.classify(_program(tmp_path, "runtime: dotnet\n")).supported is True

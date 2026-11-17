@@ -25,13 +25,11 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.api.routers.package_cache import authenticate_package_request
-from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.storage import get_storage
 
@@ -43,15 +41,6 @@ VERSION = f"{BASE}/versions/{VER}/"
 DOWNLOAD = f"{BASE}/versions/{VER}/download/{NS}-{NAME}-{VER}.tar.gz"
 
 OWNER = "owner@example.com"
-
-
-@pytest.fixture(autouse=True)
-def _galaxy_on():
-    """Pin the capability on so a default change cannot mute these (#1986)."""
-    before = settings.registry.package_cache.galaxy.enabled
-    settings.registry.package_cache.galaxy.enabled = True
-    yield
-    settings.registry.package_cache.galaxy.enabled = before
 
 
 def _user(email: str = "stranger@example.com", roles=None, auth_method: str = "session"):

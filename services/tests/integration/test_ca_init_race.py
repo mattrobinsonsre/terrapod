@@ -40,7 +40,7 @@ async def test_concurrent_init_ca_creates_single_ca(app):
     async with get_db_session() as session:
         await session.execute(text("DELETE FROM certificate_authority"))
         await session.commit()
-    ca_module._ca = None
+    ca_module._cas = []
 
     # Fire N concurrent initializers, each on its own connection — the scenario
     # of N API replicas starting together.
@@ -62,7 +62,7 @@ async def test_init_ca_is_idempotent_when_ca_exists(app):
     async with get_db_session() as session:
         await session.execute(text("DELETE FROM certificate_authority"))
         await session.commit()
-    ca_module._ca = None
+    ca_module._cas = []
 
     first = await _run_init_ca()
     second = await _run_init_ca()
@@ -73,3 +73,44 @@ async def test_init_ca_is_idempotent_when_ca_exists(app):
         ).scalar_one()
     assert count == 1
     assert first == second
+
+
+async def test_init_ca_loads_EVERY_row_not_only_the_newest():
+    """#2602 (c): startup has to pick up the whole trust set, not just the signer.
+
+    A rotation inserts a row and the newest signs, but every pod that restarts
+    afterwards must still trust the predecessor -- otherwise a rolling restart during
+    a rotation window refuses every certificate issued before it, which is the outage
+    the dual trust exists to prevent.
+
+    Also covers the bug this caught once: `init_ca`'s generate branch REASSIGNS its
+    row variable, so a condition testing that variable rather than the queried list
+    reads as "rows existed" on a fresh database.
+    """
+    from terrapod.auth import ca as ca_module
+
+    async with get_db_session() as session:
+        await session.execute(text("DELETE FROM certificate_authority"))
+        await session.commit()
+    ca_module._cas = []
+
+    # A fresh database: generate, and trust exactly one. `_run_init_ca` returns the
+    # FINGERPRINT, not the CA.
+    first_fingerprint = await _run_init_ca()
+    assert len(ca_module._cas) == 1, "a fresh database should trust exactly the CA it generated"
+
+    # Rotate, then simulate a pod restart by clearing the in-memory set and
+    # re-initialising from the database alone.
+    async with get_db_session() as session:
+        await ca_module.rotate_ca(session)
+    rotated_fingerprint = get_certificate_fingerprint(ca_module._cas[0].ca_cert)
+    ca_module._cas = []
+
+    await _run_init_ca()
+    assert len(ca_module._cas) == 2, "a restart mid-rotation lost the previous CA"
+    assert get_certificate_fingerprint(ca_module._cas[0].ca_cert) == rotated_fingerprint, (
+        "the newest row must be the signer; a restart changed which CA signs"
+    )
+    assert get_certificate_fingerprint(ca_module._cas[1].ca_cert) == first_fingerprint, (
+        "the predecessor loaded is not the one that was there before the rotation"
+    )

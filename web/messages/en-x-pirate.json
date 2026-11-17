@@ -1802,7 +1802,9 @@
       "repository": "Port",
       "commit": "Log mark",
       "paths": "Courses",
-      "written": "Writ"
+      "written": "Writ",
+      "origin": "Home port",
+      "uploadedBy": "Hauled aboard by"
     },
     "warm": {
       "heading": "Warm cache",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Haulin''…",
       "showing": "Showin'' {shown} o'' {total} — th'' table sorts what be hauled aboard, so haul th'' rest afore ye read an order as th'' whole cache.",
       "listedAll": "{count, plural, one {# piece o'' booty} other {# pieces o'' booty}} listed — that be all that matches these filters.",
-      "successBulkTruncated": "Purged {files} pieces o'' booty, freein'' {size}. More match than one purge carries off — purge again to press on."
+      "successBulkTruncated": "Purged {files} pieces o'' booty, freein'' {size}. More match than one purge carries off — purge again to press on.",
+      "uploadedBy": "by th'' hand o'' {who}",
+      "confirmRowUploaded": "This booty were hauled aboard by an operator, so it sits in nay upstream registry. Scuttle it an'' th'' only copy be gone forever."
     },
     "archives": {
       "connectionLabel": "Linkin''",
@@ -1903,7 +1907,6 @@
       "heading": "Warm th'' booty an'' likeness holds",
       "help": "Give a version wherever ye know it: a warm named at a version can be checked against a lockfile after, an'' “whatever be newest” cannot. Write each line as <code>name version</code>; fer Pulumi plugins, add trailin'' <code>os/arch</code> tokens t'' warm particular platforms.",
       "ecosystemLabel": "Kind o'' booty",
-      "ecosystemOff": "{ecosystem} (shut down)",
       "sourceLabel": "Haul from",
       "sourceDefault": "Th'' configured upstream",
       "upstreamIs": "Hauled from <code>{url}</code> she''ll be.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Failed t'' start th'' warmin''",
       "errorStatus": "Failed t'' read th'' warmin'' task",
       "helpLead": "Haul booty into th'' hold afore aught asks fer it — one per line, as a handle an'' a version."
+    },
+    "attestation": {
+      "upstreamDigest": "Vouched for",
+      "nonePublished": "Nay seal posted",
+      "operatorUpload": "Hauled aboard",
+      "unrecorded": "Nay in th'' log"
+    },
+    "upload": {
+      "title": "Haul aboard booty ye have vouched for",
+      "description": "Stow booty ye have inspected yerself in th'' hold. This be th'' only way t'' take any aboard while th'' vessel be battened down, an'' it asks fer nay publisher''s seal — what be writ in th'' log instead be who hauled it aboard.",
+      "show": "Haul aboard",
+      "hide": "Belay",
+      "sealedNote": "This vessel be battened down, so haulin'' aboard be th'' only way t'' add booty — an'' th'' only copy, fer naught here can be fetched again.",
+      "ecosystem": "Hold",
+      "kind": "What ye be haulin'' aboard",
+      "kindArtifact": "Th'' booty''s bytes",
+      "kindIndex": "A manifest",
+      "kindHintIndexed": "A battened-down vessel reads which versions there be from a manifest, so booty hauled aboard wi''out one cannot be found.",
+      "kindHintNoIndex": "This hold needs nay manifest.",
+      "file": "Scroll",
+      "reference": "Marque (ye may leave it bare)",
+      "referenceHint": "Yer own ticket, change or approval mark. Writ in th'' log alongside th'' haul.",
+      "replace": "Overwrite what already lies at these bearings",
+      "replaceHint": "Wi''out this, booty already aboard be turned away rather than writ over. What ye shove overboard may be what a run already leans on.",
+      "confirmReplace": "Haul {filename} aboard over th'' booty already at these bearings? Th'' bytes it overwrites be sent t'' th'' deep.",
+      "confirmReplaceSealed": "This vessel be battened down, so th'' overwritten bytes cannot be hauled back from anywhere.",
+      "submit": "Haul aboard",
+      "submitting": "Haulin'' aboard…",
+      "provenanceNote": "Writ in th'' log against yer name.",
+      "success": "Hauled {filename} aboard, aye.",
+      "successReplaced": "Hauled {filename} aboard, overwritin'' what lay there.",
+      "successUnchanged": "{filename} were already stowed wi'' th'' very same bytes. Naught changed.",
+      "error": "Th'' haul be lost.",
+      "fields": {
+        "project": "Venture",
+        "name": "Handle",
+        "version": "Vintage",
+        "filename": "Scroll''s name",
+        "package_id": "Cargo mark",
+        "module": "Module course",
+        "suffix": "Scroll",
+        "namespace": "Waters",
+        "document": "Manifest",
+        "kind": "Plugin breed",
+        "os": "Ship''s system",
+        "arch": "Hull",
+        "tool": "Tackle",
+        "hostname": "Registry berth",
+        "type": "Provider breed"
+      },
+      "hints": {
+        "filename": "Handed over rather than reckoned: a wheel''s name carries its compatibility tags.",
+        "suffix": "One o'' .info, .mod or .zip. A version be three scrolls an'' each goes aboard on its own.",
+        "document": "Which manifest. Galaxy has collection an'' versions; Go has list an'' latest.",
+        "kind": "resource, language, analyzer or converter, aye.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov, aye.",
+        "hostname": "registry.terraform.io, or yer own registry''s berth"
+      },
+      "ecosystems": {
+        "binary": "Engine irons",
+        "provider": "Terraform provider wares"
+      }
     }
   },
   "catalog": {

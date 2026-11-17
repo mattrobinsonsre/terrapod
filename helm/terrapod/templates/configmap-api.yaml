@@ -270,13 +270,26 @@ data:
     {{- end }}
     {{- if .Values.api.config.registry }}
     registry:
-      enabled: {{ .Values.api.config.registry.enabled }}
+      {{- with .Values.api.config.registry.content_allowlist }}
+      content_allowlist:
+        {{- if hasKey . "mode" }}
+        {{- /* Quoted: `off` is a YAML 1.1 boolean, so bare it reaches Pydantic
+               as False and the Literal refuses it -- an operator setting the
+               documented default would fail startup. */}}
+        mode: {{ .mode | quote }}
+        {{- end }}
+        {{- with .packages }}
+        packages: {{ toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .ecosystems }}
+        ecosystems: {{ toYaml . | nindent 10 }}
+        {{- end }}
+      {{- end }}
       {{- if hasKey .Values.api.config.registry "cache_only" }}
       cache_only: {{ .Values.api.config.registry.cache_only }}
       {{- end }}
       {{- with .Values.api.config.registry.oci }}
       oci:
-        enabled: {{ .enabled }}
         {{- with .upload_session_timeout_hours }}
         upload_session_timeout_hours: {{ . | int64 }}
         {{- end }}
@@ -313,10 +326,8 @@ data:
       {{- end }}
       {{- with .Values.api.config.registry.package_cache }}
       package_cache:
-        enabled: {{ .enabled }}
         {{- with .pypi }}
         pypi:
-          enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
           {{- with .mirrors }}
           mirrors:
@@ -325,7 +336,6 @@ data:
         {{- end }}
         {{- with .npm }}
         npm:
-          enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
           {{- with .mirrors }}
           mirrors:
@@ -334,7 +344,6 @@ data:
         {{- end }}
         {{- with .pulumi }}
         pulumi:
-          enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
           {{- with .mirrors }}
           mirrors:
@@ -351,8 +360,11 @@ data:
         {{- end }}
         {{- with .go }}
         go:
-          enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- /* Rendered with `dig` rather than `| default`, because an operator
+                 who sets this EMPTY means "serve no checksum database" and a
+                 `default` would render the database back over that choice. */}}
+          sumdb_upstream: {{ dig "sumdb_upstream" "https://sum.golang.org" . | quote }}
           {{- with .mirrors }}
           mirrors:
             {{- toYaml . | nindent 12 }}
@@ -360,8 +372,8 @@ data:
         {{- end }}
         {{- with .nuget }}
         nuget:
-          enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          registration_upstream: {{ .registration_upstream | quote }}
           {{- with .mirrors }}
           mirrors:
             {{- toYaml . | nindent 12 }}
@@ -369,7 +381,6 @@ data:
         {{- end }}
         {{- with .galaxy }}
         galaxy:
-          enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
           {{- with .mirrors }}
           mirrors:
@@ -379,7 +390,6 @@ data:
       {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
       provider_cache:
-        enabled: {{ .Values.api.config.registry.provider_cache.enabled }}
         {{- if .Values.api.config.registry.provider_cache.upstream_registries }}
         upstream_registries:
           {{- range .Values.api.config.registry.provider_cache.upstream_registries }}
@@ -403,7 +413,6 @@ data:
       {{- end }}
       {{- if .Values.api.config.registry.binary_cache }}
       binary_cache:
-        enabled: {{ .Values.api.config.registry.binary_cache.enabled }}
         {{- if .Values.api.config.registry.binary_cache.terraform_mirror_url }}
         terraform_mirror_url: {{ .Values.api.config.registry.binary_cache.terraform_mirror_url | quote }}
         {{- end }}
@@ -649,6 +658,7 @@ data:
     {{- if .Values.api.config.agent_pools }}
     agent_pools:
       listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | int64 }}
+      ca_algorithm: {{ .Values.api.config.agent_pools.ca_algorithm | default "ed25519" | quote }}
       {{- with .Values.api.config.agent_pools.default_join_token_max_uses }}
       default_join_token_max_uses: {{ . | int64 }}
       {{- end }}

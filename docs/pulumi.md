@@ -348,8 +348,11 @@ GET alone.
 
 Two further Go settings are forced, both because a sealed deployment has no
 second upstream: `GOTOOLCHAIN=local`, so a `go.mod` naming a newer toolchain does
-not fetch one, and `GOSUMDB=off`. The module hashes in the program's own `go.sum`
-are still verified; it is the transparency-log lookup that is turned off.
+not fetch one, and `GOSUMDB=off`. The module hashes your program has already
+pinned in `go.sum` are still verified; it is the transparency-log lookup that is
+turned off. **So commit a complete `go.sum`** — a module missing from it is
+recorded from whatever the proxy served rather than refused, because the lookup
+that would otherwise catch that is the one being turned off.
 
 ### Binding an update to its preview
 

@@ -34,6 +34,8 @@ from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services.package_cache.substrate import (
     Artifact,
+    CoordinateError,
+    Coordinates,
     NotFoundUpstream,
     UpstreamError,
 )
@@ -258,6 +260,67 @@ def artifact_for(namespace: str, name: str, version: str, detail: dict) -> Artif
         upstream_url=download,
         digest=digest,
         content_type="application/octet-stream",
+    )
+
+
+#: The index documents an operator may upload, and the only ones a sealed node reads
+#: back for a collection. `version-{version}.json` is deliberately absent: it is
+#: keyed per version and `galaxy.version_doc` derives it, so it is uploaded by naming
+#: the version rather than by naming a document.
+INDEX_DOCUMENTS = {"collection": COLLECTION_DOC, "versions": VERSIONS_DOC}
+
+
+def index_coordinates(namespace: str, name: str, document: str) -> Coordinates:
+    """Where an operator-uploaded collection index document is served from.
+
+    Galaxy needs TWO, which is why this takes a document name where npm's does not:
+    a sealed node answers the collection record from `collection.json` and the
+    version list from `versions.json`, each from its own cached document. An
+    uploaded collection tarball with neither is present and unresolvable --
+    `ansible-galaxy install` is told the collection is not cached.
+    """
+    key = collection_key(namespace, name)
+    filename = INDEX_DOCUMENTS.get((document or "").strip().lower())
+    if filename is None:
+        raise CoordinateError(
+            f"document {document!r} is not a collection index document; "
+            f"valid values are {', '.join(sorted(INDEX_DOCUMENTS))}"
+        )
+    return Coordinates(name=key, version="", filename=filename, content_type="application/json")
+
+
+def upload_coordinates(namespace: str, name: str, version: str) -> Coordinates:
+    """Where an operator-uploaded collection tarball is served from.
+
+    The filename is derived by `artifact_filename`, which is the same function
+    the fetch path uses and which exists precisely because the value is
+    interpolated into a storage key and a URL.
+
+    **Not checked against galaxy.ansible.com** (#2599): an internal collection
+    nobody has published is the normal case for an upload. Note that this serves
+    the collection's *bytes*; a sealed node also needs the cached version
+    documents to advertise it, which an artifact upload does not supply.
+
+    This is not the same thing as `ansible-galaxy collection publish`, which
+    publishes into Terrapod's **native** collection registry and takes every
+    coordinate out of the archive. That path is still the right one for an
+    operator who wants to sign what they vetted, because `ansible-galaxy` itself
+    then verifies the signature against their keyring.
+    """
+    namespace = (namespace or "").strip()
+    name = (name or "").strip()
+    version = (version or "").strip()
+    if not valid_segment(namespace) or not valid_segment(name):
+        raise CoordinateError(
+            f"{namespace!r}.{name!r} is not a collection coordinate "
+            "(lowercase letters, digits and '_')"
+        )
+    if not valid_version(version):
+        raise CoordinateError(f"version {version!r} is not a collection version")
+    return Coordinates(
+        name=collection_key(namespace, name),
+        version=version,
+        filename=artifact_filename(namespace, name, version),
     )
 
 

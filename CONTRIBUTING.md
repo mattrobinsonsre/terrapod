@@ -26,7 +26,7 @@ their own non-trivial work too.
 So the flow is:
 
 ```
-issue  →  branch  →  pull request  →  review  →  merge
+issue  →  branch  →  draft PR  →  ready for review  →  review  →  merge
 ```
 
 If you're not sure whether something needs an issue, open one — it costs a
@@ -88,6 +88,25 @@ check that matches what you changed:
 - **Go** → `go build ./...` and `go test ./...` in the relevant module
 
 ## Open the pull request
+
+**Open it as a draft, and mark it ready for review when you consider it
+mergeable.** Push as often as you like while it is a draft — that is what the
+state is for.
+
+Why we ask: we read "ready for review" as "this can land once it is green", so a
+non-draft PR is one we may merge. We have merged a contributor's work minutes
+after leaving review findings on it, before they had a chance to respond, and the
+result was that they had to reopen their own review points as fresh issues. The
+draft flag is the cheapest signal that prevents that.
+
+If you would rather not use drafts, leave the PR open and **post a comment when it
+is ready** — we will treat an open, non-draft PR with no such comment as still in
+progress.
+
+The other half of this is ours and does not depend on you: **we will not merge
+while our own review findings are outstanding.** If we want something landed
+before it is fully addressed, we will say so and open the follow-up ourselves
+rather than leaving it for you to collect.
 
 - Base your branch on `main`; don't stack a PR on another open branch.
 - Reference the issue (`closes #123`).

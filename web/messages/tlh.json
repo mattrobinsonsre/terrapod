@@ -1802,7 +1802,9 @@
       "repository": "ghItlh",
       "commit": "choH",
       "paths": "Hemey",
-      "written": "ghItlhlu'pu' poH"
+      "written": "ghItlhlu'pu' poH",
+      "origin": "mung",
+      "uploadedBy": "lI'wI'"
     },
     "warm": {
       "heading": "nge'wI' tujmoH",
@@ -1869,7 +1871,9 @@
       "loadingMore": "gheltaH…",
       "showing": "{total} 'ay' {shown} 'oH cha'lu'; tetlh ghelta'bogh neH tlhegh, vaj tlhegh naQ DaleghDI' latlh yIghel.",
       "listedAll": "{count, plural, other {# jan}} tetlhlu'pu' — naDev chenmoHlu'bogh Hoch 'oH.",
-      "successBulkTruncated": "{files} janmey tlhIllu'pu', {size} tlhaplu'pu'. wa' tlhIlwI' tlhIlbogh law' law' qaS — Daq DataghmeH latlh yItlhIl."
+      "successBulkTruncated": "{files} janmey tlhIllu'pu', {size} tlhaplu'pu'. wa' tlhIlwI' tlhIlbogh law' law' qaS — Daq DataghmeH latlh yItlhIl.",
+      "uploadedBy": "{who} lI'pu'",
+      "confirmRowUploaded": "che'wI' janvam lI'pu', vaj mung nughmey teywI'Daq tu'lu'be'. teqlu'DI', velqa' neH Qaw'lu'."
     },
     "archives": {
       "connectionLabel": "rar",
@@ -1903,7 +1907,6 @@
       "heading": "De' mIllogh je nge'wI'mey tujmoH",
       "help": "mI' DaSovDI' yIper: mI' ghajbogh tujmoHwI' ngaQmoHwI' teywI' nuDlaHlu', 'ach «chu'qu'bogh Doch» nuDlaHbe'lu'. Hoch tlhegh <code>pong mI''</code> rurnIS; Pulumi chenmoHwI'meyvaD Qav <code>os/arch</code> mu'mey yIchel, wIvlu'bogh qachmey tujmoHmeH.",
       "ecosystemLabel": "jan Segh",
-      "ecosystemOff": "{ecosystem} (chu'Ha'lu'pu')",
       "sourceLabel": "ghelmeH mung",
       "sourceDefault": "ghunlu'pu'bogh mung",
       "upstreamIs": "ghelmeH mung: <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "tujmoH taghmeH lujpu'",
       "errorStatus": "tujmoH Qu' laDmeH lujpu'",
       "helpLead": "vay' poQlu'pa' nge'wI'Daq janmey yIghel — wa' tlheghvaD wa' jan: pong mI' je."
+    },
+    "attestation": {
+      "upstreamDigest": "toblu'pu'",
+      "nonePublished": "per 'anglu'be'",
+      "operatorUpload": "lI'lu'pu'",
+      "unrecorded": "qonlu'be'"
+    },
+    "upload": {
+      "title": "toblu'pu'bogh jan yIlI'",
+      "description": "nge'wI'Daq jan DatobtaHbogh yIlI'. ngaQtaHvIS De'wI', jan chelmeH mIw neH 'oH, 'ej 'anglu'wI' per poQbe' — 'ach lI'wI' qonlu'.",
+      "show": "lI'",
+      "hide": "SoQmoH",
+      "sealedNote": "ngaQlu' De'wI'vam, vaj jan chelmeH mIw neH 'oH lI' — 'ej velqa' neH 'oH, naDev pagh Hevqa'laHlu'mo'.",
+      "ecosystem": "nge'wI'",
+      "kind": "nuq DalI'",
+      "kindArtifact": "jan byte",
+      "kindIndex": "tetlh teywI'",
+      "kindHintIndexed": "tetlh teywI'vo' mI'mey tu'lu'bogh laD ngaQlu'bogh De'wI', vaj tetlh teywI' Hutlhbogh jan wIvlaHbe'lu'.",
+      "kindHintNoIndex": "tetlh teywI' poQbe' nge'wI'vam.",
+      "file": "De'",
+      "reference": "per (DaH DIch)",
+      "referenceHint": "Qu'lIj mI', choHlIj mI', pagh chaw'lIj mI'. lI' tlhej pollu'.",
+      "replace": "DaqvamDaq tu'lu'bogh yItam",
+      "replaceHint": "Hutlhchugh, tu'lu'bogh jan lajHa'lu'; ghItlhHa'be'lu'. Sar lo'taHbogh Doch tamlaH.",
+      "confirmReplace": "DaqvamDaq tu'lu'bogh jan Dung {filename} yIlI''a'? tamlu'bogh byte Qaw'lu'.",
+      "confirmReplaceSealed": "ngaQlu' De'wI'vam, vaj tamlu'pu'bogh byte pagh Daqvo' Hevqa'laHbe'lu'.",
+      "submit": "lI'",
+      "submitting": "lI'taH…",
+      "provenanceNote": "lo'wI'lIjvaD qonlu'.",
+      "success": "{filename} lI'lu'pu'.",
+      "successReplaced": "{filename} lI'lu'pu'; pa' tu'lu'pu'bogh Doch tamlu'pu'.",
+      "successUnchanged": "rap byte ghajtaH {filename}; nge'wI'Daq tu'lu'pu'. pagh choHlu'.",
+      "error": "lI' lujpu'.",
+      "fields": {
+        "project": "Qu'",
+        "name": "pong",
+        "version": "mI'",
+        "filename": "teywI' pong",
+        "package_id": "De' mI'",
+        "module": "Segh He",
+        "suffix": "De'",
+        "namespace": "pong yoS",
+        "document": "teywI'",
+        "kind": "chenmoHwI' Segh",
+        "os": "OS pat",
+        "arch": "qach",
+        "tool": "tool",
+        "hostname": "nughmey teywI' host",
+        "type": "nobwI' Segh"
+      },
+      "hints": {
+        "filename": "noblu', 'ach chenmoHlu'be': wheel pong rurlaHbogh permey ngu'.",
+        "suffix": ".info, .mod, joq .zip. wa' mI' wej De' 'oH, 'ej Hoch De' pIm lI'lu'.",
+        "document": "nuq tetlh teywI'. Galaxy ghaj collection versions je; Go ghaj list latest je.",
+        "kind": "resource, language, analyzer joq converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io, joq nughmey teywI'lIj host"
+      },
+      "ecosystems": {
+        "binary": "QuQ HaqwI'mey",
+        "provider": "Terraform nobwI'pu'"
+      }
     }
   },
   "catalog": {

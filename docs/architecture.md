@@ -317,7 +317,7 @@ All listeners follow the same flow — there is no distinction between pool type
 4. On startup, each listener pod looks for a Kubernetes Secret named after the Deployment (`{release-fullname}-listener-credentials`, supplied via `TERRAPOD_CREDENTIALS_SECRET_NAME`) in its own namespace. If present and valid, it adopts the existing identity (cert, key, CA, listener-id) and skips the join entirely
 5. If no Secret exists, the pod calls `POST /api/v1/agent-pools/join` with the token. The API validates it (SHA-256 hash, expiry, `max_uses`), issues a short-lived X.509 certificate (Ed25519, 1h validity by default), and returns the listener ID, cert, and pool ID
 6. The pod writes the credentials to the Secret. If the create returns `409 AlreadyExists` (another pod won the race), the loser re-reads the Secret and adopts the winner's identity
-7. The listener authenticates subsequent API calls via `X-Terrapod-Client-Cert` header (base64-encoded PEM)
+7. The listener authenticates subsequent API calls with `X-Terrapod-Client-Cert-Fingerprint` (the certificate's SHA-256 fingerprint), or `X-Terrapod-Client-Cert` (base64-encoded PEM) if it predates that — see [runners.md](runners.md#identifying-by-fingerprint-rather-than-by-certificate)
 8. The listener connects to the SSE endpoint (`GET /api/v1/listeners/{id}/events`) — a persistent outbound HTTP stream for receiving events from the API
 9. Heartbeats every 60s (300s TTL in Redis), SSE event loop handles run claims, Job status queries, log streaming, and cancellation
 
@@ -401,7 +401,7 @@ Listener Join Flow:
     |
     v
 Ongoing Authentication:
-    - Listener sends X-Terrapod-Client-Cert header (base64 PEM)
+    - Listener sends X-Terrapod-Client-Cert-Fingerprint (SHA-256 hex), or X-Terrapod-Client-Cert (base64 PEM) if older
     - API verifies: CA signature, expiry, CN->DB lookup, fingerprint match
     |
     v

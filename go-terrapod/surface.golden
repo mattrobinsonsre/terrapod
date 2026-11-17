@@ -141,10 +141,16 @@ field AutodiscoveryRule.Attributes map[string]any
 field AutodiscoveryRule.CreatedAt string
 field AutodiscoveryRule.ID string
 field AutodiscoveryRule.UpdatedAt string
+field BinaryUpload.Binary CachedBinaryRow
+field BinaryUpload.PreviousDigest string
+field BinaryUpload.Replaced bool
+field BinaryUpload.Unchanged bool
 field BulkUpdateResult.Applied int `json:"applied"`
 field BulkUpdateResult.Changes []WorkspaceChange `json:"changes,omitempty"`
 field BulkUpdateResult.DryRun bool `json:"dry_run"`
 field BulkUpdateResult.Errors []string `json:"errors,omitempty"`
+field BulkUpdateResult.ExcludeEmpty []int `json:"exclude_empty,omitempty"`
+field BulkUpdateResult.Excluded int `json:"excluded,omitempty"`
 field BulkUpdateResult.Matched int `json:"matched"`
 field BulkUpdateResult.Unchanged []WorkspaceChange `json:"unchanged,omitempty"`
 field BulkUpdateResult.WouldChange []WorkspaceChange `json:"would_change,omitempty"`
@@ -157,6 +163,17 @@ field BulkWarmResponse.Total int `json:"total"`
 field CacheTotalsMeta.Bytes int64 `json:"bytes"`
 field CacheTotalsMeta.Files int64 `json:"files"`
 field CacheTotalsMeta.Sealed bool `json:"sealed"`
+field CachedBinaryRow.Arch string `json:"arch"`
+field CachedBinaryRow.Attestation string `json:"attestation"`
+field CachedBinaryRow.CachedAt string `json:"cached-at"`
+field CachedBinaryRow.ID string `json:"-"`
+field CachedBinaryRow.OS string `json:"os"`
+field CachedBinaryRow.Shasum string `json:"shasum"`
+field CachedBinaryRow.Tool string `json:"tool"`
+field CachedBinaryRow.UploadReference string `json:"upload-reference"`
+field CachedBinaryRow.UploadedBy string `json:"uploaded-by"`
+field CachedBinaryRow.Version string `json:"version"`
+field CachedPackageFile.Attestation string `json:"attestation"`
 field CachedPackageFile.CachedAt string `json:"cached-at"`
 field CachedPackageFile.Digest string `json:"digest"`
 field CachedPackageFile.Ecosystem string `json:"ecosystem"`
@@ -164,8 +181,26 @@ field CachedPackageFile.Filename string `json:"filename"`
 field CachedPackageFile.ID string `json:"id"`
 field CachedPackageFile.LastAccessedAt string `json:"last-accessed-at"`
 field CachedPackageFile.Name string `json:"name"`
+field CachedPackageFile.ReplacedAt string `json:"replaced-at"`
+field CachedPackageFile.ReplacedDigest string `json:"replaced-digest"`
 field CachedPackageFile.Size int64 `json:"size"`
+field CachedPackageFile.UploadReference string `json:"upload-reference"`
+field CachedPackageFile.UploadedBy string `json:"uploaded-by"`
 field CachedPackageFile.Version string `json:"version"`
+field CachedProviderRow.Arch string `json:"arch"`
+field CachedProviderRow.Attestation string `json:"attestation"`
+field CachedProviderRow.CachedAt string `json:"cached-at"`
+field CachedProviderRow.Filename string `json:"filename"`
+field CachedProviderRow.H1Hash string `json:"h1-hash"`
+field CachedProviderRow.Hostname string `json:"hostname"`
+field CachedProviderRow.ID string `json:"-"`
+field CachedProviderRow.Namespace string `json:"namespace"`
+field CachedProviderRow.OS string `json:"os"`
+field CachedProviderRow.ProviderType string `json:"provider-type"`
+field CachedProviderRow.Shasum string `json:"shasum"`
+field CachedProviderRow.UploadReference string `json:"upload-reference"`
+field CachedProviderRow.UploadedBy string `json:"uploaded-by"`
+field CachedProviderRow.Version string `json:"version"`
 field CachedVCSArchive.ConnectionID string `json:"connection-id"`
 field CachedVCSArchive.Key string `json:"key"`
 field CachedVCSArchive.LastModified string `json:"last-modified"`
@@ -815,7 +850,6 @@ field PackageCacheListOptions.Name string
 field PackageCacheListOptions.PageNumber int
 field PackageCacheListOptions.PageSize int
 field PackageCacheSource.Ecosystem string `json:"ecosystem"`
-field PackageCacheSource.Enabled bool `json:"enabled"`
 field PackageCacheSource.Mirrors map[string]string `json:"mirrors"`
 field PackageCacheSource.ResolvesLatest bool `json:"resolves-latest"`
 field PackageCacheSource.Upstream string `json:"upstream"`
@@ -826,6 +860,12 @@ field PackageCacheTotal.Ecosystem string `json:"ecosystem"`
 field PackageCacheTotal.Files int64 `json:"files"`
 field PackageEvictRequest.Ecosystem string `json:"ecosystem,omitempty"`
 field PackageEvictRequest.OlderThanDays *int `json:"older_than_days,omitempty"`
+field PackageUpload.File CachedPackageFile
+field PackageUpload.PreviousDigest string
+field PackageUpload.Replaced bool
+field PackageUpload.Unchanged bool
+field PackageUploadOptions.Reference string
+field PackageUploadOptions.Replace bool
 field PackageWarmSpec.Ecosystem string `json:"ecosystem"`
 field PackageWarmSpec.Name string `json:"name"`
 field PackageWarmSpec.Platforms []string `json:"platforms,omitempty"`
@@ -912,6 +952,10 @@ field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
 field ProviderTemplate.UpdatedAt string
+field ProviderUpload.PreviousDigest string
+field ProviderUpload.Provider CachedProviderRow
+field ProviderUpload.Replaced bool
+field ProviderUpload.Unchanged bool
 field QueuedRun.PositionInQueue int `json:"position-in-queue"`
 field QueuedRun.Run
 field RegisteredModuleRef.Name string `json:"name"`
@@ -1161,6 +1205,8 @@ field RunTrigger.SourceID string `json:"sourceable-id"`
 field RunTrigger.SourceableName string `json:"sourceable-name"`
 field RunTrigger.WorkspaceID string `json:"workspace-id"`
 field RunTrigger.WorkspaceName string `json:"workspace-name"`
+field SearchWorkspacesResult.ExcludeEmpty []int `json:"exclude_empty,omitempty"`
+field SearchWorkspacesResult.Excluded int `json:"excluded,omitempty"`
 field SearchWorkspacesResult.Matched int `json:"matched"`
 field SearchWorkspacesResult.Workspaces []WorkspaceSummary `json:"workspaces"`
 field SecurityScan.CreatedAt string `json:"created-at,omitempty"`
@@ -1698,6 +1744,7 @@ field WorkspaceFilter.AgentPoolID string `json:"agent_pool_id,omitempty"`
 field WorkspaceFilter.All bool `json:"all,omitempty"`
 field WorkspaceFilter.DriftStatus string `json:"drift_status,omitempty"`
 field WorkspaceFilter.EngineVersion string `json:"engine_version,omitempty"`
+field WorkspaceFilter.Exclude []WorkspaceFilter `json:"exclude,omitempty"`
 field WorkspaceFilter.ExecutionBackend string `json:"execution_backend,omitempty"`
 field WorkspaceFilter.ExecutionMode string `json:"execution_mode,omitempty"`
 field WorkspaceFilter.HasVCS *bool `json:"has_vcs,omitempty"`
@@ -2019,6 +2066,7 @@ method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte
 method (*Client) PinIdentitySubject(ctx context.Context, providerName, email, subject string) error
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspaceID, content string, ) (*ArchitectureCritiqueMessage, error)
+method (*Client) PostMultipart( ctx context.Context, path string, fields map[string]string, fileField, fileName string, content []byte, ) ([]byte, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
 method (*Client) PreviewModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryPreview, error)
@@ -2078,10 +2126,22 @@ method (*Client) UpdateVariable(ctx context.Context, workspaceID, id string, req
 method (*Client) UpdateVariableSet(ctx context.Context, id string, req UpdateVariableSetRequest) (*VariableSet, error)
 method (*Client) UpdateVarsetVariable(ctx context.Context, varsetID, varID string, req UpdateVarsetVariableRequest) (*VariableSetVariable, error)
 method (*Client) UpdateWorkspace(ctx context.Context, id string, req UpdateWorkspaceRequest) (*Workspace, error)
+method (*Client) UploadEngineBinary( ctx context.Context, tool, version, osName, arch, fileName string, content []byte, opts *PackageUploadOptions, ) (*BinaryUpload, error)
+method (*Client) UploadGalaxyCollection(ctx context.Context, namespace, name, version string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadGalaxyIndex(ctx context.Context, namespace, name, document string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadGoIndex(ctx context.Context, module, document string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadGoModuleFile(ctx context.Context, module, version, suffix string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
 method (*Client) UploadModuleVersion(ctx context.Context, name, provider, version string, tarball []byte) error
+method (*Client) UploadNPMIndex(ctx context.Context, name string, document []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadNPMPackage(ctx context.Context, name, version string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadNuGetIndex(ctx context.Context, packageID string, document []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadNuGetPackage(ctx context.Context, packageID, version string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadProviderPackage( ctx context.Context, hostname, namespace, providerType, version, osName, arch, fileName string, content []byte, opts *PackageUploadOptions, ) (*ProviderUpload, error)
 method (*Client) UploadProviderPlatform(ctx context.Context, name, version, goos, goarch string, zip []byte) error
 method (*Client) UploadProviderSHASUMS(ctx context.Context, name, version string, shasums []byte) error
 method (*Client) UploadProviderSignature(ctx context.Context, name, version string, sig []byte) error
+method (*Client) UploadPulumiPlugin(ctx context.Context, kind, name, version, goos, arch string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
+method (*Client) UploadPyPIPackage(ctx context.Context, project, filename string, content []byte, opts *PackageUploadOptions) (*PackageUpload, error)
 method (*Client) UploadStateContent(ctx context.Context, stateVersionID string, raw []byte) error
 method (*Client) VCSArchiveCacheTotals(ctx context.Context) ([]VCSArchiveTotal, ArchiveTotalsMeta, error)
 method (*Client) VersionCheck(ctx context.Context) error
@@ -2116,11 +2176,14 @@ type ArchiveTotalsMeta struct
 type AuthenticationError struct
 type AuthorizationError struct
 type AutodiscoveryRule struct
+type BinaryUpload struct
 type BulkUpdateResult struct
 type BulkWarmRequest struct
 type BulkWarmResponse struct
 type CacheTotalsMeta struct
+type CachedBinaryRow struct
 type CachedPackageFile struct
+type CachedProviderRow struct
 type CachedVCSArchive struct
 type CatalogInstance struct
 type CatalogItem struct
@@ -2227,6 +2290,8 @@ type PackageCacheSource struct
 type PackageCacheSourcesMeta struct
 type PackageCacheTotal struct
 type PackageEvictRequest struct
+type PackageUpload struct
+type PackageUploadOptions struct
 type PackageWarmSpec struct
 type PlanSummary struct
 type PlanSummaryMessage struct
@@ -2237,6 +2302,7 @@ type PolicyCheckSummary struct
 type PolicyEvaluationDetail struct
 type PolicySet struct
 type ProviderTemplate struct
+type ProviderUpload struct
 type QueuedRun struct
 type RegisteredModuleRef struct
 type RegistryModule struct

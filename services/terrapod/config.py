@@ -175,6 +175,16 @@ class RunnerConfig(BaseSettings):
         description="Listener certificate validity; drives the renewal threshold. "
         "Must match api.config.agent_pools.listener_cert_ttl_seconds.",
     )
+    go_sumdb: str = Field(
+        default="sum.golang.org",
+        description="The Go checksum database the runner verifies module hashes "
+        "against, served through this deployment's own cache rather than reached "
+        "directly. Must match the host of "
+        "api.config.registry.package_cache.go.sumdb_upstream, which is what serves "
+        "it; the chart renders this from that value. Empty means GOSUMDB=off, which "
+        "is what the runner did before #2589 -- a module absent from the program's "
+        "go.sum is then recorded from whatever the proxy served, unverified.",
+    )
     heartbeat_interval: int = Field(default=60, description="Listener heartbeat interval (s).")
     max_concurrent: int = Field(
         default=3,
@@ -853,7 +863,7 @@ class OIDCIssuerConfig(BaseSettings):
         ),
     )
     require_phase: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Refuse to mint an identity token for a run whose runner token carries "
             "no phase, and refuse to issue such a runner token in the first place. "
@@ -866,7 +876,7 @@ class OIDCIssuerConfig(BaseSettings):
         ),
     )
     require_assigned_pool: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Refuse to mint an identity for a run whose executing agent pool is "
             "no longer in the workspace's pool set. A run snapshots its candidate "
@@ -1198,7 +1208,6 @@ class WarmProviderEntry(BaseModel):
 class ProviderCacheConfig(BaseModel):
     """Provider binary caching (network mirror) configuration."""
 
-    enabled: bool = Field(default=True)
     upstream_registries: list[str] = Field(
         default=["registry.terraform.io", "registry.opentofu.org"]
     )
@@ -1206,14 +1215,21 @@ class ProviderCacheConfig(BaseModel):
     platforms: list[dict[str, str]] = Field(
         default=[{"os": "linux", "arch": "amd64"}, {"os": "linux", "arch": "arm64"}],
     )
-    verify: Literal["off", "checksum", "signature"] = Field(
+    verify: Literal["checksum", "signature"] = Field(
         default="signature",
         description="Integrity verification for provider archives fetched from upstream. "
         "'signature' (default, fail-closed): verify the archive's SHA-256 against the "
         "registry-advertised shasum AND verify the registry's SHA256SUMS GPG signature "
         "against the registry-advertised signing key (mirrors `terraform init`). "
         "'checksum': verify the SHA-256 against the advertised shasum only. "
-        "'off': no verification (NOT recommended — the mirror would trust any bytes). "
+        "There is deliberately NO 'off'. A network mirror carries no signature "
+        "verification of its own: terraform and tofu attach only a hash check on that "
+        "path, against the hashes the mirror itself declares. So this is the ONLY "
+        "publisher-provenance check anywhere in the chain for a third-party provider, "
+        "and disabling it left a deployment strictly worse off than not using the "
+        "cache at all. Where upstream advertises no signature material use "
+        "`allow_unsigned`, which degrades to a shasum check per provider with a "
+        "warning rather than abandoning verification wholesale. "
         "On failure the fetch is rejected; nothing is cached or served.",
     )
     allow_unsigned: bool = Field(
@@ -1230,7 +1246,6 @@ class ProviderCacheConfig(BaseModel):
 class BinaryCacheConfig(BaseModel):
     """Terraform/tofu CLI binary caching configuration."""
 
-    enabled: bool = Field(default=True)
     terraform_mirror_url: str = Field(default="https://releases.hashicorp.com/terraform")
     tofu_mirror_url: str = Field(default="https://github.com/opentofu/opentofu/releases/download")
     terragrunt_mirror_url: str = Field(
@@ -1537,11 +1552,6 @@ class OCIRegistryConfig(BaseModel):
     spec mandates that prefix.
     """
 
-    enabled: bool = Field(
-        default=True,
-        description="Serve the OCI registry at /v2/. Disabling it hides the surface "
-        "entirely; pushed images remain in storage and reappear if re-enabled.",
-    )
     upstreams: list[OCIUpstreamConfig] = Field(
         default_factory=list,
         description="Registries Terrapod may pull through to. **An allow-list, not a "
@@ -1586,11 +1596,6 @@ class OCIRegistryConfig(BaseModel):
 class PackageEcosystemConfig(BaseModel):
     """One language registry Terrapod proxies."""
 
-    enabled: bool = Field(
-        default=True,
-        description="Serve this ecosystem's proxy. Disabling it 404s the endpoints; "
-        "already-cached artifacts stay in storage and reappear if re-enabled.",
-    )
     upstream: str = Field(
         description="Base URL of the registry to pull through to. A single URL, not a "
         "list: unlike the container registry there is no client-chosen host here — the "
@@ -1633,7 +1638,69 @@ class PulumiPluginCacheConfig(PackageEcosystemConfig):
         "its tag. Separate from `upstream` deliberately: that one is where PULUMI's "
         "plugins come from, and pointing it here to reach ours would send every other "
         "plugin to a host that does not have it. Point this at an internal mirror for a "
-        "restricted-network install, the same way the other mirror URLs work.",
+        "restricted-network install, the same way the other mirror URLs work -- and if "
+        "you want those plugins VERIFIED, carry "
+        "`v{version}/pulumi-resource-terrapod_{version}_SHA256SUMS` there too, which is "
+        "fetched from this base on a cache miss. A mirror holding only the tarballs "
+        "still serves them: the absence is logged and the row records "
+        "`none-published`, rather than refusing a plugin under configuration you "
+        "already have. A manifest that IS present and disagrees with the bytes does "
+        "refuse (#2589).",
+    )
+
+
+class NuGetCacheConfig(PackageEcosystemConfig):
+    """The NuGet proxy, which needs a second upstream to verify a package.
+
+    A subclass rather than a field on `PackageEcosystemConfig`, for the reason
+    `PulumiPluginCacheConfig` gives: the key means nothing for the ecosystems that
+    publish a digest in the index their download URL came from.
+
+    NuGet does not. The flat container serves the `.nupkg` and publishes no digest
+    beside it (`<id>.<version>.nupkg.sha512` is a 404); `packageHash` lives on the
+    registration index's `catalogEntry`, which is a different resource on a
+    different base. So verifying a package costs one extra request, on a miss.
+    """
+
+    registration_upstream: str = Field(
+        default="https://api.nuget.org/v3/registration5-gz-semver2",
+        description="Base URL of the registration index, which is where NuGet "
+        "publishes `packageHash` -- the only digest it publishes anywhere, and "
+        "therefore what a cached package is verified against. Separate from "
+        "`upstream` because the flat container that serves packages does not serve "
+        "this. An internal-mirror deployment must point this at something reachable "
+        "too, exactly as `platform_tools.checkov_checksum_api_url` has to be pointed "
+        "alongside `checkov_mirror_url`: a mirror of the downloads alone leaves the "
+        "digest source unreachable, and verification is not optional.",
+    )
+
+
+class GoCacheConfig(PackageEcosystemConfig):
+    """The Go module proxy, plus the checksum database it can mirror.
+
+    The module proxy publishes no per-file digest -- `.ziphash` and `.zip.sha256`
+    are both 404, measured -- so the authoritative hash for a module lives in the
+    checksum database and nowhere else. That used to be a second upstream the
+    runner could not reach, which is why it ran with `GOSUMDB=off`.
+
+    It is mirrorable through this very cache: the module-proxy protocol carries
+    the sumdb under `/sumdb/<host>/...`, and the `go` command asks
+    `/sumdb/<host>/supported` first to find out whether the proxy will serve it.
+    So the database stops being a second upstream and becomes more cached
+    content, which is what lets the check come back on (#2589).
+    """
+
+    sumdb_upstream: str = Field(
+        default="https://sum.golang.org",
+        description="The Go checksum database to mirror. Served through this cache "
+        "under /sumdb/<host>/, so the runner verifies every module hash against the "
+        "transparency log rather than trusting whichever proxy answered -- which "
+        "matters for a module ABSENT from the program's go.sum, where the `go` "
+        "command otherwise records the proxy's bytes as authoritative. "
+        "Set it empty to serve no checksum database: the runner then falls back to "
+        "GOSUMDB=off and a module missing from go.sum is unverified. "
+        "A SEALED deployment must warm the sumdb before sealing -- a miss cannot be "
+        "filled, and the dependency install fails rather than degrading.",
     )
 
 
@@ -1647,11 +1714,6 @@ class PackageCacheConfig(BaseModel):
     resolve its dependency closure with no upstream reach.
     """
 
-    enabled: bool = Field(
-        default=True,
-        description="Serve the language package proxies. Point runners at them with "
-        "PIP_INDEX_URL and NPM_CONFIG_REGISTRY.",
-    )
     pypi: PackageEcosystemConfig = Field(
         default_factory=lambda: PackageEcosystemConfig(upstream="https://pypi.org"),
         description="PyPI (PEP 503/691 simple index). Serves Pulumi Python programs, "
@@ -1670,16 +1732,14 @@ class PackageCacheConfig(BaseModel):
         "PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES; a `pulumi up` then resolves its plugins "
         "without reaching get.pulumi.com.",
     )
-    go: PackageEcosystemConfig = Field(
-        default_factory=lambda: PackageEcosystemConfig(upstream="https://proxy.golang.org"),
+    go: GoCacheConfig = Field(
+        default_factory=lambda: GoCacheConfig(upstream="https://proxy.golang.org"),
         description="Go module proxy. Point the toolchain at it with GOPROXY; a "
         "`go mod download` then resolves without reaching proxy.golang.org. Serves "
         "Pulumi programs written in Go.",
     )
-    nuget: PackageEcosystemConfig = Field(
-        default_factory=lambda: PackageEcosystemConfig(
-            upstream="https://api.nuget.org/v3-flatcontainer"
-        ),
+    nuget: NuGetCacheConfig = Field(
+        default_factory=lambda: NuGetCacheConfig(upstream="https://api.nuget.org/v3-flatcontainer"),
         description="NuGet V3 flat container. Point a nuget.config packageSource at this "
         "proxy's index.json; `dotnet restore` then resolves without reaching nuget.org. "
         "Serves Pulumi programs written in C#.",
@@ -1738,10 +1798,52 @@ class ModuleAutodiscoveryConfig(BaseModel):
     )
 
 
+class ContentAllowlistConfig(BaseModel):
+    """What this deployment is willing to serve, not just where it fetches from (#2589).
+
+    `provider_cache.upstream_registries` restricts which HOSTS we reach; this
+    restricts WHAT. Without it, a workspace naming any package gets it faithfully
+    fetched, verified and served -- verification working perfectly while an
+    artifact signed by its own author executes. Verification answers "is this what
+    the publisher published" and has no opinion on whether this deployment wanted
+    that publisher's package at all.
+
+    **Ships `off`, and the intended path is `off` -> `observe` -> `enforce`.**
+    Nobody can hand-write an allowlist for an estate they do not yet understand,
+    so `observe` is what tells an operator what their own estate actually pulls;
+    `enforce` then fails closed against a set they have already approved rather
+    than being a cliff they walk off on upgrade.
+    """
+
+    mode: Literal["off", "observe", "enforce"] = Field(
+        default="off",
+        description="'off' (default): no allowlist, and no per-fetch log line -- a "
+        "control nobody configured must not fill the log. 'observe': record what "
+        "WOULD be refused and fetch it anyway, which is how the list gets built. "
+        "'enforce': refuse anything unmatched, fail-closed. An EMPTY list under "
+        "'enforce' refuses everything, deliberately: that is loud rather than "
+        "silent, and a mode that quietly allowed everything would make the "
+        "posture a false claim.",
+    )
+    packages: list[str] = Field(
+        default=[],
+        description="Glob patterns applied to EVERY package cache, for an estate "
+        "that mirrors the same namespace across ecosystems (e.g. '@acme/*'). "
+        "fnmatch rather than regex, so a mis-escaped '.' cannot silently match "
+        "more than it reads as. Matched case-insensitively.",
+    )
+    ecosystems: dict[str, list[str]] = Field(
+        default={},
+        description="Per-ecosystem glob patterns, keyed by pypi/npm/nuget/go/"
+        "galaxy/pulumi, for a rule that is only meaningful to one cache (a Go "
+        "module path, say). Unioned with `packages` rather than overriding it.",
+    )
+
+
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
-    enabled: bool = Field(default=True)
+    content_allowlist: ContentAllowlistConfig = Field(default_factory=ContentAllowlistConfig)
     cache_only: bool = Field(
         default=False,
         description="Sealed (cache-only) mode for air-gapped deployments. When true, "
@@ -2206,6 +2308,29 @@ class AgentPoolsConfig(BaseModel):
             "drives both how fast a compromised cert ages out and how often "
             "the API issues fresh ones. For local Tilt, override to ~300s "
             "in values-local.yaml so a renewal cycle finishes in minutes."
+        ),
+    )
+    ca_algorithm: str = Field(
+        default="ed25519",
+        description=(
+            "Signature algorithm for the listener certificate authority: `ed25519` "
+            "(the default) or `mldsa44` / `mldsa65` / `mldsa87` for ML-DSA, the NIST "
+            "post-quantum signature standard. It applies to the CA key AND to the "
+            "listener certificates it issues, so a post-quantum CA issues "
+            "post-quantum leaves whose proof-of-possession signatures are "
+            "post-quantum too. "
+            "It takes effect only when a CA is GENERATED: an existing one is loaded "
+            "as it is, whatever this says, because the algorithm is a property of the "
+            "stored key rather than of the configuration -- so changing it on a "
+            "running deployment does nothing until the CA is rotated. "
+            "RSA and ECDSA are deliberately not offered: the capability-URL signing "
+            "key is derived from the CA private key's RAW bytes, which only the "
+            "Edwards and ML-DSA key types expose, so admitting one would break a path "
+            "that has nothing to do with listener certificates. "
+            "Nothing forces this yet -- a listener certificate lives an hour and the "
+            "CA is node-local -- so the realistic reason to set it is an "
+            "organisational post-quantum mandate rather than a threat. See "
+            "docs/post-quantum.md."
         ),
     )
     require_listener_proof_of_possession: bool = Field(
@@ -3886,9 +4011,31 @@ class Settings(BaseSettings):
     # once `token_signing_key` is set and the static KEK is generated material.
     # See terrapod/secret_strength.py.
     require_strong_secrets: bool = Field(
-        default=False,
-        description="Fail startup when the token signing key or static KEK is "
-        "weak or falls back to the database URL, instead of warning.",
+        default=True,
+        description="Fail startup when a secret this deployment was GIVEN is weak, "
+        "instead of warning. It fires on a configured `token_signing_key` that a "
+        "strength estimate rejects, and on a static encryption KEK that is a typed "
+        "passphrase rather than generated material. It does NOT fire on a signing key "
+        "derived from the database URL, because such a key is REPLACED with a "
+        "generated one on startup rather than adopted (#2605) -- so leaving "
+        "`token_signing_key` unset is the normal, strong case and is not reported at "
+        "all.\n\n"
+        "ON by default from 2.0, and the two changes that made that safe are worth "
+        "knowing because the reason it was off is still true in part. The refusal "
+        "happens at provider construction, so this fails the pod -- and an operator "
+        "with a passphrase KEK still cannot simply edit it to something better, "
+        "because the KEK derives from that secret and changing it alone leaves every "
+        "already-wrapped DEK unable to unwrap. What changed is that there is now a "
+        "remedy: `python -m terrapod.cli.kek_rotate` re-wraps every DEK from the old "
+        "secret to a new one in a single transaction, having first proven each new "
+        "wrap reads back. That is bounded work -- `crypto_keys` holds one row per DEK "
+        "version and the DEKs themselves do not change, so nothing encrypted under "
+        "them is touched. Rotate first, then upgrade.\n\n"
+        "Set it to false only to buy time, and read "
+        "`docs/upgrading-to-2.0.md` before you do: a deployment that leaves it off is "
+        "keeping a KEK an attacker holding a backup can guess at one hash per attempt "
+        "(GHSA-hc47-q72v-4vcm), which is the exposure the stretched wrap format and "
+        "this default exist together to close.",
     )
 
     # Database

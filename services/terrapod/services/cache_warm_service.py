@@ -120,16 +120,10 @@ async def warm_from_manifest(
         # later in the list is then a cache hit rather than a duplicate fetch.
         binaries = platform_tool_entries() + list(binaries)
 
-    binary_enabled = settings.registry.binary_cache.enabled
     for entry in binaries:
         platforms = entry.platforms or DEFAULT_WARM_PLATFORMS
         for plat in platforms:
             ref = f"{entry.tool} {entry.version} {plat.os}/{plat.arch}"
-            if not binary_enabled:
-                summary.results.append(
-                    WarmResult("binary", ref, ok=False, error="binary cache is disabled")
-                )
-                continue
             try:
                 await binary_cache_service.warm_binary(
                     db, storage, entry.tool, entry.version, plat.os, plat.arch
@@ -144,17 +138,11 @@ async def warm_from_manifest(
                 summary.results.append(WarmResult("binary", ref, ok=False, error=str(e)))
                 logger.warning("Failed to warm binary", ref=ref, error=exception_diagnostic(e))
 
-    provider_enabled = settings.registry.provider_cache.enabled
     for entry in providers:
         hostname, namespace, type_ = entry.coordinates
         platforms = entry.platforms or _provider_default_platforms()
         for plat in platforms:
             ref = f"{entry.source} {entry.version} {plat.os}/{plat.arch}"
-            if not provider_enabled:
-                summary.results.append(
-                    WarmResult("provider", ref, ok=False, error="provider cache is disabled")
-                )
-                continue
             try:
                 await provider_cache_service.fetch_and_cache_single_platform(
                     db, storage, hostname, namespace, type_, entry.version, plat.os, plat.arch

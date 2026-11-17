@@ -1802,7 +1802,9 @@
       "repository": "Repozytorium",
       "commit": "Commit",
       "paths": "Ścieżki",
-      "written": "Zapisano"
+      "written": "Zapisano",
+      "origin": "Pochodzenie",
+      "uploadedBy": "Przesłane przez"
     },
     "warm": {
       "heading": "Rozgrzej pamięć podręczną",
@@ -1869,7 +1871,9 @@
       "loadingMore": "Wczytywanie…",
       "showing": "Wyświetlono {shown} z {total} — tabela sortuje to, co wczytano, więc wczytaj resztę, zanim odczytasz porządek jako całą pamięć podręczną.",
       "listedAll": "Wyświetlono {count, plural, one {# artefakt} few {# artefakty} other {# artefaktów}} — to wszystko, co odpowiada tym filtrom.",
-      "successBulkTruncated": "Wyczyszczono {files} artefaktów, zwalniając {size}. Pasuje więcej, niż usuwa jedno czyszczenie — uruchom je ponownie, aby kontynuować."
+      "successBulkTruncated": "Wyczyszczono {files} artefaktów, zwalniając {size}. Pasuje więcej, niż usuwa jedno czyszczenie — uruchom je ponownie, aby kontynuować.",
+      "uploadedBy": "przez {who}",
+      "confirmRowUploaded": "Ten artefakt został przesłany przez operatora, więc nie istnieje w żadnym rejestrze nadrzędnym. Jego usunięcie niszczy jedyną kopię."
     },
     "archives": {
       "connectionLabel": "Połączenie",
@@ -1903,7 +1907,6 @@
       "heading": "Rozgrzej pamięci podręczne pakietów i obrazów",
       "help": "Podawaj wersję wszędzie tam, gdzie ją znasz: rozgrzewanie wskazane z wersją można potem sprawdzić względem pliku blokady, a „cokolwiek jest najnowsze” — nie. Każdy wiersz zapisuj jako <code>nazwa wersja</code>; w przypadku wtyczek Pulumi dodaj na końcu tokeny <code>os/arch</code>, aby rozgrzać konkretne platformy.",
       "ecosystemLabel": "Rodzaj artefaktu",
-      "ecosystemOff": "{ecosystem} (wyłączone)",
       "sourceLabel": "Pobieraj z",
       "sourceDefault": "Skonfigurowane źródło nadrzędne",
       "upstreamIs": "Zostanie pobrane z <code>{url}</code>.",
@@ -1927,6 +1930,68 @@
       "errorSubmit": "Nie udało się rozpocząć rozgrzewania",
       "errorStatus": "Nie udało się odczytać zadania rozgrzewania",
       "helpLead": "Pobierz artefakty do pamięci podręcznej, zanim cokolwiek się o nie upomni — po jednym w wierszu, jako nazwa i wersja."
+    },
+    "attestation": {
+      "upstreamDigest": "Zweryfikowano",
+      "nonePublished": "Brak opublikowanego skrótu",
+      "operatorUpload": "Przesłano",
+      "unrecorded": "Brak zapisu"
+    },
+    "upload": {
+      "title": "Prześlij sprawdzony artefakt",
+      "description": "Umieść w pamięci podręcznej artefakt zweryfikowany samodzielnie. To jedyny sposób dodania go, gdy węzeł jest zapieczętowany, i nie wymaga podpisu wydawcy — zamiast niego zapisywane jest, kto go przesłał.",
+      "show": "Prześlij",
+      "hide": "Zamknij",
+      "sealedNote": "Ten węzeł jest zapieczętowany, więc przesłanie to jedyny sposób dodania artefaktu — i jedyna jego kopia, ponieważ niczego tutaj nie da się pobrać ponownie.",
+      "ecosystem": "Pamięć podręczna",
+      "kind": "Co przesyłasz",
+      "kindArtifact": "Bajty artefaktu",
+      "kindIndex": "Dokument indeksu",
+      "kindHintIndexed": "Zapieczętowany węzeł odczytuje istniejące wersje z dokumentu indeksu, więc artefaktu przesłanego bez niego nie da się rozwiązać.",
+      "kindHintNoIndex": "Ta pamięć podręczna nie potrzebuje dokumentu indeksu.",
+      "file": "Plik",
+      "reference": "Odniesienie (opcjonalne)",
+      "referenceHint": "Identyfikator twojego zgłoszenia, zmiany lub zatwierdzenia. Przechowywany razem z przesłanym plikiem.",
+      "replace": "Zastąp to, co już znajduje się pod tymi współrzędnymi",
+      "replaceHint": "Bez tego istniejący artefakt zostanie odrzucony, a nie nadpisany. To, co zostanie wyparte, może być tym, od czego już zależy jakiś przebieg.",
+      "confirmReplace": "Przesłać {filename} na miejsce artefaktu znajdującego się już pod tymi współrzędnymi? Zastępowane bajty zostaną zniszczone.",
+      "confirmReplaceSealed": "Ten węzeł jest zapieczętowany, więc zastąpionych bajtów nie da się skądkolwiek pobrać z powrotem.",
+      "submit": "Prześlij",
+      "submitting": "Przesyłanie…",
+      "provenanceNote": "Zapisane na twoje konto.",
+      "success": "Przesłano {filename}.",
+      "successReplaced": "Przesłano {filename}, zastępując to, co tam było.",
+      "successUnchanged": "{filename} był już w pamięci podręcznej z identycznymi bajtami. Nic się nie zmieniło.",
+      "error": "Przesyłanie nie udało się.",
+      "fields": {
+        "project": "Projekt",
+        "name": "Nazwa",
+        "version": "Wersja",
+        "filename": "Nazwa pliku",
+        "package_id": "Identyfikator pakietu",
+        "module": "Ścieżka modułu",
+        "suffix": "Plik",
+        "namespace": "Przestrzeń nazw",
+        "document": "Dokument",
+        "kind": "Rodzaj wtyczki",
+        "os": "System operacyjny",
+        "arch": "Architektura",
+        "tool": "Narzędzie",
+        "hostname": "Host rejestru",
+        "type": "Typ dostawcy"
+      },
+      "hints": {
+        "filename": "Podawana, a nie wyprowadzana: nazwa pliku wheel koduje jego tagi zgodności.",
+        "suffix": "Jeden z .info, .mod lub .zip. Wersja to trzy pliki i każdy przesyła się osobno.",
+        "document": "Który dokument indeksu. Galaxy ma collection i versions; Go ma list i latest.",
+        "kind": "resource, language, analyzer lub converter.",
+        "tool": "tofu, terraform, terragrunt, opa, trivy, checkov",
+        "hostname": "registry.terraform.io lub host własnego rejestru"
+      },
+      "ecosystems": {
+        "binary": "Pliki binarne silników",
+        "provider": "Dostawcy Terraform"
+      }
     }
   },
   "catalog": {
