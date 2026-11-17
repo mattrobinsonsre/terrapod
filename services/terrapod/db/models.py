@@ -1741,6 +1741,20 @@ class CachedProviderPackage(Base):
         DateTime(timezone=True), default=now_utc, nullable=False
     )
 
+    #: Provenance for a row an operator UPLOADED rather than one fetched (#2599),
+    #: mirroring `CachedPackageFile` exactly -- same names, same widths, same
+    #: meanings -- because an audit that has to learn a different vocabulary per
+    #: cache is one nobody runs. NULL on a fetched row, which has no uploader.
+    attestation: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    uploaded_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    #: Free text an uploader may attach -- their own ticket or approval record.
+    upload_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: What was at these coordinates before the last replacement, and when it was
+    #: displaced. A replacement must be asked for explicitly and recorded: what is
+    #: being overwritten may be what a run already depends on.
+    replaced_digest: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    replaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     __table_args__ = (
         sa.UniqueConstraint(
             "hostname",
@@ -1775,6 +1789,20 @@ class CachedBinary(Base):
     last_accessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
+
+    #: Provenance for a row an operator UPLOADED rather than one fetched (#2599),
+    #: mirroring `CachedPackageFile` exactly -- same names, same widths, same
+    #: meanings -- because an audit that has to learn a different vocabulary per
+    #: cache is one nobody runs. NULL on a fetched row, which has no uploader.
+    attestation: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    uploaded_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    #: Free text an uploader may attach -- their own ticket or approval record.
+    upload_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: What was at these coordinates before the last replacement, and when it was
+    #: displaced. A replacement must be asked for explicitly and recorded: what is
+    #: being overwritten may be what a run already depends on.
+    replaced_digest: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    replaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         sa.UniqueConstraint("tool", "version", "os", "arch", name="uq_cached_binaries"),

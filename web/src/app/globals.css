@@ -398,3 +398,102 @@ body {
 [dir="rtl"] :is(p, li, span, div) > code {
   text-align: start;
 }
+
+  /* Render the `<select>` picker as PAGE CONTENT, so our stylesheet reaches it.
+     #2599.
+
+     A native select's open list is not part of the page: Chrome, Safari and
+     Firefox all draw it as a separate browser- or OS-level window, built from
+     internal shadow DOM or by the platform itself. Nothing an author writes
+     reaches it -- not the font, not the type scale, not the theme -- which is
+     why a Status filter in our palette sat beside an engine filter in the
+     system's, on one screen, with no CSS able to close the gap.
+
+     That is the documented limitation. The reason this rule exists is the
+     SECOND problem, which is a defect rather than a design: because the picker
+     is its own window, it carries its own scale factor, computed separately
+     from the page's. Chromium has shipped bugs in that path -- crbug/41329817
+     renders the popup at twice its size AND in the wrong position, and
+     crbug/40859249 failed to propagate a HiDPI scale override to child popup
+     windows -- and a stale per-site zoom in a Chrome profile produces the same
+     shape of fault. An operator met exactly that: a picker several times its
+     proper size, floating away from the control it belonged to. The page had no
+     access to the code drawing it and no way to defend itself.
+
+     `appearance: base-select` removes the second window entirely. The picker
+     becomes page content, so it inherits our tokens, scales with the page, and
+     cannot acquire a geometry of its own. It also keeps everything that makes
+     the native element worth having, which a hand-built listbox has to
+     reimplement and usually reimplements worse: form participation, keyboard
+     behaviour including type-ahead, screen-reader semantics, and the proper
+     platform picker on a phone.
+
+     Behind `@supports` because Firefox has not shipped it (Chrome 135+,
+     Safari 27+). There it keeps today's native popup, which is the documented
+     fallback and is correct rather than merely tolerable -- the element still
+     works, it is simply drawn by the platform. So this is progressive
+     enhancement, not a dependency.
+
+     Deliberately applied to the bare element, with no utility classes, because
+     the point is that all 133 `<select>`s in the app are covered at once. Each
+     keeps its own Tailwind classes for the closed control; only the picker and
+     the options are styled here, and they are styled to match the custom
+     `role="menu"` dropdowns the app already draws, so the two patterns finally
+     agree. */
+  @supports (appearance: base-select) {
+    select,
+    ::picker(select) {
+      appearance: base-select;
+    }
+
+    ::picker(select) {
+      border: 1px solid var(--color-slate-700);
+      border-radius: 0.5rem;
+      background: var(--color-slate-800);
+      box-shadow:
+        0 10px 15px -3px color-mix(in oklab, var(--color-slate-950) 30%, transparent),
+        0 4px 6px -4px color-mix(in oklab, var(--color-slate-950) 30%, transparent);
+      padding-block: 0.25rem;
+      /* The picker is page content now, so it needs its own overflow bound --
+         an estate-sized option list would otherwise run off the viewport. */
+      max-height: 24rem;
+      overflow-y: auto;
+    }
+
+    select option {
+      /* 44px, matching the app's tap-target floor: the options are real
+         content now, so the touch rules apply to them as they do anywhere. */
+      min-height: 2.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding-inline: 0.75rem;
+      padding-block: 0.375rem;
+      font-size: 0.875rem;
+      color: var(--color-slate-300);
+      background: transparent;
+    }
+
+    select option:checked {
+      background: color-mix(in oklab, var(--color-slate-700) 60%, transparent);
+      color: var(--color-slate-100);
+    }
+
+    /* `:hover` is a pointer affordance and must not be the only signal --
+       `:checked` above carries the state, and the checkmark below is not
+       hover-dependent. */
+    select option:hover:not(:checked) {
+      background: color-mix(in oklab, var(--color-slate-700) 40%, transparent);
+    }
+
+    select option:disabled {
+      color: var(--color-slate-500);
+    }
+
+    /* Chrome's base appearance puts a checkmark column on every option and
+       hides it unless selected; keep it in our accent so the selected row
+       reads the same way the custom dropdowns' does. */
+    select option::checkmark {
+      color: var(--color-brand-400);
+    }
+  }

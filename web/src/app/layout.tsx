@@ -7,7 +7,17 @@ import { dirForLocale } from '@/i18n/config'
 import { parseTheme, THEME_COOKIE } from '@/lib/theme'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+// `fallback` is not cosmetic here. `next/font` emits `Inter, "Inter Fallback"`
+// and NOTHING after it, and both of those are webfonts -- `Inter Fallback` is a
+// generated `@font-face` with `size-adjust`, not a local face. A native control
+// drawn by the OS rather than the page cannot use either: a `<select>` popup on
+// macOS exhausts that chain and lands on Chrome's default, which is a SERIF, so
+// every dropdown rendered in Times while the page around it was Inter.
+//
+// Ending the chain in a generic family is what stops that. It changes nothing
+// where the webfont loads, which is why it is invisible until you open a native
+// menu.
+const inter = Inter({ subsets: ['latin'], fallback: ['system-ui', 'sans-serif'] })
 
 export const metadata: Metadata = {
   title: 'Terrapod',

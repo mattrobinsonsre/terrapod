@@ -6,8 +6,11 @@ operations an operator actually reaches for, so they live here on the native
 surface rather than being invented under `/v2/`, which is a contract with
 container clients rather than with people.
 
-Mounted only when the registry is (`capabilities.capability_enabled("oci")`), so
-a deployment that has switched Ansible off carries none of it — see #1429.
+Always mounted. The registry used to be an optional capability and is not: it is
+how an Ansible configure run obtains its execution environment, since
+`ansible_ee_service` resolves the available ansible-core lines by listing tags
+through it. A deployment with it switched off could not run a configure at all,
+so the flag is gone along with every other cache's on the 2.0 line.
 """
 
 from __future__ import annotations

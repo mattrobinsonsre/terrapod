@@ -127,9 +127,6 @@ func (s *WarmJobState) Finished() bool { return s.Status == "finished" }
 // PackageCacheSource is where a warm of one ecosystem would pull from.
 type PackageCacheSource struct {
 	Ecosystem string `json:"ecosystem"`
-	// Enabled is whether that proxy serves at all. A warm for a disabled one is
-	// a 404.
-	Enabled bool `json:"enabled"`
 	// Upstream is the default this ecosystem pulls through. EMPTY for "oci",
 	// which has no single answer: an image reference's own first path component
 	// names the host, chosen against registry.oci.upstreams.

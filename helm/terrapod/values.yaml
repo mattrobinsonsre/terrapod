@@ -166,13 +166,27 @@ api:
 
   # Configuration mounted as /etc/terrapod/config.yaml
   config:
-    # Refuse to start when the token signing key falls back to the database URL,
-    # or when it (or the static encryption key) is a typed passphrase rather than
-    # generated material (GHSA-hc47-q72v-4vcm). OFF by default so a deployment
-    # already running on a weak secret is not bricked by a patch upgrade -- its
-    # data is encrypted under that very key. Turn it on once both are generated:
-    #   openssl rand -base64 32
-    require_strong_secrets: false
+    # Refuse to start when a secret this deployment was GIVEN is weak -- a
+    # configured token signing key a strength estimate rejects, or a static
+    # encryption key that is a typed passphrase rather than generated material
+    # (GHSA-hc47-q72v-4vcm).
+    #
+    # ON from 2.0. It was off because an operator with a passphrase KEK could not
+    # simply edit it: the KEK derives from that secret, so changing it alone leaves
+    # every wrapped DEK unable to unwrap. That is still true -- what changed is that
+    # there is now a remedy, so the refusal no longer stands between an operator
+    # and their own data:
+    #
+    #   TERRAPOD_KEK_ROTATE_NEW_SECRET="$(openssl rand -base64 32)"     #     python -m terrapod.cli.kek_rotate
+    #
+    # It re-wraps every DEK in one transaction, having first proven each new wrap
+    # reads back. Bounded work: one row per DEK version, and the DEKs themselves do
+    # not change, so nothing encrypted under them is touched. ROTATE BEFORE YOU
+    # UPGRADE, and see docs/upgrading-to-2.0.md.
+    #
+    # Setting this to false buys time and keeps a KEK an attacker holding a backup
+    # can guess at one hash per attempt.
+    require_strong_secrets: true
     log_level: info
 
     # Public-facing Terrapod URL (the Next.js frontend ingress).
@@ -548,7 +562,24 @@ api:
 
     # Private Registry & Caching
     registry:
-      enabled: true
+      # WHAT this deployment is willing to serve, as opposed to WHERE it fetches
+      # from (#2589). provider_cache.upstream_registries restricts the hosts;
+      # nothing restricted the content, so a workspace naming any package got it
+      # faithfully fetched, verified and served -- verification working perfectly
+      # while an artifact signed by its own author executes.
+      #
+      # The intended path is off -> observe -> enforce. Nobody can hand-write an
+      # allowlist for an estate they do not yet understand, so `observe` logs what
+      # WOULD be refused (and fetches it anyway), which is how the list gets
+      # built; `enforce` then fails closed against a set already approved.
+      # An empty list under `enforce` refuses EVERYTHING, deliberately.
+      content_allowlist:
+        mode: "off"
+        # Globs applied to every package cache, e.g. "@acme/*".
+        packages: []
+        # Per-ecosystem globs, keyed pypi/npm/nuget/go/galaxy/pulumi. Unioned
+        # with `packages` rather than overriding it.
+        ecosystems: {}
       # Sealed (cache-only) mode for air-gapped deployments. When true, NO
       # upstream fetch ever happens across the binary cache, provider network
       # mirror, terragrunt binary, and version resolution: a cache miss returns
@@ -561,7 +592,6 @@ api:
       # Container image registry (#1408). Serves execution environments and any
       # other image, both pushed by operators and mirrored from upstream, at /v2/.
       oci:
-        enabled: true
         # Registries Terrapod may pull through to. An ALLOW-LIST, not a
         # convenience: clients name the upstream in the first path component
         # (pulling <host>/quay.io/ansible/awx-ee mirrors quay.io/ansible/awx-ee),
@@ -654,9 +684,7 @@ api:
       # request-forgery surface. Point it at an internal mirror to pull through
       # that instead of the public registry.
       package_cache:
-        enabled: true
         pypi:
-          enabled: true
           upstream: https://pypi.org
           # Extra registries this ecosystem may be WARMED from, by label.
           # Serving always pulls through `upstream` above; these are reachable
@@ -674,7 +702,6 @@ api:
           #     hub: https://terrapod.hub.example/api/v1/packages/pypi
           mirrors: {}
         npm:
-          enabled: true
           upstream: https://registry.npmjs.org
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
@@ -683,7 +710,6 @@ api:
         # is on regardless: there is no engine on/off switch, and a proxy costs
         # nothing until a run of that engine asks it for something.
         pulumi:
-          enabled: true
           upstream: https://get.pulumi.com/releases/plugins
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
@@ -704,14 +730,28 @@ api:
         # switch to disable it with -- that was withdrawn (#1986) -- so turn this
         # off here if no Pulumi program uses the Go SDK. Point GOPROXY at it.
         go:
-          enabled: true
           upstream: https://proxy.golang.org
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
+          # The Go checksum database, SERVED THROUGH THIS CACHE rather than
+          # reached directly: the module-proxy protocol carries it under
+          # /sumdb/<host>/, which is what stops it being a second upstream and
+          # lets the runner verify module hashes again (#2589).
+          #
+          # It matters for a module ABSENT from the program's own go.sum. The
+          # `go` command enforces go.sum against what the program has PINNED,
+          # and for anything else -- measured, go1.27.3, cold module cache --
+          # `go mod download` with GOSUMDB=off exits 0 and records the hash of
+          # whatever the proxy served.
+          #
+          # SEALED DEPLOYMENTS: warm the checksum database before sealing. A
+          # miss cannot be filled while sealed, so the dependency install fails
+          # rather than degrading. Set this empty to run without the database,
+          # which is what this deployment did before 2.0.
+          sumdb_upstream: https://sum.golang.org
         # NuGet V3 flat container. Pulumi-only (C# SDK programs). Point a
         # nuget.config packageSource at this proxy's index.json.
         nuget:
-          enabled: true
           upstream: https://api.nuget.org/v3-flatcontainer
           # Where NuGet publishes `packageHash` -- the only digest it publishes
           # anywhere, and so what a cached package is verified against. A second
@@ -726,12 +766,10 @@ api:
         # private collection publishing and signature verification, so unlike
         # the others it holds content that exists nowhere upstream.
         galaxy:
-          enabled: true
           upstream: https://galaxy.ansible.com
           # Warm-from mirrors by label; see `pypi.mirrors` above.
           mirrors: {}
       provider_cache:
-        enabled: true
         upstream_registries:
           - registry.terraform.io
           - registry.opentofu.org
@@ -754,7 +792,6 @@ api:
         # (with a warning) for those providers instead of rejecting them.
         allow_unsigned: false
       binary_cache:
-        enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
         tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
         # Upstream download base for terragrunt binaries (bare per-platform

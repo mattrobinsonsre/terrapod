@@ -281,52 +281,6 @@ class TestNpm:
         assert fetch.call_args.kwargs["accept"] == "application/vnd.npm.install-v1+json"
 
 
-class TestDisabled:
-    """A switched-off ecosystem is not mounted, so its routes do not exist.
-
-    Asserted by building the application *after* changing the setting, because
-    that is when the decision is now made: an ecosystem nobody wants is never
-    registered rather than registered and refusing. Patching the router module's
-    `settings` no longer has any effect — the decision lives in
-    `services/capabilities.py`, which reads the real settings object.
-    """
-
-    @pytest.fixture(autouse=True)
-    def _restore(self):
-        from terrapod.config import settings
-
-        before = (
-            settings.registry.package_cache.enabled,
-            settings.registry.package_cache.pypi.enabled,
-        )
-        yield
-        (
-            settings.registry.package_cache.enabled,
-            settings.registry.package_cache.pypi.enabled,
-        ) = before
-
-    async def test_a_disabled_ecosystem_is_404(self) -> None:
-        from terrapod.config import settings
-
-        settings.registry.package_cache.enabled = True
-        settings.registry.package_cache.pypi.enabled = False
-
-        async with await _client(_app()) as c:
-            r = await c.get(f"{BASE}/pypi/simple/flask/", headers=AUTH)
-
-        assert r.status_code == 404
-
-    async def test_the_whole_cache_can_be_switched_off(self) -> None:
-        from terrapod.config import settings
-
-        settings.registry.package_cache.enabled = False
-
-        async with await _client(_app()) as c:
-            r = await c.get(f"{BASE}/npm/left-pad", headers=AUTH)
-
-        assert r.status_code == 404
-
-
 class TestAuthenticationIsRequired:
     """Every route, walked from the real table rather than a hand-written list.
 
@@ -415,6 +369,19 @@ class TestAuthenticationIsRequired:
         "/api/v1/package-cache/pulumi/{filename}": (
             "GET",
             f"{BASE}/pulumi/pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
+            None,
+        ),
+        # The checksum database (#2589). `supported` is the one the toolchain asks
+        # FIRST, so an unauthenticated answer there is what would advertise this
+        # cache as an open sumdb relay before any module request is made.
+        "/api/v1/package-cache/go/sumdb/{host}/supported": (
+            "GET",
+            f"{BASE}/go/sumdb/sum.golang.org/supported",
+            None,
+        ),
+        "/api/v1/package-cache/go/sumdb/{host}/{path:path}": (
+            "GET",
+            f"{BASE}/go/sumdb/sum.golang.org/lookup/rsc.io/quote@v1.5.2",
             None,
         ),
         "/api/v1/package-cache/go/{module:path}/@v/list": (
@@ -1110,7 +1077,6 @@ class TestEveryPackageCacheRouteRecordsItsDuration:
             assert router.route_class is mod.TimedRoute, router
 
         built = mod.build_router()
-        assert built is not None
         mounted = [r for r in built.routes if isinstance(r, APIRoute)]
         assert mounted, "no routes mounted"
         assert all(isinstance(r, mod.TimedRoute) for r in mounted)
