@@ -368,6 +368,10 @@ data:
         go:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
+          {{- /* Rendered with `dig` rather than `| default`, because an operator
+                 who sets this EMPTY means "serve no checksum database" and a
+                 `default` would render the database back over that choice. */}}
+          sumdb_upstream: {{ dig "sumdb_upstream" "https://sum.golang.org" . | quote }}
           {{- with .mirrors }}
           mirrors:
             {{- toYaml . | nindent 12 }}

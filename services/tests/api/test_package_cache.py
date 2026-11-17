@@ -417,6 +417,19 @@ class TestAuthenticationIsRequired:
             f"{BASE}/pulumi/pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
             None,
         ),
+        # The checksum database (#2589). `supported` is the one the toolchain asks
+        # FIRST, so an unauthenticated answer there is what would advertise this
+        # cache as an open sumdb relay before any module request is made.
+        "/api/v1/package-cache/go/sumdb/{host}/supported": (
+            "GET",
+            f"{BASE}/go/sumdb/sum.golang.org/supported",
+            None,
+        ),
+        "/api/v1/package-cache/go/sumdb/{host}/{path:path}": (
+            "GET",
+            f"{BASE}/go/sumdb/sum.golang.org/lookup/rsc.io/quote@v1.5.2",
+            None,
+        ),
         "/api/v1/package-cache/go/{module:path}/@v/list": (
             "GET",
             f"{BASE}/go/example.com/m/@v/list",

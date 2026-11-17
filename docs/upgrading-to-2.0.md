@@ -72,6 +72,7 @@ first — most rows do not apply to most deployments.
 | Do this | If | Why it cannot wait |
 |---|---|---|
 | Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
+| [Warm the Go checksum database, or set `sumdb_upstream` empty](#go-module-hashes-are-verified-against-the-checksum-database) | `registry.cache_only: true` **and** any workspace runs a Pulumi program written in Go | the runner verifies module hashes against the checksum database from 2.0, and Terrapod mirrors it — but **a sealed node cannot fill a miss**, so until it is warmed every Go dependency install fails rather than degrading. Warming it needs egress, which is what you no longer have once sealed |
 | [Unseal, re-warm, re-seal](#if-you-run-a-sealed-deployment-registrycache_only-true-read-this-before-upgrading) | `registry.cache_only: true` | artifacts cached before 2.0 are re-fetched once to verify them, and **a miss cannot be filled while sealed** — so between the upgrade and a re-warm, runs needing a cached package fail. Nothing is deleted, so re-warming later recovers everything, but the window is a real outage for those runs |
 | Move automation off the shapes that change: [a `status == "planning"` branch](#a-run-held-after-its-plan-reports-terraform-enterprises-statuses), [`ListRunPolicyEvaluations` and `IsBlocking()`](#policyevaluation-becomes-policycheck-in-the-go-sdk), and [a literal `queued` or `canceling` read from `/api/tfe/v2`](#a-runs-status-on-apitfev2-is-always-one-go-tfe-defines) | you have scripts or Go programs that read a run's status or its policy results | each is silent: a branch that no longer fires, a `switch` that falls through every case. The first two can be tried ahead of time on your current release |
 | [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status), and move bookmarked `status:locked` / `status:unhealthy` filters | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked`, or you share filter URLs | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then |
@@ -132,6 +133,46 @@ Worth saying, because both look like upgrade steps and are not:
   does promise.
 
 ## Breaking changes
+
+### Go module hashes are verified against the checksum database
+
+A run used to set `GOSUMDB=off`. From 2.0 it verifies every module hash against
+the Go checksum database, which **Terrapod now mirrors** — the module-proxy
+protocol carries it under `/sumdb/<host>/`, so it is served from your own cache
+rather than being a second upstream a runner has to reach.
+
+**Why it changed.** The reason for `off` was that the program's own `go.sum` is
+enforced by the `go` command anyway. That is true of a module the program has
+already *pinned* and false of one absent from the file: measured against go1.27.3
+with a cold module cache, `go mod download` with `GOSUMDB=off` and no `go.sum`
+entry exits 0 and **writes the hash of whatever the proxy served**. A run executes
+exactly that command against exactly this cache, so an incomplete `go.sum`
+recorded Terrapod's own bytes as authoritative.
+
+**Most deployments have nothing to do.** An unsealed deployment fetches the
+database through the cache on first use, like any other upstream content.
+
+> **If you run sealed (`registry.cache_only: true`) and any workspace runs a
+> Pulumi program written in Go, warm the checksum database before sealing.** A
+> miss cannot be filled while sealed, so the dependency install fails rather than
+> quietly skipping the check. This is the same shape as the re-warm entry above
+> and is best done in the same window.
+
+To run without it, set the database empty:
+
+```yaml
+api:
+  config:
+    registry:
+      package_cache:
+        go:
+          sumdb_upstream: ""
+```
+
+That restores the pre-2.0 behaviour exactly, including the gap: a module missing
+from `go.sum` is cached and used unverified. The chart renders the runner's
+`GOSUMDB` from this value, so there is one place to set it rather than two that
+can disagree.
 
 ### A weak supplied secret now fails startup, and the KEK has a remedy now
 

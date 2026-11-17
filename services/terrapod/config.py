@@ -175,6 +175,16 @@ class RunnerConfig(BaseSettings):
         description="Listener certificate validity; drives the renewal threshold. "
         "Must match api.config.agent_pools.listener_cert_ttl_seconds.",
     )
+    go_sumdb: str = Field(
+        default="sum.golang.org",
+        description="The Go checksum database the runner verifies module hashes "
+        "against, served through this deployment's own cache rather than reached "
+        "directly. Must match the host of "
+        "api.config.registry.package_cache.go.sumdb_upstream, which is what serves "
+        "it; the chart renders this from that value. Empty means GOSUMDB=off, which "
+        "is what the runner did before #2589 -- a module absent from the program's "
+        "go.sum is then recorded from whatever the proxy served, unverified.",
+    )
     heartbeat_interval: int = Field(default=60, description="Listener heartbeat interval (s).")
     max_concurrent: int = Field(
         default=3,
@@ -1677,6 +1687,35 @@ class NuGetCacheConfig(PackageEcosystemConfig):
     )
 
 
+class GoCacheConfig(PackageEcosystemConfig):
+    """The Go module proxy, plus the checksum database it can mirror.
+
+    The module proxy publishes no per-file digest -- `.ziphash` and `.zip.sha256`
+    are both 404, measured -- so the authoritative hash for a module lives in the
+    checksum database and nowhere else. That used to be a second upstream the
+    runner could not reach, which is why it ran with `GOSUMDB=off`.
+
+    It is mirrorable through this very cache: the module-proxy protocol carries
+    the sumdb under `/sumdb/<host>/...`, and the `go` command asks
+    `/sumdb/<host>/supported` first to find out whether the proxy will serve it.
+    So the database stops being a second upstream and becomes more cached
+    content, which is what lets the check come back on (#2589).
+    """
+
+    sumdb_upstream: str = Field(
+        default="https://sum.golang.org",
+        description="The Go checksum database to mirror. Served through this cache "
+        "under /sumdb/<host>/, so the runner verifies every module hash against the "
+        "transparency log rather than trusting whichever proxy answered -- which "
+        "matters for a module ABSENT from the program's go.sum, where the `go` "
+        "command otherwise records the proxy's bytes as authoritative. "
+        "Set it empty to serve no checksum database: the runner then falls back to "
+        "GOSUMDB=off and a module missing from go.sum is unverified. "
+        "A SEALED deployment must warm the sumdb before sealing -- a miss cannot be "
+        "filled, and the dependency install fails rather than degrading.",
+    )
+
+
 class PackageCacheConfig(BaseModel):
     """Pull-through caching for language package registries (#1417).
 
@@ -1710,8 +1749,8 @@ class PackageCacheConfig(BaseModel):
         "PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES; a `pulumi up` then resolves its plugins "
         "without reaching get.pulumi.com.",
     )
-    go: PackageEcosystemConfig = Field(
-        default_factory=lambda: PackageEcosystemConfig(upstream="https://proxy.golang.org"),
+    go: GoCacheConfig = Field(
+        default_factory=lambda: GoCacheConfig(upstream="https://proxy.golang.org"),
         description="Go module proxy. Point the toolchain at it with GOPROXY; a "
         "`go mod download` then resolves without reaching proxy.golang.org. Serves "
         "Pulumi programs written in Go.",
