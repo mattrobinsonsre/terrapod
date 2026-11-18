@@ -292,11 +292,28 @@ semantics would only be needed in an active-active design, which this is not.
 | Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |
 | Object-store content (state, registry, caches, logs) | Per-class policy — see [Choosing verify or copy](#choosing-verify-or-copy-per-class) |
 | The OIDC issuer signing keys | Replicated — including the private half, see [below](#private-keys-and-the-one-that-does-travel) |
+| **The artifact ledger** | **Replicated — completely, or it means nothing (see below)** |
 | The CA, the encryption keys | **Never** — node-local by design (see below) |
 
 **Settings replication is now complete**: everything a workspace's runs depend on
-carries. What remains is run and artifact *history* — a separate phase. The
-objects those rows name are a different question with its own answer, below.
+carries. What remains is *run* history — a separate phase. Artifact history is no
+longer outstanding: the ledger below carries it. The objects those rows name are
+a different question with its own answer, below.
+
+> **The artifact ledger replicates completely, and partially would be worse than
+> not at all.** It records every artifact a runner was served and who vouched for
+> each of it, so a promoted follower holding only part of it answers "we never
+> served that artifact" when the record was on the old leader. That is a *wrong*
+> answer rather than an absent one, in the one surface whose entire purpose is
+> being trustworthy after an incident — which is why it is not offered as a
+> per-class choice the way object-store content is.
+>
+> It is keyed on the artifact's **digest** rather than on a surrogate id, so that
+> two nodes which each recorded the same artifact converge on one row instead of
+> holding two that never reconcile. Nothing in it is encrypted, deliberately: an
+> SBOM, a publisher identity and a findings list are facts about something the
+> deployment chose to serve, and `crypto_keys` never travels, so a promoted node
+> could not have read them anyway.
 
 Three of the classes above are **gates**, and for a gate the failure mode of
 partial replication is not an error but a silently weaker posture: a mandatory
