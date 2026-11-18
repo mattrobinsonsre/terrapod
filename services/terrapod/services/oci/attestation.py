@@ -257,3 +257,166 @@ async def _fetch_referrers(
     if response.status_code != 200:
         return None
     return response.content
+
+
+#: What the ledger records about how an artifact came to be trusted. The names
+#: are the vocabulary #2589's attestation field uses, so an operator reading a
+#: row and an operator reading a log see the same words.
+ATTEST_UPSTREAM_PUBLISHER = "upstream-publisher"
+ATTEST_NONE_PUBLISHED = "none-published"
+ATTEST_NOT_CONFIGURED = "none-configured"
+
+
+class AttestationRefused(Exception):
+    """An artifact was refused because its attestation was absent or bad.
+
+    Fail-closed: the caller must not store the manifest. Raised for two
+    different situations deliberately kept distinguishable in the message,
+    because they want different responses -- an absent attestation on an
+    upstream configured to require one is a configuration decision biting, and
+    a *present* attestation that does not verify is a supply-chain event.
+    """
+
+
+async def _bundle_bytes(
+    host: str,
+    repository: str,
+    manifest_digest: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> bytes | None:
+    """Fetch the bundle JSON a bundle manifest points at.
+
+    Read wholly into memory rather than streamed, which is the opposite of what
+    `fetch_blob` does for an image layer and is right here: a Sigstore bundle is
+    kilobytes (10,743 bytes for the signature on one of our own images), the
+    verifier needs the whole document at once, and the PVC-tempfile rule exists
+    for things that can realistically reach tens of megabytes.
+    """
+    from terrapod.http_retry import arequest_with_retry
+
+    try:
+        body, _media, _ = await pull.fetch_manifest(
+            host, repository, manifest_digest, client=client
+        )
+    except pull.UpstreamUnavailable:
+        return None
+
+    try:
+        document = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(document, dict) or not _is_bundle_manifest(document):
+        return None
+
+    layer = next(
+        (
+            layer
+            for layer in document.get("layers") or []
+            if isinstance(layer, dict) and layer.get("mediaType") == BUNDLE_ARTIFACT_TYPE
+        ),
+        None,
+    )
+    if layer is None or not isinstance(layer.get("digest"), str):
+        return None
+
+    url = f"{pull._base_url(host)}/v2/{repository}/blobs/{layer['digest']}"
+    auth = pull._auth(host)
+    owns = client is None
+    client = client or httpx.AsyncClient(timeout=30.0, follow_redirects=True, auth=auth)
+    try:
+        response = await arequest_with_retry(
+            client, "GET", url, auth=auth, follow_redirects=True, timeout=30.0
+        )
+    except httpx.HTTPError:
+        return None
+    finally:
+        if owns:
+            await client.aclose()
+
+    return response.content if response.status_code == 200 else None
+
+
+async def attest_before_admission(
+    host: str,
+    repository: str,
+    digest: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> str:
+    """Check an artifact's publisher attestation, returning what to record.
+
+    Called between fetching a manifest and storing it, which is the placement
+    that matters: nothing unverified is written, so a refusal leaves the cache
+    as it was rather than needing to be undone.
+
+    Returns one of `ATTEST_NOT_CONFIGURED`, `ATTEST_NONE_PUBLISHED` or
+    `ATTEST_UPSTREAM_PUBLISHER`. Raises `AttestationRefused` when the artifact
+    must not be admitted.
+
+    The three outcomes are not a severity scale and the middle one is not a
+    failure. An upstream with no expected signer is not being checked, and an
+    upstream that publishes nothing cannot be -- recording which is the whole
+    point, because "we did not check" and "we checked and nobody signed it" are
+    different facts and a single boolean loses both.
+    """
+    from terrapod.config import settings
+    from terrapod.services import sigstore_verification as sigver
+
+    upstream = next(
+        (u for u in settings.registry.oci.upstreams if u.host == host),
+        None,
+    )
+    if upstream is None or not upstream.signer_identity.strip():
+        return ATTEST_NOT_CONFIGURED
+
+    expect = sigver.ExpectedSigner(
+        identity=upstream.signer_identity.strip(),
+        issuer=upstream.signer_issuer.strip(),
+    )
+    bundles = await discover_bundles(host, repository, digest, client=client)
+    if not bundles:
+        if upstream.require_attestation:
+            raise AttestationRefused(
+                f"{host}/{repository}@{digest} publishes no Sigstore attestation, and "
+                f"this upstream is configured to require one from {expect.identity}"
+            )
+        return ATTEST_NONE_PUBLISHED
+
+    digest_hex = digest.split(":", 1)[-1]
+    verified_any = False
+    last_error: str | None = None
+
+    for candidate in bundles:
+        raw = await _bundle_bytes(host, repository, candidate.digest, client=client)
+        if raw is None:
+            continue
+        try:
+            await sigver.verify_attestation(digest_hex=digest_hex, bundle_json=raw, expect=expect)
+        except sigver.TrustRootUnavailable as exc:
+            # Says nothing about the artifact, so it must not read as a bad
+            # one. Refused rather than passed because admitting unverified
+            # content on an upstream an operator asked to verify would be the
+            # quiet failure this whole feature exists to remove.
+            raise AttestationRefused(
+                f"{host}/{repository}@{digest} could not be verified because the "
+                f"Sigstore trust root was unavailable: {exc}"
+            ) from exc
+        except sigver.SigstoreVerificationError as exc:
+            last_error = str(exc)
+            continue
+        verified_any = True
+        break
+
+    if not verified_any:
+        # A bundle was published and none of them verified as the expected
+        # signer. Fail-closed regardless of `require_attestation`: that switch
+        # decides whether an ABSENT attestation is tolerated, never whether a
+        # BAD one is.
+        raise AttestationRefused(
+            f"{host}/{repository}@{digest} publishes {len(bundles)} Sigstore "
+            f"attestation(s) and none verified as {expect.identity} via "
+            f"{expect.issuer}: {last_error or 'no bundle could be fetched'}"
+        )
+
+    return ATTEST_UPSTREAM_PUBLISHER
