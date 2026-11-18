@@ -533,6 +533,13 @@ async def _run_queue_depth_sampler(shutdown: asyncio.Event, interval: int = 15) 
             # Never let a metrics sample take the scheduler down with it.
             logger.warning("Queue depth sample failed", error=str(e))
 
+        # Shared-state VCS gauges, so every replica reports the same value.
+        from terrapod.config import aggregate_statuses_enabled
+        from terrapod.services import vcs_pr_decisions
+
+        if aggregate_statuses_enabled():
+            await vcs_pr_decisions.sample_gauges()
+
         try:
             await asyncio.wait_for(shutdown.wait(), timeout=interval)
             break

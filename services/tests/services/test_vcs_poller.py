@@ -1,6 +1,7 @@
 """Tests for VCS poller — subdirectory filtering and VCS error tracking."""
 
 import asyncio
+import contextlib
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -8,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest  # noqa: F401  # used by tests appended later via @pytest.mark.asyncio
 
+from terrapod.services.vcs_pr_decisions import repo_scope
 from terrapod.services.vcs_provider import OpenPullRequests
 
 
@@ -626,7 +628,9 @@ class TestPollCycleParallel:
         max_in_flight: list[int] = [0]
         entered = 0
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
+        async def fake_owned_poll(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
             import asyncio as _a
 
             nonlocal entered
@@ -703,7 +707,9 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
+        async def fake_owned_poll(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
             polled.append(ws_id)
 
         with (
@@ -753,7 +759,9 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
+        async def fake_owned_poll(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
             polled.append(ws_id)
 
         with (
@@ -802,7 +810,9 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
+        async def fake_owned_poll(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
             polled.append(ws_id)
 
         with (
@@ -2191,3 +2201,486 @@ class TestForkPullRequestsDoNotPlanByDefault:
         mock_create.return_value = MagicMock(id=uuid.uuid4())
         await self._cycle(_mock_workspace(), self._pr(from_fork=True))
         mock_session.assert_not_called()
+
+
+class TestThePollRecordsWhichWorkspacesEachPRAffects:
+    """Every path through the PR loop leaves a decision for the aggregate statuses.
+
+    Driven with the real collector: an optional `decisions` parameter makes the
+    bypass the default, so the paths below are exercised with it supplied.
+    """
+
+    def _pr(self, *, from_fork=False, number=21, sha="abc123"):
+        pr = MagicMock()
+        pr.number, pr.head_sha = number, sha
+        pr.head_ref, pr.title = "feature", "a change"
+        pr.from_fork = from_fork
+        pr.base_ref = "main"
+        return pr
+
+    def _db(self, *, existing=None):
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = existing
+        result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(return_value=result)
+        return db
+
+    async def _poll(self, ws, pr, *, db=None, create=None, remembered=False, changed=None):
+        from terrapod.services.vcs_poller import _poll_workspace_prs
+        from terrapod.services.vcs_pr_decisions import PRDecisions
+
+        conn = _mock_connection()
+        conn.id = uuid.uuid4()
+        decisions = PRDecisions()
+        with (
+            patch(
+                "terrapod.services.vcs_poller._list_all_open_prs",
+                new=AsyncMock(return_value=_listing([pr])),
+            ),
+            patch(
+                "terrapod.services.vcs_poller._pr_decision_is_remembered",
+                new=AsyncMock(return_value=remembered),
+            ),
+            patch(
+                "terrapod.services.vcs_poller._get_changed_files",
+                new=AsyncMock(return_value=changed),
+            ),
+            patch("terrapod.services.vcs_poller._create_vcs_run", new=create or AsyncMock()),
+            patch("terrapod.services.vcs_poller._remember_pr_decision", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller._upsert_pr_session", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller.enqueue_trigger", new=AsyncMock()),
+        ):
+            await _poll_workspace_prs(
+                db or self._db(), ws, conn, "org", "repo", "main", decisions=decisions
+            )
+        got = decisions.records_for(repo_scope(conn, "org/repo"), pr.number, pr.head_sha)
+        return decisions, conn, got.get(ws.id)
+
+    async def test_a_fork_skip_is_recorded(self):
+        ws = _mock_workspace()
+        _, _, d = await self._poll(ws, self._pr(from_fork=True))
+        assert d.outcome == "fork_skipped"
+
+    async def test_an_existing_run_is_affected(self):
+        ws = _mock_workspace()
+        _, _, d = await self._poll(ws, self._pr(), db=self._db(existing=MagicMock()))
+        assert d.outcome == "affected"
+
+    async def test_a_remembered_prefix_skip_is_not_affected(self):
+        ws = _mock_workspace(trigger_prefixes=["terraform/a"])
+        _, _, d = await self._poll(ws, self._pr(), remembered=True)
+        assert d.outcome == "not_affected"
+
+    async def test_a_fresh_prefix_skip_is_not_affected(self):
+        ws = _mock_workspace(trigger_prefixes=["terraform/a"])
+        _, _, d = await self._poll(ws, self._pr(), changed=["frontend/app.tsx"])
+        assert d.outcome == "not_affected"
+
+    async def test_a_truncated_change_list_creates_a_run_so_it_is_affected(self):
+        ws = _mock_workspace(trigger_prefixes=["terraform/a"])
+        create = AsyncMock(return_value=MagicMock(id=uuid.uuid4()))
+        _, _, d = await self._poll(ws, self._pr(), create=create, changed=None)
+        assert d.outcome == "affected"
+        create.assert_awaited_once()
+
+    async def test_a_created_run_is_affected(self):
+        ws = _mock_workspace()
+        create = AsyncMock(return_value=MagicMock(id=uuid.uuid4()))
+        _, _, d = await self._poll(ws, self._pr(), create=create)
+        assert d.outcome == "affected"
+
+    async def test_a_run_that_could_not_be_created_is_undecided(self):
+        ws = _mock_workspace()
+        _, _, d = await self._poll(ws, self._pr(), create=AsyncMock(return_value=None))
+        assert d.outcome == "undecided"
+        assert d.reason
+
+    async def test_a_workspace_declaring_no_plan_apply_operation_is_not_affected(self):
+        ws = _mock_workspace(plan_apply_enabled=False)
+        _, _, d = await self._poll(ws, self._pr(), create=AsyncMock(return_value=None))
+        assert d.outcome == "not_affected"
+
+    async def test_a_missing_configure_declaration_stays_undecided(self):
+        ws = _mock_workspace(configure_after_apply=True, configure_enabled=False)
+        ws.vcs_workflow = "apply_then_merge"
+        _, _, d = await self._poll(ws, self._pr(), create=AsyncMock(return_value=None))
+        assert d.outcome == "undecided"
+
+    async def test_the_workflow_mode_is_carried_for_every_outcome(self):
+        ws = _mock_workspace()
+        ws.vcs_workflow = "apply_then_merge"
+        _, _, d = await self._poll(ws, self._pr(from_fork=True))
+        assert d.mode == "apply_then_merge"
+
+    async def test_a_loop_that_finishes_is_marked_completed(self):
+        ws = _mock_workspace()
+        decisions, conn, _ = await self._poll(ws, self._pr(), create=AsyncMock(return_value=None))
+        assert ws.id in decisions.completed_for(repo_scope(conn, "org/repo"))
+
+    async def test_a_loop_that_raises_is_not_marked_completed(self):
+        ws = _mock_workspace()
+        boom = AsyncMock(side_effect=RuntimeError("archive exploded"))
+        from terrapod.services.vcs_poller import _poll_workspace_prs
+        from terrapod.services.vcs_pr_decisions import PRDecisions
+
+        conn = _mock_connection()
+        conn.id = uuid.uuid4()
+        decisions = PRDecisions()
+        with (
+            patch(
+                "terrapod.services.vcs_poller._list_all_open_prs",
+                new=AsyncMock(return_value=_listing([self._pr()])),
+            ),
+            patch("terrapod.services.vcs_poller._create_vcs_run", new=boom),
+        ):
+            with pytest.raises(RuntimeError):
+                await _poll_workspace_prs(
+                    self._db(), ws, conn, "org", "repo", "main", decisions=decisions
+                )
+        scope = repo_scope(conn, "org/repo")
+        assert ws.id not in decisions.completed_for(scope)
+        assert decisions.records_for(scope, 21, "abc123") == {}
+
+    async def test_omitting_the_collector_changes_nothing(self):
+        from terrapod.services.vcs_poller import _poll_workspace_prs
+
+        ws = _mock_workspace()
+        create = AsyncMock(return_value=MagicMock(id=uuid.uuid4()))
+        with (
+            patch(
+                "terrapod.services.vcs_poller._list_all_open_prs",
+                new=AsyncMock(return_value=_listing([self._pr()])),
+            ),
+            patch("terrapod.services.vcs_poller._create_vcs_run", new=create),
+            patch("terrapod.services.vcs_poller._upsert_pr_session", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller.enqueue_trigger", new=AsyncMock()),
+        ):
+            await _poll_workspace_prs(self._db(), ws, _mock_connection(), "org", "repo", "main")
+        create.assert_awaited_once()
+
+
+class TestBothEntryPointsThreadTheCollector:
+    """`poll_cycle` and `handle_immediate_poll` each hand every workspace poll
+    a real collector, and persist what it gathered afterwards."""
+
+    def _mock_db_ctx(self, rows=None):
+        db = AsyncMock()
+        select_result = MagicMock()
+        select_result.all = MagicMock(return_value=rows or [])
+        db.execute = AsyncMock(return_value=select_result)
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=db)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        return ctx
+
+    async def _run(self, entry, *args):
+        from terrapod.services.vcs_pr_decisions import PRDecisions
+
+        seen: list = []
+        stored: list = []
+
+        async def fake_owned(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
+            seen.append(decisions)
+
+        async def fake_store(decisions, member_check=None):
+            stored.append(decisions)
+            return {}
+
+        ws_id = uuid.uuid4()
+        with (
+            patch("terrapod.services.vcs_poller.get_db_session", return_value=self._mock_db_ctx()),
+            patch(
+                "terrapod.services.vcs_poller._select_workspace_ids",
+                new=AsyncMock(return_value=[ws_id]),
+            ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions",
+                new=AsyncMock(return_value={}),
+            ),
+            patch("terrapod.services.vcs_poller._poll_autodiscovery", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller._poll_workspace_owned", new=fake_owned),
+            patch("terrapod.services.vcs_poller.store_pr_evaluations", new=fake_store),
+        ):
+            await entry(*args)
+        assert len(seen) == 1 and isinstance(seen[0], PRDecisions)
+        assert stored == [seen[0]]
+
+    async def test_poll_cycle(self):
+        from terrapod.services.vcs_poller import poll_cycle
+
+        await self._run(poll_cycle)
+
+    async def test_handle_immediate_poll(self):
+        from terrapod.services.vcs_poller import handle_immediate_poll
+
+        await self._run(handle_immediate_poll, {"repo": "org/repo", "provider": "github"})
+
+    @pytest.mark.parametrize("entry", ["poll_cycle", "handle_immediate_poll"])
+    async def test_switched_off_nothing_is_recorded_registered_or_marked(self, entry):
+        from terrapod.config import settings
+        from terrapod.services import vcs_poller
+
+        seen: list = []
+
+        async def fake_owned(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
+            seen.append(decisions)
+
+        guarded = {
+            name: AsyncMock()
+            for name in (
+                "_register_candidates",
+                "_report_disabled_candidates",
+                "_store_pr_decisions",
+                "mark_unverified",
+                "clear_unverified",
+            )
+        }
+        args = (
+            ({"repo": "org/repo", "provider": "github"},)
+            if entry == "handle_immediate_poll"
+            else ()
+        )
+        cfg = settings.vcs.commit_statuses
+        cfg.enabled = False
+        try:
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(
+                    patch(
+                        "terrapod.services.vcs_poller.get_db_session",
+                        return_value=self._mock_db_ctx(),
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "terrapod.services.vcs_poller._select_workspace_ids",
+                        new=AsyncMock(return_value=[uuid.uuid4()]),
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "terrapod.services.vcs_poller._compute_paths_unions",
+                        new=AsyncMock(return_value={}),
+                    )
+                )
+                stack.enter_context(
+                    patch("terrapod.services.vcs_poller._poll_autodiscovery", new=AsyncMock())
+                )
+                stack.enter_context(
+                    patch("terrapod.services.vcs_poller._poll_workspace_owned", new=fake_owned)
+                )
+                for name, mock in guarded.items():
+                    stack.enter_context(patch(f"terrapod.services.vcs_poller.{name}", new=mock))
+                await getattr(vcs_poller, entry)(*args)
+        finally:
+            cfg.enabled = True
+        assert seen == [None]
+        for mock in guarded.values():
+            mock.assert_not_called()
+
+    async def test_a_failure_persisting_does_not_fail_the_cycle(self):
+        from terrapod.services.vcs_poller import poll_cycle
+
+        async def fake_owned(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
+            return None
+
+        with (
+            patch("terrapod.services.vcs_poller.get_db_session", return_value=self._mock_db_ctx()),
+            patch(
+                "terrapod.services.vcs_poller._select_workspace_ids",
+                new=AsyncMock(return_value=[uuid.uuid4()]),
+            ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions",
+                new=AsyncMock(return_value={}),
+            ),
+            patch("terrapod.services.vcs_poller._poll_autodiscovery", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller._poll_workspace_owned", new=fake_owned),
+            patch(
+                "terrapod.services.vcs_poller.store_pr_evaluations",
+                new=AsyncMock(side_effect=RuntimeError("redis on fire")),
+            ),
+        ):
+            await poll_cycle()
+
+
+class TestCandidatesAreRegisteredBeforeAnyWorkspaceIsPolled:
+    """A workspace that fails before its own poll starts must still be counted."""
+
+    def _rows(self, *specs):
+        rows = []
+        for name, status, url in specs:
+            conn = _mock_connection()
+            conn.id, conn.status = uuid.uuid4(), status
+            rows.append((uuid.uuid4(), name, "apply_then_merge", url, conn))
+        return rows
+
+    def _db(self, rows):
+        db = AsyncMock()
+        result = MagicMock()
+        result.all = MagicMock(return_value=rows)
+        db.execute = AsyncMock(return_value=result)
+        return db
+
+    async def test_an_active_parseable_workspace_is_a_candidate_with_its_mode(self):
+        from terrapod.services.vcs_poller import _register_candidates
+        from terrapod.services.vcs_pr_decisions import PRDecisions
+
+        rows = self._rows(("a", "active", "https://github.com/Org/Repo"))
+        dec = PRDecisions()
+        assert await _register_candidates(self._db(rows), [rows[0][0]], dec) is True
+        (scope,) = dec.scopes()
+        assert scope == repo_scope(rows[0][4], "org/repo")
+        assert dec.polled_for(scope)[rows[0][0]] == ("a", "apply_then_merge", str(rows[0][4].id))
+
+    async def test_an_inactive_connection_still_counts_but_an_unparseable_url_cannot(self):
+        from terrapod.services.vcs_poller import _register_candidates
+        from terrapod.services.vcs_pr_decisions import PRDecisions
+
+        rows = self._rows(
+            ("off", "disabled", "https://github.com/org/repo"),
+            ("junk", "active", "not a url"),
+            ("none", "active", ""),
+        )
+        dec = PRDecisions()
+        assert await _register_candidates(self._db(rows), [r[0] for r in rows], dec) is True
+        (scope,) = dec.scopes()
+        assert list(dec.polled_for(scope)) == [rows[0][0]]
+
+    async def test_a_failure_reports_false(self):
+        from terrapod.services.vcs_poller import _register_candidates
+        from terrapod.services.vcs_pr_decisions import PRDecisions
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db down"))
+        assert await _register_candidates(db, [uuid.uuid4()], PRDecisions()) is False
+
+    async def test_nothing_is_stored_when_registration_failed(self):
+        from terrapod.services.vcs_poller import poll_cycle
+
+        db = AsyncMock()
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=db)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        store = AsyncMock()
+
+        async def fake_owned(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
+            return None
+
+        with (
+            patch("terrapod.services.vcs_poller.get_db_session", return_value=ctx),
+            patch(
+                "terrapod.services.vcs_poller._select_workspace_ids",
+                new=AsyncMock(return_value=[uuid.uuid4()]),
+            ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions",
+                new=AsyncMock(return_value={}),
+            ),
+            patch(
+                "terrapod.services.vcs_poller._register_candidates",
+                new=AsyncMock(return_value=False),
+            ),
+            patch("terrapod.services.vcs_poller._poll_autodiscovery", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller._poll_workspace_owned", new=fake_owned),
+            patch("terrapod.services.vcs_poller.store_pr_evaluations", new=store),
+        ):
+            await poll_cycle()
+        store.assert_not_awaited()
+
+
+class TestAFailedRegistrationIsVisible:
+    async def test_the_failure_is_named_counted_and_gauged(self):
+        from terrapod.services.vcs_poller import _register_candidates
+        from terrapod.services.vcs_pr_decisions import PRDecisions
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db pool exhausted"))
+        with (
+            patch("terrapod.services.vcs_poller.VCS_CANDIDATE_REGISTRATION_FAILURES") as counter,
+            patch("terrapod.services.vcs_poller.logger") as log,
+        ):
+            assert (
+                await _register_candidates(db, [uuid.uuid4()], PRDecisions(), entry="cycle")
+                is False
+            )
+        counter.labels.assert_called_once_with(entry="cycle")
+        counter.labels.return_value.inc.assert_called_once()
+        message = str(log.warning.call_args)
+        assert "db pool exhausted" in message and "RuntimeError" in message
+
+    async def test_the_unverified_gauge_follows_the_marker(self):
+        from terrapod.services import vcs_pr_decisions as d
+
+        class _R:
+            def __init__(self):
+                self.v = {}
+
+            async def set(self, key, value, ex=None):
+                self.v[key] = value
+
+            async def delete(self, key):
+                self.v.pop(key, None)
+
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=_R()),
+            patch.object(d, "VCS_PR_RECORDS_UNVERIFIED") as gauge,
+        ):
+            await d.mark_unverified()
+            gauge.set.assert_called_with(1)
+            await d.clear_unverified()
+            gauge.set.assert_called_with(0)
+
+    async def test_the_cycle_reports_the_workspaces_on_disabled_connections_once(self):
+        from terrapod.services.vcs_poller import poll_cycle
+
+        db = AsyncMock()
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=db)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+
+        async def register(db_, ids, decisions, entry="cycle"):
+            decisions.polled(
+                SimpleNamespace(id=uuid.uuid4(), name="w", vcs_workflow=""),
+                SimpleNamespace(
+                    id=uuid.uuid4(), provider="github", server_url="", status="disabled"
+                ),
+                "org/repo",
+            )
+            return True
+
+        async def fake_owned(
+            ws_id, semaphore, cache=None, meta=None, paths_unions=None, *, decisions=None
+        ):
+            return None
+
+        with (
+            patch("terrapod.services.vcs_poller.get_db_session", return_value=ctx),
+            patch(
+                "terrapod.services.vcs_poller._select_workspace_ids",
+                new=AsyncMock(return_value=[uuid.uuid4()]),
+            ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions", new=AsyncMock(return_value={})
+            ),
+            patch("terrapod.services.vcs_poller._register_candidates", new=register),
+            patch("terrapod.services.vcs_poller._poll_autodiscovery", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller._poll_workspace_owned", new=fake_owned),
+            patch(
+                "terrapod.services.vcs_poller.store_pr_evaluations", new=AsyncMock(return_value={})
+            ),
+            patch("terrapod.services.vcs_poller.clear_unverified", new=AsyncMock()),
+            patch("terrapod.services.vcs_poller.record_disabled_count", new=AsyncMock()) as gauge,
+            patch("terrapod.services.vcs_poller.logger") as log,
+        ):
+            await poll_cycle()
+        gauge.assert_awaited_once_with(1)
+        assert any("disabled" in str(c) for c in log.warning.call_args_list)
