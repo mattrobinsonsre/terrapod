@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services.run_service import MODULE_IMPACT_POLLER_CREATED_BY
-from terrapod.services.vcs_status_comment import _plan_summary
+from terrapod.services.vcs_status_comment import GateVerdict, _plan_summary
 
 
 class _FakeRun:
@@ -295,6 +295,25 @@ class TestRunTaskStageVerdict:
         for status in ("pending", "running"):
             v = _verdict_from_stage(status)
             assert v is not None and v.passed is False
+            assert v.pending is True
+
+    def test_failed_stage_is_not_pending(self):
+        from terrapod.services.vcs_status_comment import _verdict_from_stage
+
+        assert _verdict_from_stage("failed").pending is False
+
+    def test_boundary_and_finality_follow_the_stage(self):
+        from terrapod.services.vcs_status_comment import _verdict_from_stage
+
+        post = _verdict_from_stage("failed", "post_plan")
+        assert (post.boundary, post.final) == ("post_plan", False)
+        for stage in ("pre_plan", "pre_apply"):
+            v = _verdict_from_stage("failed", stage)
+            assert (v.boundary, v.final) == (stage, True)
+
+    def test_existing_verdicts_keep_default_new_fields(self):
+        v = GateVerdict("policy", "p", True, "mandatory")
+        assert (v.pending, v.final, v.boundary) == (False, False, "")
 
 
 class TestCostDelta:
@@ -468,6 +487,14 @@ class TestTheAIPolicyGateAppearsInTheComment:
         assert len(ai) == 1
         assert ai[0].passed is False
         assert "awaiting verdict" in ai[0].name
+        assert ai[0].pending is True
+
+    async def test_a_failed_verdict_is_not_pending(self):
+        gates = await _gates_with_ai(
+            enforcement="mandatory", row=SimpleNamespace(outcome="failed"), held=True
+        )
+        ai = [g for g in gates if g.gate == "ai-policy"]
+        assert ai[0].pending is False
 
     async def test_a_passing_verdict_is_listed_as_an_attestation(self):
         gates = await _gates_with_ai(

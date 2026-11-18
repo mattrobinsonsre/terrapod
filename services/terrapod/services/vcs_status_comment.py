@@ -39,7 +39,13 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, run_links, vcs_provider
+from terrapod.services import (
+    github_service,
+    gitlab_service,
+    run_links,
+    run_task_service,
+    vcs_provider,
+)
 from terrapod.services.run_service import MODULE_IMPACT_POLLER_CREATED_BY
 from terrapod.services.scheduler import enqueue_trigger
 
@@ -119,6 +125,12 @@ class GateVerdict:
     name: str
     passed: bool
     enforcement: str
+    #: Not yet ruled (a run-task stage pending/running; the AI gate awaiting a verdict).
+    pending: bool = False
+    #: A failure no override can release (a stage outside `OVERRIDABLE_STAGES`).
+    final: bool = False
+    #: The run-task boundary (`pre_plan`/`post_plan`/`pre_apply`); empty elsewhere.
+    boundary: str = ""
 
 
 @dataclass(frozen=True)
@@ -263,6 +275,7 @@ _SCAN_PASS_OUTCOMES = frozenset({"passed"})
 #: A task stage that reached `passed` or was `overridden` releases the run;
 #: `pending` and `running` still hold it, which is why they are not passes.
 _STAGE_PASS_STATUSES = frozenset({"passed", "overridden"})
+_STAGE_PENDING_STATUSES = frozenset({"pending", "running"})
 
 
 def _verdict_from_scan(
@@ -297,7 +310,7 @@ def _verdict_from_ai_policy(row: Any | None, enforcement: str, *, held: bool) ->
     name = "AI policy gate"
     if row is None:
         name = "AI policy gate (awaiting verdict)"
-    return GateVerdict("ai-policy", name, not held, "mandatory")
+    return GateVerdict("ai-policy", name, not held, "mandatory", pending=row is None)
 
 
 # The three boundaries run tasks fire at (#1837), in the order a run meets
@@ -323,10 +336,13 @@ def _verdict_from_stage(status: str, stage: str = "post_plan") -> GateVerdict:
         _STAGE_LABELS.get(stage, stage),
         status in _STAGE_PASS_STATUSES,
         "mandatory",
+        pending=status in _STAGE_PENDING_STATUSES,
+        final=stage not in run_task_service.OVERRIDABLE_STAGES,
+        boundary=stage,
     )
 
 
-async def _collect_gates(db, run: Run) -> tuple[GateVerdict, ...]:
+async def _collect_gates(db, run: Run, cache: dict | None = None) -> tuple[GateVerdict, ...]:
     """Every gate that could hold this run, in `post_plan_hold` evaluation order.
 
     Run task, then policy, then security scan, then the AI policy gate — the
