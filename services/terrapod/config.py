@@ -1609,6 +1609,56 @@ class OCIUpstreamConfig(BaseModel):
         "unset for anonymous pulls, which is the usual case for public registries.",
     )
 
+    signer_identity: str = Field(
+        default="",
+        description="Who must have signed content from this upstream, as it appears in "
+        "the Sigstore certificate's subject -- for a GitHub Actions publisher that is the "
+        "workflow ref, e.g. "
+        "'https://github.com/org/repo/.github/workflows/release.yml@refs/tags/v1.2.3'. "
+        "Empty means no expectation is checked, which is the default because most "
+        "registries publish nothing to check. Setting it without signer_issuer is "
+        "refused: an identity alone is satisfied by anyone who can obtain a certificate "
+        "naming it from any OIDC provider, so the pair is the control and either half "
+        "alone is not.",
+    )
+    signer_issuer: str = Field(
+        default="",
+        description="The OIDC issuer that vouched for signer_identity, e.g. "
+        "'https://token.actions.githubusercontent.com'. Required whenever "
+        "signer_identity is set, and refused on its own.",
+    )
+    require_attestation: bool = Field(
+        default=False,
+        description="Refuse content from this upstream that carries no verifiable "
+        "Sigstore attestation. Off by default deliberately: most container content in "
+        "the world is unsigned, so turning this on globally would stop a mirror working "
+        "rather than make it safer. With it off an unsigned artifact is still mirrored "
+        "and recorded as having no publisher attestation, which is the honest answer; "
+        "with it on, a missing or unverifiable attestation fails the pull closed. Needs "
+        "signer_identity and signer_issuer, since there is nothing to require otherwise.",
+    )
+
+    @model_validator(mode="after")
+    def _signer_is_a_pair(self) -> "OCIUpstreamConfig":
+        """An identity without an issuer is not a weaker control; it is none.
+
+        Refused at config time rather than at verification time so the operator
+        learns at startup, when they can fix it, instead of on a pull.
+        """
+        if bool(self.signer_identity.strip()) != bool(self.signer_issuer.strip()):
+            raise ValueError(
+                f"upstream {self.host!r}: signer_identity and signer_issuer must be set "
+                "together -- an identity alone is satisfied by any OIDC provider that "
+                "will name it, so half the pair is not half the control"
+            )
+        if self.require_attestation and not self.signer_identity.strip():
+            raise ValueError(
+                f"upstream {self.host!r}: require_attestation needs signer_identity and "
+                "signer_issuer, because without an expected signer there is nothing to "
+                "require beyond 'somebody signed something'"
+            )
+        return self
+
     @property
     def password_env_var(self) -> str:
         """Name of the environment variable carrying this upstream's password.

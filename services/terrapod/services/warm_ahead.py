@@ -447,7 +447,12 @@ async def _warm_oci(
     Manifest-only would be worse than useless: it would look cached and fail on
     the first layer a sealed node tried to serve.
     """
-    from terrapod.services.oci import pullthrough_service, registry_service, upload_service
+    from terrapod.services.oci import (
+        attestation,
+        pullthrough_service,
+        registry_service,
+        upload_service,
+    )
     from terrapod.services.oci.names import parse_digest
     from terrapod.storage import keys as storage_keys
 
@@ -469,6 +474,17 @@ async def _warm_oci(
 
     body, media_type, digest = await pullthrough_service.fetch_manifest(
         host, upstream_repo, reference
+    )
+    # The same gate as the pull-through route, from the same producer rather
+    # than a second copy of the rule -- a warm that admitted what a pull would
+    # refuse would be a way around the control (#2589). Before storing, so a
+    # refusal leaves the cache untouched.
+    attested = await attestation.attest_before_admission(host, upstream_repo, digest)
+    logger.info(
+        "Warmed an OCI manifest",
+        repository=item.name,
+        digest=digest,
+        attestation=attested,
     )
     manifest = await registry_service.store_manifest(
         db, storage, repository, digest, media_type, body

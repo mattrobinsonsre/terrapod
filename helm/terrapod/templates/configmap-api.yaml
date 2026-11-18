@@ -381,6 +381,15 @@ data:
             {{- if .username }}
             username: {{ .username | quote }}
             {{- end }}
+            {{- if .signer_identity }}
+            signer_identity: {{ .signer_identity | quote }}
+            {{- end }}
+            {{- if .signer_issuer }}
+            signer_issuer: {{ .signer_issuer | quote }}
+            {{- end }}
+            {{- if .require_attestation }}
+            require_attestation: true
+            {{- end }}
           {{- end }}
         {{- end }}
       {{- end }}
