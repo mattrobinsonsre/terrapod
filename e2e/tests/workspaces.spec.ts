@@ -770,6 +770,15 @@ test.describe("Workspaces", () => {
     expect(seen[0]).toContain("(2)");
     expect(posts, "declining the confirm must send nothing").toEqual([]);
 
+    // Enter on an item hands focus back to the trigger before the confirm opens.
+    const trigger = page.getByTestId("ws-selection");
+    await trigger.click();
+    await page.getByTestId("ws-selection-apply").focus();
+    page.once("dialog", (d) => void d.dismiss());
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("ws-selection-menu")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+
     // Accepting sends one call per workspace, to the existing endpoint.
     page.once("dialog", (d) => void d.accept());
     await page.getByTestId("ws-selection").click();
