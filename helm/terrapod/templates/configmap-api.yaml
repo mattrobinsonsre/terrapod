@@ -700,6 +700,14 @@ data:
       {{- if hasKey .Values.api.config.vcs "require_connection_authorization" }}
       require_connection_authorization: {{ .Values.api.config.vcs.require_connection_authorization }}
       {{- end }}
+      {{/* dig, not `with` or `| default`: enabled and per_workspace default true and
+           `false` is the value an operator sets, which both of those would discard. */}}
+      commit_statuses:
+        enabled: {{ dig "commit_statuses" "enabled" true .Values.api.config.vcs }}
+        plan_name: {{ dig "commit_statuses" "plan_name" "terrapod/plan" .Values.api.config.vcs | quote }}
+        policy_name: {{ dig "commit_statuses" "policy_name" "terrapod/policy" .Values.api.config.vcs | quote }}
+        apply_name: {{ dig "commit_statuses" "apply_name" "terrapod/apply" .Values.api.config.vcs | quote }}
+        per_workspace: {{ dig "commit_statuses" "per_workspace" true .Values.api.config.vcs }}
       # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
       # streamed tarballs onto the PVC, not pod memory. Override
       # api.config.vcs.tmpdir if you remount the PVC elsewhere.

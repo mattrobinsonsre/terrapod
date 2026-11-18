@@ -1249,6 +1249,18 @@ api:
       # authorized. The check fails closed: a command whose author cannot be
       # established is refused, with a reply on the PR saying so.
       require_push_permission_for_commands: true
+      # Aggregate statuses on every open PR, so branch protection can require a stable
+      # name. Require `plan` and `policy`, never `apply`: it would block its own apply.
+      commit_statuses:
+        # false posts no aggregate status and runs nothing that serves them: with
+        # per_workspace left true that is the behaviour before the aggregates existed.
+        enabled: true
+        plan_name: "terrapod/plan"
+        policy_name: "terrapod/policy"
+        apply_name: "terrapod/apply"
+        # Also post a `terrapod/<workspace>` status per pull-request run. Branch
+        # runs and module pull requests keep theirs either way.
+        per_workspace: true
       github:
         # Optional: K8s Secret containing the webhook HMAC secret.
         # Only needed if GitHub webhooks are enabled for faster feedback.
