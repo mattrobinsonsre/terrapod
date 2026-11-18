@@ -121,6 +121,64 @@ uppercased, with non-alphanumeric characters replaced by underscores).
 `registry.cache_only` seals upstream fetching across every Terrapod cache
 including this one, and takes precedence over anything listed here.
 
+### Verifying who published what you mirror
+
+An upstream may declare who must have signed its content, checked against the
+[Sigstore](https://www.sigstore.dev/) attestation that publisher published:
+
+```yaml
+api:
+  config:
+    registry:
+      oci:
+        upstreams:
+          - host: ghcr.io
+            signer_identity: https://github.com/org/repo/.github/workflows/release.yml@refs/tags/v1.2.3
+            signer_issuer: https://token.actions.githubusercontent.com
+            require_attestation: true
+```
+
+`signer_identity` is the identity in the signing certificate's subject — for a
+GitHub Actions publisher that is the workflow ref. `signer_issuer` is the OIDC
+issuer that vouched for it.
+
+**They are set together or not at all, and the chart refuses one without the
+other.** An identity on its own is satisfied by anyone who can obtain a
+certificate naming it from any OIDC provider, so half the pair is not half the
+control — it is none of it.
+
+Verification happens on a **cache miss, before the manifest is stored**, so a
+refusal leaves the cache exactly as it was and no unverified bytes are ever
+servable. Three outcomes are recorded:
+
+| outcome | meaning |
+|---|---|
+| `none-configured` | this upstream names no expected signer, so nothing was checked |
+| `none-published` | it names one, and the artifact carries no attestation |
+| `upstream-publisher` | an attestation verified as that signer |
+
+The middle one is not a failure. Most container content in the world is
+unsigned, so `require_attestation` defaults to **off** and an unsigned artifact
+is mirrored with the absence recorded — "we did not check" and "we checked and
+nobody signed it" are different facts, and only recording both lets you tell
+them apart later.
+
+`require_attestation: true` refuses content from that upstream which carries no
+verifiable attestation. Turn it on per upstream, for a publisher you know signs.
+
+**A bad attestation always fails, whatever that switch says.** It governs
+whether a *missing* attestation is tolerated, never whether a *broken* one is:
+an artifact that publishes a signature which does not verify as the expected
+signer is refused either way, because that is the case worth catching. An
+unreachable Sigstore trust root is also a refusal, reported as such rather than
+as a bad artifact — on an upstream you asked to verify, admitting content
+unverified would be the silent pass this exists to remove.
+
+Nothing extra is needed for a sealed deployment. The trust root is fetched in
+the same breath as the artifact, and in a sealed deployment a miss is refused
+rather than fetched, so there is no moment at which verification needs an
+upstream the artifact did not.
+
 ### When the upstream's API is not on its own hostname
 
 `host` does two jobs at once: it is the first path component clients name,
