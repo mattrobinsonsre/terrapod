@@ -106,11 +106,20 @@ class TestAnUploadedBinaryIsRecordedAsOne:
         assert record.download_url == ""
 
     async def test_the_bytes_land_where_the_serve_path_looks(self, binary_file) -> None:
-        await _admit(binary_file(VETTED))
+        record, _, _ = await _admit(binary_file(VETTED))
         storage = get_storage()
-        key = keys.binary_cache_key(TOOL, VERSION, OS_, ARCH)
-        stored = b"".join([chunk async for chunk in storage.get_stream(key)])
+        # Where the serve path looks is the row's recorded key, not a derived
+        # one: an upload lives under `uploads/` so replication can tier it as
+        # irreplaceable rather than as a re-warmable cache (#2599).
+        assert record.storage_key == keys.uploaded_binary_key(TOOL, VERSION, OS_, ARCH)
+        stored = b"".join([chunk async for chunk in storage.get_stream(record.storage_key)])
         assert hashlib.sha256(stored).hexdigest() == VETTED_SHA
+        # And deriving would aim at a different object: on a node that had
+        # already pulled this binary, the derived key still holds the OLD
+        # upstream bytes. This assertion is what caught the derived form -- it
+        # passed locally on bytes an earlier run had left at that key, and
+        # failed in CI against a clean store.
+        assert record.storage_key != keys.binary_cache_key(TOOL, VERSION, OS_, ARCH)
 
     async def test_the_reference_is_stored_and_never_interpreted(self, binary_file) -> None:
         record, _, _ = await _admit(binary_file(VETTED), reference="CHG-4471 / approved by sec")

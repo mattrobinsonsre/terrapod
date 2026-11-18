@@ -36,10 +36,10 @@ from terrapod.db.models import (
     Workspace,
 )
 from terrapod.logging_config import get_logger
+from terrapod.services.cache_object_keys import binary_storage_key, provider_storage_key
 from terrapod.services.run_service import TERMINAL_STATES
 from terrapod.storage.keys import (
     apply_log_key,
-    binary_cache_key,
     config_version_key,
     configure_log_key,
     cost_estimate_key,
@@ -51,7 +51,6 @@ from terrapod.storage.keys import (
     plan_json_output_key,
     plan_log_key,
     plan_output_key,
-    provider_cache_key,
     resolved_inventory_key,
     state_key,
 )
@@ -563,13 +562,11 @@ async def _cleanup_provider_cache(
 
     for entry in entries:
         try:
-            key = provider_cache_key(
-                entry.hostname,
-                entry.namespace,
-                entry.type,
-                entry.version,
-                entry.filename,
-            )
+            # The recorded key, not the derived one: an uploaded artifact
+            # lives under `uploads/` and deriving would aim the delete at a
+            # `cache/` key holding nothing -- which reaps the row, reports
+            # success, and leaves the object for ever (#2599).
+            key = provider_storage_key(entry)
             await storage.delete(key)
         except Exception:
             logger.warning(
@@ -606,7 +603,7 @@ async def _cleanup_binary_cache(
 
     for entry in entries:
         try:
-            key = binary_cache_key(entry.tool, entry.version, entry.os, entry.arch)
+            key = binary_storage_key(entry)
             await storage.delete(key)
         except Exception:
             logger.warning(

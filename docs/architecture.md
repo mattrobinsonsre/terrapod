@@ -193,6 +193,9 @@ registry/modules/{ns}/{name}/{prov}/{ver}.tar.gz         # Private modules
 registry/providers/{ns}/{name}/{ver}/...                  # Private providers
 cache/providers/{host}/{ns}/{type}/{ver}/{file}           # Cached providers
 cache/binaries/{tool}/{ver}/{os}_{arch}                   # Cached CLI binaries
+uploads/packages/{eco}/{name}/{file}                      # Operator-uploaded packages
+uploads/providers/{host}/{ns}/{type}/{ver}/{file}         # Operator-uploaded providers
+uploads/binaries/{tool}/{ver}/{os}_{arch}                 # Operator-uploaded binaries
 cache/provider/terrapod/{ver}/...                         # Platform provider cache
 module_overrides/{commit_sha}/{ns}/{name}/{prov}.tar.gz  # Module impact analysis overrides
 policies/{policy_set_id}/{version_id}.tar.gz              # Policy set bundles

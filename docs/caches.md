@@ -305,6 +305,24 @@ uploaded it, a replacement is deliberate, and nothing is gated on a scan of
 ours. See [Uploading a vetted
 artifact](package-cache.md#uploading-a-vetted-artifact) for all of that.
 
+**An upload is stored under `uploads/`, not beside the pull-through content it
+stands in for**, and its row records that key. This matters for one reason: a
+cached artifact that goes missing re-warms itself from upstream, and an uploaded
+one cannot, because there is no upstream. Replication therefore tiers the two
+differently — uploads are
+[`uploaded_artifacts`](high-availability.md#the-other-data-plane-is-the-object-store-actually-there), which is
+irreplaceable whatever the deployment, where the caches are re-derivable unless
+the node is sealed. Keeping them at separate prefixes is what lets a readiness
+report tell them apart, and it means a standby that is "merely cold" on the
+caches is reported honestly as missing something permanent if an upload has not
+reached it.
+
+A consequence worth knowing when you replace a *pulled* artifact with an upload:
+the old object is left behind at its `cache/` key, referenced by nothing. Every
+retention sweep walks rows, so it would otherwise be kept for ever. Terrapod
+records it instead and an hourly sweep reclaims it, re-checking first that
+nothing has come to point at it again.
+
 What differs is worth knowing before you use them.
 
 **They are separate caches, not ecosystems.** Each has its own route with no

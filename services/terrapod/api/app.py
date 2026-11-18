@@ -612,6 +612,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Clean up old artifacts from object storage",
         )
 
+    # Orphaned-object sweep (#2599). Unconditional, unlike artifact retention
+    # above: this reclaims objects that NOTHING points at any more, which is a
+    # pure leak rather than a retention policy an operator chooses. Gating it on
+    # `artifact_retention.enabled` -- off by default -- would mean the common
+    # deployment accumulates them for ever, and the table recording them is the
+    # only evidence they exist.
+    #
+    # On the distributed scheduler like every other sweep, never
+    # `asyncio.create_task` (principle 11): it deletes objects, so exactly one
+    # replica may run a cycle.
+    async def _orphaned_objects() -> None:
+        from terrapod.db.session import get_db_session
+        from terrapod.services import orphaned_objects
+        from terrapod.storage import get_storage
+
+        storage = get_storage()
+        async with get_db_session() as db:
+            await orphaned_objects.sweep(db, storage)
+            await db.commit()
+
+    register_periodic_task(
+        "orphaned_objects",
+        interval_seconds=3600,
+        handler=_orphaned_objects,
+        description="Delete storage objects no row points at any more",
+    )
+
     # OCI garbage collection (#1419). Deletes data, so it runs on the
     # distributed scheduler like everything else — exactly one replica per cycle,
     # never `asyncio.create_task` (principle 11). Hourly: the grace period is

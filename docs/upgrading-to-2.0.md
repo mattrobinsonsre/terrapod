@@ -241,6 +241,49 @@ Nothing about this changes what a DEK decrypts.
 
 
 
+### Operator-uploaded artifacts replicate by default, and move to their own prefix
+
+Two changes to the same thing, and only the first can cost you anything.
+
+**`uploaded_artifacts` is a new object-store class, and it is the one class that
+defaults to `copy` rather than to `ha.blobs.mode`.** If you run an HA pair and have
+not configured `ha.blobs` at all, a follower will now pull uploaded artifacts across
+where before it only verified them. **Nothing else changed mode** — every other class
+still takes your `mode`, which defaults to `verify`.
+
+It defaults that way because it is the only class a follower cannot recover any other
+way. A cold provider cache on a promoted node costs a re-fetch; an operator-uploaded
+wheel, provider archive or engine binary has no upstream at all, so "verified absent"
+after a failover reports permanent loss, and the only recovery is uploading your whole
+curated set again.
+
+**To decline it**, set it explicitly — your entry always wins:
+
+```yaml
+api:
+  config:
+    ha:
+      blobs:
+        classes:
+          uploaded_artifacts: verify   # or: off
+```
+
+Reasonable if your object store already replicates, or if you have no uploads. **Not
+reasonable on a sealed deployment** (`registry.cache_only: true`), where the artifacts
+cannot be re-fetched by anyone.
+
+**Uploads are also stored under `uploads/` rather than beside the pull-through content
+they stand in for**, and each row records its key. This is why the class can exist:
+replication resolves exactly one class per key by longest prefix, so uploads and caches
+cannot share `cache/binaries/`.
+
+**No action is required and nothing moves.** Existing rows are backfilled with the key
+their object is already at, and every read path uses the recorded key, so artifacts
+uploaded before 2.0 stay exactly where they are and keep being served from there. Only
+uploads made *after* the upgrade land under the new prefix. One consequence worth
+knowing: replacing a *pulled* artifact with an upload leaves the old object behind, and
+an hourly sweep now reclaims it — it re-checks that nothing points at it first.
+
 ### Artifacts cached before 2.0 are re-fetched once, to verify them
 
 The pull-through package cache now checks every artifact against the digest its own
