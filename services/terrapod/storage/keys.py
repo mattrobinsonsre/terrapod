@@ -332,6 +332,49 @@ def package_cache_key(ecosystem: str, name: str, filename: str) -> str:
     return f"cache/packages/{ecosystem}/{name}/{filename}"
 
 
+# --- Operator-uploaded artifacts (#2599) ---
+#
+# Under their OWN prefix rather than beside the pull-through content they stand
+# in for, and the reason is replication rather than tidiness. `blob_classes`
+# resolves a key to exactly one class by longest-prefix match, deliberately --
+# `owning_class`'s docstring says overlapping classes would be "counted twice in
+# a readiness report, copied twice by the copier", and it is the gate that stops
+# a crafted key escaping a prefix. So two classes cannot share `cache/packages/`,
+# and the distinction has to live in the key.
+#
+# It has to live SOMEWHERE because the two differ in the one way replication
+# cares about: pull-through content is re-warmable and an uploaded artifact is
+# not. There is no upstream to re-fetch it from, sealed or otherwise, so a
+# promoted follower that treated it as re-derivable would hold a complete ledger
+# of what should be there and be unable to serve any of it -- recoverable only by
+# the operator re-uploading their whole curated set, discovered during an
+# incident.
+#
+# Safe to introduce because every serve path reads `record.storage_key` rather
+# than recomputing a key, so an object's location is whatever its row says: new
+# uploads land here, rows written before this keep serving from where they are,
+# and a backfill relocates them.
+
+UPLOADS_PREFIX = "uploads/"
+
+
+def uploaded_package_key(ecosystem: str, name: str, filename: str) -> str:
+    """Key for an operator-uploaded language-registry artifact."""
+    return f"{UPLOADS_PREFIX}packages/{ecosystem}/{name}/{filename}"
+
+
+def uploaded_provider_key(
+    hostname: str, namespace: str, type_: str, version: str, filename: str
+) -> str:
+    """Key for an operator-uploaded provider archive."""
+    return f"{UPLOADS_PREFIX}providers/{hostname}/{namespace}/{type_}/{version}/{filename}"
+
+
+def uploaded_binary_key(tool: str, version: str, os_: str, arch: str) -> str:
+    """Key for an operator-uploaded engine or platform-tool binary."""
+    return f"{UPLOADS_PREFIX}binaries/{tool}/{version}/{os_}_{arch}"
+
+
 # --- Binary Cache ---
 
 

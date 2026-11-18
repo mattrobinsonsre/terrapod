@@ -1734,6 +1734,10 @@ class CachedProviderPackage(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     shasum: Mapped[str] = mapped_column(String(64), nullable=False)
     h1_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    #: Where the object actually is -- see `CachedBinary.storage_key`. NULL for
+    #: a row written before #2599, whose object sits at the key its coordinates
+    #: derive. Read it through `storage_key_of`.
+    storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     cached_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -1783,6 +1787,14 @@ class CachedBinary(Base):
     arch: Mapped[str] = mapped_column(String(20), nullable=False)
     shasum: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     download_url: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    #: Where the object actually is. NULL for a row written before #2599,
+    #: whose object is at the key its coordinates derive. Recorded rather than
+    #: derived so an operator upload can live under `uploads/` -- which it must,
+    #: because `blob_classes.owning_class` resolves one class per key by longest
+    #: prefix, so "irreplaceable upload" and "re-warmable cache" cannot share a
+    #: prefix. Read it through `storage_key_of`, never directly: that helper is
+    #: the one place the NULL fallback lives.
+    storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     cached_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
