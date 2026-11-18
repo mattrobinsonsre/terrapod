@@ -31,6 +31,7 @@ NOT_KEY_BUILDERS: dict[str, str] = {
     "oci_upload_prefix": "a prefix builder for cleanup, not a key",
     "workspace_id_of_key": "the classifier under test",
     "prefix_may_hold_workspace_keys": "a listing-prefix classifier, not a key",
+    "shared_prefix": "a config-prefix check, not a key",
 }
 
 _KEYS_FILE = pathlib.Path(keys_mod.__file__)
