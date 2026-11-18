@@ -115,6 +115,28 @@ class ExpectedSigner:
             )
 
 
+def _checked_digest(digest_hex: str) -> bytes:
+    """Validate a hex sha256 and return its bytes, importing nothing.
+
+    Deliberately free of any `sigstore` import so that a malformed digest is
+    refused even where the library is absent, and -- the reason it is a
+    separate function -- so the refusal cannot be reordered behind either the
+    import or the TUF refresh by a later edit. Both have happened: the first
+    version of this module put the ~3s refresh first, and the second still had
+    the library import above this check.
+    """
+    want = digest_hex.strip().lower()
+    try:
+        raw = bytes.fromhex(want)
+    except ValueError as exc:
+        raise SigstoreVerificationError(f"{digest_hex!r} is not a hex sha256 digest") from exc
+    if len(raw) != 32:
+        raise SigstoreVerificationError(
+            f"a sha256 digest is 32 bytes; got {len(raw)} from {digest_hex!r}"
+        )
+    return raw
+
+
 # The trust root is cached because obtaining it is a TUF refresh -- several
 # network round trips and signature checks -- and admission can verify many
 # artifacts in a burst (a `docker pull` of one image fetches a manifest and
@@ -169,24 +191,15 @@ def _verify_sync(
     ttl_seconds: float,
 ) -> None:
     """The synchronous body. Never call this from an `async` handler."""
+    # The digest first, before even the import: it needs nothing, and a bad
+    # one reported as "could not obtain the trust root" (or as a missing
+    # library) sends an operator to look at their egress instead of at the
+    # caller.
+    digest = _checked_digest(digest_hex)
+
     from sigstore.hashes import HashAlgorithm, Hashed
     from sigstore.models import Bundle
     from sigstore.verify import Verifier, policy
-
-    # Local checks first, deliberately. Obtaining the trust root is a TUF
-    # refresh -- measured at ~3s against the real repository -- and a malformed
-    # digest or an unparseable bundle is knowable without touching the network.
-    # Doing it the other way round also mislabels the failure: a bad digest
-    # reported as "could not obtain the trust root" sends an operator to look
-    # at their egress instead of at the caller.
-    try:
-        digest = bytes.fromhex(digest_hex)
-    except ValueError as exc:
-        raise SigstoreVerificationError(f"{digest_hex!r} is not a hex sha256 digest") from exc
-    if len(digest) != 32:
-        raise SigstoreVerificationError(
-            f"a sha256 digest is 32 bytes; got {len(digest)} from {digest_hex!r}"
-        )
 
     try:
         bundle = Bundle.from_json(bundle_json)
@@ -251,3 +264,140 @@ async def verify_digest(
         identity=expect.identity,
         issuer=expect.issuer,
     )
+
+
+#: The payload type a Sigstore DSSE envelope carries for an in-toto statement.
+#: `verify_dsse` hands back the type alongside the payload precisely so the
+#: caller checks it before trusting the bytes, and a bundle is free to carry
+#: something else.
+_IN_TOTO = "application/vnd.in-toto+json"
+
+
+def _attested_digests(statement: dict) -> set[str]:
+    """The sha256 digests an in-toto statement claims to be *about*.
+
+    An in-toto subject is a list, each entry carrying a `digest` map keyed by
+    algorithm, so a statement can legitimately cover several artifacts. Only
+    sha256 is read here because that is the only algorithm the callers address
+    content by.
+    """
+    out: set[str] = set()
+    for subject in statement.get("subject") or []:
+        if not isinstance(subject, dict):
+            continue
+        sha256 = (subject.get("digest") or {}).get("sha256")
+        if isinstance(sha256, str) and sha256.strip():
+            out.add(sha256.strip().lower())
+    return out
+
+
+def _verify_attestation_sync(
+    *,
+    digest_hex: str,
+    bundle_json: bytes,
+    expect: ExpectedSigner,
+    tuf_url: str,
+    refresh: bool,
+    ttl_seconds: float,
+) -> tuple[str, dict]:
+    """The synchronous body. Never call this from an `async` handler."""
+    # The digest first, before even the import -- see `_checked_digest`.
+    _checked_digest(digest_hex)
+    want_digest = digest_hex.strip().lower()
+
+    from sigstore.models import Bundle
+    from sigstore.verify import Verifier, policy
+
+    try:
+        bundle = Bundle.from_json(bundle_json)
+    except Exception as exc:  # noqa: BLE001
+        raise SigstoreVerificationError(f"the Sigstore bundle did not parse: {exc}") from exc
+
+    config = _trust_config(tuf_url, refresh=refresh, ttl_seconds=ttl_seconds)
+    verifier = Verifier(trusted_root=config.trusted_root)
+    want = policy.Identity(identity=expect.identity, issuer=expect.issuer)
+
+    try:
+        payload_type, payload = verifier.verify_dsse(bundle, want)
+    except Exception as exc:  # noqa: BLE001
+        raise SigstoreVerificationError(
+            f"the attestation over sha256:{want_digest} did not verify as "
+            f"{expect.identity} via {expect.issuer}: {exc}"
+        ) from exc
+
+    if payload_type != _IN_TOTO:
+        raise SigstoreVerificationError(
+            f"the envelope verified but carries {payload_type!r} rather than {_IN_TOTO!r}, "
+            "so its payload is not an in-toto statement and its subject cannot be checked"
+        )
+
+    import json as _json
+
+    try:
+        statement = _json.loads(payload)
+    except ValueError as exc:
+        raise SigstoreVerificationError(f"the verified in-toto payload is not JSON: {exc}") from exc
+    if not isinstance(statement, dict):
+        raise SigstoreVerificationError("the verified in-toto payload is not an object")
+
+    # THE check this function exists for. `verify_dsse` establishes that the
+    # expected identity signed THIS envelope; it says nothing about which
+    # artifact the envelope is about. A genuine, correctly-signed attestation
+    # for a different image verifies perfectly here -- so without this, an
+    # attacker who can choose which bundle we fetch substitutes one they did
+    # not have to forge. Checking the subject is what ties the signature to the
+    # bytes we are admitting.
+    attested = _attested_digests(statement)
+    if want_digest not in attested:
+        raise SigstoreVerificationError(
+            f"the attestation verified as {expect.identity} but is about "
+            f"{sorted(attested) or ['nothing']}, not sha256:{want_digest} -- "
+            "a valid signature over the wrong artifact"
+        )
+
+    return str(statement.get("predicateType") or ""), statement
+
+
+async def verify_attestation(
+    *,
+    digest_hex: str,
+    bundle_json: bytes,
+    expect: ExpectedSigner,
+    tuf_url: str = DEFAULT_TUF_URL,
+    refresh: bool = True,
+    ttl_seconds: float = 3600.0,
+) -> tuple[str, dict]:
+    """Verify a DSSE attestation and that it is **about** `digest_hex`.
+
+    This is the path real cosign material takes, which is worth stating because
+    the other one looks like the obvious choice: measured against our own
+    published images, `cosign download signature` returns
+    `application/vnd.dev.sigstore.bundle.v0.3+json` envelopes carrying
+    `dsseEnvelope` rather than a bare message signature -- three of them, for
+    `sigstore.dev/cosign/sign/v1`, `slsa.dev/provenance/v1` and
+    `spdx.dev/Document/v2.3`. So an OCI caller wants this, not `verify_digest`.
+
+    Returns `(predicateType, statement)` so a caller can tell an SBOM
+    attestation from a provenance one without parsing the payload again.
+
+    Raises `SigstoreVerificationError` when the signature fails, when the
+    envelope carries something other than an in-toto statement, **or when the
+    statement is about a different artifact** -- see the comment on that last
+    check, which is the one a caller would otherwise forget.
+    """
+    predicate, statement = await asyncio.to_thread(
+        _verify_attestation_sync,
+        digest_hex=digest_hex,
+        bundle_json=bundle_json,
+        expect=expect,
+        tuf_url=tuf_url,
+        refresh=refresh,
+        ttl_seconds=ttl_seconds,
+    )
+    logger.info(
+        "Sigstore attestation verified",
+        digest=f"sha256:{digest_hex.strip().lower()}",
+        identity=expect.identity,
+        predicate=predicate,
+    )
+    return predicate, statement
