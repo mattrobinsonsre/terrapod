@@ -7,7 +7,7 @@ commit statuses and PR/MR comments back to the VCS provider.
 
 import uuid
 
-from terrapod.config import aggregate_statuses_enabled
+from terrapod.config import aggregate_statuses_enabled, settings
 from terrapod.db.models import Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
@@ -17,6 +17,7 @@ from terrapod.services import (
     run_links,
     vcs_aggregate_post,
     vcs_status_comment,
+    vcs_status_names,
 )
 
 logger = get_logger(__name__)
@@ -98,6 +99,13 @@ def _resolve_status(
             return ("pending", "running", "Has changes, awaiting confirmation")
         return ("pending", "running", "Plan complete, awaiting confirmation")
     return _STATUS_MAP.get(run_status, ("pending", "pending", run_status))
+
+
+def _posts_own_status(ws_name: str, context: str, is_pr_run: bool) -> bool:
+    """Whether a run posts `terrapod/<workspace>`: never an aggregate's name; a PR run only if switched on."""
+    if vcs_status_names.blocks_own_status(ws_name, context):
+        return False
+    return settings.vcs.commit_statuses.per_workspace or not is_pr_run
 
 
 async def handle_vcs_commit_status(payload: dict) -> None:
@@ -227,10 +235,13 @@ async def handle_vcs_commit_status(payload: dict) -> None:
 
         # Only a pull-request run has aggregate statuses to stand in for this one.
         is_pr_run = bool(run.vcs_pull_request_number) and run.source != "module-test"
+        post_own = _posts_own_status(ws.name, context, is_pr_run)
 
         # Post commit status
         try:
-            if conn.provider == "gitlab":
+            if not post_own:
+                logger.debug("Per-workspace status not posted for a PR run", context=context)
+            elif conn.provider == "gitlab":
                 await gitlab_service.create_commit_status(
                     conn,
                     owner,

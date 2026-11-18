@@ -437,3 +437,132 @@ class TestTheDispatcherPostsTheAggregateToo:
         publish.assert_awaited_once()
         status.assert_awaited_once()
         refresh.assert_awaited_once()
+
+
+class TestThePerWorkspaceSwitch:
+    """`vcs.commit_statuses.per_workspace` applies to pull-request runs only."""
+
+    _helper = TestTheDispatcherAsksForARefresh()
+
+    async def _dispatch(
+        self, *, pr_number, per_workspace=True, ws_name="prod-vpc", source="vcs", names=None
+    ):
+        from terrapod.config import settings
+        from terrapod.services.vcs_status_dispatcher import handle_vcs_commit_status
+
+        run, ws, conn = self._helper._fixtures(pr_number=pr_number)
+        run.source = source
+        ws.name = ws_name
+        session = self._helper._session(run, ws, conn)
+
+        class _Ctx:
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, *a):
+                return False
+
+        cfg = settings.vcs.commit_statuses
+        saved = cfg.model_copy()
+        cfg.per_workspace = per_workspace
+        for field, value in (names or {}).items():
+            setattr(cfg, field, value)
+        try:
+            with (
+                patch(
+                    "terrapod.services.vcs_status_dispatcher.get_db_session", return_value=_Ctx()
+                ),
+                patch.object(
+                    dispatcher.github_service, "create_commit_status", new=AsyncMock()
+                ) as status,
+                patch.object(
+                    dispatcher.vcs_status_comment, "refresh_for_run", new=AsyncMock()
+                ) as refresh,
+                patch.object(dispatcher.vcs_aggregate_post, "publish", new=AsyncMock()) as publish,
+                patch.object(dispatcher.vcs_status_names, "logger") as log,
+            ):
+                await handle_vcs_commit_status(
+                    {
+                        "run_id": str(run.id),
+                        "workspace_id": str(ws.id),
+                        "target_status": "planned",
+                        "has_changes": True,
+                    }
+                )
+        finally:
+            for field in ("plan_name", "policy_name", "apply_name", "per_workspace"):
+                setattr(cfg, field, getattr(saved, field))
+        return status, refresh, publish, log
+
+    @pytest.mark.asyncio
+    async def test_on_by_default_a_pr_run_posts_its_own_status(self):
+        status, *_ = await self._dispatch(pr_number=7)
+        status.assert_awaited_once()
+        assert status.await_args.kwargs["context"] == "terrapod/prod-vpc"
+
+    @pytest.mark.asyncio
+    async def test_off_a_pr_run_posts_no_per_workspace_status(self):
+        status, _, _, _ = await self._dispatch(pr_number=7, per_workspace=False)
+        status.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_off_the_aggregate_and_the_comment_refresh_still_happen(self):
+        _, refresh, publish, _ = await self._dispatch(pr_number=7, per_workspace=False)
+        publish.assert_awaited_once()
+        refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_off_a_branch_run_still_posts_its_status(self):
+        status, refresh, publish, _ = await self._dispatch(pr_number=None, per_workspace=False)
+        status.assert_awaited_once()
+        publish.assert_not_awaited()
+        refresh.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_off_a_module_impact_run_is_left_alone(self):
+        status, *_ = await self._dispatch(pr_number=7, per_workspace=False, source="module-test")
+        status.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("name", ["plan", "policy", "apply"])
+    async def test_a_workspace_named_like_an_aggregate_is_skipped_with_a_warning(self, name):
+        status, refresh, publish, log = await self._dispatch(pr_number=7, ws_name=name)
+        status.assert_not_awaited()
+        log.warning.assert_called_once()
+        assert f"terrapod/{name}" in str(log.warning.call_args)
+        publish.assert_awaited_once()
+        refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_configured_aggregate_name_equal_to_a_workspace_status_does_not_clobber(self):
+        status, _, publish, log = await self._dispatch(
+            pr_number=7, ws_name="prod-vpc", names={"plan_name": "terrapod/prod-vpc"}
+        )
+        status.assert_not_awaited()
+        log.warning.assert_called_once()
+        publish.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_similar_name_is_not_a_collision(self):
+        status, *_ = await self._dispatch(pr_number=7, ws_name="plans")
+        status.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_branch_run_of_a_workspace_named_plan_is_skipped_too(self):
+        """A workspace tracking branch X with an open PR X->main would otherwise write
+        `terrapod/plan` on the PR's head commit and overwrite the aggregate."""
+        status, _, publish, log = await self._dispatch(pr_number=None, ws_name="plan")
+        status.assert_not_awaited()
+        log.warning.assert_called_once()
+        publish.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_module_impact_run_of_a_workspace_named_plan_is_skipped_too(self):
+        status, _, _, log = await self._dispatch(pr_number=7, ws_name="plan", source="module-test")
+        status.assert_not_awaited()
+        log.warning.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_a_branch_run_with_the_switch_off_still_posts_when_nothing_collides(self):
+        status, *_ = await self._dispatch(pr_number=None, per_workspace=False, ws_name="prod-vpc")
+        status.assert_awaited_once()

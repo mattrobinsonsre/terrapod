@@ -404,6 +404,71 @@ class TestAFailedDowngradeHealsOnTheNextPoll:
         assert plan[-1] == "failure"
 
 
+class TestThePerWorkspaceSwitchThroughTheRealHandler:
+    @pytest.fixture
+    def switch_off(self):
+        from terrapod.config import settings
+
+        cfg = settings.vcs.commit_statuses
+        cfg.per_workspace = False
+        yield
+        cfg.per_workspace = True
+
+    async def test_off_only_the_aggregates_are_posted_for_a_pr_run(self, app, switch_off):
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        before = len(wire.posts)
+        await helper._dispatch(wire, run_id, ws_id)
+
+        contexts = {p["context"] for p in wire.posts[before:]}
+        assert {PLAN, POLICY, APPLY} <= contexts
+        assert not [c for c in contexts if c.startswith("terrapod/post-a-")]
+
+    async def test_on_the_per_workspace_status_is_still_posted(self, app):
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        before = len(wire.posts)
+        await helper._dispatch(wire, run_id, ws_id)
+        assert [p for p in wire.posts[before:] if p["context"].startswith("terrapod/post-a-")]
+
+    async def test_a_workspace_named_plan_cannot_clobber_the_aggregate(self, app):
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, ws_id)
+            ws.name = "plan"
+            await db.commit()
+        before = len(wire.posts)
+        await helper._dispatch(wire, run_id, ws_id)
+        new = wire.posts[before:]
+        plan_posts = [p for p in new if p["context"] == PLAN]
+        assert plan_posts and all(
+            p["description"] != "Has changes, awaiting confirmation" for p in plan_posts
+        )
+
+
+class TestABranchRunCannotOverwriteAnAggregate:
+    async def test_a_branch_run_of_a_workspace_named_plan_posts_nothing_on_the_aggregate(self, app):
+        from terrapod.db.models import Run
+
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        await helper._dispatch(wire, run_id, ws_id)  # the aggregate is posted for the PR head
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, ws_id)
+            ws.name = "plan"
+            run = await db.get(Run, run_id)
+            run.vcs_pull_request_number = None  # the same commit seen as a branch run
+            await db.commit()
+        before = len(wire.posts)
+        await helper._dispatch(wire, run_id, ws_id)
+        assert [p for p in wire.posts[before:] if p["context"] == PLAN] == []
+
+
 class TestAPullRequestIntoAnUntrackedBranchGetsGreenChecks:
     async def test_immediate_poll_posts_plan_and_policy_success_and_no_apply(self, app):
         from tests.integration.test_pr_aggregate_evaluation import _pr

@@ -53,6 +53,7 @@ from terrapod.services import (
     run_service,
     vcs_aggregate_post,
     vcs_rate_limit,
+    vcs_status_names,
     workspace_settings,
 )
 from terrapod.services.scheduler import enqueue_trigger
@@ -2636,6 +2637,27 @@ async def _register_candidates(
     return True
 
 
+async def _warn_name_collisions(db: AsyncSession) -> None:
+    """Once per periodic cycle: workspaces named like an aggregate status (their own is skipped)."""
+    try:
+        names = vcs_status_names.colliding_workspace_names()
+        if not names:
+            return
+        found = (
+            (await db.execute(select(Workspace.name).where(Workspace.name.in_(names))))
+            .scalars()
+            .all()
+        )
+        if found:
+            logger.warning(
+                "Workspaces are named like an aggregate commit status, so their own "
+                "terrapod/<workspace> status is never posted: rename them or the aggregate",
+                workspaces=sorted(found),
+            )
+    except Exception as e:
+        logger.debug("Could not check workspace names against the aggregate names", error=repr(e))
+
+
 async def _report_disabled_candidates(decisions: PRDecisions, registered: bool) -> None:
     """Once per periodic cycle: how many workspaces hold their repository's checks pending."""
     if not registered:
@@ -2705,11 +2727,14 @@ async def poll_cycle() -> None:
     async with get_db_session() as db:
         workspace_ids = await _select_workspace_ids(db)
         paths_unions = await _compute_paths_unions(db, workspace_ids)
-        decisions = PRDecisions() if aggregate_statuses_enabled() else None
+        enabled = aggregate_statuses_enabled()
+        decisions = PRDecisions() if enabled else None
         registered = False
         if decisions is not None:
             registered = await _register_candidates(db, workspace_ids, decisions, "cycle")
             await _report_disabled_candidates(decisions, registered)
+            if registered:
+                await _warn_name_collisions(db)
 
     if not workspace_ids:
         VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)

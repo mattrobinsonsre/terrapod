@@ -45,6 +45,7 @@ from terrapod.services import (
     variable_service,
     vcs_rate_limit,
     vcs_status_comment,
+    vcs_status_names,
 )
 from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.services.module_subdirectory import scope_archive_to_subdirectory
@@ -512,6 +513,8 @@ async def _post_unusable_module_pr_status(
     description: str,
 ) -> bool:
     """Report an unusable candidate; retry transient failures on the next poll."""
+    if vcs_status_names.blocks_own_status(ws.name, f"terrapod/{ws.name}"):
+        return True  # final: a retry would collide again
     try:
         if conn.provider == "gitlab":
             await gitlab_service.create_commit_status(
@@ -1057,7 +1060,9 @@ async def _post_module_vcs_status(
     context = f"terrapod/{ws_name}"
 
     try:
-        if conn.provider == "gitlab":
+        if vcs_status_names.blocks_own_status(ws_name, context):
+            logger.debug("Module status not posted: name collision", context=context)
+        elif conn.provider == "gitlab":
             await gitlab_service.create_commit_status(
                 conn,
                 owner,

@@ -2435,6 +2435,7 @@ class TestBothEntryPointsThreadTheCollector:
             for name in (
                 "_register_candidates",
                 "_report_disabled_candidates",
+                "_warn_name_collisions",
                 "_store_pr_decisions",
                 "mark_unverified",
                 "clear_unverified",
@@ -2679,8 +2680,44 @@ class TestAFailedRegistrationIsVisible:
             ),
             patch("terrapod.services.vcs_poller.clear_unverified", new=AsyncMock()),
             patch("terrapod.services.vcs_poller.record_disabled_count", new=AsyncMock()) as gauge,
+            patch(
+                "terrapod.services.vcs_poller._warn_name_collisions", new=AsyncMock()
+            ) as collisions,
             patch("terrapod.services.vcs_poller.logger") as log,
         ):
             await poll_cycle()
         gauge.assert_awaited_once_with(1)
+        collisions.assert_awaited_once()
         assert any("disabled" in str(c) for c in log.warning.call_args_list)
+
+
+class TestAWorkspaceNamedLikeAnAggregateIsReported:
+    async def test_the_cycle_warns_naming_the_workspaces(self):
+        from terrapod.services.vcs_poller import _warn_name_collisions
+
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = ["plan", "apply"]
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=result)
+        with patch("terrapod.services.vcs_poller.logger") as log:
+            await _warn_name_collisions(db)
+        text = str(log.warning.call_args)
+        assert "plan" in text and "apply" in text
+
+    async def test_no_collision_is_silent(self):
+        from terrapod.services.vcs_poller import _warn_name_collisions
+
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = []
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=result)
+        with patch("terrapod.services.vcs_poller.logger") as log:
+            await _warn_name_collisions(db)
+        log.warning.assert_not_called()
+
+    async def test_a_failing_query_never_fails_the_cycle(self):
+        from terrapod.services.vcs_poller import _warn_name_collisions
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db"))
+        await _warn_name_collisions(db)
