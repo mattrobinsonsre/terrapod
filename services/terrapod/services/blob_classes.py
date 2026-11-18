@@ -109,6 +109,19 @@ class BlobClass:
     #: Why the class is not verifiable, surfaced to the operator so the gap reads
     #: as a considered boundary rather than a missing feature.
     unverifiable_reason: str = ""
+    #: The mode this class takes when the operator has named no preference for
+    #: it, overriding the global `ha.blobs.mode` default. `None` means "use the
+    #: global default", which is every class but one.
+    #:
+    #: This is NOT the sealed escalation (`sealed_is_fatal`, which is about the
+    #: deployment) and it does not decide for the operator: a per-class entry in
+    #: `ha.blobs.classes` still wins. It exists because `verify` is the right
+    #: global default -- it observes the whole store and commits to nothing --
+    #: and is actively wrong for content that cannot be re-fetched, where
+    #: "verified absent" is a report of permanent loss rather than of something
+    #: that will re-warm. #2599 requires uploads to default to `copy` for that
+    #: reason.
+    default_mode: str | None = None
     #: True when the objects are enveloped by app-layer encryption
     #: (`encryption.enabled`, #635). Each node wraps with ITS OWN data key and
     #: `crypto_keys` is deliberately never replicated, so a byte-for-byte copy
@@ -417,6 +430,13 @@ CLASSES: tuple[BlobClass, ...] = (
         tier=IRREPLACEABLE,
         prefixes=(keys.UPLOADS_PREFIX,),
         resolver=_resolve_uploaded_artifacts,
+        # The one class that does not take the global `verify` default (#2599).
+        # A cold cache on a promoted follower costs a re-fetch; a cold upload
+        # cannot be re-fetched at all, so leaving this on `verify` would mean
+        # the report says "absent" and nothing can be done about it but ask the
+        # operator to upload their whole curated set again. An explicit
+        # `ha.blobs.classes.uploaded_artifacts` still overrides this.
+        default_mode=COPY,
         # No `sealed_is_fatal`: it escalates a class TO irreplaceable, and this
         # one already is. Sealing changes nothing here, which is the honest
         # statement -- an upload was never re-warmable in the first place.
@@ -640,16 +660,25 @@ def _sealed() -> bool:
 def effective_mode(cls: BlobClass, *, blobs=None) -> str:
     """What Terrapod does about this class: ``off``, ``verify`` or ``copy``.
 
-    A per-class entry wins over the global default. Both are the operator's call —
-    nothing here escalates a mode on their behalf, because the mode is a decision
-    about their topology and #1114 is explicit that Terrapod does not make it.
+    A per-class entry wins over the class's own default, which wins over the
+    global one. Nothing here escalates a mode on the operator's behalf on the
+    strength of their *topology* — that is the mode's whole point, and #1114 is
+    explicit that Terrapod does not decide it for them.
+
+    A class-level `default_mode` is a different thing and the one case is
+    `uploaded_artifacts`: `verify` is the right global default because it
+    observes everything and commits to nothing, and it is actively wrong for
+    content with no upstream, where "verified absent" reports permanent loss
+    rather than something that re-warms. The operator's own entry still wins.
 
     Takes the class rather than its name so it is total: there is no way to ask
     about a class that does not exist, which is where a name-keyed lookup would
     have needed a fallback and a fallback is where a typo goes quiet.
     """
     cfg = blobs if blobs is not None else _blobs_config()
-    return cfg.classes.get(cls.name, cfg.mode)
+    if cls.name in cfg.classes:
+        return cfg.classes[cls.name]
+    return cls.default_mode or cfg.mode
 
 
 def effective_tier(cls: BlobClass, *, sealed: bool | None = None) -> str:

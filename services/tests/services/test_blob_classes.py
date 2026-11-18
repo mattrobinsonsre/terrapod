@@ -604,3 +604,60 @@ class TestEachCacheResolverActuallyAppliesTheExclusion:
         # excluding everything else.
         assert all("NOT" not in c for c in clauses), f"expected a positive filter: {clauses}"
         assert all("storage_key" in c and "LIKE" in c for c in clauses)
+
+
+class TestUploadsDefaultToCopyRatherThanVerify:
+    """#2599's requirement, and the one class that does not take the global
+    default.
+
+    `verify` is right globally: it observes the whole store, costs nothing until
+    the readiness endpoint is called, and commits the operator to nothing. It is
+    actively wrong for content with no upstream -- "verified absent" then
+    reports permanent loss rather than something that will re-warm on first use,
+    and the only recovery is the operator uploading their entire curated set
+    again.
+    """
+
+    @staticmethod
+    def _cls(name):
+        return next(c for c in blob_classes.CLASSES if c.name == name)
+
+    def test_it_defaults_to_copy(self):
+        from terrapod.config import HABlobsConfig
+
+        plain = HABlobsConfig(mode="verify", classes={})
+        assert blob_classes.effective_mode(self._cls("uploaded_artifacts"), blobs=plain) == "copy"
+
+    @pytest.mark.parametrize(
+        "name", ["package_cache", "binary_cache", "provider_cache", "state", "run_logs"]
+    )
+    def test_no_other_class_overrides_the_global_default(self, name):
+        """The control. Without it, a change that returned `copy` for everything
+        would pass the case above while quietly committing an operator to
+        copying their whole store.
+        """
+        from terrapod.config import HABlobsConfig
+
+        plain = HABlobsConfig(mode="verify", classes={})
+        assert blob_classes.effective_mode(self._cls(name), blobs=plain) == "verify"
+
+    @pytest.mark.parametrize("chosen", ["off", "verify", "copy"])
+    def test_the_operator_still_wins(self, chosen):
+        """A class default is a default, not an escalation. `ha.blobs` is the
+        operator's decision about their topology and #1114 is explicit that
+        Terrapod does not make it for them -- so an explicit entry overrides
+        this, including back down to `off`.
+        """
+        from terrapod.config import HABlobsConfig
+
+        cfg = HABlobsConfig(mode="verify", classes={"uploaded_artifacts": chosen})
+        assert blob_classes.effective_mode(self._cls("uploaded_artifacts"), blobs=cfg) == chosen
+
+    def test_exactly_one_class_carries_a_default(self):
+        """Derived, so a second one is a deliberate act rather than a drift.
+
+        Each is a decision to commit an operator's bandwidth without being
+        asked, which is worth being able to count.
+        """
+        carrying = {c.name for c in blob_classes.CLASSES if c.default_mode is not None}
+        assert carrying == {"uploaded_artifacts"}

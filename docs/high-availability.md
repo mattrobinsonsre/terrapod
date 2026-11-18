@@ -682,7 +682,8 @@ The classes, in the order a report lists them:
 > irreplaceable tier puts a line in the readiness report nobody can ever clear.
 
 > **`uploaded_artifacts` is Irreplaceable whatever the deployment, and it is the
-> one cache-shaped class that sealing does not change.** It holds what an
+> one cache-shaped class that sealing does not change -- and the one class whose
+> replication mode defaults to `copy` rather than to `ha.blobs.mode`.** It holds what an
 > operator uploaded by hand — a vetted wheel, a provider archive, an engine
 > binary — and there is no upstream to re-fetch any of it from, sealed or not.
 > That is why it is its own class rather than part of the three caches: lumped in
@@ -694,6 +695,16 @@ The classes, in the order a report lists them:
 > two classes cannot share `cache/binaries/`; the upload paths record that key on
 > the row, and every serve, check and reap path reads it rather than deriving
 > one.
+>
+> The `copy` default is the one place Terrapod picks a mode for you, and it is
+> a default rather than an escalation: an explicit
+> `ha.blobs.classes.uploaded_artifacts` still wins, including back down to
+> `verify` or `off` where your object store already replicates. It defaults
+> that way because `verify` is the right global choice -- it observes
+> everything and commits you to nothing -- and is the wrong one for content
+> that cannot be re-fetched, where a verified absence reports permanent loss
+> rather than something that re-warms on first use. **For a sealed deployment,
+> replicating this class is not optional.**
 
 An unknown class name is **rejected** — by `helm lint` before install, and again at
 startup for the paths the chart never sees. A typo that silently left a class on

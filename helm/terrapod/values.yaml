@@ -1159,7 +1159,8 @@ api:
         # startup rather than ignored, so a typo cannot leave a class you believe
         # you configured sitting on the default. Known names:
         #   irreplaceable — state, state_index, configuration_versions,
-        #                   registry_modules, registry_providers
+        #                   registry_modules, registry_providers,
+        #                   uploaded_artifacts
         #   history       — run_logs, run_plans, run_vars,
         #                   deleted_workspace_markers
         #   re-derivable  — provider_cache, binary_cache, package_cache,
@@ -1170,6 +1171,14 @@ api:
         # (registry.cache_only) node — it is forbidden to reach upstream, so a
         # promoted node with a cold cache has no binary and no providers. That
         # escalation is derived, not something to restate here.
+        #
+        # `uploaded_artifacts` is the ONE class that does not take `mode` as its
+        # default: it defaults to `copy`. It holds what an operator uploaded by
+        # hand, which has no upstream to re-warm from — sealed or not — so a
+        # follower that only VERIFIES it reports permanent loss after a failover
+        # and the only recovery is uploading the whole curated set again. Set it
+        # here explicitly to override that, including back down to `verify` or
+        # `off` if your object store already replicates.
         #
         # e.g.
         #   classes:

@@ -111,10 +111,45 @@ class TestTheThrottleIsHonest:
 
 
 class TestNothingHappensUnlessAskedTo:
-    async def test_no_copy_classes_is_the_ordinary_case(self):
-        """The default is `verify` everywhere, so on almost every install this
-        does nothing at all — and says so rather than logging a cycle."""
+    async def test_only_the_unrecoverable_class_copies_by_default(self):
+        """Almost nothing copies unasked, and the exception is deliberate.
+
+        `verify` is the global default, so on an ordinary install this cycle
+        has exactly ONE class to do: `uploaded_artifacts`, which defaults to
+        `copy` because it is the only class a follower cannot recover any other
+        way -- there is no upstream to re-warm an operator's hand-uploaded
+        artifact from, so a verified absence after a failover is a report of
+        permanent loss (#2599).
+
+        Asserted as an exact set rather than a count, because the value of this
+        test is that the unasked-for work stays bounded to that one class. A
+        change that defaulted a second class to `copy` would spend an operator's
+        bandwidth without being asked and should fail here.
+        """
+        from terrapod.services import blob_classes
+
         with patch.object(blob_sync.settings.ha, "blobs", _cfg(mode=VERIFY)):
+            copying = {
+                c.name for c in blob_classes.CLASSES if blob_classes.effective_mode(c) == COPY
+            }
+            result = await blob_sync.run_cycle()
+
+        assert copying == {"uploaded_artifacts"}
+        # And the cycle agrees there is work: it now stops at the peer rather
+        # than at "nothing to copy", which is the observable difference the
+        # default makes on an install that has configured neither.
+        assert result.skipped_reason == "no peer configured"
+
+    async def test_switching_that_class_off_leaves_nothing_to_do(self):
+        """The operator's word is still final, which is what makes the default a
+        default rather than an escalation -- and then the cycle says it did
+        nothing rather than logging an empty pass.
+        """
+        with patch.object(
+            blob_sync.settings.ha,
+            "blobs",
+            _cfg(mode=VERIFY, classes={"uploaded_artifacts": VERIFY}),
+        ):
             result = await blob_sync.run_cycle()
 
         assert result.skipped_reason == "no classes configured to copy"
