@@ -36,8 +36,12 @@ from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 from terrapod.services.artifact_verification import verify_provider
 from terrapod.services.cache_errors import CacheOnlyError
+from terrapod.services.cache_object_keys import provider_storage_key
 from terrapod.services.hashing_stream import HashingStream
-from terrapod.storage.keys import provider_binary_key, provider_cache_key
+from terrapod.storage.keys import (
+    provider_binary_key,
+    provider_cache_key,
+)
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -213,7 +217,7 @@ async def get_or_fetch_platforms(
         stale_ids = []
         now = datetime.now(UTC)
         for entry in cached:
-            key = provider_cache_key(hostname, namespace, type_, version, entry.filename)
+            key = provider_storage_key(entry)
             # Verify the object actually exists in storage
             if not await storage.exists(key):
                 logger.warning(
@@ -947,7 +951,7 @@ async def get_cached_platform(
     if cached is None:
         return None
 
-    key = provider_cache_key(hostname, namespace, type_, version, cached.filename)
+    key = provider_storage_key(cached)
     if not await storage.exists(key):
         logger.warning(
             "Stale provider cache record (object missing from storage)",
@@ -1002,7 +1006,7 @@ async def purge_cached_provider(
     )
     entries = list(result.scalars().all())
     for entry in entries:
-        key = provider_cache_key(hostname, namespace, type_, version, entry.filename)
+        key = provider_storage_key(entry)
         await storage.delete(key)
         await db.delete(entry)
 

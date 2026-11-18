@@ -5576,3 +5576,39 @@ class InventoryGlobalVar(Base):
         UniqueConstraint("workspace_id", "key", name="uq_inventory_global_vars_workspace_key"),
         Index("ix_inventory_global_vars_workspace_id", "workspace_id"),
     )
+
+
+class OrphanedObject(Base):
+    """An object in storage that no row points at any more (#2599).
+
+    Replacing a pulled artifact with an operator upload moves the row's
+    `storage_key` from `cache/` to `uploads/`, which leaves the `cache/` object
+    referenced by nothing. Every retention sweep in the tree is **row-driven**
+    -- it walks rows and deletes the object each one names -- so an object with
+    no row is invisible to all of them and would be kept for ever.
+
+    Recorded rather than deleted inline, and the upload path's ordering is why:
+    it changes the row, flushes, and only then streams the bytes, so that a
+    failed put rolls back cleanly. The caller's transaction can still roll back
+    *after* a successful put, reverting the row to the old key -- and if the old
+    object had already been deleted, that is data loss rather than a leak. A row
+    here is written in the same transaction as the key change, so a rollback
+    takes it with it, correctly, because the old object is referenced again.
+
+    The sweep re-checks that nothing references the key before deleting, so a
+    stale row cannot destroy a live object.
+    """
+
+    __tablename__ = "orphaned_objects"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    storage_key: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
+    #: Why it was orphaned, for an operator reading the table during an
+    #: incident. Free text rather than an enum: it is diagnostic, and a new
+    #: caller should not need a migration to describe itself.
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (Index("ix_orphaned_objects_recorded_at", "recorded_at"),)

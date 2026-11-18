@@ -84,9 +84,11 @@ async def _download(version: str, dest: Path) -> None:
     blocking the event loop on the write (rule 13).
     """
     from terrapod.db.session import get_db_session
-    from terrapod.services.binary_cache_service import get_or_cache_binary
+    from terrapod.services.binary_cache_service import (
+        cached_binary_key,
+        get_or_cache_binary,
+    )
     from terrapod.storage import get_storage
-    from terrapod.storage.keys import binary_cache_key
 
     arch = "arm64" if platform.machine().lower() in ("aarch64", "arm64") else "amd64"
     storage = get_storage()
@@ -96,8 +98,14 @@ async def _download(version: str, dest: Path) -> None:
     # Its own short-lived session: nothing is held open across the transfer.
     async with get_db_session() as db:
         await get_or_cache_binary(db, storage, "opa", version, "linux", arch)
-
-    key = binary_cache_key("opa", version, "linux", arch)
+        # The row's key, not a derived one: an operator-uploaded OPA lives under
+        # `uploads/` and deriving would look under `cache/` and find nothing --
+        # reporting OPA unavailable on exactly the sealed deployment that
+        # uploaded it because it could not fetch it (#2599).
+        key = await cached_binary_key(db, "opa", version, "linux", arch)
+    if key is None:
+        logger.warning("OPA was cached but no row names its object", version=version)
+        return None
 
     # A UNIQUE scratch file per fetch, not a fixed `<dest>.partial`. Two
     # concurrent fetchers (two policy-set writes arriving together, or two

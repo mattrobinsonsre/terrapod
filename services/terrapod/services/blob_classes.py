@@ -57,10 +57,15 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+import sqlalchemy as sa
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import BLOB_CLASS_NAMES, BLOB_MODES
+from terrapod.services.cache_object_keys import (
+    binary_storage_key,
+    provider_storage_key,
+)
 from terrapod.storage import keys
 
 #: What losing a class costs, from #1114.
@@ -113,8 +118,60 @@ class BlobClass:
     encrypted_at_rest: bool = False
 
 
-async def _count(db: AsyncSession, model: type) -> int:
-    return int((await db.execute(select(func.count()).select_from(model))).scalar() or 0)
+async def _count(db: AsyncSession, model: type, *predicates) -> int:
+    stmt = select(func.count()).select_from(model)
+    for predicate in predicates:
+        stmt = stmt.where(predicate)
+    return int((await db.execute(stmt)).scalar() or 0)
+
+
+def _not_uploaded(model: type):
+    """Rows whose object is NOT under `uploads/`.
+
+    The cache classes carry this so an uploaded artifact is counted and checked
+    under exactly one class. Without it the same key appears in two, which is
+    the double-count `owning_class` is written to prevent -- the endpoint's
+    `owns()` filter would drop it from the cache class's listing anyway, but a
+    readiness report built from the resolver would already have counted it, and
+    the two numbers would disagree with no way to tell which was wrong.
+
+    `IS NULL` counts as not-uploaded: a row written before #2599 has its object
+    at the key its coordinates derive, which is under `cache/`.
+    """
+    column = model.storage_key
+    return sa.or_(column.is_(None), sa.not_(column.like(f"{keys.UPLOADS_PREFIX}%")))
+
+
+async def _resolve_uploaded_artifacts(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
+    """Every operator-uploaded artifact, across all three caches.
+
+    One class rather than three because the tier is a property of how the bytes
+    got here, not of which cache serves them: an upload has no upstream whatever
+    its kind, so losing one is the same problem in each case. Three classes
+    would also need three prefixes under `uploads/`, and the peer listing
+    endpoint takes exactly one prefix per class.
+
+    `storage_key LIKE 'uploads/%'` rather than
+    `attestation = 'operator-upload'`, and the difference matters: the class is
+    about where the OBJECT is, because that is what the copier enumerates and
+    what `owning_class` resolves. A row whose attestation says upload but whose
+    object still sits under `cache/` -- which is every upload written before
+    this landed -- belongs to the cache class until its object moves, and saying
+    otherwise would have the resolver promise a key the copier cannot find.
+    """
+    from terrapod.db.models import CachedBinary, CachedPackageFile, CachedProviderPackage
+
+    pattern = f"{keys.UPLOADS_PREFIX}%"
+    found: list[str] = []
+    total = 0
+    for model in (CachedPackageFile, CachedBinary, CachedProviderPackage):
+        uploaded = model.storage_key.like(pattern)
+        total += await _count(db, model, uploaded)
+        stmt = select(model.storage_key).where(uploaded).order_by(model.cached_at.desc())
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        found.extend(k for k in (await db.execute(stmt)).scalars().all() if k)
+    return total, found[:limit] if limit is not None else found
 
 
 # ---------------------------------------------------------------------------
@@ -254,18 +311,16 @@ async def _resolve_provider_cache(db: AsyncSession, limit: int | None) -> tuple[
     """
     from terrapod.db.models import CachedProviderPackage
 
-    total = await _count(db, CachedProviderPackage)
-    stmt = select(
-        CachedProviderPackage.hostname,
-        CachedProviderPackage.namespace,
-        CachedProviderPackage.type,
-        CachedProviderPackage.version,
-        CachedProviderPackage.filename,
-    ).order_by(CachedProviderPackage.cached_at.desc())
+    total = await _count(db, CachedProviderPackage, _not_uploaded(CachedProviderPackage))
+    stmt = (
+        select(CachedProviderPackage)
+        .where(_not_uploaded(CachedProviderPackage))
+        .order_by(CachedProviderPackage.cached_at.desc())
+    )
     if limit is not None:
         stmt = stmt.limit(limit)
-    rows = (await db.execute(stmt)).all()
-    return total, [keys.provider_cache_key(h, ns, t, v, f) for h, ns, t, v, f in rows]
+    rows = (await db.execute(stmt)).scalars().all()
+    return total, [provider_storage_key(row) for row in rows]
 
 
 async def _resolve_package_cache(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
@@ -276,8 +331,12 @@ async def _resolve_package_cache(db: AsyncSession, limit: int | None) -> tuple[i
     """
     from terrapod.db.models import CachedPackageFile
 
-    total = await db.scalar(select(func.count()).select_from(CachedPackageFile)) or 0
-    query = select(CachedPackageFile.storage_key).order_by(CachedPackageFile.cached_at)
+    total = await _count(db, CachedPackageFile, _not_uploaded(CachedPackageFile))
+    query = (
+        select(CachedPackageFile.storage_key)
+        .where(_not_uploaded(CachedPackageFile))
+        .order_by(CachedPackageFile.cached_at)
+    )
     if limit is not None:
         query = query.limit(limit)
     rows = (await db.execute(query)).scalars().all()
@@ -294,14 +353,16 @@ async def _resolve_binary_cache(db: AsyncSession, limit: int | None) -> tuple[in
     """
     from terrapod.db.models import CachedBinary
 
-    total = await _count(db, CachedBinary)
-    stmt = select(
-        CachedBinary.tool, CachedBinary.version, CachedBinary.os, CachedBinary.arch
-    ).order_by(CachedBinary.cached_at.desc())
+    total = await _count(db, CachedBinary, _not_uploaded(CachedBinary))
+    stmt = (
+        select(CachedBinary)
+        .where(_not_uploaded(CachedBinary))
+        .order_by(CachedBinary.cached_at.desc())
+    )
     if limit is not None:
         stmt = stmt.limit(limit)
-    rows = (await db.execute(stmt)).all()
-    return total, [keys.binary_cache_key(t, v, o, a) for t, v, o, a in rows]
+    rows = (await db.execute(stmt)).scalars().all()
+    return total, [binary_storage_key(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +404,22 @@ CLASSES: tuple[BlobClass, ...] = (
         tier=IRREPLACEABLE,
         prefixes=("registry/providers/",),
         resolver=_resolve_provider_binaries,
+    ),
+    BlobClass(
+        name="uploaded_artifacts",
+        # IRREPLACEABLE rather than REDERIVABLE, which is the whole point of the
+        # class existing: there is no upstream to re-fetch an operator's upload
+        # from, sealed or not. Lumped in with the caches it inherited their tier
+        # and read as merely cold, so a promoted follower would hold a complete
+        # ledger of what should be there and be unable to serve any of it --
+        # recoverable only by the operator re-uploading their entire curated set,
+        # discovered during an incident (#2599).
+        tier=IRREPLACEABLE,
+        prefixes=(keys.UPLOADS_PREFIX,),
+        resolver=_resolve_uploaded_artifacts,
+        # No `sealed_is_fatal`: it escalates a class TO irreplaceable, and this
+        # one already is. Sealing changes nothing here, which is the honest
+        # statement -- an upload was never re-warmable in the first place.
     ),
     BlobClass(
         name="deleted_workspace_markers",

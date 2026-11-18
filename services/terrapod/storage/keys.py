@@ -358,20 +358,33 @@ def package_cache_key(ecosystem: str, name: str, filename: str) -> str:
 UPLOADS_PREFIX = "uploads/"
 
 
+# An operator upload goes under its own top-level prefix rather than beside the
+# pull-through content it stands in for, and the reason is `blob_classes`:
+# `owning_class` resolves exactly ONE class per key by longest-prefix match --
+# deliberately, because overlapping classes would be counted twice in a
+# readiness report and copied twice by the copier, and it is also the gate that
+# stops a crafted key escaping a prefix. So two classes cannot share
+# `cache/binaries/`, and the distinction between "re-fetchable from upstream"
+# and "irreplaceable" has to live in the key itself (#2599).
+#
+# Safe because every serve path reads the row's recorded `storage_key` rather
+# than deriving one -- see `services.cache_object_keys`.
+
+
 def uploaded_package_key(ecosystem: str, name: str, filename: str) -> str:
-    """Key for an operator-uploaded language-registry artifact."""
+    """Where an operator-uploaded language package lives."""
     return f"{UPLOADS_PREFIX}packages/{ecosystem}/{name}/{filename}"
 
 
 def uploaded_provider_key(
     hostname: str, namespace: str, type_: str, version: str, filename: str
 ) -> str:
-    """Key for an operator-uploaded provider archive."""
+    """Where an operator-uploaded provider archive lives."""
     return f"{UPLOADS_PREFIX}providers/{hostname}/{namespace}/{type_}/{version}/{filename}"
 
 
 def uploaded_binary_key(tool: str, version: str, os_: str, arch: str) -> str:
-    """Key for an operator-uploaded engine or platform-tool binary."""
+    """Where an operator-uploaded engine binary lives."""
     return f"{UPLOADS_PREFIX}binaries/{tool}/{version}/{os_}_{arch}"
 
 

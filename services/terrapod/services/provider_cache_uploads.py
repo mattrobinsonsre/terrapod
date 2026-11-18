@@ -32,9 +32,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import CachedProviderPackage
 from terrapod.logging_config import get_logger
-from terrapod.services import cache_admission
+from terrapod.services import cache_admission, orphaned_objects
 from terrapod.services.package_cache import substrate
-from terrapod.storage.keys import provider_cache_key
+from terrapod.storage.keys import uploaded_provider_key
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -132,7 +132,11 @@ async def admit(
     validate_coordinates(hostname, namespace, type_, version, os_, arch)
     h1, hexdigest = await asyncio.to_thread(_h1_and_digest, tmp_path)
     filename = archive_filename(type_, version, os_, arch)
-    key = provider_cache_key(hostname, namespace, type_, version, filename)
+    # Under `uploads/`, not beside the pull-through content it stands in for.
+    # An upload has no upstream, so it is irreplaceable where cached content is
+    # merely cold, and `blob_classes` can only tell them apart by the key --
+    # `owning_class` resolves one class per key by longest prefix (#2599).
+    key = uploaded_provider_key(hostname, namespace, type_, version, filename)
 
     existing = (
         await db.execute(
@@ -180,7 +184,18 @@ async def admit(
         now = datetime.now(UTC)
         existing.shasum = hexdigest
         existing.h1_hash = h1
+        # Nothing points at the old object once the key moves, and every
+        # retention sweep is row-driven -- so record it, or it is kept for ever
+        # (#2599). Recorded rather than deleted: this transaction can still
+        # roll back after the put below succeeds, which would revert the row to
+        # the old key, and a deleted object then is data loss rather than a
+        # leak.
+        if existing.storage_key and existing.storage_key != key:
+            await orphaned_objects.record(
+                db, existing.storage_key, reason="replaced by an operator upload"
+            )
         existing.filename = filename
+        existing.storage_key = key
         existing.attestation = substrate.ATTEST_OPERATOR_UPLOAD
         existing.uploaded_by = uploaded_by
         existing.upload_reference = reference or None
@@ -212,6 +227,7 @@ async def admit(
         filename=filename,
         shasum=hexdigest,
         h1_hash=h1,
+        storage_key=key,
         attestation=substrate.ATTEST_OPERATOR_UPLOAD,
         uploaded_by=uploaded_by,
         upload_reference=reference or None,

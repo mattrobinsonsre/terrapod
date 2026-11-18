@@ -3134,6 +3134,11 @@ BLOB_CLASS_NAMES: tuple[str, ...] = (
     "configuration_versions",
     "registry_modules",
     "registry_providers",
+    # Operator uploads. Irreplaceable where the caches below are merely cold:
+    # there is no upstream to re-fetch one from (#2599). Ordered with the
+    # other permanent-loss classes because that is the order a copier works
+    # in, and the register asserts the two lists match element for element.
+    "uploaded_artifacts",
     "deleted_workspace_markers",
     "run_logs",
     "run_plans",

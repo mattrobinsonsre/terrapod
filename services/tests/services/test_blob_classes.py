@@ -41,6 +41,11 @@ class TestTheRegisterDescribesTheWholeStore:
             "plans",
             "runs",
             "cache",
+            # Operator uploads live under their own top-level prefix rather than
+            # beside the pull-through content they stand in for, because
+            # `owning_class` resolves one class per key by longest prefix and two
+            # classes therefore cannot share `cache/` (#2599).
+            "uploads",
             "vcs_archives",
             "module_overrides",
         }
@@ -72,6 +77,10 @@ class TestTheRegisterDescribesTheWholeStore:
             "configuration_versions",
             "registry_modules",
             "registry_providers",
+            # Not in #1114's own table, which predates operator uploads: an
+            # upload has no upstream, so losing one is permanent in exactly the
+            # sense the tier means (#2599).
+            "uploaded_artifacts",
         }
 
     def test_policy_sets_are_deliberately_absent(self):
@@ -263,8 +272,25 @@ class TestResolvers:
         result = MagicMock()
         result.all.return_value = rows
         result.scalar.return_value = count
+        # Some resolvers select whole entities rather than column tuples, so the
+        # fake answers both shapes from the same list.
+        result.scalars.return_value.all.return_value = rows
         db.execute.return_value = result
         return db
+
+    @staticmethod
+    def _row(**fields):
+        """A stand-in for a cache row.
+
+        `SimpleNamespace` rather than `MagicMock`: a resolver reads
+        `row.storage_key` and falls back to the derived key only when it is
+        falsy, and a MagicMock would hand it a truthy auto-attribute that reads
+        as a recorded key -- so every test would pass whatever the resolver did.
+        """
+        from types import SimpleNamespace
+
+        fields.setdefault("storage_key", None)
+        return SimpleNamespace(**fields)
 
     async def test_state_resolves_every_version_not_just_the_latest(self):
         """Rollback is a shipped feature, so a node holding only HEAD has
@@ -321,7 +347,15 @@ class TestResolvers:
         """The row carries the filename verbatim, so the key is recorded rather
         than reconstructed — upstream naming is not ours to guess at."""
         db = self._db(
-            [("registry.terraform.io", "hashicorp", "aws", "5.0.0", "aws_5.0.0_linux_amd64.zip")],
+            [
+                self._row(
+                    hostname="registry.terraform.io",
+                    namespace="hashicorp",
+                    type="aws",
+                    version="5.0.0",
+                    filename="aws_5.0.0_linux_amd64.zip",
+                )
+            ],
             count=1,
         )
 
@@ -331,17 +365,62 @@ class TestResolvers:
             "cache/providers/registry.terraform.io/hashicorp/aws/5.0.0/aws_5.0.0_linux_amd64.zip"
         ]
 
+    async def test_a_provider_row_that_records_its_key_is_believed(self):
+        """An operator-uploaded provider lives under `uploads/`, and deriving the
+        key would aim the check at a `cache/` object that holds nothing -- a
+        false gap on a healthy node, which is what this class exists to avoid
+        reporting (#2599).
+        """
+        uploaded = "uploads/providers/registry.terraform.io/hashicorp/aws/5.0.0/aws.zip"
+        db = self._db(
+            [
+                self._row(
+                    hostname="registry.terraform.io",
+                    namespace="hashicorp",
+                    type="aws",
+                    version="5.0.0",
+                    filename="aws.zip",
+                    storage_key=uploaded,
+                )
+            ],
+            count=1,
+        )
+
+        _, resolved = await blob_classes._resolve_provider_cache(db, None)
+
+        assert resolved == [uploaded]
+
     async def test_the_binary_cache_checks_the_executable_only(self):
         """The publisher manifest and signature cached alongside it were added
         later and are written opportunistically, so a node that cached a binary
         before that legitimately has none. Checking them would report a false gap
         on a healthy node."""
-        db = self._db([("tofu", "1.12.0", "linux", "amd64")], count=1)
+        db = self._db([self._row(tool="tofu", version="1.12.0", os="linux", arch="amd64")], count=1)
 
         _, resolved = await blob_classes._resolve_binary_cache(db, None)
 
         assert resolved == ["cache/binaries/tofu/1.12.0/linux_amd64"]
         assert not any("SHA256SUMS" in k for k in resolved)
+
+    async def test_a_binary_row_that_records_its_key_is_believed(self):
+        """The same property for binaries -- see the provider case above."""
+        uploaded = "uploads/binaries/tofu/1.12.0/linux_amd64"
+        db = self._db(
+            [
+                self._row(
+                    tool="tofu",
+                    version="1.12.0",
+                    os="linux",
+                    arch="amd64",
+                    storage_key=uploaded,
+                )
+            ],
+            count=1,
+        )
+
+        _, resolved = await blob_classes._resolve_binary_cache(db, None)
+
+        assert resolved == [uploaded]
 
     async def test_every_resolver_honours_the_limit(self):
         """Sampling is the default, so a resolver that ignored `limit` would turn
@@ -353,3 +432,175 @@ class TestResolvers:
                 continue
             source = inspect.getsource(cls.resolver)
             assert "limit" in source, cls.name
+
+
+class TestUploadedArtifactsAreTheirOwnClass:
+    """Why this class exists at all (#2599).
+
+    Before it, an operator upload sat in whichever cache class served its kind
+    and inherited that class's tier -- `rederivable`, meaning "a miss re-warms
+    itself from upstream". For an upload that is false: there is no upstream. A
+    promoted follower would hold a complete ledger of what should be there and
+    be unable to serve any of it, recoverable only by the operator re-uploading
+    their entire curated set, discovered during an incident.
+    """
+
+    def test_it_is_irreplaceable(self):
+        cls = next(c for c in blob_classes.CLASSES if c.name == "uploaded_artifacts")
+        assert cls.tier == IRREPLACEABLE
+
+    def test_it_does_not_escalate_on_sealing(self):
+        """`sealed_is_fatal` escalates a class TO irreplaceable, and this one
+        already is. Sealing changes nothing here, which is the honest statement:
+        an upload was never re-warmable in the first place.
+        """
+        cls = next(c for c in blob_classes.CLASSES if c.name == "uploaded_artifacts")
+        assert cls.sealed_is_fatal is False
+
+    def test_it_owns_the_uploads_prefix_and_the_caches_do_not(self):
+        """The property `owning_class` is written to guarantee: one class per
+        key. Two classes sharing a prefix would be counted twice in a readiness
+        report and copied twice by the copier.
+        """
+        owner = blob_classes.owning_class("uploads/binaries/tofu/1.9.0/linux_amd64")
+        assert owner is not None and owner.name == "uploaded_artifacts"
+
+    @pytest.mark.parametrize(
+        ("key", "expected"),
+        [
+            ("uploads/packages/pypi/requests/requests-2.0.whl", "uploaded_artifacts"),
+            (
+                "uploads/providers/registry.terraform.io/hashicorp/aws/5.0.0/aws.zip",
+                "uploaded_artifacts",
+            ),
+            ("uploads/binaries/tofu/1.9.0/linux_amd64", "uploaded_artifacts"),
+            # The controls. Without these a class claiming `""` would pass every
+            # case above.
+            ("cache/packages/pypi/requests/requests-2.0.whl", "package_cache"),
+            ("cache/binaries/tofu/1.9.0/linux_amd64", "binary_cache"),
+            ("cache/providers/registry.terraform.io/hashicorp/aws/5.0.0/aws.zip", "provider_cache"),
+        ],
+    )
+    def test_every_upload_kind_resolves_to_it_and_cached_kinds_do_not(self, key, expected):
+        owner = blob_classes.owning_class(key)
+        assert owner is not None and owner.name == expected
+
+
+class TestTheCacheClassesExcludeUploads:
+    """The half that is easy to miss, and silent when wrong.
+
+    `owns()` filters the peer listing endpoint, so an `uploads/` key returned by
+    a cache resolver would be dropped there -- but a readiness report is built
+    from the resolver directly and would already have counted it. The two
+    numbers then disagree with no way to tell which is wrong, which is the
+    double-count the register's one-class-per-key rule exists to prevent.
+    """
+
+    def test_a_null_key_counts_as_not_uploaded(self):
+        """A row written before #2599 has NULL and its object is under `cache/`,
+        so it belongs to its cache class rather than falling out of both.
+        """
+        from terrapod.db.models import CachedBinary
+
+        clause = str(blob_classes._not_uploaded(CachedBinary))
+        assert "IS NULL" in clause
+
+    def test_the_predicate_excludes_the_uploads_prefix(self):
+        from terrapod.db.models import CachedBinary
+
+        clause = str(blob_classes._not_uploaded(CachedBinary))
+        assert "LIKE" in clause and "NOT" in clause
+
+    @pytest.mark.parametrize(
+        "model_name", ["CachedPackageFile", "CachedBinary", "CachedProviderPackage"]
+    )
+    def test_every_key_holding_model_can_be_filtered(self, model_name):
+        """Derived rather than listed: a fourth table with a `storage_key` is
+        covered the day it is added, rather than silently double-counting.
+        """
+        import terrapod.db.models as models
+
+        model = getattr(models, model_name)
+        assert blob_classes._not_uploaded(model) is not None
+
+
+class TestEachCacheResolverActuallyAppliesTheExclusion:
+    """A predicate nothing uses is the defect this class exists to catch.
+
+    The tests above assert `_not_uploaded` builds the right SQL. That is a
+    presence check: removing the `.where(_not_uploaded(...))` from a resolver
+    left all 61 of them green, because the fake session returns whatever rows it
+    is given regardless of the clause. So these read the statement the resolver
+    actually executed.
+
+    Via `stmt.whereclause` rather than `str(stmt)`: rendering a
+    `select(Model)` emits every column of the table, so asserting the string
+    contains `storage_key` passes whether or not it is in the predicate.
+    """
+
+    @staticmethod
+    def _recording_db():
+        db = AsyncMock()
+        statements = []
+        result = MagicMock()
+        result.all.return_value = []
+        result.scalar.return_value = 0
+        result.scalars.return_value.all.return_value = []
+
+        async def _execute(stmt, *a, **kw):
+            statements.append(stmt)
+            return result
+
+        db.execute = _execute
+        db.scalar = AsyncMock(return_value=0)
+        return db, statements
+
+    @pytest.mark.parametrize(
+        ("resolver", "label"),
+        [
+            ("_resolve_binary_cache", "binary_cache"),
+            ("_resolve_provider_cache", "provider_cache"),
+            ("_resolve_package_cache", "package_cache"),
+        ],
+    )
+    async def test_the_resolver_excludes_uploaded_rows(self, resolver, label):
+        db, statements = self._recording_db()
+
+        await getattr(blob_classes, resolver)(db, None)
+
+        # EVERY statement, not any. A resolver runs a count and a select and
+        # both carry the predicate, so `any` is satisfied by the count while the
+        # select quietly returns uploaded rows. Measured: with `any`, this test
+        # passed with the select's own `.where()` deleted.
+        # `or ""` would call bool() on a SQLAlchemy clause, which raises by
+        # design ("Boolean value of this clause is not defined").
+        clauses = ["" if stmt.whereclause is None else str(stmt.whereclause) for stmt in statements]
+        assert len(clauses) >= 2, (
+            f"{label} executed {len(clauses)} statement(s); expected a count and a select"
+        )
+        missing = [c for c in clauses if "storage_key" not in c or "LIKE" not in c]
+        assert not missing, (
+            f"{label} has {len(missing)} statement(s) that do not exclude uploads -- an "
+            f"uploaded key would be counted under this class AND under "
+            f"uploaded_artifacts: {missing}"
+        )
+
+    async def test_the_uploads_resolver_selects_only_uploaded_rows(self):
+        """The other direction. Without it, a resolver returning everything
+        would pass the cases above while reporting cached content as
+        irreplaceable.
+        """
+        db, statements = self._recording_db()
+
+        await blob_classes._resolve_uploaded_artifacts(db, None)
+
+        # `or ""` would call bool() on a SQLAlchemy clause, which raises by
+        # design ("Boolean value of this clause is not defined").
+        clauses = ["" if stmt.whereclause is None else str(stmt.whereclause) for stmt in statements]
+        assert len(clauses) >= 6, (
+            f"expected a count and a select per key-holding table; got {len(clauses)}"
+        )
+        # Positive match, not a negated one -- it selects uploads rather than
+        # excluding everything else.
+        assert all("NOT" not in c for c in clauses), f"expected a positive filter: {clauses}"
+        assert all("storage_key" in c and "LIKE" in c for c in clauses)

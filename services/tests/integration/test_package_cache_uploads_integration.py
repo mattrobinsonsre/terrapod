@@ -124,7 +124,16 @@ class TestAFirstUpload:
         await _admit(artifact_file(VETTED))
 
         row = await _row()
-        assert row.storage_key == keys.package_cache_key(pypi.ECOSYSTEM, "flask", FILENAME)
+        # Under `uploads/`, and the serve path finds it because it reads the
+        # key off the row rather than deriving one (#2599). An upload has no
+        # upstream, so it is irreplaceable where pull-through content is merely
+        # cold -- and `blob_classes.owning_class` resolves exactly one class per
+        # key by longest prefix, so the two cannot share `cache/packages/`.
+        assert row.storage_key == keys.uploaded_package_key(pypi.ECOSYSTEM, "flask", FILENAME)
+        # The discriminating half: it is NOT where the pull-through cache would
+        # have put it. Without this the assertion above would pass if the two
+        # key builders ever converged.
+        assert row.storage_key != keys.package_cache_key(pypi.ECOSYSTEM, "flask", FILENAME)
 
 
 class TestTheUploadedArtifactIsWhatGetsServed:

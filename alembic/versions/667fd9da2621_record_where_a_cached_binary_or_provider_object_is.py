@@ -21,8 +21,12 @@ NULL -- so an old replica serving traffic during a rolling upgrade is unaffected
 and the column stops being load-bearing only when something is written under a
 prefix the coordinates do not describe.
 
-No `schema_contractions` row: this adds a column and removes nothing, so an older
-pod reading this table is fine.
+It also adds `orphaned_objects`, because moving a row's key leaves the old object
+referenced by nothing and every retention sweep in the tree is row-driven. The
+reasoning for recording rather than deleting inline is at the `create_table`.
+
+No `schema_contractions` row: this adds a column and a table and removes nothing,
+so an older pod reading these tables is fine.
 
 Revision ID: 667fd9da2621
 Revises: a38b26d03bd2
@@ -72,6 +76,34 @@ def upgrade() -> None:
         """
     )
 
+    # And a place to record an object nothing points at any more.
+    #
+    # Replacing a pulled artifact with an upload moves the row's key from
+    # `cache/` to `uploads/`, which leaves the `cache/` object referenced by
+    # nothing. Every retention sweep in the tree is ROW-driven -- it walks rows
+    # and deletes the object each one names -- so an object with no row is
+    # invisible to all of them and would be kept for ever.
+    #
+    # Deleting it inline is not safe, and the ordering is why: the upload path
+    # changes the row, flushes, and only then streams the bytes, deliberately,
+    # so that a failed put rolls back cleanly. The caller's transaction can
+    # still roll back AFTER a successful put, which would revert the row to the
+    # old key -- and if the old object had already been deleted, that is data
+    # loss rather than a leak. So the orphan is RECORDED in the same
+    # transaction as the row change (a rollback takes the record with it,
+    # correctly, because the old object is still referenced) and swept later.
+    op.create_table(
+        "orphaned_objects",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("storage_key", sa.String(length=1024), nullable=False, unique=True),
+        sa.Column("reason", sa.String(length=255), nullable=False),
+        # No server_default: the model supplies it with `now_utc`, matching
+        # every sibling cache table, so the two cannot disagree about which
+        # clock wrote it.
+        sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index("ix_orphaned_objects_recorded_at", "orphaned_objects", ["recorded_at"])
+
 
 def downgrade() -> None:
     # Dropping the column loses only where an object is, and for every row whose
@@ -83,5 +115,10 @@ def downgrade() -> None:
     # after upgrading, then downgraded, has a row whose object the old code cannot
     # find. That is stated rather than silently accepted, and it is why the column
     # is the mechanism rather than a convention about prefixes.
+    # The table goes first: dropping it loses only the record of which objects
+    # are unreferenced, and after a downgrade the keys are derivable again for
+    # every row that has not been uploaded over.
+    op.drop_index("ix_orphaned_objects_recorded_at", table_name="orphaned_objects")
+    op.drop_table("orphaned_objects")
     op.drop_column("cached_provider_packages", "storage_key")
     op.drop_column("cached_binaries", "storage_key")

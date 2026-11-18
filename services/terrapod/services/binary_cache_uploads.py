@@ -30,10 +30,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import CachedBinary
 from terrapod.logging_config import get_logger
-from terrapod.services import cache_admission
+from terrapod.services import cache_admission, orphaned_objects
 from terrapod.services.binary_cache_service import VALID_TOOLS
 from terrapod.services.package_cache import substrate
-from terrapod.storage.keys import binary_cache_key
+from terrapod.storage.keys import uploaded_binary_key
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -101,7 +101,11 @@ async def admit(
     """
     validate_coordinates(tool, version, os_, arch)
     _, hexdigest = await asyncio.to_thread(substrate._digest_file, tmp_path, UPLOAD_ALGORITHM)
-    key = binary_cache_key(tool, version, os_, arch)
+    # Under `uploads/`, not beside the pull-through content it stands in for.
+    # An upload has no upstream, so it is irreplaceable where cached content is
+    # merely cold, and `blob_classes` can only tell them apart by the key --
+    # `owning_class` resolves one class per key by longest prefix (#2599).
+    key = uploaded_binary_key(tool, version, os_, arch)
 
     existing = (
         await db.execute(
@@ -151,7 +155,18 @@ async def admit(
         existing.shasum = hexdigest
         # An uploaded binary has no upstream, and leaving a stale URL would invite
         # a reader to believe one could be re-fetched from it.
+        # Nothing points at the old object once the key moves, and every
+        # retention sweep is row-driven -- so record it, or it is kept for ever
+        # (#2599). Recorded rather than deleted: this transaction can still
+        # roll back after the put below succeeds, which would revert the row to
+        # the old key, and a deleted object then is data loss rather than a
+        # leak.
+        if existing.storage_key and existing.storage_key != key:
+            await orphaned_objects.record(
+                db, existing.storage_key, reason="replaced by an operator upload"
+            )
         existing.download_url = ""
+        existing.storage_key = key
         existing.attestation = substrate.ATTEST_OPERATOR_UPLOAD
         existing.uploaded_by = uploaded_by
         existing.upload_reference = reference or None
@@ -182,6 +197,7 @@ async def admit(
         arch=arch,
         shasum=hexdigest,
         download_url="",
+        storage_key=key,
         attestation=substrate.ATTEST_OPERATOR_UPLOAD,
         uploaded_by=uploaded_by,
         upload_reference=reference or None,
