@@ -2479,8 +2479,61 @@
                       },
                       "existingSecretKey": {
                         "type": "string"
+                      },
+                      "signer_identity": {
+                        "type": "string"
+                      },
+                      "signer_issuer": {
+                        "type": "string"
+                      },
+                      "require_attestation": {
+                        "type": "boolean"
                       }
-                    }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "required": [
+                            "signer_identity"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "signer_issuer"
+                          ]
+                        }
+                      },
+                      {
+                        "if": {
+                          "required": [
+                            "signer_issuer"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "signer_identity"
+                          ]
+                        }
+                      },
+                      {
+                        "if": {
+                          "required": [
+                            "require_attestation"
+                          ],
+                          "properties": {
+                            "require_attestation": {
+                              "const": true
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "signer_identity",
+                            "signer_issuer"
+                          ]
+                        }
+                      }
+                    ]
                   }
                 }
               }

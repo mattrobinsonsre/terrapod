@@ -619,6 +619,25 @@ api:
         #       existingSecretKey: password        # optional, defaults to "password"
         #     - host: mirror.example.com           # API not on its own hostname
         #       api_url: https://artifacts.internal/v2-proxy
+        #     - host: ghcr.io                       # verified against its publisher
+        #       signer_identity: https://github.com/org/repo/.github/workflows/release.yml@refs/tags/v1.2.3
+        #       signer_issuer: https://token.actions.githubusercontent.com
+        #       require_attestation: true           # refuse unsigned content from here
+        #
+        # signer_identity and signer_issuer name who must have signed content
+        # from an upstream, checked against the Sigstore attestation the
+        # publisher published (#2589). They are set together or not at all: an
+        # identity alone is satisfied by anyone who can obtain a certificate
+        # naming it from any OIDC provider, so half the pair is not half the
+        # control, and the schema refuses one without the other.
+        #
+        # require_attestation then refuses content from that upstream which
+        # carries no verifiable attestation. It is off by default because most
+        # container content in the world is unsigned, so requiring one globally
+        # would stop a mirror working rather than make it safer. Left off, an
+        # unsigned artifact is still mirrored and recorded as having no
+        # publisher attestation — which is the honest answer rather than a
+        # silent pass.
         #
         # host does two jobs: it is the first path component clients name AND,
         # by default, the address Terrapod fetches from (https://{host}).
