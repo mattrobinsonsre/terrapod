@@ -856,3 +856,150 @@ class TestGoModulesRecordNonePublished:
         # One request: no second upstream is consulted for a digest, which is the
         # whole of the decision recorded on `goproxy.artifact_for`.
         assert len(calls) == 1, calls
+
+
+class TestPublisherProvenanceOnTheMissPath:
+    """That the hook is REACHED and what it records (#2589 Gap A).
+
+    These exist because adding the hook broke none of 505 package-cache tests,
+    and an instrumented run showed neither verify function was called once: the
+    per-ecosystem files drive those modules in isolation, and every miss-path
+    test built an Artifact with no resolver. So the hook was present, correct
+    and never executed -- an optional parameter makes the bypass the default,
+    and tests take defaults.
+
+    Driven through `fetch_and_cache` rather than by calling the resolver, because
+    what is under test is the WIRING: that it runs, that it runs after the digest
+    and before the store, and which attestation the row ends up with.
+    """
+
+    @staticmethod
+    def _recording_resolver(result, *, seen: list[str]):
+        async def resolve(_client, digest_hex: str):
+            seen.append(digest_hex)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        return resolve
+
+    async def test_a_verified_publisher_is_recorded_as_such(self, app) -> None:
+        from terrapod.services.package_cache import publisher_provenance, substrate
+
+        seen: list[str] = []
+        provenance = publisher_provenance.Provenance(
+            identity="https://github.com/o/r/.github/workflows/release.yml@refs/heads/main",
+            issuer="https://token.actions.githubusercontent.com",
+            predicate="https://docs.pypi.org/attestations/publish/v1",
+            mechanism="PEP 740 / Sigstore",
+        )
+        artifact = _artifact()
+        artifact = Artifact(
+            **{
+                **{f: getattr(artifact, f) for f in artifact.__dataclass_fields__},
+                "provenance_resolver": self._recording_resolver(provenance, seen=seen),
+            }
+        )
+
+        storage = get_storage()
+        async with get_db_session() as db, _fake_upstream(calls=[]) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert record.attestation == substrate.ATTEST_UPSTREAM_PUBLISHER
+        # Handed the digest computed from the DOWNLOADED BYTES, not the one the
+        # index declared -- that is what makes the subject check meaningful.
+        assert seen == [WHEEL_SHA]
+
+    async def test_no_published_attestation_keeps_the_digest_result(self, app) -> None:
+        """The ordinary case for most of PyPI. A publisher who published nothing
+        must not downgrade an artifact whose digest verified."""
+        from terrapod.services.package_cache import substrate
+
+        seen: list[str] = []
+        artifact = _artifact()
+        artifact = Artifact(
+            **{
+                **{f: getattr(artifact, f) for f in artifact.__dataclass_fields__},
+                "provenance_resolver": self._recording_resolver(None, seen=seen),
+            }
+        )
+
+        storage = get_storage()
+        async with get_db_session() as db, _fake_upstream(calls=[]) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert record.attestation == substrate.ATTEST_UPSTREAM_DIGEST
+        assert seen == [WHEEL_SHA], "the resolver was not reached"
+
+    async def test_a_bad_attestation_refuses_the_artifact(self, app) -> None:
+        """Fatal, and not configurable.
+
+        What an operator may choose is whether an ABSENT attestation is
+        tolerated; never whether a BAD one is. A present signature that does not
+        verify is the supply-chain event this exists to catch.
+        """
+        from terrapod.services.package_cache import publisher_provenance
+
+        storage = get_storage()
+        artifact = _artifact("flask-3.0.0-badattest.whl")
+        artifact = Artifact(
+            **{
+                **{f: getattr(artifact, f) for f in artifact.__dataclass_fields__},
+                "provenance_resolver": self._recording_resolver(
+                    publisher_provenance.ProvenanceError("signed by somebody else"),
+                    seen=[],
+                ),
+            }
+        )
+
+        async with get_db_session() as db, _fake_upstream(calls=[]) as client:
+            with pytest.raises(publisher_provenance.ProvenanceError):
+                await fetch_and_cache(db, storage, artifact, client=client)
+
+        # And nothing was stored OR recorded. An artifact that fails must not
+        # reach the object store, because a half-stored object is still a thing a
+        # future bug could serve.
+        async with get_db_session() as db:
+            rows = await db.scalar(
+                select(func.count())
+                .select_from(CachedPackageFile)
+                .where(CachedPackageFile.filename == "flask-3.0.0-badattest.whl")
+            )
+        assert rows == 0
+        assert not await storage.exists("cache/packages/pypi/flask/flask-3.0.0-badattest.whl")
+
+    async def test_an_unavailable_check_degrades_rather_than_refusing(self, app) -> None:
+        """An unreachable trust root says nothing about the artifact.
+
+        Refusing here would make our own egress a reason to reject a package
+        whose digest verified, which is a worse failure than recording the
+        weaker claim honestly.
+        """
+        from terrapod.services.package_cache import publisher_provenance, substrate
+
+        storage = get_storage()
+        artifact = _artifact()
+        artifact = Artifact(
+            **{
+                **{f: getattr(artifact, f) for f in artifact.__dataclass_fields__},
+                "provenance_resolver": self._recording_resolver(
+                    publisher_provenance.ProvenanceUnavailable("no route to the trust root"),
+                    seen=[],
+                ),
+            }
+        )
+
+        async with get_db_session() as db, _fake_upstream(calls=[]) as client:
+            record = await fetch_and_cache(db, storage, artifact, client=client)
+
+        assert record.attestation == substrate.ATTEST_UPSTREAM_DIGEST
+
+    async def test_an_artifact_with_no_resolver_is_unaffected(self, app) -> None:
+        """The control. Every other ecosystem passes None, and must behave
+        exactly as it did before this existed."""
+        from terrapod.services.package_cache import substrate
+
+        storage = get_storage()
+        async with get_db_session() as db, _fake_upstream(calls=[]) as client:
+            record = await fetch_and_cache(db, storage, _artifact(), client=client)
+        assert record.attestation == substrate.ATTEST_UPSTREAM_DIGEST
