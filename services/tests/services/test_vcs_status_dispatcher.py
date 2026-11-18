@@ -345,3 +345,95 @@ class TestTheDispatcherAsksForARefresh:
         status, refresh = await self._dispatch(pr_number=None)
         status.assert_awaited_once()
         refresh.assert_not_awaited()
+
+
+class TestTheDispatcherPostsTheAggregateToo:
+    """The per-run hook: best-effort, PR runs only, and it hands over the run's
+    new state because the row may not have caught up with the trigger."""
+
+    _helper = TestTheDispatcherAsksForARefresh()
+
+    async def _dispatch(self, *, pr_number, source="vcs", publish=None, enabled=True):
+        from terrapod.config import settings
+        from terrapod.services.vcs_status_dispatcher import handle_vcs_commit_status
+
+        run, ws, conn = self._helper._fixtures(pr_number=pr_number)
+        run.source = source
+        session = self._helper._session(run, ws, conn)
+
+        class _Ctx:
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, *a):
+                return False
+
+        publish = publish or AsyncMock()
+        settings.vcs.commit_statuses.enabled = enabled
+        try:
+            with (
+                patch(
+                    "terrapod.services.vcs_status_dispatcher.get_db_session", return_value=_Ctx()
+                ),
+                patch.object(
+                    dispatcher.github_service, "create_commit_status", new=AsyncMock()
+                ) as status,
+                patch.object(
+                    dispatcher.vcs_status_comment, "refresh_for_run", new=AsyncMock()
+                ) as refresh,
+                patch.object(dispatcher.vcs_aggregate_post, "publish", new=publish),
+            ):
+                await handle_vcs_commit_status(
+                    {
+                        "run_id": str(run.id),
+                        "workspace_id": str(ws.id),
+                        "target_status": "planned",
+                        "has_changes": True,
+                    }
+                )
+        finally:
+            settings.vcs.commit_statuses.enabled = True
+        return run, conn, status, refresh, publish
+
+    @pytest.mark.asyncio
+    async def test_switched_off_no_aggregate_is_published_and_the_rest_is_unchanged(self):
+        _, _, status, refresh, publish = await self._dispatch(pr_number=7, enabled=False)
+        publish.assert_not_awaited()
+        status.assert_awaited_once()
+        assert status.await_args.kwargs["context"] == "terrapod/prod-vpc"
+        refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_pr_run_publishes_with_its_new_state(self):
+        run, conn, _, _, publish = await self._dispatch(pr_number=7)
+        publish.assert_awaited_once()
+        args, kwargs = publish.await_args
+        assert args[1] is conn
+        assert args[2:5] == ("org/repo", 7, run.vcs_commit_sha)
+        assert kwargs["overlay"] == (run.id, "planned", True)
+
+    @pytest.mark.asyncio
+    async def test_the_per_workspace_status_is_unchanged(self):
+        _, _, status, refresh, _ = await self._dispatch(pr_number=7)
+        status.assert_awaited_once()
+        assert status.await_args.kwargs["context"] == "terrapod/prod-vpc"
+        refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_branch_run_publishes_nothing(self):
+        *_, publish = await self._dispatch(pr_number=None)
+        publish.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_module_impact_run_publishes_nothing(self):
+        *_, publish = await self._dispatch(pr_number=7, source="module-test")
+        publish.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_publish_failure_never_fails_the_per_workspace_path(self):
+        _, _, status, refresh, publish = await self._dispatch(
+            pr_number=7, publish=AsyncMock(side_effect=RuntimeError("redis on fire"))
+        )
+        publish.assert_awaited_once()
+        status.assert_awaited_once()
+        refresh.assert_awaited_once()

@@ -51,6 +51,7 @@ from terrapod.services import (
     github_service,
     gitlab_service,
     run_service,
+    vcs_aggregate_post,
     vcs_rate_limit,
     workspace_settings,
 )
@@ -2669,7 +2670,8 @@ async def _still_in_scope(ids: set[uuid.UUID], scope: str) -> set[uuid.UUID]:
 
 async def _store_pr_decisions(decisions: PRDecisions) -> None:
     try:
-        await store_pr_evaluations(decisions, member_check=_still_in_scope)
+        stored = await store_pr_evaluations(decisions, member_check=_still_in_scope)
+        await vcs_aggregate_post.publish_pass(decisions, stored)
     except Exception:
         logger.warning("Could not store or post the PR evaluations", exc_info=True)
 

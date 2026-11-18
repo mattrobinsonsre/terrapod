@@ -345,6 +345,9 @@ def _verdict_from_stage(status: str, stage: str = "post_plan") -> GateVerdict:
 async def _collect_gates(db, run: Run, cache: dict | None = None) -> tuple[GateVerdict, ...]:
     """Every gate that could hold this run, in `post_plan_hold` evaluation order.
 
+    `cache` (run id -> verdicts) lets one caller that reads the same runs twice, such
+    as the comment handler, pay for each run once. It must not outlive that call.
+
     Run task, then policy, then security scan, then the AI policy gate — the
     order `run_service.post_plan_hold` checks them in, so the first failing
     verdict here is the same gate the run's `blocked-by` attribute names.
@@ -354,6 +357,15 @@ async def _collect_gates(db, run: Run, cache: dict | None = None) -> tuple[GateV
     AI gate is the exception — it is asked directly, because the state that
     matters there (held with no verdict yet) has no row to read.
     """
+    if cache is not None and run.id in cache:
+        return cache[run.id]
+    gates = await _read_gates(db, run)
+    if cache is not None:
+        cache[run.id] = gates
+    return gates
+
+
+async def _read_gates(db, run: Run) -> tuple[GateVerdict, ...]:
     run_id = run.id
     gates: list[GateVerdict] = []
 
@@ -786,7 +798,9 @@ async def _ready_ai_summary(db, run: Run) -> PlanSummary | None:
         return None
 
 
-async def _row_for(db, ws: Workspace, run: Run, merged_run: Run | None = None) -> _Row:
+async def _row_for(
+    db, ws: Workspace, run: Run, merged_run: Run | None = None, gates_cache: dict | None = None
+) -> _Row:
     """One table row for a (workspace, run) pair.
 
     Shared by both collectors so a workspace PR and a module PR cannot end up
@@ -800,7 +814,7 @@ async def _row_for(db, ws: Workspace, run: Run, merged_run: Run | None = None) -
         apply_summary=_apply_summary(run),
         mergeable_summary=_mergeable_summary(run),
         cost_delta=_cost_delta(run),
-        gates=await _collect_gates(db, run),
+        gates=await _collect_gates(db, run, gates_cache),
         ai_summary=await _ready_ai_summary(db, run),
         run_url=run_links.run_url(ws.id, run.id),
         resource_list=run.plan_resources,
@@ -881,7 +895,7 @@ async def _collect_module_rows(
     ]
 
 
-async def _collect_rows(db, sess: PRSession) -> list[_Row]:
+async def _collect_rows(db, sess: PRSession, gates_cache: dict | None = None) -> list[_Row]:
     """Find every workspace whose runs reference this PR, latest run per."""
     # Workspaces in either mode that have a run for this PR. We don't
     # have a direct (connection, repo, pr) → workspace index, so we
@@ -918,7 +932,7 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
         # the post-merge run is all there is to report.
         run = pair[1] if pair else merged_pair[1]  # type: ignore[index]
         merged_run = merged_pair[1] if merged_pair else None
-        rows.append(await _row_for(db, ws, run, merged_run))
+        rows.append(await _row_for(db, ws, run, merged_run, gates_cache))
     return rows
 
 

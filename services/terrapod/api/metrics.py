@@ -161,6 +161,18 @@ VCS_RUNS_CREATED = Counter(
     ["provider", "type"],
 )
 
+VCS_AGGREGATE_STATUS_REJECTED = Counter(
+    "terrapod_vcs_aggregate_status_rejected_total",
+    "Aggregate commit statuses a provider refused outright (final 4xx, not rate limits)",
+    ["provider", "status_code"],
+)
+
+VCS_AGGREGATE_STATUS_POSTS = Counter(
+    "terrapod_vcs_aggregate_status_posts_total",
+    "Aggregate commit status posts, by outcome: ok, transient (retried later) or rejected (final 4xx)",
+    ["provider", "outcome"],
+)
+
 VCS_CANDIDATE_REGISTRATION_FAILURES = Counter(
     "terrapod_vcs_candidate_registration_failures_total",
     (

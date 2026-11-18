@@ -523,6 +523,38 @@ class TestPruningNeedsTheScopeToMatch:
         assert await _still_in_scope({ids["b"]}, SCOPE) == {ids["b"]}
 
 
+class TestADisabledConnectionIsLegible:
+    async def test_the_blocker_names_the_connection(self, app):
+        _, _ = await _seed(b_own_connection=True, b_status="disabled")
+        await _poll_cycle(_Provider(changed=["svc/b/main.tf"]))
+        ev = await _eval()
+        assert ev is not None and not ev.complete
+        assert [reason for _, reason in ev.undecided] == ["connection disabled"]
+        assert "connection disabled" in aggregate([], ev).plan.description
+
+    async def test_the_per_workspace_switch_does_not_exclude_a_workspace_from_the_aggregate(
+        self, app
+    ):
+        from terrapod.config import settings
+
+        _, _ = await _seed(b_own_connection=True, b_status="disabled")
+        settings.vcs.commit_statuses.per_workspace = False
+        try:
+            await _poll_cycle(_Provider(changed=["svc/b/main.tf"]))
+            ev = await _eval()
+        finally:
+            settings.vcs.commit_statuses.per_workspace = True
+        assert ev is not None and not ev.complete
+
+    def test_no_aggregate_module_reads_the_switch(self):
+        import inspect
+
+        from terrapod.services import vcs_aggregate_post, vcs_aggregate_status, vcs_pr_decisions
+
+        for mod in (vcs_aggregate_post, vcs_aggregate_status, vcs_pr_decisions):
+            assert "per_workspace" not in inspect.getsource(mod)
+
+
 class TestAPullRequestIntoABranchNoWorkspaceTracks:
     """A ruleset requiring `terrapod/plan` on every branch must not leave such a PR at Expected."""
 

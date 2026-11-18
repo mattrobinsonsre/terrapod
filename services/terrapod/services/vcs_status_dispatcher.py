@@ -7,10 +7,17 @@ commit statuses and PR/MR comments back to the VCS provider.
 
 import uuid
 
+from terrapod.config import aggregate_statuses_enabled
 from terrapod.db.models import Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, run_links, vcs_status_comment
+from terrapod.services import (
+    github_service,
+    gitlab_service,
+    run_links,
+    vcs_aggregate_post,
+    vcs_status_comment,
+)
 
 logger = get_logger(__name__)
 
@@ -218,6 +225,9 @@ async def handle_vcs_commit_status(payload: dict) -> None:
         # rather than clobbering each other.
         context = f"terrapod/{ws.name}"
 
+        # Only a pull-request run has aggregate statuses to stand in for this one.
+        is_pr_run = bool(run.vcs_pull_request_number) and run.source != "module-test"
+
         # Post commit status
         try:
             if conn.provider == "gitlab":
@@ -261,6 +271,25 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                 sha=run.vcs_commit_sha[:12] if run.vcs_commit_sha else "",
                 error=str(e),
             )
+
+        # The aggregate plan/policy/apply statuses for the PR head. Best-effort,
+        # like the per-workspace post above: it must never fail that path.
+        if is_pr_run and aggregate_statuses_enabled():
+            try:
+                await vcs_aggregate_post.publish(
+                    db,
+                    conn,
+                    f"{owner}/{repo}",
+                    run.vcs_pull_request_number,
+                    run.vcs_commit_sha,
+                    overlay=(run.id, target_status, has_changes),
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to post the aggregate commit statuses",
+                    run_id=run_id_str,
+                    error=repr(e),
+                )
 
         # The PR comment is no longer this module's to write (#1940).
         #
