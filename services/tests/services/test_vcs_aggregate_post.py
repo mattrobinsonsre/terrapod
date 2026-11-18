@@ -1300,3 +1300,27 @@ class TestASteadyGreenIsRecheckedNowAndThen:
             provider.github.reset_mock()
             await _publish(*_stub(_agg("failure", "failure")))
         assert "terrapod/plan" in _contexts(provider.github)
+
+
+class TestTheGatesBlockSaysWhenAStatusDidNotLand:
+    async def test_notes_come_from_the_last_posted_markers(self, kv):
+        names = SimpleNamespace(
+            plan_name="terrapod/plan", policy_name="terrapod/policy", apply_name="terrapod/apply"
+        )
+        kv.values[f"tp:vcs_agg_last:{SCOPE}:{SHA}:terrapod/plan"] = (
+            "failed:2:99999999999.0::failure:abc"
+        )
+        kv.values[f"tp:vcs_agg_last:{SCOPE}:{SHA}:terrapod/policy"] = "success:abc"
+        kv.values[f"tp:vcs_agg_rejected:{SCOPE}:{SHA}:terrapod/apply"] = "failure:abc"
+        kv.values[f"tp:vcs_agg_last:{SCOPE}:{SHA}:terrapod/apply"] = (
+            "failed:1:99999999999.0::failure:abc"
+        )
+        notes = await post.posting_notes(SCOPE, SHA, names)
+        assert "retrying" in notes["terrapod/plan"]
+        assert "terrapod/policy" not in notes
+        assert "refused" in notes["terrapod/apply"]
+
+    async def test_a_redis_error_gives_no_notes(self, kv):
+        kv.fail = True
+        names = SimpleNamespace(plan_name="a", policy_name="b", apply_name="c")
+        assert await post.posting_notes(SCOPE, SHA, names) == {}

@@ -640,15 +640,19 @@ def _render_workspace_details(
     return "\n".join(lines)
 
 
-def render_comment(rows: list[_Row]) -> str:
+def render_comment(rows: list[_Row], gates: list[str] | None = None) -> str:
     """Render the Markdown status-comment body.
 
     Mode-aware rows: apply_then_merge workspaces show 'not applied' /
     'applied'; merge_then_apply workspaces show 'will apply on merge'
     in the apply column because they don't apply pre-merge by design.
+
+    `gates` is the Gates block (`vcs_aggregate_status.render_gates`), placed after
+    the table; None leaves it out.
     """
     if not rows:
-        return f"{_COMMENT_MARKER}\n\n{_HEADING}\n\n_No Terrapod workspaces affected by this PR._"
+        empty = f"{_COMMENT_MARKER}\n\n{_HEADING}\n\n_No Terrapod workspaces affected by this PR._"
+        return empty + ("\n\n" + "\n".join(gates) if gates else "")
 
     # No Mode column: `merge_then_apply` is internal vocabulary, and the Apply
     # cell already states the same fact in a reviewer's language ("will apply
@@ -710,10 +714,11 @@ def render_comment(rows: list[_Row]) -> str:
 
     # The lists share one budget after everything that is not a list, so `fixed`
     # includes the table, hint, footer and join newlines.
-    head = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, "", *tail]
+    gate_lines = ["", *gates] if gates else []
+    head = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, *gate_lines, "", *tail]
     detail_blocks = _fit_details(rows, detail_blocks, len("\n".join(head)))
 
-    parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines]
+    parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, *gate_lines]
     if detail_blocks:
         parts.append("")
         parts.extend(detail_blocks)
@@ -1289,6 +1294,42 @@ async def refresh_for_run(db, run: Run, reason: str) -> None:
         )
 
 
+async def _gates_for(
+    db, sess: PRSession, conn: VCSConnection, gates_cache: dict | None = None
+) -> list[str] | None:
+    """The Gates block, from the computation the commit statuses use; None leaves it out.
+
+    Left out, not invented, when no record backs the head or anything fails.
+    """
+    try:
+        # Local: the poster imports this module.
+        from terrapod.config import aggregate_statuses_enabled, settings
+        from terrapod.services import vcs_aggregate_post, vcs_pr_decisions
+        from terrapod.services.vcs_aggregate_status import render_gates
+
+        if not aggregate_statuses_enabled():
+            return None
+        scope = vcs_pr_decisions.repo_scope(conn, sess.repo)
+        head = await vcs_pr_decisions.latest_head(scope, sess.pr_number)
+        head = head or getattr(sess, "head_sha", "")
+        if not head:
+            return None
+        agg = await vcs_aggregate_post.compute_recorded(
+            db, conn, sess.repo, sess.pr_number, head, gates_cache
+        )
+        if agg is None:
+            return None
+        names = settings.vcs.commit_statuses
+        try:
+            notes = await vcs_aggregate_post.posting_notes(scope, head, names)
+        except Exception:
+            notes = {}
+        return render_gates(agg, names, head, notes)
+    except Exception as e:
+        logger.debug("Could not compute the Gates block", error=repr(e))
+        return None
+
+
 async def handle_vcs_status_comment_update(payload: dict[str, Any]) -> None:
     """Scheduler trigger handler.
 
@@ -1305,8 +1346,9 @@ async def handle_vcs_status_comment_update(payload: dict[str, Any]) -> None:
         conn = await db.get(VCSConnection, sess.vcs_connection_id)
         if conn is None:
             return
-        rows = await _collect_rows(db, sess)
-        body = render_comment(rows)
+        gates_cache: dict = {}
+        rows = await _collect_rows(db, sess, gates_cache)
+        body = render_comment(rows, await _gates_for(db, sess, conn, gates_cache))
         comment_id = await _post_or_update(
             conn, sess.repo, sess.pr_number, body, recorded_id=sess.status_comment_id
         )

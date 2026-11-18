@@ -450,6 +450,213 @@ class TestThePerWorkspaceSwitchThroughTheRealHandler:
         )
 
 
+class TestTheCommentShowsWhatTheChecksReport:
+    """The same fixtures through `publish` and through the comment handler."""
+
+    async def _comment(self, repo_pr=5):
+        import re
+
+        from sqlalchemy import select
+
+        from terrapod.db.models import PRSession
+        from terrapod.services import vcs_status_comment as mod
+
+        async with get_db_session() as db:
+            sess = (
+                (await db.execute(select(PRSession).where(PRSession.pr_number == repo_pr)))
+                .scalars()
+                .one()
+            )
+            sess_id = sess.id
+        captured = {}
+
+        async def fake_post(conn, repo, pr_number, body, recorded_id=None):
+            captured["body"] = body
+            return "1"
+
+        with patch.object(mod, "_post_or_update", new=fake_post):
+            await mod.handle_vcs_status_comment_update({"session_id": str(sess_id)})
+        body = captured["body"]
+        states = dict(re.findall(r"^- \S+ `([^`]+)`: (\w+) ", body, re.M))
+        return body, states
+
+    def _posted(self, wire):
+        out = {}
+        for p in wire.landed:
+            ctx = p.get("context")
+            if ctx in (PLAN, POLICY, APPLY):
+                out[ctx] = p["state"]
+        return out
+
+    async def test_a_planned_apply_then_merge_run(self, app):
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        await helper._dispatch(wire, run_id, ws_id)
+
+        body, shown = await self._comment()
+        assert "**Gates at `2222222`**" in body
+        assert shown == self._posted(wire)
+        assert shown == {PLAN: "success", POLICY: "success", APPLY: "pending"}
+
+    async def test_an_errored_run(self, app):
+        from terrapod.db.models import Run
+
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        async with get_db_session() as db:
+            run = await db.get(Run, run_id)
+            run.status = "errored"
+            await db.commit()
+        await helper._dispatch(wire, run_id, ws_id, status="errored")
+
+        _, shown = await self._comment()
+        assert shown == self._posted(wire)
+        assert shown[PLAN] == "failure" and shown[POLICY] == "failure"
+
+    async def test_custom_names_render_and_match_what_was_posted(self, app):
+        from terrapod.config import settings
+
+        cfg = settings.vcs.commit_statuses
+        old = (cfg.plan_name, cfg.policy_name)
+        cfg.plan_name, cfg.policy_name = "ci/tf-plan", "ci/tf-policy"
+        try:
+            wire = _Wire()
+            helper = TestTheDispatcherHook()
+            run_id, ws_id = await helper._planned_atm_run(wire)
+            await helper._dispatch(wire, run_id, ws_id)
+            _, shown = await self._comment()
+            posted = {
+                p["context"]: p["state"] for p in wire.landed if p["context"].startswith("ci/")
+            }
+        finally:
+            cfg.plan_name, cfg.policy_name = old
+        assert shown["ci/tf-plan"] == posted["ci/tf-plan"]
+        assert shown["ci/tf-policy"] == posted["ci/tf-policy"]
+
+    async def test_without_a_record_the_block_is_omitted_not_invented(self, app):
+        from terrapod.redis.client import get_redis_client
+
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        await helper._dispatch(wire, run_id, ws_id)
+        redis = get_redis_client()
+        for key in [k async for k in redis.scan_iter(match="tp:vcs_pr_eval:*")]:
+            await redis.delete(key)
+
+        body, shown = await self._comment()
+        assert "Gates at" not in body and shown == {}
+        assert "| Workspace |" in body
+
+    async def test_redis_failing_for_the_gates_still_posts_the_table(self, app):
+        wire = _Wire()
+        helper = TestTheDispatcherHook()
+        run_id, ws_id = await helper._planned_atm_run(wire)
+        await helper._dispatch(wire, run_id, ws_id)
+        with patch(
+            "terrapod.services.vcs_aggregate_post.load", new=AsyncMock(side_effect=RuntimeError)
+        ):
+            body, _ = await self._comment()
+        assert "Gates at" not in body and "| Workspace |" in body
+
+
+class TestTheCommentHandlerDoesNotReadGatesTwice:
+    """`_gates_for` used to re-run the per-run gate queries `_collect_rows` had just run."""
+
+    GATE_TABLES = ("task_stages", "policy_evaluations", "security_scan_results")
+
+    async def _workspaces_with_runs(self, n):
+        from terrapod.db.models import PRSession, Run
+
+        tag = uuid.uuid4().hex[:8]
+        async with get_db_session() as db:
+            conn = VCSConnection(
+                provider="github",
+                name=f"gq-{tag}",
+                server_url="",
+                token="x",
+                status="active",
+                github_installation_id=int(tag[:7], 16),
+            )
+            db.add(conn)
+            await db.flush()
+            for i in range(n):
+                ws = Workspace(
+                    name=f"gq-{i:02d}-{tag}",
+                    vcs_connection_id=conn.id,
+                    vcs_repo_url="https://github.com/acme/mono",
+                    vcs_branch="main",
+                )
+                db.add(ws)
+                await db.flush()
+                db.add(
+                    Run(
+                        workspace_id=ws.id,
+                        created_by="tests",
+                        source="vcs",
+                        vcs_pull_request_number=5,
+                        vcs_commit_sha=HEAD_SHA,
+                        status="planned",
+                        plan_only=True,
+                    )
+                )
+            db.add(
+                PRSession(vcs_connection_id=conn.id, repo="acme/mono", pr_number=5, state="open")
+            )
+            await db.commit()
+            return conn.id
+
+    async def test_each_runs_gates_are_read_once(self, app):
+        from sqlalchemy import event
+
+        from terrapod.db import session as session_mod
+        from terrapod.services import vcs_pr_decisions
+        from terrapod.services import vcs_status_comment as mod
+
+        n = 12
+        await self._workspaces_with_runs(n)
+        with patch.object(vcs_pr_decisions, "load", new=AsyncMock()) as load:
+            from terrapod.services.vcs_aggregate_status import PREvaluation
+
+            load.return_value = PREvaluation(True, (), (), (), (), False)
+            statements: list[str] = []
+
+            def count(conn, cursor, statement, *a):
+                if any(t in statement for t in self.GATE_TABLES) and statement.lstrip().startswith(
+                    "SELECT"
+                ):
+                    statements.append(statement)
+
+            engine = session_mod._engine.sync_engine
+            event.listen(engine, "before_cursor_execute", count)
+            try:
+                from sqlalchemy import select
+
+                from terrapod.db.models import PRSession
+
+                async with get_db_session() as db:
+                    sess = (await db.execute(select(PRSession))).scalars().one()
+                    sess_id = sess.id
+
+                async def fake_post(conn, repo, pr_number, body, recorded_id=None):
+                    return "1"
+
+                with (
+                    patch.object(mod, "_post_or_update", new=fake_post),
+                    patch(
+                        "terrapod.services.vcs_pr_decisions.latest_head",
+                        new=AsyncMock(return_value=HEAD_SHA),
+                    ),
+                ):
+                    await mod.handle_vcs_status_comment_update({"session_id": str(sess_id)})
+            finally:
+                event.remove(engine, "before_cursor_execute", count)
+        per_table = {t: sum(1 for st in statements if t in st) for t in self.GATE_TABLES}
+        assert all(c == n for c in per_table.values()), per_table
+
+
 class TestABranchRunCannotOverwriteAnAggregate:
     async def test_a_branch_run_of_a_workspace_named_plan_posts_nothing_on_the_aggregate(self, app):
         from terrapod.db.models import Run
