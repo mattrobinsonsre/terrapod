@@ -306,6 +306,7 @@ api:
       # Named storage locations (s3 | azure | gcs), keyed by name; `default` is reserved.
       # Takes effect once workspaces carry a storage location; empty = a single store.
       locations: {}
+      # A location's `credentials.type` is a placeholder: only `default` exists, nothing reads it.
 
     # Authentication
     auth:
