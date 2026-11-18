@@ -21,9 +21,10 @@ import hashlib
 
 import httpx
 import pytest
+import sqlalchemy as sa
 from sqlalchemy import func, select
 
-from terrapod.db.models import CachedPackageFile
+from terrapod.db.models import CachedPackageFile, OrphanedObject
 from terrapod.db.session import get_db_session
 from terrapod.services.package_cache import pypi, substrate, uploads
 from terrapod.storage import get_storage, keys
@@ -333,6 +334,23 @@ class TestConvertingAFetchedArtifactIntoAVettedOne:
         assert row.attestation == substrate.ATTEST_OPERATOR_UPLOAD
         assert row.uploaded_by == "vetting@example.com"
         assert row.replaced_digest == f"sha256:{VETTED_SHA}"
+
+        # The row's object moved from `cache/` to `uploads/`, so the key it used
+        # to be at is now referenced by nothing -- and every retention sweep in
+        # the tree walks rows, so without a record it would be kept for ever
+        # (#2599). This is the collector's real entry point, which is why it is
+        # asserted here rather than only against a hand-written record.
+        assert row.storage_key == keys.uploaded_package_key(pypi.ECOSYSTEM, "flask", FILENAME)
+        fetched_key = keys.package_cache_key(pypi.ECOSYSTEM, "flask", FILENAME)
+        async with get_db_session() as db:
+            orphans = list(
+                (await db.execute(sa.select(OrphanedObject.storage_key))).scalars().all()
+            )
+        assert orphans == [fetched_key]
+        # The old object is still THERE -- recorded, not deleted, because this
+        # transaction could still have rolled back and reverted the row to that
+        # key. The sweep reclaims it later.
+        assert await storage.get(fetched_key) == VETTED
 
     async def test_identical_bytes_over_a_fetched_row_still_need_replace(
         self, app, artifact_file
