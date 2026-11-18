@@ -293,6 +293,11 @@ language-package proxies have their own settings, in
 | `api.config.vcs.module_poll_interval_seconds` | `300` | Module repo poll interval (version tags + module-impact PRs). Longer by design: module repos are more numerous than they are active |
 | `api.config.vcs.tmpdir` | (matches `api.ephemeralStorage.mountPath`) | Directory for streaming download/strip/upload of VCS tarballs. Falls back to system tempdir if the path doesn't exist |
 | `api.config.vcs.archive_cache_retention_days` | `7` | TTL for cached stripped tarballs in object storage. Evicted by the artifact-retention sweeper |
+| `api.config.vcs.commit_statuses.enabled` | `true` | Post the aggregate statuses at all. `false` turns off everything that serves them ([details](vcs-integration.md#turning-the-aggregates-off)) |
+| `api.config.vcs.commit_statuses.plan_name` | `terrapod/plan` | Context of the aggregate plan status posted on every open PR ([Aggregate statuses](vcs-integration.md#aggregate-statuses)) |
+| `api.config.vcs.commit_statuses.policy_name` | `terrapod/policy` | Context of the aggregate policy status |
+| `api.config.vcs.commit_statuses.apply_name` | `terrapod/apply` | Context of the aggregate apply status. Never require it in branch protection ([why](vcs-workflows.md#why-not-apply)) |
+| `api.config.vcs.commit_statuses.per_workspace` | `true` | Also post `terrapod/<workspace>` for pull-request runs. Branch runs and module-impact statuses are unaffected |
 | `api.config.vcs.github.existingSecret` | `""` | K8s Secret containing the GitHub webhook HMAC secret |
 | `api.config.vcs.github.existingSecretKey` | `"webhook_secret"` | Key within the Secret |
 
