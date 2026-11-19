@@ -80,6 +80,46 @@ A brand-new upstream Checkov release is not immediately pinnable — the builder
 runs weekly over the newest upstream releases, so one published mid-week becomes
 available on the next run.
 
+### Every open pull request gains aggregate commit statuses
+
+**Every open pull request on a repository Terrapod polls gets two or three new
+commit statuses**: `terrapod/plan`, `terrapod/policy` and,
+when a workspace on the repository is `apply_then_merge`, `terrapod/apply`. They
+exist so a branch-protection rule can require a stable name, and a pull request
+that touches no workspace now gets `plan` and `policy` as `success`. Terrapod
+posts them from the next poll cycle after the upgrade, to the head commit of
+each open PR. Nothing requires them until you add a branch-protection rule, but
+three results are visible without any configuration:
+
+- **A pull request from a fork now shows a failing `plan` and `policy`** (a red X)
+  where it showed nothing before, if any workspace tracking the PR's base branch
+  has not opted in to `allow-fork-pr-plans` (the default). Terrapod skipped that
+  workspace without looking at the diff, so it cannot say the PR does not touch it.
+- **A workspace on a disabled VCS connection holds every pull request on its
+  repository `pending`** on `plan` and `policy` (`<workspace> (connection
+  disabled)`), until the connection is re-enabled or the workspace is repointed
+  or deleted.
+- **On GitLab, nothing here is documented to block a merge, but we have not
+  tested it.** GitLab's documentation describes *external status checks* as a
+  different mechanism from a commit status posted to the `/statuses` API, and
+  says a failing external status check does not by itself prevent merging.
+  How a commit status interacts with *Pipelines must succeed* is not documented
+  as far as we found, and **has not been tested by us**. Try it on a
+  non-critical project.
+
+| if you | then |
+|---|---|
+| do nothing | Terrapod requires nothing on your behalf: only a branch-protection rule you add makes a status block a merge (but see the three visible results above). The per-workspace `terrapod/<workspace>` statuses and the PR comment are unchanged (the comment gains a **Gates** block) |
+| want to gate merges on Terrapod | require `terrapod/plan` and `terrapod/policy`, **never** `terrapod/apply` (it deadlocks `apply_then_merge`). See [Branch protection](vcs-workflows.md#branch-protection) |
+| want none of this | set `api.config.vcs.commit_statuses.enabled: false`. No aggregate status is posted and nothing that serves them runs (no recording, no Gates block); with `per_workspace` left `true` that is the behaviour before the aggregates existed. Statuses already posted stay on their commits |
+| have a status check list that is long or noisy | set `api.config.vcs.commit_statuses.per_workspace: false` to stop the per-workspace statuses on pull-request runs. Branch-push and module-impact statuses are not affected |
+| use different names | set `api.config.vcs.commit_statuses.plan_name`, `policy_name` and `apply_name`; renaming later leaves the old contexts on old commits |
+| have a workspace named `plan`, `policy` or `apply` | its own per-workspace status (on any run: pull request, branch push or module impact) is skipped, with a warning, rather than overwriting the aggregate. Rename the workspace, or rename the aggregate |
+
+New metrics are listed in [Monitoring](monitoring.md#vcs). The `apply_then_merge`
+caveat, the cases where a status stays `pending`, and the GitLab limits are
+in [Branch protection](vcs-workflows.md#branch-protection).
+
 ## Behaviour changes in v1.10.1 (carried to main)
 
 ### A run cannot pin another workspace's configuration version

@@ -39,7 +39,13 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, run_links, vcs_provider
+from terrapod.services import (
+    github_service,
+    gitlab_service,
+    run_links,
+    run_task_service,
+    vcs_provider,
+)
 from terrapod.services.run_service import MODULE_IMPACT_POLLER_CREATED_BY
 from terrapod.services.scheduler import enqueue_trigger
 
@@ -119,6 +125,12 @@ class GateVerdict:
     name: str
     passed: bool
     enforcement: str
+    #: Not yet ruled (a run-task stage pending/running; the AI gate awaiting a verdict).
+    pending: bool = False
+    #: A failure no override can release (a stage outside `OVERRIDABLE_STAGES`).
+    final: bool = False
+    #: The run-task boundary (`pre_plan`/`post_plan`/`pre_apply`); empty elsewhere.
+    boundary: str = ""
 
 
 @dataclass(frozen=True)
@@ -263,6 +275,7 @@ _SCAN_PASS_OUTCOMES = frozenset({"passed"})
 #: A task stage that reached `passed` or was `overridden` releases the run;
 #: `pending` and `running` still hold it, which is why they are not passes.
 _STAGE_PASS_STATUSES = frozenset({"passed", "overridden"})
+_STAGE_PENDING_STATUSES = frozenset({"pending", "running"})
 
 
 def _verdict_from_scan(
@@ -297,7 +310,7 @@ def _verdict_from_ai_policy(row: Any | None, enforcement: str, *, held: bool) ->
     name = "AI policy gate"
     if row is None:
         name = "AI policy gate (awaiting verdict)"
-    return GateVerdict("ai-policy", name, not held, "mandatory")
+    return GateVerdict("ai-policy", name, not held, "mandatory", pending=row is None)
 
 
 # The three boundaries run tasks fire at (#1837), in the order a run meets
@@ -323,11 +336,17 @@ def _verdict_from_stage(status: str, stage: str = "post_plan") -> GateVerdict:
         _STAGE_LABELS.get(stage, stage),
         status in _STAGE_PASS_STATUSES,
         "mandatory",
+        pending=status in _STAGE_PENDING_STATUSES,
+        final=stage not in run_task_service.OVERRIDABLE_STAGES,
+        boundary=stage,
     )
 
 
-async def _collect_gates(db, run: Run) -> tuple[GateVerdict, ...]:
+async def _collect_gates(db, run: Run, cache: dict | None = None) -> tuple[GateVerdict, ...]:
     """Every gate that could hold this run, in `post_plan_hold` evaluation order.
+
+    `cache` (run id -> verdicts) lets one caller that reads the same runs twice, such
+    as the comment handler, pay for each run once. It must not outlive that call.
 
     Run task, then policy, then security scan, then the AI policy gate — the
     order `run_service.post_plan_hold` checks them in, so the first failing
@@ -338,6 +357,15 @@ async def _collect_gates(db, run: Run) -> tuple[GateVerdict, ...]:
     AI gate is the exception — it is asked directly, because the state that
     matters there (held with no verdict yet) has no row to read.
     """
+    if cache is not None and run.id in cache:
+        return cache[run.id]
+    gates = await _read_gates(db, run)
+    if cache is not None:
+        cache[run.id] = gates
+    return gates
+
+
+async def _read_gates(db, run: Run) -> tuple[GateVerdict, ...]:
     run_id = run.id
     gates: list[GateVerdict] = []
 
@@ -612,15 +640,19 @@ def _render_workspace_details(
     return "\n".join(lines)
 
 
-def render_comment(rows: list[_Row]) -> str:
+def render_comment(rows: list[_Row], gates: list[str] | None = None) -> str:
     """Render the Markdown status-comment body.
 
     Mode-aware rows: apply_then_merge workspaces show 'not applied' /
     'applied'; merge_then_apply workspaces show 'will apply on merge'
     in the apply column because they don't apply pre-merge by design.
+
+    `gates` is the Gates block (`vcs_aggregate_status.render_gates`), placed after
+    the table; None leaves it out.
     """
     if not rows:
-        return f"{_COMMENT_MARKER}\n\n{_HEADING}\n\n_No Terrapod workspaces affected by this PR._"
+        empty = f"{_COMMENT_MARKER}\n\n{_HEADING}\n\n_No Terrapod workspaces affected by this PR._"
+        return empty + ("\n\n" + "\n".join(gates) if gates else "")
 
     # No Mode column: `merge_then_apply` is internal vocabulary, and the Apply
     # cell already states the same fact in a reviewer's language ("will apply
@@ -682,10 +714,11 @@ def render_comment(rows: list[_Row]) -> str:
 
     # The lists share one budget after everything that is not a list, so `fixed`
     # includes the table, hint, footer and join newlines.
-    head = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, "", *tail]
+    gate_lines = ["", *gates] if gates else []
+    head = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, *gate_lines, "", *tail]
     detail_blocks = _fit_details(rows, detail_blocks, len("\n".join(head)))
 
-    parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines]
+    parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, *gate_lines]
     if detail_blocks:
         parts.append("")
         parts.extend(detail_blocks)
@@ -770,7 +803,9 @@ async def _ready_ai_summary(db, run: Run) -> PlanSummary | None:
         return None
 
 
-async def _row_for(db, ws: Workspace, run: Run, merged_run: Run | None = None) -> _Row:
+async def _row_for(
+    db, ws: Workspace, run: Run, merged_run: Run | None = None, gates_cache: dict | None = None
+) -> _Row:
     """One table row for a (workspace, run) pair.
 
     Shared by both collectors so a workspace PR and a module PR cannot end up
@@ -784,7 +819,7 @@ async def _row_for(db, ws: Workspace, run: Run, merged_run: Run | None = None) -
         apply_summary=_apply_summary(run),
         mergeable_summary=_mergeable_summary(run),
         cost_delta=_cost_delta(run),
-        gates=await _collect_gates(db, run),
+        gates=await _collect_gates(db, run, gates_cache),
         ai_summary=await _ready_ai_summary(db, run),
         run_url=run_links.run_url(ws.id, run.id),
         resource_list=run.plan_resources,
@@ -865,7 +900,7 @@ async def _collect_module_rows(
     ]
 
 
-async def _collect_rows(db, sess: PRSession) -> list[_Row]:
+async def _collect_rows(db, sess: PRSession, gates_cache: dict | None = None) -> list[_Row]:
     """Find every workspace whose runs reference this PR, latest run per."""
     # Workspaces in either mode that have a run for this PR. We don't
     # have a direct (connection, repo, pr) → workspace index, so we
@@ -902,7 +937,7 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
         # the post-merge run is all there is to report.
         run = pair[1] if pair else merged_pair[1]  # type: ignore[index]
         merged_run = merged_pair[1] if merged_pair else None
-        rows.append(await _row_for(db, ws, run, merged_run))
+        rows.append(await _row_for(db, ws, run, merged_run, gates_cache))
     return rows
 
 
@@ -1259,6 +1294,42 @@ async def refresh_for_run(db, run: Run, reason: str) -> None:
         )
 
 
+async def _gates_for(
+    db, sess: PRSession, conn: VCSConnection, gates_cache: dict | None = None
+) -> list[str] | None:
+    """The Gates block, from the computation the commit statuses use; None leaves it out.
+
+    Left out, not invented, when no record backs the head or anything fails.
+    """
+    try:
+        # Local: the poster imports this module.
+        from terrapod.config import aggregate_statuses_enabled, settings
+        from terrapod.services import vcs_aggregate_post, vcs_pr_decisions
+        from terrapod.services.vcs_aggregate_status import render_gates
+
+        if not aggregate_statuses_enabled():
+            return None
+        scope = vcs_pr_decisions.repo_scope(conn, sess.repo)
+        head = await vcs_pr_decisions.latest_head(scope, sess.pr_number)
+        head = head or getattr(sess, "head_sha", "")
+        if not head:
+            return None
+        agg = await vcs_aggregate_post.compute_recorded(
+            db, conn, sess.repo, sess.pr_number, head, gates_cache
+        )
+        if agg is None:
+            return None
+        names = settings.vcs.commit_statuses
+        try:
+            notes = await vcs_aggregate_post.posting_notes(scope, head, names)
+        except Exception:
+            notes = {}
+        return render_gates(agg, names, head, notes)
+    except Exception as e:
+        logger.debug("Could not compute the Gates block", error=repr(e))
+        return None
+
+
 async def handle_vcs_status_comment_update(payload: dict[str, Any]) -> None:
     """Scheduler trigger handler.
 
@@ -1275,8 +1346,9 @@ async def handle_vcs_status_comment_update(payload: dict[str, Any]) -> None:
         conn = await db.get(VCSConnection, sess.vcs_connection_id)
         if conn is None:
             return
-        rows = await _collect_rows(db, sess)
-        body = render_comment(rows)
+        gates_cache: dict = {}
+        rows = await _collect_rows(db, sess, gates_cache)
+        body = render_comment(rows, await _gates_for(db, sess, conn, gates_cache))
         comment_id = await _post_or_update(
             conn, sess.repo, sess.pr_number, body, recorded_id=sess.status_comment_id
         )

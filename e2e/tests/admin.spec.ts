@@ -156,8 +156,18 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
     // 1. Select by name prefix — scoped to this test's own workspaces so the
     //    assertions never depend on what else is in the org.
     await adminPage.getByPlaceholder('prod-').fill(prefix);
-    await adminPage.getByRole('button', { name: 'Search' }).click();
-    await expect(adminPage.getByText(/Matched/)).toContainText('2');
+    // Search is a client component, so a click landing before React hydrates is
+    // lost and no result ever renders -- the #902 pre-hydration flake, which
+    // showed up here as `getByText(/Matched/)` finding no element at all. Retry
+    // the click while the result is still absent.
+    const matched = adminPage.getByText(/Matched/);
+    await expect(async () => {
+      if (!(await matched.isVisible())) {
+        await adminPage.getByRole('button', { name: 'Search' }).click();
+      }
+      await expect(matched).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await expect(matched).toContainText('2');
 
     // 2. The control must be the four-value mode select, not a boolean.
     const mode = adminPage.getByRole('combobox', { name: 'Auto-apply' });

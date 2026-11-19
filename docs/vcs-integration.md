@@ -585,6 +585,7 @@ Whenever a VCS-triggered run changes state (queued, planning, planned, applied, 
 - **Commit statuses** appear as status checks on the commit (e.g. the green checkmark or red X on a PR)
 - **PR/MR comments** are updated in place -- **one comment per PR**, with a row per affected workspace, not a new comment on every status change or push
 - Clicking the status link or comment link navigates directly to the run page in Terrapod
+- On every open PR/MR, Terrapod also posts up to three **aggregate statuses** (`terrapod/plan`, `terrapod/policy`, `terrapod/apply`) whose names do not depend on which workspaces the change touches, so branch protection can require them. See [Aggregate statuses](#aggregate-statuses)
 
 For **module-impact PR plans**, the status context on GitHub and GitLab is
 `terrapod/<workspace>`, including failed checks for invalid candidate archives.
@@ -637,7 +638,11 @@ Without `external_url`, commit statuses are still posted but without clickable l
 
 **GitLab** -- the access token needs `api` scope (not just `read_api`) to post commit statuses and MR comments.
 
+The [aggregate statuses](#aggregate-statuses) use the same commit-status call, so they need no additional GitHub App permission or token scope, and nothing is read from the repository's branch-protection settings.
+
 ### Status Mapping
+
+This is the mapping for the per-workspace `terrapod/<workspace>` status of one run. The aggregate statuses are mapped separately, [below](#aggregate-statuses).
 
 | Run Status | GitHub State | GitLab State | Description |
 |---|---|---|---|
@@ -651,11 +656,108 @@ Without `external_url`, commit statuses are still posted but without clickable l
 | `discarded` | `failure` | `failed` | Plan discarded |
 | `canceled` | `error` | `canceled` | Run canceled |
 
+### Aggregate Statuses
+
+On every open pull request or merge request of a repository Terrapod polls, it posts up to three **aggregate** statuses to the head commit. Their names are fixed and do not depend on which workspaces the change touches, which is what lets branch protection require them: a per-workspace context only exists once a run has posted it, and a PR that touches no workspace has none at all.
+
+| Context (default) | Means | Posted |
+|---|---|---|
+| `terrapod/plan` | Every workspace the change affects has planned. Also `success` for a PR that touches no workspace | Always |
+| `terrapod/policy` | No gate has stopped the PR. In `apply_then_merge` workspaces the real post-plan gates ruled (mandatory policy sets, enforced security scans, pre-plan and post-plan run tasks, a mandatory AI policy gate). In `merge_then_apply` workspaces it means only that **no recorded mandatory failure** exists on the speculative plan, see [below](#what-policy-means-in-each-mode). An overridden failure counts as passed. Also `success` for a PR that touches no workspace | Always |
+| `terrapod/apply` | Every apply-then-merge workspace has applied (a zero-change plan counts as applied). `pre_apply` run tasks count here, not in `policy` | Only when a workspace that evaluated the PR uses `apply_then_merge`. A PR touching no workspace then gets `success` ("Nothing to apply") |
+
+**Require `terrapod/plan` and `terrapod/policy`, never `terrapod/apply`.** See [Branch protection](vcs-workflows.md#branch-protection) for why, and for what each status means in each workflow mode.
+
+#### What `policy` means in each mode
+
+- **`apply_then_merge`**: the run is a full plan that the post-plan gates hold, so `policy` is `success` only once every mandatory policy set, enforced security scan, run task and mandatory AI policy gate has ruled and passed (or been overridden). A gate still running or a held run is `pending`; a failure waiting for an override is `failure`.
+- **`merge_then_apply`** (the default): the PR gets a speculative plan, and **speculative plans are never held at a gate**; the gates are enforced on the apply after merge. Terrapod still records the policy-set results of the speculative plan, so `policy` is `failure` when a mandatory policy set failed on it (and not overridden), and when the plan errored. It cannot say that a missing evaluation, a scan or the AI policy gate would have passed: the AI policy gate does not rule on a speculative plan at all. Read `policy` there as "no recorded mandatory failure", not "every gate passed".
+
+They are posted from the poll cycle, which is the only path that can reach a PR touching no workspace (such a PR has no run, so nothing else would ever post for it), and again from the run lifecycle whenever a run of the PR changes state. A new PR therefore gets its statuses within one poll interval (default 60 seconds), or within seconds when a webhook triggers the poll. A PR into a branch **no workspace tracks** gets `plan` and `policy` `success` too (`No Terrapod workspaces affected`), so a rule that requires them on every branch does not leave it at Expected. That needs a complete listing of the repository's open PRs and every workspace's branch to be known. If a workspace's branch cannot be resolved (or its connection is disabled), the PR cannot be called untracked, and `plan` and `policy` are `pending` naming that workspace, so the required check shows why it waits. If the listing is cut off by its bound, Terrapod cannot enumerate the PRs and posts nothing new for such a PR: one never posted stays at Expected, and a status posted earlier stays as it was (a green does not turn into Expected), until a complete listing is seen. Branch names are compared exactly and case-sensitively, as the planning filter does; whether GitHub resolves branch names case-insensitively is not verified. They are posted for draft PRs like any other, and nothing is posted for a PR whose Terrapod session is closed. Closing or merging a PR does not retract a status already posted.
+
+#### Aggregate status configuration
+
+```yaml
+api:
+  config:
+    vcs:
+      commit_statuses:
+        enabled: true
+        plan_name: "terrapod/plan"
+        policy_name: "terrapod/policy"
+        apply_name: "terrapod/apply"
+        per_workspace: true
+```
+
+| Value | Default | Description |
+|---|---|---|
+| `api.config.vcs.commit_statuses.enabled` | `true` | Post the aggregate statuses at all. `false` turns off everything that serves them, see [Turning the aggregates off](#turning-the-aggregates-off) |
+| `api.config.vcs.commit_statuses.plan_name` | `terrapod/plan` | Context of the aggregate plan status |
+| `api.config.vcs.commit_statuses.policy_name` | `terrapod/policy` | Context of the aggregate policy status |
+| `api.config.vcs.commit_statuses.apply_name` | `terrapod/apply` | Context of the aggregate apply status. Do not require it in branch protection |
+| `api.config.vcs.commit_statuses.per_workspace` | `true` | Also post the per-workspace `terrapod/<workspace>` status for pull-request runs. See [the per-workspace switch](#the-per-workspace-switch) |
+
+A name must be 1 to 255 characters with no leading or trailing whitespace and no control characters, and the three names must differ. The chart's values schema rejects a bad name when you run `helm lint` or `helm template`, and the API refuses to start with one. **Renaming a status leaves the old context on commits that already have it**; see [Branch protection](vcs-workflows.md#renaming-a-status).
+
+#### Turning the aggregates off
+
+`enabled: false` posts no aggregate status and runs nothing that serves them: the poller records no per-PR decisions and writes no Redis keys for them, no publish pass or run-time hook posts, the PR comment has no **Gates** block, and the workspace-name collision guard and its warning are off (there is no aggregate name to collide with). Per-workspace statuses follow their own switch, so `enabled: false` with `per_workspace: true` (the default) is the behaviour before the aggregates existed. With both `false`, pull-request runs post no commit status at all. Statuses already posted stay on their commits, and records already in Redis expire on their own (seven days).
+
+#### State mapping
+
+| Aggregate verdict | GitHub state | GitLab state | Typical cause |
+|---|---|---|---|
+| `success` | `success` | `success` | Everything proven done |
+| `failure` | `failure` | `failed` | An errored, discarded or canceled run; a failed gate; a fork PR whose workspace was skipped |
+| `pending` | `pending` | `pending` | Something is not known yet: evaluation incomplete, a gate still running, a held run |
+| `running` | `pending` | `running` | A plan is queued or in progress |
+
+Terrapod never posts `error` or `canceled` for an aggregate. A gate that failed and is waiting for an override makes `policy` `failure` (somebody has to act), where the per-workspace status of the same run stays `pending`.
+
+#### Description and link
+
+The description is ASCII and at most 140 characters, built rather than truncated: the counts first, then the blocking workspaces, then `+N more`.
+
+```
+Planned 1 of 2 workspaces; api (errored)
+Gates passed for 0 of 1 workspaces; api (prod-guardrails failed, awaiting override)
+Planned 0 of 1 workspaces; web (not planned: fork PR)
+Planned 0 of 1 workspaces; api (connection disabled)
+Evaluating affected workspaces
+No Terrapod workspaces affected
+```
+
+The status link is the run page of the first blocking workspace. When nothing blocks, it is the PR's Terrapod comment (once it exists), then the first run's page. Run links need [`external_url`](#configuration). On **GitLab** a status that stays `pending` or `running` keeps the description and link it was first posted with (see [Failures and rate limits](#failures-and-rate-limits)); they change when the state changes.
+
+#### The per-workspace switch
+
+`per_workspace: false` stops Terrapod posting `terrapod/<workspace>` for **pull-request runs**. The aggregate statuses and the PR comment are posted either way. Branch-push runs and module-impact statuses are not affected by the switch, and keep their per-workspace statuses. The switch does not exclude a workspace from the aggregates: its runs and its gates still count.
+
+If a per-workspace context would equal one of the three aggregate names (a workspace called `plan`, or an aggregate name set to `terrapod/<an existing workspace>`), Terrapod skips that per-workspace status and logs a warning, so a workspace can never overwrite an aggregate. This applies to **every** per-workspace post, not only pull-request runs: a branch run's commit can be the head of an open pull request too (a workspace tracking a promotion branch, say), and module-impact statuses are checked the same way. Only the exact context collides: a workspace called `plans` is fine. Once per periodic poll cycle Terrapod also logs a warning naming any existing workspace whose name collides, so you can rename it or the aggregate.
+
+#### Which connection posts
+
+The status belongs to a repository and a commit, but workspaces on one repository can use different VCS connections. Terrapod posts one set per commit, through the **oldest active connection** (lowest id; ids are time-ordered) among all of the repository's workspaces, whichever bases their branches track: the same one for every PR of the repository, on every replica. If that connection is disabled the next oldest posts, so the poster changes when connections are disabled or re-enabled. If the oldest active connection is **refused** (401, 403 or 404, for example because its GitHub App is not installed on the repository), Terrapod remembers the refusal and does **not** try another connection, so the statuses sit at Expected until that connection is fixed or disabled. The per-workspace statuses still go through each workspace's own connection. If a repository's workspaces use different connections (different GitHub Apps), a required check that GitHub pins to one App as its source can miss; keep one connection per repository, or leave the check's source as "any".
+
+#### Failures and rate limits
+
+A status is never posted green from evidence Terrapod could not read. If Redis is unavailable Terrapod posts nothing (statuses already on the commit stand); if the stored record of which workspaces the PR affects is missing or incomplete, a verdict can be `pending` (or `failure`, when a run has already failed) but never `success`.
+
+- **A failed post is retried on later poll cycles with backoff**: after 30 seconds, then doubling up to 15 minutes. A changed verdict is posted at once. The exception is a status that is replacing a **green the provider still shows** (for example `success` to `failure` during a provider outage): that is retried every poll interval, because a stale green is the dangerous case, whatever the backoff has grown to.
+- **A green that nothing has touched is re-verified** every ten minutes: Terrapod recomputes the verdicts and posts only if one changed, so a green left stale by a lost update is bounded.
+- **A rate-limited response pauses every aggregate post on that connection** for as long as the provider asks (`Retry-After` or the rate-limit reset time; 60 seconds when it says nothing; at most 15 minutes).
+- **A refused post** (a 4xx that is not a rate limit) is logged at error level and counted. The same text is not re-sent for one hour (five minutes for 401 and 403), and the poll cycle does not re-evaluate that commit while the refusal is remembered.
+- **GitLab** answers 400 "cannot transition" when a status is re-posted with the state it already has; Terrapod treats that as already posted. This is based on GitLab's documented behaviour and has not been verified against a live GitLab.
+
+Metrics are listed in [Monitoring](monitoring.md#vcs): `terrapod_vcs_aggregate_status_posts_total` (by `outcome`), `terrapod_vcs_aggregate_status_rejected_total`, `terrapod_vcs_candidate_registration_failures_total`, `terrapod_vcs_pr_records_unverified` and `terrapod_vcs_disabled_connection_candidates`. A candidate-registration failure marks every stored record unverified, so the aggregates read `pending` until the next successful periodic poll cycle; alert on `terrapod_vcs_pr_records_unverified` staying at 1. Both gauges are read from shared Redis state every 15 seconds on every replica, so they agree across replicas.
+
 ### PR/MR Comment Format
 
 PR comments include a hidden HTML marker so Terrapod can find and update them, which is how a PR keeps to a single comment even if the recorded comment id is lost.
 
 **One comment per PR.** Every affected workspace is a row of one table, with its AI summary and gate verdicts in that workspace's own collapsed block. Several workspaces tracking the same repository share the comment rather than each posting one, and a new push edits it rather than adding another.
+
+The comment also carries a **Gates** block after the table: one line for each aggregate status for the head commit, computed by the same code that decides the statuses (see [the status comment](vcs-workflows.md#status-comment)). It is computed from the database at each refresh, so it can lag a check by a refresh. A line says `(not posted yet, retrying)` or `(refused by the provider)` when Terrapod knows that status could not be posted; it cannot tell when no connection was able to post or Redis could not be read, so the block is a statement of what Terrapod computed, not a guarantee of what the provider shows. The block is left out, rather than guessed at, while no record of the PR's affected workspaces exists yet (before the first poll that evaluated it, or while Redis is unavailable).
 
 When a PR is updated with a new commit, old speculative runs are automatically **canceled** (the old comment is updated to show the canceled status), and a new run is created for the latest commit.
 
@@ -754,6 +856,8 @@ calls per hour ≈ (3600 / poll_interval_seconds)
                  × ( distinct repo+branch pairs
                    + Σ ceil(open_prs / 100) over distinct repos )
 ```
+
+**Aggregate statuses** add provider writes, not reads. An unchanged head costs nothing per cycle. Each run state change on a PR posts about two statuses (three in a repository with an `apply_then_merge` workspace), where the per-workspace status posted one. For a push that affects W workspaces, each going queued, planning, planned, that is roughly 6W + 2 writes against roughly 3W for the per-workspace statuses alone: about three times the commit-status writes by default, which `per_workspace: false` offsets (and `enabled: false` removes the aggregate share entirely). These writes draw on the same provider rate-limit budget as everything else the poller does, so on a large estate a secondary rate limit would slow VCS polling generally, not only this feature; the per-connection backoff limits the damage. The first poll cycle after an upgrade posts two or three statuses for every open PR (four at a time); a per-connection backoff handles rate limits, and whether GitHub's secondary limits apply to a burst of this size is unverified. The database cost is that every PR head with anything not yet green (including every `apply_then_merge` PR awaiting its apply) is recomputed each cycle from its runs and their gates, and a green head is re-verified every ten minutes.
 
 The PR term became repository-wide in v1.11.3 / v1.10.8, which lowered it for an
 estate whose workspaces track several branches of one repository and raised it for a

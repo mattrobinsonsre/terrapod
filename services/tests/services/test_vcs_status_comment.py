@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services.run_service import MODULE_IMPACT_POLLER_CREATED_BY
-from terrapod.services.vcs_status_comment import _plan_summary
+from terrapod.services.vcs_status_comment import GateVerdict, _plan_summary
 
 
 class _FakeRun:
@@ -295,6 +295,25 @@ class TestRunTaskStageVerdict:
         for status in ("pending", "running"):
             v = _verdict_from_stage(status)
             assert v is not None and v.passed is False
+            assert v.pending is True
+
+    def test_failed_stage_is_not_pending(self):
+        from terrapod.services.vcs_status_comment import _verdict_from_stage
+
+        assert _verdict_from_stage("failed").pending is False
+
+    def test_boundary_and_finality_follow_the_stage(self):
+        from terrapod.services.vcs_status_comment import _verdict_from_stage
+
+        post = _verdict_from_stage("failed", "post_plan")
+        assert (post.boundary, post.final) == ("post_plan", False)
+        for stage in ("pre_plan", "pre_apply"):
+            v = _verdict_from_stage("failed", stage)
+            assert (v.boundary, v.final) == (stage, True)
+
+    def test_existing_verdicts_keep_default_new_fields(self):
+        v = GateVerdict("policy", "p", True, "mandatory")
+        assert (v.pending, v.final, v.boundary) == (False, False, "")
 
 
 class TestCostDelta:
@@ -468,6 +487,14 @@ class TestTheAIPolicyGateAppearsInTheComment:
         assert len(ai) == 1
         assert ai[0].passed is False
         assert "awaiting verdict" in ai[0].name
+        assert ai[0].pending is True
+
+    async def test_a_failed_verdict_is_not_pending(self):
+        gates = await _gates_with_ai(
+            enforcement="mandatory", row=SimpleNamespace(outcome="failed"), held=True
+        )
+        ai = [g for g in gates if g.gate == "ai-policy"]
+        assert ai[0].pending is False
 
     async def test_a_passing_verdict_is_listed_as_an_attestation(self):
         gates = await _gates_with_ai(
@@ -1747,3 +1774,136 @@ class TestAModulePrAlsoGetsOneComment:
                 )
                 == []
             )
+
+
+class TestTheHandlerAddsTheGatesBlock:
+    """The comment gets its three verdicts from the same computation the checks use."""
+
+    def _sess(self, h, **kw):
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            state="open",
+            repo="org/repo",
+            pr_number=7,
+            head_sha=kw.get("head_sha", "f" * 40),
+            vcs_connection_id=h.conn.id,
+            status_comment_id=None,
+            merge_commit_sha=None,
+        )
+
+    async def _run(self, *, compute, latest="a" * 40, head_sha="f" * 40):
+        from terrapod.services import vcs_aggregate_post, vcs_pr_decisions
+        from terrapod.services import vcs_status_comment as mod
+
+        h = _CommentHarness()
+        sess = self._sess(h, head_sha=head_sha)
+        db = TestTheSessionRecordsTheCommentId._db(sess, h.conn)
+
+        class _Ctx:
+            async def __aenter__(self):
+                return db
+
+            async def __aexit__(self, *a):
+                return False
+
+        with contextlib.ExitStack() as stack:
+            for p in h.patches():
+                stack.enter_context(p)
+            stack.enter_context(patch.object(mod, "get_db_session", return_value=_Ctx()))
+            stack.enter_context(
+                patch.object(mod, "_collect_rows", new=AsyncMock(return_value=[_row()]))
+            )
+            stack.enter_context(patch.object(vcs_aggregate_post, "compute_recorded", new=compute))
+            stack.enter_context(
+                patch.object(vcs_pr_decisions, "latest_head", new=AsyncMock(return_value=latest))
+            )
+            await mod.handle_vcs_status_comment_update({"session_id": str(sess.id)})
+        return h.gh.posted[0]["body"], compute
+
+    def _agg(self):
+        from terrapod.services.vcs_aggregate_status import Aggregate, Verdict
+
+        return Aggregate(
+            Verdict("success", "Planned 1 of 1 workspaces", None),
+            Verdict("failure", "Gates passed for 0 of 1 workspaces; a (g failed, final)", None),
+            None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_the_block_is_rendered_from_the_shared_computation(self):
+        body, compute = await self._run(compute=AsyncMock(return_value=self._agg()))
+        assert "**Gates at `aaaaaaa`**" in body
+        assert "`terrapod/plan`: success" in body and "`terrapod/policy`: failure" in body
+        args = compute.await_args.args
+        assert args[2:5] == ("org/repo", 7, "a" * 40)
+
+    @pytest.mark.asyncio
+    async def test_switched_off_there_is_no_block_and_nothing_is_computed(self):
+        from terrapod.config import settings
+
+        settings.vcs.commit_statuses.enabled = False
+        try:
+            body, compute = await self._run(compute=AsyncMock(return_value=self._agg()))
+        finally:
+            settings.vcs.commit_statuses.enabled = True
+        compute.assert_not_awaited()
+        assert "Gates at" not in body and "| Workspace |" in body
+
+    @pytest.mark.asyncio
+    async def test_the_head_falls_back_to_the_sessions(self):
+        body, compute = await self._run(
+            compute=AsyncMock(return_value=self._agg()), latest=None, head_sha="c" * 40
+        )
+        assert compute.await_args.args[4] == "c" * 40
+        assert "`ccccccc`" in body
+
+    @pytest.mark.asyncio
+    async def test_a_status_that_did_not_land_is_marked_in_the_block(self):
+        from terrapod.services import vcs_aggregate_post
+
+        notes = AsyncMock(return_value={"terrapod/plan": "not posted yet, retrying"})
+        with patch.object(vcs_aggregate_post, "posting_notes", new=notes):
+            body, _ = await self._run(compute=AsyncMock(return_value=self._agg()))
+        plan = next(line for line in body.splitlines() if "`terrapod/plan`" in line)
+        assert "(not posted yet, retrying)" in plan
+
+    @pytest.mark.asyncio
+    async def test_a_failure_reading_the_notes_leaves_the_block_unannotated(self):
+        from terrapod.services import vcs_aggregate_post
+
+        with patch.object(
+            vcs_aggregate_post, "posting_notes", new=AsyncMock(side_effect=RuntimeError("redis"))
+        ):
+            body, _ = await self._run(compute=AsyncMock(return_value=self._agg()))
+        assert "Gates at" in body and "not posted" not in body
+
+    @pytest.mark.asyncio
+    async def test_no_aggregate_omits_the_block(self):
+        body, _ = await self._run(compute=AsyncMock(return_value=None))
+        assert "Gates at" not in body
+
+    @pytest.mark.asyncio
+    async def test_a_failing_computation_omits_the_block_and_still_posts_the_table(self):
+        body, _ = await self._run(compute=AsyncMock(side_effect=RuntimeError("redis down")))
+        assert "Gates at" not in body and "| Workspace |" in body
+
+    @pytest.mark.asyncio
+    async def test_no_head_at_all_omits_the_block(self):
+        body, compute = await self._run(
+            compute=AsyncMock(return_value=self._agg()), latest=None, head_sha=""
+        )
+        assert "Gates at" not in body
+        compute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_custom_names_render(self):
+        from terrapod.config import settings
+
+        cfg = settings.vcs.commit_statuses
+        old = (cfg.plan_name, cfg.policy_name)
+        cfg.plan_name, cfg.policy_name = "ci/tf-plan", "ci/tf-policy"
+        try:
+            body, _ = await self._run(compute=AsyncMock(return_value=self._agg()))
+        finally:
+            cfg.plan_name, cfg.policy_name = old
+        assert "`ci/tf-plan`" in body and "terrapod/plan" not in body

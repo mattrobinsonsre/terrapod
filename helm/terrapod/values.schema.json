@@ -2662,6 +2662,36 @@
             "require_push_permission_for_commands": {
               "type": "boolean"
             },
+            "commit_statuses": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "plan_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^\\S(.*\\S)?$"
+                },
+                "policy_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^\\S(.*\\S)?$"
+                },
+                "apply_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^\\S(.*\\S)?$"
+                },
+                "per_workspace": {
+                  "type": "boolean"
+                }
+              }
+            },
             "tmpdir": {
               "type": "string"
             },
