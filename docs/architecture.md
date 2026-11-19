@@ -592,7 +592,7 @@ Currently registered periodic tasks:
 
 | Task | Interval | Handler | Description |
 |---|---|---|---|
-| `vcs_poll` | 60s (configurable) | `vcs_poller.poll_cycle` | Poll VCS providers for new commits and PRs |
+| `vcs_poll` | 60s (configurable) | `vcs_poller.poll_cycle` | Poll VCS providers for new commits and PRs, record which workspaces each PR head affects, and post the aggregate PR statuses |
 | `registry_vcs_poll` | 300s (`vcs.module_poll_interval_seconds`) | `registry_vcs_poller.poll_cycle` | Poll VCS for new module version tags |
 | `audit_retention` | 86400s (daily) | `audit_service.purge_old_entries` | Purge audit log entries older than retention period |
 | `drift_check` | 300s (configurable) | `drift_detection_service.drift_check_cycle` | Check workspaces for infrastructure drift |
@@ -608,7 +608,7 @@ Currently registered trigger handlers:
 | Handler | Description | Dedup |
 |---|---|---|
 | `vcs_immediate_poll` | Webhook-triggered immediate VCS poll for a specific repo | Per repo (5 min) |
-| `vcs_commit_status` | Post commit status to VCS provider on run state change | Per run+status (60s) |
+| `vcs_commit_status` | Post commit status to VCS provider on run state change; for a pull-request run also recompute and post the aggregate `plan`/`policy`/`apply` statuses ([details](vcs-integration.md#aggregate-statuses)) | Per run+status (60s) |
 | `notification_deliver` | Deliver workspace notification on run state change | Per run+trigger (60s) |
 | `run_task_call` | Deliver run task webhook to external service | Per result (5 min) |
 | `drift_run_completed` | Update workspace drift status when drift run completes | Per run (5 min) |

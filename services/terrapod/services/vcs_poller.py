@@ -22,16 +22,19 @@ import hashlib
 import time as time_mod
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 from sqlalchemy import not_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import (
+    VCS_CANDIDATE_REGISTRATION_FAILURES,
     VCS_COMMITS_DETECTED,
     VCS_POLL_DURATION,
     VCS_PRS_DETECTED,
     VCS_RUNS_CREATED,
 )
+from terrapod.config import aggregate_statuses_enabled
 from terrapod.db.models import (
     AutodiscoveryRule,
     PRSession,
@@ -48,12 +51,23 @@ from terrapod.services import (
     github_service,
     gitlab_service,
     run_service,
+    vcs_aggregate_post,
     vcs_rate_limit,
+    vcs_status_names,
     workspace_settings,
 )
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+from terrapod.services.vcs_pr_decisions import (
+    PRDecisions,
+    clear_unverified,
+    mark_unverified,
+    normalise_repo,
+    record_disabled_count,
+    repo_scope,
+)
+from terrapod.services.vcs_pr_decisions import store_all as store_pr_evaluations
 from terrapod.services.vcs_provider import (
     OpenPullRequests,
     PRComment,
@@ -1455,6 +1469,41 @@ async def _reconcile_closed_pr_sessions(
         sess.state = "closed"
 
 
+def _note_decision(
+    decisions: PRDecisions | None,
+    ws: Workspace,
+    conn: VCSConnection,
+    slug: str,
+    pr: PullRequest,
+    outcome: str,
+    reason: str = "",
+) -> None:
+    if decisions is not None:
+        decisions.record(ws, conn, slug, pr, outcome, reason)
+
+
+def _refusal_outcome(ws: Workspace, speculative: bool) -> tuple[str, str]:
+    """Why no run came back: `create_run`'s own refusal, with the shape it resolves.
+
+    Only `PlanApplyNotEnabled` proves nothing is planned; anything else is undecided.
+    """
+    is_configure, after_apply = run_service.resolve_configure_shape(
+        ws,
+        requested_configure=False,
+        plan_only=speculative,
+        is_destroy=False,
+    )
+    try:
+        workspace_settings.require_run_operations(
+            ws, is_configure=is_configure, configure_after_apply=after_apply
+        )
+    except workspace_settings.PlanApplyNotEnabled:
+        return "not_affected", "declares no plan/apply operation"
+    except ValueError:
+        pass
+    return "undecided", "run not created"
+
+
 async def _poll_workspace_prs(
     db: AsyncSession,
     ws: Workspace,
@@ -1465,6 +1514,8 @@ async def _poll_workspace_prs(
     cache: VCSArchiveCache | None = None,
     meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
+    *,
+    decisions: PRDecisions | None = None,
 ) -> None:
     """Reconcile PR sessions across the repository, then plan the PRs/MRs
     targeting the tracked branch.
@@ -1520,6 +1571,8 @@ async def _poll_workspace_prs(
     # wrong one, in the direction that closes live sessions and cancels work
     # somebody is waiting for.
     if listing.complete:
+        if decisions is not None:
+            decisions.listing(conn, f"{owner}/{repo}", listing.prs)
         open_pr_numbers = {pr.number for pr in listing.prs}
         await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers, meta=meta)
         # The planning half, scoped back to this workspace's own branch.
@@ -1556,6 +1609,7 @@ async def _poll_workspace_prs(
         # dispatcher's dedup key handles the race).
         await _poll_pr_comments(db, conn, f"{owner}/{repo}")
 
+    slug = f"{owner}/{repo}"
     for pr in prs:
         # A fork PR does not plan unless the workspace opted in.
         #
@@ -1577,6 +1631,7 @@ async def _poll_workspace_prs(
                 head_sha=pr.head_sha,
                 repo=f"{owner}/{repo}",
             )
+            _note_decision(decisions, ws, conn, slug, pr, "fork_skipped")
             continue
 
         # Check if we already have any run for this PR + SHA (avoid duplicates)
@@ -1590,6 +1645,7 @@ async def _poll_workspace_prs(
             .limit(1)
         )
         if existing.scalar_one_or_none() is not None:
+            _note_decision(decisions, ws, conn, slug, pr, "affected")
             continue
 
         # VCS subdirectory filtering for PRs: compare PR head against tracked branch.
@@ -1610,6 +1666,7 @@ async def _poll_workspace_prs(
         if prefix_filtered and await _pr_decision_is_remembered(
             ws.id, pr.number, pr.head_sha, pr_prefixes
         ):
+            _note_decision(decisions, ws, conn, slug, pr, "not_affected")
             continue
 
         # Cancel any existing non-terminal runs for this PR (superseded by new commit)
@@ -1663,6 +1720,7 @@ async def _poll_workspace_prs(
                         changed_files_count=len(changed),
                     )
                     await _remember_pr_decision(ws.id, pr.number, pr.head_sha, pr_prefixes)
+                    _note_decision(decisions, ws, conn, slug, pr, "not_affected")
                     continue
             except Exception as e:
                 logger.warning(
@@ -1749,6 +1807,13 @@ async def _poll_workspace_prs(
                 pr_number=pr.number,
                 head_sha=pr.head_sha[:8],
             )
+            _note_decision(decisions, ws, conn, slug, pr, "affected")
+        else:
+            outcome, reason = _refusal_outcome(ws, speculative)
+            _note_decision(decisions, ws, conn, slug, pr, outcome, reason)
+
+    if decisions is not None:
+        decisions.completed(ws.id, conn, slug)
 
 
 async def _poll_workspace(
@@ -1757,6 +1822,8 @@ async def _poll_workspace(
     cache: VCSArchiveCache | None = None,
     meta: VCSMetadataCache | None = None,
     paths_unions: "PathsUnionMap | None" = None,
+    *,
+    decisions: PRDecisions | None = None,
 ) -> None:
     """Poll a single workspace: check branch for pushes and PRs for speculative plans.
 
@@ -1811,10 +1878,14 @@ async def _poll_workspace(
     with vcs_rate_limit.vcs_target(
         repo=f"{owner}/{repo}", consumer=ws.name, kind="workspace", labels=ws.labels
     ):
-        await _poll_workspace_repo(db, ws, conn, owner, repo, cache, meta, paths_unions)
+        await _poll_workspace_repo(
+            db, ws, conn, owner, repo, cache, meta, paths_unions, decisions=decisions
+        )
 
 
-async def _poll_workspace_repo(db, ws, conn, owner, repo, cache, meta, paths_unions) -> None:
+async def _poll_workspace_repo(
+    db, ws, conn, owner, repo, cache, meta, paths_unions, *, decisions: PRDecisions | None = None
+) -> None:
     try:
         branch = await _resolve_branch(conn, ws, owner, repo, meta)
     except Exception as e:
@@ -1835,6 +1906,9 @@ async def _poll_workspace_repo(db, ws, conn, owner, repo, cache, meta, paths_uni
         ws.vcs_last_error_at = now_utc()
         return
 
+    if decisions is not None:
+        decisions.branch(ws.id, conn, f"{owner}/{repo}", branch)
+
     fetch_paths: list[str] | None = None
     if paths_unions is not None:
         fetch_paths = paths_unions.get((conn.id, owner, repo))
@@ -1851,7 +1925,16 @@ async def _poll_workspace_repo(db, ws, conn, owner, repo, cache, meta, paths_uni
 
         # 2. Check open PRs/MRs targeting the tracked branch → speculative plans
         await _poll_workspace_prs(
-            db, ws, conn, owner, repo, branch, cache=cache, meta=meta, fetch_paths=fetch_paths
+            db,
+            ws,
+            conn,
+            owner,
+            repo,
+            branch,
+            cache=cache,
+            meta=meta,
+            fetch_paths=fetch_paths,
+            decisions=decisions,
         )
 
         # Success: update last-polled timestamp and clear any previous error
@@ -1885,6 +1968,8 @@ async def _poll_workspace_owned(
     cache: VCSArchiveCache | None = None,
     meta: VCSMetadataCache | None = None,
     paths_unions: "PathsUnionMap | None" = None,
+    *,
+    decisions: PRDecisions | None = None,
 ) -> None:
     """Poll a single workspace in its own DB session, bounded by a semaphore.
 
@@ -1904,7 +1989,9 @@ async def _poll_workspace_owned(
         if ws is None:
             return
         try:
-            await _poll_workspace(db, ws, cache=cache, paths_unions=paths_unions, meta=meta)
+            await _poll_workspace(
+                db, ws, cache=cache, paths_unions=paths_unions, meta=meta, decisions=decisions
+            )
             await db.commit()
         except Exception as e:
             logger.error(
@@ -2137,7 +2224,7 @@ async def _select_workspace_ids(
         if parsed is None:
             continue
         owner, repo_name = parsed
-        if f"{owner}/{repo_name}" == target:
+        if normalise_repo(f"{owner}/{repo_name}") == normalise_repo(target):
             matched.append(ws_id)
     return matched
 
@@ -2503,6 +2590,114 @@ async def _poll_autodiscovery(
         return total_created
 
 
+async def _register_candidates(
+    db: AsyncSession,
+    workspace_ids: list[uuid.UUID],
+    decisions: PRDecisions,
+    entry: str = "cycle",
+) -> bool:
+    """Register every selected workspace as a candidate before any is polled.
+
+    A workspace that fails before its own poll starts (pool timeout, a failed
+    load) must still be counted, or a PR touching only it reads as touching
+    nothing. A workspace on an inactive connection stays a candidate, so a PR
+    waits for it until the connection is back; one with an unparseable URL
+    belongs to no repository and cannot be. False means registration failed.
+    """
+    try:
+        rows = (
+            await db.execute(
+                select(
+                    Workspace.id,
+                    Workspace.name,
+                    Workspace.vcs_workflow,
+                    Workspace.vcs_repo_url,
+                    VCSConnection,
+                )
+                .join(VCSConnection, Workspace.vcs_connection_id == VCSConnection.id)
+                .where(Workspace.id.in_(workspace_ids))
+            )
+        ).all()
+        for ws_id, name, workflow, url, conn in rows:
+            parsed = _parse_repo_url(conn, url or "")
+            if parsed is None:
+                continue
+            ws = SimpleNamespace(id=ws_id, name=name, vcs_workflow=workflow)
+            decisions.polled(ws, conn, f"{parsed[0]}/{parsed[1]}")
+    except Exception as e:
+        VCS_CANDIDATE_REGISTRATION_FAILURES.labels(entry=entry).inc()
+        logger.warning(
+            "Could not register PR candidates; stored PR records read pending until a cycle succeeds",
+            entry=entry,
+            error=repr(e),
+            error_type=type(e).__name__,
+            exc_info=True,
+        )
+        return False
+    return True
+
+
+async def _warn_name_collisions(db: AsyncSession) -> None:
+    """Once per periodic cycle: workspaces named like an aggregate status (their own is skipped)."""
+    try:
+        names = vcs_status_names.colliding_workspace_names()
+        if not names:
+            return
+        found = (
+            (await db.execute(select(Workspace.name).where(Workspace.name.in_(names))))
+            .scalars()
+            .all()
+        )
+        if found:
+            logger.warning(
+                "Workspaces are named like an aggregate commit status, so their own "
+                "terrapod/<workspace> status is never posted: rename them or the aggregate",
+                workspaces=sorted(found),
+            )
+    except Exception as e:
+        logger.debug("Could not check workspace names against the aggregate names", error=repr(e))
+
+
+async def _report_disabled_candidates(decisions: PRDecisions, registered: bool) -> None:
+    """Once per periodic cycle: how many workspaces hold their repository's checks pending."""
+    if not registered:
+        return
+    count = len(decisions.disabled_candidates())
+    await record_disabled_count(count)
+    if count:
+        logger.warning(
+            "Workspaces on a disabled VCS connection are holding their repositories' PR checks "
+            "pending: re-enable the connection, or repoint or remove the workspaces",
+            workspaces=count,
+        )
+
+
+async def _still_in_scope(ids: set[uuid.UUID], scope: str) -> set[uuid.UUID]:
+    """Which of these workspaces still exist and still belong to `scope`."""
+    async with get_db_session() as db:
+        rows = (
+            await db.execute(
+                select(Workspace.id, Workspace.vcs_repo_url, VCSConnection)
+                .join(VCSConnection, Workspace.vcs_connection_id == VCSConnection.id)
+                .where(Workspace.id.in_(ids))
+            )
+        ).all()
+    found: set[uuid.UUID] = set()
+    for ws_id, url, conn in rows:
+        parsed = _parse_repo_url(conn, url or "")
+        if parsed is not None and repo_scope(conn, f"{parsed[0]}/{parsed[1]}") == scope:
+            found.add(ws_id)
+    return found
+
+
+async def _store_pr_decisions(decisions: PRDecisions) -> None:
+    try:
+        stored = await store_pr_evaluations(decisions, member_check=_still_in_scope)
+        await vcs_aggregate_post.publish_pass(decisions, stored)
+    except Exception:
+        logger.warning("Could not store or post the PR evaluations", exc_info=True)
+
+
 async def poll_cycle() -> None:
     """Execute one poll cycle: check all VCS-enabled workspaces in parallel.
 
@@ -2532,6 +2727,14 @@ async def poll_cycle() -> None:
     async with get_db_session() as db:
         workspace_ids = await _select_workspace_ids(db)
         paths_unions = await _compute_paths_unions(db, workspace_ids)
+        enabled = aggregate_statuses_enabled()
+        decisions = PRDecisions() if enabled else None
+        registered = False
+        if decisions is not None:
+            registered = await _register_candidates(db, workspace_ids, decisions, "cycle")
+            await _report_disabled_candidates(decisions, registered)
+            if registered:
+                await _warn_name_collisions(db)
 
     if not workspace_ids:
         VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
@@ -2549,12 +2752,26 @@ async def poll_cycle() -> None:
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     results = await asyncio.gather(
         *[
-            _poll_workspace_owned(wid, semaphore, cache=cache, meta=meta, paths_unions=paths_unions)
+            _poll_workspace_owned(
+                wid,
+                semaphore,
+                cache=cache,
+                meta=meta,
+                paths_unions=paths_unions,
+                decisions=decisions,
+            )
             for wid in workspace_ids
         ],
         return_exceptions=True,
     )
     _log_cycle_failures(results, workspace_ids)
+    if decisions is None:
+        pass
+    elif registered:
+        await _store_pr_decisions(decisions)
+        await clear_unverified()
+    else:
+        await mark_unverified()
 
     VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
 
@@ -2611,6 +2828,10 @@ async def handle_immediate_poll(payload: dict) -> None:
             provider=provider,
         )
         paths_unions = await _compute_paths_unions(db, workspace_ids)
+        decisions = PRDecisions() if aggregate_statuses_enabled() else None
+        registered = False
+        if decisions is not None:
+            registered = await _register_candidates(db, workspace_ids, decisions, "webhook")
 
     if not workspace_ids:
         logger.info("Immediate poll: no workspaces match repo", repo=repo)
@@ -2629,11 +2850,24 @@ async def handle_immediate_poll(payload: dict) -> None:
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     results = await asyncio.gather(
         *[
-            _poll_workspace_owned(wid, semaphore, cache=cache, meta=meta, paths_unions=paths_unions)
+            _poll_workspace_owned(
+                wid,
+                semaphore,
+                cache=cache,
+                meta=meta,
+                paths_unions=paths_unions,
+                decisions=decisions,
+            )
             for wid in workspace_ids
         ],
         return_exceptions=True,
     )
     _log_cycle_failures(results, workspace_ids)
+    if decisions is None:
+        pass
+    elif registered:
+        await _store_pr_decisions(decisions)
+    else:
+        await mark_unverified()
 
     VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)

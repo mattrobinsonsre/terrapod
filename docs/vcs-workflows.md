@@ -309,6 +309,12 @@ many times you push:
 | [`accounts-beta-compute`](…) | + 0 ~ 2 | no change | not applied | yes |
 | [`shared-network`](…) | + 0 ~ 0 | — | will apply on merge | yes |
 
+**Gates at `2c91f4e`**
+
+- ✅ `terrapod/plan`: success — Planned 3 of 3 workspaces
+- ✅ `terrapod/policy`: success — Gates passed for 3 of 3 workspaces
+- ⏳ `terrapod/apply`: pending — Applied 1 of 2 workspaces; accounts-beta-compute (awaiting apply)
+
 Comment `terrapod apply` to apply `accounts-beta-compute`.
 
 <details><summary><code>accounts-beta-compute</code> — policy: passed · scan: passed</summary>
@@ -330,6 +336,19 @@ each ruled, passes included, in the order the run evaluates them. So the first
 failing gate matches the run's `blocked-by` attribute. A workspace whose gate
 failed is not offered a `terrapod apply` that would be refused.
 
+The **Gates** block lists the aggregate commit statuses Terrapod posted for the
+head commit (`terrapod/plan`, `terrapod/policy` and, when a workspace applies
+before merge, `terrapod/apply`), with the same state and description each check
+shows, under the names you configured. It is computed by the same code that
+decides the checks, from the database at each refresh, so it can lag a check by
+one refresh. A line ends `(not posted yet, retrying)` or `(refused by the
+provider)` when Terrapod knows that status could not be posted. It cannot tell
+when no connection could post or Redis could not be read, so treat it as what
+Terrapod computed, not a guarantee of what the provider shows. A pending state is shown as `pending` on
+both providers. The block is **left out, not guessed**, while Terrapod has no
+record of which workspaces the PR affects: before the first poll that evaluated
+the PR, or while Redis is unavailable. See [Branch protection](#branch-protection).
+
 A **module** pull request gets the same single comment, one row per consuming
 workspace, rather than a comment each.
 
@@ -341,6 +360,145 @@ than merely being the intent.
 
 Comments posted by older versions are left where they are; the next status edits
 the one it finds, or posts one if there is none.
+
+## Branch protection
+
+Terrapod posts three **aggregate commit statuses** on every open pull request
+of a repository it polls, with fixed names, so a branch-protection rule can
+require them whatever workspaces the change touches:
+
+| Context (default) | Require it? |
+|---|---|
+| `terrapod/plan` | **Yes** |
+| `terrapod/policy` | **Yes** |
+| `terrapod/apply` | **No, never** |
+
+The names, the state mapping per provider and the configuration keys are in
+[Aggregate statuses](vcs-integration.md#aggregate-statuses). Branch protection
+needs no new permission: the statuses use the commit-status permission the
+integration already has, and Terrapod does not read the repository's
+protection rules. Everything described here is scoped to the repository.
+
+### Why not `apply`
+
+Requiring `terrapod/apply` deadlocks an `apply_then_merge` workspace. Before the
+apply, `terrapod/apply` is `pending`. As far as we know, GitHub reports the pull
+request's `mergeable_state` as `blocked` while a required status is pending, and
+Terrapod refuses `terrapod apply` while the mergeability check reports `blocked`
+(`dirty`, `blocked` and `behind` all refuse: `github_service.py`'s
+`_GITHUB_BLOCKING_STATES`, read by `run_service._check_mergeability_or_block`).
+So the apply is refused until the status is green, and the status cannot turn
+green until the apply has run. Nothing clears it. Require `plan` and `policy`
+instead: both can go green **before** the apply.
+
+### What each status means
+
+| | `merge_then_apply` (default) | `apply_then_merge` |
+|---|---|---|
+| `terrapod/plan` | `success` once the speculative plan of every affected workspace has finished | `success` once the full run has planned, **even though the run then waits for `terrapod apply`** |
+| `terrapod/policy` | `success` unless a **recorded** mandatory failure exists on the speculative plan (or it errored). Speculative plans are never held at a gate, and the AI policy gate does not rule on them: the gates are enforced on the apply after merge. It does **not** mean every gate passed | `success` once the post-plan gates of every affected workspace have ruled and passed |
+| `terrapod/apply` | not posted, unless another workspace on the repository is `apply_then_merge` (then it only counts those workspaces) | `pending` until the apply lands, `success` once it has (a plan with no changes counts as applied), `failure` if the apply fails or the run is discarded or canceled |
+
+A planned `apply_then_merge` run is therefore `plan` **success** and `apply`
+**pending**. This differs from the per-workspace `terrapod/<workspace>` status
+of the same run, which stays `pending` until the apply: that is the status that
+would have held a required check unmet. `plan` reports plan completion only; the
+gates are `policy`'s, so a run held at a gate is `plan` success and `policy`
+`pending` or `failure`. **Require both**, or a PR can merge past a held gate.
+
+`policy` is `failure`, not `pending`, for a gate that failed and is waiting for
+an override: somebody has to act, and red says so. `pre_apply` run tasks are
+created when you confirm the apply, so they count towards `apply`; if they were
+in `policy` they would turn a required check pending in the middle of
+`terrapod apply` and get the apply refused.
+
+### A pull request that touches no workspace
+
+A repository can have workspaces that a given PR never touches. Such a PR has
+no run, no session and no trigger, so nothing else would ever post a status for
+it, and a required check nobody posts sits at **Expected** for ever. Terrapod
+posts `terrapod/plan` and `terrapod/policy` as `success`
+(`No Terrapod workspaces affected`) from the poll cycle, once it has evaluated
+**every** workspace of the repository against the PR's head commit, and
+`terrapod/apply` as `success` (`Nothing to apply`) when a workspace on the
+repository is `apply_then_merge`. A missing run never proves a PR touches
+nothing: the evaluation has to complete first. That is why the cases below
+read `pending`, not `success`.
+
+The same holds for a PR into a **branch no workspace tracks** (a `release/*`
+branch, say): the poll cycle posts `plan` and `policy` as `success` for it, so a
+ruleset that requires them on every branch does not leave it at Expected. It
+needs a complete listing of the repository's open PRs and every workspace's
+tracked branch to be known. When a workspace's branch cannot be resolved (or
+its connection is disabled) the PR is `pending`, naming that workspace. When the
+listing is cut off by its bound, Terrapod posts nothing for that PR until the
+listing is complete. Branch names are compared exactly and case-sensitively, as
+the planning filter does.
+
+### When a status is not green
+
+| You see | Status | Why, and what to do |
+|---|---|---|
+| `Evaluating affected workspaces` | `pending` | Terrapod has no complete record of which workspaces this commit affects: the first poll has not run yet (up to one poll interval, 60 seconds by default), Redis was unavailable, or a failed candidate registration marked the records unverified (`terrapod_vcs_pr_records_unverified` is 1). It clears on the next successful poll. |
+| `<workspace> (run not created)` | `pending` | The workspace is affected or may be, but its run could not be created: the archive fetch failed, or the run was refused (for example a configure-after-apply workspace with no configure operation declared, or one that is locked). A workspace that declares no plan/apply operation is not affected and does not show here. Check the workspace's `vcs-last-error` and the API log. |
+| `<workspace> (not evaluated)` | `pending` | The workspace's poll failed before it looked at this PR, so Terrapod cannot say the PR does not touch it. This includes a workspace that tracks a **different branch**: one persistently failing workspace holds every PR on its repository `pending`, deliberately and visibly. Fix the workspace. |
+| `<workspace> (connection disabled)` | `pending` | The workspace's VCS connection is disabled, so it can never plan its pull requests, and every PR on its repository stays pending on `plan` and `policy`. Re-enable the connection, or repoint or delete the workspace. Turning off the per-workspace statuses does not exclude it. The checks are posted by another active connection on the same repository, if there is one; with none, nothing is posted and a required check stays Expected. `terrapod_vcs_disabled_connection_candidates` counts these workspaces and the periodic cycle logs a warning. |
+| `<workspace> (not planned: fork PR)` | `failure` | The PR comes from a fork and the workspace has not opted in (`allow-fork-pr-plans`, default off), so it was skipped without looking at the diff. Terrapod cannot tell whether the fork touches the workspace, so it fails closed. See [Pull requests from forks](vcs-integration.md#pull-requests-from-forks). |
+| `<workspace> (queued)` | `running` (GitHub `pending`) | The run has not started. For an `apply_then_merge` workspace that is a manual lock or another apply-capable run in flight on the workspace (apply-capable runs do not start on a locked workspace); speculative plans of `merge_then_apply` workspaces are not held by the lock. Unlock, or wait for the other run. |
+| `<workspace> (errored)`, `(discarded)`, `(canceled)` | `failure` | The plan did not finish, and Terrapod does not count an errored plan as planned. `policy` reads `(not checked)` for the same workspace. Re-plan with `terrapod plan` or push. |
+| `<workspace> (<gate> failed, awaiting override)` | `policy` `failure` | A mandatory gate failed and an override or a discard is needed. `(…, final)` marks a pre-plan run task failure, which cannot be overridden (a pre-apply run task failure shows under `apply`). |
+| `<workspace> (held)` | `policy` `pending` | The plan finished and something holds the run that the checks cannot name yet; it resolves when the gate result lands. |
+
+### Configuring the required checks
+
+Contexts are matched by **exact name**. As far as we know neither GitHub nor
+GitLab matches a prefix or wildcard for required commit statuses, which is why
+the aggregate names exist rather than asking you to require
+`terrapod/<workspace>` for each workspace (and a workspace added later would
+not be required until you added it).
+
+**GitHub, branch protection rule:** Settings → Branches → edit the rule →
+*Require status checks to pass before merging* → search for and add
+`terrapod/plan` and `terrapod/policy`. **GitHub rulesets:** add *Require status
+checks to pass* and add the same two names. As far as we know GitHub offers
+only contexts it has seen on a recent commit in the search box, so open a pull
+request first so the names appear; if you cannot select them, type the
+name exactly.
+
+**GitLab:** Terrapod posts the aggregates as commit statuses to the `/statuses`
+API (`name=terrapod/plan`, states `pending`, `running`, `success`, `failed`).
+GitLab's documentation describes its *external status checks* as a different
+mechanism, which this change does not use, and says a failing external status
+check does not by itself prevent merging. **Not tested by us:** how *Pipelines
+must succeed* treats a commit status posted this way, and whether any GitLab
+setting can require these particular names; we can describe none. Try it on a
+test project before relying on it.
+Terrapod's own apply gate accepts GitLab's `ci_must_pass` and
+`ci_still_running` merge states as mergeable (`gitlab_service.py`'s
+`_GITLAB_MERGEABLE_DETAILED`), so a pending status does not by that route refuse
+`terrapod apply`; whether GitLab reports those states for external statuses is
+also unverified.
+
+#### Renaming a status
+
+Changing `plan_name`, `policy_name` or `apply_name` only affects commits posted
+afterwards: **old contexts stay on old commits**, and a rule that still requires
+the old name waits for a status that will never be posted on new commits (it
+shows as Expected). Change the names in Terrapod and in the branch-protection
+rule together, and expect existing open pull requests to need a new push (or a
+fresh poll) before they carry the new names.
+
+### Turning the per-workspace statuses off
+
+With `api.config.vcs.commit_statuses.per_workspace: false` a pull-request run no
+longer posts `terrapod/<workspace>`, which keeps the commit's check list short
+on a repository with many workspaces. The aggregates and the comment are
+unaffected, and branch-push runs and module-impact checks keep their statuses.
+
+A workspace named `plan`, `policy` or `apply` (or whatever your aggregate names
+end in) never posts its own `terrapod/<workspace>` status, on any kind of run,
+because it would overwrite the aggregate; Terrapod logs a warning each cycle
+naming such workspaces.
 
 ## Monorepo behaviour
 
@@ -420,6 +578,12 @@ Project / Group access tokens need `api` scope (the existing requirement covers 
 **"No changes — nothing to apply"** — the plan found nothing to do, so no apply was launched. The run still reaches `applied` because it is complete, not because anything was applied.
 
 **Comment didn't trigger anything** — look at the reaction first. **No reaction at all** means the comment never reached the dispatcher: check that it starts with `terrapod` at the beginning of a line (a command inside a code fence is ignored by design), that the GitHub App has Issues permission accepted, and the API pod logs for `vcs_comment_dispatch` events. **👎 with a reply** means it arrived and the reply says why. **👀 that never changes** means dispatch started and did not finish — check the API pod logs. On **v1.11.2, v1.10.7 and earlier this was the normal outcome of a *successful* GitHub command** and not a fault at all: Terrapod sent GitHub the GitLab emoji names `thumbsup`/`thumbsdown`, GitHub's reactions API takes only `+1`/`-1`, and because an acknowledgement must never stop a command running the rejection was swallowed. The command itself always ran — read the status comment rather than the reaction. Fixed in v1.11.3 and v1.10.8; nothing to configure, and GitLab was never affected. If reactions are absent everywhere but replies still appear, the App has not accepted the permission that lets Terrapod react; that is cosmetic and nothing else is affected.
+
+**A required `terrapod/plan` or `terrapod/policy` check sits at "Expected"** — GitHub never received that context for the head commit. Check, in order: the repository has at least one workspace with a VCS connection (a repository Terrapod does not poll gets nothing; a PR into a branch no workspace tracks does get its statuses, unless the open-PR listing was cut off, in which case nothing is posted until it is complete); the connection is active (with every connection on the repository disabled nothing is posted); the poll has run since the push (up to one poll interval); Redis is reachable (with Redis down Terrapod posts no aggregate statuses); and the required name in branch protection is exactly the configured `plan_name`/`policy_name`. After renaming a status, see [Renaming a status](#renaming-a-status).
+
+**`terrapod/plan` stays `pending` with a workspace named in brackets** — read the bracket against [When a status is not green](#when-a-status-is-not-green): `(run not created)`, `(not evaluated)`, `(connection disabled)` and `(queued)` each have a different remedy.
+
+**`terrapod apply` is refused as blocked and `terrapod/apply` is pending** — `terrapod/apply` is required in branch protection. Remove it from the required checks: see [Why not `apply`](#why-not-apply).
 
 **Workflow flip rejected** — you can't change `vcs_workflow` while PR runs are in flight on the workspace. Cancel or merge those PR runs first.
 

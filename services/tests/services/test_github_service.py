@@ -828,3 +828,82 @@ class TestActorHasPushAccess:
         await actor_has_push_access(_mock_conn(), "org", "repo", "a/../../x")
         url = req.call_args.args[1]
         assert "/collaborators/a%2F..%2F..%2Fx/permission" in url
+
+
+class TestAggregateStatusRequestBody:
+    """The request a `terrapod/plan` aggregate status puts on the wire."""
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service.get_installation_token")
+    async def test_the_body_carries_context_state_description_and_target(self, mock_token):
+        from terrapod.services.github_service import create_commit_status
+
+        mock_token.return_value = "tok"
+        ok = _fake_resp(201)
+        ok.raise_for_status = MagicMock()
+        client = _patched_client([ok])
+        with patch("httpx.AsyncClient", return_value=client):
+            await create_commit_status(
+                _mock_conn(),
+                "acme",
+                "mono",
+                "deadbeef",
+                state="pending",
+                description="Planned 1 of 2 workspaces; ws-b (planning)" + "x" * 200,
+                target_url="https://tp.example/workspaces/ws-b/runs/run-1",
+                context="terrapod/plan",
+            )
+
+        (call,) = client.request.await_args_list
+        assert call.args[:2] == ("POST", "https://api.github.com/repos/acme/mono/statuses/deadbeef")
+        body = call.kwargs["json"]
+        assert body["context"] == "terrapod/plan"
+        assert body["state"] == "pending"
+        assert len(body["description"]) <= 140
+        assert body["target_url"] == "https://tp.example/workspaces/ws-b/runs/run-1"
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service.get_installation_token")
+    async def test_an_aggregate_description_is_posted_whole(self, mock_token):
+        from terrapod.services.github_service import create_commit_status
+        from terrapod.services.vcs_aggregate_status import (
+            MAX_DESCRIPTION,
+            PREvaluation,
+            WorkspaceRun,
+            aggregate,
+            github_state,
+        )
+
+        mock_token.return_value = "tok"
+        rows = [
+            WorkspaceRun(
+                f"workspace-{i:02d}-" + "n" * 47,
+                "merge_then_apply",
+                "errored",
+                False,
+                False,
+                None,
+                (),
+                None,
+            )
+            for i in range(50)
+        ]
+        ev = PREvaluation(True, (), (), (), (), False)
+        verdict = aggregate(rows, ev).plan
+        ok = _fake_resp(201)
+        ok.raise_for_status = MagicMock()
+        client = _patched_client([ok])
+        with patch("httpx.AsyncClient", return_value=client):
+            await create_commit_status(
+                _mock_conn(),
+                "o",
+                "r",
+                "sha",
+                state=github_state(verdict),
+                description=verdict.description,
+                context="terrapod/plan",
+            )
+        body = client.request.await_args_list[0].kwargs["json"]
+        assert body["description"] == verdict.description
+        assert len(body["description"]) <= MAX_DESCRIPTION and body["description"].isascii()
+        assert "target_url" not in body

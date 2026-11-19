@@ -395,3 +395,46 @@ class TestSmallThings:
             ]
         )
         assert "    (value): x → y" in out
+
+
+class TestTheGatesBlock:
+    GATES = [
+        "**Gates at `abc1234`**",
+        "",
+        "- \u2705 `terrapod/plan`: success \u2014 Planned 1 of 1 workspaces",
+    ]
+
+    def test_it_sits_after_the_table_and_before_the_details(self):
+        gate = (GateVerdict("policy", "guardrails", False, "mandatory"),)
+        out = render_comment([_row(gates=gate)], gates=self.GATES)
+        assert out.index("| Workspace |") < out.index("**Gates at") < out.index("<details>")
+
+    def test_no_gates_leaves_the_block_out(self):
+        assert "Gates at" not in render_comment([_row()], gates=None)
+        assert "Gates at" not in render_comment([_row()], gates=[])
+        assert "Gates at" not in render_comment([], gates=None)
+
+    def test_an_empty_pr_comment_still_shows_the_gates(self):
+        out = render_comment([], gates=self.GATES)
+        assert "No Terrapod workspaces affected" in out and "**Gates at" in out
+
+    def test_a_fifty_workspace_comment_stays_in_the_budget_with_gates(self):
+        rows = [_row(name=f"ws-{i}", resource_list=_big_list()) for i in range(50)]
+        gates = ["**Gates at `abc1234`**", ""] + [
+            f"- \u274c `terrapod/{k}`: failure \u2014 " + "x" * 140
+            for k in ("plan", "policy", "apply")
+        ]
+        out = render_comment(rows, gates=gates)
+        assert len(out) <= COMMENT_MAX_CHARS
+        assert "**Gates at" in out
+        for i in range(50):
+            assert f"`ws-{i}`" in out
+
+    def test_the_gates_are_charged_to_the_budget(self):
+        """A block big enough to matter must squeeze the lists, not the limit."""
+        rows = [_row(name=f"ws-{i}", resource_list=_big_list()) for i in range(10)]
+        without = render_comment(rows)
+        gates = ["**Gates**", ""] + ["- " + "g" * 2000 for _ in range(10)]
+        with_gates = render_comment(rows, gates=gates)
+        assert len(without) <= COMMENT_MAX_CHARS and len(with_gates) <= COMMENT_MAX_CHARS
+        assert with_gates.count("see the run") >= without.count("see the run")

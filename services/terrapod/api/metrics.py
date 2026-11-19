@@ -161,6 +161,40 @@ VCS_RUNS_CREATED = Counter(
     ["provider", "type"],
 )
 
+VCS_AGGREGATE_STATUS_REJECTED = Counter(
+    "terrapod_vcs_aggregate_status_rejected_total",
+    "Aggregate commit statuses a provider refused outright (final 4xx, not rate limits)",
+    ["provider", "status_code"],
+)
+
+VCS_AGGREGATE_STATUS_POSTS = Counter(
+    "terrapod_vcs_aggregate_status_posts_total",
+    "Aggregate commit status posts, by outcome: ok, transient (retried later) or rejected (final 4xx)",
+    ["provider", "outcome"],
+)
+
+VCS_CANDIDATE_REGISTRATION_FAILURES = Counter(
+    "terrapod_vcs_candidate_registration_failures_total",
+    (
+        "Poll passes that could not register their candidate workspaces, so stored "
+        "PR records read pending until a periodic cycle succeeds"
+    ),
+    ["entry"],
+)
+
+VCS_PR_RECORDS_UNVERIFIED = Gauge(
+    "terrapod_vcs_pr_records_unverified",
+    "1 while a failed candidate registration has the stored PR records marked unverified",
+)
+
+VCS_DISABLED_CONNECTION_CANDIDATES = Gauge(
+    "terrapod_vcs_disabled_connection_candidates",
+    (
+        "Workspaces on a disabled VCS connection, as of the last periodic cycle: each "
+        "holds its repository's PR checks pending until the connection is re-enabled"
+    ),
+)
+
 VCS_WEBHOOK_RECEIVED = Counter(
     "terrapod_vcs_webhook_received_total",
     "Total VCS webhook events received",
