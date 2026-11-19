@@ -1764,6 +1764,7 @@ field WorkspaceCostEstimate.Unpriced []UnpricedResource `json:"unpriced"`
 field WorkspaceCostEstimate.WorkspaceID string `json:"-"`
 field WorkspaceFilter.AgentPoolID string `json:"agent_pool_id,omitempty"`
 field WorkspaceFilter.All bool `json:"all,omitempty"`
+field WorkspaceFilter.AutodiscoveryRuleID string `json:"autodiscovery_rule_id,omitempty"`
 field WorkspaceFilter.DriftStatus string `json:"drift_status,omitempty"`
 field WorkspaceFilter.EngineVersion string `json:"engine_version,omitempty"`
 field WorkspaceFilter.Exclude []WorkspaceFilter `json:"exclude,omitempty"`

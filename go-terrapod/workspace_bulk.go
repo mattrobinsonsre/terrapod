@@ -28,11 +28,13 @@ type WorkspaceFilter struct {
 	TerraformVersion string `json:"terraform_version,omitempty"`
 	AgentPoolID      string `json:"agent_pool_id,omitempty"`
 	VCSConnectionID  string `json:"vcs_connection_id,omitempty"`
-	OwnerEmail       string `json:"owner_email,omitempty"`
-	DriftStatus      string `json:"drift_status,omitempty"`
-	Locked           *bool  `json:"locked,omitempty"`
-	HasVCS           *bool  `json:"has_vcs,omitempty"`
-	All              bool   `json:"all,omitempty"`
+	// AutodiscoveryRuleID selects the workspaces an autodiscovery rule created.
+	AutodiscoveryRuleID string `json:"autodiscovery_rule_id,omitempty"`
+	OwnerEmail          string `json:"owner_email,omitempty"`
+	DriftStatus         string `json:"drift_status,omitempty"`
+	Locked              *bool  `json:"locked,omitempty"`
+	HasVCS              *bool  `json:"has_vcs,omitempty"`
+	All                 bool   `json:"all,omitempty"`
 	// Exclude removes every workspace matching any entry from the result.
 	// Entries use the same dimensions as the filter.
 	Exclude []WorkspaceFilter `json:"exclude,omitempty"`

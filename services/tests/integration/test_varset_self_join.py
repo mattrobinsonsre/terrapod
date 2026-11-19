@@ -353,8 +353,13 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
         from terrapod.services.workspace_search_service import WorkspaceFilter
 
         # `exclude` is refused until a later PR recurses into its entries through
-        # the same predicate.
-        assert set(RULE_DIMENSIONS_REFUSED) == {"drift_status", "locked", "exclude"}
+        # the same predicate; `autodiscovery_rule_id` until rules are offered it.
+        assert set(RULE_DIMENSIONS_REFUSED) == {
+            "drift_status",
+            "locked",
+            "exclude",
+            "autodiscovery_rule_id",
+        }
         for dim in RULE_DIMENSIONS_REFUSED:
             assert dim in WorkspaceFilter.model_fields, (
                 f"{dim} is refused but is no longer a filter dimension — the refusal "
@@ -403,16 +408,39 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
         assert resp.status_code == 422, resp.text
         assert "exclude" in resp.text
 
+        for key in ("autodiscovery-rule-id", "autodiscovery_rule_id"):
+            resp = await client.post(
+                VARSETS,
+                json={
+                    "data": {
+                        "type": "varsets",
+                        "attributes": {
+                            "name": f"adrule-{tag}",
+                            "global": False,
+                            "assignment-rule": {key: str(uuid.uuid4())},
+                        },
+                    }
+                },
+                headers=AUTH,
+            )
+            assert resp.status_code == 422, resp.text
+            assert "autodiscovery_rule_id" in resp.text
+
     async def test_a_stored_rule_naming_one_matches_nothing(self, db_session=None):
         """A deployment that already has such a rule must stop honouring it, not keep
         the hole open for exactly the installs that have one."""
         from terrapod.services.variable_service import _rule_matches
+        from terrapod.services.varset_self_join import rule_refused_dimensions
 
         assert not await _rule_matches(None, {"locked": True}, uuid.uuid4())
         assert not await _rule_matches(None, {"drift_status": ""}, uuid.uuid4())
         assert not await _rule_matches(
             None, {"labels": {"team": "x"}, "exclude": [{"locked": False}]}, uuid.uuid4()
         )
+        for key in ("autodiscovery-rule-id", "autodiscovery_rule_id"):
+            rule = {key: str(uuid.uuid4())}
+            assert rule_refused_dimensions(rule) == ["autodiscovery_rule_id"]
+            assert not await _rule_matches(None, rule, uuid.uuid4())
 
 
 class TestEveryWayAWorkspaceComesIntoExistence:
