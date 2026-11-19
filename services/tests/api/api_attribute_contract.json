@@ -265,14 +265,32 @@
     "replaced-at",
     "replaced-digest",
     "size",
+    "supply-chain",
     "upload-reference",
     "uploaded-by",
+    "verification",
     "version"
   ],
   "cache_admin._upload_artifact:meta": [
     "previous-digest",
     "replaced",
     "unchanged"
+  ],
+  "cache_admin.artifact_ledger_detail": [
+    "admission",
+    "admitted-at",
+    "attestation",
+    "attestor",
+    "coordinates",
+    "digest",
+    "kind",
+    "matches",
+    "packages",
+    "sbom",
+    "supply-chain",
+    "updated-at",
+    "verdict-provenance",
+    "verification"
   ],
   "cache_admin.list_vcs_archive_cache": [
     "connection-id",
@@ -1525,6 +1543,9 @@
   "variables.list_varset_workspaces": [
     "assignment-source",
     "name"
+  ],
+  "variables.list_varset_workspaces:meta": [
+    "exclusion"
   ],
   "variables.list_workspace_varsets": [
     "assignment-source",

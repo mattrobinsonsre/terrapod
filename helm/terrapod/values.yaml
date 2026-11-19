@@ -897,8 +897,13 @@ api:
         opa_version: "1.22.4"
         trivy_version: "0.76.2"
         checkov_version: "3.4.5"
+        # Syft inventories a cached artifact into an SBOM (#2589). Syft
+        # GENERATES and Trivy CONSUMES it, which is why there is no third
+        # tool here: `trivy sbom` matches a Syft CycloneDX document directly.
+        syft_version: "1.57.2"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
+        syft_mirror_url: "https://github.com/anchore/syft/releases/download"
         # Checkov comes from TERRAPOD's releases, not Checkov's, and that is
         # deliberate (#2066). Upstream stopped publishing
         # checkov_linux_arm64.zip at 3.3.21 — its arm build job waits on a
@@ -921,11 +926,15 @@ api:
         checkov_checksum_api_url: "https://api.github.com/repos/mattrobinsonsre/terrapod/releases/tags"
         # Integrity verification for platform tools. One of: off, checksum.
         # 'checksum' (default, fail-closed) checks the downloaded artifact's
-        # SHA-256 against the publisher's published sum before caching. There is
-        # no 'signature' level: none of the three publishes a GPG-signed
-        # manifest — which is exactly what the Dockerfiles did before, a checksum
-        # and nothing more.
-        verify: checksum
+        # SHA-256 against the publisher's published sum before caching, and at
+        # 'signature' the publisher's Sigstore signature over it as well.
+        # Measured against the live releases: trivy and syft each publish a
+        # bundle over their checksums manifest, and checkov is built by
+        # TERRAPOD's own CI, which has attested its build provenance since
+        # #2066 — verifiable anonymously through the GitHub attestations API.
+        # opa publishes nothing, so it verifies by checksum and the outcome is
+        # recorded as such; 'signature' never silently means 'checksum'.
+        verify: signature
       module_interface:
         enabled: true
       # Org-wide module autodiscovery (#1620): a module autodiscovery rule may

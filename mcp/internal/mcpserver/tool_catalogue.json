@@ -8,6 +8,27 @@
     }
   },
   {
+    "name": "terrapod_artifact_ledger_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "description": "the artifact's digest in full sha256:\u003chex\u003e form, exactly as the caches report it, NOT the bare hex and NOT a package name. Get one from terrapod_package_cache_list, which reports a digest per cached artifact. The ledger is keyed on the digest because that is the artifact's identity: one set of bytes served under two names is one entry carrying both namings, and two different artifacts published under one name are two entries, which is the case a name cannot address",
+          "type": "string"
+        },
+        "include_sbom": {
+          "description": "return the full CycloneDX inventory document as well. Off by default because it carries a component per dependency and is routinely far larger than every other field together. The packages count and the supply_chain findings answer most questions without it, so ask for it only when you need the component list itself",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "digest"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_cache_warm_images",
     "input_schema": {
       "additionalProperties": false,

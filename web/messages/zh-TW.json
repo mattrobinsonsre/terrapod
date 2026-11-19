@@ -4261,5 +4261,46 @@
     "knownHostsHint": "此憑證所連線的機器的公開主機金鑰，依 known_hosts 格式每行一個。將清查變數指向其路徑，即可在不放寬主機金鑰驗證的情況下建立連線。不會隱藏：主機的公開金鑰本就是公開的，金鑰不相符時比對的正是它。",
     "knownHostsLead": "此憑證所連線的機器的公開主機金鑰，依 known_hosts 格式每行一個。",
     "machineLead": "Ansible 連線到引用此憑證的主機的方式。請提供私密金鑰或密碼，也可以同時提供兩者。"
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "已驗證",
+      "unverified": "未驗證",
+      "failed": "驗證失敗",
+      "legend": "此構件的准入方式"
+    },
+    "state": {
+      "inventoried": "已產生清單",
+      "notInventoried": "未產生清單",
+      "findings": "{count, plural, other {# 項發現}}",
+      "malicious": "{count, plural, other {# 個惡意套件}}"
+    },
+    "reason": {
+      "notAdmitted": "在此記錄存在之前即已准入，因此從未產生清單",
+      "awaiting": "已准入，等待產生清單"
+    },
+    "detail": {
+      "title": "構件",
+      "back": "返回快取",
+      "admitted": "准入",
+      "attestation": "證明",
+      "attestor": "擔保者",
+      "coordinates": "標識為",
+      "packages": "{count, plural, other {# 個套件}}",
+      "sbom": "軟體物料清單",
+      "sbomNone": "未為此構件產生清單",
+      "findings": "發現項",
+      "findingsNone": "沒有相符項目",
+      "verdict": "判定",
+      "verdictLine": "由 {matcher} {matcherVersion} 針對資料庫紀元 {epoch} 進行比對，由 {generator} {generatorVersion} 產生清單",
+      "verdictNone": "此構件尚未與弱點資料庫進行比對",
+      "notFound": "此構件沒有任何記錄",
+      "advisory": "發現項僅供參考。它們描述的是已准入並已驗證的構件內部包含哪些內容；它們不會封鎖該構件，因為擔保者已經為這些位元組作出擔保。",
+      "maliciousNote": "被標記為惡意的套件並非相依項目中的缺陷。請將其視為該構件本身具有敵意。"
+    },
+    "column": {
+      "verification": "驗證",
+      "supplyChain": "內容"
+    }
   }
 }

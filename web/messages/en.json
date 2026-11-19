@@ -4261,5 +4261,46 @@
     "replaceHint": "Saving replaces the whole credential, so fill in every field it needs — not only the one being changed. Leaving all of them empty keeps the stored credential as it is.",
     "knownHostsLead": "The public host keys of the machines this credential reaches, one per line in known_hosts format.",
     "machineLead": "How Ansible connects to the hosts that refer to this credential. Supply a private key or a password, or both."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "failed": "Verification failed",
+      "legend": "How this artifact was admitted"
+    },
+    "state": {
+      "inventoried": "Inventoried",
+      "notInventoried": "Not inventoried",
+      "findings": "{count, plural, one {# finding} other {# findings}}",
+      "malicious": "{count, plural, one {# malicious} other {# malicious}}"
+    },
+    "reason": {
+      "notAdmitted": "Admitted before this record existed, so it was never inventoried",
+      "awaiting": "Admitted and awaiting inventory"
+    },
+    "detail": {
+      "title": "Artifact",
+      "back": "Back to the cache",
+      "admitted": "Admitted",
+      "attestation": "Attestation",
+      "attestor": "Vouched for by",
+      "coordinates": "Known as",
+      "packages": "{count, plural, one {# package} other {# packages}}",
+      "sbom": "Software bill of materials",
+      "sbomNone": "No inventory was produced for this artifact",
+      "findings": "Findings",
+      "findingsNone": "Nothing matched",
+      "verdict": "Verdict",
+      "verdictLine": "Matched by {matcher} {matcherVersion} against database epoch {epoch}, inventoried by {generator} {generatorVersion}",
+      "verdictNone": "This artifact has not been matched against the vulnerability database",
+      "notFound": "No record exists for this artifact",
+      "advisory": "Findings are advisory. They describe what is inside an artifact that was admitted and verified; they do not block it, because the attestor has already vouched for these bytes.",
+      "maliciousNote": "A package flagged malicious is not a defect in a dependency. Treat it as the artifact being hostile."
+    },
+    "column": {
+      "verification": "Verification",
+      "supplyChain": "Contents"
+    }
   }
 }

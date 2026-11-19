@@ -29,6 +29,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import Workspace, WorkspaceAgentPool
 
+#: Each exclude entry costs a count query when an exclusion is reported.
+MAX_EXCLUDE_ENTRIES = 20
+
 
 class WorkspaceFilterError(ValueError):
     """Raised when a filter is empty or structurally invalid. Routers
@@ -82,6 +85,7 @@ class WorkspaceFilter(BaseModel):
     engine_version: str | None = None
     agent_pool_id: str | None = None
     vcs_connection_id: str | None = None
+    autodiscovery_rule_id: str | None = None
     owner_email: str | None = None
     drift_status: str | None = None
     locked: bool | None = None
@@ -102,6 +106,7 @@ class WorkspaceFilter(BaseModel):
                 "engine_version",
                 "agent_pool_id",
                 "vcs_connection_id",
+                "autodiscovery_rule_id",
                 "owner_email",
                 "drift_status",
                 "locked",
@@ -158,6 +163,9 @@ def _dimension_clauses(f: WorkspaceFilter) -> list[ColumnElement[bool]]:
         )
     if f.vcs_connection_id is not None:
         clauses.append(Workspace.vcs_connection_id == _strip_uuid(f.vcs_connection_id, "vcs-"))
+    if f.autodiscovery_rule_id is not None:
+        # Rules are exposed as bare uuids, so there is no prefix to strip.
+        clauses.append(Workspace.autodiscovery_rule_id == _strip_uuid(f.autodiscovery_rule_id, ""))
     if f.owner_email is not None:
         clauses.append(Workspace.owner_email == f.owner_email)
     if f.drift_status is not None:
@@ -282,6 +290,10 @@ def _parse_entry(raw: Any, label: str | None = None) -> WorkspaceFilter:
             raw_exclude = []
         if not isinstance(raw_exclude, list):
             raise WorkspaceFilterError("'exclude' must be a list of selectors")
+        if len(raw_exclude) > MAX_EXCLUDE_ENTRIES:
+            raise WorkspaceFilterError(
+                f"'exclude' has {len(raw_exclude)} entries; at most {MAX_EXCLUDE_ENTRIES} are allowed"
+            )
         norm["exclude"] = [_parse_entry(e, f"exclude[{i}]") for i, e in enumerate(raw_exclude)]
     try:
         entry = WorkspaceFilter(**norm)

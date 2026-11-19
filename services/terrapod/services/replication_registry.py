@@ -14,6 +14,7 @@ from terrapod.db.models import (
     AgentPool,
     AgentPoolToken,
     APIToken,
+    ArtifactLedgerEntry,
     AutodiscoveryRule,
     CatalogItem,
     ConfigurationVersion,
@@ -614,6 +615,33 @@ CONFIGURATION_VERSIONS = register(
 # has to carry signature metadata that wants its own thought, and it needs
 # `registry_providers` and `gpg_keys` registered ahead of it.
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# The artifact ledger (#2589)
+#
+# Replicated COMPLETELY, or it means nothing. A partially replicated evidence
+# store is worse than none: a promoted follower would answer "we never served
+# that artifact" when the record was on the old leader, which is a WRONG answer
+# rather than an absent one -- in the one surface whose entire purpose is being
+# trustworthy after an incident.
+#
+# Keyed on `digest` rather than on the surrogate id, so a row the follower
+# already holds by a second route converges instead of duplicating. The digest
+# is the artifact's identity; the id is an implementation detail of this table.
+#
+# No encrypted columns, deliberately. Nothing here is a secret: an SBOM, a
+# publisher identity and a findings list are all facts about something a
+# deployment deliberately served, and encrypting them would make the evidence
+# store unreadable on a promoted node for no gain -- `crypto_keys` never
+# travels, so the peer could not decrypt them anyway.
+ARTIFACT_LEDGER = register(
+    ReplicatedClass(
+        name="artifact_ledger",
+        model=ArtifactLedgerEntry,
+        pk_attrs=("digest",),
+    )
+)
 
 
 # ---------------------------------------------------------------------------
