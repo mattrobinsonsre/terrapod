@@ -135,6 +135,26 @@ field ArchiveTotalsMeta.Bytes int64 `json:"bytes"`
 field ArchiveTotalsMeta.ScanLimit int `json:"scan-limit"`
 field ArchiveTotalsMeta.Sealed bool `json:"sealed"`
 field ArchiveTotalsMeta.Truncated bool `json:"truncated"`
+field ArtifactLedgerEntry.Admission map[string]any `json:"admission"`
+field ArtifactLedgerEntry.AdmittedAt string `json:"admitted-at"`
+field ArtifactLedgerEntry.Attestation string `json:"attestation"`
+field ArtifactLedgerEntry.Attestor map[string]any `json:"attestor"`
+field ArtifactLedgerEntry.Coordinates []map[string]any `json:"coordinates"`
+field ArtifactLedgerEntry.Digest string `json:"digest"`
+field ArtifactLedgerEntry.Kind string `json:"kind"`
+field ArtifactLedgerEntry.Matches []map[string]any `json:"matches"`
+field ArtifactLedgerEntry.Packages int `json:"packages"`
+field ArtifactLedgerEntry.SBOM map[string]any `json:"sbom"`
+field ArtifactLedgerEntry.SupplyChain ArtifactSupplyChain `json:"supply-chain"`
+field ArtifactLedgerEntry.UpdatedAt string `json:"updated-at"`
+field ArtifactLedgerEntry.VerdictProvenance map[string]any `json:"verdict-provenance"`
+field ArtifactLedgerEntry.Verification string `json:"verification"`
+field ArtifactSupplyChain.Critical int `json:"critical"`
+field ArtifactSupplyChain.Findings int `json:"findings"`
+field ArtifactSupplyChain.Malicious int `json:"malicious"`
+field ArtifactSupplyChain.Reason string `json:"reason"`
+field ArtifactSupplyChain.State string `json:"state"`
+field ArtifactSupplyChain.Verdict map[string]any `json:"verdict"`
 field AuthenticationError.Detail string
 field AuthorizationError.Detail string
 field AutodiscoveryRule.Attributes map[string]any
@@ -184,8 +204,10 @@ field CachedPackageFile.Name string `json:"name"`
 field CachedPackageFile.ReplacedAt string `json:"replaced-at"`
 field CachedPackageFile.ReplacedDigest string `json:"replaced-digest"`
 field CachedPackageFile.Size int64 `json:"size"`
+field CachedPackageFile.SupplyChain ArtifactSupplyChain `json:"supply-chain"`
 field CachedPackageFile.UploadReference string `json:"upload-reference"`
 field CachedPackageFile.UploadedBy string `json:"uploaded-by"`
+field CachedPackageFile.Verification string `json:"verification"`
 field CachedPackageFile.Version string `json:"version"`
 field CachedProviderRow.Arch string `json:"arch"`
 field CachedProviderRow.Attestation string `json:"attestation"`
@@ -1742,6 +1764,7 @@ field WorkspaceCostEstimate.Unpriced []UnpricedResource `json:"unpriced"`
 field WorkspaceCostEstimate.WorkspaceID string `json:"-"`
 field WorkspaceFilter.AgentPoolID string `json:"agent_pool_id,omitempty"`
 field WorkspaceFilter.All bool `json:"all,omitempty"`
+field WorkspaceFilter.AutodiscoveryRuleID string `json:"autodiscovery_rule_id,omitempty"`
 field WorkspaceFilter.DriftStatus string `json:"drift_status,omitempty"`
 field WorkspaceFilter.EngineVersion string `json:"engine_version,omitempty"`
 field WorkspaceFilter.Exclude []WorkspaceFilter `json:"exclude,omitempty"`
@@ -1759,6 +1782,7 @@ field WorkspaceFilter.WorkspaceIDs []string `json:"workspace_ids,omitempty"`
 field WorkspaceLatestRun.Actions RunActions `json:"actions"`
 field WorkspaceLatestRun.CreatedAt string `json:"created-at"`
 field WorkspaceLatestRun.ID string `json:"id"`
+field WorkspaceLatestRun.IsDestroy bool `json:"is-destroy"`
 field WorkspaceLatestRun.PhaseStartedAt map[string]string `json:"phase-started-at,omitempty"`
 field WorkspaceLatestRun.PlanOnly bool `json:"plan-only"`
 field WorkspaceLatestRun.RunKind string `json:"run-kind"`
@@ -1911,6 +1935,7 @@ method (*Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error
 method (*Client) GetAgentPoolToken(ctx context.Context, poolID, tokenID string) (*AgentPoolToken, error)
 method (*Client) GetApplyLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
 method (*Client) GetArchitectureCritique( ctx context.Context, workspaceID string, ) (*ArchitectureCritique, error)
+method (*Client) GetArtifactLedgerEntry(ctx context.Context, digest string) (*ArtifactLedgerEntry, error)
 method (*Client) GetAutodiscoveryRule(ctx context.Context, id string) (*AutodiscoveryRule, error)
 method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogInstance, error)
 method (*Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error)
@@ -2173,6 +2198,8 @@ type ArchitectureCritiqueFinding struct
 type ArchitectureCritiqueMessage struct
 type ArchiveEvictRequest struct
 type ArchiveTotalsMeta struct
+type ArtifactLedgerEntry struct
+type ArtifactSupplyChain struct
 type AuthenticationError struct
 type AuthorizationError struct
 type AutodiscoveryRule struct

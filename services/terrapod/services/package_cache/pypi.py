@@ -133,7 +133,40 @@ def artifact_for(project: str, entry: dict) -> Artifact:
         upstream_url=entry["url"],
         digest=_digest_of(entry),
         content_type="application/octet-stream",
+        provenance_resolver=_provenance_resolver(
+            normalise(project), _version_from_filename(filename), filename
+        ),
     )
+
+
+def _provenance_resolver(name: str, version: str, filename: str):
+    """A closure the substrate calls on the MISS path with the verified digest.
+
+    A closure rather than a method so the coordinates travel with it and the
+    substrate stays ecosystem-agnostic -- it knows only that something may
+    verify a publisher, not how PyPI spells its integrity endpoint.
+
+    The version is derived from the filename, which `artifact_for`'s own comment
+    calls best-effort because it was only ever displayed. It is load-bearing
+    here, so a wrong one means a 404 from the integrity endpoint, which is
+    recorded as "nothing published" rather than as a failure -- the honest
+    outcome when we cannot form the question, and the reason this degrades
+    quietly instead of refusing the artifact.
+    """
+
+    async def resolve(client, digest_hex: str):
+        from terrapod.services.package_cache import publisher_provenance
+
+        return await publisher_provenance.verify_pypi(
+            client,
+            base_url=upstream_base(),
+            name=name,
+            version=version,
+            filename=filename,
+            digest_hex=digest_hex,
+        )
+
+    return resolve
 
 
 #: A project name as a caller spells it, before normalisation — PEP 503's own

@@ -21,6 +21,7 @@ from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.artifact_verification import VerificationError, verify_binary
 from terrapod.services.cache_errors import CacheOnlyError, UpstreamArtifactMissing
+from terrapod.services.cache_object_keys import binary_storage_key
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.services.platform_tools import (
     DESCRIBED_TOOLS,
@@ -284,7 +285,7 @@ async def get_or_cache_binary(
         # Touch last_accessed_at for retention tracking
         cached.last_accessed_at = datetime.now(UTC)
         await db.flush()
-        key = binary_cache_key(tool, version, os_, arch)
+        key = binary_storage_key(cached)
         presigned = await storage.presigned_get_url(key)
         return presigned.url
 
@@ -523,7 +524,7 @@ async def purge_binary(
     )
     entries = list(result.scalars().all())
     for entry in entries:
-        key = binary_cache_key(tool, version, entry.os, entry.arch)
+        key = binary_storage_key(entry)
         await storage.delete(key)
         await db.delete(entry)
 
@@ -1080,6 +1081,28 @@ async def _resolve_pulumi_version(partial: str) -> str:
 
 
 # --- Internal helpers ---
+
+
+async def cached_binary_key(
+    db: AsyncSession,
+    tool: str,
+    version: str,
+    os_: str,
+    arch: str,
+) -> str | None:
+    """Where a cached binary's object is, read from its row.
+
+    For a caller that needs the KEY rather than a presigned URL, so it does not
+    derive one. Deriving is wrong for an operator-uploaded tool: the object is
+    under `uploads/` and the derived `cache/` key holds nothing, so the caller
+    reports the tool unavailable on precisely the sealed deployment that
+    uploaded it because it could not fetch it (#2599).
+
+    None when nothing is cached, which the caller must distinguish from a key:
+    an absent row and a present one are different answers.
+    """
+    cached = await _get_cached(db, tool, version, os_, arch)
+    return None if cached is None else binary_storage_key(cached)
 
 
 async def _get_cached(

@@ -235,5 +235,12 @@ class TestValidTriggers:
             "run:completed",
             "run:errored",
             "run:drift_detected",
+            # Not a run STATUS, and the only trigger that is not: an artifact
+            # the run tried to pull was refused admission -- a publisher
+            # signature that failed, or an allowlist refusal (#2589). ONE kind
+            # covers both, because to an operator they are the same event and
+            # splitting them would make a complete subscription two boxes to
+            # tick rather than one.
+            "artifact:refused",
         }
         assert VALID_TRIGGERS == expected

@@ -121,7 +121,7 @@ fi
 QUERY_BUILD = (
     'mkdir -p docker/query-bin && ' +
     'docker run --rm -v "$PWD/query":/src:ro -v "$PWD/docker/query-bin":/out ' +
-    '-w /src golang:1.26.10 go build -trimpath -o /out/terrapod-query ./cmd/terrapod-query'
+    '-w /src golang:1.26.11 go build -trimpath -o /out/terrapod-query ./cmd/terrapod-query'
 )
 if config.tilt_subcommand != 'down':
     local(QUERY_BUILD, quiet=True)
@@ -131,7 +131,7 @@ if config.tilt_subcommand != 'down':
 EE_AGENT_BUILD = (
     'mkdir -p docker/ee-agent-bin && ' +
     'docker run --rm -e CGO_ENABLED=0 -v "$PWD/ee-agent":/src:ro ' +
-    '-v "$PWD/docker/ee-agent-bin":/out -w /src golang:1.26.10 ' +
+    '-v "$PWD/docker/ee-agent-bin":/out -w /src golang:1.26.11 ' +
     'go build -trimpath -o /out/terrapod-ee-agent .'
 )
 if config.tilt_subcommand != 'down':

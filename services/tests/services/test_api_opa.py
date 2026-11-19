@@ -12,6 +12,7 @@ import ast
 import asyncio
 import contextlib
 import inspect
+import platform
 import shutil
 import stat
 from unittest.mock import AsyncMock, patch
@@ -19,27 +20,51 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from terrapod.services import api_opa, policy_engine
+from terrapod.storage.keys import binary_cache_key
+
+#: Distinguishes "caller said nothing" from an explicit `key=None`, which is a
+#: case under test (a cache that reports no row).
+_SENTINEL = "\x00unset"
 
 
 @contextlib.contextmanager
-def _cache_serving(storage, *, cached: AsyncMock | None = None):
+def _cache_serving(
+    storage,
+    *,
+    cached: AsyncMock | None = None,
+    key: str | None = _SENTINEL,
+):
     """Stand in for the binary cache and the object store behind it.
 
-    `_download` imports `get_db_session`, `get_or_cache_binary` and
-    `get_storage` lazily inside the function, so they resolve from their own
-    modules at call time -- patching them on `api_opa` would patch nothing and
-    the test would silently exercise the real cache. Patch them at the source.
+    `_download` imports `get_db_session`, `get_or_cache_binary`,
+    `cached_binary_key` and `get_storage` lazily inside the function, so they
+    resolve from their own modules at call time -- patching them on `api_opa`
+    would patch nothing and the test would silently exercise the real cache.
+    Patch them at the source.
+
+    `key` is where the row says the object is. It defaults to the derived
+    `cache/` key, which is what a pull-through OPA has; a test passes
+    `uploads/...` to exercise an operator-uploaded one, and `None` to exercise
+    a cache that reports no row at all.
     """
 
     @contextlib.asynccontextmanager
     async def _session():
         yield AsyncMock()
 
+    if key is _SENTINEL:
+        arch = "arm64" if platform.machine().lower() in ("aarch64", "arm64") else "amd64"
+        key = binary_cache_key("opa", "1.19.0", "linux", arch)
+
     with (
         patch("terrapod.db.session.get_db_session", _session),
         patch(
             "terrapod.services.binary_cache_service.get_or_cache_binary",
             cached if cached is not None else AsyncMock(return_value=""),
+        ),
+        patch(
+            "terrapod.services.binary_cache_service.cached_binary_key",
+            AsyncMock(return_value=key),
         ),
         patch("terrapod.storage.get_storage", lambda: storage),
     ):
@@ -289,3 +314,56 @@ class TestTheApiFetchesOpaThroughTheCacheOnly:
             f"{offenders} is reachable from api_opa. The API's OPA fetch goes through "
             "get_or_cache_binary, never upstream directly -- see this class's docstring."
         )
+
+
+class TestAnUploadedOpaIsReadFromWhereItWasPut:
+    """The gap #2599 opens and this closes.
+
+    Once an upload lands under `uploads/` rather than beside the pull-through
+    content, a caller that DERIVES the key from the coordinates looks under
+    `cache/` and finds nothing. The derived key is perfectly valid and simply
+    holds no object, so the failure is silent: OPA reports unavailable, policy
+    evaluation degrades, and it happens on precisely the sealed deployment that
+    uploaded its own OPA because it could not fetch one.
+
+    So the key comes from the row, and these pin that it does.
+    """
+
+    @staticmethod
+    def _storage(read_keys: list[str]):
+        class _FakeStorage:
+            async def get_stream(self, key):
+                read_keys.append(key)
+                yield b"opa-bytes"
+
+        return _FakeStorage()
+
+    async def test_the_uploaded_object_is_the_one_read(self, tmp_path):
+        read_keys: list[str] = []
+        uploaded = "uploads/binaries/opa/1.19.0/linux_amd64"
+        with _cache_serving(self._storage(read_keys), key=uploaded):
+            await api_opa._download("1.19.0", tmp_path / "opa-1.19.0")
+        assert read_keys == [uploaded], "the derived cache/ key was used instead"
+
+    async def test_a_pull_through_opa_still_reads_the_cache_key(self, tmp_path):
+        """The control. Without it, a change that always returned `uploads/`
+        would pass the test above while breaking every ordinary deployment.
+        """
+        read_keys: list[str] = []
+        with _cache_serving(self._storage(read_keys)):
+            await api_opa._download("1.19.0", tmp_path / "opa-1.19.0")
+        assert len(read_keys) == 1
+        assert read_keys[0].startswith("cache/binaries/opa/1.19.0/")
+
+    async def test_no_row_is_not_a_silent_read_of_the_wrong_key(self, tmp_path):
+        """`cached_binary_key` returning None means nothing names the object.
+
+        Falling back to a derived key here is what the whole change exists to
+        stop, so the fetch gives up rather than reading a key nobody recorded.
+        """
+        read_keys: list[str] = []
+        dest = tmp_path / "opa-1.19.0"
+        with _cache_serving(self._storage(read_keys), key=None):
+            assert await api_opa._download("1.19.0", dest) is None
+        assert read_keys == []
+        assert not dest.exists()

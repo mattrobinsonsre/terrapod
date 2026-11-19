@@ -4261,5 +4261,46 @@
     "knownHostsHint": "As chaves públicas de host das máquinas que esta credencial alcança, uma por linha no formato known_hosts. Aponte uma variável de inventário para o caminho dela para conectar sem afrouxar a verificação da chave de host. Não é oculta: a chave pública de um host é pública e é exatamente o que você compara quando uma chave não corresponde.",
     "knownHostsLead": "As chaves públicas de host das máquinas que esta credencial alcança, uma por linha no formato known_hosts.",
     "machineLead": "Como o Ansible se conecta aos hosts que se referem a esta credencial. Informe uma chave privada ou uma senha, ou as duas."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verificado",
+      "unverified": "Não verificado",
+      "failed": "Falha na verificação",
+      "legend": "Como este artefato foi admitido"
+    },
+    "state": {
+      "inventoried": "Inventariado",
+      "notInventoried": "Não inventariado",
+      "findings": "{count, plural, one {# achado} other {# achados}}",
+      "malicious": "{count, plural, one {# malicioso} other {# maliciosos}}"
+    },
+    "reason": {
+      "notAdmitted": "Admitido antes de este registro existir, por isso nunca foi inventariado",
+      "awaiting": "Admitido e aguardando inventário"
+    },
+    "detail": {
+      "title": "Artefato",
+      "back": "Voltar ao cache",
+      "admitted": "Admitido",
+      "attestation": "Atestação",
+      "attestor": "Atestado por",
+      "coordinates": "Conhecido como",
+      "packages": "{count, plural, one {# pacote} other {# pacotes}}",
+      "sbom": "Lista de materiais de software",
+      "sbomNone": "Nenhum inventário foi gerado para este artefato",
+      "findings": "Achados",
+      "findingsNone": "Nada correspondeu",
+      "verdict": "Veredito",
+      "verdictLine": "Comparado por {matcher} {matcherVersion} com a época {epoch} do banco de dados, inventariado por {generator} {generatorVersion}",
+      "verdictNone": "Este artefato não foi comparado com o banco de dados de vulnerabilidades",
+      "notFound": "Não existe nenhum registro para este artefato",
+      "advisory": "Os achados são informativos. Descrevem o que há dentro de um artefato que foi admitido e verificado; não o bloqueiam, porque quem o atestou já respondeu por esses bytes.",
+      "maliciousNote": "Um pacote sinalizado como malicioso não é um defeito em uma dependência. Deve ser tratado como um artefato hostil."
+    },
+    "column": {
+      "verification": "Verificação",
+      "supplyChain": "Conteúdo"
+    }
   }
 }

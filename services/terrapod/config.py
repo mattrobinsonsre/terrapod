@@ -624,7 +624,8 @@ class StorageLocationCredentials(BaseModel):
 
     type: Literal["default"] = Field(
         default="default",
-        description="Credential source. `default` = the API pod's ambient identity",
+        description="Placeholder, not read by anything yet. `default` is the only value: "
+        "the API pod's ambient identity",
     )
 
 
@@ -1291,9 +1292,9 @@ class WarmBinaryEntry(BaseModel):
     just {tool, version}.
     """
 
-    tool: Literal["terraform", "tofu", "terragrunt", "opa", "trivy", "checkov", "pulumi"] = (
-        "terraform"
-    )
+    tool: Literal[
+        "terraform", "tofu", "terragrunt", "opa", "trivy", "checkov", "syft", "pulumi"
+    ] = "terraform"
     version: str
     platforms: list[WarmPlatform] = Field(default_factory=list)
 
@@ -1535,6 +1536,13 @@ class PlatformToolsConfig(BaseModel):
         description="Checkov version used for IaC security scanning on the runner "
         "(the default engine). Exact version.",
     )
+    syft_version: str = Field(
+        default="1.57.2",
+        description="Syft version used to inventory a cached artifact into an SBOM "
+        "(#2589). Exact version. Syft GENERATES the SBOM and Trivy consumes it, "
+        "which is why there is no third tool here: `trivy sbom` matches a "
+        "Syft-produced CycloneDX document directly.",
+    )
     opa_mirror_url: str = Field(
         default="https://github.com/open-policy-agent/opa/releases/download",
         description="Upstream download base for OPA. Assets are bare per-platform "
@@ -1547,6 +1555,13 @@ class PlatformToolsConfig(BaseModel):
         description="Upstream download base for Trivy. Assets are per-platform "
         ".tar.gz archives with a single trivy_<version>_checksums.txt manifest "
         "covering the release. A mirror must serve the same asset layout.",
+    )
+    syft_mirror_url: str = Field(
+        default="https://github.com/anchore/syft/releases/download",
+        description="Upstream download base for Syft. Assets are per-platform "
+        ".tar.gz archives (syft_<version>_linux_<arch>.tar.gz) with a single "
+        "syft_<version>_checksums.txt manifest covering the release -- the same "
+        "layout as Trivy. A mirror must serve the same asset layout.",
     )
     checkov_mirror_url: str = Field(
         default="https://github.com/mattrobinsonsre/terrapod/releases/download",
@@ -1570,15 +1585,23 @@ class PlatformToolsConfig(BaseModel):
         "this endpoint is unreachable (air-gapped mirrors), accepting that trade "
         "knowingly.",
     )
-    verify: Literal["off", "checksum"] = Field(
-        default="checksum",
+    verify: Literal["off", "checksum", "signature"] = Field(
+        default="signature",
         description="Integrity verification for platform tools fetched from upstream. "
-        "'checksum' (default, fail-closed): verify the downloaded artifact's SHA-256 "
-        "against the publisher's published checksum before caching. 'off': no "
-        "verification (NOT recommended — these binaries are executed). There is no "
-        "'signature' level: none of the three publishes a GPG-signed manifest, which "
-        "is exactly what the images did before — the Dockerfiles checked a checksum "
-        "and nothing more.",
+        "'signature' (default, fail-closed): verify the SHA-256 against the publisher's "
+        "published checksum AND verify the publisher's Sigstore signature over it. "
+        "'checksum': the SHA-256 only. 'off': no verification (NOT recommended — these "
+        "binaries are executed). "
+        "What 'signature' covers, measured against the live releases rather than taken "
+        "from anyone's docs: trivy and syft each publish a Sigstore bundle over their "
+        "checksums manifest (<tool>_<version>_checksums.txt.sigstore.json); checkov is "
+        "built and published by TERRAPOD's own CI, which has attested its build "
+        "provenance since #2066, verifiable anonymously through the GitHub attestations "
+        "API. opa publishes no signing material at all, so it verifies by checksum and "
+        "the outcome is RECORDED as such — 'signature' never silently means 'checksum'. "
+        "A signature that genuinely fails refuses the artifact; signing material that "
+        "cannot be FETCHED degrades to the checksum that already passed, because a "
+        "transport failure says nothing about the bytes.",
     )
 
 
@@ -1608,6 +1631,56 @@ class OCIUpstreamConfig(BaseModel):
         "Secret, because a credential must not be rendered into a ConfigMap. Leave both "
         "unset for anonymous pulls, which is the usual case for public registries.",
     )
+
+    signer_identity: str = Field(
+        default="",
+        description="Who must have signed content from this upstream, as it appears in "
+        "the Sigstore certificate's subject -- for a GitHub Actions publisher that is the "
+        "workflow ref, e.g. "
+        "'https://github.com/org/repo/.github/workflows/release.yml@refs/tags/v1.2.3'. "
+        "Empty means no expectation is checked, which is the default because most "
+        "registries publish nothing to check. Setting it without signer_issuer is "
+        "refused: an identity alone is satisfied by anyone who can obtain a certificate "
+        "naming it from any OIDC provider, so the pair is the control and either half "
+        "alone is not.",
+    )
+    signer_issuer: str = Field(
+        default="",
+        description="The OIDC issuer that vouched for signer_identity, e.g. "
+        "'https://token.actions.githubusercontent.com'. Required whenever "
+        "signer_identity is set, and refused on its own.",
+    )
+    require_attestation: bool = Field(
+        default=False,
+        description="Refuse content from this upstream that carries no verifiable "
+        "Sigstore attestation. Off by default deliberately: most container content in "
+        "the world is unsigned, so turning this on globally would stop a mirror working "
+        "rather than make it safer. With it off an unsigned artifact is still mirrored "
+        "and recorded as having no publisher attestation, which is the honest answer; "
+        "with it on, a missing or unverifiable attestation fails the pull closed. Needs "
+        "signer_identity and signer_issuer, since there is nothing to require otherwise.",
+    )
+
+    @model_validator(mode="after")
+    def _signer_is_a_pair(self) -> "OCIUpstreamConfig":
+        """An identity without an issuer is not a weaker control; it is none.
+
+        Refused at config time rather than at verification time so the operator
+        learns at startup, when they can fix it, instead of on a pull.
+        """
+        if bool(self.signer_identity.strip()) != bool(self.signer_issuer.strip()):
+            raise ValueError(
+                f"upstream {self.host!r}: signer_identity and signer_issuer must be set "
+                "together -- an identity alone is satisfied by any OIDC provider that "
+                "will name it, so half the pair is not half the control"
+            )
+        if self.require_attestation and not self.signer_identity.strip():
+            raise ValueError(
+                f"upstream {self.host!r}: require_attestation needs signer_identity and "
+                "signer_issuer, because without an expected signer there is nothing to "
+                "require beyond 'somebody signed something'"
+            )
+        return self
 
     @property
     def password_env_var(self) -> str:
@@ -3084,6 +3157,11 @@ BLOB_CLASS_NAMES: tuple[str, ...] = (
     "configuration_versions",
     "registry_modules",
     "registry_providers",
+    # Operator uploads. Irreplaceable where the caches below are merely cold:
+    # there is no upstream to re-fetch one from (#2599). Ordered with the
+    # other permanent-loss classes because that is the order a copier works
+    # in, and the register asserts the two lists match element for element.
+    "uploaded_artifacts",
     "deleted_workspace_markers",
     "run_logs",
     "run_plans",
@@ -3341,7 +3419,8 @@ class BackupConfig(BaseModel):
 
     prefix: str = Field(
         default="backups/",
-        description="Object-store key prefix backups are written under",
+        description="Object-store key prefix backups are written under; not under a "
+        "workspace-scoped prefix (state/, plans/, logs/, config/, runs/, inventory/)",
     )
     retention_keep: int = Field(
         default=0,

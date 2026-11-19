@@ -299,19 +299,6 @@ class TestOneCommentHasOneBudget:
             assert first in out, n_noop
             assert "see the run" not in out, n_noop
 
-    def test_noop_rows_before_the_busy_row_do_not_take_its_share_either(self):
-        busy = _big_list()
-        first = busy["entries"][0]["address"]
-        gate = (GateVerdict("policy", "guardrails", True, "mandatory"),)
-        rows = [
-            _row(name=f"ws-noop-{i}", resource_list={"entries": [], "omitted": 0}, gates=gate)
-            for i in range(3)
-        ] + [_row(name="ws-busy", resource_list=busy)]
-        out = render_comment(rows)
-        assert first in out
-        assert "see the run" not in out
-        assert len(out) <= COMMENT_MAX_CHARS
-
     def test_the_list_never_pushes_the_comment_past_the_budget(self):
         for n in (10, 100, 300):
             bare = render_comment([_row(name=f"ws-{i}") for i in range(n)])

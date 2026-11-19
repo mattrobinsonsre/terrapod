@@ -265,8 +265,9 @@ describe('the dark theme is checked too', () => {
     const baseEdge = paint('', 'border')
     const hovEdge = paint('hover:', 'border')
     const chkEdge = paint('checked:', 'border')
+    const chkFill = paint('checked:', 'bg')
     assert.ok(
-      baseFill && hovFill && baseEdge && hovEdge && chkEdge,
+      baseFill && hovFill && baseEdge && hovEdge && chkEdge && chkFill,
       'checkbox.tsx: a base, hover or checked border or fill class is missing',
     )
     const states: [string, RGB, [RGB, number, string], [RGB, number, string]][] = [
@@ -285,8 +286,10 @@ describe('the dark theme is checked too', () => {
         if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  \`${edge[2]}\` ${name}, against ${what}`)
       }
     }
+    // A lone border alpha shows here; the light gate's solid fill would mask it.
     for (const [name, backdrop] of [['the page', page], ['the panel', panel], ['a hovered row', row]] as [string, RGB][]) {
-      const c = contrast(chkEdge[0], backdrop)
+      const under = composite(chkFill[0], chkFill[1], backdrop)
+      const c = contrast(composite(chkEdge[0], chkEdge[1], under), backdrop)
       if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  checked \`${chkEdge[2]}\` on ${name}`)
     }
     assert.deepEqual(

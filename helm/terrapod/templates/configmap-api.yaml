@@ -381,6 +381,15 @@ data:
             {{- if .username }}
             username: {{ .username | quote }}
             {{- end }}
+            {{- if .signer_identity }}
+            signer_identity: {{ .signer_identity | quote }}
+            {{- end }}
+            {{- if .signer_issuer }}
+            signer_issuer: {{ .signer_issuer | quote }}
+            {{- end }}
+            {{- if .require_attestation }}
+            require_attestation: true
+            {{- end }}
           {{- end }}
         {{- end }}
       {{- end }}
@@ -537,11 +546,17 @@ data:
         {{- if .Values.api.config.registry.platform_tools.checkov_version }}
         checkov_version: {{ .Values.api.config.registry.platform_tools.checkov_version | quote }}
         {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.syft_version }}
+        syft_version: {{ .Values.api.config.registry.platform_tools.syft_version | quote }}
+        {{- end }}
         {{- if .Values.api.config.registry.platform_tools.opa_mirror_url }}
         opa_mirror_url: {{ .Values.api.config.registry.platform_tools.opa_mirror_url | quote }}
         {{- end }}
         {{- if .Values.api.config.registry.platform_tools.trivy_mirror_url }}
         trivy_mirror_url: {{ .Values.api.config.registry.platform_tools.trivy_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.syft_mirror_url }}
+        syft_mirror_url: {{ .Values.api.config.registry.platform_tools.syft_mirror_url | quote }}
         {{- end }}
         {{- if .Values.api.config.registry.platform_tools.checkov_mirror_url }}
         checkov_mirror_url: {{ .Values.api.config.registry.platform_tools.checkov_mirror_url | quote }}

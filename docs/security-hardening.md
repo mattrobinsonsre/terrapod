@@ -916,6 +916,14 @@ rule-assigned variable set it does not already match. Shrinking is allowed, as i
 any edit to a workspace that already matches, and global or explicitly-assigned
 sets never count. It is a **403** on workspace create and workspace `PATCH`.
 
+The same holds for `exclude`: an exclusion on a label the workspace's owner can edit
+lets that owner opt out of the set, which is allowed because shrinking is. Do not
+use `exclude` to withhold a set from a workspace as a control. Opting back **in**
+(removing the label an exclusion selects on) is growth and is refused only for sets
+holding a secret, like any other join; a set of plain configuration rejoins freely.
+So the opt-out matters for **priority** sets, whose variables override the
+workspace's own, and for any set that carries policy-like values rather than secrets.
+
 This is a **behaviour change**: a non-admin who previously created workspaces that
 joined a rule-scoped set now needs an admin to make the change, or an explicit
 assignment. Expect it on first upgrade from self-service workflows and from a

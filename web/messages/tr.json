@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Bu kimlik bilgisinin ulaştığı makinelerin genel ana makine anahtarları, known_hosts biçiminde satır başına bir tane. Ana makine anahtarı doğrulamasını gevşetmeden bağlanmak için bir envanter değişkenini bu yola yönlendirin. Gizlenmez: bir ana makinenin genel anahtarı geneldir ve bir anahtar uyuşmadığında karşılaştırdığınız şey tam olarak budur.",
     "knownHostsLead": "Bu kimlik bilgisinin ulaştığı makinelerin genel ana makine anahtarları, known_hosts biçiminde satır başına bir tane.",
     "machineLead": "Ansible''ın bu kimlik bilgisine atıfta bulunan ana makinelere nasıl bağlandığı. Bir özel anahtar ya da parola girin; ikisini birlikte de verebilirsiniz."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Doğrulandı",
+      "unverified": "Doğrulanmadı",
+      "failed": "Doğrulama başarısız",
+      "legend": "Bu yapıt nasıl kabul edildi"
+    },
+    "state": {
+      "inventoried": "Envanteri çıkarıldı",
+      "notInventoried": "Envanteri çıkarılmadı",
+      "findings": "{count, plural, one {# bulgu} other {# bulgu}}",
+      "malicious": "{count, plural, one {# kötü amaçlı} other {# kötü amaçlı}}"
+    },
+    "reason": {
+      "notAdmitted": "Bu kayıt var olmadan önce kabul edildi, bu yüzden envanteri hiç çıkarılmadı",
+      "awaiting": "Kabul edildi, envanteri bekleniyor"
+    },
+    "detail": {
+      "title": "Yapıt",
+      "back": "Önbelleğe dön",
+      "admitted": "Kabul edildi",
+      "attestation": "Tasdik",
+      "attestor": "Kefil",
+      "coordinates": "Şu adla biliniyor",
+      "packages": "{count, plural, one {# paket} other {# paket}}",
+      "sbom": "Yazılım bileşen listesi",
+      "sbomNone": "Bu yapıt için hiçbir envanter üretilmedi",
+      "findings": "Bulgular",
+      "findingsNone": "Hiçbir şey eşleşmedi",
+      "verdict": "Karar",
+      "verdictLine": "{matcher} {matcherVersion} tarafından {epoch} tarihli veritabanına karşı eşleştirildi, {generator} {generatorVersion} tarafından envanteri çıkarıldı",
+      "verdictNone": "Bu yapıt güvenlik açığı veritabanına karşı eşleştirilmedi",
+      "notFound": "Bu yapıt için hiçbir kayıt yok",
+      "advisory": "Bulgular bilgilendirme amaçlıdır. Kabul edilmiş ve doğrulanmış bir yapıtın içinde ne olduğunu anlatırlar; onu engellemezler, çünkü kefil bu baytlara zaten kefil olmuştur.",
+      "maliciousNote": "Kötü amaçlı olarak işaretlenen bir paket, bir bağımlılıktaki kusur değildir. Yapıtın kendisini düşmanca kabul edin."
+    },
+    "column": {
+      "verification": "Doğrulama",
+      "supplyChain": "İçerik"
+    }
   }
 }

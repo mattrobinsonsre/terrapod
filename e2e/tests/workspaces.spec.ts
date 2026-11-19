@@ -602,6 +602,47 @@ test.describe("Workspaces", () => {
     await expect(page.getByTestId("ws-status-count")).toHaveCount(0);
   });
 
+  test("a typed term the dropdowns do not offer is not counted in either badge", async ({ page }) => {
+    await createWorkspace(getStoredToken(), uniqueName("e2e-unoffered"));
+    await page.goto("/workspaces");
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await expect(filter).toBeVisible();
+    // The list has loaded, so the empty result below is the filter's doing.
+    await expect(page.getByTestId("ws-row-select").first()).toBeVisible();
+
+    // `flag:nope` and `status:locked` match nothing and have no row to tick.
+    await filter.fill("flag:drifted flag:vcs-error flag:nope status:locked ");
+    await expect(page.getByTestId("ws-row-select")).toHaveCount(0);
+    await expect(page.getByTestId("ws-flags-count")).toHaveText("2");
+    await expect(page.getByTestId("ws-status-count")).toHaveCount(0);
+  });
+
+  test("the Status dropdown counts a workspace by its run's status, not by its pill", async ({ page }) => {
+    // A drifted workspace shows the drifted pill, but its run is still errored.
+    const id = await createWorkspace(getStoredToken(), uniqueName("e2e-status-own"));
+    await page.route("**/api/v1/workspaces?**", async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      for (const w of body.data ?? []) {
+        const mine = w.id === id;
+        w.attributes["drift-status"] = mine ? "drifted" : "";
+        w.attributes["latest-run"] = mine
+          ? { id: "run-errored", status: "errored", "plan-only": false, "created-at": "2026-11-10T10:00:00Z" }
+          : null;
+      }
+      await route.fulfill({ response: res, json: body });
+    });
+
+    try {
+      await page.goto("/workspaces");
+      await page.locator('button[aria-haspopup="menu"]', { hasText: "Status" }).click();
+      const errored = page.getByRole("menuitemcheckbox", { name: /Errored/ });
+      await expect(errored.locator("span").last()).toHaveText("1");
+    } finally {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+    }
+  });
+
   test("selecting workspaces offers bulk actions, and Plan runs on each one", async ({ page }) => {
     // Two workspaces under one prefix scope the list to this test's own rows.
     // `seedRun` uploads a configuration, which a workspace needs before it can
@@ -812,6 +853,15 @@ test.describe("Workspaces", () => {
     expect(seen[0]).toContain(`${prefix}-b`);
     expect(seen[0]).toContain("(2)");
     expect(posts, "declining the confirm must send nothing").toEqual([]);
+
+    // Enter on an item hands focus back to the trigger before the confirm opens.
+    const trigger = page.getByTestId("ws-selection");
+    await trigger.click();
+    await page.getByTestId("ws-selection-apply").focus();
+    page.once("dialog", (d) => void d.dismiss());
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("ws-selection-menu")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
 
     // Accepting sends one call per workspace, to the existing endpoint.
     page.once("dialog", (d) => void d.accept());

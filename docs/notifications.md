@@ -43,6 +43,7 @@ SMTP email delivery to one or more addresses.
 | `run:completed` | Run reaches applied (success) state |
 | `run:errored` | Run enters errored state |
 | `run:drift_detected` | Infrastructure drift detected by a [drift detection](drift-detection.md) run |
+| `artifact:refused` | An artifact the run tried to pull was refused admission — a publisher signature that failed verification, or a [content allowlist](supply-chain-verification.md) refusal. **One trigger covers both**: to an operator they are the same event, and splitting them would make a complete subscription two boxes to tick. The payload carries `reason` and `coordinates`. A refusal during a pre-warm has no run and so no workspace to notify; it is logged instead, because fanning one refusal out to every workspace would teach people to mute the channel. |
 
 Each notification configuration selects which triggers it responds to.
 

@@ -5,21 +5,25 @@
  * actions the current selection can take.
  *
  * It is styled like the workspace page's run button (`RunKindSplitButton`), and
- * follows the WAI-ARIA menu-button keyboard pattern (`aria-haspopup`,
- * `role="menu"`, arrow keys, Home and End, Escape and Tab returning focus to the
- * trigger, a click outside closing), but it is a different component on purpose,
- * for one reason. That component is structurally a primary action plus a caret,
- * and it DERIVES the primary: "the most complete option the workspace declares".
- * That is right for one workspace and wrong for an arbitrary selection, where
- * there is no most-complete action and a loud default applying across a dozen
- * workspaces is the outcome to avoid. So this has no default action: pressing it
- * anywhere opens the menu, and that is all it does. Every action lives inside.
+ * is a different component on purpose, for one reason. That component is
+ * structurally a primary action plus a caret, and it DERIVES the primary: "the
+ * most complete option the workspace declares". That is right for one workspace
+ * and wrong for an arbitrary selection, where there is no most-complete action
+ * and a loud default applying across a dozen workspaces is the outcome to avoid.
+ * So this has no default action: pressing it anywhere opens the menu, and that
+ * is all it does. Every action lives inside.
  *
  * **The reason an action is unavailable is in the row, not in a tooltip.** Each
  * item reads `Apply · 9 of 12 eligible`, so it is readable with no interaction at
  * all, by a keyboard or screen-reader user as much as a mouse. A disabled item
  * is `aria-disabled` and stays focusable, so a screen reader reaches it and
  * hears why; a `disabled` button would be skipped and read as nothing.
+ *
+ * Keyboard: ArrowDown on the closed trigger opens it and focuses the first item;
+ * ArrowUp, ArrowDown, Home and End move between items; Escape, Tab and
+ * activating an item return focus to the trigger. It does not implement every
+ * key of the WAI-ARIA menu-button pattern (ArrowUp on the trigger does nothing,
+ * and there is no type-ahead).
  *
  * Desktop only: the caller hides it below `sm`, and the checkbox column with it.
  */
@@ -141,7 +145,7 @@ export function SelectionMenu({
               onClick={() => {
                 // Stays focusable when off, so the reason beside it is reachable.
                 if (!it.enabled) return
-                setOpen(false)
+                close(true)
                 it.run()
               }}
               onKeyDown={(e) => onItemKey(e, i)}

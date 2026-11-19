@@ -2,12 +2,14 @@
 """The health-condition codes the server emits are the ones every reader lists.
 
 `_compute_health_conditions` (`services/terrapod/api/routers/tfe_v2.py`) is the
-only producer. Four hand-kept lists restate it, and a new server condition fails
+only producer. Five hand-kept lists restate it, and a new server condition fails
 none of their tests: `FLAG_CODES` (`web/src/lib/workspace-filter.ts`), the
 `workspaces.flagName` keys (`web/messages/en.json`, kebab), the codes table in
-`docs/api-reference.md`, and the `flag` row in `docs/rbac.md` (kebab). A gate
-here because the test image copies only `services/`. Producer read as text; any
-shape it cannot read fails loudly, naming the line, rather than passing.
+`docs/api-reference.md`, the `flag` row in `docs/rbac.md` (kebab), and the
+`status:unhealthy` row in `docs/upgrading-to-2.0.md` (kebab; the complete
+bookmark rewrite). A gate here because the test image copies only `services/`.
+Producer read as text; any shape it cannot read fails loudly, naming the line,
+rather than passing.
 """
 
 from __future__ import annotations
@@ -26,6 +28,8 @@ MESSAGES = Path("web/messages/en.json")
 API_DOC = Path("docs/api-reference.md")
 API_DOC_HEADING = "### Health Conditions"
 RBAC_DOC = Path("docs/rbac.md")
+UPGRADE_DOC = Path("docs/upgrading-to-2.0.md")
+UPGRADE_ROW = "| `status:unhealthy` |"
 
 MIN_CODES = 6
 
@@ -112,7 +116,11 @@ def _flag_codes_ts() -> set[str]:
             f"{FLAG_CODES_SOURCE}: FLAG_CODES holds more than plain string items "
             f"({leftover!r}); teach this reader the new shape."
         )
-    return {a or b for a, b in items}
+    values = [a or b for a, b in items]
+    duplicates = sorted({v for v in values if values.count(v) > 1})
+    if duplicates:
+        raise _fail(f"{FLAG_CODES_SOURCE}: FLAG_CODES lists {duplicates} more than once")
+    return set(values)
 
 
 def _flag_name_keys() -> set[str]:
@@ -146,6 +154,13 @@ def _rbac_flag_values() -> set[str]:
     raise _fail(f"{RBAC_DOC}: no `| `flag` |` row found in the reserved-keys table")
 
 
+def _upgrade_flag_values() -> set[str]:
+    for line in UPGRADE_DOC.read_text().splitlines():
+        if line.startswith(UPGRADE_ROW):
+            return set(re.findall(r"flag:([\w-]+)", line.split("|")[2]))
+    raise _fail(f"{UPGRADE_DOC}: no `{UPGRADE_ROW}` row found in the rewrite table")
+
+
 def main() -> int:
     produced = _producer_codes()
     kebab = {_kebab(c) for c in produced}
@@ -154,6 +169,7 @@ def main() -> int:
         (f"{MESSAGES} workspaces.flagName", _flag_name_keys(), kebab),
         (f"{API_DOC} codes table", _api_doc_codes(), produced),
         (f"{RBAC_DOC} `flag` row", _rbac_flag_values(), kebab),
+        (f"{UPGRADE_DOC} `status:unhealthy` row", _upgrade_flag_values(), kebab),
     )
 
     problems: list[str] = []

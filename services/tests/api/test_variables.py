@@ -1148,6 +1148,22 @@ class TestBothNamesForTheTypedFlag:
         assert attrs["structured"] is True
 
 
+UNUSABLE_EXCLUDES = [
+    [{}],
+    [{"name_prefix": ""}],
+    [{"all": True}],
+    [{"labels": {"a": "b"}, "exclude": [{"labels": {"c": "d"}}]}],
+    [{"workspace_ids": ["ws-1"]}],
+    [{"workspace_ids": None, "labels": {"a": "b"}}],
+    [{"workspace-ids": None, "labels": {"a": "b"}}],
+    "env=dev",
+    {"labels": {"a": "b"}},
+    ["env=dev"],
+    "",
+    0,
+]
+
+
 class TestVarsetAssignmentRuleValidation:
     """Write-path validation for assignment rules (#1440).
 
@@ -1231,17 +1247,152 @@ class TestVarsetAssignmentRuleValidation:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    async def test_exclude_in_a_rule_is_rejected(self, *mocks):
-        """An exclude entry could carry a refused dimension (`locked`,
-        `drift_status`) past the self-join guard, so `exclude` is refused."""
+    async def test_an_exclusion_is_accepted_and_stored(self, *mocks):
+        rule = {"labels": {"team": "x"}, "exclude": [{"labels": {"env": "dev"}}]}
+        resp = await self._post({"name": "x", "assignment-rule": rule})
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["assignment-rule"] == rule
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_exclusion_on_a_refused_dimension_is_refused_with_the_same_reason(
+        self, *mocks
+    ):
+        """A workspace owner who can move `locked` could otherwise opt themselves out."""
+        from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+
+        for dim in ["drift_status", "locked", "drift-status"]:
+            key = dim.replace("-", "_")
+            rule = {"labels": {"team": "x"}, "exclude": [{dim: "x"}]}
+            resp = await self._post({"name": "x", "assignment-rule": rule})
+            assert resp.status_code == 422
+            detail = resp.json()["detail"]
+            assert f"cannot select on {key}" in detail
+            assert RULE_DIMENSIONS_REFUSED[key] in detail
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_refused_dimension_in_any_one_entry_refuses_the_rule(self, *mocks):
+        rule = {
+            "labels": {"team": "x"},
+            "exclude": [{"labels": {"env": "dev"}}, {"labels": {"a": "b"}, "locked": True}],
+        }
+        resp = await self._post({"name": "x", "assignment-rule": rule})
+        assert resp.status_code == 422
+        assert "cannot select on locked" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unusable_exclusion_is_refused_at_write(self, *mocks):
+        for exclude in UNUSABLE_EXCLUDES:
+            rule = {"labels": {"team": "x"}, "exclude": exclude}
+            resp = await self._post({"name": "x", "assignment-rule": rule})
+            assert resp.status_code == 422, (exclude, resp.text)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_reserved_label_key_in_an_exclusion_is_refused(self, *mocks):
+        """A workspace can never carry a reserved label, so such an entry matches nothing
+        and would protect nothing, while looking like it protects something."""
+        from terrapod.services.label_validation import RESERVED_LABEL_KEYS
+
+        for key in sorted(RESERVED_LABEL_KEYS):
+            rule = {"labels": {"team": "x"}, "exclude": [{"labels": {key: "true"}}]}
+            resp = await self._post({"name": "x", "assignment-rule": rule})
+            assert resp.status_code == 422, key
+            assert f'"{key}"' in resp.json()["detail"]
+            assert "exclude[0]" in resp.json()["detail"]
+
         resp = await self._post(
             {
                 "name": "x",
-                "assignment-rule": {"labels": {"team": "x"}, "exclude": [{"locked": False}]},
+                "assignment-rule": {
+                    "labels": {"team": "x"},
+                    "exclude": [{"labels": {"env": "dev"}}, {"labels": {"locked": "true"}}],
+                },
             }
         )
         assert resp.status_code == 422
-        assert "cannot select on exclude" in resp.json()["detail"]
+        assert "exclude[1]" in resp.json()["detail"]
+        assert "locked" in resp.json()["detail"] and "owner_email" not in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_owner_reserved_key_points_at_owner_email(self, *mocks):
+        rule = {"labels": {"team": "x"}, "exclude": [{"labels": {"owner": "a@b.c"}}]}
+        resp = await self._post({"name": "x", "assignment-rule": rule})
+        assert resp.status_code == 422
+        assert "owner_email" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_reserved_label_key_is_still_fine_as_a_positive_selector(self, *mocks):
+        """It matches nothing, which is the safe direction for a positive selector, and
+        refusing it would be a behaviour change outside this feature."""
+        rule = {"labels": {"locked": "true"}}
+        resp = await self._post({"name": "x", "assignment-rule": rule})
+        assert resp.status_code == 201
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_exclusion_over_the_entry_cap_is_refused(self, *mocks):
+        from terrapod.services.workspace_search_service import MAX_EXCLUDE_ENTRIES
+
+        def rule(n):
+            return {
+                "labels": {"team": "x"},
+                "exclude": [{"labels": {"k": str(i)}} for i in range(n)],
+            }
+
+        resp = await self._post({"name": "x", "assignment-rule": rule(MAX_EXCLUDE_ENTRIES)})
+        assert resp.status_code == 201, resp.text
+        resp = await self._post({"name": "x", "assignment-rule": rule(MAX_EXCLUDE_ENTRIES + 1)})
+        assert resp.status_code == 422
+        assert str(MAX_EXCLUDE_ENTRIES) in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_exclusion_alone_is_not_a_rule(self, *mocks):
+        resp = await self._post({"name": "x", "assignment-rule": {"exclude": [{"locked": False}]}})
+        assert resp.status_code == 422
+        resp = await self._post(
+            {"name": "x", "assignment-rule": {"exclude": [{"labels": {"env": "dev"}}]}}
+        )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_empty_exclude_is_not_stored(self, *mocks):
+        for empty in ([], None):
+            resp = await self._post(
+                {"name": "x", "assignment-rule": {"labels": {"team": "x"}, "exclude": empty}}
+            )
+            assert resp.status_code == 201, resp.text
+            assert resp.json()["data"]["attributes"]["assignment-rule"] == {"labels": {"team": "x"}}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_autodiscovery_rule_id_in_a_rule_is_rejected(self, *mocks):
+        """Which rule created a workspace is not offered to assignment rules yet."""
+        for key in ("autodiscovery-rule-id", "autodiscovery_rule_id"):
+            resp = await self._post(
+                {
+                    "name": "x",
+                    "assignment-rule": {"labels": {"team": "x"}, key: str(uuid.uuid4())},
+                }
+            )
+            assert resp.status_code == 422, key
+            assert "cannot select on autodiscovery_rule_id" in resp.json()["detail"]
 
 
 class TestVaultValueSource:

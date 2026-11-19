@@ -303,9 +303,10 @@ api:
         presigned_url_expiry_seconds: 3600
         base_url: ""  # Auto-detected from ingress hostname if empty
 
-      # Named storage locations (s3 | azure | gcs), keyed by name; `default` is reserved.
-      # Takes effect once workspaces carry a storage location; empty = a single store.
+      # Named storage locations (s3 | azure | gcs); `default` is reserved. Empty = one store. None is assigned
+      # to a workspace yet, but listings outside one workspace's prefix (state/, ...) read all: a wrong bucket breaks them.
       locations: {}
+      # A location's `credentials.type` is a placeholder: only `default` exists, nothing reads it.
 
     # Authentication
     auth:
@@ -619,6 +620,25 @@ api:
         #       existingSecretKey: password        # optional, defaults to "password"
         #     - host: mirror.example.com           # API not on its own hostname
         #       api_url: https://artifacts.internal/v2-proxy
+        #     - host: ghcr.io                       # verified against its publisher
+        #       signer_identity: https://github.com/org/repo/.github/workflows/release.yml@refs/tags/v1.2.3
+        #       signer_issuer: https://token.actions.githubusercontent.com
+        #       require_attestation: true           # refuse unsigned content from here
+        #
+        # signer_identity and signer_issuer name who must have signed content
+        # from an upstream, checked against the Sigstore attestation the
+        # publisher published (#2589). They are set together or not at all: an
+        # identity alone is satisfied by anyone who can obtain a certificate
+        # naming it from any OIDC provider, so half the pair is not half the
+        # control, and the schema refuses one without the other.
+        #
+        # require_attestation then refuses content from that upstream which
+        # carries no verifiable attestation. It is off by default because most
+        # container content in the world is unsigned, so requiring one globally
+        # would stop a mirror working rather than make it safer. Left off, an
+        # unsigned artifact is still mirrored and recorded as having no
+        # publisher attestation — which is the honest answer rather than a
+        # silent pass.
         #
         # host does two jobs: it is the first path component clients name AND,
         # by default, the address Terrapod fetches from (https://{host}).
@@ -878,8 +898,13 @@ api:
         opa_version: "1.22.4"
         trivy_version: "0.76.2"
         checkov_version: "3.4.5"
+        # Syft inventories a cached artifact into an SBOM (#2589). Syft
+        # GENERATES and Trivy CONSUMES it, which is why there is no third
+        # tool here: `trivy sbom` matches a Syft CycloneDX document directly.
+        syft_version: "1.57.2"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
+        syft_mirror_url: "https://github.com/anchore/syft/releases/download"
         # Checkov comes from TERRAPOD's releases, not Checkov's, and that is
         # deliberate (#2066). Upstream stopped publishing
         # checkov_linux_arm64.zip at 3.3.21 — its arm build job waits on a
@@ -902,11 +927,15 @@ api:
         checkov_checksum_api_url: "https://api.github.com/repos/mattrobinsonsre/terrapod/releases/tags"
         # Integrity verification for platform tools. One of: off, checksum.
         # 'checksum' (default, fail-closed) checks the downloaded artifact's
-        # SHA-256 against the publisher's published sum before caching. There is
-        # no 'signature' level: none of the three publishes a GPG-signed
-        # manifest — which is exactly what the Dockerfiles did before, a checksum
-        # and nothing more.
-        verify: checksum
+        # SHA-256 against the publisher's published sum before caching, and at
+        # 'signature' the publisher's Sigstore signature over it as well.
+        # Measured against the live releases: trivy and syft each publish a
+        # bundle over their checksums manifest, and checkov is built by
+        # TERRAPOD's own CI, which has attested its build provenance since
+        # #2066 — verifiable anonymously through the GitHub attestations API.
+        # opa publishes nothing, so it verifies by checksum and the outcome is
+        # recorded as such; 'signature' never silently means 'checksum'.
+        verify: signature
       module_interface:
         enabled: true
       # Org-wide module autodiscovery (#1620): a module autodiscovery rule may
@@ -1140,7 +1169,8 @@ api:
         # startup rather than ignored, so a typo cannot leave a class you believe
         # you configured sitting on the default. Known names:
         #   irreplaceable — state, state_index, configuration_versions,
-        #                   registry_modules, registry_providers
+        #                   registry_modules, registry_providers,
+        #                   uploaded_artifacts
         #   history       — run_logs, run_plans, run_vars,
         #                   deleted_workspace_markers
         #   re-derivable  — provider_cache, binary_cache, package_cache,
@@ -1151,6 +1181,14 @@ api:
         # (registry.cache_only) node — it is forbidden to reach upstream, so a
         # promoted node with a cold cache has no binary and no providers. That
         # escalation is derived, not something to restate here.
+        #
+        # `uploaded_artifacts` is the ONE class that does not take `mode` as its
+        # default: it defaults to `copy`. It holds what an operator uploaded by
+        # hand, which has no upstream to re-warm from — sealed or not — so a
+        # follower that only VERIFIES it reports permanent loss after a failover
+        # and the only recovery is uploading the whole curated set again. Set it
+        # here explicitly to override that, including back down to `verify` or
+        # `off` if your object store already replicates.
         #
         # e.g.
         #   classes:
@@ -1942,7 +1980,7 @@ api:
 backup:
   enabled: false
   schedule: "0 2 * * *"          # daily at 02:00 (cluster TZ)
-  prefix: "backups/"             # object-store key prefix for dumps
+  prefix: "backups/"             # object-store key prefix for dumps (not under state/, plans/ ...)
   retention:
     keep: 0                      # keep N most-recent backups (0 = keep all)
     days: 0                      # delete backups older than N days (0 = disabled)

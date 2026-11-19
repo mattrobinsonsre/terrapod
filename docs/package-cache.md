@@ -92,6 +92,56 @@ mismatch — neither the object nor the row is written, because a mismatch is
 either a corrupted transfer or a substituted artifact and there is no telling
 which from here.
 
+### Publisher provenance, where the registry publishes it
+
+A digest check answers *are these the bytes the index named*. It does not answer
+*did the publisher say so* — and whoever controls an index controls both the
+entry and the artifact it points at, so a digest verifies them against each
+other either way.
+
+Two registries publish something stronger, and Terrapod checks it on a miss:
+
+| registry | what is checked | what it establishes |
+|---|---|---|
+| **PyPI** | a [PEP 740](https://peps.python.org/pep-0740/) attestation, Sigstore-signed | **which** publisher — the repository and workflow that built the file, read from the signing certificate |
+| **npm** | the registry signature on `dist.integrity`, against the key npm publishes | that **the registry** vouched for these bytes |
+
+A row whose publisher check passed records `upstream-publisher`, which implies
+the digest check as well: provenance is attempted only once the bytes are
+confirmed, so that value can never mean the signature was checked *instead* of
+the artifact.
+
+Three behaviours are worth knowing before you rely on it:
+
+- **Most of PyPI publishes nothing**, and that is not a failure. The row records
+  `upstream-digest` exactly as before.
+- **A present attestation that does not verify refuses the artifact**, and this
+  is not configurable. What an operator may choose is whether an *absent*
+  attestation is tolerated; never whether a *bad* one is.
+- **A check we could not perform is not a check that failed.** An unreachable
+  Sigstore trust root says nothing about the package, so it degrades to the
+  digest result and logs why, rather than refusing an artifact because of our own
+  egress.
+
+Terrapod does not ask you to pre-register an expected publisher per package —
+that would be unusable for a transitive dependency tree, and an unusable control
+gets switched off. The publisher is **recorded**; deciding which publishers are
+acceptable is policy's job.
+
+#### npm's SLSA provenance is not checked yet, and the reason is upstream
+
+npm publishes two attestations. Its own publish attestation and the SLSA
+provenance both carry transparency-log entries of kind `intoto` version `0.0.2`,
+and `sigstore-python` — 4.5.1, the current release — accepts only `dsse` and
+`hashedrekord` at `0.0.1`. So the SLSA attestation, which is the stronger claim
+because it names the building workflow, cannot be verified here today, and
+hand-rolling that verification would mean reimplementing a security-critical
+internal of a cryptographic library.
+
+The cost is smaller than it looks: npm signs its publish attestation with the
+**same key** as the registry signature that *is* verified, so that trust root is
+still reached.
+
 Every cached row records **how it was admitted**, so the ledger can be read
 rather than assumed:
 
