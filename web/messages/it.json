@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Le chiavi host pubbliche delle macchine raggiunte da questa credenziale, una per riga in formato known_hosts. Punta una variabile di inventario al suo percorso per connetterti senza allentare la verifica della chiave host. Non nascosta: la chiave pubblica di un host è pubblica ed è proprio ciò che confronti quando una chiave non corrisponde.",
     "knownHostsLead": "Le chiavi host pubbliche delle macchine raggiunte da questa credenziale, una per riga in formato known_hosts.",
     "machineLead": "Come Ansible si connette agli host che fanno riferimento a questa credenziale. Fornisci una chiave privata o una password, o entrambe."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verificato",
+      "unverified": "Non verificato",
+      "failed": "Verifica non riuscita",
+      "legend": "Come è stato ammesso questo artefatto"
+    },
+    "state": {
+      "inventoried": "Inventariato",
+      "notInventoried": "Non inventariato",
+      "findings": "{count, plural, one {# riscontro} other {# riscontri}}",
+      "malicious": "{count, plural, one {# malevolo} other {# malevoli}}"
+    },
+    "reason": {
+      "notAdmitted": "Ammesso prima che questo record esistesse, quindi non è mai stato inventariato",
+      "awaiting": "Ammesso e in attesa di inventario"
+    },
+    "detail": {
+      "title": "Artefatto",
+      "back": "Torna alla cache",
+      "admitted": "Ammesso",
+      "attestation": "Attestazione",
+      "attestor": "Attestato da",
+      "coordinates": "Noto come",
+      "packages": "{count, plural, one {# pacchetto} other {# pacchetti}}",
+      "sbom": "Distinta base del software",
+      "sbomNone": "Per questo artefatto non è stato prodotto alcun inventario",
+      "findings": "Riscontri",
+      "findingsNone": "Nessuna corrispondenza",
+      "verdict": "Verdetto",
+      "verdictLine": "Confrontato da {matcher} {matcherVersion} con l''epoca {epoch} del database, inventariato da {generator} {generatorVersion}",
+      "verdictNone": "Questo artefatto non è stato confrontato con il database delle vulnerabilità",
+      "notFound": "Non esiste alcun record per questo artefatto",
+      "advisory": "I riscontri sono informativi. Descrivono che cosa contiene un artefatto già ammesso e verificato; non lo bloccano, perché chi lo ha attestato ha già risposto di questi byte.",
+      "maliciousNote": "Un pacchetto segnalato come malevolo non è un difetto in una dipendenza. Va considerato come un artefatto ostile."
+    },
+    "column": {
+      "verification": "Verifica",
+      "supplyChain": "Contenuto"
+    }
   }
 }

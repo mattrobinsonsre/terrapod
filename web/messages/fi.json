@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Niiden koneiden julkiset isäntäavaimet, joihin tämä tunnus ulottuu, yksi riviä kohden known_hosts-muodossa. Osoita inventaariomuuttuja tähän polkuun, jotta voit yhdistää ilman isäntäavaimen tarkistuksen löysentämistä. Ei piiloteta: isännän julkinen avain on julkinen ja juuri sitä verrataan, kun avain ei täsmää.",
     "knownHostsLead": "Niiden koneiden julkiset isäntäavaimet, joihin tämä tunnus ulottuu, yksi riviä kohden known_hosts-muodossa.",
     "machineLead": "Miten Ansible yhdistää niihin koneisiin, jotka viittaavat tähän tunnistetietoon. Anna yksityinen avain tai salasana, tai molemmat."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Varmennettu",
+      "unverified": "Varmentamaton",
+      "failed": "Varmennus epäonnistui",
+      "legend": "Miten tämä artefakti hyväksyttiin"
+    },
+    "state": {
+      "inventoried": "Inventoitu",
+      "notInventoried": "Ei inventoitu",
+      "findings": "{count, plural, one {# löydös} other {# löydöstä}}",
+      "malicious": "{count, plural, one {# haitallinen} other {# haitallista}}"
+    },
+    "reason": {
+      "notAdmitted": "Hyväksyttiin ennen kuin tämä merkintä oli olemassa, joten sitä ei koskaan inventoitu",
+      "awaiting": "Hyväksytty ja odottaa inventointia"
+    },
+    "detail": {
+      "title": "Artefakti",
+      "back": "Takaisin välimuistiin",
+      "admitted": "Hyväksytty",
+      "attestation": "Attestaatio",
+      "attestor": "Takaaja",
+      "coordinates": "Tunnetaan nimellä",
+      "packages": "{count, plural, one {# paketti} other {# pakettia}}",
+      "sbom": "Ohjelmiston osaluettelo",
+      "sbomNone": "Tälle artefaktille ei tuotettu inventaariota",
+      "findings": "Löydökset",
+      "findingsNone": "Mikään ei täsmännyt",
+      "verdict": "Päätelmä",
+      "verdictLine": "Täsmäytti {matcher} {matcherVersion} tietokantaa {epoch} vasten, inventoinnin teki {generator} {generatorVersion}",
+      "verdictNone": "Tätä artefaktia ei ole täsmäytetty haavoittuvuustietokantaa vasten",
+      "notFound": "Tälle artefaktille ei ole merkintää",
+      "advisory": "Löydökset ovat neuvoa-antavia. Ne kertovat, mitä on sellaisen artefaktin sisällä, joka on hyväksytty ja varmennettu; ne eivät estä sitä, koska takaaja on jo taannut nämä tavut.",
+      "maliciousNote": "Haitalliseksi merkitty paketti ei ole vika riippuvuudessa. Käsittele sitä niin, että artefakti itse on vihamielinen."
+    },
+    "column": {
+      "verification": "Varmennus",
+      "supplyChain": "Sisältö"
+    }
   }
 }

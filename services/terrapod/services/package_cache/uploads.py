@@ -235,6 +235,25 @@ async def admit(
         size=size,
         by=uploaded_by,
     )
+    # The ledger is the durable answer to "who vouched for this?" (#2589).
+    # Best-effort by construction -- an upload must not fail because the
+    # bookkeeping did.
+    from terrapod.services.artifact_ledger import coordinate, record_upload
+
+    await record_upload(
+        db,
+        digest=record.digest,
+        kind="package",
+        coordinates=coordinate(
+            "package",
+            ecosystem=record.ecosystem,
+            name=record.name,
+            version=record.version or "",
+            filename=record.filename,
+        ),
+        uploaded_by=uploaded_by,
+        storage_key=record.storage_key,
+    )
     return Admission(record=record)
 
 
@@ -323,6 +342,25 @@ async def _admit_over(
         digest=digest,
         replaced_digest=previous,
         by=uploaded_by,
+    )
+    # The ledger is the durable answer to "who vouched for this?" (#2589).
+    # Best-effort by construction -- an upload must not fail because the
+    # bookkeeping did.
+    from terrapod.services.artifact_ledger import coordinate, record_upload
+
+    await record_upload(
+        db,
+        digest=existing.digest,
+        kind="package",
+        coordinates=coordinate(
+            "package",
+            ecosystem=existing.ecosystem,
+            name=existing.name,
+            version=existing.version or "",
+            filename=existing.filename,
+        ),
+        uploaded_by=uploaded_by,
+        storage_key=existing.storage_key,
     )
     return Admission(record=existing, replaced=True, previous_digest=previous)
 

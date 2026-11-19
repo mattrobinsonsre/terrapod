@@ -501,6 +501,13 @@ class TestTheBlastRadiusViewAgreesWithTheMatcher:
         out = await workspaces_for_varset(db, self._varset({"locked": "true"}))
         assert out == []
 
+    async def test_the_autodiscovery_rule_dimension_too_in_either_spelling(self):
+        from terrapod.services.variable_service import workspaces_for_varset
+
+        for key in ("autodiscovery_rule_id", "autodiscovery-rule-id"):
+            out = await workspaces_for_varset(self._db(), self._varset({key: str(uuid.uuid4())}))
+            assert out == [], key
+
     async def test_a_refused_dimension_mixed_with_a_good_one_still_reports_nothing(self):
         """The matcher refuses the whole rule, not the refused clause — so must this."""
         from terrapod.services.variable_service import workspaces_for_varset
@@ -532,7 +539,16 @@ class TestTheBlastRadiusViewAgreesWithTheMatcher:
         from terrapod.services.workspace_search_service import WorkspaceFilter
 
         annotation = str(WorkspaceFilter.model_fields[dim].annotation)
-        return True if "bool" in annotation else "x"
+        if "bool" in annotation:
+            return True
+        # An id dimension is parsed through `uuid.UUID`, so "x" raises
+        # WorkspaceFilterError and the shape would match nothing for a reason
+        # that has nothing to do with the refusal -- which is exactly what this
+        # guard exists to rule out. Derived from the name rather than listed, so
+        # the next id dimension is covered without anyone remembering.
+        if dim.endswith("_id"):
+            return "00000000-0000-4000-8000-000000000000"
+        return "x"
 
     @classmethod
     def _positions(cls, dim):

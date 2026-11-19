@@ -3313,6 +3313,9 @@ accepted. The varset's [association view](#association-views) reports `meta.excl
 
 The Terraform provider's `assignment_rule` does not model `exclude`. On every update it reads the set's current rule and carries its `exclude` across unchanged, so an exclusion set through the API or UI survives an apply; removing the `assignment_rule` block clears the whole rule, exclusion included.
 
+`autodiscovery_rule_id` (the bulk-update selector's autodiscovery-rule dimension)
+is not available in assignment rules yet and is refused with the same `422`.
+
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
 credential set to the whole estate. That includes an `exclude` that cannot be
@@ -4311,12 +4314,15 @@ Resolve a structured filter to the matching workspaces — no side effects (the 
     "name-prefix": "terrapod-testing-",
     "execution-backend": "terraform",
     "agent-pool-id": "apool-...", "vcs-connection-id": "vcs-...",
+    "autodiscovery-rule-id": "<rule id>",
     "owner-email": "...", "drift-status": "...", "locked": false, "has-vcs": true,
     "workspace-ids": ["ws-..."],
     "all": false } }
 ```
 
 Dimensions are **AND-combined** (narrower = safer). An empty/omitted `filter` is a `422` (typo guard); matching the whole fleet requires explicit `"all": true`. Returns `{matched, workspaces:[...]}`.
+
+`autodiscovery-rule-id` selects the workspaces an autodiscovery rule created, by the rule's `id` as returned by the autodiscovery-rules API (a bare uuid). An id that is not a valid uuid is a `422`. It works inside `exclude` entries too, and is not available in [variable set assignment rules](#assignment-rules) yet.
 
 #### Excluding workspaces
 
@@ -5083,7 +5089,7 @@ UUID):
 | `filename` | string | The artifact file. One version has many — an sdist plus a wheel per platform and ABI — so the cache is keyed on the filename |
 | `size` | int | Bytes |
 | `digest` | string | The digest these bytes were admitted against, in the form its **source** expresses it (`sha256:…`, or an SRI `sha512-…`). For a fetched artifact that is **upstream's own**, never re-derived — it is what the client checks our bytes against. For an operator upload there is no upstream, so it is the digest computed **on receipt**. `attestation` says which |
-| `attestation` | string \| null | How the row was admitted: `upstream-digest` (checked against what upstream published), `none-published` (that ecosystem's upstream publishes no per-file digest), or `operator-upload`. `null` means it was admitted before verification existed, which the serve path treats as a miss and re-verifies |
+| `attestation` | string \| null | How the row was admitted: `upstream-publisher` (the publisher's own signature or attestation verified -- PyPI's PEP 740, or npm's registry signature -- which implies the digest too, since provenance is only attempted once the bytes are confirmed), `upstream-digest` (checked against what upstream published), `none-published` (that ecosystem's upstream publishes no per-file digest), or `operator-upload`. `null` means it was admitted before verification existed, which the serve path treats as a miss and re-verifies |
 | `uploaded-by` | string \| null | The admin who uploaded it. `null` for a fetched artifact, which has no uploader |
 | `upload-reference` | string \| null | Free text an uploader attached — their own ticket or approval record. Never interpreted |
 | `replaced-digest` | string \| null | The digest that was at these coordinates before the last deliberate replacement. The immediately previous admission, not a history |
@@ -6103,7 +6109,7 @@ POST /api/v1/workspaces/{id}/notification-configurations
 | `slack` | `url` (Slack webhook URL) | — |
 | `email` | `email-addresses` (list) | — |
 
-**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`, `run:drift_detected`
+**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`, `run:drift_detected`, `artifact:refused`.
 
 **Required permission:** `admin` on the workspace.
 

@@ -101,6 +101,10 @@ RULE_DIMENSIONS_REFUSED: dict[str, str] = {
         "lock state is moved by the lock, unlock and force-unlock endpoints, which "
         "need only `workspace:lock`"
     ),
+    "autodiscovery_rule_id": (
+        "selecting on the autodiscovery rule that created a workspace is not offered "
+        "for assignment rules yet"
+    ),
 }
 
 

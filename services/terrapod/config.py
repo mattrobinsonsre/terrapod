@@ -1291,9 +1291,9 @@ class WarmBinaryEntry(BaseModel):
     just {tool, version}.
     """
 
-    tool: Literal["terraform", "tofu", "terragrunt", "opa", "trivy", "checkov", "pulumi"] = (
-        "terraform"
-    )
+    tool: Literal[
+        "terraform", "tofu", "terragrunt", "opa", "trivy", "checkov", "syft", "pulumi"
+    ] = "terraform"
     version: str
     platforms: list[WarmPlatform] = Field(default_factory=list)
 
@@ -1535,6 +1535,13 @@ class PlatformToolsConfig(BaseModel):
         description="Checkov version used for IaC security scanning on the runner "
         "(the default engine). Exact version.",
     )
+    syft_version: str = Field(
+        default="1.57.2",
+        description="Syft version used to inventory a cached artifact into an SBOM "
+        "(#2589). Exact version. Syft GENERATES the SBOM and Trivy consumes it, "
+        "which is why there is no third tool here: `trivy sbom` matches a "
+        "Syft-produced CycloneDX document directly.",
+    )
     opa_mirror_url: str = Field(
         default="https://github.com/open-policy-agent/opa/releases/download",
         description="Upstream download base for OPA. Assets are bare per-platform "
@@ -1547,6 +1554,13 @@ class PlatformToolsConfig(BaseModel):
         description="Upstream download base for Trivy. Assets are per-platform "
         ".tar.gz archives with a single trivy_<version>_checksums.txt manifest "
         "covering the release. A mirror must serve the same asset layout.",
+    )
+    syft_mirror_url: str = Field(
+        default="https://github.com/anchore/syft/releases/download",
+        description="Upstream download base for Syft. Assets are per-platform "
+        ".tar.gz archives (syft_<version>_linux_<arch>.tar.gz) with a single "
+        "syft_<version>_checksums.txt manifest covering the release -- the same "
+        "layout as Trivy. A mirror must serve the same asset layout.",
     )
     checkov_mirror_url: str = Field(
         default="https://github.com/mattrobinsonsre/terrapod/releases/download",
@@ -1570,15 +1584,23 @@ class PlatformToolsConfig(BaseModel):
         "this endpoint is unreachable (air-gapped mirrors), accepting that trade "
         "knowingly.",
     )
-    verify: Literal["off", "checksum"] = Field(
-        default="checksum",
+    verify: Literal["off", "checksum", "signature"] = Field(
+        default="signature",
         description="Integrity verification for platform tools fetched from upstream. "
-        "'checksum' (default, fail-closed): verify the downloaded artifact's SHA-256 "
-        "against the publisher's published checksum before caching. 'off': no "
-        "verification (NOT recommended — these binaries are executed). There is no "
-        "'signature' level: none of the three publishes a GPG-signed manifest, which "
-        "is exactly what the images did before — the Dockerfiles checked a checksum "
-        "and nothing more.",
+        "'signature' (default, fail-closed): verify the SHA-256 against the publisher's "
+        "published checksum AND verify the publisher's Sigstore signature over it. "
+        "'checksum': the SHA-256 only. 'off': no verification (NOT recommended — these "
+        "binaries are executed). "
+        "What 'signature' covers, measured against the live releases rather than taken "
+        "from anyone's docs: trivy and syft each publish a Sigstore bundle over their "
+        "checksums manifest (<tool>_<version>_checksums.txt.sigstore.json); checkov is "
+        "built and published by TERRAPOD's own CI, which has attested its build "
+        "provenance since #2066, verifiable anonymously through the GitHub attestations "
+        "API. opa publishes no signing material at all, so it verifies by checksum and "
+        "the outcome is RECORDED as such — 'signature' never silently means 'checksum'. "
+        "A signature that genuinely fails refuses the artifact; signing material that "
+        "cannot be FETCHED degrades to the checksum that already passed, because a "
+        "transport failure says nothing about the bytes.",
     )
 
 

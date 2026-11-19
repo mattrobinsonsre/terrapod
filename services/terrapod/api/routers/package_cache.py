@@ -323,7 +323,7 @@ async def pypi_file(
             else pypi.artifact_for(project, entry)
         )
         try:
-            record = await get_or_fetch(db, storage, artifact)
+            record = await get_or_fetch(db, storage, artifact, run_id=user.run_id)
         except (SealedError, NotFoundUpstream, UpstreamError) as exc:
             raise _upstream_failure(exc) from exc
 
@@ -419,7 +419,9 @@ async def npm_tarball(
             raise HTTPException(status_code=404, detail="Not found")
         version, entry = found
         try:
-            record = await get_or_fetch(db, storage, npm.artifact_for(name, version, entry))
+            record = await get_or_fetch(
+                db, storage, npm.artifact_for(name, version, entry), run_id=user.run_id
+            )
         except (SealedError, NotFoundUpstream, UpstreamError) as exc:
             raise _upstream_failure(exc) from exc
 
@@ -847,7 +849,10 @@ async def galaxy_download(
         try:
             detail = await galaxy.fetch_version(namespace, name, version)
             record = await get_or_fetch(
-                db, storage, galaxy.artifact_for(namespace, name, version, detail)
+                db,
+                storage,
+                galaxy.artifact_for(namespace, name, version, detail),
+                run_id=user.run_id,
             )
         except (SealedError, NotFoundUpstream, UpstreamError) as exc:
             raise _upstream_failure(exc) from exc
@@ -1176,7 +1181,7 @@ async def pulumi_plugin(
 
     artifact = pulumi_plugins.artifact_for(filename, parts)
     try:
-        record = await get_or_fetch(db, storage, artifact)
+        record = await get_or_fetch(db, storage, artifact, run_id=user.run_id)
     except (SealedError, NotFoundUpstream, UpstreamError) as exc:
         raise _upstream_failure(exc) from exc
 
@@ -1341,7 +1346,9 @@ async def go_module_file(
         raise HTTPException(status_code=404, detail="Not found")
 
     try:
-        record = await get_or_fetch(db, storage, goproxy.artifact_for(module, version, suffix))
+        record = await get_or_fetch(
+            db, storage, goproxy.artifact_for(module, version, suffix), run_id=user.run_id
+        )
     except (SealedError, NotFoundUpstream, UpstreamError) as exc:
         raise _upstream_failure(exc) from exc
 
@@ -1440,7 +1447,7 @@ async def nuget_package(
         raise HTTPException(status_code=404, detail="Not found")
 
     try:
-        record = await get_or_fetch(db, storage, artifact)
+        record = await get_or_fetch(db, storage, artifact, run_id=user.run_id)
     except (SealedError, NotFoundUpstream, UpstreamError) as exc:
         raise _upstream_failure(exc) from exc
 

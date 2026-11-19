@@ -95,6 +95,20 @@ type CachedPackageFile struct {
 	// happened. Empty when nothing was displaced.
 	ReplacedAt     string `json:"replaced-at"`
 	ReplacedDigest string `json:"replaced-digest"`
+	// Verification is whether the attestation above actually HELD --
+	// `verified`, `unverified` or `failed` (#2589). Attestation says what was
+	// claimed; this says what came of checking it, and the two are separate
+	// fields because an attestation that was attempted and did not hold is a
+	// finding, where one that could not be attempted is not.
+	Verification string `json:"verification"`
+	// SupplyChain is what the inventory found inside this artifact, carried
+	// here as well as on the ledger so the question "is anything in the cache
+	// carrying a critical finding" is one listing rather than a ledger lookup
+	// per row.
+	//
+	// Read SupplyChain.State before its counts: they are all zero when nothing
+	// was inventoried, which is not the same as nothing being found.
+	SupplyChain ArtifactSupplyChain `json:"supply-chain"`
 }
 
 // PackageCacheListOptions filters and pages ListPackageCache.
