@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from terrapod.config import settings
 from terrapod.storage import close_storage, get_storage, init_storage
+from terrapod.storage.keys import shared_prefix
 
 logger = logging.getLogger("terrapod.restore_verify")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -60,7 +61,7 @@ def _async_dsn(url: str) -> str:
 
 async def _latest_backup_key() -> str:
     cfg = settings.backup
-    prefix = cfg.prefix if cfg.prefix.endswith("/") else cfg.prefix + "/"
+    prefix = shared_prefix("backup.prefix", cfg.prefix)
     entries = [m for m in await get_storage().list_prefix(prefix) if m.key.endswith(".dump")]
     if not entries:
         raise RuntimeError(f"no backups found under {prefix!r}")

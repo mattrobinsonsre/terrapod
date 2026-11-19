@@ -624,7 +624,8 @@ class StorageLocationCredentials(BaseModel):
 
     type: Literal["default"] = Field(
         default="default",
-        description="Credential source. `default` = the API pod's ambient identity",
+        description="Placeholder, not read by anything yet. `default` is the only value: "
+        "the API pod's ambient identity",
     )
 
 
@@ -3418,7 +3419,8 @@ class BackupConfig(BaseModel):
 
     prefix: str = Field(
         default="backups/",
-        description="Object-store key prefix backups are written under",
+        description="Object-store key prefix backups are written under; not under a "
+        "workspace-scoped prefix (state/, plans/, logs/, config/, runs/, inventory/)",
     )
     retention_keep: int = Field(
         default=0,

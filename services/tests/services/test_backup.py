@@ -96,3 +96,12 @@ async def test_backup_requires_database_url(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     with pytest.raises(SystemExit):
         await bk.backup()
+
+
+@pytest.mark.asyncio
+async def test_backup_refuses_a_workspace_scoped_prefix(monkeypatch, caplog):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@h:5432/db")
+    monkeypatch.setattr(bk.settings.backup, "prefix", "state/db/")
+    with pytest.raises(SystemExit):
+        await bk.backup()
+    assert "workspace-scoped prefix 'state/'" in caplog.text
