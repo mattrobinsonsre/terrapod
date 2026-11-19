@@ -1333,6 +1333,7 @@
     "latest-run.actions.is-retryable",
     "latest-run.created-at",
     "latest-run.id",
+    "latest-run.is-destroy",
     "latest-run.phase-started-at",
     "latest-run.plan-only",
     "latest-run.run-kind",

@@ -1027,6 +1027,7 @@ Workspace responses (show and list, on both the native and TFE-compatible surfac
     "plan-only": false,
     "created-at": "2026-01-02T03:04:05Z",
     "run-kind": "plan_apply",
+    "is-destroy": false,
     "phase-started-at": { "planning-at": "2026-01-02T03:04:06Z" },
     "actions": {
       "is-confirmable": true,
@@ -1045,10 +1046,13 @@ Workspace responses (show and list, on both the native and TFE-compatible surfac
 | `plan-only` | boolean | Whether the run is speculative |
 | `created-at` | string (RFC3339) | When the run was created |
 | `run-kind` | string | `plan_apply`, `configure` or `full`, as on the [run document](#optional-run-attributes) |
+| `is-destroy` | boolean | Whether the run is a destroy. `run-kind` and `plan-only` cannot say: a destroy reports `plan_apply`. Applying a destroy, or retrying one that applies, needs `run:apply-destroy` rather than `run:apply` |
 | `phase-started-at` | object | When each phase that has started began, keyed `planning-at`, `applying-at`, `configuring-at`. A phase that has not started is absent, not null |
 | `actions` | object | The run document's own `actions` block (see [Show Run](#show-run)): `is-confirmable`, `is-discardable`, `is-cancelable`, `is-retryable`, with the same values the run document reports for that run |
 
 `actions` is the server's answer, computed once for both documents. It depends on inputs the workspace document does not publish (whether the plan has changes, the run's resolved auto-apply mode, and whether a finished plan is held at a gate), so a client should read it rather than infer it from `status`.
+
+It answers about the run's state only. It carries no RBAC and does not predict the destroy capability (`run:apply-destroy`, which `is-destroy` lets a client check), the workspace's `plan-apply-enabled` or `configure-enabled`, the workspace lock, or the refusal of a non-destroy apply of CLI-uploaded code on a VCS-connected workspace; an action it offers can still be refused.
 
 A server that predates `actions` and `run-kind` omits both keys; treat an absent `actions` as "nothing is offered".
 
