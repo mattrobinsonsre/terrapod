@@ -1,7 +1,7 @@
 """workspaces/rules.storage_location: the named storage location, NULL meaning `default`
 
 Revision ID: 0e1c85ce67d0
-Revises: 667fd9da2621
+Revises: 33575ebac4ef
 Create Date: 2026-11-12
 """
 
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0e1c85ce67d0"
-down_revision = "667fd9da2621"
+down_revision = "33575ebac4ef"
 branch_labels = None
 depends_on = None
 

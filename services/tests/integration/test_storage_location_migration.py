@@ -16,7 +16,7 @@ from tests.integration.test_migrated_schema_matches_models import (
 pytestmark = pytest.mark.integration
 
 _REVISION = "0e1c85ce67d0"
-_BEFORE = "667fd9da2621"
+_BEFORE = "33575ebac4ef"
 
 
 async def _scalar(engine, sql: str):
