@@ -3524,13 +3524,22 @@ class TestStorageLocationOnTheWorkspaceRoutes:
         assert _stored(added).storage_location is None
         assert resp.json()["data"]["attributes"]["storage-location"] is None
 
-    @pytest.mark.parametrize("raw", [None, "default"])
-    async def test_create_with_null_or_default_stores_null(self, raw):
+    async def test_create_with_null_stores_null(self):
         app, added = self._app()
-        resp = await self._create(app, {"storage-location": raw})
+        resp = await self._create(app, {"storage-location": None})
         assert resp.status_code == 201, resp.text
         assert _stored(added).storage_location is None
         assert resp.json()["data"]["attributes"]["storage-location"] is None
+
+    async def test_create_with_the_literal_default_is_422(self):
+        """It used to store NULL, so the response read `null` for a value the
+        client sent -- the provider-inconsistency trap (#2621). Refused at the
+        boundary instead, with a message saying what to send."""
+        app, added = self._app()
+        resp = await self._create(app, {"storage-location": "default"})
+        assert resp.status_code == 422, resp.text
+        assert "omit the attribute or send null" in resp.json()["detail"]
+        assert not added
 
     async def test_create_with_a_configured_location_stores_it(self):
         app, added = self._app()

@@ -210,11 +210,29 @@ async def check_locations_at_startup() -> None:
         _unchecked = type(exc).__name__
         logger.warning("Storage location check failed; not ready until it passes", error=str(exc))
         return
-    _unchecked = None
     if missing := _missing(counts):
         problem = _refusal(missing)
-        logger.error("Refusing to start: " + problem, locations=missing)
-        raise RuntimeError(problem)
+        # NOT fatal (#2621). This used to raise, which is a CrashLoopBackOff for
+        # every API replica -- including every workspace on the default location,
+        # which has nothing to do with the misconfigured row that triggered it.
+        # The trigger is a DATABASE ROW, so the blast radius is the whole
+        # deployment by construction.
+        #
+        # Worse, a crash-looping pod serves neither /ready nor /health, so the
+        # `storage_locations: <refusal>` detail below is unreachable exactly when
+        # an operator needs it. Holding readiness achieves the same safety -- the
+        # pod is drained and serves no writes -- and stays inspectable. It is
+        # also what `lifespan` already does for a schema behind the app, twelve
+        # lines above where this is called from.
+        #
+        # `_unchecked` is assigned HERE rather than cleared above, so the
+        # readiness path cannot report healthy on a deployment this check has
+        # refused. Clearing it first and relying on the raise was the ordering
+        # that made a swallowed raise look fine.
+        _unchecked = problem
+        logger.error("Not ready: " + problem, locations=missing)
+        return
+    _unchecked = None
 
 
 async def locations_readiness() -> tuple[bool, str]:

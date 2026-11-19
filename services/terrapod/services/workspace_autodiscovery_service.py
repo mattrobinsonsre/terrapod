@@ -378,7 +378,7 @@ async def find_or_autocreate_workspace(
 
     # The rule was valid when saved; its location may have left the config since.
     try:
-        storage_location = workspace_settings.validate_storage_location(rule.storage_location)
+        storage_location = workspace_settings.stored_storage_location(rule.storage_location)
     except ValueError as exc:
         logger.warning(
             "Autodiscovery rule names a storage location that is not configured — skipping",
@@ -663,7 +663,7 @@ async def preview_for_paths(
     name_taken: set[str] = {row[0] for row in name_taken_result.all()}
 
     try:
-        workspace_settings.validate_storage_location(rule.storage_location)
+        workspace_settings.stored_storage_location(rule.storage_location)
         location_usable = True
     except ValueError:
         location_usable = False

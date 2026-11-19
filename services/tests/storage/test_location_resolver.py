@@ -189,24 +189,34 @@ class TestTheStartupCheck:
         await lr.check_locations_at_startup()
         assert await lr.locations_readiness() == (True, "healthy")
 
-    async def test_rows_naming_a_location_with_none_configured_refuse_to_start(
+    async def test_rows_naming_a_location_with_none_configured_hold_readiness(
         self, rows, configured, monkeypatch
     ):
+        """NOT a raise (#2621): a raise is a CrashLoopBackOff for every replica
+        over one row, and a crash-looping pod cannot serve the detail below."""
         rows.named.append(("eu-west", 3))
         log = MagicMock()
         monkeypatch.setattr(lr, "logger", log)
-        with pytest.raises(RuntimeError, match="none are configured") as refused:
-            await lr.check_locations_at_startup()
-        assert "re-add" in str(refused.value) and "api.config.storage.locations" in str(
-            refused.value
-        )
+        await lr.check_locations_at_startup()
+        ready, detail = await lr.locations_readiness()
+        assert ready is False
+        assert "none are configured" in detail
+        assert "re-add" in detail and "api.config.storage.locations" in detail
         assert log.error.call_args.kwargs["locations"] == {"eu-west": 3}
 
-    async def test_rows_naming_an_unconfigured_location_refuse_to_start(self, rows, configured):
+    async def test_the_refusal_is_not_raised(self, rows, configured):
+        """Pinned on its own, because the whole point is the absence of a raise
+        and a test that merely checks readiness would pass either way."""
+        rows.named.append(("eu-west", 3))
+        await lr.check_locations_at_startup()  # must not raise
+
+    async def test_rows_naming_an_unconfigured_location_hold_readiness(self, rows, configured):
         configured("us-east")
         rows.named.extend([("us-east", 1), ("eu-west", 2)])
-        with pytest.raises(RuntimeError, match="not configured: eu-west; re-add"):
-            await lr.check_locations_at_startup()
+        await lr.check_locations_at_startup()
+        ready, detail = await lr.locations_readiness()
+        assert ready is False
+        assert "not configured: eu-west; re-add" in detail
 
     async def test_rows_naming_configured_locations_start(self, rows, configured):
         configured("eu-west", "us-east")

@@ -2185,14 +2185,20 @@ class TestTheRuleCarriesAStorageLocation:
         assert added[0].storage_location == "eu-west"
         assert resp.json()["data"]["attributes"]["storage-location"] == "eu-west"
 
-    @pytest.mark.parametrize(
-        "attrs", [{}, {"storage-location": None}, {"storage-location": "default"}]
-    )
-    async def test_create_without_one_or_with_default_stores_null(self, attrs):
+    @pytest.mark.parametrize("attrs", [{}, {"storage-location": None}])
+    async def test_create_without_one_stores_null(self, attrs):
         resp, added = await self._create(**attrs)
         assert resp.status_code == 201, resp.text
         assert added[0].storage_location is None
         assert resp.json()["data"]["attributes"]["storage-location"] is None
+
+    async def test_create_with_the_literal_default_is_422(self):
+        """Same rule as the workspace routes: `default` is the absence of a
+        location, not a name, and collapsing it silently is the trap (#2621)."""
+        resp, added = await self._create(**{"storage-location": "default"})
+        assert resp.status_code == 422, resp.text
+        assert "omit the attribute or send null" in resp.json()["detail"]
+        assert not added
 
     async def test_create_with_an_unconfigured_name_is_422(self):
         resp, added = await self._create(**{"storage-location": "nowhere"})
