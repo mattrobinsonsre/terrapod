@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Of the machines this credential reaches, the public host keys, one per line in known_hosts format. At its path, an inventory variable point, to connect without relaxing host-key verification. Hidden, not: public, a host's public key is, and what you compare when a key does not match, it is.",
     "knownHostsLead": "Of the machines this credential reaches, the public host keys, one per line in known_hosts format.",
     "machineLead": "To the hosts that refer to this credential, how Ansible connects. A private key or a password, supply — or both."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verified, it is",
+      "unverified": "Verified, it is not",
+      "failed": "Failed, the verification has",
+      "legend": "Admitted, how this artifact was"
+    },
+    "state": {
+      "inventoried": "Inventoried, it is",
+      "notInventoried": "Inventoried, it is not",
+      "findings": "{count, plural, one {# finding} other {# findings}}",
+      "malicious": "{count, plural, one {# malicious} other {# malicious}}"
+    },
+    "reason": {
+      "notAdmitted": "Before this record existed, admitted it was; so inventoried it never was",
+      "awaiting": "Admitted it is, and inventory it awaits"
+    },
+    "detail": {
+      "title": "Artifact, the",
+      "back": "To the cache, back",
+      "admitted": "Admitted, it was",
+      "attestation": "Attestation, the",
+      "attestor": "Vouched for, it was, by",
+      "coordinates": "Known, it is, as",
+      "packages": "{count, plural, one {# package} other {# packages}}",
+      "sbom": "Software bill of materials, the",
+      "sbomNone": "For this artifact, produced no inventory was",
+      "findings": "Findings, the",
+      "findingsNone": "Matched, nothing has",
+      "verdict": "Verdict, the",
+      "verdictLine": "By {matcher} {matcherVersion} matched it was, against database epoch {epoch}; by {generator} {generatorVersion}, inventoried",
+      "verdictNone": "Against the vulnerability database, matched this artifact has not been",
+      "notFound": "For this artifact, no record exists",
+      "advisory": "Advisory, findings are. What is inside an artifact that was admitted and verified, describe they do; block it, they do not, because for these bytes already vouched the attestor has.",
+      "maliciousNote": "A defect in a dependency, a package flagged malicious is not. As the artifact being hostile, treat it you must."
+    },
+    "column": {
+      "verification": "Verification, the",
+      "supplyChain": "Contents, the"
+    }
   }
 }

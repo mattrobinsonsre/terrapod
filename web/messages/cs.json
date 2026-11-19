@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Veřejné klíče hostitelů strojů, na které toto přihlašovací údaje dosáhne, jeden na řádek ve formátu known_hosts. Nasměruj proměnnou inventáře na tuto cestu, abys se připojil bez oslabení ověření klíče hostitele. Není skrytý: veřejný klíč hostitele je veřejný a je to právě to, co porovnáváš, když klíč nesouhlasí.",
     "knownHostsLead": "Veřejné klíče hostitelů strojů, na které tyto přihlašovací údaje dosáhnou, jeden na řádek ve formátu known_hosts.",
     "machineLead": "Jak se Ansible připojuje k hostitelům, kteří odkazují na tyto přihlašovací údaje. Zadejte privátní klíč nebo heslo, případně obojí."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Ověřeno",
+      "unverified": "Neověřeno",
+      "failed": "Ověření selhalo",
+      "legend": "Jak byl tento artefakt přijat"
+    },
+    "state": {
+      "inventoried": "Inventarizováno",
+      "notInventoried": "Neinventarizováno",
+      "findings": "{count, plural, one {# nález} few {# nálezy} many {# nálezu} other {# nálezů}}",
+      "malicious": "{count, plural, one {# škodlivý} few {# škodlivé} many {# škodlivého} other {# škodlivých}}"
+    },
+    "reason": {
+      "notAdmitted": "Přijat dříve, než tento záznam existoval, takže nikdy nebyl inventarizován",
+      "awaiting": "Přijat a čeká na inventarizaci"
+    },
+    "detail": {
+      "title": "Artefakt",
+      "back": "Zpět do cache",
+      "admitted": "Přijat",
+      "attestation": "Atestace",
+      "attestor": "Ručitel",
+      "coordinates": "Znám jako",
+      "packages": "{count, plural, one {# balíček} few {# balíčky} many {# balíčku} other {# balíčků}}",
+      "sbom": "Soupis součástí softwaru",
+      "sbomNone": "Pro tento artefakt nebyl vytvořen žádný soupis",
+      "findings": "Nálezy",
+      "findingsNone": "Nic neodpovídalo",
+      "verdict": "Verdikt",
+      "verdictLine": "Porovnáno nástrojem {matcher} {matcherVersion} s databází z {epoch}, inventarizoval {generator} {generatorVersion}",
+      "verdictNone": "Tento artefakt nebyl porovnán s databází zranitelností",
+      "notFound": "Pro tento artefakt neexistuje žádný záznam",
+      "advisory": "Nálezy jsou pouze informativní. Popisují, co je uvnitř artefaktu, který byl přijat a ověřen; neblokují jej, protože ručitel už za tyto bajty ručí.",
+      "maliciousNote": "Balíček označený jako škodlivý není vadou závislosti. Berte to tak, že nepřátelský je sám artefakt."
+    },
+    "column": {
+      "verification": "Ověření",
+      "supplyChain": "Obsah"
+    }
   }
 }

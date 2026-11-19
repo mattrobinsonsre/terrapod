@@ -213,3 +213,71 @@ For an adopter's security review, in one place:
 - **Local security testing** — `scripts/pentest.sh` bundles those first two layers with a third, **Nuclei** DAST against a live stack. It is run on demand by a maintainer and is **not** part of CI: the DAST layer needs a running deployment to point at, which no CI job stands up. An earlier version of this page said every change ran all three; it did not.
 - **Hardened by default** — all pods run non-root with read-only root filesystems, dropped capabilities, and seccomp (api/web/listener/runner/jobs).
 - **Reporting** — see [SECURITY.md](../SECURITY.md) for the vulnerability-disclosure policy.
+
+## The artifact ledger: what ran, and who vouched for it
+
+Verification answers *should this be admitted*. The ledger answers the question
+an infosec team actually asks afterwards: **show me everything that ran, and who
+vouched for each of it.**
+
+A row is written at **admission**, keyed on the artifact's **digest**. Two names
+for one set of bytes is one row carrying two coordinates; two different
+artifacts published under one name is two rows, which is the case a
+coordinate-keyed table cannot represent and the one worth catching.
+
+Each row records how the artifact was admitted — a publisher's signature, a
+bare digest, or a named person in your organisation who uploaded it — and, once
+the sweeps have run, an SBOM of what is inside it and any vulnerabilities
+matched against that SBOM.
+
+### Two indicators, never one severity scale
+
+The admin cache page shows **verification** and **contents** as separate
+columns, and the detail view keeps them apart.
+
+A single badge meaning both "signature verification failed" and "has four known
+CVEs" teaches a reviewer the opposite of what we intend: it makes an
+advisory-by-design finding look like an incident, and buries a real verification
+failure among many of them. So verification has three states
+(`verified` / `unverified` / `failed`) and only `failed` is styled as critical,
+because only `failed` means something happened.
+
+### Three states, never two
+
+Contents is `inventoried`, `findings`, or **`not inventoried` — with its
+reason**. A blank cell must never read as safe: *we did not look* and *we looked
+and found nothing* are the two facts a reviewer most needs told apart, and only
+one of them is reassuring.
+
+The two reasons are distinct, because one resolves itself and one does not: an
+artifact admitted before the ledger existed will never be inventoried, while one
+merely awaiting the sweep will be.
+
+### Every verdict is dated
+
+A clean result with no date is worthless. Each match records the matcher and its
+version, the SBOM generator and its version, and the **vulnerability-database
+epoch** it was matched against. With those, a clean result is evidence; without
+them it is an assertion.
+
+That epoch is also the re-match trigger: findings expire when the database
+moves, not when the artifact changes, so a CVE published today reaches an
+artifact admitted months ago.
+
+### Findings are advisory
+
+They describe what is inside an artifact that was *already admitted and
+verified*. They do not block it, because the attestor has already vouched for
+those bytes — and for an operator upload, gating on our own scan would
+second-guess the person who uploaded it.
+
+One finding class is not advisory: a package flagged **malicious** is not a
+defect in a dependency, it is the artifact being hostile. It is surfaced
+separately from the severity counts for that reason.
+
+### Where to look
+
+The admin cache page lists every cached artifact with both indicators. Each row
+links to `/admin/cache/artifact/<digest>` — a **route**, not a modal, so a
+reviewer can send a colleague straight at one artifact and it survives reload
+and back.

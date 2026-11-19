@@ -4261,5 +4261,46 @@
     "knownHostsHint": "De publieke hostsleutels van de machines die deze credential bereikt, één per regel in known_hosts-formaat. Laat een inventarisvariabele naar dit pad verwijzen om te verbinden zonder de hostsleutelverificatie te versoepelen. Niet verborgen: de publieke sleutel van een host is openbaar en is precies wat je vergelijkt als een sleutel niet overeenkomt.",
     "knownHostsLead": "De publieke hostsleutels van de machines die deze credential bereikt, één per regel in known_hosts-formaat.",
     "machineLead": "Hoe Ansible verbinding maakt met de hosts die naar deze inloggegevens verwijzen. Geef een privésleutel of een wachtwoord op, of beide."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Geverifieerd",
+      "unverified": "Niet geverifieerd",
+      "failed": "Verificatie mislukt",
+      "legend": "Hoe dit artefact is toegelaten"
+    },
+    "state": {
+      "inventoried": "Geïnventariseerd",
+      "notInventoried": "Niet geïnventariseerd",
+      "findings": "{count, plural, one {# bevinding} other {# bevindingen}}",
+      "malicious": "{count, plural, one {# kwaadaardig} other {# kwaadaardige}}"
+    },
+    "reason": {
+      "notAdmitted": "Toegelaten voordat deze registratie bestond, en daarom nooit geïnventariseerd",
+      "awaiting": "Toegelaten en wacht op inventarisatie"
+    },
+    "detail": {
+      "title": "Artefact",
+      "back": "Terug naar de cache",
+      "admitted": "Toegelaten",
+      "attestation": "Attestatie",
+      "attestor": "Verklaard door",
+      "coordinates": "Bekend als",
+      "packages": "{count, plural, one {# pakket} other {# pakketten}}",
+      "sbom": "Softwarestuklijst",
+      "sbomNone": "Voor dit artefact is geen inventaris opgesteld",
+      "findings": "Bevindingen",
+      "findingsNone": "Geen treffers",
+      "verdict": "Oordeel",
+      "verdictLine": "Vergeleken door {matcher} {matcherVersion} met database-epoch {epoch}, geïnventariseerd door {generator} {generatorVersion}",
+      "verdictNone": "Dit artefact is niet vergeleken met de kwetsbaarhedendatabase",
+      "notFound": "Er bestaat geen registratie voor dit artefact",
+      "advisory": "Bevindingen zijn adviserend. Ze beschrijven wat er in een artefact zit dat is toegelaten en geverifieerd; ze blokkeren het niet, want wie het heeft verklaard, staat al in voor deze bytes.",
+      "maliciousNote": "Een pakket dat als kwaadaardig is gemarkeerd, is geen defect in een afhankelijkheid. Behandel het alsof het artefact zelf vijandig is."
+    },
+    "column": {
+      "verification": "Verificatie",
+      "supplyChain": "Inhoud"
+    }
   }
 }

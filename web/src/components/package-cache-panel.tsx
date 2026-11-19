@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 
+import Link from 'next/link'
+
 import { EmptyState } from '@/components/empty-state'
+import type { SupplyChain } from '@/components/supply-chain-indicators'
+import { SupplyChainCell } from '@/components/supply-chain-indicators'
 import { MobileCard, MobileCardList } from '@/components/mobile-card-list'
 import { SortableHeader } from '@/components/sortable-header'
 import { StatChip } from '@/components/stat-chip'
@@ -57,6 +61,11 @@ interface CachedPackageFile {
     digest: string
     'cached-at': string | null
     'last-accessed-at': string | null
+    /** What is INSIDE the artifact, as against who vouched for it. Two
+     *  indicators, never one severity scale: a badge meaning both "verification
+     *  failed" and "has 4 CVEs" makes an advisory-by-design finding look like
+     *  an incident and buries the real failure (#2589). */
+    'supply-chain'?: SupplyChain | null
     /** How the artifact was admitted: `upstream-digest`, `none-published`,
      *  `operator-upload`, or absent for a row written before this was recorded.
      *  Absent is NOT "unverified" -- such a row is re-fetched on the next
@@ -125,6 +134,17 @@ export function PackageCachePanel({
    *  rather than mapped to "unrecorded": a server newer than this page may have a
    *  state we have no word for, and showing the raw value is honest where
    *  claiming it is unrecorded would be a false negative. */
+  // Its own namespace, kept apart from this panel's copy: the two indicators
+  // must not share a severity vocabulary, and a translator who sees them in one
+  // group will reach for one.
+  const sc = useTranslations('supplyChain')
+  const supplyLabels = {
+    inventoried: sc('state.inventoried'),
+    notInventoried: sc('state.notInventoried'),
+    findings: (count: number) => sc('state.findings', { count }),
+    malicious: (count: number) => sc('state.malicious', { count }),
+  }
+
   function attestationLabel(value: string | null | undefined): string {
     if (!value) return t('attestation.unrecorded')
     if (value === 'upstream-digest') return t('attestation.upstreamDigest')
@@ -508,6 +528,7 @@ export function PackageCachePanel({
                   <SortableHeader label={t('columns.size')} sortKey="size" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('columns.lastAccessed')} sortKey="last-accessed-at" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('columns.origin')} sortKey="attestation" sortState={sortState} onSort={toggleSort} />
+                  <th className="px-4 py-3 text-slate-400 font-medium">{sc('column.supplyChain')}</th>
                   <th className="text-end px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
                 </tr>
               </thead>
@@ -517,7 +538,19 @@ export function PackageCachePanel({
                     <td className="px-4 py-3 text-slate-400">{entry.attributes.ecosystem}</td>
                     <td className="px-4 py-3 text-slate-200 font-mono break-all">{entry.attributes.name}</td>
                     <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.version}</td>
-                    <td className="px-4 py-3 text-slate-400 font-mono text-xs break-all">{entry.attributes.filename}</td>
+                    <td className="px-4 py-3 font-mono text-xs break-all">
+                      {/* A ROUTE, not a modal: a reviewer wants to send a
+                          colleague at one artifact, so the detail has to
+                          survive reload, back and deep-link (#2589). It is
+                          also the mobile-first answer -- drill down rather
+                          than cram a panel into the row. */}
+                      <Link
+                        href={`/admin/cache/artifact/${encodeURIComponent(entry.attributes.digest)}`}
+                        className="text-brand-400 hover:text-brand-300 hover:underline"
+                      >
+                        {entry.attributes.filename}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-slate-400">{formatBytes(entry.attributes.size, locale)}</td>
                     <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(entry.attributes['last-accessed-at'])}</td>
                     <td className="px-4 py-3">
@@ -530,6 +563,12 @@ export function PackageCachePanel({
                           {t('packages.uploadedBy', { who: entry.attributes['uploaded-by'] })}
                         </div>
                       ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      <SupplyChainCell
+                        supply={entry.attributes['supply-chain']}
+                        labels={supplyLabels}
+                      />
                     </td>
                     <td className="px-4 py-3 text-end">
                       <button

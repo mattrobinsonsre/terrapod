@@ -4261,5 +4261,46 @@
     "knownHostsHint": "이 자격 증명이 연결하는 머신의 공개 호스트 키를 known_hosts 형식으로 한 줄에 하나씩 적습니다. 호스트 키 검증을 완화하지 않고 연결하려면 인벤토리 변수를 이 경로로 지정하세요. 숨기지 않습니다. 호스트의 공개 키는 공개 정보이며, 키가 일치하지 않을 때 비교하는 대상이 바로 이것입니다.",
     "knownHostsLead": "이 자격 증명이 연결하는 머신의 공개 호스트 키를 known_hosts 형식으로 한 줄에 하나씩 적습니다.",
     "machineLead": "이 자격 증명을 가리키는 호스트에 Ansible이 연결하는 방식입니다. 개인 키나 암호를 입력하세요. 둘 다 입력해도 됩니다."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "검증됨",
+      "unverified": "미검증",
+      "failed": "검증 실패",
+      "legend": "이 아티팩트가 허용된 경위"
+    },
+    "state": {
+      "inventoried": "인벤토리 생성됨",
+      "notInventoried": "인벤토리 미생성",
+      "findings": "{count, plural, other {발견 항목 #개}}",
+      "malicious": "{count, plural, other {악성 패키지 #개}}"
+    },
+    "reason": {
+      "notAdmitted": "이 기록이 생기기 전에 허용되어 인벤토리가 생성된 적이 없습니다",
+      "awaiting": "허용되었으며 인벤토리 생성을 기다리는 중입니다"
+    },
+    "detail": {
+      "title": "아티팩트",
+      "back": "캐시로 돌아가기",
+      "admitted": "허용",
+      "attestation": "어테스테이션",
+      "attestor": "보증한 주체",
+      "coordinates": "식별 이름",
+      "packages": "{count, plural, other {패키지 #개}}",
+      "sbom": "소프트웨어 자재 명세서",
+      "sbomNone": "이 아티팩트에 대한 인벤토리가 생성되지 않았습니다",
+      "findings": "발견 항목",
+      "findingsNone": "일치하는 항목이 없습니다",
+      "verdict": "판정",
+      "verdictLine": "{matcher} {matcherVersion}이(가) 데이터베이스 에포크 {epoch}과(와) 대조했으며, {generator} {generatorVersion}이(가) 인벤토리를 생성했습니다",
+      "verdictNone": "이 아티팩트는 취약점 데이터베이스와 대조된 적이 없습니다",
+      "notFound": "이 아티팩트에 대한 기록이 없습니다",
+      "advisory": "발견 항목은 참고용입니다. 허용되고 검증된 아티팩트 안에 무엇이 들어 있는지를 설명할 뿐이며, 보증 주체가 이미 이 바이트를 보증했으므로 아티팩트를 차단하지는 않습니다.",
+      "maliciousNote": "악성으로 표시된 패키지는 의존성의 결함이 아닙니다. 아티팩트 자체가 적대적인 것으로 간주하십시오."
+    },
+    "column": {
+      "verification": "검증",
+      "supplyChain": "내용"
+    }
   }
 }

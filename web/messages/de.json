@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Die öffentlichen Hostschlüssel der Maschinen, die dieses Anmeldedatum erreicht, einer pro Zeile im known_hosts-Format. Richte eine Inventarvariable auf diesen Pfad, um ohne Abschwächung der Hostschlüsselprüfung zu verbinden. Nicht verborgen: Der öffentliche Schlüssel eines Hosts ist öffentlich und genau das, was du vergleichst, wenn ein Schlüssel nicht übereinstimmt.",
     "knownHostsLead": "Die öffentlichen Hostschlüssel der Maschinen, die mit diesen Zugangsdaten erreicht werden, einer pro Zeile im known_hosts-Format.",
     "machineLead": "Wie Ansible sich mit den Hosts verbindet, die auf diese Zugangsdaten verweisen. Geben Sie einen privaten Schlüssel oder ein Passwort an, oder beides."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verifiziert",
+      "unverified": "Nicht verifiziert",
+      "failed": "Verifizierung fehlgeschlagen",
+      "legend": "Wie dieses Artefakt aufgenommen wurde"
+    },
+    "state": {
+      "inventoried": "Inventarisiert",
+      "notInventoried": "Nicht inventarisiert",
+      "findings": "{count, plural, one {# Befund} other {# Befunde}}",
+      "malicious": "{count, plural, one {# bösartiges} other {# bösartige}}"
+    },
+    "reason": {
+      "notAdmitted": "Aufgenommen, bevor es diesen Eintrag gab, und daher nie inventarisiert",
+      "awaiting": "Aufgenommen und wartet auf die Inventarisierung"
+    },
+    "detail": {
+      "title": "Artefakt",
+      "back": "Zurück zum Zwischenspeicher",
+      "admitted": "Aufgenommen",
+      "attestation": "Attestierung",
+      "attestor": "Verbürgt durch",
+      "coordinates": "Bekannt als",
+      "packages": "{count, plural, one {# Paket} other {# Pakete}}",
+      "sbom": "Software-Stückliste",
+      "sbomNone": "Für dieses Artefakt wurde kein Inventar erstellt",
+      "findings": "Befunde",
+      "findingsNone": "Keine Treffer",
+      "verdict": "Urteil",
+      "verdictLine": "Abgeglichen von {matcher} {matcherVersion} gegen die Datenbank-Epoche {epoch}, inventarisiert von {generator} {generatorVersion}",
+      "verdictNone": "Dieses Artefakt wurde nicht mit der Schwachstellendatenbank abgeglichen",
+      "notFound": "Für dieses Artefakt existiert kein Eintrag",
+      "advisory": "Befunde sind beratend. Sie beschreiben, was in einem Artefakt steckt, das aufgenommen und verifiziert wurde; sie blockieren es nicht, denn wer es attestiert hat, hat sich bereits für diese Bytes verbürgt.",
+      "maliciousNote": "Ein als bösartig markiertes Paket ist kein Fehler in einer Abhängigkeit. Behandeln Sie es so, als wäre das Artefakt selbst feindlich."
+    },
+    "column": {
+      "verification": "Verifizierung",
+      "supplyChain": "Inhalt"
+    }
   }
 }
