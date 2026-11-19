@@ -22,10 +22,13 @@ Endpoints:
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 from datetime import UTC
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -54,6 +57,11 @@ from terrapod.services.parallelism import (
     validate_configure_parallelism,
     validate_parallelism,
 )
+from terrapod.services.rule_propagation_service import (
+    PROPAGATED_FIELDS,
+    is_changed,
+    propagate_rule_update,
+)
 from terrapod.services.workspace_settings import (
     validate_ansible_collections,
     validate_ansible_version,
@@ -64,6 +72,7 @@ logger = get_logger(__name__)
 
 _VALID_EXEC_MODES = frozenset({"agent"})
 _VALID_BACKENDS = frozenset({"tofu", "terraform"})
+_NAME_CONFLICT = "An autodiscovery rule with that name already exists for this connection"
 
 
 def _rfc3339(dt) -> str:  # noqa: ANN001
@@ -825,6 +834,59 @@ async def show_rule(
 # ── Update ───────────────────────────────────────────────────────────────
 
 
+def _bool_option(body: dict, key: str) -> bool:
+    value = body.get(key, False)
+    if not isinstance(value, bool):
+        raise HTTPException(status_code=422, detail=f"{key} must be a boolean")
+    return value
+
+
+def _propagated_changes(
+    fields: dict[str, Any], previous: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Previous and new values of the changed propagated fields, by rule attribute name."""
+    names = {column: column.replace("_", "-") for column in fields}
+    changed = [
+        c
+        for c in fields
+        if names[c] in PROPAGATED_FIELDS and is_changed(names[c], previous[c], fields[c])
+    ]
+    return {names[c]: previous[c] for c in changed}, {names[c]: fields[c] for c in changed}
+
+
+async def _save_and_propagate(
+    db: AsyncSession,
+    rule: AutodiscoveryRule,
+    user: AuthenticatedUser,
+    fields: dict[str, Any],
+    previous: dict[str, Any],
+    *,
+    dry_run: bool,
+) -> dict:
+    """Save the rule and propagate it in one transaction; a dry run rolls both back."""
+    request_id = structlog.contextvars.get_contextvars().get("request_id", "")
+    before, changed = _propagated_changes(fields, previous)
+    try:
+        await db.flush()
+        result = await propagate_rule_update(
+            db, rule, before, changed, user, request_id, dry_run=dry_run
+        )
+        if dry_run:
+            await db.refresh(rule)
+            body = {"data": _rule_json(rule), "meta": {"propagation": asdict(result)}}
+            await db.rollback()
+            return jsonable_encoder(body)
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=_NAME_CONFLICT) from exc
+    except Exception:
+        await db.rollback()
+        raise
+    await db.refresh(rule)
+    return jsonable_encoder({"data": _rule_json(rule), "meta": {"propagation": asdict(result)}})
+
+
 @router.patch("/autodiscovery-rules/{rule_id}")
 async def update_rule(
     rule_id: str = Path(...),
@@ -832,7 +894,11 @@ async def update_rule(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Update an autodiscovery rule. Admin only."""
+    """Update an autodiscovery rule; `propagate` also applies it to its workspaces. Admin only."""
+    propagate = _bool_option(body, "propagate")
+    dry_run = _bool_option(body, "dry_run")
+    if dry_run and not propagate:
+        raise HTTPException(status_code=422, detail="dry_run only applies with propagate")
     try:
         rid = uuid.UUID(rule_id)
     except ValueError:
@@ -853,16 +919,24 @@ async def update_rule(
     # the poll cycle uses for a full-tree walk (#309).
     if "enabled" in fields and fields["enabled"] and not rule.enabled:
         fields["first_scan_at"] = None
+    previous = {k: getattr(rule, k) for k in fields} if propagate else {}
     for k, v in fields.items():
         setattr(rule, k, v)
+    if propagate:
+        content = await _save_and_propagate(db, rule, user, fields, previous, dry_run=dry_run)
+        if not dry_run:
+            logger.info(
+                "Autodiscovery rule updated and propagated",
+                rule_id=content["data"]["id"],
+                actor=user.email,
+                changed=sorted(fields.keys()),
+            )
+        return JSONResponse(content=content)
     try:
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="An autodiscovery rule with that name already exists for this connection",
-        ) from exc
+        raise HTTPException(status_code=409, detail=_NAME_CONFLICT) from exc
     await db.refresh(rule)
     logger.info(
         "Autodiscovery rule updated",

@@ -1024,6 +1024,8 @@ async def _apply(
     workspaces: list[Workspace],
     plan: dict[str, Any],
     actor: str,
+    *,
+    write_audit: bool = True,
 ) -> tuple[list[dict], list[dict]]:
     """Apply the plan to every workspace. Caller owns the transaction
     (commit for apply, rollback for dry-run). Run-tasks/notifications
@@ -1124,6 +1126,8 @@ async def _apply(
 
         if diff:
             changed.append({"id": f"ws-{ws.id}", "name": ws.name, "diff": diff})
+            if not write_audit:
+                continue
             # Audit row is added INTO the same transaction (no commit) —
             # NOT via audit_service.log_audit_event, which commits
             # internally and would break both the all-or-nothing apply
@@ -1142,6 +1146,32 @@ async def _apply(
         else:
             unchanged.append({"id": f"ws-{ws.id}", "name": ws.name})
     return changed, unchanged
+
+
+async def _reject_for_matched_set(fields: dict[str, Any], workspaces: list, db) -> None:
+    """Every guard that judges a validated update against the matched workspaces' own rows."""
+    _reject_auto_apply_on_apply_then_merge(fields, workspaces)
+    _reject_leaving_a_workspace_with_no_operations(fields, workspaces)
+    _reject_a_run_kind_a_workspace_cannot_offer(fields, workspaces)
+    _reject_a_playbook_list_without_its_default(fields, workspaces)
+    _reject_scan_enforcement_on_unscannable_engines(fields, workspaces)
+    await _reject_unrunnable_ee_selection(fields, workspaces, db)
+    _reject_apply_then_merge_where_it_cannot_hold(fields, workspaces)
+    _reject_bind_plan_on_non_pulumi_engines(fields, workspaces)
+
+
+async def apply_update_to_workspaces(
+    db: AsyncSession,
+    workspaces: list[Workspace],
+    update: dict[str, Any],
+    user: AuthenticatedUser,
+    *,
+    write_audit: bool = True,
+) -> tuple[list[dict], list[dict]]:
+    """Validate `update`, run the matched-set guards, then apply it; never commits."""
+    plan = await _validate_update(update, db, user)
+    await _reject_for_matched_set(plan["fields"], workspaces, db)
+    return await _apply(db, workspaces, plan, user.email, write_audit=write_audit)
 
 
 @router.post("/workspaces/actions/bulk-update")
@@ -1170,14 +1200,7 @@ async def bulk_update_workspaces(
         raise HTTPException(status_code=422, detail=_refusal_detail(report))
 
     workspaces = list((await db.execute(query)).scalars().all())
-    _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
-    _reject_leaving_a_workspace_with_no_operations(plan["fields"], workspaces)
-    _reject_a_run_kind_a_workspace_cannot_offer(plan["fields"], workspaces)
-    _reject_a_playbook_list_without_its_default(plan["fields"], workspaces)
-    _reject_scan_enforcement_on_unscannable_engines(plan["fields"], workspaces)
-    await _reject_unrunnable_ee_selection(plan["fields"], workspaces, db)
-    _reject_apply_then_merge_where_it_cannot_hold(plan["fields"], workspaces)
-    _reject_bind_plan_on_non_pulumi_engines(plan["fields"], workspaces)
+    await _reject_for_matched_set(plan["fields"], workspaces, db)
 
     try:
         changed, unchanged = await _apply(db, workspaces, plan, user.email)

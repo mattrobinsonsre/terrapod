@@ -280,7 +280,7 @@ Three places in the web UI set the same thing, and which one you want depends on
 | Surface | Use it for |
 |---|---|
 | **Workspace → Settings** | One workspace, by hand |
-| **Admin → Autodiscovery**, in a rule's workspace template | Every workspace a rule creates *from now on* — it is a template default, so it does not touch workspaces the rule has already created |
+| **Admin → Autodiscovery**, in a rule's workspace template | Every workspace a rule creates *from now on* — it is a template default, so it does not touch workspaces the rule has already created **unless that edit asks for it** ([propagation](autodiscovery.md#updating-a-rule-and-rolling-it-out-to-existing-workspaces)); that write carries the same caveat as bulk update below, since planned applies are auto-discarded |
 | **Admin → Bulk update** | Every workspace a filter matches, in one all-or-nothing write (dry-run by default). Read the [caveat](api-reference.md#bulk-workspace-operations) first: a fleet-wide audience change auto-discards already-planned applies |
 
 **An empty override is the common case and does not mean "mints nothing"** — it
