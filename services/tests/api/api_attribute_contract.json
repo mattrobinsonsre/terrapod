@@ -165,6 +165,9 @@
     "vcs-connection-id",
     "vcs-workflow"
   ],
+  "autodiscovery_rules._save_and_propagate:meta": [
+    "propagation"
+  ],
   "autodiscovery_rules.preview_rule": [
     "entries",
     "files-walked",

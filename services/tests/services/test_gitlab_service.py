@@ -510,3 +510,56 @@ class TestActorHasPushAccess:
 
         assert await actor_has_push_access(_mock_conn(), "grp", "proj", "") is False
         req.assert_not_called()
+
+
+class TestAggregateStatusRequestBody:
+    """The request a `terrapod/plan` aggregate status puts on the wire."""
+
+    @pytest.mark.asyncio
+    async def test_the_params_carry_name_and_failed_not_failure(self):
+        from terrapod.services.gitlab_service import create_commit_status
+        from terrapod.services.vcs_aggregate_status import Verdict, gitlab_state
+
+        v = Verdict("failure", "Planned 0 of 1 workspaces; a (errored)", "https://tp/run")
+        ok = _fake_resp(201)
+        ok.raise_for_status = MagicMock()
+        client = _patched_client([ok])
+        with patch("httpx.AsyncClient", return_value=client):
+            await create_commit_status(
+                _mock_conn(server_url="https://gitlab.example"),
+                "group",
+                "project",
+                "deadbeef",
+                state=gitlab_state(v),
+                description=v.description + "x" * 200,
+                target_url=v.target_url or "",
+                context="terrapod/plan",
+            )
+
+        (call,) = client.request.await_args_list
+        assert call.args[:2] == (
+            "POST",
+            "https://gitlab.example/api/v4/projects/group%2Fproject/statuses/deadbeef",
+        )
+        body = call.kwargs["json"]
+        assert body["name"] == "terrapod/plan"
+        assert body["state"] == "failed"
+        assert "context" not in body
+        assert len(body["description"]) <= 140
+        assert body["target_url"] == "https://tp/run"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("state", "wire"),
+        [
+            ("pending", "pending"),
+            ("running", "running"),
+            ("success", "success"),
+            ("failure", "failed"),
+        ],
+    )
+    async def test_every_verdict_state_maps_to_a_gitlab_state(self, state, wire):
+        from terrapod.services.vcs_aggregate_status import Verdict, gitlab_state
+
+        assert gitlab_state(Verdict(state, "d", None)) == wire
+        assert wire in {"pending", "running", "success", "failed", "canceled"}

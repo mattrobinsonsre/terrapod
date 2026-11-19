@@ -1943,6 +1943,8 @@ jobs:
           for k in \
             vcs.require_connection_authorization \
             vcs.require_push_permission_for_commands \
+            vcs.commit_statuses.enabled \
+            vcs.commit_statuses.per_workspace \
             database.pool_pre_ping \
             notifications.smtp.use_tls
           do
@@ -1951,7 +1953,7 @@ jobs:
               | grep -q "${leaf}: false" \
               || { echo "setting ${k}=false does not reach the ConfigMap"; exit 1; }
           done
-          echo "an explicit false reaches the pod for all four keys"
+          echo "an explicit false reaches the pod for all six keys"
 
           # Direction 2: every key rendered into config.yaml is one Settings accepts,
           # on all three profiles -- the eval profile included, because a key behind
@@ -1989,6 +1991,40 @@ jobs:
           echo "$out" | grep -q 'TERRAPOD_VCS__REQUIRE_PUSH_PERMISSION' \
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the comment-command push gate renders, defaults on, and honours false"
+
+
+      - name: (helm-smoke) The aggregate status names render, honour overrides, and the schema rejects bad ones
+        run: |
+          # All five vcs.commit_statuses keys render, an override (false included)
+          # reaches the ConfigMap, and the schema refuses bad names and unknown keys.
+          for f in values.yaml values-local.yaml values-eval.yaml; do
+            out=$(helm template ./helm/terrapod -f "helm/terrapod/$f")
+            for want in 'plan_name: "terrapod/plan"' 'policy_name: "terrapod/policy"' \
+                        'apply_name: "terrapod/apply"' 'per_workspace: true'; do
+              echo "$out" | grep -q "$want" \
+                || { echo "$f: commit_statuses is missing '$want'"; exit 1; }
+            done
+            echo "$out" | grep -A1 'commit_statuses:' | grep -q 'enabled: true' \
+              || { echo "$f: commit_statuses.enabled is not true by default"; exit 1; }
+          done
+          off=$(helm template ./helm/terrapod --set api.config.vcs.commit_statuses.per_workspace=false)
+          echo "$off" | grep -q 'per_workspace: false' \
+            || { echo "per_workspace=false does not reach the ConfigMap"; exit 1; }
+          off=$(helm template ./helm/terrapod --set api.config.vcs.commit_statuses.enabled=false)
+          echo "$off" | grep -A1 'commit_statuses:' | grep -q 'enabled: false' \
+            || { echo "enabled=false does not reach the ConfigMap"; exit 1; }
+          custom=$(helm template ./helm/terrapod --set api.config.vcs.commit_statuses.plan_name=ci/tf-plan)
+          echo "$custom" | grep -q 'plan_name: "ci/tf-plan"' \
+            || { echo "a custom plan_name does not reach the ConfigMap"; exit 1; }
+          # Policy, not a credential: ConfigMap only, never a TERRAPOD_* env var.
+          helm template ./helm/terrapod | grep -q 'TERRAPOD_VCS__COMMIT_STATUSES' \
+            && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
+          for bad in 'plan_name= x' 'plan_name=x ' 'plan_name=' 'unknown_key=x'; do
+            if helm lint ./helm/terrapod --set "api.config.vcs.commit_statuses.${bad}" >/dev/null 2>&1; then
+              echo "helm lint accepted commit_statuses.${bad}"; exit 1
+            fi
+          done
+          echo "the aggregate status names render, honour overrides, and the schema rejects bad ones"
 
 
       - name: (helm-smoke) The Vault value source reaches the pod, and its credential never does

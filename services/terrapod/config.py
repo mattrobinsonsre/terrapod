@@ -5,6 +5,7 @@ Non-secret configuration loaded from YAML file, secrets from environment variabl
 """
 
 import re
+import unicodedata
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
@@ -2267,6 +2268,67 @@ class GitLabConfig(BaseModel):
     )
 
 
+class CommitStatusConfig(BaseModel):
+    """Names of the aggregate commit statuses and the per-workspace switch."""
+
+    plan_name: str = Field(
+        default="terrapod/plan",
+        description=(
+            "Context of the aggregate plan status. Success once every affected "
+            "workspace has planned, and on a pull request that touches none."
+        ),
+    )
+    policy_name: str = Field(
+        default="terrapod/policy",
+        description="Context of the aggregate status that carries the post-plan gate state.",
+    )
+    apply_name: str = Field(
+        default="terrapod/apply",
+        description=(
+            "Context of the aggregate apply status, posted only when a workspace "
+            "applies before merge. Do not require it in branch protection."
+        ),
+    )
+    enabled: bool = Field(
+        default=True,
+        description=(
+            "Post the aggregate statuses at all. False turns off everything that serves "
+            "them (recording, posting, the comment's Gates block, the name-collision guard)."
+        ),
+    )
+    per_workspace: bool = Field(
+        default=True,
+        description=(
+            "Post a `terrapod/<workspace>` status for each pull-request run as well "
+            "as the aggregates. Branch runs and module pull requests are unaffected."
+        ),
+    )
+
+    @field_validator("plan_name", "policy_name", "apply_name")
+    @classmethod
+    def _valid_name(cls, v: str, info) -> str:
+        field = info.field_name
+        if not v:
+            raise ValueError(f"{field} must not be empty")
+        if v != v.strip():
+            raise ValueError(f"{field} must not have leading or trailing whitespace")
+        if any(unicodedata.category(c).startswith("C") for c in v):
+            raise ValueError(f"{field} must not contain control characters")
+        if len(v) > 255:
+            raise ValueError(f"{field} must be at most 255 characters")
+        return v
+
+    @model_validator(mode="after")
+    def _distinct_names(self):
+        names = {f: getattr(self, f) for f in ("plan_name", "policy_name", "apply_name")}
+        fields = list(names)
+        for i, a in enumerate(fields):
+            for b in fields[i + 1 :]:
+                if names[a] == names[b]:
+                    raise ValueError(f"{a} and {b} must differ, both are {names[a]!r}")
+        return self
+
+
 class VCSConfig(BaseModel):
     """VCS integration configuration."""
 
@@ -2325,6 +2387,7 @@ class VCSConfig(BaseModel):
             "with a reply saying so."
         ),
     )
+    commit_statuses: CommitStatusConfig = Field(default_factory=CommitStatusConfig)
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
     gitlab: GitLabConfig = Field(default_factory=GitLabConfig)
     tmpdir: str = Field(
@@ -4497,3 +4560,8 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+
+def aggregate_statuses_enabled() -> bool:
+    """Whether the aggregate commit statuses, and everything that serves them, run at all."""
+    return settings.vcs.commit_statuses.enabled

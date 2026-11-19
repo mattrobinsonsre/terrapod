@@ -522,6 +522,12 @@ field CreateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
 field CreateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
 field CreateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
 field CreateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
+field CustomisedField.Current any `json:"current"`
+field CustomisedField.New any `json:"new"`
+field CustomisedField.Previous any `json:"previous"`
+field CustomisedWorkspace.Fields map[string]CustomisedField `json:"fields"`
+field CustomisedWorkspace.ID string `json:"id"`
+field CustomisedWorkspace.Name string `json:"name"`
 field DeletedWorkspace.AgeDays *float64 `json:"age-days"`
 field DeletedWorkspace.DeletedAt string `json:"deleted-at"`
 field DeletedWorkspace.DeletedBy string `json:"deleted-by"`
@@ -970,6 +976,13 @@ field PolicySet.VCSLastCommitSHA string `json:"vcs-last-commit-sha,omitempty"`
 field PolicySet.VCSLastError string `json:"vcs-last-error,omitempty"`
 field PolicySet.VCSLastSyncedAt string `json:"vcs-last-synced-at,omitempty"`
 field PolicySet.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
+field PropagateOptions.DryRun bool
+field Propagation.Customised []CustomisedWorkspace `json:"customised"`
+field Propagation.DryRun bool `json:"dry_run"`
+field Propagation.Matched int `json:"matched"`
+field Propagation.SkippedLifecycle int `json:"skipped_lifecycle"`
+field Propagation.Unchanged []WorkspaceRef `json:"unchanged"`
+field Propagation.WouldChange []WorkspaceChange `json:"would_change"`
 field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
@@ -1796,6 +1809,8 @@ field WorkspaceListOptions.Engine string
 field WorkspaceListOptions.PageNumber int
 field WorkspaceListOptions.PageSize int
 field WorkspaceListOptions.Search string
+field WorkspaceRef.ID string `json:"id"`
+field WorkspaceRef.Name string `json:"name"`
 field WorkspaceSummary.AgentPoolID *string `json:"agent-pool-id"`
 field WorkspaceSummary.EngineVersion string `json:"engine-version"`
 field WorkspaceSummary.ExecutionBackend string `json:"execution-backend"`
@@ -2129,6 +2144,7 @@ method (*Client) UnassignWorkspaceFromExecutionHook(ctx context.Context, hookID,
 method (*Client) UnassignWorkspaceFromVarset(ctx context.Context, varsetID, workspaceID string) error
 method (*Client) UpdateAgentPool(ctx context.Context, id string, req UpdateAgentPoolRequest) (*AgentPool, error)
 method (*Client) UpdateAutodiscoveryRule(ctx context.Context, id string, attrs map[string]any) (*AutodiscoveryRule, error)
+method (*Client) UpdateAutodiscoveryRuleWithPropagation(ctx context.Context, id string, attrs map[string]any, opts PropagateOptions) (*AutodiscoveryRule, *Propagation, error)
 method (*Client) UpdateCatalogItem(ctx context.Context, id string, attrs map[string]any) (*CatalogItem, error)
 method (*Client) UpdateExecutionHook(ctx context.Context, id string, req UpdateExecutionHookRequest) (*ExecutionHook, error)
 method (*Client) UpdateInventoryGlobalVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
@@ -2251,6 +2267,8 @@ type CreateVariableRequest struct
 type CreateVariableSetRequest struct
 type CreateVarsetVariableRequest struct
 type CreateWorkspaceRequest struct
+type CustomisedField struct
+type CustomisedWorkspace struct
 type DeletedWorkspace struct
 type DeletedWorkspaceList struct
 type DeletedWorkspaceListOptions struct
@@ -2328,6 +2346,8 @@ type PolicyCheck struct
 type PolicyCheckSummary struct
 type PolicyEvaluationDetail struct
 type PolicySet struct
+type PropagateOptions struct
+type Propagation struct
 type ProviderTemplate struct
 type ProviderUpload struct
 type QueuedRun struct
@@ -2425,6 +2445,7 @@ type WorkspaceFilter struct
 type WorkspaceLatestRun struct
 type WorkspaceList struct
 type WorkspaceListOptions struct
+type WorkspaceRef struct
 type WorkspaceSummary struct
 type WorkspaceVarset struct
 var ErrVersionMismatch

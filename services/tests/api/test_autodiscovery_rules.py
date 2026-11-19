@@ -538,6 +538,304 @@ class TestUpdateRule:
         assert rule.first_scan_at == scanned
 
 
+class TestUpdateRulePropagation:
+    URL = "/api/terrapod/v1/autodiscovery-rules/{}"
+    SERVICE = "terrapod.api.routers.autodiscovery_rules.propagate_rule_update"
+
+    @staticmethod
+    def _result(dry_run=False):
+        from terrapod.services.rule_propagation_service import PropagationResult
+
+        return PropagationResult(dry_run, 2, [{"id": "ws-1", "name": "a"}], [], [], 1)
+
+    async def _patch(self, attributes, options=None, *, rule=None, result=None, headers=None):
+        rule = rule or _mock_rule()
+        admin = _admin()
+        app, db = _make_app(admin)
+        db.get = AsyncMock(return_value=rule)
+        body = {"data": {"attributes": attributes}, **(options or {})}
+        with patch(self.SERVICE, new_callable=AsyncMock) as service:
+            service.return_value = result or self._result((options or {}).get("dry_run", False))
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(
+                    self.URL.format(rule.id), json=body, headers={**_AUTH, **(headers or {})}
+                )
+        return resp, db, service, rule, admin
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_without_options_the_response_and_commit_are_unchanged(self, *_mocks):
+        resp, db, service, _, _ = await self._patch({"pattern": "envs/*/**/*.tf"})
+
+        assert resp.status_code == 200
+        assert list(resp.json()) == ["data"]
+        service.assert_not_awaited()
+        db.commit.assert_awaited_once()
+        db.rollback.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_explicit_false_options_behave_like_none(self, *_mocks):
+        resp, db, service, _, _ = await self._patch(
+            {"pattern": "envs/*/**/*.tf"}, {"propagate": False, "dry_run": False}
+        )
+
+        assert resp.status_code == 200
+        assert list(resp.json()) == ["data"]
+        service.assert_not_awaited()
+        db.commit.assert_awaited_once()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_dry_run_without_propagate_is_422_and_changes_nothing(self, *_mocks):
+        rule = _mock_rule()
+        resp, db, service, _, _ = await self._patch(
+            {"pattern": "envs/*/**/*.tf"}, {"dry_run": True}, rule=rule
+        )
+
+        assert resp.status_code == 422
+        assert "dry_run only applies with propagate" in resp.json()["detail"]
+        assert rule.pattern == "accounts/*/**/*.tf"
+        service.assert_not_awaited()
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_non_admin_is_403_and_nothing_is_propagated_or_saved(self, *_mocks):
+        from terrapod.api.dependencies import get_current_user
+
+        rule, db = _mock_rule(), AsyncMock()
+        app, _ = _make_app(_admin(), db)
+        del app.dependency_overrides[require_admin]
+        user = AuthenticatedUser(
+            email="user@example.com",
+            display_name="User",
+            roles=["everyone"],
+            provider_name="local",
+            auth_method="session",
+        )
+        app.dependency_overrides[get_current_user] = lambda: user
+        db.get = AsyncMock(return_value=rule)
+        body = {"data": {"attributes": {"parallelism": 11}}, "propagate": True}
+        with patch(self.SERVICE, new_callable=AsyncMock) as service:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(self.URL.format(rule.id), json=body, headers=_AUTH)
+
+        assert resp.status_code == 403
+        service.assert_not_awaited()
+        db.commit.assert_not_awaited()
+
+    NON_BOOLEAN = [
+        {"propagate": "true"},
+        {"propagate": 1},
+        {"propagate": None},
+        {"propagate": True, "dry_run": "false"},
+        {"propagate": True, "dry_run": 0},
+    ]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_non_boolean_option_is_422(self, *_mocks):
+        for options in self.NON_BOOLEAN:
+            resp, db, service, _, _ = await self._patch({"pattern": "envs/*/**/*.tf"}, options)
+
+            assert resp.status_code == 422, options
+            assert "must be a boolean" in resp.json()["detail"], options
+            service.assert_not_awaited()
+            db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_propagate_passes_only_changed_propagated_fields_and_commits_once(self, *_mocks):
+        attributes = {
+            "terraform-version": "1.12",
+            "parallelism": 11,
+            "resource-cpu": "1",
+            "pattern": "envs/*/**/*.tf",
+            "enabled": False,
+        }
+        resp, db, service, rule, admin = await self._patch(
+            attributes, {"propagate": True}, headers={"X-Request-ID": "req-abc"}
+        )
+
+        assert resp.status_code == 200
+        service.assert_awaited_once_with(
+            db,
+            rule,
+            {"engine-version": "1.11", "parallelism": 10},
+            {"engine-version": "1.12", "parallelism": 11},
+            admin,
+            "req-abc",
+            dry_run=False,
+        )
+        assert rule.pattern == "envs/*/**/*.tf"
+        db.commit.assert_awaited_once()
+        db.rollback.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_auto_apply_boolean_is_passed_as_the_stored_mode(self, *_mocks):
+        _, _, service, _, _ = await self._patch({"auto-apply": True}, {"propagate": True})
+
+        args = service.await_args.args
+        assert args[2] == {"auto-apply-mode": "never"}
+        assert args[3] == {"auto-apply-mode": "always"}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_response_carries_the_propagation_in_meta(self, *_mocks):
+        resp, _, _, _, _ = await self._patch({"parallelism": 11}, {"propagate": True})
+
+        body = resp.json()
+        assert body["data"]["attributes"]["parallelism"] == 11
+        assert body["meta"] == {
+            "propagation": {
+                "dry_run": False,
+                "matched": 2,
+                "would_change": [{"id": "ws-1", "name": "a"}],
+                "customised": [],
+                "unchanged": [],
+                "skipped_lifecycle": 1,
+            }
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_dry_run_rolls_back_and_never_commits(self, *_mocks):
+        resp, db, service, rule, _ = await self._patch(
+            {"parallelism": 11}, {"propagate": True, "dry_run": True}
+        )
+
+        assert resp.status_code == 200
+        assert service.await_args.kwargs == {"dry_run": True}
+        assert resp.json()["data"]["attributes"]["parallelism"] == 11
+        assert resp.json()["meta"]["propagation"]["dry_run"] is True
+        db.rollback.assert_awaited_once()
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_refusal_rolls_back_and_never_commits(self, *_mocks):
+        from fastapi import HTTPException
+
+        rule = _mock_rule()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        body = {"data": {"attributes": {"parallelism": 11}}, "propagate": True}
+        with patch(self.SERVICE, new_callable=AsyncMock) as service:
+            service.side_effect = HTTPException(status_code=422, detail="refused: ws-b")
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(self.URL.format(rule.id), json=body, headers=_AUTH)
+
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == "refused: ws-b"
+        db.rollback.assert_awaited_once()
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unexpected_error_rolls_back_and_is_raised(self, *_mocks):
+        rule = _mock_rule()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        body = {"data": {"attributes": {"parallelism": 11}}, "propagate": True}
+        with patch(self.SERVICE, new_callable=AsyncMock) as service:
+            service.side_effect = ValueError("programmer error")
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                with pytest.raises(ValueError, match="programmer error"):
+                    await c.patch(self.URL.format(rule.id), json=body, headers=_AUTH)
+
+        db.rollback.assert_awaited_once()
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_name_conflict_is_409_on_the_propagating_path(self, *_mocks):
+        from sqlalchemy.exc import IntegrityError
+
+        rule = _mock_rule()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.flush = AsyncMock(side_effect=IntegrityError("stmt", {}, Exception("dup")))
+        body = {"data": {"attributes": {"name": "taken"}}, "propagate": True}
+        with patch(self.SERVICE, new_callable=AsyncMock) as service:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(self.URL.format(rule.id), json=body, headers=_AUTH)
+
+        assert resp.status_code == 409
+        service.assert_not_awaited()
+        db.rollback.assert_awaited_once()
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unset_spelling_change_is_not_passed_as_a_change(self, *_mocks):
+        rule = _mock_rule()
+        rule.ee_resource_cpu = None
+        rule.var_files = None
+        attributes = {"ee-resource-cpu": "", "var-files": [], "parallelism": 11}
+
+        _, _, service, _, _ = await self._patch(attributes, {"propagate": True}, rule=rule)
+
+        args = service.await_args.args
+        assert args[2] == {"parallelism": 10}
+        assert args[3] == {"parallelism": 11}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_only_an_unset_spelling_change_passes_an_empty_change(self, *_mocks):
+        rule = _mock_rule()
+        rule.ee_resource_cpu = None
+
+        _, _, service, _, _ = await self._patch(
+            {"ee-resource-cpu": ""}, {"propagate": True}, rule=rule
+        )
+
+        assert service.await_args.args[2:4] == ({}, {})
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_real_change_from_unset_is_passed(self, *_mocks):
+        rule = _mock_rule()
+        rule.ee_resource_cpu = None
+
+        _, _, service, _, _ = await self._patch(
+            {"ee-resource-cpu": "500m"}, {"propagate": True}, rule=rule
+        )
+
+        assert service.await_args.args[2:4] == (
+            {"ee-resource-cpu": None},
+            {"ee-resource-cpu": "500m"},
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_request_changing_no_propagated_field_propagates_nothing(self, *_mocks):
+        resp, db, service, _, _ = await self._patch(
+            {"pattern": "envs/*/**/*.tf", "resource-cpu": "1"}, {"propagate": True}
+        )
+
+        assert resp.status_code == 200
+        assert service.await_args.args[2:4] == ({}, {})
+        db.commit.assert_awaited_once()
+
+
 # ── on-directory-delete (#314) ───────────────────────────────────────────
 
 

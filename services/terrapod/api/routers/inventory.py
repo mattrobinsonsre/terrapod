@@ -81,6 +81,11 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import inventory_service as inv
+from terrapod.services.inventory_masking import (
+    mask_hosts,
+    mask_provenance,
+    sensitive_keys,
+)
 from terrapod.services.inventory_provenance import attribute as attribute_vars
 from terrapod.services.inventory_resolution import InventoryValidationError
 from terrapod.services.inventory_resolve import (
@@ -1436,7 +1441,13 @@ async def show_resolved_inventory(
         # later evaluation to catch it.
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    hosts = resolved["hosts"]
+    # GHSA-23jf-9q8w-5f37: this route is gated on INVENTORY_READ, which is in
+    # the READ preset, and it returned every resolved value in the clear --
+    # including the ones `_var_json` masks two routes over. Masked HERE rather
+    # than in `resolve_inventory`, because a configure run reads the stored
+    # artifact through a different route and needs the real values.
+    _sensitive = await sensitive_keys(db, ws.id)
+    hosts = mask_hosts(resolved["hosts"], _sensitive)
     groups = resolved["groups"]
     attrs: dict[str, Any] = {
         "hosts": hosts,
@@ -1463,17 +1474,20 @@ async def show_resolved_inventory(
         for group, members in groups.items():
             for host in members:
                 groups_of.setdefault(host, []).append(group)
-        attrs["var-provenance"] = {
-            host: attribute_vars(
-                node=host,
-                is_host=True,
-                effective=host_vars or {},
-                groups_of_node=groups_of.get(host, []),
-                at_level=levels,
-                children=children,
-            )
-            for host, host_vars in hosts.items()
-        }
+        attrs["var-provenance"] = mask_provenance(
+            {
+                host: attribute_vars(
+                    node=host,
+                    is_host=True,
+                    effective=host_vars or {},
+                    groups_of_node=groups_of.get(host, []),
+                    at_level=levels,
+                    children=children,
+                )
+                for host, host_vars in hosts.items()
+            },
+            _sensitive,
+        )
 
     return JSONResponse(
         content={

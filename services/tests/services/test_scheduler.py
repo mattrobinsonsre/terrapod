@@ -5,6 +5,8 @@ import json
 import time
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from terrapod.services.scheduler import (
     AI_LANE,
     DEFAULT_AI_LANE_CONSUMERS,
@@ -525,3 +527,28 @@ class TestQueueDepthSampler:
         sampled = {c.kwargs.get("lane") for c in mock_gauge.labels.call_args_list}
         assert sampled == {DEFAULT_LANE, AI_LANE}
         mock_gauge.labels.return_value.set.assert_called_with(7)
+
+    @pytest.mark.parametrize("enabled", [True, False])
+    @patch("terrapod.services.scheduler.SCHEDULER_QUEUE_DEPTH")
+    @patch("terrapod.services.scheduler.get_redis_client")
+    async def test_the_vcs_gauges_are_sampled_only_when_the_statuses_are_on(
+        self, mock_get_redis, mock_gauge, enabled
+    ):
+        from terrapod.config import settings
+
+        mock_get_redis.return_value = AsyncMock()
+        shutdown = asyncio.Event()
+
+        async def stop_soon():
+            await asyncio.sleep(0.05)
+            shutdown.set()
+
+        settings.vcs.commit_statuses.enabled = enabled
+        try:
+            with patch(
+                "terrapod.services.vcs_pr_decisions.sample_gauges", new=AsyncMock()
+            ) as sample:
+                await asyncio.gather(_run_queue_depth_sampler(shutdown, interval=60), stop_soon())
+        finally:
+            settings.vcs.commit_statuses.enabled = True
+        assert bool(sample.await_count) is enabled

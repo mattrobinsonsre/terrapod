@@ -191,6 +191,16 @@ class TestTheKeysOperatorsSetActuallyReachThePod:
             "a PR comment can apply infrastructure again",
         ),
         (
+            "api.config.vcs.commit_statuses.enabled",
+            False,
+            "the explicit false is discarded and the aggregate statuses stay on",
+        ),
+        (
+            "api.config.vcs.commit_statuses.per_workspace",
+            False,
+            "the explicit false is discarded and per-workspace statuses stay on",
+        ),
+        (
             "api.config.database.pool_pre_ping",
             False,
             "the explicit false is discarded and pre-ping stays on",

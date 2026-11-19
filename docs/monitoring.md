@@ -167,6 +167,11 @@ depth alone — a deep queue that drains fast is fine.
 | `terrapod_vcs_commits_detected_total` | Counter | provider | New commits detected |
 | `terrapod_vcs_prs_detected_total` | Counter | provider | New PRs/MRs detected |
 | `terrapod_vcs_runs_created_total` | Counter | provider, type | Runs created by VCS poller |
+| `terrapod_vcs_aggregate_status_rejected_total` | Counter | provider, status_code | Aggregate plan/policy/apply commit statuses a provider refused outright (a final 4xx; rate limits and 5xx are retried and not counted) |
+| `terrapod_vcs_aggregate_status_posts_total` | Counter | provider, outcome | Aggregate commit status posts: `ok`, `transient` (retried later, with backoff) or `rejected` (a final 4xx) |
+| `terrapod_vcs_candidate_registration_failures_total` | Counter | entry | Poll passes (`cycle` or `webhook`) that could not register their candidate workspaces; stored PR records then read pending until a periodic cycle succeeds |
+| `terrapod_vcs_pr_records_unverified` | Gauge | | 1 while a failed registration has the stored PR records marked unverified. Read from shared Redis state on every replica; alert on a value that stays 1 |
+| `terrapod_vcs_disabled_connection_candidates` | Gauge | | Workspaces on a disabled VCS connection at the last periodic cycle (shared via Redis, so every replica reports it); each holds its repository's PR checks pending |
 | `terrapod_vcs_webhook_received_total` | Counter | provider | Webhook events received |
 
 ### VCS API budget
