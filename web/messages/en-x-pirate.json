@@ -4261,5 +4261,46 @@
     "knownHostsHint": "The public host keys o'' the vessels this credential boards, one per line in known_hosts riggin''. Point an inventory variable at her path to come alongside without slackenin'' host-key verification, arr. Not hidden: a host''s public key be public, an'' it be what ye compare when a key don''t match.",
     "knownHostsLead": "Th'' public host keys o'' th'' vessels this credential boards, one per line in known_hosts riggin''.",
     "machineLead": "How Ansible hails th'' hosts that call on these papers. Hand over a private key or a watchword, or both."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Vouched for",
+      "unverified": "Not vouched for",
+      "failed": "The vouchin'' ran aground",
+      "legend": "How this here booty came aboard"
+    },
+    "state": {
+      "inventoried": "Logged in the manifest",
+      "notInventoried": "Not in the manifest",
+      "findings": "{count, plural, one {# find} other {# finds}}",
+      "malicious": "{count, plural, one {# cursed} other {# cursed}}"
+    },
+    "reason": {
+      "notAdmitted": "Came aboard afore this log were ever kept, so it were never put in the manifest",
+      "awaiting": "Aboard, an'' awaitin'' the manifest"
+    },
+    "detail": {
+      "title": "Booty",
+      "back": "Back t'' the hold",
+      "admitted": "Came aboard",
+      "attestation": "The sworn oath",
+      "attestor": "Sworn fer by",
+      "coordinates": "Goes by",
+      "packages": "{count, plural, one {# crate} other {# crates}}",
+      "sbom": "The cargo manifest, every last plank",
+      "sbomNone": "No manifest were drawn up fer this here booty",
+      "findings": "The finds",
+      "findingsNone": "Nothin'' were found",
+      "verdict": "The cap''n''s rulin''",
+      "verdictLine": "Matched by {matcher} {matcherVersion} against the ledger o'' epoch {epoch}, an'' put in the manifest by {generator} {generatorVersion}",
+      "verdictNone": "This here booty has not been held against the ledger o'' plagues",
+      "notFound": "No log exists fer this here booty",
+      "advisory": "Finds be advice, nothin'' more. They tell ye what lies inside booty that came aboard an'' were vouched for; they do not bar it, fer the one who swore has already vouched fer these here bytes.",
+      "maliciousNote": "A crate marked cursed be no mere hole in a dependency. Treat it as the booty itself bein'' hostile."
+    },
+    "column": {
+      "verification": "The vouchin''",
+      "supplyChain": "What be inside"
+    }
   }
 }

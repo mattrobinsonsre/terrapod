@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Allweddi gwesteiwr cyhoeddus y peiriannau y mae''r cymhwyster hwn yn eu cyrraedd, un fesul llinell yn fformat known_hosts. Cyfeiria newidyn rhestr eiddo at ei lwybr i gysylltu heb lacio dilysu allwedd y gwesteiwr. Nid yw''n cael ei guddio: mae allwedd gyhoeddus gwesteiwr yn gyhoeddus, a dyna''n union yr hyn a gymharir pan nad yw allwedd yn cyfateb.",
     "knownHostsLead": "Allweddi gwesteiwr cyhoeddus y peiriannau y mae'r cymhwyster hwn yn eu cyrraedd, un fesul llinell yn fformat known_hosts.",
     "machineLead": "Sut mae Ansible yn cysylltu â'r gwesteiwyr sy'n cyfeirio at y tystlythyr hwn. Darparwch allwedd breifat neu gyfrinair, neu'r ddau."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Wedi''i ddilysu",
+      "unverified": "Heb ei ddilysu",
+      "failed": "Methodd y dilysu",
+      "legend": "Sut y derbyniwyd yr arteffact hwn"
+    },
+    "state": {
+      "inventoried": "Wedi''i restru",
+      "notInventoried": "Heb ei restru",
+      "findings": "{count, plural, zero {# canfyddiad} one {# canfyddiad} two {# ganfyddiad} few {# chanfyddiad} many {# chanfyddiad} other {# canfyddiad}}",
+      "malicious": "{count, plural, zero {# maleisus} one {# maleisus} two {# maleisus} few {# maleisus} many {# maleisus} other {# maleisus}}"
+    },
+    "reason": {
+      "notAdmitted": "Derbyniwyd cyn i''r cofnod hwn fodoli, felly ni chafodd ei restru erioed",
+      "awaiting": "Wedi''i dderbyn ac yn aros i gael ei restru"
+    },
+    "detail": {
+      "title": "Arteffact",
+      "back": "Yn ôl i''r storfa",
+      "admitted": "Derbyniwyd",
+      "attestation": "Ardystiad",
+      "attestor": "Gwarantwr",
+      "coordinates": "Yn hysbys fel",
+      "packages": "{count, plural, zero {# pecyn} one {# pecyn} two {# becyn} few {# phecyn} many {# phecyn} other {# pecyn}}",
+      "sbom": "Rhestr cydrannau meddalwedd",
+      "sbomNone": "Ni luniwyd rhestr gydrannau ar gyfer yr arteffact hwn",
+      "findings": "Canfyddiadau",
+      "findingsNone": "Ni chyfatebodd dim",
+      "verdict": "Dyfarniad",
+      "verdictLine": "Cyfatebwyd gan {matcher} {matcherVersion} yn erbyn cyfnod {epoch} y gronfa ddata, a''i restru gan {generator} {generatorVersion}",
+      "verdictNone": "Ni chymharwyd yr arteffact hwn â''r gronfa ddata gwendidau",
+      "notFound": "Nid oes cofnod ar gyfer yr arteffact hwn",
+      "advisory": "Cynghorol yw''r canfyddiadau. Maent yn disgrifio beth sydd y tu mewn i arteffact a dderbyniwyd ac a ddilyswyd; nid ydynt yn ei rwystro, oherwydd mae''r gwarantwr eisoes wedi gwarantu''r beitiau hyn.",
+      "maliciousNote": "Nid diffyg mewn dibyniaeth yw pecyn a nodir yn faleisus. Cymerwch fod yr arteffact ei hun yn elyniaethus."
+    },
+    "column": {
+      "verification": "Dilysu",
+      "supplyChain": "Cynnwys"
+    }
   }
 }

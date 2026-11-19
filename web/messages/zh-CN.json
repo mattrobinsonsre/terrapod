@@ -4261,5 +4261,46 @@
     "knownHostsHint": "此凭据所连接的机器的公开主机密钥，按 known_hosts 格式每行一个。将清单变量指向其路径，即可在不放松主机密钥校验的情况下建立连接。不会隐藏：主机的公钥本就是公开的，密钥不匹配时比对的正是它。",
     "knownHostsLead": "此凭据所连接的机器的公开主机密钥，按 known_hosts 格式每行一个。",
     "machineLead": "Ansible 连接引用此凭据的主机的方式。请提供私钥或密码，也可以同时提供两者。"
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "已验证",
+      "unverified": "未验证",
+      "failed": "验证失败",
+      "legend": "此构件的准入方式"
+    },
+    "state": {
+      "inventoried": "已生成清单",
+      "notInventoried": "未生成清单",
+      "findings": "{count, plural, other {# 项发现}}",
+      "malicious": "{count, plural, other {# 个恶意软件包}}"
+    },
+    "reason": {
+      "notAdmitted": "在此记录存在之前即已准入，因此从未生成清单",
+      "awaiting": "已准入，等待生成清单"
+    },
+    "detail": {
+      "title": "构件",
+      "back": "返回缓存",
+      "admitted": "准入",
+      "attestation": "证明",
+      "attestor": "担保者",
+      "coordinates": "标识为",
+      "packages": "{count, plural, other {# 个软件包}}",
+      "sbom": "软件物料清单",
+      "sbomNone": "未为此构件生成清单",
+      "findings": "发现项",
+      "findingsNone": "没有匹配项",
+      "verdict": "判定",
+      "verdictLine": "由 {matcher} {matcherVersion} 针对数据库纪元 {epoch} 进行匹配，由 {generator} {generatorVersion} 生成清单",
+      "verdictNone": "此构件尚未与漏洞数据库进行匹配",
+      "notFound": "此构件没有任何记录",
+      "advisory": "发现项仅供参考。它们描述的是已准入并已验证的构件内部包含哪些内容；它们不会阻止该构件，因为担保者已经为这些字节作出担保。",
+      "maliciousNote": "被标记为恶意的软件包并非依赖项中的缺陷。请将其视为该构件本身具有敌意。"
+    },
+    "column": {
+      "verification": "验证",
+      "supplyChain": "内容"
+    }
   }
 }

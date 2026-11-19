@@ -2956,3 +2956,121 @@ test.describe('Workspace form sections (#2253)', () => {
   })
 
 })
+
+test.describe('the artifact detail view (#2589)', () => {
+  // A ROUTE, not a modal: a reviewer wants to link a colleague at one
+  // artifact, so it has to survive reload, back and deep-link. Drilling down
+  // to a route is also the mobile-first answer — preferred over cramming a
+  // panel into an already dense cache row.
+  const DIGEST = 'sha256:' + 'ab'.repeat(32);
+
+  async function stubLedger(page: Page, attributes: Record<string, unknown>) {
+    await page.route('**/api/v1/admin/artifact-ledger/**', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { id: DIGEST, type: 'artifact-ledger-entries', attributes },
+        }),
+      }),
+    );
+  }
+
+  const BASE = {
+    digest: DIGEST,
+    kind: 'package',
+    coordinates: [{ kind: 'package', ecosystem: 'pypi', name: 'flask', version: '0.12.2' }],
+    attestation: 'upstream-publisher',
+    attestor: { publisher: 'pypi/flask' },
+    verification: 'verified',
+    'admitted-at': '2026-11-19T10:00:00Z',
+    admission: {},
+    packages: 1,
+    'updated-at': '2026-11-19T10:05:00Z',
+  };
+
+  test('an inventoried artifact with findings fits a phone', async ({ page }) => {
+    await stubLedger(page, {
+      ...BASE,
+      'supply-chain': {
+        state: 'findings',
+        reason: null,
+        findings: 2,
+        critical: 1,
+        malicious: 1,
+        verdict: { matcher: 'trivy' },
+      },
+      sbom: { bomFormat: 'CycloneDX', components: [{ name: 'flask', purl: 'pkg:pypi/flask@0.12.2' }] },
+      matches: [
+        { id: 'CVE-2019-1010083', package: 'flask', installed: '0.12.2', fixed: '1.0', severity: 'HIGH', malicious: false },
+        { id: 'MAL-1', package: 'evil', installed: '1.0', fixed: null, severity: 'CRITICAL', malicious: true },
+      ],
+      'verdict-provenance': {
+        matcher: 'trivy',
+        matcher_version: '0.76.2',
+        sbom_generator: 'syft',
+        sbom_generator_version: '1.57.2',
+        db: { updated_at: '2026-11-19T07:06:49Z' },
+      },
+    });
+
+    await page.goto(`/admin/cache/artifact/${encodeURIComponent(DIGEST)}`);
+
+    // The verification badge states its word, never colour alone — no single
+    // mid-chroma fill clears 3:1 against both themes' surfaces, so the text is
+    // what carries the state.
+    await expect(page.getByText('Verified', { exact: true })).toBeVisible({ timeout: 15_000 });
+    // Every verdict is dated: a clean result with no epoch is worthless.
+    await expect(page.getByText(/trivy 0\.76\.2/)).toBeVisible();
+    await expect(page.getByText('CVE-2019-1010083')).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('a not-inventoried artifact states its REASON, never a blank', async ({ page }) => {
+    // The failure this guards: a blank cell reads as safe. "We did not look"
+    // and "we looked and found nothing" are the two facts a reviewer most
+    // needs told apart.
+    await stubLedger(page, {
+      ...BASE,
+      'supply-chain': {
+        state: 'not-inventoried',
+        reason: 'awaiting-inventory',
+        findings: 0,
+        critical: 0,
+        malicious: 0,
+        verdict: null,
+      },
+      sbom: null,
+      matches: [],
+      'verdict-provenance': {},
+      packages: 0,
+    });
+
+    await page.goto(`/admin/cache/artifact/${encodeURIComponent(DIGEST)}`);
+
+    await expect(page.getByText(/No inventory was produced/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/awaiting inventory/i)).toBeVisible();
+    // And it must NOT claim a verdict it never reached.
+    await expect(page.getByText(/has not been matched/)).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('the detail route survives a reload, because it is a URL and not a modal', async ({ page }) => {
+    await stubLedger(page, {
+      ...BASE,
+      'supply-chain': { state: 'inventoried', reason: null, findings: 0, critical: 0, malicious: 0, verdict: { matcher: 'trivy' } },
+      sbom: { bomFormat: 'CycloneDX', components: [] },
+      matches: [],
+      'verdict-provenance': { matcher: 'trivy', matcher_version: '0.76.2', sbom_generator: 'syft', sbom_generator_version: '1.57.2', db: {} },
+    });
+
+    const url = `/admin/cache/artifact/${encodeURIComponent(DIGEST)}`;
+    await page.goto(url);
+    await expect(page.getByText('Nothing matched')).toBeVisible({ timeout: 15_000 });
+
+    await page.reload();
+    await expect(page.getByText('Nothing matched')).toBeVisible({ timeout: 15_000 });
+    expect(page.url()).toContain(encodeURIComponent(DIGEST));
+    await expectNoHorizontalPageScroll(page);
+  });
+});
