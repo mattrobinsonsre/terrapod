@@ -296,19 +296,29 @@ class TestStorageLocationAgainstRealPostgres:
         read = await client.get(f"{NATIVE}/{wid}", headers=AUTH)
         assert read.json()["data"]["attributes"]["storage-location"] == "eu-west"
 
-    async def test_default_is_stored_as_null_and_unknown_is_refused(self, app, client):
+    async def test_absent_is_null_and_both_default_and_unknown_are_refused(self, app, client):
+        """`default` is refused rather than collapsed to NULL (#2621).
+
+        It used to be stored as NULL, so a client that sent `"default"` read
+        `null` back -- and the Terraform provider writes the server's answer
+        into state, so that round trip is "Provider produced inconsistent
+        result after apply" on every apply, unfixable from the configuration.
+        """
         set_auth(app, admin_user())
-        _, explicit = await self._make(client, "loc-default", **{"storage-location": "default"})
         _, absent = await self._make(client, "loc-absent")
-        assert explicit["storage-location"] is None
         assert absent["storage-location"] is None
 
-        r = await client.post(
-            NATIVE,
-            json={"data": {"attributes": {"name": "loc-bad", "storage-location": "nowhere"}}},
-            headers=AUTH,
-        )
-        assert r.status_code == 422, r.text
+        for bad, expected in (
+            ("default", "omit the attribute or send null"),
+            ("nowhere", "storage-location"),
+        ):
+            r = await client.post(
+                NATIVE,
+                json={"data": {"attributes": {"name": f"loc-{bad}", "storage-location": bad}}},
+                headers=AUTH,
+            )
+            assert r.status_code == 422, r.text
+            assert expected in r.json()["detail"], r.text
 
 
 class TestTheTfeSurfaceStaysTerraformOnly:
