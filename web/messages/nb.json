@@ -4261,5 +4261,46 @@
     "knownHostsHint": "De offentlige vertsnøklene til maskinene denne legitimasjonen når, én per linje i known_hosts-format. Pek en inventarvariabel mot stien dens for å koble til uten å svekke verifiseringen av vertsnøkkelen. Skjules ikke: en verts offentlige nøkkel er offentlig og er nettopp det du sammenligner når en nøkkel ikke stemmer.",
     "knownHostsLead": "De offentlige vertsnøklene til maskinene denne legitimasjonen når, én per linje i known_hosts-format.",
     "machineLead": "Hvordan Ansible kobler seg til vertene som viser til denne legitimasjonen. Oppgi en privat nøkkel eller et passord, eller begge."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verifisert",
+      "unverified": "Ikke verifisert",
+      "failed": "Verifiseringen mislyktes",
+      "legend": "Hvordan dette artefaktet ble sluppet inn"
+    },
+    "state": {
+      "inventoried": "Inventert",
+      "notInventoried": "Ikke inventert",
+      "findings": "{count, plural, one {# funn} other {# funn}}",
+      "malicious": "{count, plural, one {# skadelig} other {# skadelige}}"
+    },
+    "reason": {
+      "notAdmitted": "Sluppet inn før denne registreringen fantes, og derfor aldri inventert",
+      "awaiting": "Sluppet inn og venter på inventering"
+    },
+    "detail": {
+      "title": "Artefakt",
+      "back": "Tilbake til bufferen",
+      "admitted": "Sluppet inn",
+      "attestation": "Attestering",
+      "attestor": "Attestert av",
+      "coordinates": "Kjent som",
+      "packages": "{count, plural, one {# pakke} other {# pakker}}",
+      "sbom": "Programvarestykkliste",
+      "sbomNone": "Det ble ikke laget noen inventering for dette artefaktet",
+      "findings": "Funn",
+      "findingsNone": "Ingen treff",
+      "verdict": "Vurdering",
+      "verdictLine": "Matchet av {matcher} {matcherVersion} mot databasens epoke {epoch}, inventert av {generator} {generatorVersion}",
+      "verdictNone": "Dette artefaktet er ikke matchet mot sårbarhetsdatabasen",
+      "notFound": "Det finnes ingen registrering for dette artefaktet",
+      "advisory": "Funn er rådgivende. De beskriver hva som finnes i et artefakt som er sluppet inn og verifisert; de blokkerer det ikke, fordi den som attesterte det, allerede har innestått for disse bytene.",
+      "maliciousNote": "En pakke som er merket som skadelig, er ikke en defekt i en avhengighet. Behandle det som at artefaktet selv er fiendtlig."
+    },
+    "column": {
+      "verification": "Verifisering",
+      "supplyChain": "Innhold"
+    }
   }
 }

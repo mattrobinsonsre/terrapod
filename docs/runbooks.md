@@ -2820,7 +2820,9 @@ platform state a workspace's own owner can move — through `dismiss-drift`, thr
 disabling drift detection, and through lock/unlock, none of which is a variable-set
 write — so a rule selecting on either is rejected with `422`, and a rule stored
 before this release that names one matches nothing. Select on something an admin
-controls, such as labels.
+controls, such as labels. The same two are refused inside an `exclude` entry (an
+owner could otherwise opt their own workspace out of the set), and an `exclude`
+that cannot be parsed makes the whole rule match nothing.
 
 **It is a behaviour change**, so expect it on first upgrade from any self-service
 workflow that created workspaces carrying labels a rule-scoped set selects on,

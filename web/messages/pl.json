@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Publiczne klucze hostów maszyn, do których sięga to poświadczenie, po jednym w wierszu w formacie known_hosts. Wskaż zmiennej inwentarza tę ścieżkę, aby połączyć się bez osłabiania weryfikacji klucza hosta. Nie jest ukrywany: publiczny klucz hosta jest publiczny i to właśnie go porównujesz, gdy klucz się nie zgadza.",
     "knownHostsLead": "Publiczne klucze hostów maszyn, do których sięga to poświadczenie, po jednym w wierszu w formacie known_hosts.",
     "machineLead": "Sposób, w jaki Ansible łączy się z hostami, które odwołują się do tego poświadczenia. Podaj klucz prywatny lub hasło — albo oba."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Zweryfikowano",
+      "unverified": "Bez weryfikacji",
+      "failed": "Weryfikacja nieudana",
+      "legend": "Jak ten artefakt został dopuszczony"
+    },
+    "state": {
+      "inventoried": "Zinwentaryzowano",
+      "notInventoried": "Nie zinwentaryzowano",
+      "findings": "{count, plural, one {# znalezisko} few {# znaleziska} many {# znalezisk} other {# znaleziska}}",
+      "malicious": "{count, plural, one {# złośliwy} few {# złośliwe} many {# złośliwych} other {# złośliwego}}"
+    },
+    "reason": {
+      "notAdmitted": "Dopuszczony, zanim ten rejestr powstał, więc nigdy nie został zinwentaryzowany",
+      "awaiting": "Dopuszczony i oczekuje na inwentaryzację"
+    },
+    "detail": {
+      "title": "Artefakt",
+      "back": "Powrót do pamięci podręcznej",
+      "admitted": "Dopuszczono",
+      "attestation": "Poświadczenie",
+      "attestor": "Poręczyciel",
+      "coordinates": "Znany jako",
+      "packages": "{count, plural, one {# pakiet} few {# pakiety} many {# pakietów} other {# pakietu}}",
+      "sbom": "Wykaz składników oprogramowania",
+      "sbomNone": "Dla tego artefaktu nie sporządzono wykazu składników",
+      "findings": "Znaleziska",
+      "findingsNone": "Nic nie pasowało",
+      "verdict": "Werdykt",
+      "verdictLine": "Dopasowane przez {matcher} {matcherVersion} do bazy danych z {epoch}, zinwentaryzowane przez {generator} {generatorVersion}",
+      "verdictNone": "Tego artefaktu nie porównano z bazą podatności",
+      "notFound": "Dla tego artefaktu nie istnieje żaden zapis",
+      "advisory": "Znaleziska mają charakter informacyjny. Opisują, co znajduje się wewnątrz artefaktu, który został dopuszczony i zweryfikowany; nie blokują go, ponieważ poręczyciel już poręczył za te bajty.",
+      "maliciousNote": "Pakiet oznaczony jako złośliwy nie jest usterką zależności. Potraktuj to tak, że wrogi jest sam artefakt."
+    },
+    "column": {
+      "verification": "Weryfikacja",
+      "supplyChain": "Zawartość"
+    }
   }
 }

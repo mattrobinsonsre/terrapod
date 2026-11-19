@@ -146,6 +146,25 @@ async def admit(
             arch=arch,
             by=uploaded_by,
         )
+        # Also an admission: the operator vouched for these bytes just now.
+        # Idempotent on an identical re-upload, and on a REPLACEMENT it is the
+        # only record the ledger ever gets of the new digest.
+        from terrapod.services.artifact_ledger import coordinate, record_upload
+
+        await record_upload(
+            db,
+            digest=existing.shasum,
+            kind="binary",
+            coordinates=coordinate(
+                "binary",
+                tool=existing.tool,
+                version=existing.version,
+                os=existing.os,
+                arch=existing.arch,
+            ),
+            uploaded_by=uploaded_by,
+            storage_key=existing.storage_key,
+        )
         return existing, outcome, ""
 
     if outcome is cache_admission.Outcome.REPLACE:
@@ -187,6 +206,25 @@ async def admit(
             digest=hexdigest,
             replaced_digest=previous,
             by=uploaded_by,
+        )
+        # Also an admission: the operator vouched for these bytes just now.
+        # Idempotent on an identical re-upload, and on a REPLACEMENT it is the
+        # only record the ledger ever gets of the new digest.
+        from terrapod.services.artifact_ledger import coordinate, record_upload
+
+        await record_upload(
+            db,
+            digest=existing.shasum,
+            kind="binary",
+            coordinates=coordinate(
+                "binary",
+                tool=existing.tool,
+                version=existing.version,
+                os=existing.os,
+                arch=existing.arch,
+            ),
+            uploaded_by=uploaded_by,
+            storage_key=existing.storage_key,
         )
         return existing, outcome, previous
 
@@ -233,6 +271,21 @@ async def admit(
         arch=arch,
         digest=hexdigest,
         by=uploaded_by,
+    )
+    # The ledger is the durable answer to "who vouched for this?" (#2589).
+    # Best-effort by construction -- an upload must not fail because the
+    # bookkeeping did.
+    from terrapod.services.artifact_ledger import coordinate, record_upload
+
+    await record_upload(
+        db,
+        digest=record.shasum,
+        kind="binary",
+        coordinates=coordinate(
+            "binary", tool=record.tool, version=record.version, os=record.os, arch=record.arch
+        ),
+        uploaded_by=uploaded_by,
+        storage_key=record.storage_key,
     )
     return record, outcome, ""
 

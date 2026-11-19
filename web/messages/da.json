@@ -4261,5 +4261,46 @@
     "knownHostsHint": "De offentlige værtsnøgler for de maskiner, denne legitimation når, én pr. linje i known_hosts-format. Peg en inventarvariabel på dens sti for at forbinde uden at løsne verifikationen af værtsnøglen. Skjules ikke: en værts offentlige nøgle er offentlig og er netop det, du sammenligner, når en nøgle ikke passer.",
     "knownHostsLead": "De offentlige værtsnøgler for de maskiner, denne legitimation når, én pr. linje i known_hosts-format.",
     "machineLead": "Hvordan Ansible forbinder til de værter, der henviser til denne legitimation. Angiv en privat nøgle eller en adgangskode, eller begge."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verificeret",
+      "unverified": "Ikke verificeret",
+      "failed": "Verificering mislykkedes",
+      "legend": "Hvordan dette artefakt blev lukket ind"
+    },
+    "state": {
+      "inventoried": "Inventeret",
+      "notInventoried": "Ikke inventeret",
+      "findings": "{count, plural, one {# fund} other {# fund}}",
+      "malicious": "{count, plural, one {# skadelig} other {# skadelige}}"
+    },
+    "reason": {
+      "notAdmitted": "Lukket ind, før denne registrering fandtes, og derfor aldrig inventeret",
+      "awaiting": "Lukket ind og afventer inventering"
+    },
+    "detail": {
+      "title": "Artefakt",
+      "back": "Tilbage til cachen",
+      "admitted": "Lukket ind",
+      "attestation": "Attestering",
+      "attestor": "Attesteret af",
+      "coordinates": "Kendt som",
+      "packages": "{count, plural, one {# pakke} other {# pakker}}",
+      "sbom": "Softwarestykliste",
+      "sbomNone": "Der blev ikke lavet nogen inventering for dette artefakt",
+      "findings": "Fund",
+      "findingsNone": "Ingen træffere",
+      "verdict": "Vurdering",
+      "verdictLine": "Matchet af {matcher} {matcherVersion} mod databasens epoke {epoch}, inventeret af {generator} {generatorVersion}",
+      "verdictNone": "Dette artefakt er ikke blevet matchet mod sårbarhedsdatabasen",
+      "notFound": "Der findes ingen registrering for dette artefakt",
+      "advisory": "Fund er vejledende. De beskriver, hvad der er i et artefakt, som er lukket ind og verificeret; de blokerer det ikke, fordi den, der har attesteret det, allerede har indestået for disse bytes.",
+      "maliciousNote": "En pakke, der er markeret som skadelig, er ikke en defekt i en afhængighed. Behandl det, som om artefaktet selv er fjendtligt."
+    },
+    "column": {
+      "verification": "Verificering",
+      "supplyChain": "Indhold"
+    }
   }
 }

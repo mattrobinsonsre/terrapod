@@ -4261,5 +4261,46 @@
     "knownHostsHint": "7h3 publ1c h057 k3y5 0f 7h3 m4ch1n35 7h15 cr3d3n714l r34ch35, 0n3 p3r l1n3 1n kn0wn_h0575 f0rm47. P01n7 4n 1nv3n70ry v4r14bl3 47 175 p47h 70 c0nn3c7 w17h0u7 r3l4x1ng h057-k3y v3r1f1c4710n. N07 h1dd3n: 4 h057'5 publ1c k3y 15 publ1c, 4nd 17 15 wh47 y0u c0mp4r3 wh3n 4 k3y d035 n07 m47ch.",
     "knownHostsLead": "7h3 publ1c h057 k3y5 0f 7h3 m4ch1n35 7h15 cr3d3n714l r34ch35, 0n3 p3r l1n3 1n kn0wn_h0575 f0rm47.",
     "machineLead": "H0w 4n51bl3 c0nn3c75 70 7h3 h0575 7h47 r3f3r 70 7h15 cr3d3n714l. 5upply 4 pr1v473 k3y 0r 4 p455w0rd, 0r b07h."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "V3r1f13d",
+      "unverified": "Unv3r1f13d",
+      "failed": "V3r1f1c4710n f41l3d",
+      "legend": "H0w 7h15 4r71f4c7 w45 4dm1773d"
+    },
+    "state": {
+      "inventoried": "1nv3n70r13d",
+      "notInventoried": "N07 1nv3n70r13d",
+      "findings": "{count, plural, one {# f1nd1ng} other {# f1nd1ng5}}",
+      "malicious": "{count, plural, one {# m4l1c10u5} other {# m4l1c10u5}}"
+    },
+    "reason": {
+      "notAdmitted": "4dm1773d b3f0r3 7h15 r3c0rd 3x1573d, 50 17 w45 n3v3r 1nv3n70r13d",
+      "awaiting": "4dm1773d 4nd 4w4171ng 1nv3n70ry"
+    },
+    "detail": {
+      "title": "4r71f4c7",
+      "back": "B4ck 70 7h3 c4ch3",
+      "admitted": "4dm1773d",
+      "attestation": "4773574710n",
+      "attestor": "V0uch3d f0r by",
+      "coordinates": "Kn0wn 45",
+      "packages": "{count, plural, one {# p4ck4g3} other {# p4ck4g35}}",
+      "sbom": "50f7w4r3 b1ll 0f m473r14l5",
+      "sbomNone": "N0 1nv3n70ry w45 pr0duc3d f0r 7h15 4r71f4c7",
+      "findings": "F1nd1ng5",
+      "findingsNone": "N07h1ng m47ch3d",
+      "verdict": "V3rd1c7",
+      "verdictLine": "M47ch3d by {matcher} {matcherVersion} 4g41n57 d474b453 3p0ch {epoch}, 1nv3n70r13d by {generator} {generatorVersion}",
+      "verdictNone": "7h15 4r71f4c7 h45 n07 b33n m47ch3d 4g41n57 7h3 vuln3r4b1l17y d474b453",
+      "notFound": "N0 r3c0rd 3x1575 f0r 7h15 4r71f4c7",
+      "advisory": "F1nd1ng5 4r3 4dv150ry. 7h3y d35cr1b3 wh47 15 1n51d3 4n 4r71f4c7 7h47 w45 4dm1773d 4nd v3r1f13d; 7h3y d0 n07 bl0ck 17, b3c4u53 7h3 4773570r h45 4lr34dy v0uch3d f0r 7h353 by735.",
+      "maliciousNote": "4 p4ck4g3 fl4gg3d m4l1c10u5 15 n07 4 d3f3c7 1n 4 d3p3nd3ncy. 7r347 17 45 7h3 4r71f4c7 b31ng h0571l3."
+    },
+    "column": {
+      "verification": "V3r1f1c4710n",
+      "supplyChain": "C0n73n75"
+    }
   }
 }

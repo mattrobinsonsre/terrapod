@@ -65,6 +65,21 @@ def workspace_id_of_key(key: str) -> str | None:
     return workspace_id if sep and workspace_id else None
 
 
+def shared_prefix(setting: str, prefix: str) -> str:
+    """`prefix` with a trailing slash; ValueError if it sits under a workspace-scoped
+    prefix, where its objects would be read as a workspace's."""
+    prefix = prefix if prefix.endswith("/") else prefix + "/"
+    bare = prefix
+    while bare.startswith("./"):
+        bare = bare[2:]
+    if clash := next((p for p in WORKSPACE_KEY_PREFIXES if bare.startswith(p)), None):
+        raise ValueError(
+            f"{setting}={prefix!r} is under the workspace-scoped prefix {clash!r}; "
+            "use a shared prefix such as 'backups/'"
+        )
+    return prefix
+
+
 def prefix_may_hold_workspace_keys(prefix: str) -> bool:
     """Whether a listing of `prefix` can match a workspace-scoped key."""
     if prefix.startswith((DELETED_MARKER_PREFIX, state_index_key())):

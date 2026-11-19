@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from terrapod.config import RunnerConfig, Settings
+from terrapod.config import RunnerConfig, Settings, StorageLocationConfig
 
 _SNAPSHOT = Path(__file__).parent / "config_key_contract.json"
 
@@ -62,9 +62,28 @@ def _list_item_model(annotation: object) -> type[BaseModel] | None:
     return None
 
 
+def _dict_value_model(annotation: object) -> type[BaseModel] | None:
+    """If the annotation is a (possibly Optional) ``dict[str, Model]``, return the
+    value model, so per-entry keys freeze too (``storage.locations.<name>.backend``)."""
+    origin = typing.get_origin(annotation)
+    if origin in (typing.Union, types.UnionType):
+        for arg in typing.get_args(annotation):
+            if arg is type(None):
+                continue
+            value = _dict_value_model(arg)
+            if value is not None:
+                return value
+        return None
+    if origin is dict:
+        args = typing.get_args(annotation)
+        if len(args) == 2 and args[0] is str:
+            return _nested_model(args[1])
+    return None
+
+
 def _model_key_paths(model: type[BaseModel], prefix: str = "") -> set[str]:
-    """Dotted config key paths for one model. Nested models recurse; a
-    ``list[Model]`` recurses under a ``[]`` marker; everything else is a leaf."""
+    """Dotted config key paths for one model. Nested models recurse; ``list[Model]``
+    under ``[]``, ``dict[str, Model]`` under ``<name>`` (container kept); the rest are leaves."""
     keys: set[str] = set()
     for name, field in model.model_fields.items():
         path = f"{prefix}{name}"
@@ -75,6 +94,11 @@ def _model_key_paths(model: type[BaseModel], prefix: str = "") -> set[str]:
         item_model = _list_item_model(field.annotation)
         if item_model is not None and item_model is not model:
             keys |= _model_key_paths(item_model, f"{path}[].")
+            continue
+        value_model = _dict_value_model(field.annotation)
+        if value_model is not None and value_model is not model:
+            keys.add(path)
+            keys |= _model_key_paths(value_model, f"{path}.<name>.")
             continue
         keys.add(path)
     return keys
@@ -89,21 +113,9 @@ def config_key_paths() -> set[str]:
     return keys
 
 
-def test_config_key_contract_unchanged() -> None:
-    current = sorted(config_key_paths())
-
-    if os.environ.get("UPDATE_API_CONTRACT"):
-        _SNAPSHOT.write_text(json.dumps(current, indent=2) + "\n")
-        return
-
-    assert _SNAPSHOT.exists(), (
-        f"Config key snapshot missing at {_SNAPSHOT}. Generate it with:\n"
-        "  UPDATE_API_CONTRACT=1 pytest tests/config/test_config_contract.py"
-    )
-    snapshot = set(json.loads(_SNAPSHOT.read_text()))
-    cur = set(current)
-    removed = sorted(snapshot - cur)
-    added = sorted(cur - snapshot)
+def _contract_problems(snapshot: set[str], current: set[str]) -> list[str]:
+    removed = sorted(snapshot - current)
+    added = sorted(current - snapshot)
 
     problems: list[str] = []
     if removed:
@@ -119,9 +131,49 @@ def test_config_key_contract_unchanged() -> None:
             "  UPDATE_API_CONTRACT=1 pytest tests/config/test_config_contract.py\n"
             "  " + "\n  ".join(added)
         )
+    return problems
+
+
+def test_config_key_contract_unchanged() -> None:
+    current = sorted(config_key_paths())
+
+    if os.environ.get("UPDATE_API_CONTRACT"):
+        _SNAPSHOT.write_text(json.dumps(current, indent=2) + "\n")
+        return
+
+    assert _SNAPSHOT.exists(), (
+        f"Config key snapshot missing at {_SNAPSHOT}. Generate it with:\n"
+        "  UPDATE_API_CONTRACT=1 pytest tests/config/test_config_contract.py"
+    )
+    problems = _contract_problems(set(json.loads(_SNAPSHOT.read_text())), set(current))
     assert not problems, "\n\n".join(problems)
 
 
 def test_snapshot_is_substantial() -> None:
     # Bite-check: the config tree is large; a tiny snapshot means the walker broke.
     assert len(config_key_paths()) > 100
+
+
+def test_dict_of_models_freezes_the_keys_under_each_entry() -> None:
+    keys = config_key_paths()
+    assert "storage.locations" in keys
+    assert {
+        "storage.locations.<name>.backend",
+        "storage.locations.<name>.s3.bucket",
+        "storage.locations.<name>.credentials.type",
+    } <= keys
+
+
+def test_a_new_location_field_fails_the_gate_until_the_snapshot_is_updated() -> None:
+    class Grown(StorageLocationConfig):
+        kms_key: str = ""
+
+    class Holder(BaseModel):
+        locations: dict[str, Grown] = {}
+
+    grown = {f"storage.{k}" for k in _model_key_paths(Holder)}
+    assert "storage.locations.<name>.kms_key" in grown
+
+    snapshot = set(json.loads(_SNAPSHOT.read_text()))
+    problems = _contract_problems(snapshot, snapshot | grown)
+    assert any("storage.locations.<name>.kms_key" in p for p in problems)
