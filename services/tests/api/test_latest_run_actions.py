@@ -7,9 +7,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from terrapod.api.routers import tfe_v2
+from terrapod.api.routers import runs, tfe_v2
 from terrapod.db.models import Run, Workspace
-from terrapod.services.run_service import run_actions
 
 T = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -19,9 +18,16 @@ CASES = {
     "planned-no-changes": ("planned", {"has_changes": False}),
     "planned-always-auto-apply": ("planned", {"auto_apply_mode": "always"}),
     "planned-plan-only": ("planned", {"plan_only": True}),
+    "planned-never-auto-apply": ("planned", {"auto_apply_mode": "never"}),
+    "planned-create-auto-apply": ("planned", {"auto_apply_mode": "create"}),
+    "planned-create-update-auto-apply": ("planned", {"auto_apply_mode": "create_update"}),
     "held-apply-capable": ("planning", {"plan_finished_at": T}),
     "held-plan-only": ("planning", {"plan_finished_at": T, "plan_only": True}),
     "planning": ("planning", {}),
+    "pending": ("pending", {}),
+    "queued": ("queued", {}),
+    "confirmed": ("confirmed", {}),
+    "applying": ("applying", {}),
     "applied": ("applied", {}),
     "errored": ("errored", {}),
     "discarded": ("discarded", {}),
@@ -45,13 +51,8 @@ def _latest(run: Run | None, *, tfe: bool) -> dict | None:
 @pytest.mark.parametrize("status,cols", CASES.values(), ids=CASES.keys())
 def test_actions_are_the_run_documents_answer(status, cols, tfe):
     run = _run(status, **cols)
-    acts = run_actions(run)
-    assert _latest(run, tfe=tfe)["actions"] == {
-        "is-confirmable": acts.confirmable,
-        "is-discardable": acts.discardable,
-        "is-cancelable": acts.cancelable,
-        "is-retryable": acts.retryable,
-    }
+    run_doc = runs._run_json(run, engine="terraform", tfe=tfe)["data"]["attributes"]
+    assert _latest(run, tfe=tfe)["actions"] == run_doc["actions"]
 
 
 @pytest.mark.parametrize("tfe", [False, True], ids=["native", "tfe"])
