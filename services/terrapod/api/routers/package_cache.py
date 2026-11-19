@@ -420,7 +420,7 @@ async def npm_tarball(
         version, entry = found
         try:
             record = await get_or_fetch(
-                db, storage, npm.artifact_for(name, version, entry, run_id=user.run_id)
+                db, storage, npm.artifact_for(name, version, entry), run_id=user.run_id
             )
         except (SealedError, NotFoundUpstream, UpstreamError) as exc:
             raise _upstream_failure(exc) from exc
@@ -1347,7 +1347,7 @@ async def go_module_file(
 
     try:
         record = await get_or_fetch(
-            db, storage, goproxy.artifact_for(module, version, suffix, run_id=user.run_id)
+            db, storage, goproxy.artifact_for(module, version, suffix), run_id=user.run_id
         )
     except (SealedError, NotFoundUpstream, UpstreamError) as exc:
         raise _upstream_failure(exc) from exc
