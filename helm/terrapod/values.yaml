@@ -897,8 +897,13 @@ api:
         opa_version: "1.22.4"
         trivy_version: "0.76.2"
         checkov_version: "3.4.5"
+        # Syft inventories a cached artifact into an SBOM (#2589). Syft
+        # GENERATES and Trivy CONSUMES it, which is why there is no third
+        # tool here: `trivy sbom` matches a Syft CycloneDX document directly.
+        syft_version: "1.57.2"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
+        syft_mirror_url: "https://github.com/anchore/syft/releases/download"
         # Checkov comes from TERRAPOD's releases, not Checkov's, and that is
         # deliberate (#2066). Upstream stopped publishing
         # checkov_linux_arm64.zip at 3.3.21 — its arm build job waits on a

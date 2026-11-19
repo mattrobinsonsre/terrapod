@@ -178,12 +178,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         handle_run_ended,
         sweep_abandoned_updates,
     )
+
+    # Inventorying an admitted artifact, not gating one. Deliberately not part
+    # of admission: syft takes seconds, a cache miss is a fetch somebody is
+    # waiting on, and doing it afterwards makes it retryable on a node where
+    # syft was not yet available (#2589).
+    from terrapod.services.sbom_sweep import sbom_cycle
     from terrapod.services.scheduler import (
         AI_LANE,
         register_periodic_task,
         register_trigger_handler,
         start_scheduler,
         stop_scheduler,
+    )
+
+    register_periodic_task(
+        "sbom_sweep",
+        interval_seconds=300,
+        handler=sbom_cycle,
+        description="Inventory admitted artifacts that have no SBOM yet",
     )
 
     register_periodic_task(
