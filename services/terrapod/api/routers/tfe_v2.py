@@ -964,6 +964,8 @@ def _workspace_json(
             "plan-only": latest_run.plan_only,
             "created-at": _rfc3339(latest_run.created_at),
             "run-kind": run_service.run_kind(latest_run),
+            # `run-kind` and `plan-only` cannot say it: a destroy is `plan_apply`.
+            "is-destroy": latest_run.is_destroy,
             # The run document's own `actions`, so a client need not re-derive it.
             "actions": {
                 "is-confirmable": acts.confirmable,

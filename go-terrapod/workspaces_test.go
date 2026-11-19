@@ -582,6 +582,7 @@ func TestWorkspaceFromResource_LatestRun(t *testing.T) {
 	      "plan-only": false,
 	      "created-at": "2026-01-02T03:04:05Z",
 	      "run-kind": "configure",
+	      "is-destroy": true,
 	      "phase-started-at": {"planning-at": "2026-01-02T03:04:06Z"},
 	      "actions": {"is-confirmable": true, "is-discardable": true, "is-cancelable": false, "is-retryable": false}
 	    }
@@ -603,6 +604,9 @@ func TestWorkspaceFromResource_LatestRun(t *testing.T) {
 	}
 	if lr.PhaseStartedAt["planning-at"] != "2026-01-02T03:04:06Z" {
 		t.Errorf("phase-started-at: %v", lr.PhaseStartedAt)
+	}
+	if !lr.IsDestroy {
+		t.Errorf("is-destroy: %+v", lr)
 	}
 }
 

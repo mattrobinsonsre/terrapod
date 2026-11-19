@@ -303,9 +303,10 @@ api:
         presigned_url_expiry_seconds: 3600
         base_url: ""  # Auto-detected from ingress hostname if empty
 
-      # Named storage locations (s3 | azure | gcs), keyed by name; `default` is reserved.
-      # Takes effect once workspaces carry a storage location; empty = a single store.
+      # Named storage locations (s3 | azure | gcs); `default` is reserved. Empty = one store. None is assigned
+      # to a workspace yet, but listings outside one workspace's prefix (state/, ...) read all: a wrong bucket breaks them.
       locations: {}
+      # A location's `credentials.type` is a placeholder: only `default` exists, nothing reads it.
 
     # Authentication
     auth:
@@ -1979,7 +1980,7 @@ api:
 backup:
   enabled: false
   schedule: "0 2 * * *"          # daily at 02:00 (cluster TZ)
-  prefix: "backups/"             # object-store key prefix for dumps
+  prefix: "backups/"             # object-store key prefix for dumps (not under state/, plans/ ...)
   retention:
     keep: 0                      # keep N most-recent backups (0 = keep all)
     days: 0                      # delete backups older than N days (0 = disabled)

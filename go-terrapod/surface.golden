@@ -1782,6 +1782,7 @@ field WorkspaceFilter.WorkspaceIDs []string `json:"workspace_ids,omitempty"`
 field WorkspaceLatestRun.Actions RunActions `json:"actions"`
 field WorkspaceLatestRun.CreatedAt string `json:"created-at"`
 field WorkspaceLatestRun.ID string `json:"id"`
+field WorkspaceLatestRun.IsDestroy bool `json:"is-destroy"`
 field WorkspaceLatestRun.PhaseStartedAt map[string]string `json:"phase-started-at,omitempty"`
 field WorkspaceLatestRun.PlanOnly bool `json:"plan-only"`
 field WorkspaceLatestRun.RunKind string `json:"run-kind"`

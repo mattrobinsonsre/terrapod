@@ -918,7 +918,11 @@
           "type": "string"
         },
         "prefix": {
-          "type": "string"
+          "type": "string",
+          "description": "Object-store key prefix for dumps; not under a workspace-scoped prefix.",
+          "not": {
+            "pattern": "^(\\./)*(state|plans|logs|config|runs|inventory)(/|$)"
+          }
         },
         "retention": {
           "type": "object",

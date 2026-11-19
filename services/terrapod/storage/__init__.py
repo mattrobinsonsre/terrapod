@@ -117,7 +117,8 @@ async def init_storage(resolver: LocationResolver | None = None) -> None:
     _store = RoutingStore(default, locations, resolver)
     if isinstance(resolver, StaticDefaultResolver):
         logger.warning(
-            "Storage locations are configured but no workspace is assigned to one yet",
+            "Storage locations are configured but no workspace is assigned to one yet; "
+            "listings of shared prefixes still read every location",
             locations=sorted(locations),
         )
 

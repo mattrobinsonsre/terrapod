@@ -1027,6 +1027,7 @@ Workspace responses (show and list, on both the native and TFE-compatible surfac
     "plan-only": false,
     "created-at": "2026-01-02T03:04:05Z",
     "run-kind": "plan_apply",
+    "is-destroy": false,
     "phase-started-at": { "planning-at": "2026-01-02T03:04:06Z" },
     "actions": {
       "is-confirmable": true,
@@ -1045,10 +1046,13 @@ Workspace responses (show and list, on both the native and TFE-compatible surfac
 | `plan-only` | boolean | Whether the run is speculative |
 | `created-at` | string (RFC3339) | When the run was created |
 | `run-kind` | string | `plan_apply`, `configure` or `full`, as on the [run document](#optional-run-attributes) |
+| `is-destroy` | boolean | Whether the run is a destroy. `run-kind` and `plan-only` cannot say: a destroy reports `plan_apply`. Applying a destroy, or retrying one that applies, needs `run:apply-destroy` rather than `run:apply` |
 | `phase-started-at` | object | When each phase that has started began, keyed `planning-at`, `applying-at`, `configuring-at`. A phase that has not started is absent, not null |
 | `actions` | object | The run document's own `actions` block (see [Show Run](#show-run)): `is-confirmable`, `is-discardable`, `is-cancelable`, `is-retryable`, with the same values the run document reports for that run |
 
 `actions` is the server's answer, computed once for both documents. It depends on inputs the workspace document does not publish (whether the plan has changes, the run's resolved auto-apply mode, and whether a finished plan is held at a gate), so a client should read it rather than infer it from `status`.
+
+It answers about the run's state only. It carries no RBAC and does not predict the destroy capability (`run:apply-destroy`, which `is-destroy` lets a client check), the workspace's `plan-apply-enabled` or `configure-enabled`, the workspace lock, or the refusal of a non-destroy apply of CLI-uploaded code on a VCS-connected workspace; an action it offers can still be refused.
 
 A server that predates `actions` and `run-kind` omits both keys; treat an absent `actions` as "nothing is offered".
 
@@ -3285,6 +3289,9 @@ The rule accepts the workspace bulk-update selector's *attribute* dimensions --
 `labels`, `name_prefix`, `name_glob`, `execution_backend`,
 `execution_mode`, `terraform_version`, `agent_pool_id`, `vcs_connection_id`,
 `owner_email`, `drift_status`, `locked`, `has_vcs` -- all AND-combined.
+(`drift_status` and `locked` are refused, below.) An `exclude` list of the same
+selectors removes workspaces from the match: a workspace matching **any** entry is
+not reached, e.g. `{"labels": {"env": "prod"}, "exclude": [{"labels": {"tier": "frozen"}}]}`.
 Membership is re-evaluated on every run, so a workspace that later matches picks
 the set up without being touched, and one that stops matching stops receiving it.
 
@@ -3293,16 +3300,31 @@ Rejected with `422`: an unparseable rule; a non-object rule; `all: true` (use
 explicit assignment, and would produce a rule whose membership never
 re-evaluates); a rule on a set that is already `global`; and a rule whose
 dimensions are all blank -- `{"name_prefix": ""}` selects nothing meaningful and
-would otherwise match every workspace. `exclude` (the bulk-update selector's
-exclusion list) is not supported in assignment rules yet: a rule carrying it is
-a `422` reading `assignment-rule cannot select on exclude`, because an entry
-could select on a dimension a rule refuses. `autodiscovery_rule_id` (the bulk-update
-selector's autodiscovery-rule dimension) is likewise not available in assignment
-rules yet and is refused with the same `422`.
+would otherwise match every workspace. `exclude` is refused when it has more than 20 entries (each costs a count query when an
+exclusion is reported; a stored rule over the cap matches nothing), when it is not a list
+(`[]` and `null` mean no exclusion and are not stored), alone without a positive
+selector, or when an entry is empty, sets `all`, nests `exclude`, or names
+`workspace_ids`, even as `null` (an exclusion by id never re-evaluates either), or
+when an entry's `labels` use a reserved key (`locked`, `status`, `flag`, `owner`):
+no workspace can carry one, so the entry could never match. `drift_status` and
+`locked` are refused inside an `exclude` entry exactly as they are at the top level,
+with the same reason, because a workspace's own owner can move both and could
+otherwise opt itself out of the set (`assignment-rule cannot select on locked`).
+
+Unlike a bulk update, saving a rule does **not** require every `exclude` entry to
+match a workspace today: a rule is standing, so an entry matching nothing yet is
+accepted. The varset's [association view](#association-views) reports `meta.exclusion` (how many workspaces were excluded and which entries match nothing) so a mistyped entry is visible after saving.
+
+The Terraform provider's `assignment_rule` does not model `exclude`. On every update it reads the set's current rule and carries its `exclude` across unchanged, so an exclusion set through the API or UI survives an apply; removing the `assignment_rule` block clears the whole rule, exclusion included.
+
+`autodiscovery_rule_id` (the bulk-update selector's autodiscovery-rule dimension)
+is not available in assignment rules yet and is refused with the same `422`.
 
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
-credential set to the whole estate.
+credential set to the whole estate. That includes an `exclude` that cannot be
+parsed: dropping it would widen the match to the workspaces it protected, so the
+whole rule matches nothing.
 
 <a id="labels-are-not-a-credential-trust-boundary"></a>
 
@@ -3351,6 +3373,8 @@ GET /api/v1/workspaces/{workspace_id}/varsets
 `workspace-count` on the variable set itself counts only explicitly-assigned
 workspaces; for a global or rule-based set it is not the whole answer, and these
 views are.
+
+When the set's rule has an `exclude`, the varset-side view's `meta` also carries `exclusion`: `{"excluded": N, "empty": [i, ...]}`, the number of workspaces the exclusion removed from the rule's match and the indexes of `exclude` entries that match no workspace fleet-wide (usually a typo that protects nothing). It is absent when the rule has no `exclude`, or when the rule is unusable and matches nothing.
 
 **Required permission:** platform `admin` for the varset-side view;
 `workspace:read` for the workspace-side view.
@@ -4322,6 +4346,7 @@ Refused with `422`:
 - `exclude` with no positive dimension and no `"all": true` — it is never a selector on its own.
 - an entry that sets no selector: it is empty, or only a blank `name_prefix`/`name_glob` (`exclude[N] sets no selector`). `{"owner_email": ""}` is a valid selector (unowned workspaces).
 - an entry that sets `all` or nests `exclude` (`exclude[N]: 'all' and 'exclude' are not allowed in an exclude entry`).
+- an `exclude` with more than 20 entries.
 - an `exclude` that is not a list, or an entry that is not an object. `[]` and `null` both mean "no exclusion".
 
 When the filter has an `exclude`, the response also carries:
@@ -6088,7 +6113,7 @@ POST /api/v1/workspaces/{id}/notification-configurations
 | `slack` | `url` (Slack webhook URL) | — |
 | `email` | `email-addresses` (list) | — |
 
-**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`, `run:drift_detected`
+**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`, `run:drift_detected`, `artifact:refused`.
 
 **Required permission:** `admin` on the workspace.
 

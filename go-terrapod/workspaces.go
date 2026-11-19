@@ -385,7 +385,9 @@ type WorkspaceLatestRun struct {
 	// CreatedAt is RFC3339.
 	CreatedAt string `json:"created-at"`
 	// RunKind is "plan_apply", "configure" or "full".
-	RunKind        string            `json:"run-kind"`
+	RunKind string `json:"run-kind"`
+	// IsDestroy is true for a destroy run, which RunKind and PlanOnly cannot tell.
+	IsDestroy      bool              `json:"is-destroy"`
 	PhaseStartedAt map[string]string `json:"phase-started-at,omitempty"`
 	Actions        RunActions        `json:"actions"`
 }

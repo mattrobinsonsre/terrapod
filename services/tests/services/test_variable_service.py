@@ -531,6 +531,89 @@ class TestTheBlastRadiusViewAgreesWithTheMatcher:
             assert pf.called, "an ordinary rule must still be evaluated"
         assert out == []
 
+    @staticmethod
+    def _valid_value(dim):
+        """A value the selector would PARSE for this field. A value that fails to parse
+        makes a rule match nothing whether or not the refusal ran, hiding a consumer
+        that skips the check."""
+        from terrapod.services.workspace_search_service import WorkspaceFilter
+
+        annotation = str(WorkspaceFilter.model_fields[dim].annotation)
+        if "bool" in annotation:
+            return True
+        # An id dimension is parsed through `uuid.UUID`, so "x" raises
+        # WorkspaceFilterError and the shape would match nothing for a reason
+        # that has nothing to do with the refusal -- which is exactly what this
+        # guard exists to rule out. Derived from the name rather than listed, so
+        # the next id dimension is covered without anyone remembering.
+        if dim.endswith("_id"):
+            return "00000000-0000-4000-8000-000000000000"
+        return "x"
+
+    @classmethod
+    def _positions(cls, dim):
+        """Every shape a refused dimension can take in a rule, positive and excluded."""
+        h = dim.replace("_", "-")
+        v = cls._valid_value(dim)
+        return [
+            {"labels": {"t": "x"}, dim: v},
+            {"labels": {"t": "x"}, h: v},
+            {"labels": {"t": "x"}, "exclude": [{dim: v}]},
+            {"labels": {"t": "x"}, "exclude": [{h: v}]},
+            {
+                "labels": {"t": "x"},
+                "exclude": [{"labels": {"a": "b"}}, {"labels": {"c": "d"}, dim: v}],
+            },
+            {"labels": {"t": "x"}, "exclude": [{"labels": {"a": "b"}, "exclude": [{dim: v}]}]},
+        ]
+
+    def test_every_refused_shape_parses_when_the_refusal_is_ignored(self):
+        """Guards the test below: each shape must be a rule that WOULD match, so the
+        refusal is the only thing stopping it. The nested shape fails to parse by
+        design, so it is exempt."""
+        from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+        from terrapod.services.workspace_search_service import build_workspace_query, parse_filter
+
+        for dim in RULE_DIMENSIONS_REFUSED:
+            for rule in self._positions(dim)[:5]:
+                build_workspace_query(parse_filter(rule))
+
+    def test_an_exclusion_entry_is_refused_exactly_as_a_positive_dimension_is(self):
+        """Parametrised over the denylist, so a dimension added to it is covered in
+        every position without anyone remembering to extend this test."""
+        from terrapod.services.varset_self_join import (
+            RULE_DIMENSIONS_REFUSED,
+            rule_refused_dimensions,
+        )
+
+        assert RULE_DIMENSIONS_REFUSED
+        for dim in RULE_DIMENSIONS_REFUSED:
+            for rule in self._positions(dim):
+                assert rule_refused_dimensions(rule) == [dim], rule
+
+    async def test_every_consumer_refuses_every_position_of_every_refused_dimension(self):
+        """The matcher, the blast-radius view and the write path each go through the
+        predicate. A consumer that read only top-level keys would pass the test above
+        and still let an exclusion entry through, so ask each of them."""
+        from fastapi import HTTPException
+
+        from terrapod.api.routers.variables import _validated_assignment_rule
+        from terrapod.services.variable_service import (
+            _rule_matches,
+            workspaces_for_varset,
+        )
+        from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+
+        for dim in RULE_DIMENSIONS_REFUSED:
+            for rule in self._positions(dim):
+                with pytest.raises(HTTPException) as e:
+                    _validated_assignment_rule({"assignment-rule": rule})
+                assert e.value.status_code == 422
+                assert RULE_DIMENSIONS_REFUSED[dim] in e.value.detail
+                assert not await _rule_matches(None, rule, uuid.uuid4()), rule
+                db = self._db()
+                assert await workspaces_for_varset(db, self._varset(rule)) == [], rule
+
     def test_every_assignment_rule_consumer_refuses_the_same_dimensions(self):
         """A fourth consumer added later would diverge in silence, exactly as the view
         did — and no behavioural test can see a reader that does not exist yet."""

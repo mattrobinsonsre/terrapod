@@ -207,11 +207,11 @@ It has no default action; choosing an item runs it:
 
 | Action | Applies to |
 |---|---|
-| **Plan** | any workspace; queues a plan-only run |
-| **Retry run** | latest run is finished |
-| **Cancel run** | latest run is still in progress |
-| **Apply** | latest run is planned and not plan-only; not on a locked workspace |
-| **Discard** | latest run is planned and not plan-only |
+| **Plan** | a workspace with plan/apply enabled; queues a plan-only run |
+| **Retry run** | the server says the latest run can be retried; a configure run needs configure enabled and an unlocked workspace, a combined apply-and-configure run needs both enabled and an unlocked workspace, any other needs plan/apply enabled |
+| **Cancel run** | the server says the latest run can be cancelled |
+| **Apply** | the server says the latest run can be confirmed; not on a locked workspace |
+| **Discard** | the server says the latest run can be discarded, including a run held after its plan |
 
 Each item shows `N of M eligible`, and is enabled only when every selected
 workspace qualifies. **Apply** and **Discard** ask for confirmation first, showing

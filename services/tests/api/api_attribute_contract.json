@@ -1334,6 +1334,7 @@
     "latest-run.actions.is-retryable",
     "latest-run.created-at",
     "latest-run.id",
+    "latest-run.is-destroy",
     "latest-run.phase-started-at",
     "latest-run.plan-only",
     "latest-run.run-kind",
@@ -1545,6 +1546,9 @@
   "variables.list_varset_workspaces": [
     "assignment-source",
     "name"
+  ],
+  "variables.list_varset_workspaces:meta": [
+    "exclusion"
   ],
   "variables.list_workspace_varsets": [
     "assignment-source",

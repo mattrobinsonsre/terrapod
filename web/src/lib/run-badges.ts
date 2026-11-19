@@ -86,3 +86,8 @@ export function showsConfigureBadge(run: RunBadgeInput): boolean {
   }
   return Boolean(run.isConfigure)
 }
+
+/** Whether the run is a standalone configure: no plan or apply half. */
+export function isConfigureOnlyRun(run: RunBadgeInput): boolean {
+  return run.runKind === 'configure'
+}

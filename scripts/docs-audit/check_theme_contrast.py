@@ -273,10 +273,15 @@ def light_palette() -> dict[str, dict[int, tuple[int, int, int]]]:
     return pal
 
 
-def checkbox_outline_problems(pal: dict[str, dict[int, tuple[int, int, int]]]) -> list[str]:
+def checkbox_outline_problems(
+    pal: dict[str, dict[int, tuple[int, int, int]]], source: str | None = None
+) -> list[str]:
     """The outline in `checkbox.tsx` against its own fill and the surfaces behind it.
     Hovering the box also hovers its row, so that state is measured on a hovered row."""
-    m = re.search(r"className=\{([^}]*appearance-none[^}]*)\}", CHECKBOX.read_text())
+    m = re.search(
+        r"className=\{([^}]*appearance-none[^}]*)\}",
+        CHECKBOX.read_text() if source is None else source,
+    )
     if not m:
         return [
             f"{CHECKBOX.relative_to(ROOT)}: no className with `appearance-none`; the outline check cannot read it"
@@ -297,8 +302,8 @@ def checkbox_outline_problems(pal: dict[str, dict[int, tuple[int, int, int]]]) -
     row = composite(pal["slate"][700], 0.2, panel)
     base_fill, hov_fill = paint("", "bg"), paint("hover:", "bg")
     base_edge, hov_edge = paint("", "border"), paint("hover:", "border")
-    chk_edge = paint("checked:", "border")
-    if not (base_fill and hov_fill and base_edge and hov_edge and chk_edge):
+    chk_edge, chk_fill = paint("checked:", "border"), paint("checked:", "bg")
+    if not (base_fill and hov_fill and base_edge and hov_edge and chk_edge and chk_fill):
         return [
             f"{CHECKBOX.relative_to(ROOT)}: a base, hover or checked border or fill class is missing"
         ]
@@ -319,13 +324,36 @@ def checkbox_outline_problems(pal: dict[str, dict[int, tuple[int, int, int]]]) -
                     f"{c:5.2f}:1  checkbox outline `{edge[2]}` {name}, against {what} "
                     f"(needs {NON_TEXT}:1; {CHECKBOX.relative_to(ROOT)})"
                 )
+    # The solid brand-600 fill masks a lone border alpha here; the dark test catches it.
     for name, backdrop in (("page", page), ("panel", panel), ("hovered row", row)):
-        c = contrast(chk_edge[0], backdrop)
+        under = composite(chk_fill[0], chk_fill[1], backdrop)
+        c = contrast(composite(chk_edge[0], chk_edge[1], under), backdrop)
         if c < NON_TEXT:
             out.append(
                 f"{c:5.2f}:1  checkbox checked outline `{chk_edge[2]}` on the {name} "
                 f"(needs {NON_TEXT}:1; {CHECKBOX.relative_to(ROOT)})"
             )
+    return out
+
+
+def outline_self_test(pal: dict[str, dict[int, tuple[int, int, int]]]) -> list[str]:
+    """The checked-border compositing, on classes written here rather than read."""
+
+    def fixture(border: str, fill: str) -> str:
+        return (
+            "className={'appearance-none border-slate-500 bg-slate-800/60 "
+            "hover:border-slate-400 hover:bg-slate-700/60 "
+            f"checked:{border} checked:{fill}'}}"
+        )
+
+    def checked(source: str) -> list[str]:
+        return [p for p in checkbox_outline_problems(pal, source) if "checked outline" in p]
+
+    out: list[str] = []
+    if checked(fixture("border-brand-500", "bg-brand-600")):
+        out.append("checkbox outline: a solid checked border and fill is reported as failing")
+    if not checked(fixture("border-brand-500/20", "bg-brand-600/20")):
+        out.append("checkbox outline: a checked border and fill at 20% is not reported")
     return out
 
 
@@ -338,6 +366,12 @@ def main() -> int:
         return 1
 
     pal = light_palette()
+    broken = outline_self_test(pal)
+    if broken:
+        print("check_theme_contrast: the checkbox outline check is broken\n")
+        for b in broken:
+            print(f"  {b}")
+        return 1
     fams = "|".join(sorted(pal))
 
     # A utility paints the BASE state only when it carries no variant prefix --
