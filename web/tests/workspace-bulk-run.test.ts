@@ -90,7 +90,7 @@ describe('runBulkAction', () => {
     const results = await runBulkAction('apply', [ws('a', 'planned'), ws('b', 'planned')], fetcher)
     assert.deepEqual(results, [
       { id: 'ws-a', name: 'name-a', ok: true },
-      { id: 'ws-b', name: 'name-b', ok: false, reason: 'workspace is locked — unlock before applying' },
+      { id: 'ws-b', name: 'name-b', ok: false, failure: { kind: 'refused', detail: 'workspace is locked — unlock before applying' } },
     ])
   })
 
@@ -103,25 +103,89 @@ describe('runBulkAction', () => {
     assert.deepEqual(results.map((r) => r.ok), [false, true, true])
   })
 
-  it('reports a network failure as a refusal for that workspace, not a crash', async () => {
+  it('reports a network failure as a typed failure for that workspace, not a crash', async () => {
     const fetcher: Fetcher = async () => {
       throw new TypeError('network down')
     }
     const results = await runBulkAction('retry', [ws('a', 'errored')], fetcher)
-    assert.equal(results[0].ok, false)
-    assert.match(String((results[0] as { reason: string }).reason), /network down/)
+    assert.deepEqual(results, [{ id: 'ws-a', name: 'name-a', ok: false, failure: { kind: 'network' } }])
   })
 
   it('does not send the request for a workspace that no longer has the run, and says so', async () => {
     const { calls, fetcher } = recorder(() => ({ ok: true, status: 200 }))
     const results = await runBulkAction('apply', [ws('a', null)], fetcher)
     assert.equal(calls.length, 0)
-    assert.equal(results[0].ok, false)
+    assert.deepEqual(results, [{ id: 'ws-a', name: 'name-a', ok: false, failure: { kind: 'noRun' } }])
   })
 
   it('returns nothing for an empty selection', async () => {
     const { calls, fetcher } = recorder(() => ({ ok: true, status: 200 }))
     assert.deepEqual(await runBulkAction('apply', [], fetcher), [])
     assert.equal(calls.length, 0)
+  })
+})
+
+describe('why a workspace failed', () => {
+  const resultOf = async (run: string | null, fetcher: Fetcher) => (await runBulkAction('apply', [ws('a', run)], fetcher))[0]
+  const failureOf = async (run: string | null, fetcher: Fetcher) => {
+    const r = await resultOf(run, fetcher)
+    assert.equal(r.ok, false)
+    return r.ok ? null : r.failure
+  }
+  const answering = (status: number, body: () => Promise<unknown>): Fetcher =>
+    async () => ({ ok: false, status, json: body }) as unknown as Response
+
+  it('a refusal carries the server detail, from the errors array or the legacy detail', async () => {
+    const jsonApi = answering(403, async () => ({ errors: [{ detail: 'Requires run:apply' }] }))
+    assert.deepEqual(await failureOf('planned', jsonApi), { kind: 'refused', detail: 'Requires run:apply' })
+    const legacy = answering(404, async () => ({ detail: 'not found' }))
+    assert.deepEqual(await failureOf('planned', legacy), { kind: 'refused', detail: 'not found' })
+  })
+
+  it('an empty detail is not a refusal with nothing in it: it falls through to the status', async () => {
+    assert.deepEqual(await failureOf('planned', answering(502, async () => ({ detail: '' }))), { kind: 'status', status: 502 })
+    assert.deepEqual(await failureOf('planned', answering(502, async () => ({ errors: [{ detail: '' }] }))), {
+      kind: 'status',
+      status: 502,
+    })
+  })
+
+  it('a body-less error is its status, and not an English sentence', async () => {
+    const notJson = answering(500, async () => {
+      throw new SyntaxError('Unexpected end of JSON input')
+    })
+    assert.deepEqual(await failureOf('planned', notJson), { kind: 'status', status: 500 })
+  })
+
+  it('writes no string of its own: every string in a failure is the server detail, an id, a name or a kind', async () => {
+    const cases: Array<[string | null, Fetcher, string[]]> = [
+      ['planned', answering(403, async () => ({ errors: [{ detail: 'server words' }] })), ['server words']],
+      ['planned', answering(500, async () => ({})), []],
+      [null, answering(200, async () => ({})), []],
+      [
+        'planned',
+        async () => {
+          throw new TypeError('Failed to fetch')
+        },
+        [],
+      ],
+    ]
+    const kinds = new Set(['refused', 'status', 'noRun', 'network'])
+    for (const [run, fetcher, fromServer] of cases) {
+      const allowed = new Set(['ws-a', 'name-a', ...fromServer])
+      const strings: string[] = []
+      const walk = (v: unknown, key?: string) => {
+        if (typeof v === 'string') {
+          if (!(key === 'kind' && kinds.has(v))) strings.push(v)
+        } else if (v && typeof v === 'object') {
+          for (const [k, x] of Object.entries(v)) walk(x, k)
+        }
+      }
+      walk(await resultOf(run, fetcher))
+      assert.deepEqual(
+        strings.filter((x) => !allowed.has(x)),
+        [],
+      )
+    }
   })
 })

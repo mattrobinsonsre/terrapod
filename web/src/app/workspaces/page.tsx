@@ -22,11 +22,12 @@ import { Checkbox } from '@/components/checkbox'
 import { SelectionMenu, type SelectionMenuItem } from '@/components/selection-menu'
 import {
   BULK_ACTIONS,
+  confirmTier,
   summarise,
   type BulkActionId,
   type BulkWorkspace,
 } from '@/lib/workspace-bulk-actions'
-import { runBulkAction, type BulkResult } from '@/lib/workspace-bulk-run'
+import { runBulkAction, type BulkFailure, type BulkResult } from '@/lib/workspace-bulk-run'
 import { confirmLines } from '@/lib/workspace-bulk-confirm'
 import { headerState, pruneSelection, toggleAll, toggleOne } from '@/lib/workspace-selection'
 import { useSortable } from '@/lib/use-sortable'
@@ -105,6 +106,7 @@ interface LatestRun {
   'created-at': string
   // Absent from an older API: the run actions then fail closed.
   'run-kind'?: string
+  'is-destroy'?: boolean
   actions?: {
     'is-confirmable': boolean
     'is-discardable': boolean
@@ -979,7 +981,7 @@ function WorkspacesPageInner() {
   // Selection is by workspace id and survives a filter or sort change, but a
   // workspace that leaves the visible list is dropped, so an action can never
   // run on something the user can no longer see.
-  const { confirmIrreversible } = useConfirm()
+  const { confirmIrreversible, confirmTouchMutation } = useConfirm()
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkRunning, setBulkRunning] = useState<{ action: BulkActionId; count: number } | null>(null)
@@ -988,8 +990,8 @@ function WorkspacesPageInner() {
   // whole filtered set: a collapsed group renders neither its own rows nor its
   // subtree, and that state is persisted in `localStorage`. Deriving this from
   // `sortedWorkspaces` let select-all tick -- and a bulk action act on --
-  // workspaces the operator could not see (#2551). Plan, Retry and Cancel carry
-  // no confirm, so there was no dialog naming them either.
+  // workspaces the operator could not see (#2551). Plan and Cancel prompt only on
+  // touch, so a precise pointer got no dialog naming them either.
   const visibleIds = useMemo(() => {
     if (groupMode === 'flat' || workspaceTree.length === 0) {
       return sortedWorkspaces.map((w) => w.id)
@@ -1020,6 +1022,8 @@ function WorkspacesPageInner() {
               ? {
                   id: run.id,
                   runKind: run['run-kind'] ?? null,
+                  planOnly: run['plan-only'],
+                  isDestroy: run['is-destroy'],
                   actions: run.actions
                     ? {
                         confirmable: run.actions['is-confirmable'],
@@ -1037,18 +1041,23 @@ function WorkspacesPageInner() {
 
   const runBulk = useCallback(
     async (action: BulkActionId) => {
-      const meta = BULK_ACTIONS.find((a) => a.id === action)
-      // Apply and Discard are the irreversible tier, so they prompt in BOTH
-      // pointer modes, with the count and the first few names.
-      if (meta?.confirm) {
-        const lines = confirmLines(selectedBulk.map((w) => w.name))
-        const text = t(action === 'apply' ? 'bulk.confirmApply' : 'bulk.confirmDiscard', {
-          count: lines.count,
-          names: lines.names.join('\n'),
-          more: lines.more > 0 ? t('bulk.andMore', { count: lines.more }) : '',
-        })
-        if (!confirmIrreversible(text)) return
+      // Apply, Discard and a Retry that can apply prompt on every pointer; the rest on touch only.
+      const lines = confirmLines(selectedBulk.map((w) => w.name))
+      const values = {
+        count: lines.count,
+        names: lines.names.join('\n'),
+        more: lines.more > 0 ? t('bulk.andMore', { count: lines.more }) : '',
       }
+      // Literal keys, so the key-resolve gate sees every one.
+      const confirmText: Record<BulkActionId, () => string> = {
+        plan: () => t('bulk.confirmPlan', values),
+        retry: () => t('bulk.confirmRetry', values),
+        cancel: () => t('bulk.confirmCancel', values),
+        apply: () => t('bulk.confirmApply', values),
+        discard: () => t('bulk.confirmDiscard', values),
+      }
+      const approved = confirmTier(action, selectedBulk) === 'irreversible' ? confirmIrreversible : confirmTouchMutation
+      if (!approved(confirmText[action]())) return
       setBulkBusy(true)
       setBulkRunning({ action, count: selectedBulk.length })
       setBulkResult(null)
@@ -1066,8 +1075,22 @@ function WorkspacesPageInner() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadWorkspaces is a hoisted function
-    [selectedBulk, confirmIrreversible, t],
+    [selectedBulk, confirmIrreversible, confirmTouchMutation, t],
   )
+
+  // The server's own words verbatim; anything the client has to say is translated here.
+  const bulkFailureText = (f: BulkFailure): string => {
+    switch (f.kind) {
+      case 'refused':
+        return f.detail
+      case 'status':
+        return t('bulk.failure.status', { status: f.status })
+      case 'noRun':
+        return t('bulk.failure.noRun')
+      case 'network':
+        return t('bulk.failure.network')
+    }
+  }
 
   const selectionItems = useMemo<SelectionMenuItem[]>(
     () =>
@@ -2158,7 +2181,7 @@ function WorkspacesPageInner() {
                   .filter((r): r is Extract<BulkResult, { ok: false }> => !r.ok)
                   .map((r) => (
                     <li key={r.id} className="font-mono text-xs">
-                      {t('bulk.resultFailed', { name: r.name, reason: r.reason })}
+                      {t('bulk.resultFailed', { name: r.name, reason: bulkFailureText(r.failure) })}
                     </li>
                   ))}
               </ul>

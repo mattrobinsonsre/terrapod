@@ -1,9 +1,11 @@
 // The server's answer decides eligibility; the lib adds only the lock and the declared operations.
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import {
   BULK_ACTIONS,
+  confirmTier,
   eligibleFor,
   summarise,
   type BulkRunActions,
@@ -19,6 +21,8 @@ interface Opts {
   planApply?: boolean
   configure?: boolean
   noRun?: boolean
+  planOnly?: boolean
+  isDestroy?: boolean | null
 }
 
 function ws(id: string, o: Opts = {}): BulkWorkspace {
@@ -33,6 +37,8 @@ function ws(id: string, o: Opts = {}): BulkWorkspace {
       : {
           id: `run-${id}`,
           runKind: o.runKind === undefined ? 'plan_apply' : o.runKind,
+          planOnly: o.planOnly,
+          isDestroy: o.isDestroy === null ? undefined : (o.isDestroy ?? false),
           actions: o.actions === null ? null : { ...NONE, ...o.actions },
         },
   }
@@ -159,10 +165,81 @@ describe('the action list', () => {
     )
   })
 
-  it('marks only apply and discard as needing a confirmation', () => {
+  it('puts Apply, Discard and Retry in the irreversible tier, Plan and Cancel in the touch tier', () => {
     assert.deepEqual(
-      BULK_ACTIONS.filter((a) => a.confirm).map((a) => a.id),
-      ['apply', 'discard'],
+      BULK_ACTIONS.map((a) => [a.id, a.confirm]),
+      [
+        ['plan', 'touch'],
+        ['retry', 'irreversible'],
+        ['cancel', 'touch'],
+        ['apply', 'irreversible'],
+        ['discard', 'irreversible'],
+      ],
     )
+  })
+})
+
+describe('which pointer a confirmation is for', () => {
+  const tier = (action: Parameters<typeof confirmTier>[0], ...sel: BulkWorkspace[]) => confirmTier(action, sel)
+
+  it('Apply and Discard always confirm; Plan and Cancel confirm on touch only', () => {
+    const run = ws('a', { planOnly: true })
+    assert.equal(tier('apply', run), 'irreversible')
+    assert.equal(tier('discard', run), 'irreversible')
+    assert.equal(tier('plan', run), 'touch')
+    assert.equal(tier('cancel', run), 'touch')
+  })
+
+  it('a retry of a plan-only run applies nothing, so it confirms on touch only', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true })), 'touch')
+  })
+
+  it('a retry that can apply confirms on every pointer', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: false })), 'irreversible')
+  })
+
+  it('a configure or combined run is never read-only, even when it says plan-only', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: 'configure' })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: 'full' })), 'irreversible')
+  })
+
+  it('a destroy confirms on every pointer, plan-only or not', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true, isDestroy: true })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: false, isDestroy: true })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true }), ws('b', { planOnly: true, isDestroy: true })), 'irreversible')
+  })
+
+  it('fails toward confirming when the kind or plan-only is not known', () => {
+    assert.equal(tier('retry', ws('a', { planOnly: true, isDestroy: null })), 'irreversible')
+    assert.equal(tier('retry', ws('a')), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: null })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { planOnly: true, runKind: 'something-new' })), 'irreversible')
+    assert.equal(tier('retry', ws('a', { noRun: true })), 'irreversible')
+    assert.equal(tier('retry'), 'irreversible')
+  })
+
+  it('one apply-capable run in the selection makes the whole retry confirm on every pointer', () => {
+    const readOnly = ws('a', { planOnly: true })
+    assert.equal(tier('retry', readOnly, ws('b', { planOnly: true })), 'touch')
+    assert.equal(tier('retry', readOnly, ws('b', { planOnly: false })), 'irreversible')
+    assert.equal(tier('retry', readOnly, ws('b')), 'irreversible')
+  })
+})
+
+describe('the confirmation text', () => {
+  const page = readFileSync(new URL('../src/app/workspaces/page.tsx', import.meta.url), 'utf8')
+  const en = JSON.parse(readFileSync(new URL('../messages/en.json', import.meta.url), 'utf8'))
+
+  // A literal `t('bulk.confirmX')` is what the key-resolve gate can see; a built key is skipped.
+  it('has a literal key in the page and a string in en.json for every action', () => {
+    for (const { id } of BULK_ACTIONS) {
+      const key = `bulk.confirm${id[0].toUpperCase()}${id.slice(1)}`
+      assert.ok(page.includes(`t('${key}'`), `${key} is not requested as a literal`)
+      assert.equal(typeof en.workspaces.bulk[key.slice('bulk.'.length)], 'string', `${key} missing from en.json`)
+    }
+  })
+
+  it('does not build a key at runtime', () => {
+    assert.ok(!page.includes('`bulk.confirm'))
   })
 })

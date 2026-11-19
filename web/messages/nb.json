@@ -117,10 +117,18 @@
       },
       "confirmApply": "Bruke de planlagte kjøringene på de valgte arbeidsområdene ({count})?\n\n{names}{more}\n\nDette endrer ekte infrastruktur og kan ikke angres.",
       "confirmDiscard": "Forkaste de planlagte kjøringene på de valgte arbeidsområdene ({count})?\n\n{names}{more}\n\nPlanene forkastes og kan ikke gjenopprettes.",
+      "confirmPlan": "Legge en kjøring med kun plan i kø på de valgte arbeidsområdene ({count})?\n\n{names}{more}",
+      "confirmRetry": "Prøve den siste kjøringen på nytt på de valgte arbeidsområdene ({count})?\n\n{names}{more}\n\nPå et arbeidsområde med automatisk bruk kan en ny kjøring bruke endringer.",
+      "confirmCancel": "Avbryte den siste kjøringen på de valgte arbeidsområdene ({count})?\n\n{names}{more}",
       "andMore": "\n…og {count} til",
       "running": "Kjører {action} på de valgte arbeidsområdene ({count})…",
       "resultSummary": "{action}: {ok} av {total} lyktes",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Forespørselen mislyktes ({status})",
+        "noRun": "Ingen kjøring å utføre handlingen på",
+        "network": "Kunne ikke nå serveren"
+      },
       "resultDismiss": "Lukk"
     },
     "filter": {

@@ -117,10 +117,18 @@
       },
       "confirmApply": "¿Aplicar las ejecuciones planificadas en los espacios de trabajo seleccionados ({count})?\n\n{names}{more}\n\nEsto cambia infraestructura real y no se puede deshacer.",
       "confirmDiscard": "¿Descartar las ejecuciones planificadas en los espacios de trabajo seleccionados ({count})?\n\n{names}{more}\n\nLos planes se descartan y no se pueden recuperar.",
+      "confirmPlan": "¿Poner en cola una ejecución solo de plan en los espacios de trabajo seleccionados ({count})?\n\n{names}{more}",
+      "confirmRetry": "¿Reintentar la última ejecución en los espacios de trabajo seleccionados ({count})?\n\n{names}{more}\n\nEn un espacio de trabajo con aplicación automática, un reintento puede aplicar cambios.",
+      "confirmCancel": "¿Cancelar la última ejecución en los espacios de trabajo seleccionados ({count})?\n\n{names}{more}",
       "andMore": "\n…y {count} más",
       "running": "Ejecutando {action} en los espacios de trabajo seleccionados ({count})…",
       "resultSummary": "{action}: {ok} de {total} correctas",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "La solicitud falló ({status})",
+        "noRun": "No hay ninguna ejecución sobre la que actuar",
+        "network": "No se pudo conectar con el servidor"
+      },
       "resultDismiss": "Cerrar"
     },
     "filter": {

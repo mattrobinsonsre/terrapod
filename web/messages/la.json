@@ -117,10 +117,18 @@
       },
       "confirmApply": "Cursus destinatos in spatiis operis selectis ({count}) applicare?\n\n{names}{more}\n\nHoc infrastructuram veram mutat nec revocari potest.",
       "confirmDiscard": "Cursus destinatos in spatiis operis selectis ({count}) abicere?\n\n{names}{more}\n\nConsilia abiciuntur nec recuperari possunt.",
+      "confirmPlan": "Cursum solum ad consilium in spatiis operis selectis ({count}) in ordinem ponere?\n\n{names}{more}",
+      "confirmRetry": "Ultimum cursum in spatiis operis selectis ({count}) iterum temptare?\n\n{names}{more}\n\nIn spatio operis cum applicatione automatica, iteratio mutationes applicare potest.",
+      "confirmCancel": "Ultimum cursum in spatiis operis selectis ({count}) abrogare?\n\n{names}{more}",
       "andMore": "\n…et {count} alia",
       "running": "{action} in spatiis operis selectis ({count}) agitur…",
       "resultSummary": "{action}: {ok} ex {total} successerunt",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Petitio defecit ({status})",
+        "noRun": "Nullus cursus in quo agatur",
+        "network": "Servitor attingi non potuit"
+      },
       "resultDismiss": "Claude"
     },
     "filter": {

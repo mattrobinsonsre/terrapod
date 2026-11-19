@@ -117,10 +117,18 @@
       },
       "confirmApply": "選択したワークスペース（{count}）の計画済みの実行を適用しますか？\n\n{names}{more}\n\n実際のインフラが変更され、元に戻せません。",
       "confirmDiscard": "選択したワークスペース（{count}）の計画済みの実行を破棄しますか？\n\n{names}{more}\n\n計画は破棄され、復元できません。",
+      "confirmPlan": "選択したワークスペース（{count}）でプランのみの実行をキューに入れますか？\n\n{names}{more}",
+      "confirmRetry": "選択したワークスペース（{count}）の最新の実行を再試行しますか？\n\n{names}{more}\n\n自動適用が有効なワークスペースでは、再試行によって変更が適用されることがあります。",
+      "confirmCancel": "選択したワークスペース（{count}）の最新の実行をキャンセルしますか？\n\n{names}{more}",
       "andMore": "\n…ほか {count} 件",
       "running": "選択したワークスペース（{count}）で {action} を実行中…",
       "resultSummary": "{action}: {total} 件中 {ok} 件が成功",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "リクエストに失敗しました（{status}）",
+        "noRun": "対象の実行がありません",
+        "network": "サーバーに接続できませんでした"
+      },
       "resultDismiss": "閉じる"
     },
     "filter": {

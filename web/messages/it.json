@@ -117,10 +117,18 @@
       },
       "confirmApply": "Applicare le esecuzioni pianificate sugli spazi di lavoro selezionati ({count})?\n\n{names}{more}\n\nQuesto modifica un’infrastruttura reale e non può essere annullato.",
       "confirmDiscard": "Scartare le esecuzioni pianificate sugli spazi di lavoro selezionati ({count})?\n\n{names}{more}\n\nI piani vengono scartati e non possono essere recuperati.",
+      "confirmPlan": "Mettere in coda un'esecuzione solo di plan sugli spazi di lavoro selezionati ({count})?\n\n{names}{more}",
+      "confirmRetry": "Riprovare l'ultima esecuzione sugli spazi di lavoro selezionati ({count})?\n\n{names}{more}\n\nSu uno spazio di lavoro con applicazione automatica, un nuovo tentativo può applicare modifiche.",
+      "confirmCancel": "Annullare l'ultima esecuzione sugli spazi di lavoro selezionati ({count})?\n\n{names}{more}",
       "andMore": "\n…e altri {count}",
       "running": "Esecuzione di {action} sugli spazi di lavoro selezionati ({count})…",
       "resultSummary": "{action}: {ok} su {total} riusciti",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Richiesta non riuscita ({status})",
+        "noRun": "Nessuna esecuzione su cui agire",
+        "network": "Impossibile raggiungere il server"
+      },
       "resultDismiss": "Chiudi"
     },
     "filter": {

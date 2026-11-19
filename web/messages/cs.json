@@ -117,10 +117,18 @@
       },
       "confirmApply": "Použít naplánované běhy na vybraných pracovních prostorech ({count})?\n\n{names}{more}\n\nToto mění skutečnou infrastrukturu a nelze to vrátit.",
       "confirmDiscard": "Zahodit naplánované běhy na vybraných pracovních prostorech ({count})?\n\n{names}{more}\n\nPlány se zahodí a nelze je obnovit.",
+      "confirmPlan": "Zařadit do fronty běh pouze s plánem na vybraných pracovních prostorech ({count})?\n\n{names}{more}",
+      "confirmRetry": "Zkusit znovu poslední běh na vybraných pracovních prostorech ({count})?\n\n{names}{more}\n\nNa pracovním prostoru s automatickým použitím může opakování změny použít.",
+      "confirmCancel": "Zrušit poslední běh na vybraných pracovních prostorech ({count})?\n\n{names}{more}",
       "andMore": "\n…a {count} dalších",
       "running": "Probíhá {action} na vybraných pracovních prostorech ({count})…",
       "resultSummary": "{action}: uspělo {ok} z {total}",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Požadavek selhal ({status})",
+        "noRun": "Není žádný běh, se kterým by se dalo pracovat",
+        "network": "Server se nepodařilo kontaktovat"
+      },
       "resultDismiss": "Zavřít"
     },
     "filter": {

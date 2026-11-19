@@ -117,10 +117,18 @@
       },
       "confirmApply": "Anvend de planlagte kørsler på de valgte arbejdsområder ({count})?\n\n{names}{more}\n\nDette ændrer rigtig infrastruktur og kan ikke fortrydes.",
       "confirmDiscard": "Kassér de planlagte kørsler på de valgte arbejdsområder ({count})?\n\n{names}{more}\n\nPlanerne kasseres og kan ikke gendannes.",
+      "confirmPlan": "Sæt en kørsel kun med plan i kø på de valgte arbejdsområder ({count})?\n\n{names}{more}",
+      "confirmRetry": "Kør den seneste kørsel igen på de valgte arbejdsområder ({count})?\n\n{names}{more}\n\nPå et arbejdsområde med automatisk anvendelse kan en ny kørsel anvende ændringer.",
+      "confirmCancel": "Annuller den seneste kørsel på de valgte arbejdsområder ({count})?\n\n{names}{more}",
       "andMore": "\n…og {count} flere",
       "running": "Kører {action} på de valgte arbejdsområder ({count})…",
       "resultSummary": "{action}: {ok} af {total} lykkedes",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Anmodningen mislykkedes ({status})",
+        "noRun": "Ingen kørsel at handle på",
+        "network": "Kunne ikke nå serveren"
+      },
       "resultDismiss": "Luk"
     },
     "filter": {

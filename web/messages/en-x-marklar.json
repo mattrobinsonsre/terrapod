@@ -117,10 +117,18 @@
       },
       "confirmApply": "Marklar the planned marklar on the marklar marklar ({count})?\n\n{names}{more}\n\nThis changes real marklar and cannot be undone.",
       "confirmDiscard": "Marklar the planned marklar on the marklar marklar ({count})?\n\n{names}{more}\n\nThe marklar are thrown away and cannot be recovered.",
+      "confirmPlan": "Queue a marklar-only marklar on the marklar marklar ({count})?\n\n{names}{more}",
+      "confirmRetry": "Retry the latest marklar on the marklar marklar ({count})?\n\n{names}{more}\n\nOn a marklar with auto-apply, a retry can apply marklar.",
+      "confirmCancel": "Cancel the latest marklar on the marklar marklar ({count})?\n\n{names}{more}",
       "andMore": "\n…and {count} marklar",
       "running": "Marklar {action} on the marklar marklar ({count})…",
       "resultSummary": "{action}: {ok} of {total} marklar",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Marklar failed ({status})",
+        "noRun": "No marklar to act on",
+        "network": "Could not reach the marklar"
+      },
       "resultDismiss": "Marklar"
     },
     "filter": {

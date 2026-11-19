@@ -117,10 +117,18 @@
       },
       "confirmApply": "Apply the planned runs on the selected workspaces ({count})?\n\n{names}{more}\n\nThis changes real infrastructure and cannot be undone.",
       "confirmDiscard": "Discard the planned runs on the selected workspaces ({count})?\n\n{names}{more}\n\nThe plans are thrown away and cannot be recovered.",
+      "confirmPlan": "Queue a plan-only run on the selected workspaces ({count})?\n\n{names}{more}",
+      "confirmRetry": "Retry the latest run on the selected workspaces ({count})?\n\n{names}{more}\n\nOn a workspace with auto-apply, a retry can apply changes.",
+      "confirmCancel": "Cancel the latest run on the selected workspaces ({count})?\n\n{names}{more}",
       "andMore": "\n…and {count} more",
       "running": "Running {action} on the selected workspaces ({count})…",
       "resultSummary": "{action}: {ok} of {total} succeeded",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Request failed ({status})",
+        "noRun": "No run to act on",
+        "network": "Could not reach the server"
+      },
       "resultDismiss": "Dismiss"
     },
     "filter": {

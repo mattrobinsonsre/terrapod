@@ -117,10 +117,18 @@
       },
       "confirmApply": "Aplicar as execuções planeadas nos workspaces selecionados ({count})?\n\n{names}{more}\n\nIsto altera infraestrutura real e não pode ser desfeito.",
       "confirmDiscard": "Descartar as execuções planeadas nos workspaces selecionados ({count})?\n\n{names}{more}\n\nOs planos são descartados e não podem ser recuperados.",
+      "confirmPlan": "Colocar em fila uma execução apenas de plan nos workspaces selecionados ({count})?\n\n{names}{more}",
+      "confirmRetry": "Repetir a última execução nos workspaces selecionados ({count})?\n\n{names}{more}\n\nNum workspace com aplicação automática, uma nova tentativa pode aplicar alterações.",
+      "confirmCancel": "Cancelar a última execução nos workspaces selecionados ({count})?\n\n{names}{more}",
       "andMore": "\n…e mais {count}",
       "running": "A executar {action} nos workspaces selecionados ({count})…",
       "resultSummary": "{action}: {ok} de {total} com sucesso",
       "resultFailed": "{name}: {reason}",
+      "failure": {
+        "status": "Falha no pedido ({status})",
+        "noRun": "Nenhuma execução sobre a qual agir",
+        "network": "Não foi possível contactar o servidor"
+      },
       "resultDismiss": "Fechar"
     },
     "filter": {
