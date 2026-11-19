@@ -48,13 +48,6 @@ const STRIP_REQUEST_HEADERS = new Set([
 ])
 
 // Response framing headers undici/Next re-derive for the streamed body.
-// The largest upstream body we will hold in memory to give a client an
-// accurate Content-Length (see the comment at the return). 32 MiB clears every
-// Pulumi plugin (the largest observed is ~18 MB) while leaving provider
-// archives of hundreds of MB on the streaming path, where rule 14 requires
-// them. A client needing a length for something larger is a separate problem.
-const BUFFERED_LENGTH_LIMIT = 32 * 1024 * 1024
-
 const STRIP_RESPONSE_HEADERS = new Set([
   'content-encoding',
   'content-length',
@@ -145,19 +138,6 @@ export function forwardedContentLength(headers: Headers): string | null {
   const encoding = (headers.get('content-encoding') ?? '').trim().toLowerCase()
   if (encoding !== '' && encoding !== 'identity') return null
   return headers.get('content-length')
-}
-
-/**
- * Whether to hand Next bytes rather than a stream, so Node derives an accurate
- * Content-Length from what it actually sends.
- *
- * Exported for its unit test; the decision is the load-bearing part.
- */
-export function shouldBufferForLength(headers: Headers): boolean {
-  const length = forwardedContentLength(headers)
-  if (length === null) return false
-  const declared = Number(length)
-  return Number.isFinite(declared) && declared >= 0 && declared <= BUFFERED_LENGTH_LIMIT
 }
 
 function isClientAbort(err: unknown): boolean {
@@ -262,31 +242,9 @@ export async function proxy(request: Request, stripPrefix?: string): Promise<Res
     }
   })
 
-  // Next >= 16.4.5 strips content-length from a route handler's Response
-  // UNCONDITIONALLY (FORBIDDEN_HEADERS in its send-response.js), because a
-  // manually declared length on a body fetch may have transparently decoded is
-  // the response-framing mismatch of CVE-2026-119348 -- a desync a reverse
-  // proxy can turn into one client reading another's response. Setting the
-  // header is therefore not available to us at any version, and trying is how
-  // we would reintroduce the vulnerability.
-  //
-  // Node sets content-length itself for a FIXED-SIZE body, from the bytes it is
-  // actually sending, so the only honest way to give a client an accurate
-  // length is to hand over bytes rather than a stream. Clients that need one
-  // are real: Pulumi refuses a plugin whose length it cannot read ("expected -1
-  // bytes but copied 18043696"), and docker's registry client refuses a blob
-  // without one.
-  //
-  // So buffer when the upstream declared a length we are willing to hold, and
-  // stream otherwise. The bound is what keeps rule 14 intact: a provider
-  // archive of hundreds of MB must never be held in the web pod, and a client
-  // that needs a length for one of those is a problem to solve at that time.
-  if (shouldBufferForLength(upstream.headers)) {
-    return new Response(await upstream.arrayBuffer(), {
-      status: upstream.status,
-      statusText: upstream.statusText,
-      headers: responseHeaders,
-    })
+  const length = forwardedContentLength(upstream.headers)
+  if (length !== null) {
+    responseHeaders.set('content-length', length)
   }
 
   // Stream the upstream body back unbuffered (preserves SSE + large downloads).
