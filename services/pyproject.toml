@@ -76,6 +76,13 @@ python-multipart = ">=0.0.26,<0.0.34"
 kubernetes = ">=35,<38"
 # GPG key parsing for provider registry
 pgpy = "^0.6.0"
+# Sigstore verification for the kinds whose publisher signs with cosign rather
+# than GPG -- OCI content, and PyPI/npm attestations (#2589). Apache-2.0. Its
+# own resolution of `cryptography` sits inside the pin above it, so the two do
+# not negotiate. It pulls a signing-side (`id`) and a CLI-side (`rich`) tree it
+# does not need for verification; there is no verify-only extra, so that is the
+# price of not hand-rolling Fulcio chain validation and Rekor inclusion proofs.
+sigstore = "^4.5.1"
 # GitHub App JWT signing for VCS integration
 pyjwt = {extras = ["crypto"], version = "^2.8.0"}
 # Async SMTP for email notifications

@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Da publik host keyz ov da masheenz dis credenshul reechez, wan per line in known_hosts formatz. Point an inventry variabul at itz path to connekt wifout relaxin host-key verifikashun. Not hidd: a host publik key iz publik, an itz wot u compare when a key no match. srsly.",
     "knownHostsLead": "Da publik host keyz ov da masheenz dis credenshul reechez, wan per line in known_hosts formatz.",
     "machineLead": "How Ansible talkz to da hostz dat poynt at dis kredenshul. Giv a privat key or a passwurd, or both."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Chekd",
+      "unverified": "Not chekd",
+      "failed": "Chekin faild",
+      "legend": "How dis artifakt got let in"
+    },
+    "state": {
+      "inventoried": "Inventoreed",
+      "notInventoried": "Not inventoreed",
+      "findings": "{count, plural, one {# findin} other {# findingz}}",
+      "malicious": "{count, plural, one {# malishus} other {# malishus}}"
+    },
+    "reason": {
+      "notAdmitted": "Got let in b4 dis record wuz even a thing, so it nevr got inventoreed",
+      "awaiting": "Got let in an waitin fer teh inventoree"
+    },
+    "detail": {
+      "title": "Artifakt",
+      "back": "Bak 2 teh cashe",
+      "admitted": "Got let in",
+      "attestation": "Attestashun",
+      "attestor": "Vouchd fer by",
+      "coordinates": "Noed as",
+      "packages": "{count, plural, one {# packige} other {# packigez}}",
+      "sbom": "Softwear list ov evry last bit",
+      "sbomNone": "No inventoree wuz maed fer dis artifakt",
+      "findings": "Findingz",
+      "findingsNone": "Nuthin matchd",
+      "verdict": "Verdikt",
+      "verdictLine": "Matchd by {matcher} {matcherVersion} against databais epok {epoch}, inventoreed by {generator} {generatorVersion}",
+      "verdictNone": "Dis artifakt haz not bin matchd against teh vulnrabilitee databais",
+      "notFound": "No record exists fer dis artifakt",
+      "advisory": "Findingz iz jus advyce. Dey sez wot iz insyde an artifakt dat got let in an chekd; dey do not block it, coz teh attestor haz alredy vouchd fer deez bytez.",
+      "maliciousNote": "A packige markd malishus iz not a lil bug in sum dependensee. Treet it lyke teh artifakt itself iz hostyle."
+    },
+    "column": {
+      "verification": "Chekin",
+      "supplyChain": "Contentz"
+    }
   }
 }

@@ -101,6 +101,7 @@ func New(cfg Config) (*mcp.Server, *terrapod.Client, error) {
 	registerCatalog(srv, client)
 	registerCacheAdmin(srv, client)
 	registerCacheWarm(srv, client)
+	registerArtifactLedger(srv, client)
 
 	return srv, client, nil
 }

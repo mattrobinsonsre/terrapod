@@ -13,6 +13,21 @@ def state_index_key() -> str:
     return "state/index.yaml"
 
 
+PULUMI_CHECKPOINT_PREFIX = "state/pulumi-checkpoints/"
+
+#: Prefixes whose next path segment is a workspace id; derived-tested against the
+#: workspace-scoped builders below.
+WORKSPACE_KEY_PREFIXES: tuple[str, ...] = (
+    "state/",
+    "plans/",
+    "logs/",
+    "config/",
+    "runs/",
+    "inventory/",
+    PULUMI_CHECKPOINT_PREFIX,
+)
+
+
 #: Prefix for workspace delete markers (#1253). Deliberately a FLAT prefix
 #: rather than a marker nested inside each workspace's `state/{id}/`:
 #:
@@ -34,6 +49,29 @@ def deleted_workspace_marker_key(workspace_id: str) -> str:
     return f"{DELETED_MARKER_PREFIX}{workspace_id}.json"
 
 
+def workspace_id_of_key(key: str) -> str | None:
+    """The workspace a key belongs to, or None for a shared key (incl. `state/index.yaml`
+    and `state/deleted/` markers)."""
+    if key.startswith(DELETED_MARKER_PREFIX):
+        return None
+    if key.startswith(PULUMI_CHECKPOINT_PREFIX):
+        rest = key[len(PULUMI_CHECKPOINT_PREFIX) :]
+    else:
+        prefix = next((p for p in WORKSPACE_KEY_PREFIXES if key.startswith(p)), None)
+        if prefix is None:
+            return None
+        rest = key[len(prefix) :]
+    workspace_id, sep, _ = rest.partition("/")
+    return workspace_id if sep and workspace_id else None
+
+
+def prefix_may_hold_workspace_keys(prefix: str) -> bool:
+    """Whether a listing of `prefix` can match a workspace-scoped key."""
+    if prefix.startswith((DELETED_MARKER_PREFIX, state_index_key())):
+        return False
+    return any(prefix.startswith(p) or p.startswith(prefix) for p in WORKSPACE_KEY_PREFIXES)
+
+
 def state_key(workspace_id: str, version_id: str) -> str:
     """Key for a workspace state version."""
     return f"state/{workspace_id}/{version_id}.tfstate"
@@ -48,7 +86,7 @@ def pulumi_checkpoint_key(workspace_id: str, update_id: str) -> str:
     so the orphaned-state reaper passes over it, and the `.json` suffix keeps it out
     of anything that looks for `.tfstate`.
     """
-    return f"state/pulumi-checkpoints/{workspace_id}/{update_id}.json"
+    return f"{PULUMI_CHECKPOINT_PREFIX}{workspace_id}/{update_id}.json"
 
 
 def state_backup_key(workspace_id: str, version_id: str) -> str:
@@ -292,6 +330,62 @@ def package_cache_key(ecosystem: str, name: str, filename: str) -> str:
     separator, which is exactly the grouping we would otherwise have to invent.
     """
     return f"cache/packages/{ecosystem}/{name}/{filename}"
+
+
+# --- Operator-uploaded artifacts (#2599) ---
+#
+# Under their OWN prefix rather than beside the pull-through content they stand
+# in for, and the reason is replication rather than tidiness. `blob_classes`
+# resolves a key to exactly one class by longest-prefix match, deliberately --
+# `owning_class`'s docstring says overlapping classes would be "counted twice in
+# a readiness report, copied twice by the copier", and it is the gate that stops
+# a crafted key escaping a prefix. So two classes cannot share `cache/packages/`,
+# and the distinction has to live in the key.
+#
+# It has to live SOMEWHERE because the two differ in the one way replication
+# cares about: pull-through content is re-warmable and an uploaded artifact is
+# not. There is no upstream to re-fetch it from, sealed or otherwise, so a
+# promoted follower that treated it as re-derivable would hold a complete ledger
+# of what should be there and be unable to serve any of it -- recoverable only by
+# the operator re-uploading their whole curated set, discovered during an
+# incident.
+#
+# Safe to introduce because every serve path reads `record.storage_key` rather
+# than recomputing a key, so an object's location is whatever its row says: new
+# uploads land here, rows written before this keep serving from where they are,
+# and a backfill relocates them.
+
+UPLOADS_PREFIX = "uploads/"
+
+
+# An operator upload goes under its own top-level prefix rather than beside the
+# pull-through content it stands in for, and the reason is `blob_classes`:
+# `owning_class` resolves exactly ONE class per key by longest-prefix match --
+# deliberately, because overlapping classes would be counted twice in a
+# readiness report and copied twice by the copier, and it is also the gate that
+# stops a crafted key escaping a prefix. So two classes cannot share
+# `cache/binaries/`, and the distinction between "re-fetchable from upstream"
+# and "irreplaceable" has to live in the key itself (#2599).
+#
+# Safe because every serve path reads the row's recorded `storage_key` rather
+# than deriving one -- see `services.cache_object_keys`.
+
+
+def uploaded_package_key(ecosystem: str, name: str, filename: str) -> str:
+    """Where an operator-uploaded language package lives."""
+    return f"{UPLOADS_PREFIX}packages/{ecosystem}/{name}/{filename}"
+
+
+def uploaded_provider_key(
+    hostname: str, namespace: str, type_: str, version: str, filename: str
+) -> str:
+    """Where an operator-uploaded provider archive lives."""
+    return f"{UPLOADS_PREFIX}providers/{hostname}/{namespace}/{type_}/{version}/{filename}"
+
+
+def uploaded_binary_key(tool: str, version: str, os_: str, arch: str) -> str:
+    """Where an operator-uploaded engine binary lives."""
+    return f"{UPLOADS_PREFIX}binaries/{tool}/{version}/{os_}_{arch}"
 
 
 # --- Binary Cache ---

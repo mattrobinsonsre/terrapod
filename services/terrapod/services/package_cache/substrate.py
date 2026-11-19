@@ -99,6 +99,10 @@ class DigestMismatch(RuntimeError):
 #: its retry policy rather than opening a second one.
 DigestResolver = Callable[[httpx.AsyncClient], Awaitable[str]]
 
+#: `(client, digest_hex) -> Provenance | None`. Returns what was verified, or
+#: None when the publisher published nothing. Raises to refuse.
+ProvenanceResolver = Callable[[httpx.AsyncClient, str], Awaitable[object]]
+
 
 @dataclass(frozen=True)
 class Artifact:
@@ -141,6 +145,22 @@ class Artifact:
     #: requires egress and `fetch_and_cache` refuses before anything else when
     #: sealed.
     digest_resolver: DigestResolver | None = None
+    #: Verify the publisher's own signature or attestation (#2589 Gap A).
+    #:
+    #: Called ONLY from `fetch_and_cache`, on the miss path, and only AFTER the
+    #: digest has been confirmed -- so it is handed the digest it must find in
+    #: the attestation's subject, and so `ATTEST_UPSTREAM_PUBLISHER` can never
+    #: mean "we checked the signature instead of the bytes". Same placement
+    #: reasoning as `digest_resolver`: an Artifact is constructed on every
+    #: request including a hit, so a check during construction would put an
+    #: upstream round trip on the hit path and break `cache_only` outright.
+    #:
+    #: Returning None means the publisher published nothing for this artifact,
+    #: which is the ordinary case for most of PyPI and is recorded as such.
+    #: Raising `ProvenanceError` is fatal and is not configurable: what an
+    #: operator may choose is whether an ABSENT attestation is tolerated, never
+    #: whether a BAD one is.
+    provenance_resolver: ProvenanceResolver | None = None
 
 
 class CoordinateError(ValueError):
@@ -273,7 +293,45 @@ ATTEST_NONE_PUBLISHED = "none-published"
 #: uploaded artifact must never read as fetched-and-verified in the record: that
 #: would make the ledger lie about the one thing on it that matters.
 ATTEST_OPERATOR_UPLOAD = "operator-upload"
-ATTESTATIONS = frozenset({ATTEST_UPSTREAM_DIGEST, ATTEST_NONE_PUBLISHED, ATTEST_OPERATOR_UPLOAD})
+#: The publisher's own signature or attestation verified, not merely the digest
+#: the index published (#2589 Gap A). A STRONGER claim than
+#: `ATTEST_UPSTREAM_DIGEST` and the reason it is a separate value: a digest
+#: verifies an artifact against the index that named it, and whoever controls the
+#: index controls both halves. This says the publisher -- PyPI's PEP 740
+#: attestation, or npm's registry signature -- vouched for these bytes.
+#:
+#: It implies the digest check too: provenance is only attempted after the digest
+#: has already been confirmed, so this value never means "we checked the
+#: signature instead".
+ATTEST_UPSTREAM_PUBLISHER = "upstream-publisher"
+ATTESTATIONS = frozenset(
+    {
+        ATTEST_UPSTREAM_DIGEST,
+        ATTEST_NONE_PUBLISHED,
+        ATTEST_OPERATOR_UPLOAD,
+        ATTEST_UPSTREAM_PUBLISHER,
+    }
+)
+
+
+def _attestation_for(expected: tuple[str, str] | None, provenance: object | None) -> str:
+    """Which attestation the row records, from what was actually established.
+
+    Ordered by strength rather than by convenience, and the ordering is the
+    claim: `upstream-publisher` always implies the bytes were checked, so this
+    cannot record it for an artifact nobody verified.
+
+    That holds by two different routes, which is worth stating because the
+    second is the less obvious one. Where the index published a digest, the
+    digest check has already passed before provenance is attempted at all.
+    Where it published none, the provenance check itself compares the digest
+    computed from the downloaded bytes against the attestation's own subject --
+    so the bytes are verified against the PUBLISHER's statement rather than
+    against the index, which is the stronger of the two.
+    """
+    if provenance is not None:
+        return ATTEST_UPSTREAM_PUBLISHER
+    return ATTEST_UPSTREAM_DIGEST if expected is not None else ATTEST_NONE_PUBLISHED
 
 
 def _parse_digest(declared: str) -> tuple[str, str] | None:
@@ -480,6 +538,7 @@ async def fetch_and_cache(
         # bug or a manual read could serve, and the cost of not storing it is one
         # re-fetch.
         declared = artifact.digest
+        provenance = None
         if not declared and artifact.digest_resolver is not None:
             # One extra request, on a miss only. If the digest source is
             # unreachable while the artifact source is up we fail closed below --
@@ -504,6 +563,31 @@ async def fetch_and_cache(
                 f"{algorithm} is {computed}. Not cached."
             )
 
+        # Publisher provenance, after the digest and before storing (#2589).
+        #
+        # After, because the attestation names a digest and the check is that it
+        # names THIS one -- so `ATTEST_UPSTREAM_PUBLISHER` can never mean the
+        # signature was checked instead of the bytes. Before storing, for the
+        # same reason the digest check is: an artifact that fails must not reach
+        # the object store at all.
+        if artifact.provenance_resolver is not None:
+            from terrapod.services.package_cache import publisher_provenance
+
+            try:
+                provenance = await artifact.provenance_resolver(client, computed)
+            except publisher_provenance.ProvenanceUnavailable as exc:
+                # Says nothing about the artifact -- an unreachable trust root or
+                # a 5xx is our egress, not their signature. Degrade to the digest
+                # check, which has already passed, and record that rather than
+                # refusing an artifact on the strength of our own network.
+                logger.warning(
+                    "Could not check publisher provenance; keeping the digest result",
+                    ecosystem=artifact.ecosystem,
+                    name=artifact.name,
+                    filename=artifact.filename,
+                    reason=str(exc),
+                )
+
         await storage.put_stream(key, _file_chunks(tmp_path), content_type=artifact.content_type)
     finally:
         # The PVC is shared and finite; a failed fetch must not leave its partial
@@ -525,7 +609,7 @@ async def fetch_and_cache(
         # What was VERIFIED, which for a resolved digest is not what the
         # Artifact was constructed with.
         digest=declared,
-        attestation=(ATTEST_UPSTREAM_DIGEST if expected is not None else ATTEST_NONE_PUBLISHED),
+        attestation=_attestation_for(expected, provenance),
     )
     db.add(record)
     try:
@@ -551,6 +635,10 @@ async def fetch_and_cache(
             )
             existing.size = size
             await db.flush()
+            # A genuine admission: this row had nobody vouching for it and now
+            # does. The race-lost case below needs no ledger write -- the
+            # request that won recorded it.
+            await _record_in_ledger(db, existing, provenance)
         # Otherwise we lost a race: the winner stored identical bytes at the
         # identical key, so its row is as good as ours.
         return existing
@@ -562,7 +650,46 @@ async def fetch_and_cache(
         filename=artifact.filename,
         size=size,
     )
+    await _record_in_ledger(db, record, provenance)
     return record
+
+
+async def _record_in_ledger(
+    db: AsyncSession, record: CachedPackageFile, provenance: object | None
+) -> None:
+    """Record an admission in `artifact_ledger` (#2589).
+
+    Called from the two places an artifact is genuinely ADMITTED -- a fresh
+    fetch, and a legacy row re-verified -- and deliberately NOT from the
+    race-lost path, where the request that won stored identical bytes and
+    recorded the admission itself.
+
+    Best-effort by construction: `record_admission` swallows its own failures,
+    because a ledger problem must not fail a fetch somebody is waiting on.
+    """
+    from terrapod.services.artifact_ledger import coordinate, record_admission
+
+    attestor: dict = {}
+    if provenance is not None:
+        publisher = getattr(provenance, "publisher", None)
+        if publisher:
+            attestor = {"publisher": publisher}
+
+    await record_admission(
+        db,
+        digest=record.digest,
+        kind="package",
+        attestation=record.attestation,
+        attestor=attestor,
+        coordinates=coordinate(
+            "package",
+            ecosystem=record.ecosystem,
+            name=record.name,
+            version=record.version or "",
+            filename=record.filename,
+        ),
+        admission={"storage_key": record.storage_key, "size": record.size},
+    )
 
 
 async def lookup_present(

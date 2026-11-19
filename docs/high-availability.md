@@ -292,11 +292,28 @@ semantics would only be needed in an active-active design, which this is not.
 | Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |
 | Object-store content (state, registry, caches, logs) | Per-class policy — see [Choosing verify or copy](#choosing-verify-or-copy-per-class) |
 | The OIDC issuer signing keys | Replicated — including the private half, see [below](#private-keys-and-the-one-that-does-travel) |
+| **The artifact ledger** | **Replicated — completely, or it means nothing (see below)** |
 | The CA, the encryption keys | **Never** — node-local by design (see below) |
 
 **Settings replication is now complete**: everything a workspace's runs depend on
-carries. What remains is run and artifact *history* — a separate phase. The
-objects those rows name are a different question with its own answer, below.
+carries. What remains is *run* history — a separate phase. Artifact history is no
+longer outstanding: the ledger below carries it. The objects those rows name are
+a different question with its own answer, below.
+
+> **The artifact ledger replicates completely, and partially would be worse than
+> not at all.** It records every artifact a runner was served and who vouched for
+> each of it, so a promoted follower holding only part of it answers "we never
+> served that artifact" when the record was on the old leader. That is a *wrong*
+> answer rather than an absent one, in the one surface whose entire purpose is
+> being trustworthy after an incident — which is why it is not offered as a
+> per-class choice the way object-store content is.
+>
+> It is keyed on the artifact's **digest** rather than on a surrogate id, so that
+> two nodes which each recorded the same artifact converge on one row instead of
+> holding two that never reconcile. Nothing in it is encrypted, deliberately: an
+> SBOM, a publisher identity and a findings list are facts about something the
+> deployment chose to serve, and `crypto_keys` never travels, so a promoted node
+> could not have read them anyway.
 
 Three of the classes above are **gates**, and for a gate the failure mode of
 partial replication is not an error but a silently weaker posture: a mandatory
@@ -597,7 +614,7 @@ row already names the key — so the check is a HEAD:
 
 | Field | Meaning |
 |---|---|
-| `irreplaceable-missing` | **The list that should stop a failover.** Classes whose absence is permanent: state, the recovery index, configuration versions, module and provider artifacts |
+| `irreplaceable-missing` | **The list that should stop a failover.** Classes whose absence is permanent: state, the recovery index, configuration versions, module and provider artifacts, and anything an operator uploaded by hand |
 | `irreplaceable-unchecked` | The counterpart that makes the list above trustworthy. A class that is switched off, or that no row guarantees, produces zero missing objects — indistinguishable from a pass unless it is named |
 | `classes[]` | Per class: `tier`, `mode`, `verifiable`, `note`, `total-rows`, `checked`, `missing`, a few `missing-examples`, and `complete` |
 | `sampled` | Whether this checked everything or a sample |
@@ -665,9 +682,9 @@ The classes, in the order a report lists them:
 
 | Tier | Classes |
 |---|---|
-| Irreplaceable | `state`, `state_index`, `configuration_versions`, `registry_modules`, `registry_providers` |
+| Irreplaceable | `state`, `state_index`, `configuration_versions`, `registry_modules`, `registry_providers`, `uploaded_artifacts` |
 | History | `run_logs`, `run_plans`, `run_vars`, `deleted_workspace_markers` |
-| Re-derivable | `provider_cache`, `binary_cache`, `platform_provider_cache`, `cost_pricesheet`, `vcs_archives`, `module_overrides` |
+| Re-derivable | `provider_cache`, `binary_cache`, `package_cache`, `platform_provider_cache`, `cost_pricesheet`, `vcs_archives`, `module_overrides` |
 
 > **`deleted_workspace_markers` is History, and it must be replicated.** The
 > markers are what makes deleted-workspace state findable again — the undelete
@@ -680,6 +697,31 @@ The classes, in the order a report lists them:
 > than Irreplaceable only because a marker cannot be verified from database
 > rows (that is its whole point), and an unverifiable class in the
 > irreplaceable tier puts a line in the readiness report nobody can ever clear.
+
+> **`uploaded_artifacts` is Irreplaceable whatever the deployment, and it is the
+> one cache-shaped class that sealing does not change -- and the one class whose
+> replication mode defaults to `copy` rather than to `ha.blobs.mode`.** It holds what an
+> operator uploaded by hand — a vetted wheel, a provider archive, an engine
+> binary — and there is no upstream to re-fetch any of it from, sealed or not.
+> That is why it is its own class rather than part of the three caches: lumped in
+> with them it inherited `rederivable`, so a readiness report described a
+> promoted follower as merely cold when in fact it held a complete ledger of
+> what should be there and could serve none of it, recoverable only by
+> re-uploading the whole curated set. It sits at its own `uploads/` prefix
+> because the register resolves exactly one class per key by longest prefix, so
+> two classes cannot share `cache/binaries/`; the upload paths record that key on
+> the row, and every serve, check and reap path reads it rather than deriving
+> one.
+>
+> The `copy` default is the one place Terrapod picks a mode for you, and it is
+> a default rather than an escalation: an explicit
+> `ha.blobs.classes.uploaded_artifacts` still wins, including back down to
+> `verify` or `off` where your object store already replicates. It defaults
+> that way because `verify` is the right global choice -- it observes
+> everything and commits you to nothing -- and is the wrong one for content
+> that cannot be re-fetched, where a verified absence reports permanent loss
+> rather than something that re-warms on first use. **For a sealed deployment,
+> replicating this class is not optional.**
 
 An unknown class name is **rejected** — by `helm lint` before install, and again at
 startup for the paths the chart never sees. A typo that silently left a class on

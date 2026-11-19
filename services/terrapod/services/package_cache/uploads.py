@@ -51,7 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import CachedPackageFile
 from terrapod.logging_config import get_logger
-from terrapod.services import cache_admission
+from terrapod.services import cache_admission, orphaned_objects
 from terrapod.storage import keys
 from terrapod.storage.protocol import ObjectNotFoundError, ObjectStore
 
@@ -157,7 +157,15 @@ async def admit(
     """
     size, hexdigest = await asyncio.to_thread(substrate._digest_file, tmp_path, UPLOAD_ALGORITHM)
     digest = f"{UPLOAD_ALGORITHM}:{hexdigest}"
-    key = keys.package_cache_key(ecosystem, coordinates.name, coordinates.filename)
+    # Under `uploads/`, not beside the pull-through content it stands in for.
+    # An uploaded artifact has no upstream, so it is irreplaceable where cached
+    # content is merely cold, and `blob_classes` can only tell them apart by the
+    # key -- `owning_class` resolves one class per key by longest prefix, and two
+    # classes over `cache/packages/` would be counted and copied twice (#2599).
+    #
+    # Safe because every serve path reads `record.storage_key` rather than
+    # recomputing: a row written before this keeps serving from wherever it says.
+    key = keys.uploaded_package_key(ecosystem, coordinates.name, coordinates.filename)
 
     existing = await substrate.lookup(db, ecosystem, coordinates.name, coordinates.filename)
     if existing is not None:
@@ -227,6 +235,25 @@ async def admit(
         size=size,
         by=uploaded_by,
     )
+    # The ledger is the durable answer to "who vouched for this?" (#2589).
+    # Best-effort by construction -- an upload must not fail because the
+    # bookkeeping did.
+    from terrapod.services.artifact_ledger import coordinate, record_upload
+
+    await record_upload(
+        db,
+        digest=record.digest,
+        kind="package",
+        coordinates=coordinate(
+            "package",
+            ecosystem=record.ecosystem,
+            name=record.name,
+            version=record.version or "",
+            filename=record.filename,
+        ),
+        uploaded_by=uploaded_by,
+        storage_key=record.storage_key,
+    )
     return Admission(record=record)
 
 
@@ -280,6 +307,16 @@ async def _admit_over(
     if outcome is cache_admission.Outcome.CONFLICT:
         raise UploadConflict(existing)
 
+    # Nothing points at the old object once the key moves, and every
+    # retention sweep is row-driven -- so record it, or it is kept for ever
+    # (#2599). Recorded rather than deleted: this transaction can still
+    # roll back after the put below succeeds, which would revert the row to
+    # the old key, and a deleted object then is data loss rather than a
+    # leak.
+    if existing.storage_key and existing.storage_key != key:
+        await orphaned_objects.record(
+            db, existing.storage_key, reason="replaced by an operator upload"
+        )
     previous = existing.digest
     now = datetime.now(UTC)
     existing.version = coordinates.version
@@ -305,6 +342,25 @@ async def _admit_over(
         digest=digest,
         replaced_digest=previous,
         by=uploaded_by,
+    )
+    # The ledger is the durable answer to "who vouched for this?" (#2589).
+    # Best-effort by construction -- an upload must not fail because the
+    # bookkeeping did.
+    from terrapod.services.artifact_ledger import coordinate, record_upload
+
+    await record_upload(
+        db,
+        digest=existing.digest,
+        kind="package",
+        coordinates=coordinate(
+            "package",
+            ecosystem=existing.ecosystem,
+            name=existing.name,
+            version=existing.version or "",
+            filename=existing.filename,
+        ),
+        uploaded_by=uploaded_by,
+        storage_key=existing.storage_key,
     )
     return Admission(record=existing, replaced=True, previous_digest=previous)
 

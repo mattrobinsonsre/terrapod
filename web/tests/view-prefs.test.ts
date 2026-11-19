@@ -13,6 +13,7 @@ import {
   serializeSort,
   sortStorageKey,
   usableEngine,
+  workspacesHref,
   writePref,
   type PrefStore,
 } from '../src/lib/view-prefs.ts'
@@ -124,5 +125,17 @@ describe('usableEngine', () => {
 
   it('leaves an empty filter empty', () => {
     assert.equal(usableEngine('', ['terraform', 'pulumi']), '')
+  })
+})
+
+describe('workspacesHref', () => {
+  it('carries the filter, the engine and the grouping together', () => {
+    assert.equal(workspacesHref('env:prod', 'opentofu', 'repo'), '/workspaces?q=env%3Aprod&engine=opentofu&group=repo')
+  })
+
+  it('leaves out whatever is empty, down to the bare list', () => {
+    assert.equal(workspacesHref('', 'opentofu', null), '/workspaces?engine=opentofu')
+    assert.equal(workspacesHref('', '', 'repo'), '/workspaces?group=repo')
+    assert.equal(workspacesHref('', '', null), '/workspaces')
   })
 })

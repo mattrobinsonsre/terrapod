@@ -1015,6 +1015,43 @@ All workspace responses (show and list) include a `permissions` object reflectin
 }
 ```
 
+### Latest Run Block
+
+Workspace responses (show and list, on both the native and TFE-compatible surfaces) carry a read-only `latest-run` object: the workspace's newest run, or `null` when it has none. Module-test runs and speculative pull-request runs are not counted.
+
+```json
+{
+  "latest-run": {
+    "id": "run-0192f1c6-1d6a-7c1e-9a4e-3f0b6a7d2c11",
+    "status": "planned",
+    "plan-only": false,
+    "created-at": "2026-01-02T03:04:05Z",
+    "run-kind": "plan_apply",
+    "phase-started-at": { "planning-at": "2026-01-02T03:04:06Z" },
+    "actions": {
+      "is-confirmable": true,
+      "is-discardable": true,
+      "is-cancelable": false,
+      "is-retryable": false
+    }
+  }
+}
+```
+
+| Key | Type | Description |
+|---|---|---|
+| `id` | string (run-…) | The run's ID |
+| `status` | string | The run's stored status. Unlike the run document, it is not folded to the TFE vocabulary on `/api/tfe/v2`, so `configuring` can appear there |
+| `plan-only` | boolean | Whether the run is speculative |
+| `created-at` | string (RFC3339) | When the run was created |
+| `run-kind` | string | `plan_apply`, `configure` or `full`, as on the [run document](#optional-run-attributes) |
+| `phase-started-at` | object | When each phase that has started began, keyed `planning-at`, `applying-at`, `configuring-at`. A phase that has not started is absent, not null |
+| `actions` | object | The run document's own `actions` block (see [Show Run](#show-run)): `is-confirmable`, `is-discardable`, `is-cancelable`, `is-retryable`, with the same values the run document reports for that run |
+
+`actions` is the server's answer, computed once for both documents. It depends on inputs the workspace document does not publish (whether the plan has changes, the run's resolved auto-apply mode, and whether a finished plan is held at a gate), so a client should read it rather than infer it from `status`.
+
+A server that predates `actions` and `run-kind` omits both keys; treat an absent `actions` as "nothing is offered".
+
 ### Delete Workspace
 
 ```
@@ -1769,6 +1806,17 @@ link form; the attribute is kept alongside it.
 ```
 GET /api/tfe/v2/runs/{run_id}
 ```
+
+#### Actions on the run
+
+A run's response carries an `actions` block saying what can be done to it now. The same block, with the same values, is on the workspace's [`latest-run`](#latest-run-block).
+
+| Key | `true` when |
+|---|---|
+| `is-confirmable` | The run is `planned`, apply-capable (not plan-only), has changes (or they are unknown), and its resolved auto-apply mode is not `always` (such a run applies itself) |
+| `is-discardable` | The same plan-ready test, regardless of auto-apply mode, **or** the plan has finished and a post-plan gate holds the run (`planning` with a finished plan) and it is apply-capable |
+| `is-cancelable` | The status is one of `pending`, `queued`, `planning`, `confirmed`, `applying`, `configuring` |
+| `is-retryable` | The status is `applied`, `errored`, `discarded` or `canceled`, or the run is a plan-only run that has `planned` |
 
 #### Apply status on the run
 
@@ -5020,7 +5068,7 @@ UUID):
 | `filename` | string | The artifact file. One version has many — an sdist plus a wheel per platform and ABI — so the cache is keyed on the filename |
 | `size` | int | Bytes |
 | `digest` | string | The digest these bytes were admitted against, in the form its **source** expresses it (`sha256:…`, or an SRI `sha512-…`). For a fetched artifact that is **upstream's own**, never re-derived — it is what the client checks our bytes against. For an operator upload there is no upstream, so it is the digest computed **on receipt**. `attestation` says which |
-| `attestation` | string \| null | How the row was admitted: `upstream-digest` (checked against what upstream published), `none-published` (that ecosystem's upstream publishes no per-file digest), or `operator-upload`. `null` means it was admitted before verification existed, which the serve path treats as a miss and re-verifies |
+| `attestation` | string \| null | How the row was admitted: `upstream-publisher` (the publisher's own signature or attestation verified -- PyPI's PEP 740, or npm's registry signature -- which implies the digest too, since provenance is only attempted once the bytes are confirmed), `upstream-digest` (checked against what upstream published), `none-published` (that ecosystem's upstream publishes no per-file digest), or `operator-upload`. `null` means it was admitted before verification existed, which the serve path treats as a miss and re-verifies |
 | `uploaded-by` | string \| null | The admin who uploaded it. `null` for a fetched artifact, which has no uploader |
 | `upload-reference` | string \| null | Free text an uploader attached — their own ticket or approval record. Never interpreted |
 | `replaced-digest` | string \| null | The digest that was at these coordinates before the last deliberate replacement. The immediately previous admission, not a history |

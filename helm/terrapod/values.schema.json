@@ -1662,6 +1662,243 @@
                   "type": "string"
                 }
               }
+            },
+            "locations": {
+              "type": "object",
+              "description": "Named storage locations keyed by name. `default` is reserved; filesystem is not allowed.",
+              "propertyNames": {
+                "pattern": "^[a-z0-9-]{1,32}$",
+                "not": {
+                  "const": "default"
+                }
+              },
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "backend": {
+                    "type": "string",
+                    "enum": [
+                      "s3",
+                      "azure",
+                      "gcs"
+                    ]
+                  },
+                  "s3": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "bucket": {
+                        "type": "string"
+                      },
+                      "region": {
+                        "type": "string"
+                      },
+                      "prefix": {
+                        "type": "string"
+                      },
+                      "endpoint_url": {
+                        "type": "string"
+                      },
+                      "presigned_url_expiry_seconds": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    }
+                  },
+                  "azure": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "account_name": {
+                        "type": "string"
+                      },
+                      "container_name": {
+                        "type": "string"
+                      },
+                      "prefix": {
+                        "type": "string"
+                      },
+                      "presigned_url_expiry_seconds": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    }
+                  },
+                  "gcs": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "bucket": {
+                        "type": "string"
+                      },
+                      "prefix": {
+                        "type": "string"
+                      },
+                      "project_id": {
+                        "type": "string"
+                      },
+                      "service_account_email": {
+                        "type": "string"
+                      },
+                      "presigned_url_expiry_seconds": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    }
+                  },
+                  "credentials": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "default"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "backend"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "backend": {
+                          "const": "s3"
+                        }
+                      },
+                      "required": [
+                        "backend"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "s3"
+                      ],
+                      "properties": {
+                        "s3": {
+                          "required": [
+                            "bucket"
+                          ],
+                          "properties": {
+                            "bucket": {
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "azure"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "gcs"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "backend": {
+                          "const": "azure"
+                        }
+                      },
+                      "required": [
+                        "backend"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "azure"
+                      ],
+                      "properties": {
+                        "azure": {
+                          "required": [
+                            "account_name",
+                            "container_name"
+                          ],
+                          "properties": {
+                            "account_name": {
+                              "minLength": 1
+                            },
+                            "container_name": {
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "s3"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "gcs"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "backend": {
+                          "const": "gcs"
+                        }
+                      },
+                      "required": [
+                        "backend"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "gcs"
+                      ],
+                      "properties": {
+                        "gcs": {
+                          "required": [
+                            "bucket"
+                          ],
+                          "properties": {
+                            "bucket": {
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "s3"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "azure"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
             }
           }
         },
@@ -2016,10 +2253,16 @@
                 "checkov_version": {
                   "type": "string"
                 },
+                "syft_version": {
+                  "type": "string"
+                },
                 "opa_mirror_url": {
                   "type": "string"
                 },
                 "trivy_mirror_url": {
+                  "type": "string"
+                },
+                "syft_mirror_url": {
                   "type": "string"
                 },
                 "checkov_mirror_url": {
@@ -2032,7 +2275,8 @@
                   "type": "string",
                   "enum": [
                     "off",
-                    "checksum"
+                    "checksum",
+                    "signature"
                   ]
                 }
               }
@@ -2242,8 +2486,61 @@
                       },
                       "existingSecretKey": {
                         "type": "string"
+                      },
+                      "signer_identity": {
+                        "type": "string"
+                      },
+                      "signer_issuer": {
+                        "type": "string"
+                      },
+                      "require_attestation": {
+                        "type": "boolean"
                       }
-                    }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "required": [
+                            "signer_identity"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "signer_issuer"
+                          ]
+                        }
+                      },
+                      {
+                        "if": {
+                          "required": [
+                            "signer_issuer"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "signer_identity"
+                          ]
+                        }
+                      },
+                      {
+                        "if": {
+                          "required": [
+                            "require_attestation"
+                          ],
+                          "properties": {
+                            "require_attestation": {
+                              "const": true
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "signer_identity",
+                            "signer_issuer"
+                          ]
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -3172,7 +3469,7 @@
                   "type": "object",
                   "additionalProperties": false,
                   "patternProperties": {
-                    "^(state|state_index|configuration_versions|registry_modules|registry_providers|deleted_workspace_markers|run_logs|run_plans|run_vars|provider_cache|binary_cache|package_cache|platform_provider_cache|cost_pricesheet|vcs_archives|module_overrides)$": {
+                    "^(state|state_index|configuration_versions|registry_modules|registry_providers|uploaded_artifacts|deleted_workspace_markers|run_logs|run_plans|run_vars|provider_cache|binary_cache|package_cache|platform_provider_cache|cost_pricesheet|vcs_archives|module_overrides)$": {
                       "type": "string",
                       "enum": [
                         "off",

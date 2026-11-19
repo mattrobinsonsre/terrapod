@@ -39,7 +39,7 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.models import OCIRepository
 from terrapod.logging_config import get_logger
-from terrapod.services.oci import pullthrough_service, registry_service, upload_service
+from terrapod.services.oci import attestation, pullthrough_service, registry_service, upload_service
 from terrapod.services.oci.auth import BASIC_CHALLENGE, authenticate_oci
 from terrapod.services.oci.errors import (
     BLOB_UNKNOWN,
@@ -815,6 +815,20 @@ async def _mirror_manifest(db, storage, repository, reference: str, parsed):
         )
     except pullthrough_service.UpstreamUnavailable as exc:
         raise OCIError(UNSUPPORTED, message=str(exc)) from exc
+
+    # Before storing, not after. A refusal then leaves the cache exactly as it
+    # was, so there is nothing to undo and no window in which unverified bytes
+    # are servable (#2589).
+    try:
+        attested = await attestation.attest_before_admission(host, upstream_repo, digest)
+    except attestation.AttestationRefused as exc:
+        raise OCIError(UNSUPPORTED, message=str(exc)) from exc
+    logger.info(
+        "Mirrored an OCI manifest",
+        repository=repository.name,
+        digest=digest,
+        attestation=attested,
+    )
 
     manifest = await registry_service.store_manifest(
         db, storage, repository, digest, media_type, body

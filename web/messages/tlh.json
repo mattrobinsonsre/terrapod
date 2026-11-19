@@ -4261,5 +4261,46 @@
     "knownHostsHint": "DaH ngaQHa'moHwI' DIvI' Dochvetlh retlh jonta' ghaj, wa' per jIHmey known_hosts mo'. inventory choHbogh He'etlh DaH ghoS, ngaQHa'moHwI' tob Hoch lajQo'. So'be': wIjwI' DIvI' ngaQHa'moHwI' DIvI' ghaH, 'ej ngaQHa'moHwI' motlh chu'Ha'lu'chugh Dochvetlh Daghov.",
     "knownHostsLead": "ngaQHa''wI''vam ghoSbogh jonta''mey DIvI'' ngaQHa''moHwI''mey, wa'' per Dagh known_hosts mo''.",
     "machineLead": "chay'' ngaQHa''wI''vam ngu''bogh hostmey rar Ansible. pegh ngaQHa''wI'' ghap mu''qaD ghap cha''logh yInob."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "toblu''pu''",
+      "unverified": "toblu''pu''be''",
+      "failed": "tob luj",
+      "legend": "chay'' janvam ''elmoHlu''pu''"
+    },
+    "state": {
+      "inventoried": "tetlhlu''pu''",
+      "notInventoried": "tetlhlu''pu''be''",
+      "findings": "{count, plural, one {# tu''bogh} other {# tu''boghmey}}",
+      "malicious": "{count, plural, one {# qabqu''} other {# qabqu''}}"
+    },
+    "reason": {
+      "notAdmitted": "ghItlhvam tu''lu''pa'' ''elmoHlu''pu'', vaj not tetlhlu''pu''.",
+      "awaiting": "''elmoHlu''pu'' ''ej tetlhlu''meH loS."
+    },
+    "detail": {
+      "title": "jan",
+      "back": "nge''wI''Daq chegh",
+      "admitted": "''elmoHlu''pu''",
+      "attestation": "tobmeH De''",
+      "attestor": "tobwI''",
+      "coordinates": "ponglu''",
+      "packages": "{count, plural, one {# De''} other {# De''mey}}",
+      "sbom": "De''wI'' ghun tetlh",
+      "sbomNone": "janvamvaD pagh tetlh chenmoHlu''pu''.",
+      "findings": "tu''boghmey",
+      "findingsNone": "pagh rurpu''.",
+      "verdict": "wuq",
+      "verdictLine": "{matcher} {matcherVersion} lo''lu''DI'' qawHaq poH {epoch} rurlu''pu''; {generator} {generatorVersion} lo''lu''DI'' tetlhlu''pu''.",
+      "verdictNone": "Qob qawHaq lo''taHvIS janvam nuDlu''pu''be''.",
+      "notFound": "janvamvaD pagh ghItlh tu''lu''.",
+      "advisory": "qeS neH tu''boghmey. ''elmoHlu''pu''bogh ''ej toblu''pu''bogh jan qoD Del. bytemeyvam tobpu''mo'' tobwI'', jan botbe''.",
+      "maliciousNote": "qabqu''bogh De'': lIntaghDaq Qagh ''oHbe''. jagh ''oH jan''e'' net Har."
+    },
+    "column": {
+      "verification": "tob",
+      "supplyChain": "qoD Dochmey"
+    }
   }
 }

@@ -47,7 +47,7 @@ from terrapod.services.artifact_verification import VerificationError
 
 logger = structlog.get_logger(__name__)
 
-PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov"})
+PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov", "syft"})
 
 #: Tools whose upstream facts live here but which are NOT platform-scoped.
 #:
@@ -151,6 +151,9 @@ SPECS: dict[str, PlatformToolSpec] = {
     "opa": PlatformToolSpec(archive="raw", member="", content_type="application/octet-stream"),
     # A tarball whose only interesting member is the binary itself.
     "trivy": PlatformToolSpec(archive="targz", member="trivy", content_type="application/gzip"),
+    # Syft ships the same shape as trivy: the binary at the archive root
+    # beside CHANGELOG/LICENSE/README, so there is no directory to strip.
+    "syft": PlatformToolSpec(archive="targz", member="syft", content_type="application/gzip"),
     # A PyInstaller bundle: one ~60MB self-contained executable in a zip.
     # The tarball unpacks to `pulumi/pulumi` plus the language plugins beside it.
     "pulumi": PlatformToolSpec(
@@ -180,6 +183,7 @@ def _mirror(tool: str) -> str:
         "opa": cfg.opa_mirror_url,
         "trivy": cfg.trivy_mirror_url,
         "checkov": cfg.checkov_mirror_url,
+        "syft": cfg.syft_mirror_url,
         # Pulumi's mirror moved with it to the binary cache (#1559).
         "pulumi": settings.registry.binary_cache.pulumi_mirror_url,
         "node": settings.registry.binary_cache.node_mirror_url,
@@ -258,6 +262,7 @@ def configured_version(tool: str) -> str:
         "opa": cfg.opa_version,
         "trivy": cfg.trivy_version,
         "checkov": cfg.checkov_version,
+        "syft": cfg.syft_version,
     }[tool]
 
 
@@ -323,6 +328,13 @@ def download_url(tool: str, version: str, os_: str, arch: str) -> str:
         if plat is None:
             raise UnsupportedPlatformError(f"trivy publishes no asset for {os_}/{arch}")
         return f"{base}/v{version}/trivy_{version}_{plat}.tar.gz"
+    if tool == "syft":
+        # Lowercase `linux_amd64` / `linux_arm64` -- no platform map, unlike
+        # trivy's `Linux-64bit`. Taken from the real asset list rather than
+        # assumed from trivy's shape.
+        if os_ != "linux" or arch not in ("amd64", "arm64"):
+            raise UnsupportedPlatformError(f"syft publishes no asset for {os_}/{arch}")
+        return f"{base}/v{version}/syft_{version}_{os_}_{arch}.tar.gz"
     if tool == "checkov":
         plat = _CHECKOV_PLATFORM.get((os_, arch))
         if plat is None:
@@ -395,6 +407,23 @@ async def _expected_sha256(
             if len(parts) >= 2 and parts[1].lstrip("*") == asset:
                 return parts[0].lower()
         raise VerificationError(f"{asset} is not listed in the trivy checksums manifest")
+
+    if tool == "syft":
+        # Same manifest shape as trivy: "<hex>  <filename>" per line, one for
+        # the whole release.
+        resp = await arequest_with_retry(
+            client, "GET", f"{base}/v{version}/syft_{version}_checksums.txt"
+        )
+        if resp.status_code != 200:
+            raise VerificationError(
+                f"could not fetch the syft checksums manifest for {version} "
+                f"(HTTP {resp.status_code})"
+            )
+        for line in resp.text.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].lstrip("*") == asset:
+                return parts[0].lower()
+        raise VerificationError(f"{asset} is not listed in the syft checksums manifest")
 
     if tool == "dotnet":
         # .NET states a SHA-512 and no SHA-256, which is why the cache computes
@@ -483,6 +512,20 @@ async def _expected_sha256(
     raise VerificationError(f"not a platform tool: {tool!r}")
 
 
+def sigs_unavailable():
+    """The one signature failure that may be tolerated.
+
+    A *transport* failure says nothing about the artifact. A signature that
+    genuinely did not verify is `SigstoreVerificationError`, which is NOT caught
+    anywhere -- it propagates, the caller caches nothing, and the tool is
+    refused. Naming the tolerable case in one place keeps the two from being
+    conflated by a broader `except`.
+    """
+    from terrapod.services.sigstore_verification import TrustRootUnavailable
+
+    return TrustRootUnavailable
+
+
 async def verify_platform_tool(
     client: httpx.AsyncClient,
     tool: str,
@@ -491,8 +534,15 @@ async def verify_platform_tool(
     arch: str,
     digests: dict[str, str],
     level: str | None = None,
-) -> None:
-    """Check a downloaded artifact against the publisher's checksum.
+) -> str:
+    """Check a downloaded artifact against the publisher's checksum, and at
+    `signature` against the publisher's signature too.
+
+    **Returns what was actually established**, which is the point of the
+    `signature` level rather than a detail of it: three of the four platform
+    tools publish signing material and `opa` publishes none, so a setting that
+    silently fell back would tell an operator their fleet is signature-verified
+    when one tool is not. The outcome is a value a caller records.
 
     No-op when the level is off. Raises VerificationError on any mismatch or
     unobtainable material — the caller must cache nothing and serve nothing.
@@ -511,7 +561,7 @@ async def verify_platform_tool(
             tool=tool,
             version=version,
         )
-        return
+        return "off"
 
     algo = checksum_algorithm(tool)
     expected = await _expected_sha256(client, tool, version, os_, arch)
@@ -521,3 +571,35 @@ async def verify_platform_tool(
             f"{digests.get(algo, '')}, publisher says {expected} — refusing to cache "
             f"(possible tampering)"
         )
+
+    if level != "signature":
+        return "checksum"
+
+    # The checksum established WHICH bytes arrived. The signature establishes
+    # WHO vouched for them, and it runs second for that reason: for the tools
+    # whose bundle signs a checksums manifest, the asset's digest being a line
+    # in that manifest is exactly what the check above proved.
+    from terrapod.services import platform_tool_signatures as sigs
+
+    try:
+        return await sigs.verify_signature(
+            client,
+            tool=tool,
+            version=version,
+            asset=_asset_name(tool, version, os_, arch),
+            base=_mirror(tool),
+            asset_digest=expected,
+        )
+    except sigs_unavailable() as exc:
+        # The trust root or the signing material could not be FETCHED, which
+        # says nothing about the artifact -- an air-gapped mirror, a transient
+        # 503. The checksum still passed, so the bytes are the publisher's; what
+        # is missing is the second opinion about who published them. Degrade and
+        # record, rather than refusing a tool the operator can see is correct.
+        logger.warning(
+            "could not check the publisher signature; the checksum still passed",
+            tool=tool,
+            version=version,
+            reason=str(exc),
+        )
+        return sigs.UNAVAILABLE

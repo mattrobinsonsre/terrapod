@@ -39,6 +39,10 @@ _BASE = "http://test"
 #: gate test, which `test_every_route_in_this_file_is_covered` refuses.
 ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/api/v1/admin/package-cache"),
+    # The artifact ledger's detail view (#2589). Held to the same admin gate as
+    # the listing: it returns the SBOM whole, which is a far more detailed
+    # statement about what a deployment runs than the listing is.
+    ("GET", "/api/v1/admin/artifact-ledger/sha256:abc"),
     ("GET", "/api/v1/admin/package-cache/totals"),
     ("DELETE", "/api/v1/admin/package-cache/f1"),
     ("POST", "/api/v1/admin/package-cache/evict"),
@@ -128,7 +132,7 @@ def _file(**kw):
     return row
 
 
-def _make_app(user=None, rows=(), storage=None, get_row=None, total=None):
+def _make_app(user=None, rows=(), storage=None, get_row=None, total=None, ledger_rows=()):
     app = create_app()
     if user is not None:
         app.dependency_overrides[get_current_user] = lambda: user
@@ -142,7 +146,21 @@ def _make_app(user=None, rows=(), storage=None, get_row=None, total=None):
     # (#2492), so one result object has to answer `scalar()` too. Defaults to
     # the row count so a test with no opinion about pagination reads as before.
     result.scalar.return_value = len(rows) if total is None else total
-    db.execute.return_value = result
+    # The listing also reads the artifact ledger, to put each row's
+    # supply-chain state on the wire (#2589). A single `return_value` answers
+    # THAT query with the listing's own rows, so `supply_chain()` reads `.sbom`
+    # off a cached-package-file mock and a MagicMock reaches the JSON encoder --
+    # which is exactly how this fixture failed when the query was added. The
+    # ledger query therefore gets its own result, empty by default: these tests
+    # are about the listing, and an artifact with no ledger row renders as
+    # `not-inventoried` WITH its reason, which is the honest default.
+    ledger_result = MagicMock()
+    ledger_result.scalars.return_value.all.return_value = list(ledger_rows)
+
+    async def _execute(statement, *a, **kw):
+        return ledger_result if "artifact_ledger" in str(statement) else result
+
+    db.execute = AsyncMock(side_effect=_execute)
     db.get = AsyncMock(return_value=get_row)
     db.delete = AsyncMock()
     db.flush = AsyncMock()
@@ -265,6 +283,24 @@ class TestThePackageCacheRoutes:
             "replaced-at": None,
             "cached-at": "2026-11-01T09:00:00Z",
             "last-accessed-at": "2026-11-09T09:00:00Z",
+            # TWO indicators, never one severity scale (#2589). They are
+            # asserted here as a PAIR because the thing that would break the
+            # page is their being collapsed into one: a badge meaning both
+            # "verification failed" and "has 4 known CVEs" makes an
+            # advisory-by-design finding look like an incident and buries the
+            # real failure among many.
+            "verification": "verified",
+            # This fixture has no ledger row, which is the honest default for an
+            # artifact admitted before the ledger existed -- and it must report
+            # its REASON rather than a blank, because a blank cell reads as safe.
+            "supply-chain": {
+                "state": "not-inventoried",
+                "reason": "not-admitted-through-the-ledger",
+                "findings": 0,
+                "critical": 0,
+                "malicious": 0,
+                "verdict": None,
+            },
         }, "the wire shape changed; a consumer reads these names"
         assert "pagination" in body["meta"], (
             "the package listing is row-backed and ordinary, so it carries the shared "

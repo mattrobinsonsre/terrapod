@@ -108,6 +108,18 @@ class _Unpack:
 UNPACK: dict[str, _Unpack] = {
     "opa": _Unpack(kind="raw", member=""),
     "trivy": _Unpack(kind="targz", member="trivy"),
+    # Syft is API-SIDE ONLY: it inventories a cached artifact into an SBOM at
+    # admission (#2589), and no runner phase fetches it. It is here anyway
+    # because `test_unpack_table_agrees_with_the_server_spec` requires this table
+    # to hold exactly what the server's SPECS holds -- and rightly so: the
+    # archive shape is a fact about the tool, not about who fetches it, so an
+    # exemption would be a hole in the gate rather than an accurate omission.
+    #
+    # Deliberately NOT added to `TOOLS` above, which is "what this runner asks
+    # the API to pin a version for". The endpoint assertion is a subset check, so
+    # serving a version nobody asks for is fine; asking for one nothing uses
+    # would be a request on every run for no reason.
+    "syft": _Unpack(kind="targz", member="syft"),
     "checkov": _Unpack(kind="zip", member="dist/checkov"),
     "pulumi": _Unpack(kind="targz", member="pulumi/pulumi", tree=True),
     # The Node a Pulumi TypeScript program runs on (#1566). `member` is the path

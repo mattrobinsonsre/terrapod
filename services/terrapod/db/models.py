@@ -1734,6 +1734,10 @@ class CachedProviderPackage(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     shasum: Mapped[str] = mapped_column(String(64), nullable=False)
     h1_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    #: Where the object actually is -- see `CachedBinary.storage_key`. NULL for
+    #: a row written before #2599, whose object sits at the key its coordinates
+    #: derive. Read it through `storage_key_of`.
+    storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     cached_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -1783,6 +1787,14 @@ class CachedBinary(Base):
     arch: Mapped[str] = mapped_column(String(20), nullable=False)
     shasum: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     download_url: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    #: Where the object actually is. NULL for a row written before #2599,
+    #: whose object is at the key its coordinates derive. Recorded rather than
+    #: derived so an operator upload can live under `uploads/` -- which it must,
+    #: because `blob_classes.owning_class` resolves one class per key by longest
+    #: prefix, so "irreplaceable upload" and "re-warmable cache" cannot share a
+    #: prefix. Read it through `storage_key_of`, never directly: that helper is
+    #: the one place the NULL fallback lives.
+    storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     cached_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -5563,4 +5575,152 @@ class InventoryGlobalVar(Base):
     __table_args__ = (
         UniqueConstraint("workspace_id", "key", name="uq_inventory_global_vars_workspace_key"),
         Index("ix_inventory_global_vars_workspace_id", "workspace_id"),
+    )
+
+
+class OrphanedObject(Base):
+    """An object in storage that no row points at any more (#2599).
+
+    Replacing a pulled artifact with an operator upload moves the row's
+    `storage_key` from `cache/` to `uploads/`, which leaves the `cache/` object
+    referenced by nothing. Every retention sweep in the tree is **row-driven**
+    -- it walks rows and deletes the object each one names -- so an object with
+    no row is invisible to all of them and would be kept for ever.
+
+    Recorded rather than deleted inline, and the upload path's ordering is why:
+    it changes the row, flushes, and only then streams the bytes, so that a
+    failed put rolls back cleanly. The caller's transaction can still roll back
+    *after* a successful put, reverting the row to the old key -- and if the old
+    object had already been deleted, that is data loss rather than a leak. A row
+    here is written in the same transaction as the key change, so a rollback
+    takes it with it, correctly, because the old object is referenced again.
+
+    The sweep re-checks that nothing references the key before deleting, so a
+    stale row cannot destroy a live object.
+    """
+
+    __tablename__ = "orphaned_objects"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    storage_key: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
+    #: Why it was orphaned, for an operator reading the table during an
+    #: incident. Free text rather than an enum: it is diagnostic, and a new
+    #: caller should not need a migration to describe itself.
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (Index("ix_orphaned_objects_recorded_at", "recorded_at"),)
+
+
+class ArtifactLedgerEntry(Base):
+    """Every artifact a runner has ever been served, by digest (#2589 step 2).
+
+    Not a scan report. A durable, auditable record of what executed, which is
+    what an infosec team asks for: *show me everything that ran, and who vouched
+    for each of it.*
+
+    **Keyed on the digest, not on coordinates**, because the digest is the
+    artifact's identity and coordinates are a name somebody chose for it. The
+    same bytes reached under two names are one row with two sets of coordinates
+    recorded; two different artifacts published under one name are two rows,
+    which is the case a coordinate-keyed table cannot represent and is also the
+    case worth catching.
+
+    **Attestation is ONE field rather than a verification record beside an upload
+    record**, and that is the modelling decision this table turns on. When
+    Terrapod pulls an artifact through, it checks the publisher's provenance;
+    when an operator uploads one (#2599), it trusts that they have. Neither path
+    is unattested -- they have different attestors -- so the ledger's job is to
+    say which, and "who vouched for this?" stays answerable in a single column:
+
+        Every artifact that executes has an attestor on the record: either the
+        publisher, verified cryptographically, or a named person in your
+        organisation.
+
+    One asymmetry follows and is recorded rather than smoothed over: a pulled
+    artifact can be re-verified at any time, because the publisher's material is
+    still upstream. An uploaded one cannot be re-verified by us at all -- there
+    is nothing to check it against but the digest recorded on receipt. So for an
+    upload that digest IS the integrity story, which is why `digest` is written
+    once and never updated.
+    """
+
+    __tablename__ = "artifact_ledger"
+
+    # --- identity -----------------------------------------------------------
+    #: `sha256:<hex>`, as the rest of the tree spells a digest, and the PRIMARY
+    #: KEY rather than a unique column beside a surrogate id.
+    #:
+    #: That is not a shortcut. Replication keys a class on `pk_attrs` and
+    #: `test_replication_matrix_gate` requires those to equal the model's
+    #: primary key exactly -- because a declared key shorter than the real one
+    #: silently collapses sibling rows at a failover. With a surrogate `id` as
+    #: the primary key, the honest declaration would be `("id",)`, and two nodes
+    #: that each recorded the same artifact would hold two rows with different
+    #: ids and never converge. Keying on the digest makes the table's identity
+    #: and its replication identity the same thing, which is what the docstring
+    #: above claims anyway.
+    digest: Mapped[str] = mapped_column(String(80), primary_key=True)
+    #: Which cache served it -- `package`, `binary`, `provider`, `oci`. Not a
+    #: foreign key to any of them: a row must outlive the cache row it came
+    #: from, because the question "what executed last quarter" does not stop
+    #: being askable when retention reaps the artifact.
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: The coordinates it was served under, as that ecosystem spells them. A
+    #: list, because one digest can legitimately arrive under several names.
+    coordinates: Mapped[list] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )
+
+    # --- attestation: who vouched, and how ----------------------------------
+    #: One of `substrate.ATTESTATIONS`. NULL is impossible here, unlike on the
+    #: cache rows: a ledger entry is only ever written by code that knows.
+    attestation: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: The detail behind `attestation`, shaped by which kind it is: a publisher
+    #: identity, issuer and predicate for `upstream-publisher`; the uploading
+    #: user, timestamp and any approval reference for `operator-upload`.
+    #:
+    #: JSONB rather than columns per kind, because the two kinds share no fields
+    #: and a column that is always NULL for half the rows reads as missing data
+    #: rather than as inapplicable.
+    attestor: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}", nullable=False)
+
+    # --- admission ----------------------------------------------------------
+    #: Which policy admitted it and when, so a reviewer can tell an artifact
+    #: admitted under today's rules from one grandfathered in.
+    admitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    admission: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default="{}", nullable=False
+    )
+
+    # --- inventory and findings (populated by 2b/2c) -------------------------
+    #: The Syft SBOM, or NULL where one has not been generated yet. Nullable on
+    #: purpose: the ledger is useful before the inventory exists, and a row
+    #: written now must not have to wait for Syft to be wired.
+    sbom: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    #: Findings against the CURRENT vulnerability database epoch. Re-derivable
+    #: from the SBOM alone, which is what makes re-matching cheap and means a
+    #: stale findings list is never the only copy of anything.
+    matches: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]", nullable=False)
+
+    # --- provenance of the verdict ------------------------------------------
+    #: Tool versions, vulnerability-DB epoch, settings fingerprint and
+    #: timestamps -- what makes a finding reproducible rather than merely
+    #: asserted. Without it, "no findings" is undated and unattributable.
+    verdict_provenance: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default="{}", nullable=False
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_artifact_ledger_kind", "kind"),
+        Index("ix_artifact_ledger_attestation", "attestation"),
+        Index("ix_artifact_ledger_admitted_at", "admitted_at"),
     )

@@ -149,9 +149,20 @@ class TestAnUploadedProviderIsRecordedAsOne:
     async def test_the_bytes_land_where_the_serve_path_looks(self, archive) -> None:
         record, _, _ = await _admit(archive(VETTED))
         storage = get_storage()
-        key = keys.provider_cache_key(HOST, NS, TYPE, VERSION, record.filename)
-        stored = b"".join([chunk async for chunk in storage.get_stream(key)])
+        # Where the serve path looks is the row's recorded key, not a derived
+        # one -- an upload lives under `uploads/` so that `blob_classes` can
+        # tier it as irreplaceable rather than as a re-warmable cache (#2599).
+        assert record.storage_key == keys.uploaded_provider_key(
+            HOST, NS, TYPE, VERSION, record.filename
+        )
+        stored = b"".join([chunk async for chunk in storage.get_stream(record.storage_key)])
         assert hashlib.sha256(stored).hexdigest() == VETTED_SHA
+        # And deriving would have aimed at a different object entirely, which is
+        # the failure this records: on a workspace that had already pulled this
+        # provider, the derived key still holds the OLD upstream bytes.
+        assert record.storage_key != keys.provider_cache_key(
+            HOST, NS, TYPE, VERSION, record.filename
+        )
 
 
 class TestReplacementIsDeliberate:

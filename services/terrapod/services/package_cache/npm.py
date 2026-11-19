@@ -146,7 +146,45 @@ def artifact_for(name: str, version: str, entry: dict) -> Artifact:
         # `shasum` for packages published before integrity existed.
         digest=dist.get("integrity") or (f"sha1:{dist['shasum']}" if dist.get("shasum") else ""),
         content_type="application/octet-stream",
+        provenance_resolver=_provenance_resolver(normalise(name), version, entry),
     )
+
+
+def _provenance_resolver(name: str, version: str, entry: dict):
+    """A closure the substrate calls on the MISS path.
+
+    The version document is already in hand, so the only extra request is npm's
+    keys endpoint -- and it is on the miss path, where egress is already
+    required.
+
+    **The signed message does not mention the tarball's digest**, which is worth
+    being explicit about because it looks like a gap and is not. npm signs
+    `<name>@<version>:<integrity>`, and the substrate has ALREADY verified the
+    downloaded bytes against that same `dist.integrity` before this runs. So the
+    chain closes: bytes match integrity, and the registry signed integrity.
+    Checking a digest here as well would be checking the same link twice.
+
+    Only npm's registry signature is verified. Its *provenance* attestations
+    (`slsa.dev/provenance/v1`) carry a Fulcio certificate and would be the
+    stronger claim, but their transparency-log entries are `intoto 0.0.2` and
+    sigstore-python -- 4.5.1, the current release -- accepts only
+    `dsse`/`hashedrekord` `0.0.1`, raising "Integrated time only supported for
+    dsse/hashedrekord 0.0.1 types". Measured, not assumed. Hand-rolling the
+    timestamp establishment for that entry kind would mean reimplementing a
+    security-critical internal of a crypto library, so this waits on upstream.
+    The cost is smaller than it looks: npm's own publish attestation is signed
+    with the SAME key as the registry signature, so that trust root is still
+    reached.
+    """
+
+    async def resolve(client, digest_hex: str):  # noqa: ARG001 - see the docstring
+        from terrapod.services.package_cache import publisher_provenance
+
+        return await publisher_provenance.verify_npm(
+            client, name=name, version=version, document=entry
+        )
+
+    return resolve
 
 
 #: A package name, scope and all. npm's own rule, minus the parts that only

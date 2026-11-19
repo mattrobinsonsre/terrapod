@@ -509,7 +509,7 @@ def _render_resource_list(row: _Row, *, entries_only: bool = False) -> list[str]
     would make the reader's browser call out to a third party, and a closing
     `</details>` would break the block. A code fence interprets none of it.
 
-    `entries_only` is the degraded form used when the comment's budget is spent:
+    `entries_only` is the degraded form used when the comment's budget is short:
     a pointer to the run, which holds the whole thing, instead of the list.
     """
     data = row.resource_list
@@ -543,7 +543,9 @@ def _render_resource_list(row: _Row, *, entries_only: bool = False) -> list[str]
     return out
 
 
-def _render_workspace_details(row: _Row, *, degrade_list: bool = False) -> str:
+def _render_workspace_details(
+    row: _Row, *, degrade_list: bool = False, omit_list: bool = False
+) -> str:
     """One collapsed block per workspace: its AI narrative and its gates.
 
     This function is the whole of #1940. The narrative and the gate verdicts
@@ -562,10 +564,13 @@ def _render_workspace_details(row: _Row, *, degrade_list: bool = False) -> str:
     a reviewer can triage the whole PR without expanding anything. Gates arrive
     in the order `post_plan_hold` evaluates them, so "first failing" is the same
     gate the run's `blocked-by` attribute reports.
+
+    `degrade_list` swaps the resource list for a pointer to the run; `omit_list`
+    drops it entirely, leaving only the gates and narrative (or nothing).
     """
     summary = row.ai_summary
     ready = summary is not None and summary.status == "ready"
-    resource_lines = _render_resource_list(row, entries_only=degrade_list)
+    resource_lines = [] if omit_list else _render_resource_list(row, entries_only=degrade_list)
     if not row.gates and not ready and not resource_lines:
         return ""
 
@@ -659,37 +664,32 @@ def render_comment(rows: list[_Row]) -> str:
         if block:
             detail_blocks.append(block)
 
-    # One comment carries every workspace, so the lists share ONE budget. Spent in
-    # row order: the earlier workspaces keep their full list, and once the budget
-    # runs out a workspace's list degrades to a pointer to the run. The table is
-    # built above and always stays, since that is what a reviewer triages from.
-    detail_blocks = _fit_details(
-        rows,
-        detail_blocks,
-        len(_COMMENT_MARKER) + len(_HEADING) + len(header) + sum(map(len, body_lines)),
-    )
-
-    parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines]
-    if detail_blocks:
-        parts.append("")
-        parts.extend(detail_blocks)
-    if pending_apply:
-        if len(pending_apply) == 1:
-            parts.append("")
-            parts.append(f"Comment `terrapod apply` to apply `{_escape(pending_apply[0])}`.")
-        else:
-            parts.append("")
-            parts.append(
-                "Comment `terrapod apply` to apply all pending workspaces, "
-                "or `terrapod apply -W <workspace>` for one at a time."
-            )
+    tail: list[str] = []
+    if len(pending_apply) == 1:
+        tail = ["", f"Comment `terrapod apply` to apply `{_escape(pending_apply[0])}`."]
+    elif pending_apply:
+        hint = (
+            "Comment `terrapod apply` to apply all pending workspaces, "
+            "or `terrapod apply -W <workspace>` for one at a time."
+        )
+        tail = ["", hint]
     # Staleness signal, in the format `vcs_status_dispatcher` already uses on
     # its sibling comment. It carries more weight here: this comment is edited
     # as three separate runner uploads land, and every refresh is best-effort
     # by design (a dropped enqueue is swallowed rather than failing a plan), so
     # a reader has to be able to tell how current the row is.
-    parts.append("")
-    parts.append(f"*Updated {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}*")
+    tail += ["", f"*Updated {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}*"]
+
+    # The lists share one budget after everything that is not a list, so `fixed`
+    # includes the table, hint, footer and join newlines.
+    head = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, "", *tail]
+    detail_blocks = _fit_details(rows, detail_blocks, len("\n".join(head)))
+
+    parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines]
+    if detail_blocks:
+        parts.append("")
+        parts.extend(detail_blocks)
+    parts.extend(tail)
     return "\n".join(parts)
 
 
@@ -701,36 +701,33 @@ def _fit_details(rows: list[_Row], blocks: list[str], fixed: int) -> list[str]:
     degrades: the gate verdicts and the AI narrative it also carries are never
     dropped, since they are what blocks or explains a merge.
 
-    Two rules, applied in row order:
-
-    * **A fair share, not first come.** The budget left after the table is split
-      across the workspaces that still carry a list, so one huge plan cannot spend
-      it all and leave every later workspace with nothing. A list over its share
-      degrades to a pointer to the run.
-    * **A hard ceiling.** The pointers and the footer that follow are charged
-      too, so the comment as a whole stays under `COMMENT_MAX_CHARS` rather than
-      merely each list under its share.
+    Per row, in order: the full list if it fits its fair share, else a pointer to
+    the run, else no list; later blocks are reserved at their no-list size.
     """
-    degraded = {
-        id(r): _render_workspace_details(r, degrade_list=True) for r in rows if r.resource_list
-    }
+    listed = {id(r) for r in rows if _render_resource_list(r)}
     withblock = [r for r in rows if _render_workspace_details(r)]
+
+    def cost(block: str) -> int:
+        # A block also costs the newline that joins it; an empty one is dropped.
+        return len(block) + 1 if block else 0
+
+    bare = [cost(_render_workspace_details(r, omit_list=True)) for r in withblock]
     out: list[str] = []
     spent = fixed
     for i, (r, block) in enumerate(zip(withblock, blocks, strict=True)):
-        if r.resource_list:
-            # What every LATER workspace needs even if it degrades, so a list
-            # admitted here cannot push the pointers past the ceiling.
-            reserve = sum(
-                len(degraded[id(later)]) for later in withblock[i + 1 :] if later.resource_list
-            )
-            remaining = max(COMMENT_MAX_CHARS - spent - reserve, 0)
-            waiting = sum(1 for later in withblock[i:] if later.resource_list)
-            share = remaining // max(waiting, 1)
-            if len(block) > share:
-                block = degraded[id(r)]
-        spent += len(block)
-        out.append(block)
+        if id(r) in listed:
+            remaining = max(COMMENT_MAX_CHARS - spent - sum(bare[i + 1 :]), 0)
+            waiting = sum(1 for later in withblock[i:] if id(later) in listed)
+            if cost(block) > remaining // max(waiting, 1):
+                pointer = _render_workspace_details(r, degrade_list=True)
+                block = (
+                    pointer
+                    if cost(pointer) <= remaining
+                    else _render_workspace_details(r, omit_list=True)
+                )
+        if block:
+            spent += cost(block)
+            out.append(block)
     return out
 
 
