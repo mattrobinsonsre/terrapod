@@ -31,6 +31,13 @@ VALID_TRIGGERS = frozenset(
         "run:completed",
         "run:errored",
         "run:drift_detected",
+        # Not a run STATUS: an artifact the run tried to pull was refused
+        # admission -- a failed publisher signature, or an allowlist refusal
+        # (#2589). It joins the triggers an operator already has wired rather
+        # than growing a parallel delivery path, and it is workspace-scoped
+        # because the refusal is: the package-cache routes authenticate with a
+        # runner token carrying `run_id`.
+        "artifact:refused",
     }
 )
 

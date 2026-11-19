@@ -88,6 +88,9 @@ NOT_RULE_SELECTABLE: frozenset[str] = frozenset(
 #: Gating all five would work and would be worse: scoping a credential on "is this
 #: workspace currently drifted" is not a thing anyone should be able to express, so
 #: the dimension is the defect rather than the missing gate.
+#:
+#: The same set applies inside an `exclude` entry: an owner who can move `locked`
+#: could otherwise opt their own workspace out of a rule.
 RULE_DIMENSIONS_REFUSED: dict[str, str] = {
     "drift_status": (
         "drift status is written by the drift checker and cleared by "
@@ -98,10 +101,9 @@ RULE_DIMENSIONS_REFUSED: dict[str, str] = {
         "lock state is moved by the lock, unlock and force-unlock endpoints, which "
         "need only `workspace:lock`"
     ),
-    # Stopgap: an entry could carry a refused dimension; recursion replaces this.
-    "exclude": (
-        "exclude is not supported in assignment rules yet, because an entry may "
-        "select on a dimension that is itself refused"
+    "autodiscovery_rule_id": (
+        "selecting on the autodiscovery rule that created a workspace is not offered "
+        "for assignment rules yet"
     ),
 }
 
@@ -117,13 +119,23 @@ def rule_refused_dimensions(rule) -> list[str]:
     where there was none — and it is the screen an operator reads before rotating a
     credential.
 
+    Entries of `exclude` are checked too, to any depth: the refused set is no looser on
+    an exclusion than on a positive dimension.
+
     One predicate rather than the same comprehension in three files, with
     `test_every_assignment_rule_consumer_refuses_the_same_dimensions` failing if a
     fourth consumer appears without it.
     """
     if not isinstance(rule, dict):
         return []
-    return sorted(k for k in RULE_DIMENSIONS_REFUSED if k in rule)
+    # The selector accepts hyphenated keys, so a stored `drift-status` must not slip by.
+    norm = {str(k).replace("-", "_"): v for k, v in rule.items()}
+    refused = {k for k in RULE_DIMENSIONS_REFUSED if k in norm}
+    exclude = norm.get("exclude")
+    if isinstance(exclude, list):
+        for entry in exclude:
+            refused.update(rule_refused_dimensions(entry))
+    return sorted(refused)
 
 
 def touches_rule_selectable(attrs: dict, relationships: dict | None = None) -> bool:

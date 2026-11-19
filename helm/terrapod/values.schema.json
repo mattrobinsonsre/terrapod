@@ -2257,10 +2257,16 @@
                 "checkov_version": {
                   "type": "string"
                 },
+                "syft_version": {
+                  "type": "string"
+                },
                 "opa_mirror_url": {
                   "type": "string"
                 },
                 "trivy_mirror_url": {
+                  "type": "string"
+                },
+                "syft_mirror_url": {
                   "type": "string"
                 },
                 "checkov_mirror_url": {
@@ -2273,7 +2279,8 @@
                   "type": "string",
                   "enum": [
                     "off",
-                    "checksum"
+                    "checksum",
+                    "signature"
                   ]
                 }
               }

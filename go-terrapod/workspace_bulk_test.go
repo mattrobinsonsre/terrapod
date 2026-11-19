@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -131,6 +132,40 @@ func TestWorkspaceFilter_EmptyExcludeOmitted(t *testing.T) {
 	_ = json.Unmarshal(b, &got)
 	if _, ok := got["exclude"]; ok {
 		t.Errorf("empty exclude should be omitted: %s", b)
+	}
+}
+
+func TestWorkspaceFilter_AutodiscoveryRuleID(t *testing.T) {
+	const id = "0190a5e0-7c1e-7000-8000-000000000001"
+	b, err := json.Marshal(WorkspaceFilter{
+		AutodiscoveryRuleID: id,
+		Exclude:             []WorkspaceFilter{{AutodiscoveryRuleID: id}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	_ = json.Unmarshal(b, &got)
+	exclude, _ := got["exclude"].([]any)
+	entry, _ := exclude[0].(map[string]any)
+	if got["autodiscovery_rule_id"] != id || entry["autodiscovery_rule_id"] != id {
+		t.Errorf("autodiscovery_rule_id not forwarded: %s", b)
+	}
+
+	b, err = json.Marshal(WorkspaceFilter{NamePrefix: "prod-"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "autodiscovery_rule_id") {
+		t.Errorf("unset autodiscovery_rule_id should be omitted: %s", b)
+	}
+
+	var decoded WorkspaceFilter
+	if err := json.Unmarshal([]byte(`{"autodiscovery_rule_id":"`+id+`"}`), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.AutodiscoveryRuleID != id {
+		t.Errorf("autodiscovery_rule_id not decoded: %+v", decoded)
 	}
 }
 

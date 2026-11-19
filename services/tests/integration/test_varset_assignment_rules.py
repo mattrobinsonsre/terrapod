@@ -147,6 +147,111 @@ async def test_global_set_reports_every_workspace(app):
             assert by_id.get(ids[name]) == variable_service.ASSIGNMENT_GLOBAL
 
 
+async def _reach(vs_id, ids) -> tuple[set, set]:
+    """(varset view, workspace-side view) of which named workspaces receive the set."""
+    async with get_db_session() as db:
+        vs = await _reload(vs_id)
+        from_varset = {w.id for w, _ in await variable_service.workspaces_for_varset(db, vs)}
+        from_ws = set()
+        for wid in ids.values():
+            if vs_id in {v.id for v, _ in await variable_service.applicable_varsets(db, wid)}:
+                from_ws.add(wid)
+    return from_varset & set(ids.values()), from_ws
+
+
+@pytest.mark.asyncio
+async def test_an_exclusion_removes_workspaces_from_the_rule(app):
+    vs, ids = await _seed(
+        [
+            ("prod-a", {"env": "prod", "team": "x"}),
+            ("prod-b", {"env": "prod", "team": "y"}),
+            ("dev-a", {"env": "dev", "team": "x"}),
+        ],
+        assignment_rule={"labels": {"env": "prod"}, "exclude": [{"labels": {"team": "y"}}]},
+    )
+    by_varset, by_workspace = await _reach(vs.id, ids)
+    assert by_varset == by_workspace == {ids["prod-a"]}
+
+
+@pytest.mark.asyncio
+async def test_a_workspace_missing_the_excluded_column_value_is_not_removed(app):
+    """The NULL case on real rows: `vcs_connection_id` is NULL, and plain NOT would
+    drop these workspaces instead of keeping them."""
+    vs, ids = await _seed(
+        [("a", {"env": "prod"}), ("b", {"env": "prod"})],
+        assignment_rule={
+            "labels": {"env": "prod"},
+            "exclude": [{"vcs-connection-id": f"vcs-{uuid.uuid4()}"}],
+        },
+    )
+    by_varset, by_workspace = await _reach(vs.id, ids)
+    assert by_varset == by_workspace == set(ids.values())
+
+
+@pytest.mark.asyncio
+async def test_an_exclusion_matching_nothing_leaves_the_rule_matching_its_positives(app):
+    """Rules are standing, so an exclusion that matches nothing YET is not an error:
+    the positive selector still decides, and the exclusion bites once a workspace fits."""
+    vs, ids = await _seed(
+        [("a", {"env": "prod"})],
+        assignment_rule={"labels": {"env": "prod"}, "exclude": [{"labels": {"team": "later"}}]},
+    )
+    by_varset, by_workspace = await _reach(vs.id, ids)
+    assert by_varset == by_workspace == {ids["a"]}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "exclude",
+    [
+        [{}],
+        [{"name_prefix": ""}],
+        [{"all": True}],
+        [{"labels": {"a": "b"}, "exclude": [{"labels": {"c": "d"}}]}],
+        [{"vcs_connection_id": "not-a-uuid"}],
+        [{"bogus_dimension": 1}],
+        "env=dev",
+        {"labels": {"a": "b"}},
+        ["env=dev"],
+    ],
+)
+async def test_a_stored_exclusion_that_cannot_be_parsed_matches_nothing(app, exclude):
+    """An exclusion inverts the failure direction: dropping an unusable one would
+    widen the match to the very workspaces it was meant to protect. So the whole rule
+    fails closed, in both views and in resolution."""
+    vs, ids = await _seed(
+        [("a", {"env": "prod"})],
+        assignment_rule={"labels": {"env": "prod"}, "exclude": exclude},
+    )
+    by_varset, by_workspace = await _reach(vs.id, ids)
+    assert by_varset == by_workspace == set()
+
+
+@pytest.mark.asyncio
+async def test_a_stored_rule_over_the_exclude_cap_matches_nothing(app):
+    """The bound holds on the read path too, so a row written around the API fails
+    closed rather than costing a count query per entry on every evaluation."""
+    from terrapod.services.workspace_search_service import MAX_EXCLUDE_ENTRIES
+
+    exclude = [{"labels": {"k": str(i)}} for i in range(MAX_EXCLUDE_ENTRIES + 1)]
+    vs, ids = await _seed(
+        [("a", {"env": "prod"})], assignment_rule={"labels": {"env": "prod"}, "exclude": exclude}
+    )
+    by_varset, by_workspace = await _reach(vs.id, ids)
+    assert by_varset == by_workspace == set()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dim,value", [("locked", False), ("drift_status", "drifted")])
+async def test_a_stored_exclusion_on_a_refused_dimension_matches_nothing(app, dim, value):
+    vs, ids = await _seed(
+        [("a", {"env": "prod"})],
+        assignment_rule={"labels": {"env": "prod"}, "exclude": [{dim: value}]},
+    )
+    by_varset, by_workspace = await _reach(vs.id, ids)
+    assert by_varset == by_workspace == set()
+
+
 # ---------------------------------------------------------------------------
 # The HTTP surface: the endpoints and the update path.
 #
@@ -319,6 +424,92 @@ class TestAssignmentRuleUpdates:
         )
         resp = await client.get(f"/api/v2/varsets/{vs_id}", headers=AUTH)
         assert resp.json()["data"]["attributes"]["assignment-rule"] == {"labels": {"x": "y"}}
+
+
+class TestAssignmentRuleExclusionOverHttp:
+    async def test_an_exclusion_round_trips_and_carves_out_a_workspace(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        keep = await _ws(client, f"keep-{tag}", {"ex": tag})
+        carved = await _ws(client, f"carved-{tag}", {"ex": tag, "tier": "frozen"})
+        rule = {"labels": {"ex": tag}, "exclude": [{"labels": {"tier": "frozen"}}]}
+        vs_id = await _vs(client, f"ex-{tag}", **{"assignment-rule": rule})
+
+        got = await client.get(f"/api/v2/varsets/{vs_id}", headers=AUTH)
+        assert got.json()["data"]["attributes"]["assignment-rule"] == rule
+        for ws_id, expected in ((keep, True), (carved, False)):
+            applies = await client.get(f"/api/terrapod/v1/workspaces/{ws_id}/varsets", headers=AUTH)
+            assert (vs_id in {v["id"] for v in applies.json()["data"]}) is expected
+
+    async def _view(self, client, vs_id):
+        resp = await client.get(
+            f"/api/terrapod/v1/varsets/{vs_id}/relationships/workspaces", headers=AUTH
+        )
+        assert resp.status_code == 200, resp.text
+        return resp.json()
+
+    async def test_the_blast_radius_view_reports_what_an_exclusion_removed(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"keep-{tag}", {"ex": tag})
+        await _ws(client, f"c1-{tag}", {"ex": tag, "tier": f"frozen-{tag}"})
+        await _ws(client, f"c2-{tag}", {"ex": tag, "tier": f"frozen-{tag}"})
+        rule = {
+            "labels": {"ex": tag},
+            "exclude": [{"labels": {"tier": f"frozen-{tag}"}}, {"labels": {"tier": f"typo-{tag}"}}],
+        }
+        vs_id = await _vs(client, f"exview-{tag}", **{"assignment-rule": rule})
+
+        body = await self._view(client, vs_id)
+        assert [w["attributes"]["name"] for w in body["data"]] == [f"keep-{tag}"]
+        assert body["meta"]["exclusion"] == {"excluded": 2, "empty": [1]}
+
+    async def test_the_view_has_no_exclusion_key_without_an_exclude(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"w-{tag}", {"ex": tag})
+        vs_id = await _vs(client, f"noex-{tag}", **{"assignment-rule": {"labels": {"ex": tag}}})
+        assert "exclusion" not in (await self._view(client, vs_id))["meta"]
+
+    async def test_the_view_survives_a_stored_exclusion_it_cannot_parse(self, app, client):
+        set_auth(app, admin_user())
+        vs, _ = await _seed(
+            [("a", {"ex": "1"})], assignment_rule={"labels": {"ex": "1"}, "exclude": [{}]}
+        )
+        body = await self._view(client, f"varset-{vs.id}")
+        assert body["data"] == []
+        assert "exclusion" not in body["meta"]
+
+    async def test_the_view_omits_the_exclusion_of_a_stored_rule_over_the_cap(self, app, client):
+        from terrapod.services.workspace_search_service import MAX_EXCLUDE_ENTRIES
+
+        set_auth(app, admin_user())
+        exclude = [{"labels": {"k": str(i)}} for i in range(MAX_EXCLUDE_ENTRIES + 1)]
+        vs, _ = await _seed(
+            [("a", {"ex": "1"})], assignment_rule={"labels": {"ex": "1"}, "exclude": exclude}
+        )
+        body = await self._view(client, f"varset-{vs.id}")
+        assert body["data"] == []
+        assert "exclusion" not in body["meta"]
+
+    async def test_a_refused_dimension_in_an_exclusion_is_422_on_update(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        vs_id = await _vs(client, f"exref-{tag}", **{"assignment-rule": {"labels": {"a": tag}}})
+        resp = await client.patch(
+            f"/api/v2/varsets/{vs_id}",
+            json={
+                "data": {
+                    "type": "varsets",
+                    "attributes": {
+                        "assignment-rule": {"labels": {"a": tag}, "exclude": [{"locked": True}]}
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+        assert "cannot select on locked" in resp.text
 
 
 class TestRuleMatchedSetsReachTheRun:

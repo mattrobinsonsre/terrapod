@@ -973,6 +973,39 @@ async def list_varsets(
     return JSONResponse(content={"data": page_items, "meta": meta})
 
 
+#: Where a reserved label key points the operator, for the exclude-entry refusal.
+_RESERVED_LABEL_HINTS = {
+    "locked": "`locked` is a selector dimension but is refused in assignment rules",
+    "owner": "select on `owner_email` instead",
+}
+
+
+def _refuse_unusable_exclude_entries(rule: dict) -> None:
+    """422 for an exclude entry that could never protect anything or never re-evaluates.
+
+    An exclusion that matches nothing silently widens the rule, so these are refused
+    here rather than stored. Runs after parsing, so every entry is already a dict.
+    """
+    from terrapod.services.label_validation import RESERVED_LABEL_KEYS
+
+    for i, entry in enumerate(rule.get("exclude") or []):
+        norm = {str(k).replace("-", "_"): v for k, v in entry.items()}
+        if "workspace_ids" in norm:
+            raise HTTPException(
+                status_code=422,
+                detail="assignment-rule cannot use 'workspace_ids' in an exclude entry; "
+                "exclude by an attribute such as a label so that membership re-evaluates "
+                "as workspaces change.",
+            )
+        for key in sorted(k for k in (norm.get("labels") or {}) if k in RESERVED_LABEL_KEYS):
+            hint = _RESERVED_LABEL_HINTS.get(key, "it is a filter-bar term, not a label")
+            raise HTTPException(
+                status_code=422,
+                detail=f'exclude[{i}]: label key "{key}" is reserved, so no workspace can '
+                f"carry it and this entry would match nothing ({hint}).",
+            )
+
+
 def _validated_assignment_rule(attrs: dict) -> dict | None:
     """Validate an assignment rule at write time (#1440).
 
@@ -1052,6 +1085,10 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
     # perpetual plan drift. Drop it so the stored shape is exactly the set of
     # scoping dimensions, and the provider can model that set completely.
     rule = {k: v for k, v in rule.items() if k != "all"}
+    # `exclude: []` / null is no exclusion; store the exact shape. Anything else
+    # non-list is left for parse_filter to refuse.
+    if rule.get("exclude") in (None, []):
+        rule.pop("exclude", None)
     try:
         parsed = workspace_search_service.parse_filter(rule)
         # Build the query too, not just parse. The "at least one selector" check
@@ -1063,6 +1100,7 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
         workspace_search_service.build_workspace_query(parsed)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Invalid assignment-rule: {e}") from e
+    _refuse_unusable_exclude_entries(rule)
     return rule
 
 
@@ -1491,6 +1529,28 @@ async def vault_availability(
     )
 
 
+async def _exclusion_meta(db: AsyncSession, vs: VariableSet) -> dict | None:
+    """What the rule's `exclude` removed and which entries match nothing, if it has one.
+
+    Non-blocking: a rule is standing, so an entry matching nothing yet is reported
+    here rather than refused at write. None when there is no usable exclusion.
+    """
+    from terrapod.services.varset_self_join import rule_refused_dimensions
+
+    rule = vs.assignment_rule
+    if vs.global_set or not isinstance(rule, dict) or not rule.get("exclude"):
+        return None
+    if rule_refused_dimensions(rule):
+        return None
+    try:
+        parsed = workspace_search_service.parse_filter(rule)
+        workspace_search_service.build_workspace_query(parsed)
+    except Exception:
+        return None
+    report = await workspace_search_service.exclusion_report(db, parsed)
+    return {"excluded": report.excluded, "empty": report.empty}
+
+
 @native_router.get("/varsets/{varset_id}/relationships/workspaces")
 async def list_varset_workspaces(
     varset_id: str,
@@ -1522,6 +1582,9 @@ async def list_varset_workspaces(
         for ws, source in rows
     ]
     page_items, meta = paginate(items, request)
+    exclusion = await _exclusion_meta(db, vs)
+    if exclusion is not None:
+        meta["exclusion"] = exclusion
     return JSONResponse(content={"data": page_items, "meta": meta})
 
 

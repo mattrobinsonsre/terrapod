@@ -191,3 +191,50 @@ func TestReadPopulatesTheRuleFromTheAPI(t *testing.T) {
 		t.Errorf("a set with no rule must read back as nil, got %+v", empty.AssignmentRule)
 	}
 }
+
+// The provider does not model `exclude`. An update sends the whole rule, so
+// without carrying the server's exclusion across it would be wiped by any apply,
+// widening the set to the workspaces it protected, with no drift to show for it.
+func TestUpdateCarriesAnExclusionTheProviderDoesNotManage(t *testing.T) {
+	exclude := []any{map[string]any{"labels": map[string]any{"tier": "frozen"}}}
+	req := buildUpdateVarsetRequest(&variableSetModel{
+		Name:           types.StringValue("vs"),
+		AssignmentRule: &assignmentRuleModel{Labels: map[string]string{"env": "prod"}},
+	})
+	preserveServerExclude(&req, &terrapod.VariableSet{
+		AssignmentRule: map[string]any{"labels": map[string]any{"env": "dev"}, "exclude": exclude},
+	})
+	got := *req.AssignmentRule
+	if !reflect.DeepEqual(got["exclude"], exclude) {
+		t.Errorf("exclusion not carried across the update: %v", got)
+	}
+	if got["labels"] == nil || len(got) != 2 {
+		t.Errorf("the managed part of the rule must still come from config: %v", got)
+	}
+}
+
+func TestRemovingTheRuleBlockStillClearsTheRuleAndItsExclusion(t *testing.T) {
+	req := buildUpdateVarsetRequest(&variableSetModel{Name: types.StringValue("vs")})
+	preserveServerExclude(&req, &terrapod.VariableSet{
+		AssignmentRule: map[string]any{
+			"labels":  map[string]any{"env": "dev"},
+			"exclude": []any{map[string]any{"labels": map[string]any{"a": "b"}}},
+		},
+	})
+	if *req.AssignmentRule != nil {
+		t.Errorf("an exclusion alone is not a rule; removal must clear it, got %v", *req.AssignmentRule)
+	}
+}
+
+func TestNothingIsInventedWhenTheServerHoldsNoExclusion(t *testing.T) {
+	req := buildUpdateVarsetRequest(&variableSetModel{
+		Name:           types.StringValue("vs"),
+		AssignmentRule: &assignmentRuleModel{Labels: map[string]string{"env": "prod"}},
+	})
+	preserveServerExclude(&req, &terrapod.VariableSet{
+		AssignmentRule: map[string]any{"labels": map[string]any{"env": "prod"}},
+	})
+	if _, ok := (*req.AssignmentRule)["exclude"]; ok {
+		t.Errorf("exclude appeared from nowhere: %v", *req.AssignmentRule)
+	}
+}

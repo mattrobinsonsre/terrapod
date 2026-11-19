@@ -44,7 +44,8 @@ from terrapod.config import settings
 from terrapod.db.models import CachedPackageFile
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import cache_inventory
+from terrapod.services import cache_inventory, ledger_view
+from terrapod.services.artifact_ledger import normalise_digest
 from terrapod.services.package_cache import (
     galaxy,
     goproxy,
@@ -193,7 +194,7 @@ def _sealed_note() -> dict[str, object]:
 # sample for, which is how it stays unable to skip a new endpoint.
 
 
-def _package_file_json(row: CachedPackageFile) -> dict[str, object]:
+def _package_file_json(row: CachedPackageFile, ledger: dict | None = None) -> dict[str, object]:
     """One cached artifact as JSON:API, for the listing and for an upload.
 
     Shared by both deliberately: the upload response is the same resource the
@@ -232,8 +233,55 @@ def _package_file_json(row: CachedPackageFile) -> dict[str, object]:
             "replaced-at": rfc3339(row.replaced_at) if row.replaced_at else None,
             "cached-at": rfc3339(row.cached_at),
             "last-accessed-at": rfc3339(row.last_accessed_at),
+            # TWO indicators, never one severity scale (#2589). A badge that
+            # meant both "verification FAILED" and "has 4 known CVEs" would
+            # make an advisory-by-design CVE look like an incident and bury
+            # the real failure among many.
+            "verification": ledger_view.verification_state(row.attestation),
+            # Keyed on the NORMALISED digest: the package cache stores
+            # `sha256:...` and the binary and provider caches a bare hex, and
+            # the ledger is keyed on one form -- so looking up the raw value
+            # would miss every row from the other two.
+            "supply-chain": ledger_view.supply_chain(
+                (ledger or {}).get(normalise_digest(row.digest or ""))
+            ),
         },
     }
+
+
+async def _ledger_for(db: AsyncSession, rows) -> dict:
+    """The ledger entries for a page of artifacts, keyed by normalised digest.
+
+    Returns `{}` rather than raising if the ledger cannot be read: the cache
+    listing is how an operator sees what is cached at all, and it must not go
+    down because the supply-chain column cannot be filled. A missing entry
+    renders as `not-inventoried` with its reason, which is the honest answer.
+    """
+    from sqlalchemy import select
+
+    from terrapod.db.models import ArtifactLedgerEntry
+    from terrapod.services.artifact_ledger import normalise_digest
+
+    digests = {normalise_digest(r.digest or "") for r in rows}
+    digests.discard("")
+    if not digests:
+        return {}
+    try:
+        found = (
+            (
+                await db.execute(
+                    select(ArtifactLedgerEntry).where(
+                        ArtifactLedgerEntry.digest.in_(sorted(digests))
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    except Exception:  # noqa: BLE001 - the listing must survive a ledger problem
+        logger.warning("could not read the artifact ledger for a cache listing")
+        return {}
+    return {e.digest: e for e in found}
 
 
 @package_router.get("/admin/package-cache")
@@ -260,7 +308,11 @@ async def list_package_cache(
     entries, total = await cache_inventory.list_package_files(
         db, ecosystem=ecosystem, name=name, limit=limit, offset=offset
     )
-    items = [_package_file_json(e) for e in entries]
+    # One query for the whole page's ledger rows, not one per artifact: the
+    # listing is paged and an N+1 here would make the admin page's cost scale
+    # with the page size.
+    ledger = await _ledger_for(db, entries)
+    items = [_package_file_json(e, ledger) for e in entries]
     return JSONResponse(content={"data": items, "meta": build_meta(total, page_number, page_size)})
 
 
@@ -1058,4 +1110,68 @@ async def upload_go_index(
         user=user,
         db=db,
         storage=storage,
+    )
+
+
+@package_router.get("/admin/artifact-ledger/{digest}")
+async def artifact_ledger_detail(
+    digest: str,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """One artifact's full record: how it was admitted, what is in it, what matched.
+
+    **Addressed by DIGEST, which is what makes the detail view linkable** (#2589).
+    A reviewer wants to send a colleague at one artifact, so the identity in the
+    URL has to be the artifact's own rather than a row id that differs between
+    the three caches holding the same bytes.
+
+    The SBOM is returned whole. It is the evidence, and a summary of evidence is
+    an assertion -- a reviewer checking whether a package is really in there
+    needs the document, not our count of it.
+    """
+    from terrapod.db.models import ArtifactLedgerEntry
+    from terrapod.services.artifact_ledger import normalise_digest
+
+    key = normalise_digest(digest)
+    entry = await db.get(ArtifactLedgerEntry, key)
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"no ledger entry for {digest}. An artifact admitted before the ledger "
+                "existed, or by a path that does not record one, has no entry -- which "
+                "is not the same as having been found clean."
+            ),
+        )
+
+    return JSONResponse(
+        content={
+            "data": {
+                "id": entry.digest,
+                "type": "artifact-ledger-entries",
+                "attributes": {
+                    "digest": entry.digest,
+                    "kind": entry.kind,
+                    # Every naming of these bytes. Two names for one artifact is
+                    # one row with two coordinates, which is the case a
+                    # coordinate-keyed table could not represent.
+                    "coordinates": entry.coordinates or [],
+                    "attestation": entry.attestation,
+                    "attestor": entry.attestor or {},
+                    "verification": ledger_view.verification_state(entry.attestation),
+                    "admitted-at": rfc3339(entry.admitted_at),
+                    "admission": entry.admission or {},
+                    "supply-chain": ledger_view.supply_chain(entry),
+                    "packages": ledger_view.packages_in(entry.sbom),
+                    "sbom": entry.sbom,
+                    "matches": entry.matches or [],
+                    # What makes a clean result evidence rather than an
+                    # assertion: the tool versions and the database epoch that
+                    # produced it, with the time.
+                    "verdict-provenance": entry.verdict_provenance or {},
+                    "updated-at": rfc3339(entry.updated_at),
+                },
+            }
+        }
     )

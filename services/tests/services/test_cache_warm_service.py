@@ -178,18 +178,29 @@ class TestWarmEntryValidation:
 
 
 class TestPlatformToolDerivation:
-    """The warm manifest derives opa/trivy/checkov rather than making the
+    """The warm manifest derives the platform tools rather than making the
     operator list them (#1208).
 
     Sealing an install whose policy gate cannot run is the failure this
     derivation exists to make impossible: unlike terraform/tofu there is exactly
     one version of each in the config already, so there is nothing for a human
     to remember and no reason to make them.
+
+    `syft` is in the set for the same reason and is worth stating, because the
+    obvious objection is that SBOM generation only happens at admission and
+    admission cannot happen behind a seal. An operator UPLOAD can (#2599) --
+    that is the whole point of the upload path -- and an uploaded artifact wants
+    an inventory as much as a fetched one. A sealed node with no syft would
+    record every upload with no SBOM and no way to get one.
+
+    It needed no production change: the derivation iterates `PLATFORM_TOOLS`, so
+    a new tool is warmed the day it is added and nobody has to decide. These
+    assertions are the thing that has to move.
     """
 
     def test_derives_one_entry_per_platform_tool(self):
         entries = cache_warm_service.platform_tool_entries()
-        assert {e.tool for e in entries} == {"opa", "trivy", "checkov", "pulumi"}
+        assert {e.tool for e in entries} == {"opa", "trivy", "checkov", "syft", "pulumi"}
         assert all(e.version for e in entries)
 
     async def test_warms_platform_tools_without_being_asked(self):
@@ -199,9 +210,9 @@ class TestPlatformToolDerivation:
         ) as mock_warm:
             await warm_from_manifest(db, storage, [], [])
         warmed = {call.args[2] for call in mock_warm.await_args_list}
-        assert warmed == {"opa", "trivy", "checkov", "pulumi"}
-        # Four tools x the two default platforms.
-        assert mock_warm.await_count == 8
+        assert warmed == {"opa", "trivy", "checkov", "syft", "pulumi"}
+        # Five tools x the two default platforms.
+        assert mock_warm.await_count == 10
 
     async def test_opting_out_leaves_the_manifest_alone(self):
         db, storage = _db(), AsyncMock()
@@ -231,4 +242,4 @@ class TestPlatformToolDerivation:
                 db, storage, [WarmBinaryEntry(tool="tofu", version="1.9.0")], []
             )
         assert summary.failed == summary.total
-        assert summary.total == 10  # 4 platform tools + 1 listed entry, x2 platforms
+        assert summary.total == 12  # 5 platform tools + 1 listed entry, x2 platforms

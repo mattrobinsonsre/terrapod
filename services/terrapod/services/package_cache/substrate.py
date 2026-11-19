@@ -493,6 +493,7 @@ async def fetch_and_cache(
     artifact: Artifact,
     *,
     client: httpx.AsyncClient | None = None,
+    run_id: str | None = None,
 ) -> CachedPackageFile:
     """Fetch an artifact from upstream, store it, and record it.
 
@@ -518,7 +519,23 @@ async def fetch_and_cache(
     #
     # Deliberately AFTER the sealed check: a sealed node fetches nothing at all,
     # so its own error is the more useful one and this would only mask it.
-    content_allowlist.check(artifact.ecosystem, artifact.name, artifact.filename)
+    try:
+        content_allowlist.check(artifact.ecosystem, artifact.name, artifact.filename)
+    except Exception as exc:
+        # Tell whoever asked for it (#2589, decision 2). The notification is
+        # best-effort and the refusal is re-raised either way: an operator not
+        # hearing about a refusal is bad, and a refusal silently becoming an
+        # admission would be far worse.
+        from terrapod.services.artifact_refusal_notice import REASON_ALLOWLIST, notify_refusal
+
+        await notify_refusal(
+            db,
+            run_id=run_id,
+            reason=REASON_ALLOWLIST,
+            coordinates=f"{artifact.ecosystem}/{artifact.name}/{artifact.filename}",
+            detail=str(exc),
+        )
+        raise
 
     key = keys.package_cache_key(artifact.ecosystem, artifact.name, artifact.filename)
     owns_client = client is None
@@ -575,6 +592,24 @@ async def fetch_and_cache(
 
             try:
                 provenance = await artifact.provenance_resolver(client, computed)
+            except publisher_provenance.ProvenanceError as exc:
+                # A signature that genuinely FAILED, as against one we could not
+                # fetch -- the branch below. Fatal and not configurable, so the
+                # only thing to add is telling whoever asked for the artifact
+                # (#2589, decision 2) before re-raising it unchanged.
+                from terrapod.services.artifact_refusal_notice import (
+                    REASON_VERIFICATION,
+                    notify_refusal,
+                )
+
+                await notify_refusal(
+                    db,
+                    run_id=run_id,
+                    reason=REASON_VERIFICATION,
+                    coordinates=f"{artifact.ecosystem}/{artifact.name}/{artifact.filename}",
+                    detail=str(exc),
+                )
+                raise
             except publisher_provenance.ProvenanceUnavailable as exc:
                 # Says nothing about the artifact -- an unreachable trust root or
                 # a 5xx is our egress, not their signature. Degrade to the digest
@@ -635,6 +670,10 @@ async def fetch_and_cache(
             )
             existing.size = size
             await db.flush()
+            # A genuine admission: this row had nobody vouching for it and now
+            # does. The race-lost case below needs no ledger write -- the
+            # request that won recorded it.
+            await _record_in_ledger(db, existing, provenance)
         # Otherwise we lost a race: the winner stored identical bytes at the
         # identical key, so its row is as good as ours.
         return existing
@@ -646,7 +685,46 @@ async def fetch_and_cache(
         filename=artifact.filename,
         size=size,
     )
+    await _record_in_ledger(db, record, provenance)
     return record
+
+
+async def _record_in_ledger(
+    db: AsyncSession, record: CachedPackageFile, provenance: object | None
+) -> None:
+    """Record an admission in `artifact_ledger` (#2589).
+
+    Called from the two places an artifact is genuinely ADMITTED -- a fresh
+    fetch, and a legacy row re-verified -- and deliberately NOT from the
+    race-lost path, where the request that won stored identical bytes and
+    recorded the admission itself.
+
+    Best-effort by construction: `record_admission` swallows its own failures,
+    because a ledger problem must not fail a fetch somebody is waiting on.
+    """
+    from terrapod.services.artifact_ledger import coordinate, record_admission
+
+    attestor: dict = {}
+    if provenance is not None:
+        publisher = getattr(provenance, "publisher", None)
+        if publisher:
+            attestor = {"publisher": publisher}
+
+    await record_admission(
+        db,
+        digest=record.digest,
+        kind="package",
+        attestation=record.attestation,
+        attestor=attestor,
+        coordinates=coordinate(
+            "package",
+            ecosystem=record.ecosystem,
+            name=record.name,
+            version=record.version or "",
+            filename=record.filename,
+        ),
+        admission={"storage_key": record.storage_key, "size": record.size},
+    )
 
 
 async def lookup_present(
@@ -755,6 +833,7 @@ async def get_or_fetch(
     artifact: Artifact,
     *,
     client: httpx.AsyncClient | None = None,
+    run_id: str | None = None,
 ) -> CachedPackageFile:
     """The cached artifact, fetching it first if we do not have it."""
     existing = await lookup_present(
@@ -763,7 +842,7 @@ async def get_or_fetch(
     if existing is not None:
         return existing
 
-    return await fetch_and_cache(db, storage, artifact, client=client)
+    return await fetch_and_cache(db, storage, artifact, client=client, run_id=run_id)
 
 
 async def store_document(

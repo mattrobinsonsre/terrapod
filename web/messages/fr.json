@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Les clés d''hôte publiques des machines que cet identifiant atteint, une par ligne au format known_hosts. Pointez une variable d''inventaire sur son chemin pour vous connecter sans assouplir la vérification de la clé d''hôte. Non masquée : la clé publique d''un hôte est publique, et c''est précisément ce que vous comparez lorsqu''une clé ne correspond pas.",
     "knownHostsLead": "Les clés d''hôte publiques des machines que cet identifiant atteint, une par ligne au format known_hosts.",
     "machineLead": "Comment Ansible se connecte aux hôtes qui désignent ces identifiants. Fournissez une clé privée ou un mot de passe, ou les deux."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Vérifié",
+      "unverified": "Non vérifié",
+      "failed": "Échec de la vérification",
+      "legend": "Comment cet artefact a été admis"
+    },
+    "state": {
+      "inventoried": "Inventorié",
+      "notInventoried": "Non inventorié",
+      "findings": "{count, plural, one {# constat} other {# constats}}",
+      "malicious": "{count, plural, one {# malveillant} other {# malveillants}}"
+    },
+    "reason": {
+      "notAdmitted": "Admis avant que cet enregistrement n''existe, il n''a donc jamais été inventorié",
+      "awaiting": "Admis, en attente d''inventaire"
+    },
+    "detail": {
+      "title": "Artefact",
+      "back": "Retour au cache",
+      "admitted": "Admis",
+      "attestation": "Attestation",
+      "attestor": "Attesté par",
+      "coordinates": "Connu sous le nom de",
+      "packages": "{count, plural, one {# paquet} other {# paquets}}",
+      "sbom": "Nomenclature logicielle",
+      "sbomNone": "Aucun inventaire n''a été produit pour cet artefact",
+      "findings": "Constats",
+      "findingsNone": "Aucune correspondance",
+      "verdict": "Verdict",
+      "verdictLine": "Comparé par {matcher} {matcherVersion} à l''époque {epoch} de la base de données, inventorié par {generator} {generatorVersion}",
+      "verdictNone": "Cet artefact n''a pas été comparé à la base de données de vulnérabilités",
+      "notFound": "Aucun enregistrement n''existe pour cet artefact",
+      "advisory": "Les constats sont indicatifs. Ils décrivent ce que contient un artefact admis et vérifié ; ils ne le bloquent pas, car celui qui l''a attesté a déjà répondu de ces octets.",
+      "maliciousNote": "Un paquet signalé comme malveillant n''est pas un défaut dans une dépendance. Il faut le considérer comme un artefact hostile."
+    },
+    "column": {
+      "verification": "Vérification",
+      "supplyChain": "Contenu"
+    }
   }
 }

@@ -4261,5 +4261,46 @@
     "knownHostsHint": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format. Låt en inventarievariabel peka på dess sökväg för att ansluta utan att mjuka upp verifieringen av värdnyckeln. Döljs inte: en värds publika nyckel är offentlig och är precis det du jämför när en nyckel inte stämmer.",
     "knownHostsLead": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format.",
     "machineLead": "Hur Ansible ansluter till de värdar som hänvisar till den här autentiseringsuppgiften. Ange en privat nyckel eller ett lösenord, eller båda."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verifierad",
+      "unverified": "Overifierad",
+      "failed": "Verifieringen misslyckades",
+      "legend": "Hur den här artefakten släpptes in"
+    },
+    "state": {
+      "inventoried": "Inventerad",
+      "notInventoried": "Inte inventerad",
+      "findings": "{count, plural, one {# fynd} other {# fynd}}",
+      "malicious": "{count, plural, one {# skadligt} other {# skadliga}}"
+    },
+    "reason": {
+      "notAdmitted": "Insläppt innan den här noteringen fanns, och därför aldrig inventerad",
+      "awaiting": "Insläppt och väntar på inventering"
+    },
+    "detail": {
+      "title": "Artefakt",
+      "back": "Tillbaka till cachen",
+      "admitted": "Insläppt",
+      "attestation": "Attestering",
+      "attestor": "Intygat av",
+      "coordinates": "Känd som",
+      "packages": "{count, plural, one {# paket} other {# paket}}",
+      "sbom": "Programvaruförteckning",
+      "sbomNone": "Ingen inventering gjordes för den här artefakten",
+      "findings": "Fynd",
+      "findingsNone": "Inga träffar",
+      "verdict": "Utlåtande",
+      "verdictLine": "Matchad av {matcher} {matcherVersion} mot databasens epok {epoch}, inventerad av {generator} {generatorVersion}",
+      "verdictNone": "Den här artefakten har inte matchats mot sårbarhetsdatabasen",
+      "notFound": "Det finns ingen notering för den här artefakten",
+      "advisory": "Fynd är rådgivande. De beskriver vad som finns i en artefakt som har släppts in och verifierats; de blockerar den inte, eftersom den som intygat den redan har gått i god för dessa bytes.",
+      "maliciousNote": "Ett paket som flaggats som skadligt är inte en defekt i ett beroende. Behandla det som att artefakten själv är fientlig."
+    },
+    "column": {
+      "verification": "Verifiering",
+      "supplyChain": "Innehåll"
+    }
   }
 }
