@@ -6083,7 +6083,7 @@ POST /api/v1/workspaces/{id}/notification-configurations
 | `slack` | `url` (Slack webhook URL) | — |
 | `email` | `email-addresses` (list) | — |
 
-**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`, `run:drift_detected`
+**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`, `run:drift_detected`, `artifact:refused`.
 
 **Required permission:** `admin` on the workspace.
 

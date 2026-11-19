@@ -493,6 +493,7 @@ async def fetch_and_cache(
     artifact: Artifact,
     *,
     client: httpx.AsyncClient | None = None,
+    run_id: str | None = None,
 ) -> CachedPackageFile:
     """Fetch an artifact from upstream, store it, and record it.
 
@@ -518,7 +519,23 @@ async def fetch_and_cache(
     #
     # Deliberately AFTER the sealed check: a sealed node fetches nothing at all,
     # so its own error is the more useful one and this would only mask it.
-    content_allowlist.check(artifact.ecosystem, artifact.name, artifact.filename)
+    try:
+        content_allowlist.check(artifact.ecosystem, artifact.name, artifact.filename)
+    except Exception as exc:
+        # Tell whoever asked for it (#2589, decision 2). The notification is
+        # best-effort and the refusal is re-raised either way: an operator not
+        # hearing about a refusal is bad, and a refusal silently becoming an
+        # admission would be far worse.
+        from terrapod.services.artifact_refusal_notice import REASON_ALLOWLIST, notify_refusal
+
+        await notify_refusal(
+            db,
+            run_id=run_id,
+            reason=REASON_ALLOWLIST,
+            coordinates=f"{artifact.ecosystem}/{artifact.name}/{artifact.filename}",
+            detail=str(exc),
+        )
+        raise
 
     key = keys.package_cache_key(artifact.ecosystem, artifact.name, artifact.filename)
     owns_client = client is None
@@ -575,6 +592,24 @@ async def fetch_and_cache(
 
             try:
                 provenance = await artifact.provenance_resolver(client, computed)
+            except publisher_provenance.ProvenanceError as exc:
+                # A signature that genuinely FAILED, as against one we could not
+                # fetch -- the branch below. Fatal and not configurable, so the
+                # only thing to add is telling whoever asked for the artifact
+                # (#2589, decision 2) before re-raising it unchanged.
+                from terrapod.services.artifact_refusal_notice import (
+                    REASON_VERIFICATION,
+                    notify_refusal,
+                )
+
+                await notify_refusal(
+                    db,
+                    run_id=run_id,
+                    reason=REASON_VERIFICATION,
+                    coordinates=f"{artifact.ecosystem}/{artifact.name}/{artifact.filename}",
+                    detail=str(exc),
+                )
+                raise
             except publisher_provenance.ProvenanceUnavailable as exc:
                 # Says nothing about the artifact -- an unreachable trust root or
                 # a 5xx is our egress, not their signature. Degrade to the digest
@@ -798,6 +833,7 @@ async def get_or_fetch(
     artifact: Artifact,
     *,
     client: httpx.AsyncClient | None = None,
+    run_id: str | None = None,
 ) -> CachedPackageFile:
     """The cached artifact, fetching it first if we do not have it."""
     existing = await lookup_present(
@@ -806,7 +842,7 @@ async def get_or_fetch(
     if existing is not None:
         return existing
 
-    return await fetch_and_cache(db, storage, artifact, client=client)
+    return await fetch_and_cache(db, storage, artifact, client=client, run_id=run_id)
 
 
 async def store_document(
