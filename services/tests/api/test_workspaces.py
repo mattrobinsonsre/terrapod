@@ -10,6 +10,7 @@ from httpx import ASGITransport, AsyncClient
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth.capabilities import caps_for_level
+from terrapod.config import S3Config, StorageBackend, StorageLocationConfig, settings
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -57,6 +58,7 @@ def _mock_workspace(
     parallelism=10,
     configure_parallelism=None,
     resource_memory="2Gi",
+    storage_location=None,
 ):
     ws = MagicMock()
     # The engine this belongs to (#1521) — set explicitly because a MagicMock
@@ -130,6 +132,7 @@ def _mock_workspace(
     ws.resource_cpu = resource_cpu
     ws.parallelism = 10
     ws.configure_parallelism = None
+    ws.storage_location = storage_location
     ws.execution_backend = "tofu"
     ws.resource_memory = resource_memory
     ws.ee_resource_cpu = ""
@@ -3453,3 +3456,158 @@ class TestAWorkspaceMustHaveAtLeastOneOperation:
             )
         assert resp.status_code == 422, resp.text
         assert "configure-enabled" in resp.json()["detail"]
+
+
+_EU = {"eu-west": StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu-bucket"))}
+
+
+def _stored(added):
+    return next(w for w in added if getattr(w, "name", None) == "loc-ws")
+
+
+class TestStorageLocationOnTheWorkspaceRoutes:
+    """`storage-location`: null means `default`, and it is fixed at creation."""
+
+    @pytest.fixture(autouse=True)
+    def _wiring(self):
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock),
+            patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for") as resolve,
+        ):
+            resolve.return_value = caps_for_level("admin")
+            yield resolve
+
+    def _app(self):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        added: list = []
+        mock_db.add = added.append
+        return app, added
+
+    async def _create(self, app, attributes):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.post(
+                "/api/v1/workspaces",
+                json={"data": {"attributes": {"name": "loc-ws", **attributes}}},
+                headers=_AUTH,
+            )
+
+    async def _patch(self, ws, value, prefix="/api/v1"):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        _by_entity(mock_db, ws)
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.patch(
+                f"{prefix}/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"storage-location": value}}},
+                headers=_AUTH,
+            )
+
+    @pytest.mark.parametrize("prefix", ["/api/tfe/v2", "/api/v2", "/api/terrapod/v1"])
+    async def test_every_surface_refuses_a_change(self, prefix):
+        ws = _mock_workspace(storage_location="eu-west")
+        with patch.object(settings.storage, "locations", _EU):
+            resp = await self._patch(ws, None, prefix)
+        assert resp.status_code == 422, resp.text
+        assert ws.storage_location == "eu-west"
+
+    async def test_create_without_it_stores_null_and_reads_null(self):
+        app, added = self._app()
+        resp = await self._create(app, {})
+        assert resp.status_code == 201, resp.text
+        assert _stored(added).storage_location is None
+        assert resp.json()["data"]["attributes"]["storage-location"] is None
+
+    @pytest.mark.parametrize("raw", [None, "default"])
+    async def test_create_with_null_or_default_stores_null(self, raw):
+        app, added = self._app()
+        resp = await self._create(app, {"storage-location": raw})
+        assert resp.status_code == 201, resp.text
+        assert _stored(added).storage_location is None
+        assert resp.json()["data"]["attributes"]["storage-location"] is None
+
+    async def test_create_with_a_configured_location_stores_it(self):
+        app, added = self._app()
+        with patch.object(settings.storage, "locations", _EU):
+            resp = await self._create(app, {"storage-location": "eu-west"})
+        assert resp.status_code == 201, resp.text
+        assert _stored(added).storage_location == "eu-west"
+        assert resp.json()["data"]["attributes"]["storage-location"] == "eu-west"
+
+    @pytest.mark.parametrize("raw", ["nowhere", "", "EU-WEST", 7, ["eu-west"]])
+    async def test_create_with_an_unconfigured_name_is_422(self, raw):
+        app, added = self._app()
+        with patch.object(settings.storage, "locations", _EU):
+            resp = await self._create(app, {"storage-location": raw})
+        assert resp.status_code == 422, resp.text
+        assert "storage-location" in resp.json()["detail"]
+        assert not [w for w in added if getattr(w, "name", None) == "loc-ws"]
+
+    async def test_patch_to_a_different_value_is_422_and_changes_nothing(self):
+        ws = _mock_workspace(storage_location=None)
+        with patch.object(settings.storage, "locations", _EU):
+            resp = await self._patch(ws, "eu-west")
+        assert resp.status_code == 422, resp.text
+        assert (
+            resp.json()["detail"]
+            == "storage-location cannot be changed after the workspace is created"
+        )
+        assert ws.storage_location is None
+
+    async def test_patch_that_clears_a_location_is_422(self):
+        ws = _mock_workspace(storage_location="eu-west")
+        with patch.object(settings.storage, "locations", _EU):
+            resp = await self._patch(ws, None)
+        assert resp.status_code == 422, resp.text
+        assert ws.storage_location == "eu-west"
+
+    @pytest.mark.parametrize(
+        ("current", "sent"),
+        [(None, None), (None, "default"), ("eu-west", "eu-west")],
+    )
+    async def test_patch_with_the_same_value_is_accepted(self, current, sent):
+        ws = _mock_workspace(storage_location=current)
+        with patch.object(settings.storage, "locations", _EU):
+            resp = await self._patch(ws, sent)
+        assert resp.status_code == 200, resp.text
+        assert ws.storage_location == current
+
+    async def test_patch_that_does_not_mention_it_leaves_it_alone(self):
+        ws = _mock_workspace(storage_location="eu-west")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        _by_entity(mock_db, ws)
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v1/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"auto-apply": True}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert ws.storage_location == "eu-west"
+
+    async def test_native_reads_it_and_the_tfe_surface_does_not(self, _wiring):
+        _wiring.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="loc-read", storage_location="eu-west")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+
+        async def _get(path):
+            ws_result = MagicMock()
+            ws_result.scalar_one_or_none.return_value = ws
+            no_run = MagicMock()
+            no_run.scalar_one_or_none.return_value = None
+            mock_db.execute.side_effect = [ws_result, no_run, _no_inert_vars()]
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                return await c.get(path, headers=_AUTH)
+
+        native = await _get(f"/api/v1/workspaces/ws-{ws.id}")
+        tfe = await _get(f"/api/tfe/v2/workspaces/ws-{ws.id}")
+        assert native.status_code == tfe.status_code == 200
+        assert native.json()["data"]["attributes"]["storage-location"] == "eu-west"
+        assert "storage-location" not in tfe.json()["data"]["attributes"]

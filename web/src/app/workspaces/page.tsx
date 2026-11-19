@@ -103,6 +103,14 @@ interface LatestRun {
   status: string
   'plan-only': boolean
   'created-at': string
+  // Absent from an older API: the run actions then fail closed.
+  'run-kind'?: string
+  actions?: {
+    'is-confirmable': boolean
+    'is-discardable': boolean
+    'is-cancelable': boolean
+    'is-retryable': boolean
+  }
 }
 
 interface HealthCondition {
@@ -123,6 +131,8 @@ interface Workspace {
     // and the helper falls back to Terraform's words rather than a raw key.
     engine?: string
     locked: boolean
+    'plan-apply-enabled'?: boolean
+    'configure-enabled'?: boolean
     'resource-cpu': string
     'resource-memory': string
     'agent-pool-name': string | null
@@ -998,18 +1008,30 @@ function WorkspacesPageInner() {
     () =>
       sortedWorkspaces
         .filter((w) => selected.has(w.id))
-        .map((w) => ({
-          id: w.id,
-          name: w.attributes.name,
-          locked: !!w.attributes.locked,
-          latestRun: w.attributes['latest-run']
-            ? {
-                id: w.attributes['latest-run'].id,
-                status: w.attributes['latest-run'].status,
-                planOnly: w.attributes['latest-run']['plan-only'],
-              }
-            : null,
-        })),
+        .map((w) => {
+          const run = w.attributes['latest-run']
+          return {
+            id: w.id,
+            name: w.attributes.name,
+            locked: !!w.attributes.locked,
+            planApplyEnabled: w.attributes['plan-apply-enabled'] !== false,
+            configureEnabled: w.attributes['configure-enabled'] === true,
+            latestRun: run
+              ? {
+                  id: run.id,
+                  runKind: run['run-kind'] ?? null,
+                  actions: run.actions
+                    ? {
+                        confirmable: run.actions['is-confirmable'],
+                        discardable: run.actions['is-discardable'],
+                        cancelable: run.actions['is-cancelable'],
+                        retryable: run.actions['is-retryable'],
+                      }
+                    : null,
+                }
+              : null,
+          }
+        }),
     [sortedWorkspaces, selected],
   )
 

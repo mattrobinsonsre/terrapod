@@ -1,6 +1,7 @@
 """Unit tests for the DR-drill CLI (terrapod.cli.restore_verify)."""
 
 from dataclasses import dataclass
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -77,7 +78,7 @@ async def test_latest_backup_key_errors_when_empty(monkeypatch):
 async def test_verify_state_object_true_when_present(monkeypatch):
     store = _FakeStore(["state/ws/sv.tfstate"], data=b"{}")
     monkeypatch.setattr(rv, "get_storage", lambda: store)
-    assert await rv._verify_state_object() is True
+    assert await rv._verify_state_objects() == (["default"], [])
     assert store.got == ["state/ws/sv.tfstate"]
 
 
@@ -85,4 +86,48 @@ async def test_verify_state_object_true_when_present(monkeypatch):
 async def test_verify_state_object_false_when_absent(monkeypatch):
     store = _FakeStore([])
     monkeypatch.setattr(rv, "get_storage", lambda: store)
-    assert await rv._verify_state_object() is False
+    assert await rv._verify_state_objects() == ([], [])
+
+
+class _UnreadableStore(_FakeStore):
+    async def get(self, key: str) -> bytes:
+        raise PermissionError(f"AccessDenied: {key}")
+
+
+@pytest.mark.asyncio
+async def test_every_store_is_read_and_an_unreadable_one_fails_the_drill(monkeypatch):
+    from terrapod.storage.routing import FanOutResolver, RoutingStore
+
+    home = _FakeStore(["state/a/1.tfstate"])
+    eu = _UnreadableStore(["state/b/1.tfstate"])
+    us = _FakeStore([])
+    router = RoutingStore(home, {"eu-west": eu, "us-east": us}, FanOutResolver())
+    monkeypatch.setattr(rv, "get_storage", lambda: router)
+
+    read, failures = await rv._verify_state_objects()
+
+    assert read == ["default"]
+    assert len(failures) == 1 and failures[0].startswith("eu-west:")
+    assert "AccessDenied" in failures[0]
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_location_is_a_drill_failure(monkeypatch):
+    from terrapod.storage.routing import FanOutResolver, RoutingStore
+
+    router = RoutingStore(
+        _FakeStore(["state/a/1.tfstate"]),
+        {"eu-west": _UnreadableStore(["state/b/1.tfstate"])},
+        FanOutResolver(),
+    )
+    monkeypatch.setattr(rv, "get_storage", lambda: router)
+    conn = AsyncMock()
+    conn.execute.return_value = MagicMock(scalar_one=MagicMock(return_value=1))
+    engine = MagicMock()
+    engine.connect.return_value.__aenter__.return_value = conn
+    engine.dispose = AsyncMock()
+    monkeypatch.setattr(rv, "create_async_engine", lambda _dsn: engine)
+
+    failures = await rv._verify_invariants("postgresql+asyncpg://scratch/db")
+
+    assert any(f.startswith("eu-west:") for f in failures)

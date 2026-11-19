@@ -217,6 +217,9 @@ identity. It works across S3 / Azure / GCS / filesystem and across
 static-password **and** cloud-IAM database auth (it mints the same short-lived
 token the API uses).
 
+`prefix` must not sit under a workspace-scoped one (`state/`, `plans/`, `logs/`,
+`config/`, `runs/`, `inventory/`): the job refuses to start with it.
+
 This is a **logical** dump: RPO is the dump interval, not point-in-time. Treat
 it as the floor — for tighter RPO keep using RDS snapshots / WAL-G / pgBackRest
 (set `backup.enabled: false` and rely on those instead).

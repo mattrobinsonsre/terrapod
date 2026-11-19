@@ -1,23 +1,25 @@
-// Which bulk run actions a selection of workspaces can take.
-//
-// Every action acts on a workspace's LATEST run, which the workspace list already
-// carries, except Plan, which queues a new run. An action is enabled only when
-// EVERY selected row qualifies: a partial batch is hard to reason about, and the
-// menu says how many qualify instead of hiding the reason in a tooltip.
-//
-// The eligibility rules mirror the server (`run_service.py`): retry needs a
-// terminal run, cancel an in-progress one (`CANCELABLE_STATES`), and apply and
-// discard a `planned` run that is not plan-only. The server stays authoritative:
-// each call can still be refused, and the result says so per workspace.
+// Which bulk run actions a selection can take. The server's answer (`actions`) decides;
+// this adds only the lock and the workspace's declared operations.
+
+import { isCompositeRun, isConfigureOnlyRun } from './run-badges.ts'
 
 export type BulkActionId = 'plan' | 'retry' | 'cancel' | 'apply' | 'discard'
+
+export interface BulkRunActions {
+  confirmable: boolean
+  discardable: boolean
+  cancelable: boolean
+  retryable: boolean
+}
 
 export interface BulkWorkspace {
   id: string
   name: string
   locked: boolean
-  /** The workspace's latest run, as the list returns it; null when it has none. */
-  latestRun: { id: string; status: string; planOnly: boolean } | null
+  planApplyEnabled: boolean
+  configureEnabled: boolean
+  /** The latest run as the list returns it; `actions` is null from an older API. */
+  latestRun: { id: string; runKind: string | null; actions: BulkRunActions | null } | null
 }
 
 export interface BulkAction {
@@ -34,26 +36,26 @@ export const BULK_ACTIONS: readonly BulkAction[] = [
   { id: 'discard', confirm: true },
 ]
 
-const TERMINAL = new Set(['applied', 'errored', 'discarded', 'canceled'])
-const CANCELABLE = new Set(['pending', 'queued', 'planning', 'confirmed', 'applying', 'configuring'])
-
 function qualifies(action: BulkActionId, w: BulkWorkspace): boolean {
   const run = w.latestRun
+  const actions = run?.actions
   switch (action) {
     case 'plan':
-      // A new run, so no existing run is needed. A manual lock blocks an apply,
-      // not a plan: the server queues a plan on a locked workspace.
-      return true
-    case 'retry':
-      // A plan-only run that has planned is finished, as the server treats it.
-      return !!run && (TERMINAL.has(run.status) || (run.planOnly && run.status === 'planned'))
+      return w.planApplyEnabled
+    case 'retry': {
+      if (!actions?.retryable) return false
+      // The server retries with the workspace's current settings; a lock refuses a configure.
+      const kind = { runKind: run?.runKind ?? undefined }
+      if (isConfigureOnlyRun(kind)) return w.configureEnabled && !w.locked
+      if (isCompositeRun(kind)) return w.planApplyEnabled && w.configureEnabled && !w.locked
+      return w.planApplyEnabled
+    }
     case 'cancel':
-      return !!run && CANCELABLE.has(run.status)
+      return !!actions?.cancelable
     case 'apply':
-      // A manual lock blocks an apply on the server.
-      return !!run && run.status === 'planned' && !run.planOnly && !w.locked
+      return !!actions?.confirmable && !w.locked
     case 'discard':
-      return !!run && run.status === 'planned' && !run.planOnly
+      return !!actions?.discardable
   }
 }
 

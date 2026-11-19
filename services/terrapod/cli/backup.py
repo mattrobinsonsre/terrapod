@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 
 from terrapod.config import settings
 from terrapod.storage import close_storage, get_storage, init_storage
+from terrapod.storage.keys import shared_prefix
 
 logger = logging.getLogger("terrapod.backup")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -161,7 +162,11 @@ async def backup() -> None:
         sys.exit(1)
 
     cfg = settings.backup
-    prefix = cfg.prefix if cfg.prefix.endswith("/") else cfg.prefix + "/"
+    try:
+        prefix = shared_prefix("backup.prefix", cfg.prefix)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
     key = f"{prefix}{_backup_ts()}.dump"
     dsn = _libpq_dsn(database_url)
 

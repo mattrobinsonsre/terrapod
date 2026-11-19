@@ -23,6 +23,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.dependencies import PeerIdentity, get_peer_identity
 from terrapod.api.routers.replication import router
+from terrapod.services import blob_classes
 from terrapod.storage.protocol import ObjectMeta, ObjectNotFoundError
 
 BASE = "/api/terrapod/v1/ha/replication/blobs"
@@ -216,3 +217,70 @@ class TestPeerOnly:
             assert "get_peer_identity" in names, route.path
 
         assert seen == wanted, f"missing routes: {wanted - seen}"
+
+
+class TestAcrossStorageLocations:
+    """The leader's routing store merges every location into one ordered listing."""
+
+    @pytest.mark.parametrize(
+        ("configured", "header"), [((), ""), (("us-east", "eu-west"), "eu-west,us-east")]
+    )
+    async def test_a_listing_names_the_leaders_storage_locations(
+        self, monkeypatch, configured, header
+    ):
+        from terrapod.config import S3Config, StorageBackend, StorageLocationConfig, settings
+
+        loc = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="b"))
+        monkeypatch.setattr(settings.storage, "locations", dict.fromkeys(configured, loc))
+        store = AsyncMock()
+        store.list_prefix.return_value = []
+        with patch("terrapod.storage.get_storage", return_value=store):
+            resp = await _get(f"{BASE}/state")
+
+        assert resp.headers[blob_classes.STORAGE_LOCATIONS_HEADER] == header
+
+    WS_EU = "0192f3a1-0000-7000-8000-0000000000e0"
+
+    def _router(self):
+        from terrapod.storage.routing import RoutingStore
+        from tests.storage.test_routing import FakeStore, MapResolver
+
+        home, eu = FakeStore("home", 3600), FakeStore("eu", 900)
+        for k in ("state/a/1", "state/c/1", "state/e/1", "state/index.yaml"):
+            home.objects[k] = b"home"
+        for k in ("state/b/1", "state/d/1", f"state/{self.WS_EU}/sv-1.tfstate"):
+            eu.objects[k] = b"eu"
+        return RoutingStore(home, {"eu-west": eu}, MapResolver({self.WS_EU: "eu-west"}))
+
+    async def test_a_page_is_merged_in_key_order_and_honours_after_and_limit(self):
+        with patch("terrapod.storage.get_storage", return_value=self._router()):
+            body = (await _get(f"{BASE}/state?after=state/a/1&limit=3")).json()
+
+        assert [e["id"] for e in body["data"]] == ["state/b/1", "state/c/1", "state/d/1"]
+        assert body["meta"] == {"cursor": "state/d/1", "complete": False}
+
+    async def test_paging_walks_every_location_once(self):
+        seen: list[str] = []
+        after = ""
+        with patch("terrapod.storage.get_storage", return_value=self._router()):
+            while True:
+                body = (await _get(f"{BASE}/state?after={after}&limit=2")).json()
+                seen += [e["id"] for e in body["data"]]
+                if body["meta"]["complete"]:
+                    break
+                after = body["meta"]["cursor"]
+
+        expected = ["state/a/1", "state/b/1", "state/c/1", "state/d/1", "state/e/1"]
+        assert seen == [f"state/{self.WS_EU}/sv-1.tfstate", *expected]
+
+    @pytest.mark.parametrize("ws", [WS_EU, "0192f3a1-0000-7000-8000-0000000000dd"])
+    async def test_content_streams_from_the_location_holding_it(self, ws):
+        router = self._router()
+        key = f"state/{ws}/sv-2.tfstate"
+        router.locations["eu-west"].objects[key] = b"from-eu"
+
+        with patch("terrapod.storage.get_storage", return_value=router):
+            resp = await _get(f"{BASE}/state/content?key={key}")
+
+        assert resp.status_code == 200
+        assert resp.content == b"from-eu"

@@ -31,6 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm.base import NEVER_SET, NO_VALUE
 
 from terrapod.crypto.types import EncryptedText
 
@@ -836,6 +837,9 @@ class Workspace(Base):
     #: limit", and reusing it here would make one setting's inherit marker
     #: another's unbounded.
     configure_parallelism: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    #: The named storage location holding this workspace's objects; `NULL` is
+    #: `default`. Set at creation and never changed.
+    storage_location: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
     # Per-workspace cloud identity (#1901). **The workspace's OVERRIDE**, merged
     # over the deployment catalogue in `api.config.auth.oidc_issuer.audiences` —
     # see `services/cloud_identity_resolver.py`. Keyed on the provider name as
@@ -1147,7 +1151,28 @@ class Workspace(Base):
         Boolean, nullable=False, default=False, server_default=sa.false()
     )
 
-    __table_args__ = (sa.UniqueConstraint("name", name="uq_workspaces"),)
+    __table_args__ = (
+        sa.UniqueConstraint("name", name="uq_workspaces"),
+        Index(
+            "ix_workspaces_storage_location",
+            "storage_location",
+            postgresql_where=sa.text("storage_location IS NOT NULL"),
+        ),
+    )
+
+
+@sa.event.listens_for(Workspace.storage_location, "set")
+def _storage_location_is_fixed(
+    target: Workspace, value: Any, oldvalue: Any, _initiator: Any
+) -> None:
+    """A stored workspace keeps its location: its objects and every cached lookup depend on it."""
+    state = sa.inspect(target)
+    if state.transient or state.pending:
+        return
+    # An expired or unloaded value cannot be compared, so it is refused rather than trusted.
+    unknown = oldvalue in (NO_VALUE, NEVER_SET)
+    if unknown or (value or "default") != (oldvalue or "default"):
+        raise ValueError("storage-location cannot be changed after the workspace is created")
 
 
 class StateVersion(Base):
@@ -2351,6 +2376,8 @@ class AutodiscoveryRule(Base):
     #: the materialised workspace inherits its `parallelism`, which is what a
     #: rule written before this existed keeps doing.
     configure_parallelism: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    #: Copied onto the workspaces this rule materialises; `NULL` is `default`.
+    storage_location: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
     # Templated onto workspaces this rule materialises (#1901). Same override
     # shape as `Workspace.oidc_audiences` — provider name (optionally
     # `provider.alias`) to that target's audiences — and merged over the
