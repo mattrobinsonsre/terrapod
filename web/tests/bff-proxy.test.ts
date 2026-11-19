@@ -16,6 +16,7 @@ import {
   isRetryableTransportError,
   isRetryableRequest,
   forwardedContentLength,
+  shouldBufferForLength,
 } from '../src/lib/bff-proxy.ts'
 
 function errno(message: string, code?: string): Error {
@@ -119,4 +120,48 @@ test('a response with no Content-Length stays without one', () => {
   // A streamed response legitimately has no length; inventing one would be worse
   // than omitting it.
   assert.equal(forwardedContentLength(new Headers()), null)
+})
+
+// ── Content-Length can only come from Node, so the body shape is the decision ──
+// Next >= 16.4.5 strips a route handler's content-length unconditionally, because
+// declaring one over a possibly-decoded body is CVE-2026-119348's framing
+// mismatch. Node derives an accurate one for a fixed-size body, so whether a
+// client gets a length is decided entirely by whether we buffer.
+
+test('a bounded declared length is buffered, so Node can set the length', () => {
+  const h = new Headers({ 'content-length': String(18 * 1024 * 1024) })
+  assert.equal(shouldBufferForLength(h), true)
+})
+
+test('a body larger than the bound is streamed, not held in the web pod', () => {
+  // Rule 14: a provider archive of hundreds of MB must never be buffered here.
+  const h = new Headers({ 'content-length': String(512 * 1024 * 1024) })
+  assert.equal(shouldBufferForLength(h), false)
+})
+
+test('no declared length means stream — there is nothing to be accurate about', () => {
+  assert.equal(shouldBufferForLength(new Headers()), false)
+})
+
+test('a compressed body is streamed even when short', () => {
+  // forwardedContentLength already refuses it: undici decompresses, so the
+  // upstream count describes bytes we are no longer sending.
+  const h = new Headers({ 'content-length': '12', 'content-encoding': 'gzip' })
+  assert.equal(shouldBufferForLength(h), false)
+})
+
+test('a garbage length is streamed rather than trusted', () => {
+  const h = new Headers({ 'content-length': 'not-a-number' })
+  assert.equal(shouldBufferForLength(h), false)
+})
+
+test('a zero-length body is buffered — an empty body still has an exact length', () => {
+  assert.equal(shouldBufferForLength(new Headers({ 'content-length': '0' })), true)
+})
+
+test('a negative declared length is streamed, not treated as small', () => {
+  // `-1 <= LIMIT` is true, so without the >= 0 clause a nonsense length would
+  // select the buffered path. Pulumi reports exactly -1 when it cannot read a
+  // length, so this is the value most likely to appear.
+  assert.equal(shouldBufferForLength(new Headers({ 'content-length': '-1' })), false)
 })
