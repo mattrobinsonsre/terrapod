@@ -269,7 +269,7 @@ api:
             region: eu-west-1
 ```
 
-**A location cannot be removed while a workspace uses it.** The API refuses to start if any workspace names a location the configuration does not have. The log says `workspaces reference storage locations that are not configured: <names>` (or `...but none are configured: <names>` when the node has no locations). To fix it, re-add the location to `api.config.storage.locations` with the same bucket and prefix, then restart. If the database cannot answer this check at startup, `/ready` reports `storage_locations` as unchecked and keeps retrying until the check succeeds.
+**A location cannot be removed while a workspace uses it.** The API reports NOT READY — draining the pod without losing it — if any workspace names a location the configuration does not have. The log says `workspaces reference storage locations that are not configured: <names>` (or `...but none are configured: <names>` when the node has no locations). To fix it, re-add the location to `api.config.storage.locations` with the same bucket and prefix, then restart. If the database cannot answer this check at startup, `/ready` reports `storage_locations` as unchecked and keeps retrying until the check succeeds.
 
 Rolling back to a release without storage locations is not supported once a workspace has one: that code would write those workspaces' objects to `default`. The migration's downgrade also refuses while any workspace names a location.
 

@@ -279,18 +279,55 @@ class TestAgainstPostgres:
         assert await resolver.location_for(str(uuid.uuid4())) is None
         assert resolver._known == {eu: "eu-west", home: "default"}
 
-    async def test_the_startup_check(self, app, monkeypatch):
-        from terrapod.storage.location_resolver import check_locations_at_startup
+    async def test_the_startup_check_holds_readiness_rather_than_crashing(self, app, monkeypatch):
+        """It must NOT raise (#2621).
 
-        await check_locations_at_startup()
+        Raising is a CrashLoopBackOff for every replica over one misconfigured
+        row, and a crash-looping pod serves neither /ready nor /health -- so the
+        detail the check produces is unreachable exactly when it is needed.
+        The safety property is identical either way: a not-ready pod is drained
+        and serves no writes.
+        """
+        from terrapod.storage import location_resolver as lr
+
+        await lr.check_locations_at_startup()
+        assert (await lr.locations_readiness())[0] is True
+
         await _rows("eu-west", None)
-        await check_locations_at_startup()
+        await lr.check_locations_at_startup()
+        assert (await lr.locations_readiness())[0] is True
+
+        # A row naming a location nobody configured: not ready, and the detail
+        # names it rather than being lost with the process.
         await _rows("removed")
-        with pytest.raises(RuntimeError, match="not configured: removed"):
-            await check_locations_at_startup()
+        await lr.check_locations_at_startup()
+        ready, detail = await lr.locations_readiness()
+        assert ready is False
+        assert "removed" in detail
+
         monkeypatch.setattr(settings.storage, "locations", {})
-        with pytest.raises(RuntimeError, match="none are configured"):
-            await check_locations_at_startup()
+        await lr.check_locations_at_startup()
+        ready, detail = await lr.locations_readiness()
+        assert ready is False
+        assert "none are configured" in detail
+
+    async def test_the_check_never_reports_healthy_on_a_deployment_it_refused(
+        self, app, monkeypatch
+    ):
+        """The ordering that made the old raise load-bearing.
+
+        `_unchecked` used to be cleared BEFORE the missing-row check, so the
+        only thing stopping readiness reporting healthy was the raise itself.
+        Assigning it inside the refusal is what makes the two agree.
+        """
+        from terrapod.storage import location_resolver as lr
+
+        await _rows("removed")
+        await lr.check_locations_at_startup()
+        assert lr._unchecked is not None, (
+            "the refusal must leave _unchecked set, or readiness reports healthy "
+            "on a deployment the check refused"
+        )
 
     async def test_the_follower_guard_counts_rows_naming_a_location(self, app):
         from terrapod.services import blob_sync

@@ -811,7 +811,7 @@ follower missing a location would otherwise put that location's objects in its
 - An object whose workspace row has not replicated yet is deferred, then copied on a
   later cycle once the row arrives.
 
-Both nodes also refuse to start while any workspace names a location they do not
+Both nodes also report NOT READY while any workspace names a location they do not
 configure. To fix it, add the location, then restart.
 
 A follower never asks the leader where a workspace lives. It reads the

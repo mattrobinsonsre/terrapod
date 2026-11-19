@@ -616,9 +616,7 @@ async def restore_workspace(
         configure=_restored_configure(settings),
     )
     # A marker is a file in a bucket: its location may have left the config since.
-    storage_location = workspace_settings.validate_storage_location(
-        settings.get("storage_location")
-    )
+    storage_location = workspace_settings.stored_storage_location(settings.get("storage_location"))
     report: dict[str, Any] = {
         "source_workspace_id": workspace_id,
         "source_workspace_name": marker.get("workspace_name"),

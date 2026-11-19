@@ -75,15 +75,54 @@ def validate_ansible_version(raw: object) -> str:
 
 
 def validate_storage_location(raw: object) -> str | None:
-    """A configured location name, or None for `default` (stored as NULL)."""
+    """A configured location name, or None when the attribute is absent.
+
+    **The literal `default` is REFUSED rather than collapsed to None (#2621).**
+    Returning None for it would mean a client that sent `"default"` reads
+    `null` back, and the Terraform provider writes the server's answer into
+    state -- so `storage_location = "default"` in HCL would fail every apply
+    with "Provider produced inconsistent result after apply", unfixable from
+    the configuration. The project rule is to validate and refuse, never to
+    transform a value a provider reads back; tolerance belongs on the read
+    side, where it costs nothing.
+
+    Harmless today because no provider surfaces this attribute yet, which is
+    exactly why it is cheap to fix now and expensive once one does.
+    """
     from terrapod.config import DEFAULT_STORAGE_LOCATION, settings
 
-    if raw is None or raw == DEFAULT_STORAGE_LOCATION:
+    if raw is None:
         return None
+    if raw == DEFAULT_STORAGE_LOCATION:
+        raise ValueError(
+            f"storage-location {DEFAULT_STORAGE_LOCATION!r} is the absence of a location, "
+            f"not a location: omit the attribute or send null"
+        )
     if not isinstance(raw, str) or raw not in settings.storage.locations:
         configured = ", ".join([DEFAULT_STORAGE_LOCATION, *sorted(settings.storage.locations)])
         raise ValueError(f"storage-location {raw!r} is not a configured location ({configured})")
     return raw
+
+
+def stored_storage_location(raw: object) -> str | None:
+    """A value read from a ROW, tolerating a legacy literal `default`.
+
+    The write boundary refuses `default` (see above), but rows written before
+    that can hold it -- and re-validating a stored value on a READ path is
+    exactly how a row becomes uneditable (#316): materialisation, the rule
+    preview and a restore would all raise on a workspace nobody can now fix
+    except by direct SQL.
+
+    So the read side FOLDS it instead of refusing. `default` in a row always
+    meant "the default location", which is what None means, so nothing is lost
+    and nothing is guessed. This is the asymmetry the write-side docstring
+    promises: refuse at the boundary, tolerate on the way out.
+    """
+    from terrapod.config import DEFAULT_STORAGE_LOCATION
+
+    if raw == DEFAULT_STORAGE_LOCATION:
+        return None
+    return validate_storage_location(raw)
 
 
 #: A fleet standardising on a handful of internal collections, not a lockfile.
