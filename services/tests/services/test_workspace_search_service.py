@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from terrapod.services.workspace_search_service import (
+    MAX_EXCLUDE_ENTRIES,
     WorkspaceFilter,
     WorkspaceFilterError,
     build_workspace_query,
@@ -114,6 +115,22 @@ class TestBuildQueryGuard:
 
 
 # ── exclude ──────────────────────────────────────────────────────────────
+
+
+class TestExcludeCap:
+    @staticmethod
+    def _entries(n):
+        return [{"labels": {"k": str(i)}} for i in range(n)]
+
+    def test_the_cap_is_accepted(self):
+        wf = parse_filter({"labels": {"a": "b"}, "exclude": self._entries(MAX_EXCLUDE_ENTRIES)})
+        assert len(wf.exclude) == MAX_EXCLUDE_ENTRIES
+
+    def test_one_over_the_cap_is_refused_and_says_so(self):
+        with pytest.raises(WorkspaceFilterError) as e:
+            parse_filter({"labels": {"a": "b"}, "exclude": self._entries(MAX_EXCLUDE_ENTRIES + 1)})
+        assert str(MAX_EXCLUDE_ENTRIES) in str(e.value)
+        assert "exclude" in str(e.value)
 
 
 class TestExclude:

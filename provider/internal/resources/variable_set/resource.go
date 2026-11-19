@@ -42,7 +42,8 @@ type variableSetModel struct {
 // Read and shows up as permanent plan drift. The one dimension left out is
 // `all` and `workspace_ids`, which the API refuses to store at all — a set that
 // applies everywhere is expressed as `global`, and a literal list of ids is
-// explicit assignment rather than a rule.
+// explicit assignment rather than a rule. `exclude` is not modelled either: it
+// is managed outside Terraform and carried across updates unchanged.
 type assignmentRuleModel struct {
 	Labels           map[string]string `tfsdk:"labels"`
 	NamePrefix       types.String      `tfsdk:"name_prefix"`
@@ -96,7 +97,8 @@ func (r *variableSetResource) Schema(_ context.Context, _ resource.SchemaRequest
 					"so a workspace that later matches picks the set up without being touched. " +
 					"Conflicts with `global`, which already applies to every workspace. " +
 					"Note that `workspace_count` reflects only explicit assignments and does not " +
-					"count workspaces matched by this rule.",
+					"count workspaces matched by this rule." +
+					" An exclusion on the rule set outside Terraform (API or UI) is not modelled here: it is carried across updates unchanged and does not appear in plans, and one added by someone else between the provider's read and its write is overwritten.",
 				Attributes: map[string]schema.Attribute{
 					"labels":            schema.MapAttribute{Optional: true, ElementType: types.StringType, Description: "Match workspaces carrying all of these labels."},
 					"name_prefix":       schema.StringAttribute{Optional: true, Description: "Match workspaces whose name starts with this."},
@@ -185,7 +187,17 @@ func (r *variableSetResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	v, err := r.tc.UpdateVariableSet(ctx, state.ID.ValueString(), buildUpdateVarsetRequest(&plan))
+	upd := buildUpdateVarsetRequest(&plan)
+	if *upd.AssignmentRule != nil {
+		// Read first so an exclusion set outside Terraform survives this update.
+		cur, err := r.tc.GetVariableSet(ctx, state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Update failed", "could not read the current assignment rule: "+err.Error())
+			return
+		}
+		preserveServerExclude(&upd, cur)
+	}
+	v, err := r.tc.UpdateVariableSet(ctx, state.ID.ValueString(), upd)
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
@@ -297,6 +309,20 @@ func assignmentRuleFromAPI(raw map[string]any) *assignmentRuleModel {
 	m.Locked = getBool("locked")
 	m.HasVCS = getBool("has_vcs")
 	return m
+}
+
+// preserveServerExclude carries the server's `exclude` into an update.
+//
+// The provider does not model `exclude`, and an update sends the whole rule, so
+// an exclusion set through the API or UI would otherwise be silently removed by
+// the next apply. Removing the rule block still clears the rule and exclusion.
+func preserveServerExclude(req *terrapod.UpdateVariableSetRequest, cur *terrapod.VariableSet) {
+	if req.AssignmentRule == nil || *req.AssignmentRule == nil {
+		return
+	}
+	if ex, ok := cur.AssignmentRule["exclude"]; ok && ex != nil {
+		(*req.AssignmentRule)["exclude"] = ex
+	}
 }
 
 func buildCreateVarsetRequest(m *variableSetModel) terrapod.CreateVariableSetRequest {
