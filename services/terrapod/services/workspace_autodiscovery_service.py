@@ -47,7 +47,7 @@ from terrapod.db.models import (
     now_utc,
 )
 from terrapod.logging_config import get_logger
-from terrapod.services import pool_set
+from terrapod.services import pool_set, workspace_settings
 from terrapod.services.label_validation import sanitize_labels
 
 logger = get_logger(__name__)
@@ -376,6 +376,19 @@ async def find_or_autocreate_workspace(
             working_directory=root_directory,
         )
 
+    # The rule was valid when saved; its location may have left the config since.
+    try:
+        storage_location = workspace_settings.validate_storage_location(rule.storage_location)
+    except ValueError as exc:
+        logger.warning(
+            "Autodiscovery rule names a storage location that is not configured — skipping",
+            rule_id=str(rule.id),
+            rule_name=rule.name,
+            storage_location=rule.storage_location,
+            working_directory=root_directory,
+        )
+        raise AutodiscoveryUnusableLocation(str(exc)) from exc
+
     ws = Workspace(
         id=uuid.uuid4(),  # generate_uuid7 default also fine; explicit for log clarity
         name=name,
@@ -396,6 +409,7 @@ async def find_or_autocreate_workspace(
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
         configure_parallelism=rule.configure_parallelism,
+        storage_location=storage_location,
         ansible_version=rule.ansible_version,
         ansible_execution_environment=rule.ansible_execution_environment,
         ansible_collections=list(rule.ansible_collections or []),
@@ -565,6 +579,10 @@ class AutodiscoveryNameCollision(RuntimeError):
         self.name = name
 
 
+class AutodiscoveryUnusableLocation(RuntimeError):
+    """Raised when the rule's storage location is no longer configured."""
+
+
 # ── Top-level entry point ────────────────────────────────────────────────
 
 
@@ -644,6 +662,12 @@ async def preview_for_paths(
     name_taken_result = await db.execute(select(Workspace.name).where(Workspace.name.in_(names)))
     name_taken: set[str] = {row[0] for row in name_taken_result.all()}
 
+    try:
+        workspace_settings.validate_storage_location(rule.storage_location)
+        location_usable = True
+    except ValueError:
+        location_usable = False
+
     preview: list[dict[str, Any]] = []
     for (root, _stack), name in roots.items():
         if root in dir_bound:
@@ -656,8 +680,8 @@ async def preview_for_paths(
             collision = True
             existing_autodiscovered = False
         else:
-            # Scan will create this workspace.
-            collision = False
+            # Scan creates this workspace, unless the rule's location is gone.
+            collision = not location_usable
             existing_autodiscovered = False
         preview.append(
             {
@@ -727,7 +751,7 @@ async def autodiscover_for_paths(
             )
             if was_created:
                 created.append(ws)
-        except AutodiscoveryNameCollision:
+        except (AutodiscoveryNameCollision, AutodiscoveryUnusableLocation):
             # Logged inside; skip to next match.
             continue
     return created

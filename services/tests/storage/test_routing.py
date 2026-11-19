@@ -11,6 +11,7 @@ import pytest
 from terrapod.config import S3Config, StorageBackend, StorageLocationConfig, settings
 from terrapod.storage import keys
 from terrapod.storage.keys import WORKSPACE_KEY_PREFIXES
+from terrapod.storage.location_resolver import DbLocationResolver
 from terrapod.storage.protocol import (
     InstrumentedStore,
     ObjectMeta,
@@ -20,7 +21,12 @@ from terrapod.storage.protocol import (
     ObjectStorePermissionError,
     PresignedURL,
 )
-from terrapod.storage.routing import RoutingStore, StaticDefaultResolver
+from terrapod.storage.routing import (
+    FanOutResolver,
+    RoutingStore,
+    StaticDefaultResolver,
+    UnknownWorkspaceLocationError,
+)
 from tests.storage.test_keys_workspace_scope import _build, _shared_builders, _workspace_builders
 
 WS_EU = "ws-eu1"
@@ -175,7 +181,7 @@ class TestWrites:
     async def test_an_unknown_workspace_write_raises_and_writes_nowhere(self, router, stores, op):
         home, eu = stores
         key = keys.state_key(WS_UNKNOWN, "sv-1")
-        with pytest.raises(ObjectStoreError):
+        with pytest.raises(UnknownWorkspaceLocationError):
             if op == "put":
                 await router.put(key, b"x")
             elif op == "put_stream":
@@ -187,8 +193,9 @@ class TestWrites:
     async def test_a_resolved_location_missing_from_config_raises(self, stores):
         home, eu = stores
         router = RoutingStore(home, {"eu-west": eu}, MapResolver({WS_EU: "gone"}))
-        with pytest.raises(ObjectStoreError):
+        with pytest.raises(ObjectStoreError) as caught:
             await router.put(keys.state_key(WS_EU, "sv-1"), b"x")
+        assert not isinstance(caught.value, UnknownWorkspaceLocationError)
         with pytest.raises(ObjectStoreError):
             await router.get(keys.state_key(WS_EU, "sv-1"))
         assert not home.calls and not eu.calls
@@ -422,6 +429,16 @@ async def test_the_static_resolver_puts_every_workspace_on_default():
     assert await StaticDefaultResolver().location_for(WS_EU) == "default"
 
 
+async def test_the_fan_out_resolver_reads_everywhere_and_writes_nowhere(stores):
+    home, eu = stores
+    key = keys.state_key(WS_EU, "sv-1")
+    eu.objects[key] = b"x"
+    router = RoutingStore(home, {"eu-west": eu}, FanOutResolver())
+    assert await router.get(key) == b"x"
+    with pytest.raises(UnknownWorkspaceLocationError):
+        await router.put(key, b"y")
+
+
 class TestInitStorage:
     @pytest.fixture
     def fs_settings(self, tmp_path, monkeypatch):
@@ -475,13 +492,41 @@ class TestInitStorage:
             assert type(inner[0]) is FilesystemStore
             assert type(inner[1]) is S3Store
             assert inner[1]._bucket == "eu-bucket" and inner[1]._default_expiry == 900
-            assert isinstance(store.resolver, StaticDefaultResolver)
+            assert isinstance(store.resolver, DbLocationResolver)
         finally:
             await close_storage()
 
-    @pytest.mark.parametrize("configured", [False, True])
-    async def test_unassigned_locations_are_warned_about_once(
-        self, fs_settings, monkeypatch, configured
+    @pytest.fixture
+    def eu_location(self, fs_settings, monkeypatch):
+        loc = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu"))
+        monkeypatch.setattr(settings.storage, "locations", {"eu-west": loc})
+
+    async def test_init_does_not_need_the_database(self, eu_location, monkeypatch):
+        from terrapod.storage import close_storage, init_storage, location_resolver
+
+        def _no_db():
+            raise AssertionError("init_storage opened a database session")
+
+        monkeypatch.setattr(location_resolver, "get_db_session", _no_db)
+        await init_storage()
+        await close_storage()
+
+    async def test_an_injected_resolver_is_installed(self, eu_location):
+        from terrapod.storage import close_storage, get_storage, init_storage
+
+        resolver = MapResolver({WS_EU: "eu-west"})
+        await init_storage(resolver=resolver)
+        try:
+            assert get_storage().resolver is resolver
+        finally:
+            await close_storage()
+
+    @pytest.mark.parametrize(
+        ("configured", "static", "warned"),
+        [(False, False, 0), (False, True, 0), (True, False, 0), (True, True, 1)],
+    )
+    async def test_unassigned_locations_are_warned_about_only_under_the_static_resolver(
+        self, fs_settings, monkeypatch, configured, static, warned
     ):
         import terrapod.storage as storage_mod
 
@@ -489,9 +534,9 @@ class TestInitStorage:
             loc = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu"))
             monkeypatch.setattr(settings.storage, "locations", {"eu-west": loc})
         with patch.object(storage_mod, "logger") as log:
-            await storage_mod.init_storage()
+            await storage_mod.init_storage(resolver=StaticDefaultResolver() if static else None)
             await storage_mod.close_storage()
         warnings = [c for c in log.warning.call_args_list if "no workspace" in c.args[0]]
-        assert len(warnings) == (1 if configured else 0)
-        if configured:
+        assert len(warnings) == warned
+        if warned:
             assert warnings[0].kwargs["locations"] == ["eu-west"]

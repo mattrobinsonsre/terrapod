@@ -166,6 +166,9 @@ class TestTheNativeSurfaceServesEveryEngine:
         "ansible-host-key-checking": (
             "an Ansible connection setting; the TFE surface serves Terraform alone (#2318)"
         ),
+        "storage-location": (
+            "a Terrapod deployment concept; no `terraform`/`tofu`/`tfci` invocation reads it"
+        ),
     }
 
     #: Attributes the COMPATIBILITY surface serves and the native one does not.
@@ -251,6 +254,61 @@ class TestTheNativeSurfaceServesEveryEngine:
             assert "auto-apply" not in n
             assert t["auto-apply"] is expected, mode
             assert t["auto-apply-mode"] == mode
+
+
+class TestStorageLocationAgainstRealPostgres:
+    @pytest.fixture(autouse=True)
+    def _locations(self, monkeypatch):
+        from terrapod.config import S3Config, StorageBackend, StorageLocationConfig, settings
+
+        eu = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu-bucket"))
+        monkeypatch.setattr(settings.storage, "locations", {"eu-west": eu})
+
+    async def _make(self, client, name: str, **attrs) -> tuple[str, dict]:
+        r = await client.post(
+            NATIVE,
+            json={"data": {"attributes": {"name": name, **attrs}}},
+            headers=AUTH,
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["data"]["id"], r.json()["data"]["attributes"]
+
+    async def test_a_location_round_trips_and_is_fixed(self, app, client):
+        set_auth(app, admin_user())
+        wid, created = await self._make(client, "loc-eu", **{"storage-location": "eu-west"})
+        assert created["storage-location"] == "eu-west"
+        read = await client.get(f"{NATIVE}/{wid}", headers=AUTH)
+        assert read.json()["data"]["attributes"]["storage-location"] == "eu-west"
+
+        same = await client.patch(
+            f"{NATIVE}/{wid}",
+            json={"data": {"attributes": {"storage-location": "eu-west"}}},
+            headers=AUTH,
+        )
+        assert same.status_code == 200, same.text
+        for other in (None, "default"):
+            moved = await client.patch(
+                f"{NATIVE}/{wid}",
+                json={"data": {"attributes": {"storage-location": other}}},
+                headers=AUTH,
+            )
+            assert moved.status_code == 422, moved.text
+        read = await client.get(f"{NATIVE}/{wid}", headers=AUTH)
+        assert read.json()["data"]["attributes"]["storage-location"] == "eu-west"
+
+    async def test_default_is_stored_as_null_and_unknown_is_refused(self, app, client):
+        set_auth(app, admin_user())
+        _, explicit = await self._make(client, "loc-default", **{"storage-location": "default"})
+        _, absent = await self._make(client, "loc-absent")
+        assert explicit["storage-location"] is None
+        assert absent["storage-location"] is None
+
+        r = await client.post(
+            NATIVE,
+            json={"data": {"attributes": {"name": "loc-bad", "storage-location": "nowhere"}}},
+            headers=AUTH,
+        )
+        assert r.status_code == 422, r.text
 
 
 class TestTheTfeSurfaceStaysTerraformOnly:

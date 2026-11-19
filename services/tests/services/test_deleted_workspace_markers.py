@@ -19,6 +19,10 @@ import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from terrapod.config import S3Config, StorageBackend, StorageLocationConfig
+from terrapod.config import settings as app_settings
 from terrapod.services import deleted_workspace_service as dws
 from terrapod.services.artifact_retention_service import _cleanup_deleted_workspaces
 from terrapod.storage.keys import deleted_workspace_marker_key
@@ -318,6 +322,56 @@ class TestMarkerContents:
         # And the removed boolean is not reintroduced through the snapshot,
         # which is keyed by column name and restored by column name.
         assert "auto_apply" not in snap
+
+
+class TestAWorkspacesStorageLocationSurvivesDeletion:
+    """Its objects stay where they were, so the restored row must still point there."""
+
+    def test_the_snapshot_records_it(self):
+        ws = MagicMock()
+        ws.labels = {}
+        ws.storage_location = "eu-west"
+        assert dws._settings_snapshot(ws)["storage_location"] == "eu-west"
+
+    @pytest.fixture(autouse=True)
+    def _locations(self, monkeypatch):
+        eu = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu-bucket"))
+        monkeypatch.setattr(app_settings.storage, "locations", {"eu-west": eu})
+
+    async def _restore(self, settings, db):
+        store = FakeStore()
+        body = dws.build_discovery_marker(WS_A)
+        body["workspace_name"] = "app-prod"
+        body["settings"] = {"engine": "terraform", **settings}
+        store.objects[deleted_workspace_marker_key(WS_A)] = json.dumps(body).encode()
+        return await dws.restore_workspace(db, store, WS_A, restored_by="admin@example.com")
+
+    @pytest.mark.parametrize(
+        ("settings", "expected"),
+        [
+            ({"storage_location": "eu-west"}, "eu-west"),
+            ({"storage_location": None}, None),
+            ({"storage_location": "default"}, None),
+            ({}, None),
+        ],
+    )
+    async def test_a_restore_keeps_it(self, settings, expected):
+        db = _db()
+        db.add = MagicMock()
+
+        ws, _ = await self._restore(settings, db)
+
+        assert ws.storage_location == expected
+
+    @pytest.mark.parametrize("raw", ["removed-location", "", 7, ["eu-west"]])
+    async def test_a_restore_refuses_a_location_that_is_not_configured(self, raw):
+        db = _db()
+        db.add = MagicMock()
+
+        with pytest.raises(ValueError, match="storage-location"):
+            await self._restore({"storage_location": raw}, db)
+
+        db.add.assert_not_called()
 
 
 @contextlib.asynccontextmanager

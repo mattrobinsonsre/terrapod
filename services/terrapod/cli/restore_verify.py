@@ -35,6 +35,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from terrapod.config import settings
 from terrapod.storage import close_storage, get_storage, init_storage
 from terrapod.storage.keys import shared_prefix
+from terrapod.storage.routing import FanOutResolver, RoutingStore
 
 logger = logging.getLogger("terrapod.restore_verify")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -153,10 +154,11 @@ async def _verify_invariants(target_async_dsn: str) -> list[str]:
                 failures.append(f"state_versions not queryable: {exc}")
                 sv = 0
             if sv > 0:
-                ok = await _verify_state_object()
-                if ok:
-                    logger.info("✓ state object downloads from object store")
-                else:
+                read, problems = await _verify_state_objects()
+                failures.extend(problems)
+                for name in read:
+                    logger.info("✓ state object downloads from store %s", name)
+                if not read and not problems:
                     failures.append(
                         f"{sv} state version(s) in DB but no readable object under state/"
                     )
@@ -167,18 +169,27 @@ async def _verify_invariants(target_async_dsn: str) -> list[str]:
     return failures
 
 
-async def _verify_state_object() -> bool:
-    """Download one object under ``state/`` to prove the store is readable.
-
-    Decoupled from the exact key scheme: a state version in the DB should have a
-    corresponding object somewhere under ``state/``.
-    """
+async def _verify_state_objects() -> tuple[list[str], list[str]]:
+    """Download one ``state/`` object from each store; returns (stores read, failures)."""
     store = get_storage()
-    objs = [m for m in await store.list_prefix("state/") if m.key.endswith(".tfstate")]
-    if not objs:
-        return False
-    data = await store.get(objs[0].key)
-    return bool(data)
+    if isinstance(store, RoutingStore):
+        stores = {"default": store.default, **store.locations}
+    else:
+        stores = {"default": store}
+    read: list[str] = []
+    failures: list[str] = []
+    for name, each in stores.items():
+        try:
+            objs = [m for m in await each.list_prefix("state/") if m.key.endswith(".tfstate")]
+            if not objs:
+                logger.info("• no state objects in store %s", name)
+            elif await each.get(objs[0].key):
+                read.append(name)
+            else:
+                failures.append(f"{name}: state object {objs[0].key} is empty")
+        except Exception as exc:  # noqa: BLE001 — each store is reported on its own
+            failures.append(f"{name}: state object not readable: {exc}")
+    return read, failures
 
 
 async def restore_verify() -> None:
@@ -195,7 +206,8 @@ async def restore_verify() -> None:
     target_async = _async_dsn(target)
     target_libpq = _libpq_dsn(target)
 
-    await init_storage()
+    # The drill has no live database, so workspace reads fan out across locations.
+    await init_storage(resolver=FanOutResolver())
     fd, tmp_path = tempfile.mkstemp(suffix=".dump", dir=_resolve_tmpdir())
     os.close(fd)
     try:

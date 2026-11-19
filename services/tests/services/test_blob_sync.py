@@ -17,6 +17,7 @@ quietly stopped honouring it would only show up at a failover.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from terrapod.config import HABlobsConfig, settings
@@ -182,6 +183,7 @@ class TestIrreplaceableFirst:
             patch.object(blob_sync.settings.ha.peer, "url", "https://peer.example"),
             patch.object(blob_sync, "_peer_token", new=AsyncMock(return_value="tok")),
             patch.object(blob_sync, "_sync_class", new=record),
+            patch.object(blob_sync, "_rows_naming_a_location", new=AsyncMock(return_value=0)),
             patch.object(
                 blob_sync.blob_classes,
                 "CLASSES",
@@ -197,7 +199,7 @@ class TestIrreplaceableFirst:
 
 
 class TestCopying:
-    def _client(self, pages, content=b"payload"):
+    def _client(self, pages, content=b"payload", headers=None):
         """A peer that serves `pages` from the listing endpoint and `content`
         from every content fetch."""
         client = AsyncMock()
@@ -205,6 +207,7 @@ class TestCopying:
         listing = AsyncMock()
         listing.raise_for_status = lambda: None
         listing.json = lambda: pages.pop(0)
+        listing.headers = httpx.Headers(headers or {})
 
         async def request(*args, **kwargs):
             return listing
@@ -369,6 +372,282 @@ class TestCopying:
 
         assert result.objects_copied == 42
         assert result.stopped_early == ["registry_modules"]
+
+
+class TestAFollowerWithStorageLocations:
+    """The follower's routing store refuses a write for a workspace whose row has not arrived."""
+
+    KNOWN = "0192f3a1-0000-7000-8000-000000000001"
+    PENDING = "0192f3a1-0000-7000-8000-000000000002"
+
+    async def _sync(self, mapping: dict[str, str], keys: list[str]):
+        from terrapod.storage.routing import RoutingStore
+        from tests.storage.test_routing import FakeStore as RecordingStore
+        from tests.storage.test_routing import MapResolver
+
+        home, eu = RecordingStore("home", 1), RecordingStore("eu", 1)
+        router = RoutingStore(home, {"eu-west": eu}, MapResolver(mapping))
+        pages = [
+            {
+                "data": [{"attributes": {"key": k, "size-bytes": 7}} for k in keys],
+                "meta": {"cursor": keys[-1], "complete": True},
+            }
+        ]
+        client, request = TestCopying()._client(pages)
+        cls = BlobClass(name="state", tier=IRREPLACEABLE, prefixes=("state/",))
+        with (
+            patch.object(blob_sync.settings.ha, "blobs", _cfg(mode=COPY, concurrency=1)),
+            patch("terrapod.storage.get_storage", return_value=router),
+            patch.object(blob_sync, "arequest_with_retry", new=request),
+            patch.object(blob_sync, "logger") as log,
+        ):
+            result = await blob_sync._sync_class(
+                client, "tok", "https://peer", cls, blob_sync._Throttle(0, 0)
+            )
+        return result, home, eu, log
+
+    async def test_an_unreplicated_workspace_is_deferred_not_failed(self):
+        known, pending = f"state/{self.KNOWN}/a.tfstate", f"state/{self.PENDING}/a.tfstate"
+        result, home, eu, log = await self._sync({self.KNOWN: "eu-west"}, [known, pending])
+
+        assert (result.copied, result.deferred, result.failed) == (1, 1, 0)
+        assert set(eu.objects) == {known} and not home.objects
+        assert not log.warning.called
+        assert any(c.kwargs.get("key") == pending for c in log.info.call_args_list)
+
+    async def test_a_location_the_follower_does_not_configure_stops_the_class_loudly(self):
+        from terrapod.storage.protocol import ObjectStoreError
+
+        key = f"state/{self.KNOWN}/a.tfstate"
+        with pytest.raises(ObjectStoreError, match="not configured"):
+            await self._sync({self.KNOWN: "us-east"}, [key])
+
+    async def test_a_deferred_copy_records_its_workspace(self):
+        pending = f"state/{self.PENDING}/a.tfstate"
+        result, *_ = await self._sync({}, [pending])
+        assert result.deferred_workspaces == {self.PENDING}
+
+
+def _session_returning(ids: list[str]):
+    import contextlib
+    import uuid
+
+    @contextlib.asynccontextmanager
+    async def session():
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalars.return_value = [uuid.UUID(i) for i in ids]
+        db.execute = AsyncMock(return_value=result)
+        yield db
+
+    return session
+
+
+class TestADeferredCopyIsVisible:
+    GONE = "0192f3a1-0000-7000-8000-0000000000aa"
+    BACK = "0192f3a1-0000-7000-8000-0000000000bb"
+
+    def _result(self) -> blob_sync.SyncResult:
+        return blob_sync.SyncResult(
+            classes=[
+                blob_sync.ClassResult(
+                    name="state", tier=IRREPLACEABLE, deferred=3, deferred_workspaces={self.GONE}
+                ),
+                blob_sync.ClassResult(
+                    name="run_logs", tier=HISTORY, deferred=1, deferred_workspaces={self.BACK}
+                ),
+            ]
+        )
+
+    def test_the_deferred_metric_counts_each_class(self):
+        from terrapod.api.metrics import BLOB_COPY_DEFERRED
+
+        before = BLOB_COPY_DEFERRED.labels(blob_class="state")._value.get()
+        blob_sync._refresh_metrics(self._result())
+        assert BLOB_COPY_DEFERRED.labels(blob_class="state")._value.get() == before + 3
+
+    async def test_the_cycle_log_reports_deferred_objects(self):
+        with (
+            patch.object(blob_sync, "run_cycle", new=AsyncMock(return_value=self._result())),
+            patch.object(blob_sync, "logger") as log,
+        ):
+            await blob_sync.sync_cycle()
+        assert log.info.call_args.kwargs["objects_deferred"] == 4
+
+    async def test_one_warning_counts_workspaces_whose_rows_are_still_missing(self):
+        with (
+            patch("terrapod.db.session.get_db_session", _session_returning([self.BACK])),
+            patch.object(blob_sync, "logger") as log,
+        ):
+            await blob_sync._warn_if_rows_still_missing(self._result())
+        assert log.warning.call_count == 1
+        assert log.warning.call_args.kwargs == {"workspaces": 1, "objects": 4}
+
+    async def test_no_warning_once_every_row_has_arrived(self):
+        with (
+            patch("terrapod.db.session.get_db_session", _session_returning([self.GONE, self.BACK])),
+            patch.object(blob_sync, "logger") as log,
+        ):
+            await blob_sync._warn_if_rows_still_missing(self._result())
+        assert not log.warning.called
+
+    async def test_a_database_error_is_not_reported_as_missing_rows(self):
+        import contextlib
+
+        @contextlib.asynccontextmanager
+        async def broken():
+            raise OSError("db down")
+            yield
+
+        with (
+            patch("terrapod.db.session.get_db_session", broken),
+            patch.object(blob_sync, "logger") as log,
+        ):
+            await blob_sync._warn_if_rows_still_missing(self._result())
+        assert not log.warning.called
+
+
+class TestTheLeadersLocationsMustBeConfiguredHere:
+    """The leader names its locations on every listing; a follower lacking one copies none."""
+
+    WS = "0192f3a1-0000-7000-8000-000000000001"
+
+    async def _sync(self, cls, header, locations=()):
+        from terrapod.config import S3Config, StorageBackend, StorageLocationConfig
+
+        loc = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="b"))
+        key = f"{cls.prefixes[0]}{self.WS}/a.bin"
+        pages = [
+            {
+                "data": [{"attributes": {"key": key, "size-bytes": 7}}] * 2,
+                "meta": {"cursor": key, "complete": True},
+            }
+        ]
+        headers = {} if header is None else {blob_classes.STORAGE_LOCATIONS_HEADER: header}
+        client, request = TestCopying()._client(pages, headers=headers)
+        store = FakeStore()
+        with (
+            patch.object(blob_sync.settings.ha, "blobs", _cfg(mode=COPY, concurrency=1)),
+            patch.object(blob_sync.settings.storage, "locations", dict.fromkeys(locations, loc)),
+            patch("terrapod.storage.get_storage", return_value=store),
+            patch.object(blob_sync, "arequest_with_retry", new=request),
+        ):
+            result = await blob_sync._sync_class(
+                client, "tok", "https://peer", cls, blob_sync._Throttle(0, 0)
+            )
+        return result, store
+
+    STATE = BlobClass(name="state", tier=IRREPLACEABLE, prefixes=("state/",))
+    MODULES = BlobClass(name="registry_modules", tier=IRREPLACEABLE, prefixes=("registry/",))
+
+    @pytest.mark.parametrize("ours", [(), ("us-east",)])
+    async def test_a_location_missing_here_defers_the_workspace_class(self, ours):
+        result, store = await self._sync(self.STATE, "eu-west,us-east", ours)
+
+        assert not store.written
+        assert result.deferred == 2 and result.copied == 0
+        assert "eu-west" in result.stopped_early
+
+    @pytest.mark.parametrize(
+        ("header", "ours"),
+        [(None, ()), ("", ()), ("eu-west", ("eu-west",)), ("eu-west", ("eu-west", "us-east"))],
+    )
+    async def test_a_leader_whose_locations_are_all_here_is_copied(self, header, ours):
+        result, store = await self._sync(self.STATE, header, ours)
+
+        assert store.written and not result.deferred and not result.stopped_early
+
+    async def test_a_shared_class_is_copied_whatever_the_leader_configures(self):
+        result, store = await self._sync(self.MODULES, "eu-west")
+
+        assert store.written and not result.deferred
+
+    async def test_one_warning_per_cycle_names_the_missing_locations(self):
+        async def deferring(client, token, base, cls, throttle):
+            return blob_sync.ClassResult(
+                name=cls.name,
+                tier="x",
+                deferred=1,
+                stopped_early=f"{blob_sync.LEADER_LOCATIONS_MISSING}: eu-west",
+            )
+
+        with (
+            patch.object(blob_sync.settings.ha, "blobs", _cfg(mode=COPY)),
+            patch.object(blob_sync.settings.ha.peer, "url", "https://peer.example"),
+            patch.object(blob_sync, "_peer_token", new=AsyncMock(return_value="tok")),
+            patch.object(blob_sync, "_sync_class", new=deferring),
+            patch.object(blob_sync, "_rows_naming_a_location", new=AsyncMock(return_value=0)),
+            patch.object(blob_sync.blob_classes, "CLASSES", (self.STATE, self.MODULES)),
+            patch.object(blob_sync, "logger") as log,
+        ):
+            await blob_sync.run_cycle()
+
+        leader_warnings = [c for c in log.warning.call_args_list if "leader" in c.args[0]]
+        assert len(leader_warnings) == 1
+        assert leader_warnings[0].kwargs["classes"] == ["state", "registry_modules"]
+
+
+class TestAFollowerThatCannotHonourLocations:
+    """No locations configured here, yet replicated rows name one: refuse the workspace classes."""
+
+    CLASSES = (
+        BlobClass(name="state", tier=IRREPLACEABLE, prefixes=("state/",)),
+        BlobClass(name="registry_modules", tier=IRREPLACEABLE, prefixes=("registry/modules/",)),
+        BlobClass(name="run_logs", tier=HISTORY, prefixes=("logs/",)),
+    )
+
+    async def _cycle(self, rows: AsyncMock, locations: dict | None = None):
+        synced: list[str] = []
+
+        async def record(client, token, base, cls, throttle):
+            synced.append(cls.name)
+            return blob_sync.ClassResult(name=cls.name, tier="x")
+
+        with (
+            patch.object(blob_sync.settings.ha, "blobs", _cfg(mode=COPY)),
+            patch.object(blob_sync.settings.ha.peer, "url", "https://peer.example"),
+            patch.object(blob_sync.settings.storage, "locations", locations or {}),
+            patch.object(blob_sync, "_peer_token", new=AsyncMock(return_value="tok")),
+            patch.object(blob_sync, "_sync_class", new=record),
+            patch.object(blob_sync, "_rows_naming_a_location", new=rows),
+            patch.object(blob_sync.blob_classes, "CLASSES", self.CLASSES),
+            patch.object(blob_sync, "logger") as log,
+        ):
+            result = await blob_sync.run_cycle()
+        return result, synced, log
+
+    async def test_rows_naming_a_location_stop_the_workspace_classes(self):
+        result, synced, log = await self._cycle(AsyncMock(return_value=2))
+
+        assert synced == ["registry_modules"]
+        stopped = {c.name: c.stopped_early for c in result.classes if c.stopped_early}
+        assert set(stopped) == {"state", "run_logs"}
+        assert all("none are configured" in reason for reason in stopped.values())
+        assert log.warning.call_count == 1
+        assert log.warning.call_args.kwargs["workspaces"] == 2
+
+    async def test_a_default_deployment_copies_everything(self):
+        result, synced, log = await self._cycle(AsyncMock(return_value=0))
+
+        assert synced == ["state", "registry_modules", "run_logs"]
+        assert not result.stopped_early and not log.warning.called
+
+    async def test_a_check_that_fails_refuses_rather_than_guesses(self):
+        result, synced, log = await self._cycle(AsyncMock(side_effect=OSError("db down")))
+
+        assert synced == ["registry_modules"]
+        assert set(result.stopped_early) == {"state", "run_logs"}
+        assert log.warning.called
+
+    async def test_a_node_with_locations_does_not_run_the_check(self):
+        from terrapod.config import S3Config, StorageBackend, StorageLocationConfig
+
+        loc = StorageLocationConfig(backend=StorageBackend.S3, s3=S3Config(bucket="eu"))
+        rows = AsyncMock(return_value=5)
+        _, synced, _ = await self._cycle(rows, {"eu-west": loc})
+
+        assert synced == ["state", "registry_modules", "run_logs"]
+        rows.assert_not_awaited()
 
 
 class TestTheFollowerIsAllowedToRunThis:

@@ -11,6 +11,7 @@ from terrapod.db.session import get_db_health
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_health
 from terrapod.storage import get_storage_or_none
+from terrapod.storage.location_resolver import locations_readiness
 
 router = APIRouter(tags=["health"])
 logger = get_logger(__name__)
@@ -53,8 +54,13 @@ async def ready(response: Response) -> dict[str, str | dict[str, str]]:
     if checks["database"] == "healthy":
         schema_ok, schema_detail = await schema_is_current()
         checks["migrations"] = "healthy" if schema_ok else f"skew: {schema_detail}"
+        # A failed start-up check holds readiness; an unreachable location is detail only.
+        locations_ok, checks["storage_locations"] = await locations_readiness()
+    else:
+        locations_ok = True
 
-    all_healthy = all(v == "healthy" for v in checks.values())
+    others = (v for k, v in checks.items() if k != "storage_locations")
+    all_healthy = locations_ok and all(v == "healthy" for v in others)
 
     if not all_healthy:
         logger.warning("Readiness check failed", checks=checks)

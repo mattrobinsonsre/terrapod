@@ -112,6 +112,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "ee_resource_memory": ws.ee_resource_memory,
         "parallelism": ws.parallelism,
         "configure_parallelism": ws.configure_parallelism,
+        "storage_location": ws.storage_location,
         "ansible_version": ws.ansible_version,
         "ansible_execution_environment": ws.ansible_execution_environment,
         "ansible_collections": list(ws.ansible_collections or []),
@@ -614,6 +615,10 @@ async def restore_workspace(
         plan_apply=_restored_plan_apply(settings),
         configure=_restored_configure(settings),
     )
+    # A marker is a file in a bucket: its location may have left the config since.
+    storage_location = workspace_settings.validate_storage_location(
+        settings.get("storage_location")
+    )
     report: dict[str, Any] = {
         "source_workspace_id": workspace_id,
         "source_workspace_name": marker.get("workspace_name"),
@@ -723,6 +728,8 @@ async def restore_workspace(
         # workspace inherited. A snapshot predating this column has no key, and
         # `.get` gives the same `None` -- which is right for both (#2499).
         configure_parallelism=settings.get("configure_parallelism"),
+        # Kept, not reset: the state objects stay where they were written.
+        storage_location=storage_location,
         # "" is the correct fallback, not the deployment default: a snapshot
         # predating this column means the workspace never pinned one.
         ansible_version=settings.get("ansible_version") or "",

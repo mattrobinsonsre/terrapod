@@ -123,6 +123,7 @@ class TestAutodiscoveryRule:
             resource_cpu="1",
             parallelism=10,
             configure_parallelism=None,
+            storage_location=None,
             resource_memory="2Gi",
             ee_resource_cpu="",
             ee_resource_memory="",

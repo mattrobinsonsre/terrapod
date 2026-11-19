@@ -20,6 +20,10 @@ from terrapod.storage.protocol import (
 )
 
 
+class UnknownWorkspaceLocationError(ObjectStoreError):
+    """A write for a workspace whose location cannot be resolved (no row yet, or deleted)."""
+
+
 class LocationResolver(Protocol):
     async def location_for(self, workspace_id: str) -> str | None:
         """The workspace's location name, or None if the workspace is unknown."""
@@ -31,6 +35,13 @@ class StaticDefaultResolver:
 
     async def location_for(self, workspace_id: str) -> str | None:
         return DEFAULT_STORAGE_LOCATION
+
+
+class FanOutResolver:
+    """Knows no workspace, so reads fan out and writes are refused; for tools without a database."""
+
+    async def location_for(self, workspace_id: str) -> str | None:
+        return None
 
 
 class RoutingStore:
@@ -73,7 +84,9 @@ class RoutingStore:
     async def _writer(self, key: str) -> ObjectStore:
         store = await self._owner(key)
         if store is None:
-            raise ObjectStoreError(f"refusing to write {key}: its workspace has no known location")
+            raise UnknownWorkspaceLocationError(
+                f"refusing to write {key}: its workspace has no known location"
+            )
         return store
 
     async def _holder(self, key: str) -> ObjectStore | None:

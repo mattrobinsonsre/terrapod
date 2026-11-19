@@ -99,6 +99,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
             "configure-parallelism": rule.configure_parallelism,
+            "storage-location": rule.storage_location,
             "ansible-version": rule.ansible_version,
             "ansible-execution-environment": rule.ansible_execution_environment,
             "ansible-collections": list(rule.ansible_collections or []),
@@ -472,6 +473,13 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         try:
             out["configure_parallelism"] = validate_configure_parallelism(
                 attrs["configure-parallelism"]
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    if "storage-location" in attrs:
+        try:
+            out["storage_location"] = workspace_settings.validate_storage_location(
+                attrs["storage-location"]
             )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
@@ -948,6 +956,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         # No default: absent means the materialised workspace inherits (#2499).
         configure_parallelism=fields.get("configure_parallelism"),
+        storage_location=fields.get("storage_location"),
         ansible_version=fields.get("ansible_version", DEFAULT_ANSIBLE_LINE),
         ansible_execution_environment=fields.get("ansible_execution_environment", ""),
         ansible_collections=fields.get("ansible_collections", []),

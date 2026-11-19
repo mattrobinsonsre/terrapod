@@ -56,6 +56,10 @@ NEVER_BULK_SETTABLE: dict[str, str] = {
         "set cannot be written; and it addresses the state, so changing it "
         "would point the workspace at different infrastructure"
     ),
+    "storage_location": (
+        "set at creation and never changed — it decides where the workspace's objects "
+        "live, and moving them is a migration rather than a settings write"
+    ),
     "owner_email": "ownership grants workspace admin; platform-admin only, via the workspace API",
     # Where this workspace's code lives. Necessarily per-workspace: pointing a
     # match set at one repo, branch or subdirectory would make every one of them
@@ -757,19 +761,17 @@ _WS_FIELDS = _surface("web/src/lib/workspace-fields.ts")
 _CREATE_GUI = _surface("web/src/app/workspaces/page.tsx")
 _EDIT_GUI = _surface("web/src/app/workspaces/[id]/page.tsx")
 
-#: Attributes the write path accepts that are NOT workspace settings, and why.
-#:
-#: One entry, and it should stay that way: an operation flag is a property of
-#: the request rather than of the workspace, so no form offers it. A second
-#: entry appearing here is worth reading carefully -- the likely truth is that
-#: a real setting has been added and somebody reached for the ledger instead of
-#: the field table, which is the failure mode every exemption list in this repo
-#: has eventually had.
+#: Write-path attributes with no form field: operation flags, and a setting whose field has
+#: not landed yet (it must leave here the moment it does).
 _NOT_A_FORM_FIELD: dict[str, str] = {
     "force": (
         "an operation flag on PATCH (`attrs.get('force', False)`) that overrides a "
         "refusal for this one request -- not stored, not a setting, and offering it "
         "as a control would invite an operator to leave it on"
+    ),
+    "storage-location": (
+        "a real setting, offered on create only; the form follows with the UI change "
+        "that lists the configured locations, so remove this entry then"
     ),
 }
 
@@ -903,6 +905,14 @@ class TestCreateCanSetWhatEditCanSet:
             "nor the Configuration tab offers them. Add them to FIELDS with a "
             "group — both forms then render them — or, if the attribute is not a "
             "setting, record it in _NOT_A_FORM_FIELD with the reason."
+        )
+
+    def test_an_exemption_expires_when_its_field_lands(self):
+        """A field in `FIELDS` forces its `_NOT_A_FORM_FIELD` entry out."""
+        canonical, aliases = _declared_fields()
+        landed = sorted(set(_NOT_A_FORM_FIELD) & (canonical | aliases))
+        assert landed == [], (
+            f"{landed} now have a field in {_WS_FIELDS.name}; delete them from _NOT_A_FORM_FIELD"
         )
 
     def test_no_stale_exemption(self):

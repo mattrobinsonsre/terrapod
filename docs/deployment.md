@@ -249,6 +249,34 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 | `storage.filesystem.persistence.size` | `50Gi` | PVC size |
 | `storage.filesystem.persistence.storageClass` | `""` | Storage class |
 
+#### Storage locations
+
+`api.config.storage.locations` adds named stores (`s3`, `azure` or `gcs`, never `filesystem`), keyed by a name matching `^[a-z0-9-]{1,32}$`. The top-level block above is the `default` location, so that name is reserved. A workspace's `storage-location` is set when it is created and never changes. Its state, configuration versions, plans, logs and other run artifacts all live in that store. Shared data (registry, caches, backups, delete markers) stays on `default`.
+
+```yaml
+api:
+  config:
+    storage:
+      backend: s3
+      s3:
+        bucket: terrapod-storage
+        region: us-east-1
+      locations:
+        eu-west:
+          backend: s3
+          s3:
+            bucket: terrapod-storage-eu
+            region: eu-west-1
+```
+
+**A location cannot be removed while a workspace uses it.** The API refuses to start if any workspace names a location the configuration does not have. The log says `workspaces reference storage locations that are not configured: <names>` (or `...but none are configured: <names>` when the node has no locations). To fix it, re-add the location to `api.config.storage.locations` with the same bucket and prefix, then restart. If the database cannot answer this check at startup, `/ready` reports `storage_locations` as unchecked and keeps retrying until the check succeeds.
+
+Rolling back to a release without storage locations is not supported once a workspace has one: that code would write those workspaces' objects to `default`. The migration's downgrade also refuses while any workspace names a location.
+
+At start-up the API also checks that it can reach every named location (`default` is not probed). It lists one key under `state/` in each location, read-only and with a five-second timeout, so the node's credentials need list permission on that prefix. A location that does not answer is logged as an error together with the reason, and `terrapod_storage_location_reachable{location}` is set to `0` (or `1` when the location answers). The probe then repeats in the background whenever its last result is more than 30 seconds old, and the gauge always follows the latest result. `/ready` never waits for a probe: it reports the last result, which is at most about 30 seconds old (plus one probe's timeout). An unreachable location does not make the node unready: `/ready` stays 200 and shows `storage_locations: unreachable: <names>` as detail, and requests for workspaces in that location fail until it answers. A deployment with no locations configured runs no probe.
+
+A workspace's location never changes once it has been created, and Terrapod refuses any write that would change it. Each node therefore works out a workspace's location from its own copy of the workspace row. For high availability, both nodes must configure the same locations. See [High availability](high-availability.md#storage-locations-on-a-follower).
+
 ### Auth
 
 | Value | Default | Description |
@@ -1198,7 +1226,7 @@ Returns 200 if the process is running. Used by Kubernetes liveness probes.
 GET /ready
 ```
 
-Checks database, Redis, and storage. Returns 200 if all subsystems are healthy, 503 otherwise. Used by Kubernetes readiness probes to remove unhealthy pods from service.
+Checks database, Redis, and storage. Returns 200 if all subsystems are healthy, 503 otherwise. Used by Kubernetes readiness probes to remove unhealthy pods from service. When the [storage location check](#storage-locations) could not run at startup, readiness waits for it to succeed (`storage_locations`). A named location that does not answer the reachability probe is shown as `storage_locations: unreachable: <names>` without failing readiness.
 
 ### Structured Logging
 
