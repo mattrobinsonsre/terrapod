@@ -49,7 +49,15 @@ test('every state renders its WORD, never colour alone', () => {
     SOURCE.indexOf('export function VerificationBadge'),
     SOURCE.indexOf('export interface SupplyChain'),
   )
-  assert.ok(badge.includes('{label}'), 'the badge must render its label')
+  // In its OWN element, not a bare text node beside the glyph. The word is
+  // what states the status, so it has to be addressable on its own — as a
+  // sibling text node the badge's text content is "<glyph>Verified", and an
+  // exact match for the state never finds it. Caught by an e2e assertion
+  // before this gate existed.
+  assert.ok(
+    /<span>\{label\}<\/span>/.test(badge),
+    'the label must be its own element, not a bare text node beside the glyph',
+  )
   // The glyph is decorative and must be hidden from assistive tech, or a
   // screen reader announces a tick as well as the word.
   assert.ok(badge.includes('aria-hidden'), 'the glyph must be aria-hidden')

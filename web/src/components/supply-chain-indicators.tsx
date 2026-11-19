@@ -48,7 +48,12 @@ export function VerificationBadge({ state, label }: VerificationBadgeProps): JSX
       <span aria-hidden="true" className="text-[0.9em] leading-none">
         {state === 'failed' ? '✗' : state === 'verified' ? '✓' : '–'}
       </span>
-      {label}
+      {/* The word in its own element, not a bare text node beside the glyph.
+          It is what STATES the status -- the colour only reinforces it -- so
+          it has to be addressable on its own, by a test and by anything else
+          reading the page. As a sibling text node the badge's text content is
+          "<glyph>Verified", which an exact match never finds. */}
+      <span>{label}</span>
     </span>
   )
 }
