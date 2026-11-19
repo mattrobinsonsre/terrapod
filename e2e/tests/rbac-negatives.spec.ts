@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
+import { createWorkspace, getStoredToken, seedRun, uniqueName } from '../helpers/api';
+import { listOnly, stubLatestRun, NO_ACTIONS } from '../helpers/workspace-list';
 
 /**
  * RBAC negative paths — assert that non-admin identities are actually BLOCKED
@@ -98,5 +100,63 @@ test.describe('RBAC — audit user is read-only', () => {
     await expect(
       page.getByRole('button', { name: /create role|new role|add role/i }),
     ).toHaveCount(0);
+  });
+
+  test('bulk Plan and Cancel are refused for lack of the capability, and the row stays selected', async ({ page }) => {
+    const prefix = uniqueName('e2e-rbac-bulk');
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, `${prefix}-a`);
+    await seedRun(token, wsId, true);
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId('ws-row-select').check();
+    const result = page.getByTestId('ws-bulk-result');
+
+    // A real queued plan-only run: Plan and Cancel are offered, and the server refuses both.
+    await page.getByTestId('ws-selection').click();
+    await page.getByTestId('ws-selection-plan').click();
+    await expect(result).toContainText('Plan: 0 of 1', { timeout: 15_000 });
+    await expect(result).toContainText(`${prefix}-a`);
+    await expect(result).toContainText("Requires 'run:plan' capability on workspace");
+    await expect(page.getByTestId('ws-row-select')).toBeChecked();
+
+    await page.getByTestId('ws-selection').click();
+    await expect(page.getByTestId('ws-selection-cancel')).toContainText('1 of 1');
+    await page.getByTestId('ws-selection-cancel').click();
+    await expect(result).toContainText('Cancel run: 0 of 1', { timeout: 15_000 });
+    await expect(result).toContainText(`${prefix}-a`);
+    await expect(result).toContainText("Requires 'run:cancel' capability on workspace");
+    await expect(page.getByTestId('ws-row-select')).toBeChecked();
+  });
+
+  test('bulk Apply and Discard are refused for lack of the capability, and the row stays selected', async ({ page }) => {
+    const prefix = uniqueName('e2e-rbac-bulk');
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, `${prefix}-a`);
+    const runId = await seedRun(token, wsId, true);
+
+    // The list says the real run is planned and actionable; the server still decides.
+    await stubLatestRun(page, [wsId], () => ({
+      id: runId,
+      status: 'planned',
+      actions: { ...NO_ACTIONS, 'is-confirmable': true, 'is-discardable': true },
+    }));
+    await listOnly(page, prefix, 1);
+    await page.getByTestId('ws-row-select').check();
+    const result = page.getByTestId('ws-bulk-result');
+
+    for (const [action, label, capability] of [
+      ['apply', 'Apply', 'run:apply'],
+      ['discard', 'Discard', 'run:cancel'],
+    ]) {
+      page.once('dialog', (d) => void d.accept());
+      await page.getByTestId('ws-selection').click();
+      await page.getByTestId(`ws-selection-${action}`).click();
+      await expect(result).toContainText(`${label}: 0 of 1`, { timeout: 15_000 });
+      await expect(result).toContainText(`${prefix}-a`);
+      await expect(result).toContainText(`Requires '${capability}' capability on workspace`);
+      await expect(page.getByTestId('ws-row-select')).toBeChecked();
+    }
+    await page.unrouteAll({ behavior: 'wait' });
   });
 });

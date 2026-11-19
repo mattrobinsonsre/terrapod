@@ -10,12 +10,14 @@ import assert from 'node:assert/strict'
 import { runBulkAction, endpointFor, type Fetcher } from '../src/lib/workspace-bulk-run.ts'
 import type { BulkWorkspace } from '../src/lib/workspace-bulk-actions.ts'
 
-function ws(id: string, status: string | null, planOnly = false): BulkWorkspace {
+function ws(id: string, run: string | null): BulkWorkspace {
   return {
     id: `ws-${id}`,
     name: `name-${id}`,
     locked: false,
-    latestRun: status ? { id: `run-${id}`, status, planOnly } : null,
+    planApplyEnabled: true,
+    configureEnabled: false,
+    latestRun: run ? { id: `run-${id}`, runKind: 'plan_apply', actions: null } : null,
   }
 }
 

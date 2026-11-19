@@ -1,22 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { getStoredToken, createWorkspace, lockWorkspace, seedRun, uniqueName } from "../helpers/api";
-
-// Scope the list to one test's own rows. On a busy list the table can keep rows the
-// filter excludes (it does on upstream main too: "Showing 2 of N" above more than
-// two rows), which would make select-all act on someone else's workspaces. A reload
-// clears it, so retry from a fresh page rather than assert on a table that is wrong.
-async function listOnly(page: Page, prefix: string, count: number) {
-  for (let attempt = 1; ; attempt++) {
-    await page.goto("/workspaces");
-    await page.locator('input[aria-label="Filter workspaces"]').fill(`${prefix} `);
-    try {
-      await expect(page.getByTestId("ws-row-select")).toHaveCount(count, { timeout: 4_000 });
-      return;
-    } catch (err) {
-      if (attempt >= 4) throw err;
-    }
-  }
-}
+import { listOnly, stubLatestRun, NO_ACTIONS } from "../helpers/workspace-list";
 
 test.describe("Workspaces", () => {
   test("workspace list page loads", async ({ page }) => {
@@ -757,6 +741,76 @@ test.describe("Workspaces", () => {
     expect(dialogs, "an unavailable action must not open a confirm").toBe(0);
     await expect(page.getByTestId("ws-bulk-result")).toHaveCount(0);
   });
+  test("Apply and Discard follow the server's answer, not the run's status", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-answer");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    // A planned run the server says can be neither applied nor discarded (no changes).
+    await stubLatestRun(page, [id], () => ({ status: "planned", actions: NO_ACTIONS }));
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+    await expect(page.getByTestId("ws-selection-apply")).toContainText("0 of 1");
+    await expect(page.getByTestId("ws-selection-discard")).toContainText("0 of 1");
+    await page.unrouteAll({ behavior: "wait" });
+  });
+
+  test("Discard is offered on a run held after its plan, though its status is not planned", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-held");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    await stubLatestRun(page, [id], () => ({
+      status: "planning",
+      actions: { ...NO_ACTIONS, "is-discardable": true, "is-cancelable": true },
+    }));
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+    await expect(page.getByTestId("ws-selection-discard")).toContainText("1 of 1");
+    await expect(page.getByTestId("ws-selection-apply")).toContainText("0 of 1");
+    await page.unrouteAll({ behavior: "wait" });
+  });
+
+  test("a latest run with no actions (an older API) offers only Plan", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-old");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    await stubLatestRun(page, [id], () => ({ status: "errored", actions: undefined }));
+
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+    await expect(page.getByTestId("ws-selection-plan")).toContainText("1 of 1");
+    for (const action of ["retry", "cancel", "apply", "discard"]) {
+      await expect(page.getByTestId(`ws-selection-${action}`)).toContainText("0 of 1");
+    }
+    await page.unrouteAll({ behavior: "wait" });
+  });
+
+  test("Plan is not offered on a workspace without plan/apply, and Retry follows the run's kind", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-ops");
+    const ids = [
+      await createWorkspace(getStoredToken(), `${prefix}-cfg`),
+      await createWorkspace(getStoredToken(), `${prefix}-pa`),
+    ];
+    // Both are configure-only; the first's latest run is a configure, the second's a plan/apply.
+    await stubLatestRun(
+      page,
+      ids,
+      (i) => ({
+        status: "errored",
+        "run-kind": i === 0 ? "configure" : "plan_apply",
+        actions: { ...NO_ACTIONS, "is-retryable": true },
+      }),
+      { "plan-apply-enabled": false, "configure-enabled": true },
+    );
+
+    await listOnly(page, prefix, 2);
+    await page.getByTestId("ws-select-all").check();
+    await page.getByTestId("ws-selection").click();
+    await expect(page.getByTestId("ws-selection-plan")).toContainText("0 of 2");
+    await expect(page.getByTestId("ws-selection-retry")).toContainText("1 of 2");
+    await page.unrouteAll({ behavior: "wait" });
+  });
   test("Apply and Discard confirm in the irreversible tier, with the count and the names, and send nothing if declined", async ({ page }) => {
     // A planned, apply-capable run is the state both need, and reaching it for
     // real takes a runner. So the LIST response is stubbed to carry one, and the
@@ -769,22 +823,11 @@ test.describe("Workspaces", () => {
     ];
 
     const posts: string[] = [];
-    await page.route("**/api/v1/workspaces?**", async (route) => {
-      const res = await route.fetch();
-      const body = await res.json();
-      for (const w of body.data ?? []) {
-        const i = ids.indexOf(w.id);
-        if (i >= 0) {
-          w.attributes["latest-run"] = {
-            id: `run-planned-${i}`,
-            status: "planned",
-            "plan-only": false,
-            "created-at": "2026-11-10T10:00:00Z",
-          };
-        }
-      }
-      await route.fulfill({ response: res, json: body });
-    });
+    await stubLatestRun(page, ids, (i) => ({
+      id: `run-planned-${i}`,
+      status: "planned",
+      actions: { ...NO_ACTIONS, "is-confirmable": true, "is-discardable": true },
+    }));
     await page.route("**/api/v1/runs/*/actions/*", async (route) => {
       posts.push(route.request().url());
       await route.fulfill({ status: 200, contentType: "application/vnd.api+json", body: "{}" });
