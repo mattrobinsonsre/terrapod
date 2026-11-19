@@ -110,3 +110,34 @@ class TestInventoryOne:
         with patch("terrapod.storage.get_storage", return_value=store):
             with patch("terrapod.services.api_tool.tool_dir", return_value=tmp_path):
                 assert await sw._inventory_one(row) is None
+
+
+class TestStaleness:
+    """What makes a finding stale, which is NOT what makes an SBOM stale.
+
+    An SBOM is a fact about the artifact and never changes. A finding is a
+    statement about an SBOM *and* a database epoch, so it expires when the
+    database moves. Getting this wrong in the quiet direction -- comparing only
+    matcher versions -- means a new CVE never reaches an artifact admitted
+    months ago, because no advisory upgrades the binary.
+
+    Asserted on the predicate's STRUCTURE rather than its rendered SQL: the keys
+    are bind parameters, so they do not appear in `str()` at all, and a string
+    match would pass on a predicate that checks nothing.
+    """
+
+    def test_the_database_epoch_adds_a_trigger(self) -> None:
+        """Three clauses with an epoch, two without -- the extra one IS the
+        database-moved trigger, and without it no advisory ever re-matches."""
+        assert len(sw._needs_matching({"updated_at": "2026-11-19T07:06:49Z"}).clauses) == 3
+
+    def test_an_unknown_epoch_does_not_churn_the_whole_ledger(self) -> None:
+        """Trivy could not say. Treating that as "everything is stale" would
+        re-match the entire ledger on every cycle, for ever."""
+        assert len(sw._needs_matching({}).clauses) == 2
+
+    def test_an_empty_epoch_string_is_treated_as_unknown(self) -> None:
+        """Not as an epoch of `""`, which would mark every row stale against a
+        value nothing can ever equal."""
+        assert len(sw._needs_matching({"updated_at": ""}).clauses) == 2
+        assert len(sw._needs_matching({"version": 2}).clauses) == 2

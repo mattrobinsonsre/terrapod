@@ -76,6 +76,97 @@ async def sbom_cycle() -> None:
         await db.flush()
 
 
+async def match_cycle() -> None:
+    """Match inventoried artifacts against the vulnerability database.
+
+    Separate from the inventory sweep because the two go stale for DIFFERENT
+    reasons. An SBOM is a fact about the artifact and never changes; a finding
+    is a statement about an SBOM *and* a database epoch, so it expires when the
+    database moves rather than when the artifact does. One sweep doing both
+    would either re-inventory needlessly or never re-match.
+    """
+    from terrapod.db.session import get_db_session
+    from terrapod.services import vuln_match_service
+
+    # Asked once, before a batch: with no trivy there is nothing to do, and the
+    # SBOMs are kept, so this is a deferral rather than a loss.
+    binary = await vuln_match_service.trivy_binary()
+    if binary is None:
+        return
+
+    # The epoch ONCE per cycle, not per artifact: it is the same answer for
+    # every row in the batch, and it is what decides which rows are stale.
+    epoch = await vuln_match_service._db_epoch(binary)
+
+    async with get_db_session() as db:
+        rows = (
+            (
+                await db.execute(
+                    select(ArtifactLedgerEntry)
+                    .where(ArtifactLedgerEntry.sbom.is_not(None))
+                    # Never matched, or matched against an epoch that has since
+                    # moved. The second clause is what makes a new CVE reach an
+                    # artifact admitted months ago.
+                    .where(_needs_matching(epoch))
+                    .order_by(ArtifactLedgerEntry.updated_at)
+                    .limit(BATCH)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in rows:
+            outcome = await vuln_match_service.match(row.sbom)
+            if outcome is None:
+                # Left alone deliberately: an empty findings list would read as
+                # "we matched and found nothing", which this did not establish.
+                continue
+            matches, provenance = outcome
+            row.matches = matches
+            row.verdict_provenance = provenance
+            row.updated_at = now_utc()
+        await db.flush()
+
+
+def _needs_matching(epoch: dict):
+    """Rows whose findings are absent or derived from a superseded database.
+
+    **The database epoch is the trigger that matters**, and it is the one an
+    earlier version of this got wrong by reading it from the scan report, where
+    Trivy does not put it. A new CVE reaches an artifact admitted months ago
+    only because this notices the database moved -- comparing matcher versions
+    alone would re-match only when the binary is upgraded, which no advisory
+    does.
+
+    Expressed as a predicate so the staleness rule lives in one place rather
+    than drifting between the two sweeps.
+    """
+    from sqlalchemy import or_
+
+    from terrapod.config import settings
+
+    clauses = [
+        # Never matched at all.
+        ArtifactLedgerEntry.verdict_provenance == {},
+        # A matcher bump can change a verdict on identical input, so it counts
+        # as a new epoch even when the database has not moved.
+        ArtifactLedgerEntry.verdict_provenance["matcher_version"].astext
+        != settings.registry.platform_tools.trivy_version,
+    ]
+    updated = epoch.get("updated_at")
+    if updated:
+        clauses.append(
+            ArtifactLedgerEntry.verdict_provenance["db"]["updated_at"].astext != str(updated)
+        )
+    else:
+        # Trivy could not tell us the epoch. Re-matching everything on that
+        # basis would churn the whole ledger every cycle, so the version
+        # clauses above stand alone and this cycle simply does not use the
+        # database as a trigger.
+        logger.debug("no vulnerability-database epoch available; matching by version only")
+    return or_(*clauses)
+
+
 async def _apply(row: ArtifactLedgerEntry) -> None:
     """Inventory one row and store the result, or leave it alone.
 

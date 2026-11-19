@@ -2275,7 +2275,8 @@
                   "type": "string",
                   "enum": [
                     "off",
-                    "checksum"
+                    "checksum",
+                    "signature"
                   ]
                 }
               }
