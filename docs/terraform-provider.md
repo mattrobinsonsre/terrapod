@@ -365,6 +365,16 @@ that your configuration does not declare. If you meant to clear it, set `= []`;
 if the value is managed outside Terraform, declare the attribute explicitly to
 silence the warning.
 
+## `exclude` on a `terrapod_variable_set` rule
+
+The `assignment_rule` block does not model the API's `exclude` list. An exclusion
+added to a rule through the API or UI is **carried across every update
+unchanged** (the provider reads the set's current rule and sends its `exclude`
+back with the rule from your configuration), so an apply no longer removes it, and it **does not appear in
+plans**: Terraform neither shows it nor manages it. Removing the `assignment_rule`
+block clears the whole rule, exclusion included. The read and the write are two
+requests, so an exclusion someone else adds between them is overwritten.
+
 ## `apply_only` on the two variable resources
 
 `terrapod_variable` and `terrapod_variable_set_variable` both carry an

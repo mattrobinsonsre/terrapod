@@ -4261,5 +4261,46 @@
     "knownHostsHint": "Claves hospitum publicae machinarum quas haec fides attingit, singulae per versum in forma known_hosts. Variabilem inventarii ad eius semitam dirige ut sine relaxatione probationis clavis hospitis coniungas. Non occultatur: clavis publica hospitis publica est, atque id ipsum est quod comparas cum clavis non congruit.",
     "knownHostsLead": "Claves hospitum publicae machinarum quas haec fides attingit, singulae per versum in forma known_hosts.",
     "machineLead": "Quomodo Ansible ad hospites se coniungit qui hoc testimonium appellant. Clavem privatam aut tesseram praebe, vel utramque."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verificatum",
+      "unverified": "Non verificatum",
+      "failed": "Verificatio defecit",
+      "legend": "Quomodo hoc artificium admissum sit"
+    },
+    "state": {
+      "inventoried": "Recensitum",
+      "notInventoried": "Non recensitum",
+      "findings": "{count, plural, one {# repertum} other {# reperta}}",
+      "malicious": "{count, plural, one {# malitiosus} other {# malitiosi}}"
+    },
+    "reason": {
+      "notAdmitted": "Admissum antequam hoc monumentum esset, ideo numquam recensitum est",
+      "awaiting": "Admissum et recensionem exspectans"
+    },
+    "detail": {
+      "title": "Artificium",
+      "back": "Retro ad promptuarium",
+      "admitted": "Admissum",
+      "attestation": "Attestatio",
+      "attestor": "Auctor testimonii",
+      "coordinates": "Appellatur",
+      "packages": "{count, plural, one {# fasciculus} other {# fasciculi}}",
+      "sbom": "Index partium programmatis",
+      "sbomNone": "Nullus index partium huic artificio confectus est",
+      "findings": "Reperta",
+      "findingsNone": "Nihil congruit",
+      "verdict": "Sententia",
+      "verdictLine": "Comparatum per {matcher} {matcherVersion} cum aetate {epoch} basis datorum, recensitum per {generator} {generatorVersion}",
+      "verdictNone": "Hoc artificium cum basi datorum vulnerabilitatum nondum comparatum est",
+      "notFound": "Nullum monumentum huius artificii exstat",
+      "advisory": "Reperta monent tantum. Describunt quid intra artificium iam admissum et verificatum insit; id non impediunt, quia auctor testimonii his octetis iam fidem praestitit.",
+      "maliciousNote": "Fasciculus malitiosus notatus non est vitium in dependentia. Immo artificium ipsum hostile habendum est."
+    },
+    "column": {
+      "verification": "Verificatio",
+      "supplyChain": "Contenta"
+    }
   }
 }

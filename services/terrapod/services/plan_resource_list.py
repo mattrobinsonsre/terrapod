@@ -75,7 +75,8 @@ MAX_VALUE_LENGTH = 120
 #: Characters kept of a resource address or an attribute path.
 MAX_NAME_LENGTH = 200
 
-#: Scan steps one build may spend hiding secrets; past it everything is hidden.
+#: Scan steps one build may spend hiding secrets; running out while building the secret matcher
+#: hides the whole list, running out later hides only the entries after that point.
 MAX_SCRUB_STEPS = 1_000_000
 
 #: Most registered secrets and escaped forms in one build; past it everything is hidden.
