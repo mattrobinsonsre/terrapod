@@ -82,6 +82,7 @@ class WorkspaceFilter(BaseModel):
     engine_version: str | None = None
     agent_pool_id: str | None = None
     vcs_connection_id: str | None = None
+    autodiscovery_rule_id: str | None = None
     owner_email: str | None = None
     drift_status: str | None = None
     locked: bool | None = None
@@ -102,6 +103,7 @@ class WorkspaceFilter(BaseModel):
                 "engine_version",
                 "agent_pool_id",
                 "vcs_connection_id",
+                "autodiscovery_rule_id",
                 "owner_email",
                 "drift_status",
                 "locked",
@@ -158,6 +160,9 @@ def _dimension_clauses(f: WorkspaceFilter) -> list[ColumnElement[bool]]:
         )
     if f.vcs_connection_id is not None:
         clauses.append(Workspace.vcs_connection_id == _strip_uuid(f.vcs_connection_id, "vcs-"))
+    if f.autodiscovery_rule_id is not None:
+        # Rules are exposed as bare uuids, so there is no prefix to strip.
+        clauses.append(Workspace.autodiscovery_rule_id == _strip_uuid(f.autodiscovery_rule_id, ""))
     if f.owner_email is not None:
         clauses.append(Workspace.owner_email == f.owner_email)
     if f.drift_status is not None:
