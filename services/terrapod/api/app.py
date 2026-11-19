@@ -199,6 +199,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Inventory admitted artifacts that have no SBOM yet",
     )
 
+    # A separate task from the inventory, because the two go stale for
+    # different reasons: an SBOM is a fact about the artifact and never
+    # changes, while a finding expires when the vulnerability database moves.
+    # Less frequent, since the database is published daily rather than
+    # continuously.
+    from terrapod.services.sbom_sweep import match_cycle
+
+    register_periodic_task(
+        "vulnerability_match",
+        interval_seconds=1800,
+        handler=match_cycle,
+        description="Match inventoried artifacts against the vulnerability database",
+    )
+
     register_periodic_task(
         "pulumi_update_sweep",
         interval_seconds=60,

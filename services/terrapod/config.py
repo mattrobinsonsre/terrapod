@@ -1584,19 +1584,23 @@ class PlatformToolsConfig(BaseModel):
         "this endpoint is unreachable (air-gapped mirrors), accepting that trade "
         "knowingly.",
     )
-    verify: Literal["off", "checksum"] = Field(
-        default="checksum",
+    verify: Literal["off", "checksum", "signature"] = Field(
+        default="signature",
         description="Integrity verification for platform tools fetched from upstream. "
-        "'checksum' (default, fail-closed): verify the downloaded artifact's SHA-256 "
-        "against the publisher's published checksum before caching. 'off': no "
-        "verification (NOT recommended — these binaries are executed). There is no "
-        "'signature' level yet, and that is a gap rather than an absence of "
-        "material: opa and checkov publish no signature at all, but trivy and syft "
-        "each publish a Sigstore attestation over their checksums manifest "
-        "(<tool>_<version>_checksums.txt.sigstore.json). Measured against their "
-        "live releases. An earlier version of this description said none of them "
-        "signs anything, which was true of GPG and read as 'there is nothing "
-        "stronger available' — there is, for half of them.",
+        "'signature' (default, fail-closed): verify the SHA-256 against the publisher's "
+        "published checksum AND verify the publisher's Sigstore signature over it. "
+        "'checksum': the SHA-256 only. 'off': no verification (NOT recommended — these "
+        "binaries are executed). "
+        "What 'signature' covers, measured against the live releases rather than taken "
+        "from anyone's docs: trivy and syft each publish a Sigstore bundle over their "
+        "checksums manifest (<tool>_<version>_checksums.txt.sigstore.json); checkov is "
+        "built and published by TERRAPOD's own CI, which has attested its build "
+        "provenance since #2066, verifiable anonymously through the GitHub attestations "
+        "API. opa publishes no signing material at all, so it verifies by checksum and "
+        "the outcome is RECORDED as such — 'signature' never silently means 'checksum'. "
+        "A signature that genuinely fails refuses the artifact; signing material that "
+        "cannot be FETCHED degrades to the checksum that already passed, because a "
+        "transport failure says nothing about the bytes.",
     )
 
 

@@ -512,6 +512,20 @@ async def _expected_sha256(
     raise VerificationError(f"not a platform tool: {tool!r}")
 
 
+def sigs_unavailable():
+    """The one signature failure that may be tolerated.
+
+    A *transport* failure says nothing about the artifact. A signature that
+    genuinely did not verify is `SigstoreVerificationError`, which is NOT caught
+    anywhere -- it propagates, the caller caches nothing, and the tool is
+    refused. Naming the tolerable case in one place keeps the two from being
+    conflated by a broader `except`.
+    """
+    from terrapod.services.sigstore_verification import TrustRootUnavailable
+
+    return TrustRootUnavailable
+
+
 async def verify_platform_tool(
     client: httpx.AsyncClient,
     tool: str,
@@ -520,8 +534,15 @@ async def verify_platform_tool(
     arch: str,
     digests: dict[str, str],
     level: str | None = None,
-) -> None:
-    """Check a downloaded artifact against the publisher's checksum.
+) -> str:
+    """Check a downloaded artifact against the publisher's checksum, and at
+    `signature` against the publisher's signature too.
+
+    **Returns what was actually established**, which is the point of the
+    `signature` level rather than a detail of it: three of the four platform
+    tools publish signing material and `opa` publishes none, so a setting that
+    silently fell back would tell an operator their fleet is signature-verified
+    when one tool is not. The outcome is a value a caller records.
 
     No-op when the level is off. Raises VerificationError on any mismatch or
     unobtainable material — the caller must cache nothing and serve nothing.
@@ -540,7 +561,7 @@ async def verify_platform_tool(
             tool=tool,
             version=version,
         )
-        return
+        return "off"
 
     algo = checksum_algorithm(tool)
     expected = await _expected_sha256(client, tool, version, os_, arch)
@@ -550,3 +571,35 @@ async def verify_platform_tool(
             f"{digests.get(algo, '')}, publisher says {expected} — refusing to cache "
             f"(possible tampering)"
         )
+
+    if level != "signature":
+        return "checksum"
+
+    # The checksum established WHICH bytes arrived. The signature establishes
+    # WHO vouched for them, and it runs second for that reason: for the tools
+    # whose bundle signs a checksums manifest, the asset's digest being a line
+    # in that manifest is exactly what the check above proved.
+    from terrapod.services import platform_tool_signatures as sigs
+
+    try:
+        return await sigs.verify_signature(
+            client,
+            tool=tool,
+            version=version,
+            asset=_asset_name(tool, version, os_, arch),
+            base=_mirror(tool),
+            asset_digest=expected,
+        )
+    except sigs_unavailable() as exc:
+        # The trust root or the signing material could not be FETCHED, which
+        # says nothing about the artifact -- an air-gapped mirror, a transient
+        # 503. The checksum still passed, so the bytes are the publisher's; what
+        # is missing is the second opinion about who published them. Degrade and
+        # record, rather than refusing a tool the operator can see is correct.
+        logger.warning(
+            "could not check the publisher signature; the checksum still passed",
+            tool=tool,
+            version=version,
+            reason=str(exc),
+        )
+        return sigs.UNAVAILABLE
