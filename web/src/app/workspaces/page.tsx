@@ -135,6 +135,16 @@ interface Workspace {
     locked: boolean
     'plan-apply-enabled'?: boolean
     'configure-enabled'?: boolean
+    // Whether this USER may act, as opposed to `latest-run.actions`, which says
+    // whether the RUN is in a state where acting is possible. The bulk menu
+    // needs both and read only the second until #2579. Optional, and absent
+    // reads as no permission: offering a control that 403s on press is the
+    // defect, so failing closed is the safe direction.
+    permissions?: {
+      'can-queue-run'?: boolean
+      'can-queue-apply'?: boolean
+      'can-queue-destroy'?: boolean
+    }
     'resource-cpu': string
     'resource-memory': string
     'agent-pool-name': string | null
@@ -1018,6 +1028,11 @@ function WorkspacesPageInner() {
             locked: !!w.attributes.locked,
             planApplyEnabled: w.attributes['plan-apply-enabled'] !== false,
             configureEnabled: w.attributes['configure-enabled'] === true,
+            permissions: {
+              canQueueRun: !!w.attributes.permissions?.['can-queue-run'],
+              canQueueApply: !!w.attributes.permissions?.['can-queue-apply'],
+              canQueueDestroy: !!w.attributes.permissions?.['can-queue-destroy'],
+            },
             latestRun: run
               ? {
                   id: run.id,

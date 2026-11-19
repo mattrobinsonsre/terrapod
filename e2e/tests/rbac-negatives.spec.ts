@@ -102,7 +102,17 @@ test.describe('RBAC — audit user is read-only', () => {
     ).toHaveCount(0);
   });
 
-  test('bulk Plan and Cancel are refused for lack of the capability, and the row stays selected', async ({ page }) => {
+  // These used to assert the opposite: that the menu OFFERED Plan/Cancel/Apply/
+  // Discard to a read-only user and the server refused on press. That was the
+  // behaviour, faithfully pinned — and it was the defect (#2579 item 2). The
+  // page published `can-queue-*` on every row and read none of them, so the
+  // only thing standing between a read-only user and a 403 was the 403.
+  //
+  // The server is still authoritative and still refuses; what changed is that
+  // the control is no longer offered, so the refusal is not something a user
+  // has to discover by pressing. Note the item stays FOCUSABLE while disabled,
+  // deliberately, so the count beside it is reachable to a screen reader.
+  test('bulk Plan and Cancel are not offered without the capability', async ({ page }) => {
     const prefix = uniqueName('e2e-rbac-bulk');
     const token = getStoredToken();
     const wsId = await createWorkspace(token, `${prefix}-a`);
@@ -112,30 +122,31 @@ test.describe('RBAC — audit user is read-only', () => {
     await page.getByTestId('ws-row-select').check();
     const result = page.getByTestId('ws-bulk-result');
 
-    // A real queued plan-only run: Plan and Cancel are offered, and the server refuses both.
-    await page.getByTestId('ws-selection').click();
-    await page.getByTestId('ws-selection-plan').click();
-    await expect(result).toContainText('Plan: 0 of 1', { timeout: 15_000 });
-    await expect(result).toContainText(`${prefix}-a`);
-    await expect(result).toContainText("Requires 'run:plan' capability on workspace");
-    await expect(page.getByTestId('ws-row-select')).toBeChecked();
+    for (const action of ['plan', 'cancel'] as const) {
+      await page.getByTestId('ws-selection').click();
+      const item = page.getByTestId(`ws-selection-${action}`);
+      await expect(item).toHaveAttribute('aria-disabled', 'true');
+      // Zero of one eligible — the row qualifies on run state and the user
+      // does not hold the capability, which is the whole distinction.
+      await expect(item).toContainText('0 of 1');
 
-    await page.getByTestId('ws-selection').click();
-    await expect(page.getByTestId('ws-selection-cancel')).toContainText('1 of 1');
-    await page.getByTestId('ws-selection-cancel').click();
-    await expect(result).toContainText('Cancel run: 0 of 1', { timeout: 15_000 });
-    await expect(result).toContainText(`${prefix}-a`);
-    await expect(result).toContainText("Requires 'run:cancel' capability on workspace");
-    await expect(page.getByTestId('ws-row-select')).toBeChecked();
+      // Pressing it must do nothing at all: no request, so no result panel.
+      await item.click();
+      await expect(result).toHaveCount(0);
+      await expect(page.getByTestId('ws-row-select')).toBeChecked();
+      await page.keyboard.press('Escape');
+    }
   });
 
-  test('bulk Apply and Discard are refused for lack of the capability, and the row stays selected', async ({ page }) => {
+  test('bulk Apply and Discard are not offered without the capability', async ({ page }) => {
     const prefix = uniqueName('e2e-rbac-bulk');
     const token = getStoredToken();
     const wsId = await createWorkspace(token, `${prefix}-a`);
     const runId = await seedRun(token, wsId, true);
 
-    // The list says the real run is planned and actionable; the server still decides.
+    // The run is planned and actionable, so run STATE permits both. Only the
+    // missing capability withholds them — which is what makes this a test of
+    // the permission dimension rather than of eligibility.
     await stubLatestRun(page, [wsId], () => ({
       id: runId,
       status: 'planned',
@@ -145,17 +156,17 @@ test.describe('RBAC — audit user is read-only', () => {
     await page.getByTestId('ws-row-select').check();
     const result = page.getByTestId('ws-bulk-result');
 
-    for (const [action, label, capability] of [
-      ['apply', 'Apply', 'run:apply'],
-      ['discard', 'Discard', 'run:cancel'],
-    ]) {
-      page.once('dialog', (d) => void d.accept());
+    for (const action of ['apply', 'discard'] as const) {
       await page.getByTestId('ws-selection').click();
-      await page.getByTestId(`ws-selection-${action}`).click();
-      await expect(result).toContainText(`${label}: 0 of 1`, { timeout: 15_000 });
-      await expect(result).toContainText(`${prefix}-a`);
-      await expect(result).toContainText(`Requires '${capability}' capability on workspace`);
+      const item = page.getByTestId(`ws-selection-${action}`);
+      await expect(item).toHaveAttribute('aria-disabled', 'true');
+      await expect(item).toContainText('0 of 1');
+
+      // No confirm dialog either: a disabled item returns before prompting.
+      await item.click();
+      await expect(result).toHaveCount(0);
       await expect(page.getByTestId('ws-row-select')).toBeChecked();
+      await page.keyboard.press('Escape');
     }
     await page.unrouteAll({ behavior: 'wait' });
   });
