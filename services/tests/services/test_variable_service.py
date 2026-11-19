@@ -501,6 +501,13 @@ class TestTheBlastRadiusViewAgreesWithTheMatcher:
         out = await workspaces_for_varset(db, self._varset({"locked": "true"}))
         assert out == []
 
+    async def test_the_autodiscovery_rule_dimension_too_in_either_spelling(self):
+        from terrapod.services.variable_service import workspaces_for_varset
+
+        for key in ("autodiscovery_rule_id", "autodiscovery-rule-id"):
+            out = await workspaces_for_varset(self._db(), self._varset({key: str(uuid.uuid4())}))
+            assert out == [], key
+
     async def test_a_refused_dimension_mixed_with_a_good_one_still_reports_nothing(self):
         """The matcher refuses the whole rule, not the refused clause — so must this."""
         from terrapod.services.variable_service import workspaces_for_varset

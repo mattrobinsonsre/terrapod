@@ -4261,5 +4261,46 @@
     "knownHostsHint": "この資格情報が接続するマシンの公開ホスト鍵を、known_hosts 形式で 1 行に 1 つ記述します。ホスト鍵の検証を緩めずに接続するには、インベントリ変数をこのパスに向けてください。隠されません。ホストの公開鍵は公開情報であり、鍵が一致しないときに比較するのはまさにこれです。",
     "knownHostsLead": "この資格情報が接続するマシンの公開ホスト鍵を、known_hosts 形式で 1 行に 1 つ記述します。",
     "machineLead": "この認証情報を参照するホストに Ansible が接続する方法です。秘密鍵かパスワード、またはその両方を指定してください。"
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "検証済み",
+      "unverified": "未検証",
+      "failed": "検証に失敗しました",
+      "legend": "この成果物が受け入れられた経緯"
+    },
+    "state": {
+      "inventoried": "インベントリ作成済み",
+      "notInventoried": "インベントリ未作成",
+      "findings": "{count, plural, other {# 件の検出事項}}",
+      "malicious": "{count, plural, other {悪意のあるパッケージ # 件}}"
+    },
+    "reason": {
+      "notAdmitted": "このレコードが存在する前に受け入れられたため、インベントリは作成されていません",
+      "awaiting": "受け入れ済み、インベントリの作成待ちです"
+    },
+    "detail": {
+      "title": "成果物",
+      "back": "キャッシュに戻る",
+      "admitted": "受け入れ",
+      "attestation": "アテステーション",
+      "attestor": "保証者",
+      "coordinates": "識別名",
+      "packages": "{count, plural, other {# 個のパッケージ}}",
+      "sbom": "ソフトウェア部品表",
+      "sbomNone": "この成果物のインベントリは作成されていません",
+      "findings": "検出事項",
+      "findingsNone": "一致するものはありません",
+      "verdict": "判定",
+      "verdictLine": "{matcher} {matcherVersion} がデータベースエポック {epoch} と照合し、{generator} {generatorVersion} がインベントリを作成しました",
+      "verdictNone": "この成果物は脆弱性データベースと照合されていません",
+      "notFound": "この成果物のレコードはありません",
+      "advisory": "検出事項は参考情報です。受け入れられ検証済みの成果物に何が含まれているかを示すもので、成果物をブロックすることはありません。保証者がすでにこのバイト列を保証しているためです。",
+      "maliciousNote": "悪意ありと判定されたパッケージは、依存関係の不具合ではありません。成果物自体が敵対的であるとみなしてください。"
+    },
+    "column": {
+      "verification": "検証",
+      "supplyChain": "内容"
+    }
   }
 }

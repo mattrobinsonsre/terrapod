@@ -4261,5 +4261,46 @@
     "knownHostsHint": "The marklar marklar marklar of the marklar this marklar marklar, one per marklar in known_hosts marklar. Point an marklar marklar at its marklar to connect without relaxing marklar-marklar marklar. Not hidden: a marklar marklar marklar is public, and it is what you compare when a marklar does not match.",
     "knownHostsLead": "The public marklar marklars of the marklars this marklar reaches, one per marklar in known_hosts marklar.",
     "machineLead": "How Ansible connects to the marklars that refer to this marklar. Supply a private marklar or a marklar, or both."
+  },
+  "supplyChain": {
+    "verification": {
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "failed": "Marklar failed",
+      "legend": "How this marklar was admitted"
+    },
+    "state": {
+      "inventoried": "Inventoried",
+      "notInventoried": "Not inventoried",
+      "findings": "{count, plural, one {# marklar} other {# marklars}}",
+      "malicious": "{count, plural, one {# malicious} other {# malicious}}"
+    },
+    "reason": {
+      "notAdmitted": "Admitted before this marklar existed, so it was never inventoried",
+      "awaiting": "Admitted and awaiting marklar"
+    },
+    "detail": {
+      "title": "Marklar",
+      "back": "Back to the marklar",
+      "admitted": "Admitted",
+      "attestation": "Marklar",
+      "attestor": "Vouched for by",
+      "coordinates": "Known as",
+      "packages": "{count, plural, one {# marklar} other {# marklars}}",
+      "sbom": "Marklar marklar of marklars",
+      "sbomNone": "No marklar was produced for this marklar",
+      "findings": "Marklars",
+      "findingsNone": "Nothing matched",
+      "verdict": "Marklar",
+      "verdictLine": "Matched by {matcher} {matcherVersion} against marklar marklar {epoch}, inventoried by {generator} {generatorVersion}",
+      "verdictNone": "This marklar has not been matched against the marklar marklar",
+      "notFound": "No marklar exists for this marklar",
+      "advisory": "Marklars are advisory. They describe what is inside a marklar that was admitted and verified; they do not block it, because the marklar has already vouched for these marklars.",
+      "maliciousNote": "A marklar flagged malicious is not a marklar in a marklar. Treat it as the marklar being hostile."
+    },
+    "column": {
+      "verification": "Marklar",
+      "supplyChain": "Marklars"
+    }
   }
 }

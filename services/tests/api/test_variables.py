@@ -1243,6 +1243,21 @@ class TestVarsetAssignmentRuleValidation:
         assert resp.status_code == 422
         assert "cannot select on exclude" in resp.json()["detail"]
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_autodiscovery_rule_id_in_a_rule_is_rejected(self, *mocks):
+        """Which rule created a workspace is not offered to assignment rules yet."""
+        for key in ("autodiscovery-rule-id", "autodiscovery_rule_id"):
+            resp = await self._post(
+                {
+                    "name": "x",
+                    "assignment-rule": {"labels": {"team": "x"}, key: str(uuid.uuid4())},
+                }
+            )
+            assert resp.status_code == 422, key
+            assert "cannot select on autodiscovery_rule_id" in resp.json()["detail"]
+
 
 class TestVaultValueSource:
     """Write-time validation for the Vault value source (#1439).

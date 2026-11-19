@@ -311,6 +311,47 @@ class TestBuildQueryDimensions:
         q = build_workspace_query(WorkspaceFilter(vcs_connection_id=f"vcs-{cid}"))
         assert "workspaces.vcs_connection_id" in str(q)
 
+    def test_autodiscovery_rule_id_adds_where(self):
+        rid = uuid.uuid4()
+        q = build_workspace_query(WorkspaceFilter(autodiscovery_rule_id=str(rid)))
+        assert "workspaces.autodiscovery_rule_id =" in str(q)
+        assert q.compile().params["autodiscovery_rule_id_1"] == rid
+
+    def test_autodiscovery_rule_id_accepts_the_hyphenated_wire_key(self):
+        rid = uuid.uuid4()
+        wf = parse_filter({"autodiscovery-rule-id": str(rid)})
+        assert wf.autodiscovery_rule_id == str(rid)
+        assert "workspaces.autodiscovery_rule_id" in str(build_workspace_query(wf))
+
+    @pytest.mark.parametrize("bad", ["", "not-a-uuid", "adrule-nope"])
+    def test_autodiscovery_rule_id_invalid_raises(self, bad):
+        with pytest.raises(WorkspaceFilterError):
+            build_workspace_query(WorkspaceFilter(autodiscovery_rule_id=bad))
+
+    def test_autodiscovery_rule_id_none_is_not_a_selector(self):
+        with pytest.raises(WorkspaceFilterError, match="at least one selector"):
+            build_workspace_query(parse_filter({"autodiscovery_rule_id": None, "all": False}))
+
+    def test_autodiscovery_rule_id_works_inside_exclude(self):
+        rid = uuid.uuid4()
+        q = build_workspace_query(
+            WorkspaceFilter(locked=False, exclude=[WorkspaceFilter(autodiscovery_rule_id=str(rid))])
+        )
+        compiled = str(q.whereclause)
+        assert "workspaces.autodiscovery_rule_id" in compiled
+        assert "IS NOT true" in compiled
+
+    def test_autodiscovery_rule_id_exclude_entry_via_parse_filter(self):
+        rid = uuid.uuid4()
+        wf = parse_filter({"locked": False, "exclude": [{"autodiscovery-rule-id": str(rid)}]})
+        assert wf.exclude[0].autodiscovery_rule_id == str(rid)
+
+    def test_autodiscovery_rule_id_invalid_in_exclude_raises(self):
+        with pytest.raises(WorkspaceFilterError):
+            build_workspace_query(
+                WorkspaceFilter(locked=False, exclude=[WorkspaceFilter(autodiscovery_rule_id="x")])
+            )
+
     def test_has_vcs_true_adds_is_not_null(self):
         q = build_workspace_query(WorkspaceFilter(has_vcs=True))
         assert "workspaces.vcs_connection_id IS NOT NULL" in str(q)
