@@ -29,6 +29,130 @@
     }
   },
   {
+    "name": "terrapod_autodiscovery_rule_create",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "description": "the rule's attributes, by their wire (kebab-case) names. Required: name, vcs-connection-id, repo-url, pattern. The rest template onto the workspaces it creates — read an existing rule with terrapod_autodiscovery_rule_get for the full set, and dry-run with terrapod_autodiscovery_rule_preview first",
+          "type": "object"
+        }
+      },
+      "required": [
+        "attributes"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_autodiscovery_rule_delete",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "description": "the rule id (ad-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_autodiscovery_rule_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "description": "the workspace autodiscovery rule id (ad-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_autodiscovery_rule_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_autodiscovery_rule_preview",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "description": "preview an UNSAVED rule from the attributes that would create it (same shape as terrapod_autodiscovery_rule_create). Give this or rule_id, not both",
+          "type": "object"
+        },
+        "rule_id": {
+          "description": "preview a SAVED rule by id (ad-...). Give this or attributes, not both",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_autodiscovery_rule_scan",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "description": "the rule id (ad-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_autodiscovery_rule_update",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "description": "the attributes to change, by their wire (kebab-case) names. Attributes you omit are left alone",
+          "type": "object"
+        },
+        "dry_run": {
+          "description": "with propagate: report what propagation WOULD do and persist neither the rule nor any workspace",
+          "type": "boolean"
+        },
+        "propagate": {
+          "description": "also apply the settings THIS update changes to the workspaces the rule already created. Off by default, because a rule's settings normally apply only to workspaces it creates from now on. Only the fields this call changes are pushed, so an update that changes nothing propagates nothing",
+          "type": "boolean"
+        },
+        "rule_id": {
+          "description": "the rule id (ad-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "attributes"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_cache_warm_images",
     "input_schema": {
       "additionalProperties": false,

@@ -85,6 +85,10 @@ COPY provider/internal/resources/autodiscovery_rule/*.go ./provider/internal/res
 # the gate's `_surface()` raises rather than skipping -- deliberately, because a
 # gate that cannot read the file it checks proves nothing.
 COPY mcp/internal/mcpserver/crud.go ./mcp/internal/mcpserver/crud.go
+# And the workspace-autodiscovery tools, for the RULE parity gate's assertion
+# that they take a pass-through attribute map (#2621) -- the premise of the
+# exemption that keeps MCP out of that gate's per-attribute check.
+COPY mcp/internal/mcpserver/autodiscovery.go ./mcp/internal/mcpserver/autodiscovery.go
 
 # The two admin pages the workspace-setting parity gate reads (#1763). The gate
 # requires every bulk-settable setting to be reachable from the GUI too; without
