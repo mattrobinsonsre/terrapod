@@ -2,6 +2,7 @@ package terrapod
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -81,6 +82,24 @@ func MarshalResourceWithID(id, resourceType string, attributes map[string]any) (
 // includes relationships in the body. Use when an update needs to
 // reattach (e.g. moving a variable to a different variable set).
 func MarshalResourceWithIDAndRels(id, resourceType string, attributes, relationships map[string]any) ([]byte, error) {
+	return MarshalResourceWithOptions(id, resourceType, attributes, relationships, nil)
+}
+
+// MarshalResourceWithOptions marshals an update document and places `options`
+// at the TOP LEVEL, beside `data` rather than inside `attributes`.
+//
+// A handful of routes take per-request options that are not fields of the
+// resource — `propagate` and `dry_run` on an autodiscovery-rule update are the
+// ones that exist today. They are read off the body's top level, so they cannot
+// travel in `attributes` without being mistaken for rule fields.
+//
+// It lives here because building that document is the SDK's job: the provider
+// is a typed wrapper and must not learn the wire format, which is what
+// `MarshalResourceWithID` plus a hand-inserted key amounts to.
+func MarshalResourceWithOptions(
+	id, resourceType string,
+	attributes, relationships, options map[string]any,
+) ([]byte, error) {
 	data := map[string]any{
 		"id":         id,
 		"type":       resourceType,
@@ -89,7 +108,17 @@ func MarshalResourceWithIDAndRels(id, resourceType string, attributes, relations
 	if relationships != nil {
 		data["relationships"] = relationships
 	}
-	return json.Marshal(map[string]any{"data": data})
+	doc := map[string]any{"data": data}
+	for k, v := range options {
+		// `data` is the document, never an option. Refusing rather than
+		// overwriting, because silently replacing the payload with an option
+		// would send an update that changes nothing and report success.
+		if k == "data" {
+			return nil, fmt.Errorf("marshal %s: %q is not a request option", resourceType, k)
+		}
+		doc[k] = v
+	}
+	return json.Marshal(doc)
 }
 
 // ParseResource decodes a JSON:API single-resource response into a

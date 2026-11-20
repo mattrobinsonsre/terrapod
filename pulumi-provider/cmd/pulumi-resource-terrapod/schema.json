@@ -1380,6 +1380,10 @@
                     },
                     "description": "The playbooks a configure run may name on workspaces this rule creates, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it. **Defaults to empty**, which is the open state — any playbook is allowed. A non-empty list templates a \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e that has to be one of its entries, because a bare Configure runs the default; the pair is checked when each workspace is written, not here, so a rule is free to be edited one attribute at a time. Omitting this attribute leaves any existing server-side value untouched; set `playbooks = []` to clear it."
                 },
+                "propagate": {
+                    "type": "boolean",
+                    "description": "On update, also apply the rule's changed settings to the workspaces it created. Only the fields this update changes are propagated, so an apply with no changes to them does nothing. Workspaces whose value was customised away from the rule's previous value are skipped. Defaults to false."
+                },
                 "repoUrl": {
                     "type": "string",
                     "description": "Full repository URL (e.g. https://github.com/myorg/monorepo)."
@@ -1734,6 +1738,10 @@
                     },
                     "description": "The playbooks a configure run may name on workspaces this rule creates, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it. **Defaults to empty**, which is the open state — any playbook is allowed. A non-empty list templates a \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e that has to be one of its entries, because a bare Configure runs the default; the pair is checked when each workspace is written, not here, so a rule is free to be edited one attribute at a time. Omitting this attribute leaves any existing server-side value untouched; set `playbooks = []` to clear it."
                 },
+                "propagate": {
+                    "type": "boolean",
+                    "description": "On update, also apply the rule's changed settings to the workspaces it created. Only the fields this update changes are propagated, so an apply with no changes to them does nothing. Workspaces whose value was customised away from the rule's previous value are skipped. Defaults to false."
+                },
                 "repoUrl": {
                     "type": "string",
                     "description": "Full repository URL (e.g. https://github.com/myorg/monorepo)."
@@ -2038,6 +2046,10 @@
                             "type": "string"
                         },
                         "description": "The playbooks a configure run may name on workspaces this rule creates, each relative to \u003cspan pulumi-lang-nodejs=\"`configDirectory`\" pulumi-lang-dotnet=\"`ConfigDirectory`\" pulumi-lang-go=\"`configDirectory`\" pulumi-lang-python=\"`config_directory`\" pulumi-lang-yaml=\"`configDirectory`\" pulumi-lang-java=\"`configDirectory`\" pulumi-lang-hcl=\"`config_directory`\"\u003e`configDirectory`\u003c/span\u003e. An **allow-list**: the server refuses a run whose playbook is outside it. **Defaults to empty**, which is the open state — any playbook is allowed. A non-empty list templates a \u003cspan pulumi-lang-nodejs=\"`defaultPlaybook`\" pulumi-lang-dotnet=\"`DefaultPlaybook`\" pulumi-lang-go=\"`defaultPlaybook`\" pulumi-lang-python=\"`default_playbook`\" pulumi-lang-yaml=\"`defaultPlaybook`\" pulumi-lang-java=\"`defaultPlaybook`\" pulumi-lang-hcl=\"`default_playbook`\"\u003e`defaultPlaybook`\u003c/span\u003e that has to be one of its entries, because a bare Configure runs the default; the pair is checked when each workspace is written, not here, so a rule is free to be edited one attribute at a time. Omitting this attribute leaves any existing server-side value untouched; set `playbooks = []` to clear it."
+                    },
+                    "propagate": {
+                        "type": "boolean",
+                        "description": "On update, also apply the rule's changed settings to the workspaces it created. Only the fields this update changes are propagated, so an apply with no changes to them does nothing. Workspaces whose value was customised away from the rule's previous value are skipped. Defaults to false."
                     },
                     "repoUrl": {
                         "type": "string",
