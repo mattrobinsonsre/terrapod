@@ -82,6 +82,25 @@ _WEB = _surface("web/src/app/admin/autodiscovery/page.tsx")
 _MCP_REL = "mcp/internal/mcpserver/autodiscovery.go"
 
 
+def _optional_surface(rel: str) -> pathlib.Path | None:
+    """Resolve `rel` the way `_surface` does, or None when it is absent.
+
+    It has to search the SAME two bases `_surface` searches -- the working tree
+    and the test image's flattened `/app` -- rather than counting `.parents[n]`
+    off another resolved file. The first version of this did the latter, took
+    `_PROVIDER.parents[3]` (which is `provider/`, not the repo root) and so
+    asked whether `provider/mcp/internal/...` existed. It never could, so the
+    absence assertion below could not fail, in the gate whose own docstring is
+    about derivations that quietly check nothing.
+    """
+    tests_dir = pathlib.Path(__file__).resolve().parent
+    for base in (tests_dir.parents[2], tests_dir.parents[1]):
+        candidate = base / rel
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _aliases() -> dict[str, frozenset[str]]:
     """Attributes that are alternative spellings of one setting, DERIVED.
 
@@ -333,9 +352,8 @@ class TestEverySettableAttributeReachesEverySurface:
         `"MCP rule tools"` to `_SURFACE_FILES` and `_SPELLING`, which puts all
         72 attributes under the gate at once.
         """
-        mcp_file = pathlib.Path(_PROVIDER).parents[3] / _MCP_REL
         assert _MCP_SURFACE_ABSENT, "_MCP_SURFACE_ABSENT is stale; wire the surface in"
-        assert not mcp_file.exists(), (
+        assert _optional_surface(_MCP_REL) is None, (
             f"{_MCP_REL} now exists. Add 'MCP rule tools' to _SURFACE_FILES and "
             "_SPELLING (with _go_json_tag), drop _MCP_SURFACE_ABSENT, and let the "
             "gate judge all 72 attributes against it."
