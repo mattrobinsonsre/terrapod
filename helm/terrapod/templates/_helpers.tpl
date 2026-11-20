@@ -750,3 +750,16 @@ Call with the root context (.).
 {{- .Values.priorityClasses.runner.name -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+The in-cluster API URL the web pod talks to.
+
+A helper rather than a literal because TWO containers need the same value: the
+web container reads it as `API_URL`, and the storage-rewrite init container
+bakes it into the routes manifest. If they disagreed, the pod would proxy
+storage reads to one host while serving everything else from another -- which is
+#47 with the two halves of the deployment arguing.
+*/}}
+{{- define "terrapod.web.apiUrl" -}}
+http://{{ include "terrapod.fullname" . }}-api:8000
+{{- end }}

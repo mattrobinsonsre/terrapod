@@ -333,6 +333,9 @@
         },
         "serviceAccount": {
           "$ref": "#/$defs/serviceAccountSpec"
+        },
+        "initResources": {
+          "$ref": "#/$defs/resourceSpec"
         }
       }
     },

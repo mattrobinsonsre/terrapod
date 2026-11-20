@@ -5,6 +5,12 @@
 // `/[locale]/` URL segment): the locale comes from a cookie, so every existing
 // route + BFF path is untouched.
 const createNextIntlPlugin = require('next-intl/plugin')
+
+// Kept in step with `server-entry.mjs`, which replaces it at container start.
+// `.invalid` is reserved (RFC 2606) so it can never resolve -- unlike the
+// `localhost:8001` fallback that made #47 look like a working deployment.
+const STORAGE_REWRITE_PLACEHOLDER = 'http://terrapod-storage-rewrite.invalid'
+
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
 // HSTS (Strict-Transport-Security). Tells browsers to remember "always
@@ -75,6 +81,37 @@ const nextConfig = {
         // the Route Handler, which matters more here than anywhere else: image
         // layers are the largest bodies Terrapod moves.
         { source: '/v2/:path*', destination: '/bff/v2/:path*' },
+        // The ONE family that does not go through the Route Handler, and the
+        // only external rewrite here (#2639).
+        //
+        // Next >= 16.4.5 strips `content-length` from every route handler
+        // response and always pipes the body, so Node sends chunked. Clients
+        // that require the header then break: Pulumi refuses a plugin download
+        // outright, and docker's registry client needs one on a blob HEAD.
+        // Measured -- a handler cannot emit it, and buffering does not help
+        // because `new Response(arrayBuffer).body` is a ReadableStream too.
+        //
+        // Next's OWN proxy, which is what an external destination uses, does
+        // preserve it. Verified in the standalone output we ship, on GET and
+        // HEAD, and verified to win over the `/api/[...path]` catch-all.
+        //
+        // The destination is BAKED into the routes manifest at build time, so
+        // it cannot read `API_URL` here -- that is #47, where a baked
+        // `http://localhost:8001` beat an operator's own `API_URL` and the web
+        // pod proxied to nothing. `server-entry.mjs` rewrites the placeholder
+        // at container start and REFUSES TO START if it did not take.
+        //
+        // Both prefixes: `/api/v1` is canonical and `/api/terrapod/v1` is the
+        // deprecated alias the presigned URL builder still emits, so narrowing
+        // this to one would depend on which the API happens to generate.
+        {
+          source: '/api/v1/storage/get/:path*',
+          destination: `${STORAGE_REWRITE_PLACEHOLDER}/api/v1/storage/get/:path*`,
+        },
+        {
+          source: '/api/terrapod/v1/storage/get/:path*',
+          destination: `${STORAGE_REWRITE_PLACEHOLDER}/api/terrapod/v1/storage/get/:path*`,
+        },
       ],
     }
   },

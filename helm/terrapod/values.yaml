@@ -2076,6 +2076,19 @@ web:
   livenessProbe: {}
   readinessProbe: {}
 
+  # Resources for the `storage-rewrite` init container, which runs node
+  # briefly to point the storage rewrite at the API (see #2639) and exits.
+  # Separate from `resources` below because it is a different workload: a
+  # one-shot ~15 KiB JSON rewrite, not a long-lived server. Configurable
+  # because clusters with a LimitRange or a tight quota need to tune it.
+  initResources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
   resources:
     requests:
       cpu: 100m

@@ -53,6 +53,10 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 # Copy public assets if present
 COPY --from=builder /app/public ./public
+# The entrypoint, which points the storage rewrite at the runtime API_URL and
+# refuses to start if it cannot (#2639). Not part of the standalone output --
+# Next only traces what the app imports, and this runs before the app does.
+COPY --from=builder /app/server-entry.mjs ./server-entry.mjs
 
 # Remove npm and its bundled dependencies (not needed at runtime;
 # eliminates CVEs in npm-internal minimatch, tar, etc.)
@@ -85,5 +89,9 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Run the standalone server directly
-CMD ["node", "server.js"]
+# `server-entry.mjs`, not `server.js` directly: it rewrites the storage
+# rewrite's baked destination from `API_URL` and hands over. It refuses to start
+# rather than serve chunked responses to clients that require a Content-Length,
+# which is #2639 -- and the refusal is what stops #47 recurring, where a baked
+# destination silently beat an operator's own API_URL.
+CMD ["node", "server-entry.mjs"]
