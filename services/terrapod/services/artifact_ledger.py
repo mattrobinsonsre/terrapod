@@ -64,6 +64,30 @@ async def record_admission(
     new evidence about the same bytes rather than a different answer, so it is
     taken.
     """
+    # The ledger is KEYED on the digest, so an artifact that has none has no
+    # identity here and must not be given one. Three ecosystems publish no
+    # per-artifact digest -- Go modules, Pulumi plugins and NuGet packages all
+    # pass "" -- and `""` is a perfectly valid primary key, so without this they
+    # all collided on one row: the first insert won and every later admission
+    # merged its coordinates into it, producing a single "artifact" with
+    # thousands of coordinates, whichever `kind` arrived first, and an
+    # `admitted_at` from the first fetch. `/admin/cache/artifact/{digest}`
+    # cannot address it at all.
+    #
+    # NOT normalised here. `normalise_digest` is for the bare-hex-vs-prefixed
+    # question the binary and provider caches pose; an npm digest is an SRI
+    # (`sha512-<base64>`), which already names its algorithm and whose base64 is
+    # CASE-SENSITIVE -- putting one through it yields `sha256:sha512-aaa...`,
+    # claiming the wrong algorithm over a value it has already corrupted by
+    # lowercasing. The callers normalise what needs it.
+    if not (digest or "").strip():
+        logger.debug(
+            "not recording an admission with no digest",
+            kind=kind,
+            coordinates=coordinates,
+        )
+        return
+
     now = now_utc()
     coords = [coordinates] if coordinates else []
 
@@ -161,9 +185,21 @@ def normalise_digest(value: str) -> str:
     defeating the one property the table is built around. The package cache
     stores `sha256:...`; the binary and provider caches store a bare `shasum`.
     """
-    value = (value or "").strip().lower()
+    value = (value or "").strip()
     if not value:
         return ""
+    # An SRI -- `sha512-<base64>`, which is what npm publishes -- already names
+    # its algorithm, and its base64 is CASE-SENSITIVE. Lowercasing it corrupts
+    # it, and prefixing `sha256:` onto a sha512 claims the wrong algorithm. It is
+    # returned verbatim, so a reader joining a cache row to its ledger entry gets
+    # the same key the admission wrote.
+    #
+    # Checked before the `:` test because an SRI has no colon at all: without
+    # this, every npm digest took the prefixing branch.
+    algorithm = value.split(":", 1)[0]
+    if "-" in algorithm:
+        return value
+    value = value.lower()
     return value if ":" in value else f"sha256:{value}"
 
 
