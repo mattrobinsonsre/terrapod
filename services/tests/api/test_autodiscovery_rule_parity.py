@@ -385,3 +385,73 @@ class TestTheLedgerIsHonest:
             if len(reason.strip()) < 20
         )
         assert not thin, f"debt entries with no usable reason: {thin}"
+
+
+class TestEverySurfaceFileReachesTheTestImage:
+    """A `_surface()` path with no COPY line is a collection error in CI.
+
+    `_surface` refuses a path it cannot find rather than skipping, which is
+    right — a gate that cannot read the file it checks proves nothing. The cost
+    is that the refusal lands at IMPORT time, so one missing COPY line turns the
+    whole module into four collection errors in a shard that otherwise passed
+    2804 tests, and the local run cannot see it because the working tree has
+    every file.
+
+    That is exactly what this gate's own first CI run did, with
+    `provider/internal/resources/autodiscovery_rule/resource.go` uncopied and
+    `_surface`'s message naming the remedy. So the class is checked here rather
+    than the instance being fixed: a future `_surface()` path fails this test,
+    which names the line to add, instead of failing collection.
+
+    `docker/` is itself copied into the image (`COPY docker ./docker`), so this
+    runs in CI as well as locally.
+    """
+
+    @staticmethod
+    def _surface_paths() -> set[str]:
+        paths: set[str] = set()
+        tests_root = pathlib.Path(__file__).parent.parent
+        for path in tests_root.rglob("test_*.py"):
+            try:
+                tree = ast.parse(path.read_text())
+            except SyntaxError:  # pragma: no cover - not our file to fix
+                continue
+            for node in ast.walk(tree):
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "_surface"
+                    and node.args
+                    and isinstance(node.args[0], ast.Constant)
+                    and isinstance(node.args[0].value, str)
+                ):
+                    paths.add(node.args[0].value)
+        return paths
+
+    def test_every_surface_path_has_a_copy_line(self) -> None:
+        paths = self._surface_paths()
+        # A floor, because a matcher that stops finding `_surface()` calls
+        # would otherwise pass on nothing.
+        assert len(paths) >= 5, (
+            f"only found {len(paths)} _surface() paths, which suggests the AST "
+            "walk has stopped matching rather than that the gates have shrunk"
+        )
+        dockerfile = pathlib.Path(__file__).parents[3] / "docker" / "Dockerfile.test"
+        copied = dockerfile.read_text()
+        missing: list[str] = []
+        for rel in sorted(paths):
+            directory = str(pathlib.PurePosixPath(rel).parent)
+            suffix = pathlib.PurePosixPath(rel).suffix
+            # Either the file by name, or a glob over its own directory.
+            if rel in copied or f"{directory}/*{suffix}" in copied:
+                continue
+            # Or an ancestor directory copied wholesale (`COPY helm ./helm`).
+            parts = pathlib.PurePosixPath(rel).parts
+            if any(f"COPY {'/'.join(parts[: i + 1])} ." in copied for i in range(len(parts) - 1)):
+                continue
+            missing.append(rel)
+        assert not missing, (
+            "these files are read by a parity gate and are NOT in the test image, so "
+            "the module will fail to collect in CI while passing locally. Add a COPY "
+            f"line to docker/Dockerfile.test for each: {missing}"
+        )
