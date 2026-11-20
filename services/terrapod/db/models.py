@@ -5689,7 +5689,10 @@ class ArtifactLedgerEntry(Base):
     #: ids and never converge. Keying on the digest makes the table's identity
     #: and its replication identity the same thing, which is what the docstring
     #: above claims anyway.
-    digest: Mapped[str] = mapped_column(String(80), primary_key=True)
+    # 200, not 80: npm's digest is the SRI upstream publishes (`sha512-` plus
+    # 88 base64 characters = 95), so 80 made every npm admission raise 22001 and
+    # take the cache row down with it. Matches `cached_package_files.digest`.
+    digest: Mapped[str] = mapped_column(String(200), primary_key=True)
     #: Which cache served it -- `package`, `binary`, `provider`, `oci`. Not a
     #: foreign key to any of them: a row must outlive the cache row it came
     #: from, because the question "what executed last quarter" does not stop
