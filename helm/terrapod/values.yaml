@@ -2076,6 +2076,19 @@ web:
   livenessProbe: {}
   readinessProbe: {}
 
+  # The `storage-rewrite` init container, which points the storage rewrite at
+  # the API before Next reads the routes manifest (#2639). On by default and
+  # wanted by every real deployment: without it the rewrite that gives Pulumi
+  # and docker a Content-Length resolves to a reserved `.invalid` host.
+  #
+  # Turn it OFF only where the web container runs `next dev` rather than the
+  # production server -- the Tilt dev loop, which values-local.yaml does. There
+  # is nothing to patch there: dev regenerates `.next` at runtime, values-local
+  # masks `/app/.next` with an emptyDir anyway, and next.config.js is evaluated
+  # per request so it resolves `API_URL` live.
+  storageRewrite:
+    enabled: true
+
   # Resources for the `storage-rewrite` init container, which runs node
   # briefly to point the storage rewrite at the API (see #2639) and exits.
   # Separate from `resources` below because it is a different workload: a

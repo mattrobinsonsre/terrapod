@@ -336,6 +336,15 @@
         },
         "initResources": {
           "$ref": "#/$defs/resourceSpec"
+        },
+        "storageRewrite": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
         }
       }
     },

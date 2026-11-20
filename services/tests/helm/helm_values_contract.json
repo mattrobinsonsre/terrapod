@@ -627,6 +627,7 @@
   "web.serviceAccount.create",
   "web.serviceAccount.name",
   "web.startupProbe",
+  "web.storageRewrite.enabled",
   "web.strategy.maxSurge",
   "web.strategy.maxUnavailable",
   "web.terminationGracePeriodSeconds",
