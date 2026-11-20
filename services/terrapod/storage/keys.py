@@ -570,5 +570,13 @@ def inventory_baseline_key(workspace_id: str) -> str:
     Written on SUCCESS, so "the last successful configure" is literally true: a
     failed configure leaves the previous baseline standing, which is correct
     because its hosts may be unconfigured and the next run should go wide anyway.
+
+    NOT REPLICATED. `inventory/` is a workspace key prefix with no blob class --
+    `blob_classes.CLASSES` covers seventeen prefixes and this is not one of them
+    -- so a promoted follower has no baseline and its first configure of each
+    workspace goes wide. That is the safe direction (no baseline means
+    "configure everything") and it is why the gap is quiet, which is the reason
+    to say so here rather than leave it to be re-derived. Pre-existing from
+    #2229; recorded while auditing #2583's prefix table.
     """
     return f"inventory/{workspace_id}/baseline.json"
