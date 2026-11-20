@@ -1943,7 +1943,8 @@
       "upstreamDigest": "متحقَّق منه",
       "nonePublished": "لا توجد بصمة منشورة",
       "operatorUpload": "مرفوع",
-      "unrecorded": "غير مسجَّل"
+      "unrecorded": "غير مسجَّل",
+      "upstreamPublisher": "متحقَّق من الناشر"
     },
     "upload": {
       "title": "رفع عنصر مُدقَّق",

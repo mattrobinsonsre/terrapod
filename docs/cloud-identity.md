@@ -1883,14 +1883,19 @@ choice is not what ran.
 **`require_assigned_pool` refuses a mint from a pool the workspace has lost.** A
 run snapshots its candidate pools at creation, so detaching a pool from a
 workspace mid-flight leaves that run claimable by a pool the workspace no longer
-has. Set `api.config.auth.oidc_issuer.require_assigned_pool: true` and such a mint
-is refused, naming the pool.
+has. Such a mint is refused, naming the pool.
 
 It asks about **membership, not precedence**, and there is deliberately no
 "primary pool" rule: the pool set is flat, `ordinal` is display order only, and a
 run is offered to every pool at once so which one claims it is a race. So this
-does not constrain multi-pool routing -- every pool in the set passes. Off by
-default, because the window is narrow and the refusal fails the run.
+does not constrain multi-pool routing -- every pool in the set passes.
+
+**On by default as of 2.0**, having been off through 1.x on the grounds that the
+window is narrow and the refusal fails the run. The flip trades a narrow
+mis-issuance window for a narrow run-failure window, which is the right way round
+for a credential. Set
+`api.config.auth.oidc_issuer.require_assigned_pool: false` to restore the 1.x
+behaviour.
 
 #### A module publish can reach the apply phase without a human
 
@@ -1924,11 +1929,15 @@ refused as a backstop. That removes the form a trust policy would otherwise have
 to remember to exclude -- and a `StringLike` wildcard that forgets to exclude it is
 exactly how a plan-phase run reaches an apply-phase role.
 
-It is **off by default**, because the only thing that produces an unphased token is
-a listener image predating the phase claim and an upgrade must not strand one. Set
-it once every listener is on v1.10 or later; it becomes the default in 2.0. The
-refusal names the listener upgrade, so the operator who meets it knows which image
-to move.
+It is **on by default as of 2.0.** It was off through 1.x, because the only thing
+that produces an unphased token is a listener image predating the phase claim and
+an upgrade must not strand one — and that reason has expired, since any listener
+old enough predates two majors. The refusal names the listener upgrade, so the
+operator who meets it knows which image to move.
+
+If any listener is still older than v1.10, move it before upgrading, or set
+`api.config.auth.oidc_issuer.require_phase: false` until you have. See
+[the upgrade guide](upgrading-to-2.0.md).
 
 Azure's "flexible federated identity credentials" would allow claim expressions,
 but they are gated to a hardcoded allow-list of issuers (GitHub, GitLab and

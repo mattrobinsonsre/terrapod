@@ -1943,7 +1943,8 @@
       "upstreamDigest": "تأییدشده",
       "nonePublished": "چکیده‌ای منتشر نشده",
       "operatorUpload": "بارگذاری‌شده",
-      "unrecorded": "ثبت‌نشده"
+      "unrecorded": "ثبت‌نشده",
+      "upstreamPublisher": "ناشر تأییدشده"
     },
     "upload": {
       "title": "بارگذاری یک قلم بازبینی‌شده",

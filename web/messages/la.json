@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verificatum",
       "nonePublished": "Nullum compendium editum",
       "operatorUpload": "Immissum",
-      "unrecorded": "Non notatum"
+      "unrecorded": "Non notatum",
+      "upstreamPublisher": "Editor verificatus"
     },
     "upload": {
       "title": "Artificium probatum immittere",

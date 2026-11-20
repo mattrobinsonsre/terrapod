@@ -73,6 +73,8 @@ first — most rows do not apply to most deployments.
 |---|---|---|
 | Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
 | [Warm the Go checksum database, or set `sumdb_upstream` empty](#go-module-hashes-are-verified-against-the-checksum-database) | `registry.cache_only: true` **and** any workspace runs a Pulumi program written in Go | the runner verifies module hashes against the checksum database from 2.0, and Terrapod mirrors it — but **a sealed node cannot fill a miss**, so until it is warmed every Go dependency install fails rather than degrading. Warming it needs egress, which is what you no longer have once sealed |
+| [Pull the new web image, or unpin it](#the-web-pod-gains-a-storage-rewrite-init-container) | you pin `web.image.tag`, or mirror images into an internal registry | the chart's new init container runs `server-entry.mjs`, which **does not exist in a 1.x web image**. A 2.0 chart with an older web image gives `Init:CrashLoopBackOff` on every web replica — the whole UI, down, with nothing in this guide to search for unless you read this row |
+| [Set `platform_tools.verify: checksum`, or allow egress to `tuf-repo-cdn.sigstore.dev`](#a-platform-tool-is-verified-against-its-publishers-signature-by-default) | you **pin** a platform tool version, or your network allowlists egress by host | the default moved from `checksum` to `signature`. Unreachable signing material degrades to the checksum and keeps working, so this is not an outage — but a signature that genuinely does not verify is a hard refusal, and a pinned version signed from a differently-named workflow is how you meet one |
 | [Unseal, re-warm, re-seal](#if-you-run-a-sealed-deployment-registrycache_only-true-read-this-before-upgrading) | `registry.cache_only: true` | artifacts cached before 2.0 are re-fetched once to verify them, and **a miss cannot be filled while sealed** — so between the upgrade and a re-warm, runs needing a cached package fail. Nothing is deleted, so re-warming later recovers everything, but the window is a real outage for those runs |
 | Move automation off the shapes that change: [a `status == "planning"` branch](#a-run-held-after-its-plan-reports-terraform-enterprises-statuses), [`ListRunPolicyEvaluations` and `IsBlocking()`](#policyevaluation-becomes-policycheck-in-the-go-sdk), and [a literal `queued` or `canceling` read from `/api/tfe/v2`](#a-runs-status-on-apitfev2-is-always-one-go-tfe-defines) | you have scripts or Go programs that read a run's status or its policy results | each is silent: a branch that no longer fires, a `switch` that falls through every case. The first two can be tried ahead of time on your current release |
 | [Rename any label key `flag` or `locked`](#the-workspace-filter-has-flag-and-locked-and-status-is-only-the-runs-status) | a workspace, agent pool, registry module or provider, or autodiscovery rule carries a label named `flag` or `locked` | the next create or update of that resource that includes the key is refused with a `422`; existing rows keep working until then. Bookmarked and shared filters need nothing: the page [rewrites them when it loads](#old-filters-are-rewritten-when-the-page-loads) |
@@ -2211,3 +2213,96 @@ drift from.
 
 Listed here because no gate, snapshot or test will tell you about it: nothing
 fails, the UI simply looks different until each user flips the toggle.
+
+### A platform tool is verified against its publisher's signature by default
+
+**Affects:** anyone who pins `opa_version`, `trivy_version`, `checkov_version` or
+`syft_version`, and anyone whose network allowlists outbound hosts.
+
+`registry.platform_tools.verify` moved from `checksum` to `signature`. This is
+the one default in 2.0 that flipped on a key a **1.x chart shipped**, so unlike
+most of this guide it affects an operator who has never edited that block.
+
+What it adds is a second opinion about *who published* the binary, on top of the
+checksum that already had to pass. Trivy and Syft publish Sigstore bundles
+alongside their checksums; `opa` and `checkov` do not, so those two stay at
+`checksum` in effect however this is set.
+
+**It fails open where that is the honest answer.** If the trust root or the
+signing material cannot be *fetched* — an air-gapped mirror, a transient 503, no
+egress to `https://tuf-repo-cdn.sigstore.dev` — the checksum has already passed,
+so the tool is admitted and the run records `signature-unavailable`. Nothing
+breaks; you lose the second opinion.
+
+**It fails closed where the signature genuinely does not verify**, which is
+correct and is the case to know about before you meet it. The signer identity is
+pinned per tool, and trivy's embeds both the release tag and a workflow
+filename — so a version you have pinned, published from a differently-named
+workflow, is refused rather than degraded.
+
+```yaml
+api:
+  config:
+    registry:
+      platform_tools:
+        # 1.x shipped `checksum`. Set it back if you pin a version whose release
+        # is signed differently, or if `off` was what you needed (see above).
+        verify: checksum
+```
+
+### The web pod gains a `storage-rewrite` init container
+
+**Affects:** anyone who **pins `web.image.tag`** or mirrors images into an
+internal registry, plus any deployment whose admission policy, `LimitRange` or
+quota enumerates containers. Everything else needs no action.
+
+A presigned URL from the **filesystem storage backend** is no longer served
+through the BFF's `/api/*` route handler. From Next 16.4.5 a route handler cannot
+emit a `Content-Length` at all — the header is in `FORBIDDEN_HEADERS` and the
+body is always piped, so Node sends chunked — and some clients require a length.
+Pulumi declines a plugin download outright (`expected -1 bytes but copied
+18043696`) and docker's registry client needs one on a blob HEAD. Buffering does
+not help: a buffered `Response`'s body is still a stream and takes the same pipe.
+
+Next's own proxy, which an **external rewrite** uses, does preserve it. So that
+one family of GETs is an external rewrite now. Traffic still enters through the
+web pod, and these are GETs, so the request-body streaming the BFF rule protects
+is not involved.
+
+A rewrite destination is baked into `.next/routes-manifest.json` at build time,
+so the entrypoint rewrites a placeholder from `API_URL` at pod start and
+**refuses to start if it did not take** — a future Next release that changes that
+format fails loudly rather than leaving those clients silently back on chunked
+encoding. The web container runs `readOnlyRootFilesystem: true`, so it cannot
+patch the file in place: the init container runs the same image with `--emit`,
+writes the patched copy into an `emptyDir`, and the web container mounts it over
+that one file with `subPath`.
+
+**The one way this bites you: a pinned or mirrored web image.** `server-entry.mjs`
+arrives with this change, so a 2.0 chart running a 1.x web image runs an init
+container against a file that does not exist — non-zero exit,
+`Init:CrashLoopBackOff` on every web replica, and the UI down. Pull the new image
+with the chart, or unpin the tag so it tracks `appVersion`. Rollback is clean,
+because the patch lives in an `emptyDir` and nothing else was touched.
+
+```yaml
+web:
+  # Both default as shown; neither needs setting.
+  storageRewrite:
+    enabled: true
+  initResources:   # a one-shot ~15 KiB JSON rewrite, not a server
+    requests: { cpu: 50m, memory: 64Mi }
+```
+
+`initResources` declares limits, and Kubernetes takes a pod's effective request
+as `max(sum of containers, max of init containers)` — so a namespace with a tight
+`ResourceQuota` on `limits.cpu` or `limits.memory` can reject a web pod it
+previously admitted.
+
+**Do not set `storageRewrite.enabled: false` on a real deployment using the
+filesystem backend.** It exists for the Tilt dev loop, which regenerates `.next`
+at runtime; with it off the placeholder stays in the manifest and storage URLs
+resolve to a host reserved never to resolve. Operators on S3, Azure Blob or GCS
+are unaffected in substance — those presign against the provider — but the init
+container is rendered regardless, which is why the admission note above applies
+to everyone.

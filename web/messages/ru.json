@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Проверено",
       "nonePublished": "Дайджест не публикуется",
       "operatorUpload": "Загружено",
-      "unrecorded": "Не зафиксировано"
+      "unrecorded": "Не зафиксировано",
+      "upstreamPublisher": "Издатель проверен"
     },
     "upload": {
       "title": "Загрузить проверенный артефакт",

@@ -1943,7 +1943,8 @@
       "upstreamDigest": "מאומת",
       "nonePublished": "לא פורסם תקציר",
       "operatorUpload": "הועלה",
-      "unrecorded": "לא נרשם"
+      "unrecorded": "לא נרשם",
+      "upstreamPublisher": "המפרסם מאומת"
     },
     "upload": {
       "title": "העלאת פריט מאומת",

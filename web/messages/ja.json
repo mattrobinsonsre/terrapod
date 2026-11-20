@@ -1943,7 +1943,8 @@
       "upstreamDigest": "検証済み",
       "nonePublished": "ダイジェスト未公開",
       "operatorUpload": "アップロード済み",
-      "unrecorded": "記録なし"
+      "unrecorded": "記録なし",
+      "upstreamPublisher": "公開者を検証済み"
     },
     "upload": {
       "title": "精査済みの成果物をアップロード",

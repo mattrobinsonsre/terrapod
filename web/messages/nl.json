@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Geverifieerd",
       "nonePublished": "Geen controlesom gepubliceerd",
       "operatorUpload": "Geüpload",
-      "unrecorded": "Niet vastgelegd"
+      "unrecorded": "Niet vastgelegd",
+      "upstreamPublisher": "Uitgever geverifieerd"
     },
     "upload": {
       "title": "Een gecontroleerd artefact uploaden",

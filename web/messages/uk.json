@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Перевірено",
       "nonePublished": "Дайджест не публікується",
       "operatorUpload": "Завантажено",
-      "unrecorded": "Не зафіксовано"
+      "unrecorded": "Не зафіксовано",
+      "upstreamPublisher": "Видавця перевірено"
     },
     "upload": {
       "title": "Завантажити перевірений артефакт",

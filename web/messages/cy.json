@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Wedi'i ddilysu",
       "nonePublished": "Dim crynodeb wedi'i gyhoeddi",
       "operatorUpload": "Uwchlwythwyd",
-      "unrecorded": "Heb ei gofnodi"
+      "unrecorded": "Heb ei gofnodi",
+      "upstreamPublisher": "Cyhoeddwr wedi'i ddilysu"
     },
     "upload": {
       "title": "Uwchlwytho arteffact a archwiliwyd",

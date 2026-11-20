@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Chekd",
       "nonePublished": "No dijest publishd",
       "operatorUpload": "Uplodid",
-      "unrecorded": "Not writd down"
+      "unrecorded": "Not writd down",
+      "upstreamPublisher": "Publishr chekd"
     },
     "upload": {
       "title": "Uplode a artifakt u chekd",

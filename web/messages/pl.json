@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Zweryfikowano",
       "nonePublished": "Brak opublikowanego skrótu",
       "operatorUpload": "Przesłano",
-      "unrecorded": "Brak zapisu"
+      "unrecorded": "Brak zapisu",
+      "upstreamPublisher": "Zweryfikowano wydawcę"
     },
     "upload": {
       "title": "Prześlij sprawdzony artefakt",

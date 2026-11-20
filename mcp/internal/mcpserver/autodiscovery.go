@@ -16,7 +16,7 @@ import (
 // for workspaces, and the two are easy to confuse — every description here says
 // "workspace" explicitly for that reason.
 //
-// There were no tools for this at all until #2621: eight API routes, 116 tools,
+// There were no tools for this at all until #2621: eight API routes, 95 tools,
 // and none of them these — so an agent could read a rule's effects (the
 // workspaces it had created) and nothing about the rule. Bounded by the caller's
 // RBAC like every other tool; the routes are platform-admin.

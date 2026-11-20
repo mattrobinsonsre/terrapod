@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Doğrulandı",
       "nonePublished": "Özet yayımlanmıyor",
       "operatorUpload": "Yüklendi",
-      "unrecorded": "Kaydedilmedi"
+      "unrecorded": "Kaydedilmedi",
+      "upstreamPublisher": "Yayıncı doğrulandı"
     },
     "upload": {
       "title": "İncelenmiş bir yapıt yükle",

@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verifiziert",
       "nonePublished": "Keine Prüfsumme veröffentlicht",
       "operatorUpload": "Hochgeladen",
-      "unrecorded": "Nicht erfasst"
+      "unrecorded": "Nicht erfasst",
+      "upstreamPublisher": "Herausgeber verifiziert"
     },
     "upload": {
       "title": "Ein geprüftes Artefakt hochladen",

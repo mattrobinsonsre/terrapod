@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verified marklar",
       "nonePublished": "No marklar published",
       "operatorUpload": "Uploaded marklar",
-      "unrecorded": "Marklar not recorded"
+      "unrecorded": "Marklar not recorded",
+      "upstreamPublisher": "Marklar verified"
     },
     "upload": {
       "title": "Upload a vetted marklar",
