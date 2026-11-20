@@ -84,8 +84,66 @@ export function apiBase(env = process.env) {
  * without a built manifest.
  */
 export function patchManifest(text, base) {
-  const replaced = occurrences(text, PLACEHOLDER)
-  return { text: text.split(PLACEHOLDER).join(base), replaced }
+  const doc = JSON.parse(text)
+  let replaced = 0
+  for (const rule of rewriteRules(doc)) {
+    if (!hasPlaceholderOrigin(rule.destination)) continue
+    rule.destination = base + rule.destination.slice(PLACEHOLDER.length)
+    replaced += 1
+  }
+  return { text: JSON.stringify(doc), replaced }
+}
+
+/**
+ * Every rewrite rule in a routes manifest, whatever shape `rewrites` takes.
+ *
+ * Next writes it as `{beforeFiles, afterFiles, fallback}` today and as a flat
+ * array in older versions. Both are handled rather than assumed, because the
+ * cost of guessing is a manifest this returns nothing for -- and a rule set of
+ * zero passes any "no placeholders left" check trivially.
+ *
+ * @param {unknown} doc
+ * @returns {{ destination: string }[]}
+ */
+export function rewriteRules(doc) {
+  const rewrites = /** @type {any} */ (doc)?.rewrites
+  const groups = Array.isArray(rewrites) ? [rewrites] : Object.values(rewrites ?? {})
+  const out = []
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue
+    for (const rule of group) {
+      if (rule && typeof rule.destination === 'string') out.push(rule)
+    }
+  }
+  return out
+}
+
+/**
+ * Whether `destination`'s ORIGIN is the placeholder.
+ *
+ * An origin check, not a substring one. `destination.includes(PLACEHOLDER)` is
+ * satisfied by a host that merely contains it -- and a bare
+ * `startsWith(PLACEHOLDER)` matches
+ * `http://terrapod-storage-rewrite.invalid.example.test/...`, where the real
+ * host is somebody else's. Hence the explicit boundary.
+ *
+ * @param {string} destination
+ * @returns {boolean}
+ */
+export function hasPlaceholderOrigin(destination) {
+  return destination === PLACEHOLDER || destination.startsWith(`${PLACEHOLDER}/`)
+}
+
+/**
+ * Whether `destination`'s origin is `base`. The mirror of the above, used to
+ * count how many destinations a patch actually pointed at the API.
+ *
+ * @param {string} destination
+ * @param {string} base
+ * @returns {boolean}
+ */
+export function hasOrigin(destination, base) {
+  return destination === base || destination.startsWith(`${base}/`)
 }
 
 /**
@@ -143,7 +201,10 @@ export function applyPatch(manifestPath, base, { expected = EXPECTED_REWRITES, o
     )
   }
   try {
-    writeFileSync(target, text)
+    // 0600: the init container writes it and the web container reads it as the
+    // same uid, so nothing else needs it. Only honoured on creation, which is
+    // the `--emit` case -- an in-place patch keeps the image's own mode.
+    writeFileSync(target, text, { mode: 0o600 })
   } catch (err) {
     // The one failure an operator can act on, so it says what to do. Reached
     // when the root filesystem is read-only and nothing seeded the manifest --
@@ -174,20 +235,35 @@ export function applyPatch(manifestPath, base, { expected = EXPECTED_REWRITES, o
  */
 export function assertPatched(path, base, expected = EXPECTED_REWRITES) {
   const after = readFileSync(path, 'utf8')
-  const left = occurrences(after, PLACEHOLDER)
-  if (left > 0) {
+
+  // Two checks, because they are blind in different directions. The structural
+  // one reads the destinations Next will actually serve, and is the one that
+  // matters; the document-wide one catches a placeholder that ended up
+  // somewhere this function does not look.
+  const rules = rewriteRules(JSON.parse(after))
+  const stillPlaceholder = rules.filter((r) => hasPlaceholderOrigin(r.destination)).length
+  if (stillPlaceholder > 0) {
     throw new Error(
-      `storage rewrite: ${path} still contains ${left} placeholder ` +
-        'destination(s). Refusing to start: see #2639.',
+      `storage rewrite: ${path} still has ${stillPlaceholder} rewrite ` +
+        'destination(s) on the placeholder origin. Refusing to start: see #2639.',
     )
   }
-  const pointed = occurrences(after, base)
+  const loose = occurrences(after, PLACEHOLDER)
+  if (loose > 0) {
+    throw new Error(
+      `storage rewrite: ${path} mentions the placeholder ${loose} time(s) ` +
+        'outside a rewrite destination, so something carries it that this ' +
+        'file does not know how to point at the API. Refusing to start: ' +
+        'see #2639.',
+    )
+  }
+  const pointed = rules.filter((r) => hasOrigin(r.destination, base)).length
   if (pointed < expected) {
     throw new Error(
-      `storage rewrite: ${path} names ${base} ${pointed} time(s), expected at ` +
-        `least ${expected}. A manifest with the placeholder gone and the API ` +
-        'absent proxies storage reads to nothing, which is #47. Refusing to ' +
-        'start: see #2639.',
+      `storage rewrite: ${path} has ${pointed} rewrite destination(s) on ` +
+        `${base}, expected at least ${expected}. A manifest with the ` +
+        'placeholder gone and the API absent proxies storage reads to nothing, ' +
+        'which is #47. Refusing to start: see #2639.',
     )
   }
 }
@@ -206,7 +282,10 @@ export function assertPatched(path, base, expected = EXPECTED_REWRITES) {
  */
 export function ensurePatched(manifestPath, base, { expected = EXPECTED_REWRITES } = {}) {
   const before = readFileSync(manifestPath, 'utf8')
-  if (occurrences(before, PLACEHOLDER) === 0) {
+  const pending = rewriteRules(JSON.parse(before)).filter((r) =>
+    hasPlaceholderOrigin(r.destination),
+  ).length
+  if (pending === 0) {
     assertPatched(manifestPath, base, expected)
     return 0
   }
