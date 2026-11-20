@@ -18,7 +18,7 @@ from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
-from terrapod.services.workspace_search_service import ExclusionReport
+from terrapod.services.workspace_search_service import ExclusionReport, WorkspaceFilterError
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
@@ -1675,3 +1675,61 @@ class TestExcludeReporting:
             "an exclusion that matches nothing protects nothing"
         )
         db.commit.assert_not_awaited()
+
+
+class TestAFilterErrorFromTheReportIsA422:
+    """#2582 -- the report runs AFTER each route's `parse_filter` try/except.
+
+    `exclusion_report` re-runs filter logic over the exclude entries, so it can
+    raise `WorkspaceFilterError` in its own right, and a handler cannot catch
+    what runs after it. It is unreachable today only because `parse_filter`
+    validated the same entries a few lines above -- a coincidence of ordering,
+    which is exactly what a test should not rely on. Without the translation
+    inside `_report_exclusions` both of these are a 500.
+    """
+
+    async def _post_raising(self, path, body):
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([_mock_ws(name="w1")]))
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.rollback = AsyncMock()
+        boom = WorkspaceFilterError("exclude[0] is not a thing")
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch(_REPORT, new_callable=AsyncMock, side_effect=boom),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(path, json=body, headers=_AUTH)
+        return resp, db
+
+    async def test_search_answers_422_naming_the_entry(self):
+        resp, _db = await self._post_raising(_SEARCH, {"filter": _EXCLUDE_FILTER})
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == "exclude[0] is not a thing"
+
+    async def test_bulk_update_answers_422_and_commits_nothing(self):
+        resp, db = await self._post_raising(
+            _BULK, {"filter": _EXCLUDE_FILTER, "update": {"slack-channel": "#ops"}}
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == "exclude[0] is not a thing"
+        db.commit.assert_not_awaited()
+
+    async def test_a_filter_with_no_exclude_never_reaches_the_report(self):
+        # The early return is what keeps the cost at zero for the common case,
+        # and a translation that ran unconditionally would hide that.
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([_mock_ws(name="w1")]))
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch(_REPORT, new_callable=AsyncMock, side_effect=AssertionError("called")) as rep,
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(_SEARCH, json={"filter": {"all": True}}, headers=_AUTH)
+        assert resp.status_code == 200, resp.text
+        rep.assert_not_awaited()

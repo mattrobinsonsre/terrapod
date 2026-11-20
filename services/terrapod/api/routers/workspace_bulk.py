@@ -967,7 +967,25 @@ def _refusal_detail(report: ExclusionReport) -> str:
 
 
 async def _report_exclusions(db: AsyncSession, wf: WorkspaceFilter) -> ExclusionReport | None:
-    return await exclusion_report(db, wf) if wf.exclude else None
+    """The exclusion report, with a filter error translated to a 422 (#2582).
+
+    `exclusion_report` re-runs filter logic over the exclude entries, so it can
+    raise `WorkspaceFilterError` in its own right. Both callers reach this
+    AFTER their own `parse_filter` try/except has closed, so without the
+    translation here a bad exclude entry is a **500**.
+
+    It is unreachable today only because `parse_filter` has already validated
+    the same entries a few lines above -- a coincidence of ordering, not a
+    guarantee. Translating inside the one producer means neither caller has to
+    remember, and reordering either one cannot reintroduce it. A handler cannot
+    catch what runs after it, which is why this is not left to the callers.
+    """
+    if not wf.exclude:
+        return None
+    try:
+        return await exclusion_report(db, wf)
+    except WorkspaceFilterError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.post("/workspaces/actions/search")

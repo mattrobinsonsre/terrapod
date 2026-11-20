@@ -219,7 +219,13 @@ def build_workspace_query(f: WorkspaceFilter) -> Select[tuple[Workspace]]:
 @dataclass
 class ExclusionReport:
     excluded: int
-    #: Indexes of exclude entries that match no workspace anywhere in the fleet.
+    #: Indexes of exclude entries that protect nothing, which is the union of
+    #: two things rather than just the first (#2582): entries matching no
+    #: workspace anywhere in the fleet, AND entries naming a `workspace_ids`
+    #: value that does not exist. The second is reported even when the entry
+    #: matches workspaces by its other dimensions, because an id that names
+    #: nothing is a typo whichever way the rest of the entry resolves.
+    #: `missing_ids` below is that second set on its own.
     empty: list[int]
     #: Per entry index, the `workspace_ids` it names (as written) that do not exist.
     missing_ids: dict[int, list[str]] = field(default_factory=dict)
