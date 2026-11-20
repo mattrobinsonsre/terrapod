@@ -210,13 +210,30 @@ def _matches(form: str, text: str) -> bool:
     return form in text
 
 
-#: go-terrapod is NOT a surface here, and that is a property of the SDK rather
-#: than a gap. `CreateAutodiscoveryRule` and `UpdateAutodiscoveryRule` take
-#: `attrs map[string]any` and pass it through, so the SDK enumerates no rule
-#: attribute and a new one reaches it for free. A typed struct and an untyped
-#: bag have opposite fan-outs, and asserting against the untyped one would
-#: report 71 of 72 missing for ever.
-_SDK_IS_UNTYPED = True
+#: Neither go-terrapod NOR the MCP tools are surfaces here, and that is a
+#: property of how both take the payload rather than a gap in either.
+#:
+#: `CreateAutodiscoveryRule` takes `attrs map[string]any` and passes it through,
+#: for a reason the SDK states itself: "the set of template fields is
+#: open-ended on the API side, so the SDK exposes the create/update payload as
+#: raw map[string]any". `terrapod_autodiscovery_rule_create` and `_update` sit
+#: on top of that and take the same map, so neither enumerates a rule attribute
+#: and a new one reaches both for free.
+#:
+#: A typed struct and an untyped bag have opposite fan-outs, so asserting
+#: against an untyped one would report 71 of 72 missing for ever -- which is
+#: what this gate did for MCP before anyone looked at HOW the tools take their
+#: input. That was not a finding, it was the wrong question.
+#:
+#: The exemption is only as good as its premise, so the premise is CHECKED:
+#: `test_the_untyped_surfaces_are_still_untyped` reads both files and requires
+#: the pass-through. Type either one and this gate starts demanding parity,
+#: which is the right moment for it to start -- a typed surface CAN silently
+#: lack an attribute, and an untyped one cannot.
+_UNTYPED_SURFACES: dict[str, str] = {
+    "go-terrapod": "go-terrapod/autodiscovery_rules.go",
+    "MCP rule tools": "mcp/internal/mcpserver/autodiscovery.go",
+}
 
 
 #: Measured on 2026-11-20, each entry a REAL gap rather than a matcher artefact
@@ -338,25 +355,71 @@ class TestEverySettableAttributeReachesEverySurface:
                 )
         assert not problems, "\n".join(problems)
 
-    def test_mcp_still_has_no_rule_tools(self) -> None:
-        """Asserted so that CREATING the surface completes this gate.
+    def test_the_untyped_surfaces_are_still_untyped(self) -> None:
+        """The premise of the two exemptions, checked rather than asserted.
 
-        MCP has 95 tools, four of them for MODULE autodiscovery and none for
-        these, against eight API routes — so `propagate` has nowhere to go and
-        neither does anything else. (95 is `tool_catalogue.json`'s own count and
-        what `llms.txt` states; a count written from memory is worth nothing.) That is one missing surface rather than 72
-        missing attributes, and recording it as 72 ledger entries would read as
-        72 decisions.
+        Both go-terrapod and the MCP tools take the rule's payload as a
+        pass-through `map[string]any`, so neither can silently lack an
+        attribute and neither belongs in the per-attribute check above.
 
-        When the tools land, this test fails and says what to do: add
-        `"MCP rule tools"` to `_SURFACE_FILES` and `_SPELLING`, which puts all
-        72 attributes under the gate at once.
+        If someone types either -- a struct with a field per attribute, the way
+        `workspaceUpdateIn` does for workspaces -- that stops being true, and
+        this test fails telling them to add it to `_SURFACE_FILES` and
+        `_SPELLING`. Which is the right moment: a typed surface is exactly the
+        thing that CAN go quietly out of step.
         """
-        assert _MCP_SURFACE_ABSENT, "_MCP_SURFACE_ABSENT is stale; wire the surface in"
-        assert _optional_surface(_MCP_REL) is None, (
-            f"{_MCP_REL} now exists. Add 'MCP rule tools' to _SURFACE_FILES and "
-            "_SPELLING (with _go_json_tag), drop _MCP_SURFACE_ABSENT, and let the "
-            "gate judge all 72 attributes against it."
+        problems: list[str] = []
+        for label, rel in _UNTYPED_SURFACES.items():
+            path = _optional_surface(rel)
+            assert path is not None, (
+                f"{rel} is not readable from here, so this exemption's premise "
+                "cannot be checked. It needs a COPY line in docker/Dockerfile.test."
+            )
+            source = path.read_text()
+            if 'map[string]any `json:"attributes"' in source or "attrs map[string]any" in source:
+                continue
+            problems.append(
+                f"{label} ({rel}) no longer takes the rule's payload as a pass-through "
+                "map, so it can now lack an attribute silently. Add it to _SURFACE_FILES "
+                "and _SPELLING (with _go_json_tag) and let the gate judge it."
+            )
+        assert not problems, "\n".join(problems)
+
+    def test_the_mcp_tools_cover_every_rule_route(self) -> None:
+        """Untyped is not an excuse for a missing ROUTE.
+
+        The attribute exemption above is about how a tool takes its input. It
+        says nothing about whether a tool exists, and a missing tool is a real
+        gap -- MCP had none of these at all until #2621, so an agent could read
+        a rule's effects and nothing about the rule.
+
+        Derived from the router, so a new route arrives here rather than being
+        remembered.
+        """
+        router_src = pathlib.Path(inspect.getfile(_coerce_attrs)).read_text()
+        # (verb, path), not path alone: the eight routes share five paths, so
+        # counting paths reports five and reads as three missing routes.
+        routes = set(
+            re.findall(
+                r'^@(?:dual_)?router\.(get|post|patch|delete)\(\s*"(/autodiscovery-rules[^"]*)"',
+                router_src,
+                re.M,
+            )
+        )
+        assert len(routes) >= 7, (
+            f"only found {len(routes)} rule routes, so the matcher has stopped "
+            "matching rather than the API having shrunk"
+        )
+        tools_path = _optional_surface(_UNTYPED_SURFACES["MCP rule tools"])
+        assert tools_path is not None
+        tools = tools_path.read_text()
+        # One tool may serve two routes -- `preview` takes a saved rule id or an
+        # unsaved attribute map, which is the collection's POST and the
+        # member's GET -- so this counts TOOLS, not a route-to-tool mapping.
+        names = set(re.findall(r'Name: "(terrapod_autodiscovery_rule_\w+)"', tools))
+        assert len(names) >= len(routes) - 2, (
+            f"{len(routes)} rule routes and only {len(names)} tools "
+            f"({sorted(names)}) — an agent cannot reach what has no tool"
         )
 
 

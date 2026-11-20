@@ -157,10 +157,21 @@ field ArtifactSupplyChain.State string `json:"state"`
 field ArtifactSupplyChain.Verdict map[string]any `json:"verdict"`
 field AuthenticationError.Detail string
 field AuthorizationError.Detail string
+field AutodiscoveryPreviewEntry.Collision bool `json:"collision"`
+field AutodiscoveryPreviewEntry.ExistingAutodiscovered bool `json:"existing_autodiscovered"`
+field AutodiscoveryPreviewEntry.WorkingDirectory string `json:"working_directory"`
+field AutodiscoveryPreviewEntry.WorkspaceName string `json:"workspace_name"`
 field AutodiscoveryRule.Attributes map[string]any
 field AutodiscoveryRule.CreatedAt string
 field AutodiscoveryRule.ID string
 field AutodiscoveryRule.UpdatedAt string
+field AutodiscoveryRulePreview.Entries []AutodiscoveryPreviewEntry `json:"entries"`
+field AutodiscoveryRulePreview.FilesWalked int `json:"files-walked"`
+field AutodiscoveryRulePreview.Ref string `json:"ref"`
+field AutodiscoveryScan.FilesWalked int `json:"files-walked"`
+field AutodiscoveryScan.Ref string `json:"ref"`
+field AutodiscoveryScan.WorkspaceIDs []string `json:"workspace-ids"`
+field AutodiscoveryScan.WorkspacesCreated int `json:"workspaces-created"`
 field BinaryUpload.Binary CachedBinaryRow
 field BinaryUpload.PreviousDigest string
 field BinaryUpload.Replaced bool
@@ -2028,6 +2039,7 @@ method (*Client) ListAgentPoolTokens(ctx context.Context, poolID string) ([]Agen
 method (*Client) ListAgentPools(ctx context.Context) ([]AgentPool, error)
 method (*Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken, error)
 method (*Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error)
+method (*Client) ListAllAutodiscoveryRules(ctx context.Context) ([]AutodiscoveryRule, error)
 method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListAllDeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error)
 method (*Client) ListAllInventoryGroupMembers( ctx context.Context, groupID string, ) ([]InventoryHostGroup, error)
@@ -2042,6 +2054,7 @@ method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Va
 method (*Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error)
 method (*Client) ListAnsibleExecutionEnvironments( ctx context.Context, ) (*AnsibleExecutionEnvironments, error)
 method (*Client) ListArchitectureCritiqueMessages( ctx context.Context, workspaceID string, ) ([]ArchitectureCritiqueMessage, error)
+method (*Client) ListAutodiscoveryRules(ctx context.Context) ([]AutodiscoveryRule, error)
 method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
 method (*Client) ListDeletedWorkspaces(ctx context.Context, opts DeletedWorkspaceListOptions) (*DeletedWorkspaceList, error)
@@ -2110,9 +2123,11 @@ method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspace
 method (*Client) PostMultipart( ctx context.Context, path string, fields map[string]string, fileField, fileName string, content []byte, ) ([]byte, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
+method (*Client) PreviewAutodiscoveryRule(ctx context.Context, id string) (*AutodiscoveryRulePreview, error)
 method (*Client) PreviewModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewModuleAutodiscoveryRuleWithOptions(ctx context.Context, id string, opts ModuleAutodiscoveryPreviewOptions) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error)
+method (*Client) PreviewUnsavedAutodiscoveryRule(ctx context.Context, attrs map[string]any) (*AutodiscoveryRulePreview, error)
 method (*Client) PreviewUnsavedModuleAutodiscoveryRule(ctx context.Context, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewUnsavedModuleAutodiscoveryRuleWithOptions(ctx context.Context, req ModuleAutodiscoveryRuleRequest, opts ModuleAutodiscoveryPreviewOptions) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error)
@@ -2134,6 +2149,7 @@ method (*Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate str
 method (*Client) RotateAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error)
 method (*Client) RotateOIDCSigningKey(ctx context.Context) (*OIDCSigningKeyRotation, error)
+method (*Client) ScanAutodiscoveryRule(ctx context.Context, id string) (*AutodiscoveryScan, error)
 method (*Client) ScanModuleAutodiscoveryRule(ctx context.Context, id string, subdirectories []string) (*ModuleAutodiscoveryScan, error)
 method (*Client) ScanModuleAutodiscoveryRuleSelections(ctx context.Context, id string, selections []ModuleAutodiscoverySelection) (*ModuleAutodiscoveryScan, error)
 method (*Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (*SearchWorkspacesResult, error)
@@ -2219,7 +2235,10 @@ type ArtifactLedgerEntry struct
 type ArtifactSupplyChain struct
 type AuthenticationError struct
 type AuthorizationError struct
+type AutodiscoveryPreviewEntry struct
 type AutodiscoveryRule struct
+type AutodiscoveryRulePreview struct
+type AutodiscoveryScan struct
 type BinaryUpload struct
 type BulkUpdateResult struct
 type BulkWarmRequest struct
