@@ -172,6 +172,26 @@ Per-surface verification before you push (lint alone is **not** enough):
    and `/v2` for the container registry) reach the same handler through internal
    rewrites in `next.config.js`, so failure handling and streaming apply to all
    of them (#1381, #1408).
+   **One family is deliberately NOT on the handler: the filesystem backend's
+   presigned `storage/get` URLs, which take an EXTERNAL rewrite instead
+   (#2639).** From Next 16.4.5 a route handler cannot emit a `Content-Length` at
+   all — the header is in `FORBIDDEN_HEADERS` in `send-response.js` and the body
+   is always piped, so Node sends chunked — and some clients require one.
+   Pulumi refuses a plugin download outright (`expected -1 bytes but copied
+   18043696`) and docker's registry client needs one on a blob HEAD. Buffering
+   does not help: `new Response(arrayBuffer).body` is a `ReadableStream` like any
+   other and takes the same pipe. Next's own proxy, which an external
+   destination uses, does preserve it. This does not weaken the rule — traffic
+   still enters through the web pod, and those are GETs, so the request-body
+   streaming the rule exists to protect is not involved. **A rewrite
+   destination is baked into the routes manifest at build time**, which is #47
+   (an operator's web pod proxied to a baked `localhost:8001` while their own
+   `API_URL` said otherwise), so `web/server-entry.mjs` rewrites a placeholder
+   from `API_URL` at container start and **refuses to start if it did not
+   take** — a Next release that changes the manifest format must fail loudly
+   rather than leave those clients silently back on chunked encoding. Do not add
+   a second such rewrite without the same assertion, and do not point one at the
+   API for anything with a request body.
    **Test a new surface through the BFF, never against the API directly.** An
    API-only test is a tainted test: it skips the hop every client actually
    takes, and that hop has its own failure modes. The OCI registry hit three at
