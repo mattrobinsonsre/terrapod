@@ -454,7 +454,18 @@ class TestEverySurfaceFileReachesTheTestImage:
             f"only found {len(paths)} _surface() paths, which suggests the AST "
             "walk has stopped matching rather than that the gates have shrunk"
         )
-        dockerfile = pathlib.Path(__file__).parents[3] / "docker" / "Dockerfile.test"
+        # `_optional_surface`, not `.parents[n]` — and this gate is why that
+        # helper's docstring says so. The commit before this one fixed exactly
+        # this arithmetic in the MCP absence check; this test, written in the
+        # same breath, repeated it. `parents[3]` is the repo root locally and
+        # `/` in the test image, whose layout is one directory shallower, so it
+        # passed here and failed CI on `/docker/Dockerfile.test`.
+        dockerfile = _optional_surface("docker/Dockerfile.test")
+        assert dockerfile is not None, (
+            "docker/Dockerfile.test is not readable from here, so this gate can "
+            "check nothing. The image copies `docker/`, so its absence is a "
+            "packaging change rather than something to skip over."
+        )
         copied = dockerfile.read_text()
         missing: list[str] = []
         for rel in sorted(paths):
