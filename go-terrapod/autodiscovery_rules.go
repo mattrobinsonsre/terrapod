@@ -103,19 +103,11 @@ type Propagation struct {
 // UpdateAutodiscoveryRuleWithPropagation patches a rule and rolls its changed fields out to existing workspaces;
 // a server that omits the report returns the rule with an error.
 func (c *Client) UpdateAutodiscoveryRuleWithPropagation(ctx context.Context, id string, attrs map[string]any, opts PropagateOptions) (*AutodiscoveryRule, *Propagation, error) {
-	resource, err := MarshalResourceWithID(id, "autodiscovery-rules", attrs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("marshal update autodiscovery-rule: %w", err)
-	}
-	doc := map[string]json.RawMessage{}
-	if err := json.Unmarshal(resource, &doc); err != nil {
-		return nil, nil, fmt.Errorf("marshal update autodiscovery-rule: %w", err)
-	}
-	doc["propagate"] = json.RawMessage("true")
+	options := map[string]any{"propagate": true}
 	if opts.DryRun {
-		doc["dry_run"] = json.RawMessage("true")
+		options["dry_run"] = true
 	}
-	body, err := json.Marshal(doc)
+	body, err := MarshalResourceWithOptions(id, "autodiscovery-rules", attrs, nil, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal update autodiscovery-rule: %w", err)
 	}

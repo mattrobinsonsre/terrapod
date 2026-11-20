@@ -174,6 +174,11 @@ type autodiscoveryRuleModel struct {
 	NotificationTemplates  types.List `tfsdk:"notification_templates"`
 	ExecutionHookTemplates types.List `tfsdk:"execution_hook_templates"`
 
+	// Propagate is a request OPTION rather than a stored field: it is sent on
+	// update and never read back, so it has no `Computed` counterpart and never
+	// appears in the rule's own attributes.
+	Propagate types.Bool `tfsdk:"propagate"`
+
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
 }
@@ -930,6 +935,26 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 			},
 
 			// Read-only
+			// A request option on update, not a stored field (#2621 item 53).
+			//
+			// It is NOT the imperative action it reads as. The API computes the
+			// propagated fields THIS update changed and pushes only those down to
+			// the workspaces the rule created; an update that changes none of them
+			// propagates nothing. So on a second apply with no diff it is a no-op,
+			// which is what makes a declarative attribute the right shape rather
+			// than a trigger or a separate resource.
+			//
+			// Optional with no Computed counterpart: the server never returns it,
+			// so there is nothing to read back and nothing to drift.
+			"propagate": schema.BoolAttribute{
+				Description: "On update, also apply the rule's changed settings to the " +
+					"workspaces it created. Only the fields this update changes are " +
+					"propagated, so an apply with no changes to them does nothing. " +
+					"Workspaces whose value was customised away from the rule's previous " +
+					"value are skipped. Defaults to false.",
+				Optional: true,
+			},
+
 			"created_at": schema.StringAttribute{
 				Description: "Creation timestamp.",
 				Computed:    true,
@@ -1038,7 +1063,16 @@ func (r *autodiscoveryRuleResource) Update(ctx context.Context, req resource.Upd
 
 	attrs := buildAutodiscoveryRuleAttrs(&plan)
 
-	body, err := terrapod.MarshalResourceWithID(state.ID.ValueString(), "autodiscovery-rules", attrs)
+	// `propagate` is a top-level request option, not a rule field, so it is
+	// never in `attrs`. The SDK owns the document shape (#2621 item 53).
+	var options map[string]any
+	if plan.Propagate.ValueBool() {
+		options = map[string]any{"propagate": true}
+	}
+
+	body, err := terrapod.MarshalResourceWithOptions(
+		state.ID.ValueString(), "autodiscovery-rules", attrs, nil, options,
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
 		return

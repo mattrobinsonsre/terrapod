@@ -1846,6 +1846,7 @@ func IsValidation(err error) bool
 func MarshalResource(resourceType string, attributes map[string]any, relationships map[string]any) ([]byte, error)
 func MarshalResourceWithID(id, resourceType string, attributes map[string]any) ([]byte, error)
 func MarshalResourceWithIDAndRels(id, resourceType string, attributes, relationships map[string]any) ([]byte, error)
+func MarshalResourceWithOptions( id, resourceType string, attributes, relationships, options map[string]any, ) ([]byte, error)
 func NewClient(opts Options) (*Client, error)
 func ParseResource(body []byte) (*Resource, error)
 func ParseResourceList(body []byte) ([]Resource, error)
