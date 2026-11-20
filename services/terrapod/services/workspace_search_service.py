@@ -180,11 +180,41 @@ def _dimension_clauses(f: WorkspaceFilter) -> list[ColumnElement[bool]]:
     return clauses
 
 
-def _check_exclude_entry(entry: WorkspaceFilter, index: int) -> None:
+#: What an exclude entry may not carry. One producer for both doors (#2621):
+#: `_parse_entry` validates the wire dict and `_check_exclude_entry` validates an
+#: already-built `WorkspaceFilter`, whatever built it -- so neither is redundant,
+#: they guard different entry points, and the defect was that they DISAGREED.
+#:
+#: `_parse_entry` refused on KEY PRESENCE (`{"all", "exclude"} & set(norm)`), so
+#: `{"all": false, "labels": {...}}` was a 422; this one refused on VALUE, so the
+#: same entry passed. The model side cannot do it by key -- `all` is a `bool`
+#: field with a default, so an entry built in code always "has" it -- which
+#: settles the question rather than leaving it to taste: the shared rule is by
+#: VALUE, and the wire check relaxes to match.
+#:
+#: Relaxing is the safe direction too. `all: false` says "not all", which is
+#: already the default, so refusing it refused a statement that means nothing
+#: rather than one that does something; and nothing that was accepted before is
+#: refused now.
+def _exclude_entry_problem(entry: WorkspaceFilter, label: str) -> str | None:
+    """Why this exclude entry is invalid, or None.
+
+    An entry nesting `all: true` would match every workspace and so exclude the
+    whole fleet; one nesting `exclude` would be a double negative nobody can
+    read. An entry with no selector at all excludes nothing, which is a typo
+    rather than a request.
+    """
     if entry.all or entry.exclude:
-        raise WorkspaceFilterError(f"exclude[{index}] cannot set 'all' or nest 'exclude'")
+        return f"{label} cannot set 'all': true or nest 'exclude'"
     if not entry._explicit_dimensions():
-        raise WorkspaceFilterError(f"exclude[{index}] sets no selector")
+        return f"{label} sets no selector"
+    return None
+
+
+def _check_exclude_entry(entry: WorkspaceFilter, index: int) -> None:
+    problem = _exclude_entry_problem(entry, f"exclude[{index}]")
+    if problem:
+        raise WorkspaceFilterError(problem)
 
 
 def build_workspace_query(f: WorkspaceFilter) -> Select[tuple[Workspace]]:
@@ -284,13 +314,14 @@ def _parse_entry(raw: Any, label: str | None = None) -> WorkspaceFilter:
     unknown = set(norm) - set(WorkspaceFilter.model_fields)
     if unknown:
         raise WorkspaceFilterError(f"{prefix}unknown filter key(s): {', '.join(sorted(unknown))}")
-    if label:
-        nested = {"all", "exclude"} & set(norm)
-        if nested:
-            raise WorkspaceFilterError(
-                f"{prefix}'all' and 'exclude' are not allowed in an exclude entry"
-            )
-    else:
+    # No key-presence refusal for an exclude entry here any more: it disagreed
+    # with `_check_exclude_entry` about `all: false`, and the model side cannot
+    # be key-based, so the shared rule in `_exclude_entry_problem` decides and
+    # is applied once the entry is built, below.
+    #
+    # `not label` is the TOP-LEVEL filter: only it may carry `exclude`, and a
+    # nested one is refused by that shared rule rather than here.
+    if not label:
         raw_exclude = norm.pop("exclude", None)
         if raw_exclude is None:
             raw_exclude = []
@@ -305,8 +336,12 @@ def _parse_entry(raw: Any, label: str | None = None) -> WorkspaceFilter:
         entry = WorkspaceFilter(**norm)
     except Exception as e:  # pydantic validation
         raise WorkspaceFilterError(f"{prefix}{e}") from e
-    if label and not entry._explicit_dimensions():
-        raise WorkspaceFilterError(f"{label} sets no selector")
+    if label:
+        # The shared rule, so the wire door and the model door cannot disagree.
+        # This was a third copy of the no-selector refusal.
+        problem = _exclude_entry_problem(entry, label)
+        if problem:
+            raise WorkspaceFilterError(problem)
     return entry
 
 
