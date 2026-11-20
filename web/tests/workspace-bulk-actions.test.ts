@@ -8,6 +8,7 @@ import {
   confirmTier,
   eligibleFor,
   summarise,
+  type BulkPermissions,
   type BulkRunActions,
   type BulkWorkspace,
 } from '../src/lib/workspace-bulk-actions.ts'
@@ -23,6 +24,9 @@ interface Opts {
   noRun?: boolean
   planOnly?: boolean
   isDestroy?: boolean | null
+  /** Defaults to all three GRANTED, so a test that says nothing about
+   *  permission goes on testing run-state eligibility and nothing else. */
+  perms?: Partial<BulkPermissions>
 }
 
 function ws(id: string, o: Opts = {}): BulkWorkspace {
@@ -32,6 +36,7 @@ function ws(id: string, o: Opts = {}): BulkWorkspace {
     locked: o.locked ?? false,
     planApplyEnabled: o.planApply ?? true,
     configureEnabled: o.configure ?? false,
+    permissions: { canQueueRun: true, canQueueApply: true, canQueueDestroy: true, ...o.perms },
     latestRun: o.noRun
       ? null
       : {
@@ -241,5 +246,115 @@ describe('the confirmation text', () => {
 
   it('does not build a key at runtime', () => {
     assert.ok(!page.includes('`bulk.confirm'))
+  })
+})
+
+describe('permission gating (#2579 item 2)', () => {
+  // The menu read only run STATE until now, so a read-only user was offered
+  // Apply on any `planned` run and got a 403 on press. These assert the other
+  // dimension: whether this user MAY act.
+  const ALL: BulkRunActions = {
+    confirmable: true,
+    discardable: true,
+    cancelable: true,
+    retryable: true,
+  }
+
+  it('offers nothing when no permission is published at all', () => {
+    // Fail closed. An older API without the flags, or a role with none of
+    // them, must not be offered a control the server will refuse.
+    const w = ws('a', { actions: ALL, perms: { canQueueRun: false, canQueueApply: false, canQueueDestroy: false } })
+    for (const { id } of BULK_ACTIONS) {
+      assert.deepEqual(ids(eligibleFor(id, [w])), [], `${id} was offered with no permission`)
+    }
+  })
+
+  it('gates plan on can-queue-run', () => {
+    assert.deepEqual(ids(eligibleFor('plan', [ws('a', { perms: { canQueueRun: false } })])), [])
+    assert.deepEqual(ids(eligibleFor('plan', [ws('a', { perms: { canQueueRun: true } })])), ['a'])
+  })
+
+  it('gates cancel and discard on can-queue-run, since both need run:cancel', () => {
+    // run:cancel has no published flag and sits in the same `plan` tier as
+    // run:plan, so can-queue-run answers for it (Matt's call, #2621).
+    for (const action of ['cancel', 'discard'] as const) {
+      const denied = ws('a', { actions: ALL, perms: { canQueueRun: false } })
+      const allowed = ws('a', { actions: ALL, perms: { canQueueRun: true } })
+      assert.deepEqual(ids(eligibleFor(action, [denied])), [], `${action} offered without run:cancel`)
+      assert.deepEqual(ids(eligibleFor(action, [allowed])), ['a'])
+    }
+  })
+
+  it('gates apply on can-queue-apply, and on can-queue-destroy for a destroy run', () => {
+    // confirm_capability(is_destroy) -> RUN_APPLY_DESTROY if destroy else RUN_APPLY.
+    const normal = { actions: ALL, isDestroy: false } as const
+    const destroy = { actions: ALL, isDestroy: true } as const
+
+    assert.deepEqual(ids(eligibleFor('apply', [ws('a', { ...normal, perms: { canQueueApply: true } })])), ['a'])
+    assert.deepEqual(ids(eligibleFor('apply', [ws('a', { ...normal, perms: { canQueueApply: false } })])), [])
+
+    // The distinguishing pair: apply-but-not-destroy must NOT reach a destroy run.
+    assert.deepEqual(
+      ids(eligibleFor('apply', [ws('a', { ...destroy, perms: { canQueueApply: true, canQueueDestroy: false } })])),
+      [],
+      'a destroy run was offered to a role holding run:apply but not run:apply-destroy',
+    )
+    assert.deepEqual(
+      ids(eligibleFor('apply', [ws('a', { ...destroy, perms: { canQueueApply: false, canQueueDestroy: true } })])),
+      ['a'],
+    )
+  })
+
+  it('gates retry on what CREATING that run would require', () => {
+    // create_run_capability(plan_only, is_destroy, is_configure): a retry is a
+    // new run, so it must not let anyone queue what they could not queue
+    // directly (#1599).
+    const base = { actions: ALL } as const
+
+    // plan-only -> run:plan
+    assert.deepEqual(
+      ids(eligibleFor('retry', [ws('a', { ...base, planOnly: true, perms: { canQueueRun: true, canQueueApply: false } })])),
+      ['a'],
+    )
+    // apply-capable -> run:apply, NOT run:plan
+    assert.deepEqual(
+      ids(eligibleFor('retry', [ws('a', { ...base, planOnly: false, perms: { canQueueRun: true, canQueueApply: false } })])),
+      [],
+      'an apply-capable run was retryable by a plan-only role — the #1599 escape',
+    )
+    // destroy -> run:apply-destroy
+    assert.deepEqual(
+      ids(eligibleFor('retry', [
+        ws('a', { ...base, planOnly: false, isDestroy: true, perms: { canQueueApply: true, canQueueDestroy: false } }),
+      ])),
+      [],
+    )
+    // a configure is apply-equivalent and has no destroy analogue
+    assert.deepEqual(
+      ids(eligibleFor('retry', [
+        ws('a', { ...base, runKind: 'configure', configure: true, perms: { canQueueApply: true, canQueueRun: false } }),
+      ])),
+      ['a'],
+    )
+    assert.deepEqual(
+      ids(eligibleFor('retry', [
+        ws('a', { ...base, runKind: 'configure', configure: true, perms: { canQueueApply: false, canQueueRun: true } }),
+      ])),
+      [],
+    )
+  })
+
+  it('needs BOTH permission and run state, which neither alone establishes', () => {
+    // The property is a relationship, so a fixture holding one dimension
+    // constant passes whichever way the code is written.
+    const permitted_ineligible = ws('a', { actions: null, perms: { canQueueApply: true } })
+    const eligible_unpermitted = ws('b', { actions: ALL, perms: { canQueueApply: false } })
+    const both = ws('c', { actions: ALL, perms: { canQueueApply: true } })
+    assert.deepEqual(ids(eligibleFor('apply', [permitted_ineligible, eligible_unpermitted, both])), ['c'])
+  })
+
+  it('summarise counts an unpermitted row as not eligible, so the menu disables', () => {
+    const sel = [ws('a', { actions: ALL, perms: { canQueueApply: true } }), ws('b', { actions: ALL, perms: { canQueueApply: false } })]
+    assert.deepEqual(summarise('apply', sel), { eligible: 1, total: 2, enabled: false })
   })
 })

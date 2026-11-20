@@ -17,6 +17,10 @@ function ws(id: string, run: string | null): BulkWorkspace {
     locked: false,
     planApplyEnabled: true,
     configureEnabled: false,
+    // This file drives the HTTP layer, not eligibility: the runner is handed a
+    // list the menu has already filtered, so granting everything keeps these
+    // tests about request shaping.
+    permissions: { canQueueRun: true, canQueueApply: true, canQueueDestroy: true },
     latestRun: run ? { id: `run-${id}`, runKind: 'plan_apply', actions: null } : null,
   }
 }
