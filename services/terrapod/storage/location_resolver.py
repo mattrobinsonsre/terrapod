@@ -199,15 +199,30 @@ async def stop_probing() -> None:
         await asyncio.gather(task, return_exceptions=True)
 
 
+def _record_unchecked(value: str | None) -> str | None:
+    """Set the readiness flag and return what it now holds.
+
+    One producer for a value written in five places across two functions, each
+    with its own `global` (#2621). It also makes the write READABLE: both
+    writers set it for a LATER call of `locations_readiness` to read, which no
+    static analysis can follow, so `py/unused-global-variable` fired on the two
+    writes whose value nothing local reads. Returning the global rather than the
+    parameter is deliberate -- that is what makes the assignment used.
+    """
+    global _unchecked  # noqa: PLW0603
+    _unchecked = value
+    return _unchecked
+
+
 async def check_locations_at_startup() -> None:
     """Refuse to start on rows naming unconfigured locations; report unreachable locations."""
-    global _unchecked, _probed_at  # noqa: PLW0603
+    global _probed_at  # noqa: PLW0603
     await _probe_locations()
     _probed_at = time.monotonic()
     try:
         counts = await _location_counts()
     except Exception as exc:
-        _unchecked = type(exc).__name__
+        _record_unchecked(type(exc).__name__)
         logger.warning("Storage location check failed; not ready until it passes", error=str(exc))
         return
     if missing := _missing(counts):
@@ -229,10 +244,10 @@ async def check_locations_at_startup() -> None:
         # readiness path cannot report healthy on a deployment this check has
         # refused. Clearing it first and relying on the raise was the ordering
         # that made a swallowed raise look fine.
-        _unchecked = problem
+        _record_unchecked(problem)
         logger.error("Not ready: " + problem, locations=missing)
         return
-    _unchecked = None
+    _record_unchecked(None)
 
 
 async def locations_readiness() -> tuple[bool, str]:
@@ -240,21 +255,19 @@ async def locations_readiness() -> tuple[bool, str]:
 
     The probe result is the last one recorded, never waited for; an old one is refreshed behind.
     """
-    global _unchecked  # noqa: PLW0603
     _refresh_in_background()
     pending = _unchecked
     if pending is not None:
         try:
             counts = await _location_counts()
         except Exception as exc:
-            _unchecked = type(exc).__name__
-            return False, f"unchecked: {_unchecked}"
+            return False, f"unchecked: {_record_unchecked(type(exc).__name__)}"
         if missing := _missing(counts):
             problem = _refusal(missing)
-            _unchecked = problem
+            _record_unchecked(problem)
             logger.error("Not ready: " + problem, locations=missing)
             return False, problem
-        _unchecked = None
+        _record_unchecked(None)
         logger.info("Storage location check passed", earlier=pending)
     if _unreachable:
         return True, f"unreachable: {', '.join(sorted(_unreachable))}"
