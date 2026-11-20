@@ -659,7 +659,7 @@ def render_comment(rows: list[_Row], gates: list[str] | None = None) -> str:
     # on merge"). One column fewer also keeps the table readable on a phone.
     header = "| Workspace | Plan | Cost Δ | Apply | Mergeable |\n|---|---|---|---|---|"
     body_lines: list[str] = []
-    detail_blocks: list[str] = []
+    detailed: list[tuple[_Row, str]] = []
     pending_apply: list[str] = []
     for r in rows:
         # Once the merge has actually happened, the Apply cell reports it (#1878).
@@ -694,7 +694,10 @@ def render_comment(rows: list[_Row], gates: list[str] | None = None) -> str:
             pending_apply.append(r.workspace_name)
         block = _render_workspace_details(r)
         if block:
-            detail_blocks.append(block)
+            # Kept PAIRED with its row. `_fit_details` needs both, and
+            # appending the block alone is what made it re-derive the
+            # pairing by rendering every row again (#2581).
+            detailed.append((r, block))
 
     tail: list[str] = []
     if len(pending_apply) == 1:
@@ -716,7 +719,7 @@ def render_comment(rows: list[_Row], gates: list[str] | None = None) -> str:
     # includes the table, hint, footer and join newlines.
     gate_lines = ["", *gates] if gates else []
     head = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, *gate_lines, "", *tail]
-    detail_blocks = _fit_details(rows, detail_blocks, len("\n".join(head)))
+    detail_blocks = _fit_details(detailed, len("\n".join(head)))
 
     parts: list[str] = [_COMMENT_MARKER, "", _HEADING, "", header, *body_lines, *gate_lines]
     if detail_blocks:
@@ -726,31 +729,45 @@ def render_comment(rows: list[_Row], gates: list[str] | None = None) -> str:
     return "\n".join(parts)
 
 
-def _fit_details(rows: list[_Row], blocks: list[str], fixed: int) -> list[str]:
+def _fit_details(detailed: list[tuple[_Row, str]], fixed: int) -> list[str]:
     """Fit the details blocks into the comment's one budget.
 
-    `blocks` is parallel to the rows that produced one. A block's resource list
-    is the only part that can grow with the plan, so it is the only part that
-    degrades: the gate verdicts and the AI narrative it also carries are never
-    dropped, since they are what blocks or explains a merge.
+    Takes each row PAIRED with the block it produced, because the caller has
+    both and a bare list of blocks does not say which row made which. It used
+    to take them separately and recover the pairing with
+    `[r for r in rows if _render_workspace_details(r)]` -- a second full render
+    of every row, to learn what the caller had just worked out (#2581). Measured
+    at three renders per row before and two after.
+
+    The one remaining repeat is deliberate and is a DIFFERENT output: `bare` is
+    each block at its no-list size, which the budget needs for every LATER row
+    before it can decide this one, so it can be neither taken from `detailed`
+    nor deferred.
+
+    A block's resource list is the only part that can grow with the plan, so it
+    is the only part that degrades: the gate verdicts and the AI narrative it
+    also carries are never dropped, since they are what blocks or explains a
+    merge.
 
     Per row, in order: the full list if it fits its fair share, else a pointer to
     the run, else no list; later blocks are reserved at their no-list size.
     """
-    listed = {id(r) for r in rows if _render_resource_list(r)}
-    withblock = [r for r in rows if _render_workspace_details(r)]
+    # Over `detailed` rather than every row: the membership is only ever read
+    # for a row that HAS a block, so the rows without one were being rendered
+    # for an answer nothing asked for.
+    listed = {id(r) for r, _ in detailed if _render_resource_list(r)}
 
     def cost(block: str) -> int:
         # A block also costs the newline that joins it; an empty one is dropped.
         return len(block) + 1 if block else 0
 
-    bare = [cost(_render_workspace_details(r, omit_list=True)) for r in withblock]
+    bare = [cost(_render_workspace_details(r, omit_list=True)) for r, _ in detailed]
     out: list[str] = []
     spent = fixed
-    for i, (r, block) in enumerate(zip(withblock, blocks, strict=True)):
+    for i, (r, block) in enumerate(detailed):
         if id(r) in listed:
             remaining = max(COMMENT_MAX_CHARS - spent - sum(bare[i + 1 :]), 0)
-            waiting = sum(1 for later in withblock[i:] if id(later) in listed)
+            waiting = sum(1 for later, _ in detailed[i:] if id(later) in listed)
             if cost(block) > remaining // max(waiting, 1):
                 pointer = _render_workspace_details(r, degrade_list=True)
                 block = (
