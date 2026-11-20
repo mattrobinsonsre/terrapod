@@ -4303,10 +4303,36 @@ jobs:
           # GUARDED. Before the install completes these do not exist, and two
           # guaranteed errors pad a real failure with noise of their own — which
           # is what made the old output read as though nothing could be learned.
-          if $k -n terrapod-eval get deploy/terrapod-listener >/dev/null 2>&1; then
-            $k -n terrapod-eval logs deploy/terrapod-listener --tail=80 || true
+          # EVERY Deployment, derived rather than listed: this block dumped the
+          # listener alone, so when the WEB pod crash-looped the one log that
+          # carried the reason was the one nothing asked for -- and its absence
+          # read as "the container never started" (#2639).
+          deploys="$($k -n terrapod-eval get deploy -o name 2>/dev/null)"
+          if [ -n "$deploys" ]; then
+            printf '%s\n' "$deploys" | while IFS= read -r d; do
+              [ -n "$d" ] || continue
+              echo "--- $d"
+              $k -n terrapod-eval logs "$d" --tail=80 --all-containers || true
+            done
+            # A crash-looping container has no CURRENT instance, so plain `logs`
+            # answers "container has not started" while the message that matters
+            # sits in the one that exited. Scoped to pods that have restarted, so
+            # a healthy namespace adds no noise.
+            # jsonpath rather than go-template: kubectl's template engine has no
+            # `int` function, and `$` there is the LIST, so `$.metadata.name`
+            # silently resolves to the wrong object. Measured against a live
+            # cluster -- the template form errors out, this one does not.
+            $k -n terrapod-eval get pods \
+              -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[*].restartCount}{"\n"}{end}' \
+              2>/dev/null \
+              | awk 'NF>1 { for (i=2;i<=NF;i++) if ($i+0>0) { print $1; break } }' \
+              | sort -u | while IFS= read -r pod; do
+                [ -n "$pod" ] || continue
+                echo "--- $pod (previous instance)"
+                $k -n terrapod-eval logs "$pod" --previous --tail=80 --all-containers || true
+              done
           else
-            echo "(no listener Deployment yet — the install did not get this far)"
+            echo "(no Deployments yet — the install did not get this far)"
           fi
           if [ -n "$($k -n terrapod-eval get pods -l app.kubernetes.io/name=terrapod-runner -o name 2>/dev/null)" ]; then
             $k -n terrapod-eval logs -l app.kubernetes.io/name=terrapod-runner --tail=120 --prefix || true
