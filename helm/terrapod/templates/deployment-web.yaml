@@ -45,10 +45,42 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.web.extraInitContainers }}
       initContainers:
+        # The storage rewrite's destination is baked into
+        # `.next/routes-manifest.json` at build time (a runtime `API_URL` in
+        # next.config.js is ignored -- measured), so it ships as an unresolvable
+        # placeholder and has to be pointed at the API before Next reads it.
+        #
+        # It happens HERE, in an init container writing into an emptyDir the web
+        # container mounts over that one file, because `readOnlyRootFilesystem`
+        # is true on the web container and patching in place is a write. Doing
+        # it this way keeps that posture AND keeps the refusal: `--emit` exits
+        # non-zero if the placeholder count is not what next.config.js declares,
+        # so the pod never serves chunked responses to a client that requires a
+        # Content-Length. See #2639.
+        - name: storage-rewrite
+          image: {{ include "terrapod.web.image" . }}
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          command:
+            - node
+            - server-entry.mjs
+            - --emit
+            - /storage-rewrite/routes-manifest.json
+          env:
+            - name: API_URL
+              value: {{ include "terrapod.web.apiUrl" . | quote }}
+          volumeMounts:
+            - name: storage-rewrite
+              mountPath: /storage-rewrite
+          resources:
+            {{- toYaml .Values.web.initResources | nindent 12 }}
+          {{- with .Values.web.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- with .Values.web.extraInitContainers }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       containers:
         - name: web
           image: {{ include "terrapod.web.image" . }}
@@ -64,7 +96,7 @@ spec:
             {{- end }}
           env:
             - name: API_URL
-              value: "http://{{ include "terrapod.fullname" . }}-api:8000"
+              value: {{ include "terrapod.web.apiUrl" . | quote }}
             # HSTS (Strict-Transport-Security). When non-empty, the
             # web container sends this value on every response. Default
             # is `max-age=63072000` (2 years, no includeSubDomains, no
@@ -106,13 +138,19 @@ spec:
             preStop:
               exec:
                 command: ["sleep", "{{ .Values.web.preStopSleepSeconds | default 30 }}"]
-          {{- if or (eq (include "terrapod.caBundle.enabled" .) "true") .Values.web.extraVolumeMounts }}
           volumeMounts:
+            # One file, via subPath, so the rest of `.next` stays exactly as the
+            # image built it -- mounting the whole directory would mask the build.
+            # readOnly because the web container only ever reads it; the init
+            # container is the one that writes.
+            - name: storage-rewrite
+              mountPath: /app/.next/routes-manifest.json
+              subPath: routes-manifest.json
+              readOnly: true
             {{- include "terrapod.caBundle.volumeMountsNode" . | nindent 12 }}
             {{- with .Values.web.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- end }}
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
           {{- with .Values.web.containerSecurityContext }}
@@ -122,13 +160,20 @@ spec:
         {{- with .Values.web.extraContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- if or (eq (include "terrapod.caBundle.enabled" .) "true") .Values.web.extraVolumes }}
       volumes:
+        # One routes manifest, written once by the init container and read by
+        # Next at startup. Measured at ~15 KiB in the shipped image, so 16Mi is
+        # about a thousandfold headroom and deliberately NOT a value: a knob
+        # here would be surface nobody turns. If a future Next makes the
+        # manifest genuinely large, raise this -- the init container fails
+        # loudly on a full volume rather than starting a half-written one.
+        - name: storage-rewrite
+          emptyDir:
+            sizeLimit: 16Mi
         {{- include "terrapod.caBundle.volumesNode" . | nindent 8 }}
         {{- with .Values.web.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- end }}
       {{- with .Values.web.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

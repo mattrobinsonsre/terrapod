@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -9,6 +9,9 @@ import {
   PLACEHOLDER,
   apiBase,
   applyPatch,
+  assertPatched,
+  ensurePatched,
+  occurrences,
   patchManifest,
 } from '../server-entry.mjs'
 
@@ -97,6 +100,77 @@ describe('applyPatch refuses rather than serving chunked responses (#2639)', () 
       () => applyPatch(withManifest(manifest('http://localhost:8001')), 'http://api:8000'),
       /found 0[\s\S]*Refusing to start/,
     )
+  })
+})
+
+describe('--emit writes a copy, so a read-only root can still be served (#2639)', () => {
+  it('patches into `out` and leaves the source alone', () => {
+    const path = withManifest(manifest(PLACEHOLDER))
+    const out = join(mkdtempSync(join(tmpdir(), 'tp-emit-')), 'routes-manifest.json')
+
+    assert.equal(applyPatch(path, 'http://api:8000', { out }), EXPECTED_REWRITES)
+
+    // The source is what the IMAGE ships, and an init container must not need
+    // to write to it -- that is the whole point of emitting elsewhere.
+    assert.equal(occurrences(readFileSync(path, 'utf8'), PLACEHOLDER), EXPECTED_REWRITES)
+    assert.equal(occurrences(readFileSync(out, 'utf8'), PLACEHOLDER), 0)
+    assert.equal(occurrences(readFileSync(out, 'utf8'), 'http://api:8000'), EXPECTED_REWRITES)
+  })
+
+  it('names the init container when the write is refused, because that is the fix', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tp-emit-'))
+    const path = join(dir, 'routes-manifest.json')
+    writeFileSync(path, manifest(PLACEHOLDER))
+
+    // ENOTDIR rather than a mode: the suite runs as root in the test image,
+    // where CAP_DAC_OVERRIDE walks straight through a permission bit, so a
+    // chmod-based fixture asserts a property of the uid instead of the code.
+    const out = join(path, 'routes-manifest.json')
+    assert.throws(() => applyPatch(path, 'http://api:8000', { out }), /init container/)
+  })
+})
+
+describe('ensurePatched accepts an already-patched manifest WITHOUT writing', () => {
+  const base = 'http://api:8000'
+
+  it('does not touch a manifest the init container already pointed at the API', () => {
+    const path = withManifest(manifest(base))
+    // A write updates mtime even when the bytes are identical, so pinning it
+    // is how "did not write" becomes observable rather than asserted.
+    const past = new Date(Date.now() - 60_000)
+    utimesSync(path, past, past)
+    const before = statSync(path).mtimeMs
+
+    assert.equal(ensurePatched(path, base), 0)
+    assert.equal(statSync(path).mtimeMs, before)
+  })
+
+  it('still patches in place when the placeholder is there, for a plain docker run', () => {
+    const path = withManifest(manifest(PLACEHOLDER))
+    assert.equal(ensurePatched(path, base), EXPECTED_REWRITES)
+    assert.equal(occurrences(readFileSync(path, 'utf8'), base), EXPECTED_REWRITES)
+  })
+
+  it('refuses a manifest with the placeholder gone and the API absent', () => {
+    // The dangerous shape: nothing left to patch, so a naive "no placeholders
+    // means we are done" check passes while every storage read proxies to a
+    // host this pod was never told about. That is #47.
+    const path = withManifest(manifest('http://somewhere-else:8000'))
+    assert.throws(() => ensurePatched(path, base), /names http:\/\/api:8000 0 time/)
+  })
+
+  it('refuses a manifest naming the API fewer times than there are rewrites', () => {
+    // A count, not a substring: one destination pointed at the API and one left
+    // somewhere else would satisfy `includes(base)` and serve half the clients
+    // chunked responses.
+    const half = manifest(PLACEHOLDER)
+      .split(`${PLACEHOLDER}/api/v1/storage/get/:path*`)
+      .join(`${base}/api/v1/storage/get/:path*`)
+      .split(`${PLACEHOLDER}/api/terrapod/v1/storage/get/:path*`)
+      .join('http://elsewhere:8000/api/terrapod/v1/storage/get/:path*')
+    const path = withManifest(half)
+    assert.equal(occurrences(readFileSync(path, 'utf8'), PLACEHOLDER), 0)
+    assert.throws(() => assertPatched(path, base), /expected at least 2/)
   })
 })
 

@@ -33,6 +33,22 @@
 // baked destination silently survives. A Next release that changes the manifest
 // format must fail loudly at boot rather than leave clients quietly back on
 // chunked encoding.
+//
+// TWO WAYS IN, because the chart runs this container with
+// `readOnlyRootFilesystem: true` and patching in place is a write.
+//
+//   * `--emit <path>` patches a COPY and starts nothing. The chart runs that in
+//     an init container, writing into an emptyDir the main container then mounts
+//     over `.next/routes-manifest.json` via `subPath`. The security posture is
+//     untouched and the assertion still gates startup, because a failed init
+//     container means the pod never serves.
+//   * No argument patches in place, which is what a plain `docker run` of this
+//     image does on a writable filesystem.
+//
+// On startup an already-patched manifest is accepted WITHOUT a write -- that is
+// the init-container case, and writing would be the EROFS the arrangement
+// exists to avoid. It is accepted only after the same assertions a fresh patch
+// has to pass, so a stale or half-patched mount is still refused.
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -68,8 +84,24 @@ export function apiBase(env = process.env) {
  * without a built manifest.
  */
 export function patchManifest(text, base) {
-  const replaced = text.split(PLACEHOLDER).length - 1
+  const replaced = occurrences(text, PLACEHOLDER)
   return { text: text.split(PLACEHOLDER).join(base), replaced }
+}
+
+/**
+ * How many times `needle` occurs in `haystack`.
+ *
+ * Both the patch count and the read-back check go through this, so "the
+ * placeholder is gone" and "the base arrived" are the same kind of claim --
+ * a count -- rather than one count and one `includes()` that is satisfied by a
+ * single occurrence however many were expected.
+ *
+ * @param {string} haystack
+ * @param {string} needle
+ * @returns {number}
+ */
+export function occurrences(haystack, needle) {
+  return haystack.split(needle).length - 1
 }
 
 /**
@@ -77,8 +109,18 @@ export function patchManifest(text, base) {
  *
  * Throws rather than returning a status: the caller is a container entrypoint,
  * and a half-applied rewrite is the #47 failure with extra steps.
+ *
+ * `out` writes the patched manifest somewhere else and leaves the source alone,
+ * which is how the chart's init container works: the image's own manifest is on
+ * a read-only filesystem by then.
+ *
+ * @param {string} manifestPath
+ * @param {string} base
+ * @param {{ expected?: number, out?: string }} [opts]
+ * @returns {number}
  */
-export function applyPatch(manifestPath, base, { expected = EXPECTED_REWRITES } = {}) {
+export function applyPatch(manifestPath, base, { expected = EXPECTED_REWRITES, out } = {}) {
+  const target = out ?? manifestPath
   let before
   try {
     before = readFileSync(manifestPath, 'utf8')
@@ -100,32 +142,95 @@ export function applyPatch(manifestPath, base, { expected = EXPECTED_REWRITES } 
         'responses to clients that require a Content-Length: see #2639.',
     )
   }
-  writeFileSync(manifestPath, text)
-
-  // Read back, because a successful write is not evidence the file now says
-  // what we think. An absent signal reading as a passing one is how this class
-  // of bug survives.
-  const after = readFileSync(manifestPath, 'utf8')
-  if (after.includes(PLACEHOLDER)) {
+  try {
+    writeFileSync(target, text)
+  } catch (err) {
+    // The one failure an operator can act on, so it says what to do. Reached
+    // when the root filesystem is read-only and nothing seeded the manifest --
+    // i.e. the chart's init container did not run.
     throw new Error(
-      `storage rewrite: ${manifestPath} still contains the placeholder after ` +
-        'patching. Refusing to start: see #2639.',
+      `storage rewrite: cannot write ${target} (${err.code ?? err.message}). ` +
+        'On a read-only root filesystem the manifest must be patched by the ' +
+        "chart's web init container, which runs this file with `--emit` and " +
+        'mounts the result over the manifest. Refusing to start: see #2639.',
     )
   }
-  if (!after.includes(base)) {
-    throw new Error(
-      `storage rewrite: ${manifestPath} does not contain ${base} after patching. ` +
-        'Refusing to start: see #2639.',
-    )
-  }
+  assertPatched(target, base, expected)
   return replaced
+}
+
+/**
+ * Refuse unless `path` is a manifest that names `base` and no longer names the
+ * placeholder.
+ *
+ * Separate from `applyPatch` because it is the gate on BOTH routes in: a fresh
+ * patch reads its own write back, and an already-patched manifest mounted by
+ * the init container has to clear the same bar before it is trusted. A write is
+ * not evidence the file says what we think, and neither is a mount.
+ *
+ * @param {string} path
+ * @param {string} base
+ * @param {number} expected
+ */
+export function assertPatched(path, base, expected = EXPECTED_REWRITES) {
+  const after = readFileSync(path, 'utf8')
+  const left = occurrences(after, PLACEHOLDER)
+  if (left > 0) {
+    throw new Error(
+      `storage rewrite: ${path} still contains ${left} placeholder ` +
+        'destination(s). Refusing to start: see #2639.',
+    )
+  }
+  const pointed = occurrences(after, base)
+  if (pointed < expected) {
+    throw new Error(
+      `storage rewrite: ${path} names ${base} ${pointed} time(s), expected at ` +
+        `least ${expected}. A manifest with the placeholder gone and the API ` +
+        'absent proxies storage reads to nothing, which is #47. Refusing to ' +
+        'start: see #2639.',
+    )
+  }
+}
+
+/**
+ * Point the manifest at `base`, whether or not something already did.
+ *
+ * Returns how many destinations this call rewrote -- `0` meaning the manifest
+ * arrived patched, which is the init-container case and must NOT provoke a
+ * write, because the filesystem it would write to is read-only by design.
+ *
+ * @param {string} manifestPath
+ * @param {string} base
+ * @param {{ expected?: number }} [opts]
+ * @returns {number}
+ */
+export function ensurePatched(manifestPath, base, { expected = EXPECTED_REWRITES } = {}) {
+  const before = readFileSync(manifestPath, 'utf8')
+  if (occurrences(before, PLACEHOLDER) === 0) {
+    assertPatched(manifestPath, base, expected)
+    return 0
+  }
+  return applyPatch(manifestPath, base, { expected })
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
 if (isMain) {
   const here = dirname(fileURLToPath(import.meta.url))
+  const manifest = join(here, '.next', 'routes-manifest.json')
   const base = apiBase()
-  const replaced = applyPatch(join(here, '.next', 'routes-manifest.json'), base)
-  console.log(`[storage-rewrite] pointed ${replaced} rewrite(s) at ${base}`)
-  await import('./server.js')
+
+  const emitAt = process.argv.indexOf('--emit')
+  if (emitAt !== -1) {
+    const out = process.argv[emitAt + 1]
+    if (!out) {
+      throw new Error('storage rewrite: --emit needs a path to write to.')
+    }
+    const replaced = applyPatch(manifest, base, { out })
+    console.log(`[storage-rewrite] wrote ${out}, ${replaced} rewrite(s) at ${base}`)
+  } else {
+    const replaced = ensurePatched(manifest, base)
+    const how = replaced === 0 ? 'already pointed' : `pointed ${replaced} rewrite(s)`
+    console.log(`[storage-rewrite] ${how} at ${base}`)
+    await import('./server.js')
+  }
 }
