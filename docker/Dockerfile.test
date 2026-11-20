@@ -76,6 +76,11 @@ COPY helm ./helm
 COPY go-terrapod/*.go ./go-terrapod/
 COPY provider/internal/resources/workspace/*.go ./provider/internal/resources/workspace/
 COPY provider/internal/datasources/workspace/*.go ./provider/internal/datasources/workspace/
+# And the autodiscovery-rule resource, for the RULE parity gate (#2621). A
+# separate line rather than a wider glob over `resources/`: the gate reads this
+# one file, and copying the whole tree would bring in resources no Python test
+# looks at.
+COPY provider/internal/resources/autodiscovery_rule/*.go ./provider/internal/resources/autodiscovery_rule/
 # The MCP tool definitions, for the workspace-setting parity gate. Without this
 # the gate's `_surface()` raises rather than skipping -- deliberately, because a
 # gate that cannot read the file it checks proves nothing.
