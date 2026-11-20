@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verified, it is",
       "nonePublished": "Published, no digest was",
       "operatorUpload": "Uploaded, it was",
-      "unrecorded": "Recorded, it was not"
+      "unrecorded": "Recorded, it was not",
+      "upstreamPublisher": "Publisher verified, it is"
     },
     "upload": {
       "title": "A vetted artifact, upload",

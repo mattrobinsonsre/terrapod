@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verifisert",
       "nonePublished": "Ingen kontrollsum publisert",
       "operatorUpload": "Lastet opp",
-      "unrecorded": "Ikke registrert"
+      "unrecorded": "Ikke registrert",
+      "upstreamPublisher": "Utgiver verifisert"
     },
     "upload": {
       "title": "Last opp et kontrollert artefakt",

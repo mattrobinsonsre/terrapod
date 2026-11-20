@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verificato",
       "nonePublished": "Nessun digest pubblicato",
       "operatorUpload": "Caricato",
-      "unrecorded": "Non registrato"
+      "unrecorded": "Non registrato",
+      "upstreamPublisher": "Editore verificato"
     },
     "upload": {
       "title": "Carica un artefatto controllato",

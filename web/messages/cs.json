@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Ověřeno",
       "nonePublished": "Digest nepublikován",
       "operatorUpload": "Nahráno",
-      "unrecorded": "Nezaznamenáno"
+      "unrecorded": "Nezaznamenáno",
+      "upstreamPublisher": "Ověřen vydavatel"
     },
     "upload": {
       "title": "Nahrát ověřený artefakt",

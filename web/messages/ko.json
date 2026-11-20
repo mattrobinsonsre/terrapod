@@ -1943,7 +1943,8 @@
       "upstreamDigest": "검증됨",
       "nonePublished": "다이제스트 미공개",
       "operatorUpload": "업로드됨",
-      "unrecorded": "기록 없음"
+      "unrecorded": "기록 없음",
+      "upstreamPublisher": "배포자 검증됨"
     },
     "upload": {
       "title": "검토한 아티팩트 업로드",

@@ -228,7 +228,7 @@ To see what a submission would do before making one:
 ```sh
 curl -H "$AUTH" https://terrapod.example.com/api/v1/admin/package-cache/sources
 # → {"data": [{"id": "galaxy", "attributes": {
-#       "ecosystem": "galaxy", "enabled": true,
+#       "ecosystem": "galaxy",
 #       "upstream": "https://galaxy.ansible.com",
 #       "mirrors": {"hub": "https://terrapod.hub.example/api/v1/package-cache/galaxy"},
 #       "resolves-latest": true}}, …],

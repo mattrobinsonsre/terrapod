@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verifierad",
       "nonePublished": "Ingen kontrollsumma publicerad",
       "operatorUpload": "Uppladdad",
-      "unrecorded": "Ej registrerat"
+      "unrecorded": "Ej registrerat",
+      "upstreamPublisher": "Utgivare verifierad"
     },
     "upload": {
       "title": "Ladda upp en granskad artefakt",

@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Vérifié",
       "nonePublished": "Aucune empreinte publiée",
       "operatorUpload": "Téléversé",
-      "unrecorded": "Non enregistré"
+      "unrecorded": "Non enregistré",
+      "upstreamPublisher": "Éditeur vérifié"
     },
     "upload": {
       "title": "Téléverser un artefact contrôlé",

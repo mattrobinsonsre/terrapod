@@ -147,6 +147,7 @@ rather than assumed:
 
 | Recorded as | Means |
 |---|---|
+| `upstream-publisher` | the publisher's own signature verified — a PEP 740 attestation on PyPI, a registry signature on npm. The strongest state, and the common one for those two |
 | `upstream-digest` | verified against a digest its publisher published |
 | `none-published` | that upstream publishes no per-file digest, so there was nothing to check — a statement about the ecosystem, not about the artifact |
 
@@ -434,7 +435,7 @@ An uploaded artifact is never indistinguishable from a fetched one.
 
 | Attribute | For an upload |
 |---|---|
-| `attestation` | `operator-upload` — against `upstream-digest` for a verified fetch, or `none-published` where upstream publishes no digest |
+| `attestation` | `operator-upload` — against `upstream-publisher` where the publisher's signature verified, `upstream-digest` for a digest-only fetch, or `none-published` where upstream publishes no digest |
 | `uploaded-by` | the admin who uploaded it |
 | `upload-reference` | whatever `reference` was given, or null |
 | `digest` | the digest computed **on receipt**; for a fetch this is upstream's own |
@@ -506,7 +507,7 @@ large artifact is streamed rather than held in the web pod's memory.
 
 ### Uploading an index document
 
-An artifact upload supplies **bytes**, and for three of the six caches that is not
+An artifact upload supplies **bytes**, and for four of the six caches that is not
 enough to make the artifact reachable. A sealed node answers "what versions exist"
 from a cached index document and nowhere else, so a vetted artifact with no document
 beside it is present, recorded, and unresolvable — the install is told the package is

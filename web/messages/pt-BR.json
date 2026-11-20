@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verificado",
       "nonePublished": "Nenhuma soma de verificação publicada",
       "operatorUpload": "Enviado",
-      "unrecorded": "Não registrado"
+      "unrecorded": "Não registrado",
+      "upstreamPublisher": "Publicador verificado"
     },
     "upload": {
       "title": "Enviar um artefato revisado",

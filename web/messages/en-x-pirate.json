@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Vouched for",
       "nonePublished": "Nay seal posted",
       "operatorUpload": "Hauled aboard",
-      "unrecorded": "Nay in th'' log"
+      "unrecorded": "Nay in th'' log",
+      "upstreamPublisher": "Maker vouched for"
     },
     "upload": {
       "title": "Haul aboard booty ye have vouched for",

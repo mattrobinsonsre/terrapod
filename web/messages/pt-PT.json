@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Verificado",
       "nonePublished": "Nenhuma soma de verificação publicada",
       "operatorUpload": "Carregado",
-      "unrecorded": "Não registado"
+      "unrecorded": "Não registado",
+      "upstreamPublisher": "Editor verificado"
     },
     "upload": {
       "title": "Carregar um artefacto revisto",

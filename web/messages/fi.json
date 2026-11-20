@@ -1943,7 +1943,8 @@
       "upstreamDigest": "Varmennettu",
       "nonePublished": "Tiivistettä ei julkaistu",
       "operatorUpload": "Ladattu",
-      "unrecorded": "Ei kirjattu"
+      "unrecorded": "Ei kirjattu",
+      "upstreamPublisher": "Julkaisija varmennettu"
     },
     "upload": {
       "title": "Lataa tarkastettu artefakti",

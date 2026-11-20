@@ -346,13 +346,27 @@ binaries -- Go's rule is simply stricter than the one the rest of the Job lives
 by. Nothing is exposed outside the pod: the listener is loopback-only and serves
 GET alone.
 
-Two further Go settings are forced, both because a sealed deployment has no
-second upstream: `GOTOOLCHAIN=local`, so a `go.mod` naming a newer toolchain does
-not fetch one, and `GOSUMDB=off`. The module hashes your program has already
-pinned in `go.sum` are still verified; it is the transparency-log lookup that is
-turned off. **So commit a complete `go.sum`** — a module missing from it is
-recorded from whatever the proxy served rather than refused, because the lookup
-that would otherwise catch that is the one being turned off.
+`GOTOOLCHAIN=local` is forced, because a sealed deployment has no second
+upstream and a `go.mod` naming a newer toolchain would otherwise fetch one.
+
+**`GOSUMDB` is ON**, pointing at the checksum database Terrapod itself mirrors
+(`registry.package_cache.go.sumdb_upstream`, `https://sum.golang.org` by
+default). It ran with `GOSUMDB=off` until #2589, on the reasoning that the
+program's own `go.sum` is verified anyway — which is true of a module the program
+has already **pinned** and false of one absent from the file. Measured on
+go1.27.3 with a cold module cache: `go mod download` with `GOSUMDB=off` and no
+`go.sum` entry exits 0 and **writes the hash of whatever the proxy served**. The
+runner runs exactly that command against exactly this cache, so an incomplete
+`go.sum` used to record our bytes as authoritative.
+
+Committing a complete `go.sum` is still good practice, but it is no longer what
+stands between you and that outcome.
+
+**On a sealed node this needs warming before you seal.** The database is served
+through the proxy like everything else, so a lookup it has never cached cannot be
+satisfied and the dependency install fails rather than degrading — see
+[the upgrade guide](upgrading-to-2.0.md). Setting `sumdb_upstream: ""` restores
+`GOSUMDB=off` for a deployment that serves no checksum database.
 
 ### Binding an update to its preview
 

@@ -66,8 +66,9 @@ interface CachedPackageFile {
      *  failed" and "has 4 CVEs" makes an advisory-by-design finding look like
      *  an incident and buries the real failure (#2589). */
     'supply-chain'?: SupplyChain | null
-    /** How the artifact was admitted: `upstream-digest`, `none-published`,
-     *  `operator-upload`, or absent for a row written before this was recorded.
+    /** How the artifact was admitted: `upstream-publisher`, `upstream-digest`,
+     *  `none-published`, `operator-upload`, or absent for a row written before
+     *  this was recorded.
      *  Absent is NOT "unverified" -- such a row is re-fetched on the next
      *  request rather than served -- so it is shown as unrecorded rather than
      *  as a finding. */
@@ -88,7 +89,12 @@ type SortKey = 'ecosystem' | 'name' | 'version' | 'filename' | 'size' | 'last-ac
 
 /** How an artifact got here, as a badge.
  *
- *  Four states, and the distinction that matters is between the last two: an
+ *  FIVE states. `upstream-publisher` -- a PEP 740 attestation or an npm
+ *  registry signature that verified -- is the strongest and the common one for
+ *  those two ecosystems; it was missing from this component until the beta.6
+ *  review, so it fell through to the raw slug styled as `unrecorded`.
+ *
+ *  The distinction that matters among the rest is between the last two: an
  *  `operator-upload` is the only one that exists upstream NOWHERE, so it is the
  *  only one an eviction destroys permanently, and an absent attestation is a row
  *  written before this was recorded rather than a finding -- it is re-fetched and
@@ -99,6 +105,11 @@ type SortKey = 'ecosystem' | 'name' | 'version' | 'filename' | 'size' | 'last-ac
  *  is legible without it, and at phone width it is a labelled card field rather
  *  than a cell. */
 const ATTESTATION_STYLE: Record<string, string> = {
+  // Publisher-verified is a stronger claim than a matching digest -- somebody
+  // named vouched for these bytes -- so it reads brighter rather than sharing
+  // the digest's style. Every value here needs an entry: the fallback is the
+  // grey that means `unrecorded`, so a missing one states the opposite.
+  'upstream-publisher': 'bg-emerald-800/60 text-emerald-200',
   'upstream-digest': 'bg-emerald-900/40 text-emerald-300',
   'none-published': 'bg-slate-700/60 text-slate-300',
   'operator-upload': 'bg-amber-900/40 text-amber-200',
@@ -148,6 +159,11 @@ export function PackageCachePanel({
   function attestationLabel(value: string | null | undefined): string {
     if (!value) return t('attestation.unrecorded')
     if (value === 'upstream-digest') return t('attestation.upstreamDigest')
+    // The STRONGEST state, and the common one for PyPI and npm. Without this
+    // arm it fell through to `return value` -- the raw slug -- and through
+    // ATTESTATION_STYLE to the grey used for `unrecorded`, so the strongest
+    // provenance rendered as the weakest.
+    if (value === 'upstream-publisher') return t('attestation.upstreamPublisher')
     if (value === 'none-published') return t('attestation.nonePublished')
     if (value === 'operator-upload') return t('attestation.operatorUpload')
     return value

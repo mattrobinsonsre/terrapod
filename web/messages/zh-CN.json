@@ -1943,7 +1943,8 @@
       "upstreamDigest": "已校验",
       "nonePublished": "未发布摘要",
       "operatorUpload": "已上传",
-      "unrecorded": "未记录"
+      "unrecorded": "未记录",
+      "upstreamPublisher": "已校验发布者"
     },
     "upload": {
       "title": "上传已审核的构件",

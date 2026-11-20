@@ -1816,6 +1816,7 @@
     },
     "attestation": {
       "upstreamDigest": "Verified",
+      "upstreamPublisher": "Publisher verified",
       "nonePublished": "No digest published",
       "operatorUpload": "Uploaded",
       "unrecorded": "Not recorded"

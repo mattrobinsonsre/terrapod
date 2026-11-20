@@ -33,9 +33,25 @@ from terrapod.storage.protocol import ObjectStore
 logger = structlog.get_logger(__name__)
 
 #: Everything that names an object by a recorded key. The sweep re-checks each
-#: of these before deleting, so a stale row cannot destroy a live object --
-#: derived from the models rather than listed in prose, so a fourth table with a
-#: `storage_key` is covered the day it is added.
+#: of these before deleting, so a stale row cannot destroy a live object.
+#:
+#: This is a LIST, not a derivation, and its own comment claimed otherwise until
+#: the beta.6 review -- "derived from the models rather than listed in prose, so
+#: a fourth table with a `storage_key` is covered the day it is added". It is
+#: not, and six models carry a `storage_key`: the three here, `OrphanedObject`
+#: itself, and `OCIManifest`/`OCIBlob`.
+#:
+#: It cannot be naively derived, which is why the claim was tempting and why the
+#: honest version is a list with a gate over it. `OrphanedObject` is the sweep's
+#: OWN table, so including it would make every key "still referenced" and
+#: disable the sweep entirely -- the one entry that must never be added.
+#:
+#: The two OCI tables are a DELIBERATE omission and a latent hazard rather than
+#: a live one: all three callers of `record()` above name a key belonging to one
+#: of the three tables here, so no OCI key reaches the sweep today. The day one
+#: does, this tuple must gain them first, or the sweep deletes a live blob out
+#: of the container registry. `test_orphan_sweep_key_holders.py` is what forces
+#: that decision rather than leaving it to whoever adds the fourth recorder.
 _KEY_HOLDERS = (CachedPackageFile, CachedBinary, CachedProviderPackage)
 
 

@@ -104,11 +104,17 @@ async def warm_from_manifest(
     """Pre-pull every listed binary + provider platform into the cache.
 
     Each (entry, platform) is warmed independently; a failure is captured in the
-    returned summary and warming continues. Honours the per-cache `enabled`
-    flags — a disabled cache marks its entries failed with a clear reason rather
-    than silently skipping (so the caller sees why nothing landed).
+    returned summary and warming continues, so one unreachable upstream cannot
+    cost the rest of a seed run.
 
-    `include_platform_tools` adds the derived opa/trivy/checkov entries. It is on
+    This used to say it "honours the per-cache `enabled` flags", and that a
+    disabled cache marks its entries failed rather than skipping them silently.
+    Both are gone: there are no per-cache enable keys any more (#1986 removed the
+    engine gate and the capability flags with it), so there is nothing here to
+    honour and no disabled state to report. Nothing in this module reads one.
+
+    `include_platform_tools` adds the derived entries for every tool in
+    `PLATFORM_TOOLS` -- opa, trivy, checkov and syft. It is on
     by default because this routine backs the seed-then-seal path, where missing
     them is exactly the mistake worth preventing. Re-warming an already-cached
     artifact is a cache hit, so the repetition is cheap.
