@@ -215,6 +215,15 @@ web:
     periodSeconds: 10
     timeoutSeconds: 10
 
+  # No storage-rewrite init container: this profile runs `next dev`, which
+  # regenerates `.next` at runtime and evaluates next.config.js per request, so
+  # there is no baked manifest to patch and nothing for the init container to
+  # do. It would also FAIL here rather than no-op -- Tilt's `entrypoint=` on the
+  # web image applies to every container in the pod, init containers included,
+  # so it would run `next dev` and die on `EACCES mkdir /app/.next/dev`.
+  storageRewrite:
+    enabled: false
+
   # Dedicated emptyDir for Next.js build cache. Keeps hot-reload churn off
   # the container overlay fs so dev rebuilds don't thrash the layer cache.
   extraVolumeMounts:

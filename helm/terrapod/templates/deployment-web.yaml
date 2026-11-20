@@ -46,6 +46,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        {{- if .Values.web.storageRewrite.enabled }}
         # The storage rewrite's destination is baked into
         # `.next/routes-manifest.json` at build time (a runtime `API_URL` in
         # next.config.js is ignored -- measured), so it ships as an unresolvable
@@ -78,6 +79,7 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        {{- end }}
         {{- with .Values.web.extraInitContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -139,6 +141,7 @@ spec:
               exec:
                 command: ["sleep", "{{ .Values.web.preStopSleepSeconds | default 30 }}"]
           volumeMounts:
+            {{- if .Values.web.storageRewrite.enabled }}
             # One file, via subPath, so the rest of `.next` stays exactly as the
             # image built it -- mounting the whole directory would mask the build.
             # readOnly because the web container only ever reads it; the init
@@ -147,6 +150,7 @@ spec:
               mountPath: /app/.next/routes-manifest.json
               subPath: routes-manifest.json
               readOnly: true
+            {{- end }}
             {{- include "terrapod.caBundle.volumeMountsNode" . | nindent 12 }}
             {{- with .Values.web.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
@@ -161,6 +165,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+        {{- if .Values.web.storageRewrite.enabled }}
         # One routes manifest, written once by the init container and read by
         # Next at startup. Measured at ~15 KiB in the shipped image, so 16Mi is
         # about a thousandfold headroom and deliberately NOT a value: a knob
@@ -170,6 +175,7 @@ spec:
         - name: storage-rewrite
           emptyDir:
             sizeLimit: 16Mi
+        {{- end }}
         {{- include "terrapod.caBundle.volumesNode" . | nindent 8 }}
         {{- with .Values.web.extraVolumes }}
         {{- toYaml . | nindent 8 }}
