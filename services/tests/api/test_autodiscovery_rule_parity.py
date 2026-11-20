@@ -322,9 +322,10 @@ class TestEverySettableAttributeReachesEverySurface:
     def test_mcp_still_has_no_rule_tools(self) -> None:
         """Asserted so that CREATING the surface completes this gate.
 
-        MCP has 116 tools, four of them for module autodiscovery and none for
+        MCP has 95 tools, four of them for MODULE autodiscovery and none for
         these, against eight API routes — so `propagate` has nowhere to go and
-        neither does anything else. That is one missing surface rather than 72
+        neither does anything else. (95 is `tool_catalogue.json`'s own count and
+        what `llms.txt` states; a count written from memory is worth nothing.) That is one missing surface rather than 72
         missing attributes, and recording it as 72 ledger entries would read as
         72 decisions.
 
