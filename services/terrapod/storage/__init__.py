@@ -43,6 +43,7 @@ def _build_cloud_store(
                 presigned_url_expiry_seconds=cfg.s3.presigned_url_expiry_seconds,
             )
             logger.info("Storage initialized", backend="s3", bucket=cfg.s3.bucket, **log_fields)
+            return store
 
         case StorageBackend.AZURE:
             from terrapod.storage.azure import AzureStore
@@ -56,6 +57,7 @@ def _build_cloud_store(
             logger.info(
                 "Storage initialized", backend="azure", account=cfg.azure.account_name, **log_fields
             )
+            return store
 
         case StorageBackend.GCS:
             from terrapod.storage.gcs import GCSStore
@@ -68,17 +70,10 @@ def _build_cloud_store(
                 presigned_url_expiry_seconds=cfg.gcs.presigned_url_expiry_seconds,
             )
             logger.info("Storage initialized", backend="gcs", bucket=cfg.gcs.bucket, **log_fields)
+            return store
 
         case _:
             raise ValueError(f"unsupported storage backend: {cfg.backend}")
-
-    # ONE explicit return, so the function has no implicit `return None` path at
-    # all (#2621). It never did -- the wildcard above raises, so the match is
-    # exhaustive -- but `py/mixed-returns` cannot see that a `raise` in the
-    # wildcard makes it so, and four returns plus an unreachable fall-through is
-    # the shape that invites the question. `store` is bound on every path that
-    # reaches here.
-    return store
 
 
 async def init_storage(resolver: LocationResolver | None = None) -> None:
