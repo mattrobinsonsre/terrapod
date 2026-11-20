@@ -74,12 +74,6 @@ def _settable_attrs() -> set[str]:
 
 _PROVIDER = _surface("provider/internal/resources/autodiscovery_rule/resource.go")
 _WEB = _surface("web/src/app/admin/autodiscovery/page.tsx")
-#: Where the MCP rule tools will live. NOT resolved through `_surface`, which
-#: refuses a path that does not exist -- deliberately, so a gate cannot read an
-#: absent file and pass on nothing. The absence is asserted instead, by
-#: `test_mcp_still_has_no_rule_tools`, so whoever creates this file is told to
-#: wire the surface into this gate in the same change.
-_MCP_REL = "mcp/internal/mcpserver/autodiscovery.go"
 
 
 def _optional_surface(rel: str) -> pathlib.Path | None:
@@ -290,11 +284,6 @@ _SURFACE_DEBT: dict[str, dict[str, str]] = {
         ),
     },
 }
-
-#: True while MCP has no rule tools. Separate from `_SURFACE_DEBT` because the
-#: debt there is the SURFACE, not the attributes: enumerating 72 entries would
-#: read as 72 decisions when it is one.
-_MCP_SURFACE_ABSENT = True
 
 
 # ── the gate ────────────────────────────────────────────────────────────────

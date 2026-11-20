@@ -48,7 +48,9 @@ CI = ROOT / ".github" / "workflows" / "ci.yml"
 # with no reason is how a job that SHOULD be gated hides in here.
 ALWAYS_RUN: dict[str, str] = {
     "prepare": "computes the decision; cannot depend on it",
-    # Named "python-checks", and it is 34 docs-audit gates plus two ruff steps.
+    # Named "python-checks", and it hosts the docs-audit gates plus two ruff
+    # steps. Deliberately not a COUNT: it said 34 while there were 38, and a
+    # number in a comment has nothing keeping it true.
     # Gating it on run_python disables every documentation gate on exactly the
     # changes that need them most -- a docs-only pull request, where
     # check_links, check_counts and check_references are the whole point. It was
