@@ -706,9 +706,23 @@ async def _record_in_ledger(
 
     attestor: dict = {}
     if provenance is not None:
-        publisher = getattr(provenance, "publisher", None)
-        if publisher:
-            attestor = {"publisher": publisher}
+        # `Provenance` carries `identity, issuer, predicate, mechanism` and has
+        # never had a `publisher` attribute, so the `getattr(provenance,
+        # "publisher", None)` this replaces was always None and every
+        # `upstream-publisher` row recorded an EMPTY attestor -- claiming a
+        # verification while dropping the evidence for it, which is exactly what
+        # `test_replication_artifact_ledger` says must not happen. The dataclass
+        # is `frozen=True, slots=True`, so the attribute could never appear
+        # later either.
+        #
+        # `publisher` stays the key the web artifact page reads
+        # (`attestor.publisher`); `issuer` and `mechanism` are the rest of the
+        # evidence, which is what makes the claim checkable by a reader.
+        attestor = {
+            "publisher": provenance.identity,
+            "issuer": provenance.issuer,
+            "mechanism": provenance.mechanism,
+        }
 
     await record_admission(
         db,
