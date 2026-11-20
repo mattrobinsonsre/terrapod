@@ -11,6 +11,25 @@ const createNextIntlPlugin = require('next-intl/plugin')
 // `localhost:8001` fallback that made #47 look like a working deployment.
 const STORAGE_REWRITE_PLACEHOLDER = 'http://terrapod-storage-rewrite.invalid'
 
+// Where a storage rewrite points, resolved when this config is evaluated.
+//
+// `API_URL` is deliberately NOT set during `npm run build` -- Dockerfile.web
+// declares no such ARG or ENV -- so a production build bakes the placeholder
+// into `.next/routes-manifest.json` and the init container patches it at pod
+// start. That is the whole #2639 mechanism and it is unchanged.
+//
+// It matters for `next dev`, which is what the Tilt dev loop runs: dev has no
+// prebuilt manifest in play (values-local masks `/app/.next` with an emptyDir)
+// and evaluates this file per request, so the destination it returns is the one
+// actually used. Falling back to the placeholder there would point every local
+// storage read at a host reserved never to resolve.
+//
+// A build that DID have `API_URL` set would bake that host; the entrypoint's
+// read-back then refuses unless it matches the pod's own `API_URL`, which is
+// the fail-closed direction.
+const storageRewriteBase = () =>
+  (process.env.API_URL || STORAGE_REWRITE_PLACEHOLDER).replace(/\/+$/, '')
+
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
 // HSTS (Strict-Transport-Security). Tells browsers to remember "always
@@ -106,11 +125,11 @@ const nextConfig = {
         // this to one would depend on which the API happens to generate.
         {
           source: '/api/v1/storage/get/:path*',
-          destination: `${STORAGE_REWRITE_PLACEHOLDER}/api/v1/storage/get/:path*`,
+          destination: `${storageRewriteBase()}/api/v1/storage/get/:path*`,
         },
         {
           source: '/api/terrapod/v1/storage/get/:path*',
-          destination: `${STORAGE_REWRITE_PLACEHOLDER}/api/terrapod/v1/storage/get/:path*`,
+          destination: `${storageRewriteBase()}/api/terrapod/v1/storage/get/:path*`,
         },
       ],
     }

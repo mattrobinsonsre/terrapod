@@ -2754,6 +2754,18 @@ jobs:
           echo "$out" | grep -q "socket_mode: true" || { echo "FAIL: slack config not rendered into config.yaml"; exit 1; }
           echo "$out" | grep -q 'command: "/terrapod"' || { echo "FAIL: slack command not rendered into config.yaml (#691)"; exit 1; }
           echo "$out" | grep -q 'label: ""' || { echo "FAIL: slack label not rendered into config.yaml (#691)"; exit 1; }
+          # The dev profile must NOT carry the storage-rewrite init container
+          # (#2639). Tilt's `entrypoint=` applies to every container in the pod,
+          # init containers included, so it ran `next dev` and the web pod sat
+          # in Init:CrashLoopBackOff -- while the previous ReplicaSet kept
+          # serving, so the stack answered 200 and looked healthy. Asserted in
+          # BOTH directions, because either half alone restores the breakage.
+          echo "$out" | grep -q "name: storage-rewrite" \
+            && { echo "FAIL: the dev profile renders the storage-rewrite init container; it cannot work under next dev (#2639)"; exit 1; }
+          prod=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod --values helm/terrapod/values.yaml)
+          echo "$prod" | grep -q "name: storage-rewrite" \
+            || { echo "FAIL: the production profile does NOT render the storage-rewrite init container; the rewrite would point at a reserved .invalid host (#2639)"; exit 1; }
           # The secretKeyRef half is a property of the TEMPLATE, so it is
           # asserted with the values set explicitly rather than read off
           # whatever values-local happens to choose. Those two were coupled,

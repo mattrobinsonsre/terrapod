@@ -285,12 +285,31 @@ describe('the config and the entrypoint must not drift', () => {
   it('EXPECTED_REWRITES equals the number of placeholder destinations declared', () => {
     // Derived from the config rather than written down twice, so adding a third
     // length-requiring path updates the assertion by construction.
-    const declared = config.split('${STORAGE_REWRITE_PLACEHOLDER}').length - 1
+    //
+    // Counts `${storageRewriteBase()}` rather than the placeholder literal: the
+    // destinations resolve the base when the config is evaluated, so that call
+    // is what marks a destination as one of ours. The placeholder now appears
+    // in the config twice for reasons that are not destinations -- its own
+    // declaration and the fallback inside that helper -- so counting it would
+    // give 2 by coincidence and keep giving 2 if a destination were deleted.
+    const declared = config.split('${storageRewriteBase()}').length - 1
     assert.equal(
       declared,
       EXPECTED_REWRITES,
       `next.config.js declares ${declared} placeholder destination(s) but ` +
         `server-entry.mjs expects ${EXPECTED_REWRITES}`,
+    )
+  })
+
+  it('the base falls back to the placeholder, never to a host that resolves', () => {
+    // `API_URL` is unset during `npm run build` (Dockerfile.web declares no such
+    // ARG or ENV), so this fallback is what a production build bakes -- and the
+    // init container patches it at pod start. A fallback to anything that
+    // RESOLVES is #47: the pod proxies somewhere wrong and looks healthy.
+    assert.match(
+      config,
+      /process\.env\.API_URL \|\| STORAGE_REWRITE_PLACEHOLDER/,
+      'next.config.js must fall back to the placeholder when API_URL is unset',
     )
   })
 
