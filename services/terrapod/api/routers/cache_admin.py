@@ -458,7 +458,6 @@ async def _refuse_unparseable_json(tmp_path: str) -> None:
     rule 13 tolerates for an async handler, but it is run in a thread for the same
     reason the digest is.
     """
-    import asyncio
     import json
 
     def _parse() -> None:

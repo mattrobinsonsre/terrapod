@@ -221,7 +221,8 @@ export function PackageUploadPanel({
     // server refuses with a 409 without `replace`, so this guards the deliberate
     // case rather than standing in for the check.
     if (replace) {
-      const prompt = replace && sealed
+      // Inside `if (replace)`, so only `sealed` decides which prompt.
+      const prompt = sealed
         ? `${t('upload.confirmReplace', { filename: file.name })}\n\n${t('upload.confirmReplaceSealed')}`
         : t('upload.confirmReplace', { filename: file.name })
       if (!confirmIrreversible(prompt)) return
