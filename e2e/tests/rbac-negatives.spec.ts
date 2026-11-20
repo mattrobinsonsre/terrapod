@@ -131,7 +131,14 @@ test.describe('RBAC — audit user is read-only', () => {
       await expect(item).toContainText('0 of 1');
 
       // Pressing it must do nothing at all: no request, so no result panel.
-      await item.click();
+      //
+      // `force` is REQUIRED and is the point rather than a smell: Playwright
+      // treats `aria-disabled="true"` as not enabled, so a plain `click()`
+      // never dispatches and times out after 10s -- proving nothing about the
+      // handler. Forcing it past the actionability gate sends a real click, so
+      // the assertions below are about the component refusing rather than
+      // about Playwright declining to try.
+      await item.click({ force: true });
       await expect(result).toHaveCount(0);
       await expect(page.getByTestId('ws-row-select')).toBeChecked();
       await page.keyboard.press('Escape');
@@ -163,7 +170,9 @@ test.describe('RBAC — audit user is read-only', () => {
       await expect(item).toContainText('0 of 1');
 
       // No confirm dialog either: a disabled item returns before prompting.
-      await item.click();
+      // `force` for the same reason as above -- without it Playwright never
+      // dispatches to an `aria-disabled` item, so nothing is exercised.
+      await item.click({ force: true });
       await expect(result).toHaveCount(0);
       await expect(page.getByTestId('ws-row-select')).toBeChecked();
       await page.keyboard.press('Escape');
