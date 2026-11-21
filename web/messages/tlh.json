@@ -1192,6 +1192,32 @@
       "previewPrereq": "tI'ang pa' VCS rar, repo URL, mIw je choq",
       "scanFailed": "legh lujpu' ({status})",
       "scan": "legh lujpu'"
+    },
+    "propagate": {
+      "button": "pol 'ej ngeH…",
+      "buttonTitle": "chutvam yIpol, ghIq chenmoHbogh Qumwo'meyDaq choHbogh numtaHmey yIlo'",
+      "title": "«{ruleName}» ngeH",
+      "lead": "cha'logh ngeH waw'lu': choHlu'bogh numtaHmeyvaD neH, 'ej chut polta'bogh nap ghajtaHbogh Qumwo'meyvaD neH. ghop choHta'bogh Hoch choHbe'lu'.",
+      "computing": "choHlu'bogh wInejtaH…",
+      "matched": "{count, plural, =0 {pagh Qumwo' chenmoH} one {# Qumwo' chenmoH} other {# Qumwo'mey chenmoH}} chut vam",
+      "skippedLifecycle": "{count, plural, one {# Qumwo' 'oH} other {# Qumwo'mey bIH}}: chenmoHlu'taH ghap Qaw'lu'taH. vaj {count, plural, one {'oH} other {bIH}} Qelbe'lu'pu'.",
+      "nothingToDo": "pagh choHlu'. Hoch Qumwo' chut rur ghap ghop lanlu'pu'bogh nap ghaj.",
+      "willChange": "choHlu'bogh Qumwo'mey",
+      "leftAlone": "HarghHa'lu'bogh Qumwo'mey",
+      "leftAloneLead": "chut polta'bogh nap ghajtaHbe'. vaj wIvlu'pu'bogh choHHa'be'meH, numtaH jumlu'.",
+      "alreadyMatch": "{count, plural, one {# Qumwo' chut rurpu'bogh} other {# Qumwo'mey chut rurpu'bogh}}",
+      "colWorkspace": "Qumwo'",
+      "colSetting": "numtaH",
+      "colFrom": "nap qan",
+      "colTo": "nap chu'",
+      "colCurrent": "ghop lanlu'pu'",
+      "colRuleNow": "DaH chut maq",
+      "empty": "(pagh)",
+      "apply": "{count, plural, one {# Qumwo'Daq} other {# Qumwo'meyDaq}} ngeH",
+      "applying": "ngeHtaH…",
+      "applied": "{count, plural, one {# Qumwo'Daq} other {# Qumwo'meyDaq}} ngeHlu'pu'.",
+      "confirmApply": "{count, plural, one {# Qumwo'Daq} other {# Qumwo'meyDaq}} choHmeyvam lo''a'?",
+      "dryRunFailed": "choHlu'bogh SovlaHbe'lu'."
     }
   },
   "adminModuleAutodiscovery": {

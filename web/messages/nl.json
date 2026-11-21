@@ -1192,6 +1192,32 @@
       "previewPrereq": "Stel VCS-verbinding, repo-URL en patroon in voordat u een voorbeeld bekijkt",
       "scanFailed": "Scan mislukt ({status})",
       "scan": "Scan mislukt"
+    },
+    "propagate": {
+      "button": "Opslaan en doorvoeren…",
+      "buttonTitle": "Deze regel opslaan en vervolgens de instellingen die zij wijzigt toepassen op de workspaces die zij heeft aangemaakt",
+      "title": "“{ruleName}” doorvoeren",
+      "lead": "Het doorvoeren is dubbel begrensd: tot de instellingen die deze wijziging raakt, en daarbinnen tot de workspaces die nog de waarde hebben die de regel de vorige keer heeft gezet. Wat sindsdien handmatig is gewijzigd, blijft zoals het is.",
+      "computing": "Bezig met bepalen wat er zou veranderen…",
+      "matched": "{count, plural, =0 {Er zijn geen workspaces} one {# workspace is} other {# workspaces zijn}} door deze regel aangemaakt",
+      "skippedLifecycle": "{count, plural, one {# workspace wordt} other {# workspaces worden}} momenteel aangemaakt of vernietigd en {count, plural, one {is} other {zijn}} niet meegenomen.",
+      "nothingToDo": "Er zou niets veranderen. Elke workspace komt al overeen met de regel of heeft een waarde die iemand handmatig heeft gezet.",
+      "willChange": "Wordt gewijzigd",
+      "leftAlone": "Blijft ongewijzigd",
+      "leftAloneLead": "Deze hebben niet langer de waarde die de regel de vorige keer heeft gezet; het doorvoeren slaat de instelling daarom over in plaats van de gemaakte keuze te overschrijven.",
+      "alreadyMatch": "{count, plural, one {# workspace komt al overeen met de regel} other {# workspaces komen al overeen met de regel}}",
+      "colWorkspace": "Workspace",
+      "colSetting": "Instelling",
+      "colFrom": "Van",
+      "colTo": "Naar",
+      "colCurrent": "Handmatig gezet",
+      "colRuleNow": "Regel zegt nu",
+      "empty": "(geen)",
+      "apply": "Doorvoeren naar {count, plural, one {# workspace} other {# workspaces}}",
+      "applying": "Bezig met doorvoeren…",
+      "applied": "Doorgevoerd naar {count, plural, one {# workspace} other {# workspaces}}.",
+      "confirmApply": "Deze wijzigingen toepassen op {count, plural, one {# workspace} other {# workspaces}}?",
+      "dryRunFailed": "Kon niet bepalen wat er zou veranderen."
     }
   },
   "adminModuleAutodiscovery": {

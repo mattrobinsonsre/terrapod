@@ -1192,6 +1192,32 @@
       "previewPrereq": "Setzen Sie VCS-Verbindung, Repo-URL und Muster, bevor Sie die Vorschau anzeigen",
       "scanFailed": "Scan fehlgeschlagen ({status})",
       "scan": "Scan fehlgeschlagen"
+    },
+    "propagate": {
+      "button": "Speichern und übertragen…",
+      "buttonTitle": "Diese Regel speichern und die Einstellungen, die sie ändert, auf die von ihr erstellten Arbeitsbereiche anwenden",
+      "title": "„{ruleName}“ übertragen",
+      "lead": "Die Übertragung ist doppelt eingegrenzt: auf die Einstellungen, die diese Änderung betrifft, und innerhalb dieser auf die Arbeitsbereiche, die noch den Wert haben, den die Regel zuletzt gesetzt hat. Was seitdem von Hand geändert wurde, bleibt, wie es ist.",
+      "computing": "Es wird ermittelt, was sich ändern würde…",
+      "matched": "{count, plural, =0 {Kein Arbeitsbereich wurde} one {# Arbeitsbereich wurde} other {# Arbeitsbereiche wurden}} von dieser Regel erstellt",
+      "skippedLifecycle": "{count, plural, one {# Arbeitsbereich wird} other {# Arbeitsbereiche werden}} gerade erstellt oder gelöscht und {count, plural, one {wurde} other {wurden}} nicht berücksichtigt.",
+      "nothingToDo": "Es würde sich nichts ändern. Jeder Arbeitsbereich entspricht entweder bereits der Regel oder hat einen von Hand gesetzten Wert.",
+      "willChange": "Wird geändert",
+      "leftAlone": "Bleibt unverändert",
+      "leftAloneLead": "Diese haben nicht mehr den Wert, den die Regel zuletzt gesetzt hat. Die Übertragung überspringt die Einstellung daher, statt die getroffene Wahl zu überschreiben.",
+      "alreadyMatch": "{count, plural, one {# Arbeitsbereich entspricht bereits der Regel} other {# Arbeitsbereiche entsprechen bereits der Regel}}",
+      "colWorkspace": "Arbeitsbereich",
+      "colSetting": "Einstellung",
+      "colFrom": "Von",
+      "colTo": "Auf",
+      "colCurrent": "Von Hand gesetzt",
+      "colRuleNow": "Regel sagt jetzt",
+      "empty": "(keine)",
+      "apply": "Auf {count, plural, one {# Arbeitsbereich} other {# Arbeitsbereiche}} übertragen",
+      "applying": "Wird übertragen…",
+      "applied": "Auf {count, plural, one {# Arbeitsbereich} other {# Arbeitsbereiche}} übertragen.",
+      "confirmApply": "Diese Änderungen auf {count, plural, one {# Arbeitsbereich} other {# Arbeitsbereiche}} anwenden?",
+      "dryRunFailed": "Es konnte nicht ermittelt werden, was sich ändern würde."
     }
   },
   "adminModuleAutodiscovery": {

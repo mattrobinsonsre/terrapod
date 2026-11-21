@@ -1192,6 +1192,32 @@
       "previewPrereq": "Před náhledem nastavte VCS připojení, URL repozitáře a vzor",
       "scanFailed": "Sken selhal ({status})",
       "scan": "Sken selhal"
+    },
+    "propagate": {
+      "button": "Uložit a propagovat…",
+      "buttonTitle": "Uložit toto pravidlo a poté použít nastavení, která mění, na pracovní prostory, které vytvořilo",
+      "title": "Propagovat „{ruleName}“",
+      "lead": "Propagace je zúžena dvakrát: na nastavení, která tato změna mění, a v jejich rámci na pracovní prostory, které stále drží hodnotu, jakou pravidlo nastavilo naposledy. Cokoli bylo od té doby změněno ručně, zůstává, jak je.",
+      "computing": "Zjišťuje se, co by se změnilo…",
+      "matched": "{count, plural, =0 {Toto pravidlo nevytvořilo žádný pracovní prostor} one {Toto pravidlo vytvořilo # pracovní prostor} few {Toto pravidlo vytvořilo # pracovní prostory} many {Toto pravidlo vytvořilo # pracovního prostoru} other {Toto pravidlo vytvořilo # pracovních prostorů}}",
+      "skippedLifecycle": "{count, plural, one {# pracovní prostor se právě vytváří nebo ničí, a nebyl proto zvažován.} few {# pracovní prostory se právě vytvářejí nebo ničí, a nebyly proto zvažovány.} many {# pracovního prostoru se právě vytváří nebo ničí, a nebyl proto zvažován.} other {# pracovních prostorů se právě vytváří nebo ničí, a nebyly proto zvažovány.}}",
+      "nothingToDo": "Nic by se nezměnilo. Každý pracovní prostor již pravidlu odpovídá, nebo drží hodnotu, kterou někdo nastavil ručně.",
+      "willChange": "Změní se",
+      "leftAlone": "Zůstává bez změny",
+      "leftAloneLead": "Tyto už nedrží hodnotu, jakou pravidlo nastavilo naposledy, takže propagace nastavení přeskočí, místo aby přepsala provedenou volbu.",
+      "alreadyMatch": "{count, plural, one {# pracovní prostor již pravidlu odpovídá} few {# pracovní prostory již pravidlu odpovídají} many {# pracovního prostoru již pravidlu odpovídá} other {# pracovních prostorů již pravidlu odpovídá}}",
+      "colWorkspace": "Pracovní prostor",
+      "colSetting": "Nastavení",
+      "colFrom": "Bylo",
+      "colTo": "Bude",
+      "colCurrent": "Nastaveno ručně",
+      "colRuleNow": "Nyní podle pravidla",
+      "empty": "(žádný)",
+      "apply": "Propagovat na {count, plural, one {# pracovní prostor} few {# pracovní prostory} many {# pracovního prostoru} other {# pracovních prostorů}}",
+      "applying": "Propagace…",
+      "applied": "Propagováno na {count, plural, one {# pracovní prostor} few {# pracovní prostory} many {# pracovního prostoru} other {# pracovních prostorů}}.",
+      "confirmApply": "Použít tyto změny na {count, plural, one {# pracovní prostor} few {# pracovní prostory} many {# pracovního prostoru} other {# pracovních prostorů}}?",
+      "dryRunFailed": "Nepodařilo se zjistit, co by se změnilo."
     }
   },
   "adminModuleAutodiscovery": {

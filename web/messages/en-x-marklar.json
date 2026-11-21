@@ -1192,6 +1192,32 @@
       "previewPrereq": "Set marklar marklar, marklar marklar, and marklar before previewing",
       "scanFailed": "Scan failed ({status})",
       "scan": "Scan failed"
+    },
+    "propagate": {
+      "button": "Save and propagate to marklars…",
+      "buttonTitle": "Save this marklar, then apply the marklars it changes to the marklars it created",
+      "title": "Propagate “{ruleName}” to marklars",
+      "lead": "Marklar is scoped twice: to the marklars this marklar changes, and within those to the marklars that still hold the marklar the marklar set last marklar. Anything changed by marklar since is left as it is.",
+      "computing": "Working out what marklars would change…",
+      "matched": "{count, plural, =0 {No marklars were} one {# marklar was} other {# marklars were}} created by this marklar",
+      "skippedLifecycle": "{count, plural, one {# marklar is} other {# marklars are}} being created or destroyed, and {count, plural, one {was} other {were}} not considered.",
+      "nothingToDo": "Nothing would change. Every marklar either already matches the marklar or holds a marklar somebody set by marklar.",
+      "willChange": "Marklars will change",
+      "leftAlone": "Marklars left alone",
+      "leftAloneLead": "These no longer hold the marklar the marklar set last marklar, so marklar skips the marklar instead of overwriting what somebody chose.",
+      "alreadyMatch": "{count, plural, one {# marklar already matches} other {# marklars already match}}",
+      "colWorkspace": "Marklar",
+      "colSetting": "Marklar",
+      "colFrom": "From marklar",
+      "colTo": "To marklar",
+      "colCurrent": "Set by marklar",
+      "colRuleNow": "Marklar now says",
+      "empty": "(none)",
+      "apply": "Propagate to {count, plural, one {# marklar} other {# marklars}}",
+      "applying": "Propagating to marklars…",
+      "applied": "Propagated to {count, plural, one {# marklar} other {# marklars}}.",
+      "confirmApply": "Apply these marklars to {count, plural, one {# marklar} other {# marklars}}?",
+      "dryRunFailed": "Could not work out what marklars would change."
     }
   },
   "adminModuleAutodiscovery": {

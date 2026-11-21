@@ -1192,6 +1192,32 @@
       "previewPrereq": "Set th'' VCS connection, repo URL, and pattern afore previewin''",
       "scanFailed": "Scan hit a squall ({status})",
       "scan": "Scan hit a squall"
+    },
+    "propagate": {
+      "button": "Save an'' propagate…",
+      "buttonTitle": "Save this rule, then apply th'' settings it changes t'' th'' work-decks it created",
+      "title": "Propagate th'' rule “{ruleName}”",
+      "lead": "Propagation be scoped twice: t'' th'' settings this update changes, an'' within those t'' th'' work-decks that still hold th'' value th'' rule set last time. Anythin'' changed by hand since be left as it be.",
+      "computing": "Reckonin'' what would change…",
+      "matched": "{count, plural, =0 {No work-decks were} one {# work-deck were} other {# work-decks were}} created by this rule",
+      "skippedLifecycle": "{count, plural, one {# work-deck be} other {# work-decks be}} bein'' created or sunk, an'' {count, plural, one {were} other {were}} not reckoned with.",
+      "nothingToDo": "Nothin'' would change. Every work-deck either already matches th'' rule or holds a value somebody set by hand.",
+      "willChange": "Bound t'' change",
+      "leftAlone": "Left be",
+      "leftAloneLead": "These no longer hold th'' value th'' rule set last time, so propagation skips th'' riggin'' instead o'' overwritin'' what somebody chose.",
+      "alreadyMatch": "{count, plural, one {# work-deck already matches} other {# work-decks already match}}",
+      "colWorkspace": "Work-deck",
+      "colSetting": "Riggin''",
+      "colFrom": "Afore",
+      "colTo": "Arter",
+      "colCurrent": "Set by yer own hand",
+      "colRuleNow": "Th'' rule now says",
+      "empty": "(none)",
+      "apply": "Propagate t'' {count, plural, one {# work-deck} other {# work-decks}}",
+      "applying": "Propagatin''…",
+      "applied": "Propagated t'' {count, plural, one {# work-deck} other {# work-decks}}.",
+      "confirmApply": "Apply these changes t'' {count, plural, one {# work-deck} other {# work-decks}}?",
+      "dryRunFailed": "Could not reckon what would change."
     }
   },
   "adminModuleAutodiscovery": {

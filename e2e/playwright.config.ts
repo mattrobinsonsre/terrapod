@@ -87,6 +87,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      name: 'rule-propagation',
+      testMatch: 'rule-propagation.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'tokens',
       testMatch: 'tokens.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

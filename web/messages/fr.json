@@ -1192,6 +1192,32 @@
       "previewPrereq": "Définissez la connexion VCS, l'URL du dépôt et le motif avant de prévisualiser",
       "scanFailed": "Échec de l'analyse ({status})",
       "scan": "Échec de l'analyse"
+    },
+    "propagate": {
+      "button": "Enregistrer et propager…",
+      "buttonTitle": "Enregistrer cette règle, puis appliquer les paramètres qu'elle modifie aux espaces de travail qu'elle a créés",
+      "title": "Propager « {ruleName} »",
+      "lead": "La propagation est doublement restreinte : aux paramètres que cette mise à jour modifie, et parmi ceux-là aux espaces de travail qui conservent encore la valeur posée par la règle la dernière fois. Ce qui a été changé à la main depuis est laissé tel quel.",
+      "computing": "Calcul de ce qui changerait…",
+      "matched": "{count, plural, =0 {Aucun espace de travail n'a été créé} one {# espace de travail a été créé} other {# espaces de travail ont été créés}} par cette règle",
+      "skippedLifecycle": "{count, plural, one {# espace de travail est en cours de création ou de destruction} other {# espaces de travail sont en cours de création ou de destruction}}, et {count, plural, one {n'a} other {n'ont}} donc pas été pris en compte.",
+      "nothingToDo": "Rien ne changerait. Chaque espace de travail correspond déjà à la règle ou conserve une valeur posée à la main par quelqu'un.",
+      "willChange": "Sera modifié",
+      "leftAlone": "Laissé tel quel",
+      "leftAloneLead": "Ceux-ci ne conservent plus la valeur posée par la règle la dernière fois : la propagation ignore donc le paramètre au lieu d'écraser ce que quelqu'un a choisi.",
+      "alreadyMatch": "{count, plural, one {# espace de travail correspond déjà} other {# espaces de travail correspondent déjà}}",
+      "colWorkspace": "Espace de travail",
+      "colSetting": "Paramètre",
+      "colFrom": "De",
+      "colTo": "Vers",
+      "colCurrent": "Posé à la main",
+      "colRuleNow": "La règle indique maintenant",
+      "empty": "(aucun)",
+      "apply": "Propager vers {count, plural, one {# espace de travail} other {# espaces de travail}}",
+      "applying": "Propagation…",
+      "applied": "Propagé vers {count, plural, one {# espace de travail} other {# espaces de travail}}.",
+      "confirmApply": "Appliquer ces modifications à {count, plural, one {# espace de travail} other {# espaces de travail}} ?",
+      "dryRunFailed": "Impossible de calculer ce qui changerait."
     }
   },
   "adminModuleAutodiscovery": {

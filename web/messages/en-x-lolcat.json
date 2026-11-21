@@ -1192,6 +1192,32 @@
       "previewPrereq": "Set VCS connecshun, repo URL, an pattrn befor previewin",
       "scanFailed": "Scan faild ({status})",
       "scan": "Scan faild"
+    },
+    "propagate": {
+      "button": "Save an propagayt…",
+      "buttonTitle": "Save dis rool, den apply da settingz it changez ta da werkspacez it createded",
+      "title": "Propagayt “{ruleName}”",
+      "lead": "Propagashun iz scopd twyce: ta da settingz dis updayt changez, an wifin doze ta da werkspacez dat still hold da valyoo da rool setted last tym. Enythin changd by hand since iz left as it iz.",
+      "computing": "Figgerin out wat wud change…",
+      "matched": "{count, plural, =0 {No werkspacez wuz} one {# werkspace wuz} other {# werkspacez wuz}} createded by dis rool",
+      "skippedLifecycle": "{count, plural, one {# werkspace iz} other {# werkspacez r}} bein createded or destroyd, an {count, plural, one {wuz} other {wuz}} not considerd.",
+      "nothingToDo": "Nuthin wud change. Evry werkspace eithr alreddy matchez da rool or holdz a valyoo sumwun setted by hand.",
+      "willChange": "Will chaynge",
+      "leftAlone": "Left alown",
+      "leftAloneLead": "Deez no longr hold da valyoo da rool setted last tym, so propagashun skipz da settin insted of overwritin wat sumwun chozed.",
+      "alreadyMatch": "{count, plural, one {# werkspace alreddy matchez} other {# werkspacez alreddy match}}",
+      "colWorkspace": "Werkspace",
+      "colSetting": "Settin",
+      "colFrom": "Frum",
+      "colTo": "Ta",
+      "colCurrent": "Setted by hand",
+      "colRuleNow": "Rool now sez",
+      "empty": "(none)",
+      "apply": "Propagayt ta {count, plural, one {# werkspace} other {# werkspacez}}",
+      "applying": "Propagaytin…",
+      "applied": "Propagayted ta {count, plural, one {# werkspace} other {# werkspacez}}.",
+      "confirmApply": "Apply deez changez ta {count, plural, one {# werkspace} other {# werkspacez}}?",
+      "dryRunFailed": "Coud not figger out wat wud change."
     }
   },
   "adminModuleAutodiscovery": {

@@ -1192,6 +1192,32 @@
       "previewPrereq": "Angi VCS-tilkobling, repo-URL og mønster før forhåndsvisning",
       "scanFailed": "Skanning mislyktes ({status})",
       "scan": "Skanning mislyktes"
+    },
+    "propagate": {
+      "button": "Lagre og overfør …",
+      "buttonTitle": "Lagre denne regelen, og anvend deretter innstillingene den endrer, på arbeidsområdene den har opprettet",
+      "title": "Overfør «{ruleName}»",
+      "lead": "Overføringen er avgrenset to ganger: til innstillingene denne endringen berører, og innenfor dem til arbeidsområdene som fortsatt har verdien regelen satte sist. Det som er endret manuelt siden den gang, forblir som det er.",
+      "computing": "Finner ut hva som ville bli endret …",
+      "matched": "{count, plural, =0 {Ingen arbeidsområder er} one {# arbeidsområde er} other {# arbeidsområder er}} opprettet av denne regelen",
+      "skippedLifecycle": "{count, plural, one {# arbeidsområde er} other {# arbeidsområder er}} i ferd med å bli opprettet eller revet ned, og {count, plural, one {det ble} other {de ble}} ikke tatt med i betraktning.",
+      "nothingToDo": "Ingenting ville bli endret. Hvert arbeidsområde samsvarer allerede med regelen eller har en verdi som noen har satt manuelt.",
+      "willChange": "Endres",
+      "leftAlone": "Forblir uberørt",
+      "leftAloneLead": "Disse har ikke lenger verdien regelen satte sist, så overføringen hopper over innstillingen i stedet for å overskrive det noen har valgt.",
+      "alreadyMatch": "{count, plural, one {# arbeidsområde samsvarer allerede med regelen} other {# arbeidsområder samsvarer allerede med regelen}}",
+      "colWorkspace": "Arbeidsområde",
+      "colSetting": "Innstilling",
+      "colFrom": "Fra",
+      "colTo": "Til",
+      "colCurrent": "Satt manuelt",
+      "colRuleNow": "Regelen sier nå",
+      "empty": "(ingen)",
+      "apply": "Overfør til {count, plural, one {# arbeidsområde} other {# arbeidsområder}}",
+      "applying": "Overfører …",
+      "applied": "Overført til {count, plural, one {# arbeidsområde} other {# arbeidsområder}}.",
+      "confirmApply": "Anvend disse endringene på {count, plural, one {# arbeidsområde} other {# arbeidsområder}}?",
+      "dryRunFailed": "Kunne ikke fastslå hva som ville bli endret."
     }
   },
   "adminModuleAutodiscovery": {

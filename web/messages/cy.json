@@ -1192,6 +1192,32 @@
       "previewPrereq": "Gosodwch gysylltiad VCS, URL storfa a phatrwm cyn rhagolygu",
       "scanFailed": "Methodd y sganio ({status})",
       "scan": "Methodd y sganio"
+    },
+    "propagate": {
+      "button": "Cadw a lledaenu…",
+      "buttonTitle": "Cadw''r rheol hon, ac wedyn gweithredu''r gosodiadau y mae''n eu newid ar y gweithfannau a grëwyd ganddi",
+      "title": "Lledaenu „{ruleName}”",
+      "lead": "Mae lledaenu wedi''i gyfyngu ddwywaith: i''r gosodiadau y mae''r diweddariad hwn yn eu newid, ac o''u mewn i''r gweithfannau sy''n dal i gadw''r gwerth a osodwyd gan y rheol y tro diwethaf. Caiff unrhyw beth a newidiwyd â llaw ers hynny ei adael fel y mae.",
+      "computing": "Wrthi''n gweithio allan beth fyddai''n newid…",
+      "matched": "{count, plural, =0 {Ni chrëwyd unrhyw weithfan gan y rheol hon} one {Crëwyd # weithfan gan y rheol hon} two {Crëwyd # weithfan gan y rheol hon} few {Crëwyd # gweithfan gan y rheol hon} many {Crëwyd # gweithfan gan y rheol hon} other {Crëwyd # gweithfan gan y rheol hon}}",
+      "skippedLifecycle": "{count, plural, one {Mae # weithfan yn cael ei chreu neu ei dinistrio, ac ni chafodd ei chynnwys.} two {Mae # weithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.} few {Mae # gweithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.} many {Mae # gweithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.} other {Mae # gweithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.}}",
+      "nothingToDo": "Ni fyddai dim yn newid. Mae pob gweithfan yn cydweddu â''r rheol yn barod, neu''n cadw gwerth a osodwyd â llaw gan rywun.",
+      "willChange": "Yn newid",
+      "leftAlone": "Heb eu cyffwrdd",
+      "leftAloneLead": "Nid yw''r rhain yn cadw''r gwerth a osodwyd gan y rheol y tro diwethaf mwyach, felly mae''r lledaenu''n hepgor y gosodiad yn lle trosysgrifo''r dewis a wnaeth rhywun.",
+      "alreadyMatch": "{count, plural, one {Mae # weithfan yn cydweddu''n barod} two {Mae # weithfan yn cydweddu''n barod} few {Mae # gweithfan yn cydweddu''n barod} many {Mae # gweithfan yn cydweddu''n barod} other {Mae # gweithfan yn cydweddu''n barod}}",
+      "colWorkspace": "Gweithfan",
+      "colSetting": "Gosodiad",
+      "colFrom": "O",
+      "colTo": "I",
+      "colCurrent": "Gosodwyd â llaw",
+      "colRuleNow": "Mae''r rheol yn dweud nawr",
+      "empty": "(dim)",
+      "apply": "Lledaenu i {count, plural, one {# weithfan} two {# weithfan} few {# gweithfan} many {# gweithfan} other {# gweithfan}}",
+      "applying": "Yn lledaenu…",
+      "applied": "Lledaenwyd i {count, plural, one {# weithfan} two {# weithfan} few {# gweithfan} many {# gweithfan} other {# gweithfan}}.",
+      "confirmApply": "Gweithredu''r newidiadau hyn ar {count, plural, one {# weithfan} two {# weithfan} few {# gweithfan} many {# gweithfan} other {# gweithfan}}?",
+      "dryRunFailed": "Methwyd gweithio allan beth fyddai''n newid."
     }
   },
   "adminModuleAutodiscovery": {

@@ -1192,6 +1192,32 @@
       "previewPrereq": "预览前请先设置 VCS 连接、仓库 URL 和模式",
       "scanFailed": "扫描失败（{status}）",
       "scan": "扫描失败"
+    },
+    "propagate": {
+      "button": "保存并下发…",
+      "buttonTitle": "保存此规则，然后将其变更的设置应用到它创建的工作区",
+      "title": "下发 \"{ruleName}\"",
+      "lead": "下发范围经过两重限定：仅限本次更新变更的设置，且在这些设置中仅限仍保持规则上次所设值的工作区。此后被手动改动过的内容将保持原样。",
+      "computing": "正在计算将发生哪些变更…",
+      "matched": "{count, plural, =0 {此规则未创建任何工作区} one {此规则创建了 # 个工作区} other {此规则创建了 # 个工作区}}",
+      "skippedLifecycle": "{count, plural, one {# 个工作区} other {# 个工作区}}正在创建或销毁中，未纳入考虑。",
+      "nothingToDo": "不会有任何变更。每个工作区要么已匹配规则，要么持有手动设置的值。",
+      "willChange": "将变更",
+      "leftAlone": "保持不变",
+      "leftAloneLead": "这些工作区已不再保持规则上次所设的值，因此下发会跳过该设置，而不会覆盖已做出的选择。",
+      "alreadyMatch": "{count, plural, one {# 个工作区已匹配规则} other {# 个工作区已匹配规则}}",
+      "colWorkspace": "工作区",
+      "colSetting": "设置",
+      "colFrom": "变更前",
+      "colTo": "变更后",
+      "colCurrent": "手动设置的值",
+      "colRuleNow": "规则当前值",
+      "empty": "（无）",
+      "apply": "{count, plural, one {下发到 # 个工作区} other {下发到 # 个工作区}}",
+      "applying": "正在下发…",
+      "applied": "{count, plural, one {已下发到 # 个工作区。} other {已下发到 # 个工作区。}}",
+      "confirmApply": "要将这些变更应用到 {count, plural, one {# 个工作区} other {# 个工作区}}吗？",
+      "dryRunFailed": "无法计算将发生哪些变更。"
     }
   },
   "adminModuleAutodiscovery": {

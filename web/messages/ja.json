@@ -1192,6 +1192,32 @@
       "previewPrereq": "プレビューの前にVCS接続、リポジトリURL、パターンを設定してください",
       "scanFailed": "スキャンに失敗しました（{status}）",
       "scan": "スキャンに失敗しました"
+    },
+    "propagate": {
+      "button": "保存して反映…",
+      "buttonTitle": "このルールを保存し、変更される設定をこのルールが作成したワークスペースに適用します",
+      "title": "「{ruleName}」を反映",
+      "lead": "反映の範囲は二重に絞られます。今回の更新で変更される設定だけが対象となり、さらにその中でも、ルールが前回設定した値を今も保持しているワークスペースだけが対象です。その後に手動で変更されたものは、そのまま残されます。",
+      "computing": "変更内容を算出中…",
+      "matched": "{count, plural, =0 {このルールで作成されたワークスペースはありません} one {このルールで # 個のワークスペースが作成されました} other {このルールで # 個のワークスペースが作成されました}}",
+      "skippedLifecycle": "{count, plural, one {# 個のワークスペース} other {# 個のワークスペース}}が作成中または破棄中のため、対象に含まれませんでした。",
+      "nothingToDo": "変更されるものはありません。すべてのワークスペースは、すでにルールと一致しているか、手動で設定された値を保持しています。",
+      "willChange": "変更されます",
+      "leftAlone": "そのまま維持",
+      "leftAloneLead": "これらはルールが前回設定した値をすでに保持していないため、反映では選択された内容を上書きせず、その設定をスキップします。",
+      "alreadyMatch": "{count, plural, one {# 個のワークスペースはすでにルールと一致しています} other {# 個のワークスペースはすでにルールと一致しています}}",
+      "colWorkspace": "ワークスペース",
+      "colSetting": "設定",
+      "colFrom": "変更前",
+      "colTo": "変更後",
+      "colCurrent": "手動設定値",
+      "colRuleNow": "現在のルールの値",
+      "empty": "（なし）",
+      "apply": "{count, plural, one {# 個のワークスペースに反映} other {# 個のワークスペースに反映}}",
+      "applying": "反映中…",
+      "applied": "{count, plural, one {# 個のワークスペースに反映しました。} other {# 個のワークスペースに反映しました。}}",
+      "confirmApply": "これらの変更を {count, plural, one {# 個のワークスペース} other {# 個のワークスペース}}に適用しますか？",
+      "dryRunFailed": "変更内容を算出できませんでした。"
     }
   },
   "adminModuleAutodiscovery": {
