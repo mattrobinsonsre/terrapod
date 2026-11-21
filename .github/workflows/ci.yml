@@ -611,6 +611,15 @@ jobs:
       - name: (docs-audit) every refused backup prefix is named where operators read
         run: python3 scripts/docs-audit/check_backup_prefix_prose.py
 
+      # The 2.0 upgrade note tells an operator which `flag:` terms replace
+      # `status:unhealthy`, and says how many there are in a WORD. `check_counts.py`
+      # matches digit forms, so an eighth health condition left both the list short
+      # and the word stale -- and a filter naming six of seven silently misses the
+      # workspace it was written to find, which is worse than the thing it replaced
+      # because it looks like it worked (#2632).
+      - name: (docs-audit) the upgrade note lists every health condition, and counts them right
+        run: python3 scripts/docs-audit/check_health_conditions_prose.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:
