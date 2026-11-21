@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Ychwanegu rheol",
       "debugModeHint": "Cadw podiau rhedwyr a fethodd ar agor ar y gweithleoedd y mae'r rheol hon yn eu creu. I ffwrdd yn ddiofyn — mae pod sy'n cael ei gadw yn cadw tystlythyrau'r gweithle hwnnw.",
       "allowForkPrPlansHint": "Mae'n berthnasol i bob gweithle y mae'r rheol hon yn ei greu. I ffwrdd yn ddiofyn: nid yw cais tynnu o fforch yn cael cynllun tybiannol, am y byddai'n rhedeg cod ei awdur gyda thystlythyrau'r gweithle.",
-      "oidcAudiencesHint": "Disodliadau cynulleidfa a roddir ar bob gweithle a grëir gan y rheol hon, wedi'u hallweddu ar y cyfluniad provider y mae tocyn ar ei gyfer — aws, neu aws.west ar gyfer cyfluniad ag alias. Gadewch yn wag ac mae'r gweithleoedd hynny'n defnyddio cyfluniad y defnydd ei hun."
+      "oidcAudiencesHint": "Disodliadau cynulleidfa a roddir ar bob gweithle a grëir gan y rheol hon, wedi'u hallweddu ar y cyfluniad provider y mae tocyn ar ei gyfer — aws, neu aws.west ar gyfer cyfluniad ag alias. Gadewch yn wag ac mae'r gweithleoedd hynny'n defnyddio cyfluniad y defnydd ei hun.",
+      "matchPatternHint": "Yn cael ei gyfateb â llwybrau'r ffeiliau a newidiwyd, ar ddull gitignore. Mae <code>*</code> yn aros o fewn un segment llwybr; mae <code>**</code> yn rhychwantu unrhyw nifer ohonynt.",
+      "varFilesHint": "Caiff pob cofnod ei drosglwyddo fel <code>-var-file</code>, yn y drefn a restrir. Darllenir llwybr cymharol o'r cyfeiriadur gwaith.",
+      "nameTemplateHint": "Dalfannau: <path></path> (pob <code>/</code> wedi'i ddisodli gan <code>-</code>) a <root></root> (y cyfeiriadur fel y'i hysgrifennwyd). Gadewch yn wag ar gyfer <path></path>.",
+      "executionHooksHint": "Caiff pob bach a ddewisir yma ei gysylltu â phob gweithfan a grëir gan y rheol hon. Cânt eu diffinio ar dudalen weinyddol <page>Bachau Gweithredu</page>."
     },
     "table": {
       "name": "Enw",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Gosodwch gysylltiad VCS, URL storfa a phatrwm cyn rhagolygu",
       "scanFailed": "Methodd y sganio ({status})",
       "scan": "Methodd y sganio"
+    },
+    "propagate": {
+      "button": "Cadw a lledaenu…",
+      "buttonTitle": "Cadw''r rheol hon, ac wedyn gweithredu''r gosodiadau y mae''n eu newid ar y gweithfannau a grëwyd ganddi",
+      "title": "Lledaenu „{ruleName}”",
+      "lead": "Mae lledaenu wedi''i gyfyngu ddwywaith: i''r gosodiadau y mae''r diweddariad hwn yn eu newid, ac o''u mewn i''r gweithfannau sy''n dal i gadw''r gwerth a osodwyd gan y rheol y tro diwethaf. Caiff unrhyw beth a newidiwyd â llaw ers hynny ei adael fel y mae.",
+      "computing": "Wrthi''n gweithio allan beth fyddai''n newid…",
+      "matched": "{count, plural, =0 {Ni chrëwyd unrhyw weithfan gan y rheol hon} one {Crëwyd # weithfan gan y rheol hon} two {Crëwyd # weithfan gan y rheol hon} few {Crëwyd # gweithfan gan y rheol hon} many {Crëwyd # gweithfan gan y rheol hon} other {Crëwyd # gweithfan gan y rheol hon}}",
+      "skippedLifecycle": "{count, plural, one {Mae # weithfan yn cael ei chreu neu ei dinistrio, ac ni chafodd ei chynnwys.} two {Mae # weithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.} few {Mae # gweithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.} many {Mae # gweithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.} other {Mae # gweithfan yn cael eu creu neu eu dinistrio, ac ni chawsant eu cynnwys.}}",
+      "nothingToDo": "Ni fyddai dim yn newid. Mae pob gweithfan yn cydweddu â''r rheol yn barod, neu''n cadw gwerth a osodwyd â llaw gan rywun.",
+      "willChange": "Yn newid",
+      "leftAlone": "Heb eu cyffwrdd",
+      "leftAloneLead": "Nid yw''r rhain yn cadw''r gwerth a osodwyd gan y rheol y tro diwethaf mwyach, felly mae''r lledaenu''n hepgor y gosodiad yn lle trosysgrifo''r dewis a wnaeth rhywun.",
+      "alreadyMatch": "{count, plural, one {Mae # weithfan yn cydweddu''n barod} two {Mae # weithfan yn cydweddu''n barod} few {Mae # gweithfan yn cydweddu''n barod} many {Mae # gweithfan yn cydweddu''n barod} other {Mae # gweithfan yn cydweddu''n barod}}",
+      "colWorkspace": "Gweithfan",
+      "colSetting": "Gosodiad",
+      "colFrom": "O",
+      "colTo": "I",
+      "colCurrent": "Gosodwyd â llaw",
+      "colRuleNow": "Mae''r rheol yn dweud nawr",
+      "empty": "(dim)",
+      "apply": "Lledaenu i {count, plural, one {# weithfan} two {# weithfan} few {# gweithfan} many {# gweithfan} other {# gweithfan}}",
+      "applying": "Yn lledaenu…",
+      "applied": "Lledaenwyd i {count, plural, one {# weithfan} two {# weithfan} few {# gweithfan} many {# gweithfan} other {# gweithfan}}.",
+      "confirmApply": "Gweithredu''r newidiadau hyn ar {count, plural, one {# weithfan} two {# weithfan} few {# gweithfan} many {# gweithfan} other {# gweithfan}}?",
+      "dryRunFailed": "Methwyd gweithio allan beth fyddai''n newid."
     }
   },
   "adminModuleAutodiscovery": {

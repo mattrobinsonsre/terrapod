@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "4dd rul3",
       "debugModeHint": "H0ld f41l3d runn3r p0d5 0p3n 0n 7h3 w0rk5p4c35 7h15 rul3 cr34735. 0ff by d3f4ul7 — 4 h3ld p0d k33p5 7h47 w0rk5p4c3'5 cr3d3n714l5.",
       "allowForkPrPlansHint": "4ppl135 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 0ff by d3f4ul7: 4 pull r3qu357 fr0m 4 f0rk g375 n0 5p3cul471v3 pl4n, b3c4u53 17 w0uld run 175 4u7h0r'5 c0d3 w17h 7h3 w0rk5p4c3'5 cr3d3n714l5.",
-      "oidcAudiencesHint": "4ud13nc3 0v3rr1d35 73mpl473d 0n70 3v3ry w0rk5p4c3 7h15 rul3 cr34735, k3y3d 0n 7h3 pr0v1d3r c0nf1gur4710n 4 70k3n 15 f0r — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n. L34v3 17 3mp7y 4nd 7h053 w0rk5p4c35 74k3 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n."
+      "oidcAudiencesHint": "4ud13nc3 0v3rr1d35 73mpl473d 0n70 3v3ry w0rk5p4c3 7h15 rul3 cr34735, k3y3d 0n 7h3 pr0v1d3r c0nf1gur4710n 4 70k3n 15 f0r — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n. L34v3 17 3mp7y 4nd 7h053 w0rk5p4c35 74k3 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n.",
+      "matchPatternHint": "M47ch3d 4g41n57 7h3 p47h5 0f ch4ng3d f1l35, g171gn0r3-57yl3. <code>*</code> 574y5 w17h1n 0n3 p47h 53gm3n7; <code>**</code> 5p4n5 4ny numb3r 0f 7h3m.",
+      "varFilesHint": "34ch 3n7ry b3c0m35 4 <code>-var-file</code> 4rgum3n7, 1n 7h3 0rd3r l1573d. 4 r3l471v3 p47h 15 r34d fr0m 7h3 w0rk1ng d1r3c70ry.",
+      "nameTemplateHint": "Pl4c3h0ld3r5: <path></path> (34ch <code>/</code> r3pl4c3d by <code>-</code>) 4nd <root></root> (7h3 d1r3c70ry 45 wr1773n). L34v3 17 3mp7y f0r <path></path>.",
+      "executionHooksHint": "34ch h00k 53l3c73d h3r3 15 4774ch3d 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 7h3y 4r3 d3f1n3d 0n 7h3 <page>3x3cu710n H00k5</page> 4dm1n p4g3."
     },
     "table": {
       "name": "N4m3",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "537 VC5 c0nn3c710n, r3p0 URL, 4nd p4773rn b3f0r3 pr3v13w1ng",
       "scanFailed": "5c4n f41l3d ({status})",
       "scan": "5c4n f41l3d"
+    },
+    "propagate": {
+      "button": "54v3 4nd pr0p4g473…",
+      "buttonTitle": "54v3 7h15 rul3, 7h3n 4pply 7h3 53771ng5 17 ch4ng35 70 7h3 w0rk5p4c35 17 cr3473d",
+      "title": "Pr0p4g473 “{ruleName}”",
+      "lead": "Pr0p4g4710n 15 5c0p3d 7w1c3: 70 7h3 53771ng5 7h15 upd473 ch4ng35, 4nd w17h1n 7h053 70 7h3 w0rk5p4c35 7h47 571ll h0ld 7h3 v4lu3 7h3 rul3 537 l457 71m3. 4ny7h1ng ch4ng3d by h4nd 51nc3 15 l3f7 45 17 15.",
+      "computing": "W0rk1ng 0u7 wh47 w0uld ch4ng3…",
+      "matched": "{count, plural, =0 {N0 w0rk5p4c35 w3r3} one {# w0rk5p4c3 w45} other {# w0rk5p4c35 w3r3}} cr3473d by 7h15 rul3",
+      "skippedLifecycle": "{count, plural, one {# w0rk5p4c3 15} other {# w0rk5p4c35 4r3}} b31ng cr3473d 0r d357r0y3d, 4nd {count, plural, one {w45} other {w3r3}} n07 c0n51d3r3d.",
+      "nothingToDo": "N07h1ng w0uld ch4ng3. 3v3ry w0rk5p4c3 317h3r 4lr34dy m47ch35 7h3 rul3 0r h0ld5 4 v4lu3 50m3b0dy 537 by h4nd.",
+      "willChange": "W1ll ch4ng3",
+      "leftAlone": "L3f7 4l0n3",
+      "leftAloneLead": "7h353 n0 l0ng3r h0ld 7h3 v4lu3 7h3 rul3 537 l457 71m3, 50 pr0p4g4710n 5k1p5 7h3 53771ng 1n5734d 0f 0v3rwr171ng wh47 50m3b0dy ch053.",
+      "alreadyMatch": "{count, plural, one {# w0rk5p4c3 4lr34dy m47ch35} other {# w0rk5p4c35 4lr34dy m47ch}}",
+      "colWorkspace": "W0rk5p4c3",
+      "colSetting": "53771ng",
+      "colFrom": "Fr0m",
+      "colTo": "70",
+      "colCurrent": "537 by h4nd",
+      "colRuleNow": "Rul3 n0w 54y5",
+      "empty": "(n0n3)",
+      "apply": "Pr0p4g473 70 {count, plural, one {# w0rk5p4c3} other {# w0rk5p4c35}}",
+      "applying": "Pr0p4g471ng…",
+      "applied": "Pr0p4g473d 70 {count, plural, one {# w0rk5p4c3} other {# w0rk5p4c35}}.",
+      "confirmApply": "4pply 7h353 ch4ng35 70 {count, plural, one {# w0rk5p4c3} other {# w0rk5p4c35}}?",
+      "dryRunFailed": "C0uld n07 w0rk 0u7 wh47 w0uld ch4ng3."
     }
   },
   "adminModuleAutodiscovery": {

@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "A rule, add",
       "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. Off by default, it is — that workspace's credentials, a held pod keeps.",
       "allowForkPrPlansHint": "To every workspace this rule creates, applies it. Off by default, it is: no speculative plan a pull request from a fork gets, because run its author's code with the workspace's credentials, it would.",
-      "oidcAudiencesHint": "Audience overrides templated onto every workspace this rule creates, keyed on the provider configuration a token is for — aws, or aws.west for an aliased configuration. Empty it leave, and the deployment''s own configuration those workspaces take."
+      "oidcAudiencesHint": "Audience overrides templated onto every workspace this rule creates, keyed on the provider configuration a token is for — aws, or aws.west for an aliased configuration. Empty it leave, and the deployment''s own configuration those workspaces take.",
+      "matchPatternHint": "Against the paths of changed files, matched it is, gitignore-style. Within one path segment, <code>*</code> stays; any number of them, <code>**</code> spans.",
+      "varFilesHint": "A <code>-var-file</code> argument, each entry becomes, in the order listed. From the working directory, a relative path is read.",
+      "nameTemplateHint": "Placeholders: <path></path> (each <code>/</code> replaced by <code>-</code>, it is) and <root></root> (the directory as written). Empty leave it, and <path></path> you get.",
+      "executionHooksHint": "To every workspace this rule creates, each hook selected here is attached. On the <page>Hooks, Execution</page> admin page, defined they are."
     },
     "table": {
       "name": "Name",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Before previewing, VCS connection, repo URL, and pattern set them",
       "scanFailed": "Failed, the scan did ({status})",
       "scan": "Failed, the scan did"
+    },
+    "propagate": {
+      "button": "Save and propagate, you must…",
+      "buttonTitle": "This rule, save; then the settings it changes, to the workspaces it created apply.",
+      "title": "“{ruleName}”, propagate",
+      "lead": "Twice scoped, propagation is: to the settings this update changes, and within those to the workspaces that still hold the value the rule set last time. Anything changed by hand since, left as it is, it is.",
+      "computing": "What would change, working out we are…",
+      "matched": "By this rule, {count, plural, =0 {no workspaces were} one {# workspace was} other {# workspaces were}} created",
+      "skippedLifecycle": "Being created or destroyed, {count, plural, one {# workspace is} other {# workspaces are}}, so considered {count, plural, one {it was} other {they were}} not.",
+      "nothingToDo": "Change, nothing would. Every workspace either the rule already matches, or a value somebody set by hand it holds.",
+      "willChange": "Change they will",
+      "leftAlone": "Alone, left they are",
+      "leftAloneLead": "The value the rule set last time, no longer these hold — so instead of overwriting what somebody chose, the setting propagation skips.",
+      "alreadyMatch": "{count, plural, one {match already, # workspace does} other {match already, # workspaces do}}",
+      "colWorkspace": "Workspace",
+      "colSetting": "Setting",
+      "colFrom": "From",
+      "colTo": "To",
+      "colCurrent": "By hand, set",
+      "colRuleNow": "Now says, the rule does",
+      "empty": "(none)",
+      "apply": "To {count, plural, one {# workspace} other {# workspaces}}, propagate",
+      "applying": "Propagating, we are…",
+      "applied": "To {count, plural, one {# workspace} other {# workspaces}}, propagated it was.",
+      "confirmApply": "To {count, plural, one {# workspace} other {# workspaces}}, these changes apply?",
+      "dryRunFailed": "What would change, work out I could not."
     }
   },
   "adminModuleAutodiscovery": {

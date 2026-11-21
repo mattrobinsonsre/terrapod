@@ -85,6 +85,19 @@ def placeholders(message: str) -> set[str]:
     i = 0
     while i < len(message):
         char = message[i]
+        if char == "'" and i + 1 < len(message) and message[i + 1] == "'":
+            # `''` is a LITERAL apostrophe in ICU, always, and has to be
+            # consumed as a PAIR before the quote test below -- otherwise the
+            # second one pairs with whatever follows it. For a sub-message
+            # ending on one, `{# Qumwo''}`, that is the closing brace: the arm
+            # never closes, depth never unwinds, and the NEXT arm's prose is
+            # read as an argument name. `tlh.json` already writes the doubled
+            # form (`estate.counts.workspaces`), so the catalogue's own settled
+            # convention was one this tool refused, naming a placeholder that
+            # does not exist -- the same unfillable-key failure the depth
+            # counting above was introduced to end, one shape further in.
+            i += 2
+            continue
         if char == "'" and i + 1 < len(message) and message[i + 1] in "{}#|":
             # An ICU quote: the next special character is literal text. Skipped
             # so `'{'` is not read as opening a placeholder.
@@ -166,6 +179,18 @@ def _load(locale: str) -> collections.OrderedDict:
 #: depth-blind matcher gets wrong, and the first four are what stop a fix for
 #: them from being a matcher that finds nothing.
 _PLACEHOLDER_FIXTURES: tuple[tuple[str, set[str]], ...] = (
+    # A sub-message ending on a DOUBLED apostrophe -- a literal `'` in ICU, and
+    # the form `tlh.json` uses. The arm must close, so `count` is the only
+    # argument and the next arm's prose is not one.
+    # The NEXT arm must open with a WORD, not `#`: the defect is that the eaten
+    # brace leaves the following sub-message at ODD depth, where its first
+    # identifier is read as an argument name. An arm starting with `#` cannot
+    # match an identifier, so it passes either way -- which is how the first
+    # version of this fixture came to survive its own mutation.
+    ("{count, plural, one {# Qumwo''} other {Qumwo'mey law'}}", {"count"}),
+    # The same apostrophe mid-word, which never had the problem. Kept so a
+    # future narrowing cannot pass by handling only the hard case.
+    ("{count, plural, one {# Qumwo'mey} other {x'y}}", {"count"}),
     ("no placeholders here", set()),
     ("one {limit} of them", {"limit"}),
     ("{a} and {b}", {"a", "b"}),

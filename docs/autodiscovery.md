@@ -221,6 +221,8 @@ Both are per-request, and there is deliberately **no persistent rule attribute**
 
 In Go, `UpdateAutodiscoveryRuleWithPropagation` in go-terrapod sends `propagate` (and `dry_run` via `PropagateOptions`) and returns the rule with its `Propagation`; `UpdateAutodiscoveryRule` is unchanged and never propagates.
 
+In the admin UI, open a rule from **Admin → Autodiscovery** with **Edit** and use **Save and propagate…**. That runs the `dry_run` first and shows the verdicts as a table before anything is written: what will change (per workspace, per setting, with the value before and after), what is **left alone** because somebody set it by hand since the rule last did, and a count of the workspaces that already match. Nothing is applied until you confirm from that table, so the blast radius is on screen rather than inferred. The plain **Update** button beside it saves the rule and touches no existing workspace, exactly as a `PATCH` without `propagate` does.
+
 ### What is updated
 
 - **Only fields this update changes.** A field you resend unchanged, or spell as another form of "unset" (`null` for `""`, `[]` for no list), is not a change and touches nothing.

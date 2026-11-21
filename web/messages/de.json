@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Regel hinzufügen",
       "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Standardmäßig deaktiviert – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
       "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Standardmäßig aus: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde.",
-      "oidcAudiencesHint": "Audience-Überschreibungen, die auf jeden von dieser Regel angelegten Arbeitsbereich übertragen werden, geschlüsselt auf die Provider-Konfiguration, für die ein Token gilt — aws, oder aws.west für eine mit Alias versehene Konfiguration. Leer lassen, dann übernehmen diese Arbeitsbereiche die Konfiguration der Bereitstellung."
+      "oidcAudiencesHint": "Audience-Überschreibungen, die auf jeden von dieser Regel angelegten Arbeitsbereich übertragen werden, geschlüsselt auf die Provider-Konfiguration, für die ein Token gilt — aws, oder aws.west für eine mit Alias versehene Konfiguration. Leer lassen, dann übernehmen diese Arbeitsbereiche die Konfiguration der Bereitstellung.",
+      "matchPatternHint": "Wird mit den Pfaden der geänderten Dateien abgeglichen, im gitignore-Stil. <code>*</code> bleibt innerhalb eines Pfadsegments; <code>**</code> umfasst beliebig viele davon.",
+      "varFilesHint": "Jeder Eintrag wird in der aufgeführten Reihenfolge zu einem <code>-var-file</code>-Argument. Ein relativer Pfad wird vom Arbeitsverzeichnis aus gelesen.",
+      "nameTemplateHint": "Platzhalter: <path></path> (jedes <code>/</code> durch <code>-</code> ersetzt) und <root></root> (das Verzeichnis so, wie es geschrieben ist). Leer lassen für <path></path>.",
+      "executionHooksHint": "Jeder hier ausgewählte Hook wird jedem Arbeitsbereich zugeordnet, den diese Regel erstellt. Sie werden auf der Verwaltungsseite <page>Ausführungs-Hooks</page> definiert."
     },
     "table": {
       "name": "Name",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Setzen Sie VCS-Verbindung, Repo-URL und Muster, bevor Sie die Vorschau anzeigen",
       "scanFailed": "Scan fehlgeschlagen ({status})",
       "scan": "Scan fehlgeschlagen"
+    },
+    "propagate": {
+      "button": "Speichern und übertragen…",
+      "buttonTitle": "Diese Regel speichern und die Einstellungen, die sie ändert, auf die von ihr erstellten Arbeitsbereiche anwenden",
+      "title": "„{ruleName}“ übertragen",
+      "lead": "Die Übertragung ist doppelt eingegrenzt: auf die Einstellungen, die diese Änderung betrifft, und innerhalb dieser auf die Arbeitsbereiche, die noch den Wert haben, den die Regel zuletzt gesetzt hat. Was seitdem von Hand geändert wurde, bleibt, wie es ist.",
+      "computing": "Es wird ermittelt, was sich ändern würde…",
+      "matched": "{count, plural, =0 {Kein Arbeitsbereich wurde} one {# Arbeitsbereich wurde} other {# Arbeitsbereiche wurden}} von dieser Regel erstellt",
+      "skippedLifecycle": "{count, plural, one {# Arbeitsbereich wird} other {# Arbeitsbereiche werden}} gerade erstellt oder gelöscht und {count, plural, one {wurde} other {wurden}} nicht berücksichtigt.",
+      "nothingToDo": "Es würde sich nichts ändern. Jeder Arbeitsbereich entspricht entweder bereits der Regel oder hat einen von Hand gesetzten Wert.",
+      "willChange": "Wird geändert",
+      "leftAlone": "Bleibt unverändert",
+      "leftAloneLead": "Diese haben nicht mehr den Wert, den die Regel zuletzt gesetzt hat. Die Übertragung überspringt die Einstellung daher, statt die getroffene Wahl zu überschreiben.",
+      "alreadyMatch": "{count, plural, one {# Arbeitsbereich entspricht bereits der Regel} other {# Arbeitsbereiche entsprechen bereits der Regel}}",
+      "colWorkspace": "Arbeitsbereich",
+      "colSetting": "Einstellung",
+      "colFrom": "Von",
+      "colTo": "Auf",
+      "colCurrent": "Von Hand gesetzt",
+      "colRuleNow": "Regel sagt jetzt",
+      "empty": "(keine)",
+      "apply": "Auf {count, plural, one {# Arbeitsbereich} other {# Arbeitsbereiche}} übertragen",
+      "applying": "Wird übertragen…",
+      "applied": "Auf {count, plural, one {# Arbeitsbereich} other {# Arbeitsbereiche}} übertragen.",
+      "confirmApply": "Diese Änderungen auf {count, plural, one {# Arbeitsbereich} other {# Arbeitsbereiche}} anwenden?",
+      "dryRunFailed": "Es konnte nicht ermittelt werden, was sich ändern würde."
     }
   },
   "adminModuleAutodiscovery": {

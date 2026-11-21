@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Regel toevoegen",
       "debugModeHint": "Pods van mislukte runners openhouden op de werkruimten die deze regel aanmaakt. Standaard uit — een opengehouden pod behoudt de referenties van die werkruimte.",
       "allowForkPrPlansHint": "Geldt voor elke werkruimte die deze regel aanmaakt. Standaard uit: een pull request uit een fork krijgt geen speculatief plan, omdat daarbij de code van de auteur met de referenties van de werkruimte zou draaien.",
-      "oidcAudiencesHint": "Audience-overschrijvingen die worden toegepast op elke werkruimte die deze regel aanmaakt, met als sleutel de providerconfiguratie waarvoor een token geldt — aws, of aws.west voor een configuratie met alias. Laat leeg en die werkruimten nemen de eigen configuratie van het deployment over."
+      "oidcAudiencesHint": "Audience-overschrijvingen die worden toegepast op elke werkruimte die deze regel aanmaakt, met als sleutel de providerconfiguratie waarvoor een token geldt — aws, of aws.west voor een configuratie met alias. Laat leeg en die werkruimten nemen de eigen configuratie van het deployment over.",
+      "matchPatternHint": "Wordt vergeleken met de paden van gewijzigde bestanden, in gitignore-stijl. <code>*</code> blijft binnen één padsegment; <code>**</code> omvat er een willekeurig aantal.",
+      "varFilesHint": "Elk item wordt een <code>-var-file</code>-argument, in de vermelde volgorde. Een relatief pad wordt gelezen vanaf de werkmap.",
+      "nameTemplateHint": "Plaatshouders: <path></path> (elke <code>/</code> vervangen door <code>-</code>) en <root></root> (de map zoals die geschreven is). Laat leeg voor <path></path>.",
+      "executionHooksHint": "Elke hier geselecteerde hook wordt gekoppeld aan elke workspace die deze regel aanmaakt. Ze worden gedefinieerd op de beheerpagina <page>Uitvoerings-hooks</page>."
     },
     "table": {
       "name": "Naam",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Stel VCS-verbinding, repo-URL en patroon in voordat u een voorbeeld bekijkt",
       "scanFailed": "Scan mislukt ({status})",
       "scan": "Scan mislukt"
+    },
+    "propagate": {
+      "button": "Opslaan en doorvoeren…",
+      "buttonTitle": "Deze regel opslaan en vervolgens de instellingen die zij wijzigt toepassen op de workspaces die zij heeft aangemaakt",
+      "title": "“{ruleName}” doorvoeren",
+      "lead": "Het doorvoeren is dubbel begrensd: tot de instellingen die deze wijziging raakt, en daarbinnen tot de workspaces die nog de waarde hebben die de regel de vorige keer heeft gezet. Wat sindsdien handmatig is gewijzigd, blijft zoals het is.",
+      "computing": "Bezig met bepalen wat er zou veranderen…",
+      "matched": "{count, plural, =0 {Er zijn geen workspaces} one {# workspace is} other {# workspaces zijn}} door deze regel aangemaakt",
+      "skippedLifecycle": "{count, plural, one {# workspace wordt} other {# workspaces worden}} momenteel aangemaakt of vernietigd en {count, plural, one {is} other {zijn}} niet meegenomen.",
+      "nothingToDo": "Er zou niets veranderen. Elke workspace komt al overeen met de regel of heeft een waarde die iemand handmatig heeft gezet.",
+      "willChange": "Wordt gewijzigd",
+      "leftAlone": "Blijft ongewijzigd",
+      "leftAloneLead": "Deze hebben niet langer de waarde die de regel de vorige keer heeft gezet; het doorvoeren slaat de instelling daarom over in plaats van de gemaakte keuze te overschrijven.",
+      "alreadyMatch": "{count, plural, one {# workspace komt al overeen met de regel} other {# workspaces komen al overeen met de regel}}",
+      "colWorkspace": "Workspace",
+      "colSetting": "Instelling",
+      "colFrom": "Van",
+      "colTo": "Naar",
+      "colCurrent": "Handmatig gezet",
+      "colRuleNow": "Regel zegt nu",
+      "empty": "(geen)",
+      "apply": "Doorvoeren naar {count, plural, one {# workspace} other {# workspaces}}",
+      "applying": "Bezig met doorvoeren…",
+      "applied": "Doorgevoerd naar {count, plural, one {# workspace} other {# workspaces}}.",
+      "confirmApply": "Deze wijzigingen toepassen op {count, plural, one {# workspace} other {# workspaces}}?",
+      "dryRunFailed": "Kon niet bepalen wat er zou veranderen."
     }
   },
   "adminModuleAutodiscovery": {

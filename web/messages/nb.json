@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Legg til regel",
       "debugModeHint": "Hold pods fra mislykkede runnere åpne på arbeidsområdene denne regelen oppretter. Av som standard – en pod som holdes åpen, beholder det arbeidsområdets legitimasjon.",
       "allowForkPrPlansHint": "Gjelder hvert arbeidsområde denne regelen oppretter. Av som standard: en pull request fra en fork får ingen spekulativ plan, fordi den ville kjøre forfatterens kode med arbeidsområdets legitimasjon.",
-      "oidcAudiencesHint": "Audience-overstyringer som legges på hvert arbeidsområde denne regelen oppretter, nøklet på providerkonfigurasjonen et token gjelder for — aws, eller aws.west for en konfigurasjon med alias. La den stå tom, så bruker de arbeidsområdene utrullingens egen konfigurasjon."
+      "oidcAudiencesHint": "Audience-overstyringer som legges på hvert arbeidsområde denne regelen oppretter, nøklet på providerkonfigurasjonen et token gjelder for — aws, eller aws.west for en konfigurasjon med alias. La den stå tom, så bruker de arbeidsområdene utrullingens egen konfigurasjon.",
+      "matchPatternHint": "Matches mot stiene til de endrede filene, i gitignore-stil. <code>*</code> holder seg innenfor ett stisegment; <code>**</code> dekker et vilkårlig antall av dem.",
+      "varFilesHint": "Hver post blir et <code>-var-file</code>-argument, i den rekkefølgen de er listet. En relativ sti leses fra arbeidskatalogen.",
+      "nameTemplateHint": "Plassholdere: <path></path> (hver <code>/</code> erstattet med <code>-</code>) og <root></root> (katalogen slik den er skrevet). La feltet stå tomt for <path></path>.",
+      "executionHooksHint": "Hver krok som velges her, knyttes til hvert arbeidsområde som denne regelen oppretter. De defineres på admin-siden <page>Kjøringskroker</page>."
     },
     "table": {
       "name": "Navn",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Angi VCS-tilkobling, repo-URL og mønster før forhåndsvisning",
       "scanFailed": "Skanning mislyktes ({status})",
       "scan": "Skanning mislyktes"
+    },
+    "propagate": {
+      "button": "Lagre og overfør …",
+      "buttonTitle": "Lagre denne regelen, og anvend deretter innstillingene den endrer, på arbeidsområdene den har opprettet",
+      "title": "Overfør «{ruleName}»",
+      "lead": "Overføringen er avgrenset to ganger: til innstillingene denne endringen berører, og innenfor dem til arbeidsområdene som fortsatt har verdien regelen satte sist. Det som er endret manuelt siden den gang, forblir som det er.",
+      "computing": "Finner ut hva som ville bli endret …",
+      "matched": "{count, plural, =0 {Ingen arbeidsområder er} one {# arbeidsområde er} other {# arbeidsområder er}} opprettet av denne regelen",
+      "skippedLifecycle": "{count, plural, one {# arbeidsområde er} other {# arbeidsområder er}} i ferd med å bli opprettet eller revet ned, og {count, plural, one {det ble} other {de ble}} ikke tatt med i betraktning.",
+      "nothingToDo": "Ingenting ville bli endret. Hvert arbeidsområde samsvarer allerede med regelen eller har en verdi som noen har satt manuelt.",
+      "willChange": "Endres",
+      "leftAlone": "Forblir uberørt",
+      "leftAloneLead": "Disse har ikke lenger verdien regelen satte sist, så overføringen hopper over innstillingen i stedet for å overskrive det noen har valgt.",
+      "alreadyMatch": "{count, plural, one {# arbeidsområde samsvarer allerede med regelen} other {# arbeidsområder samsvarer allerede med regelen}}",
+      "colWorkspace": "Arbeidsområde",
+      "colSetting": "Innstilling",
+      "colFrom": "Fra",
+      "colTo": "Til",
+      "colCurrent": "Satt manuelt",
+      "colRuleNow": "Regelen sier nå",
+      "empty": "(ingen)",
+      "apply": "Overfør til {count, plural, one {# arbeidsområde} other {# arbeidsområder}}",
+      "applying": "Overfører …",
+      "applied": "Overført til {count, plural, one {# arbeidsområde} other {# arbeidsområder}}.",
+      "confirmApply": "Anvend disse endringene på {count, plural, one {# arbeidsområde} other {# arbeidsområder}}?",
+      "dryRunFailed": "Kunne ikke fastslå hva som ville bli endret."
     }
   },
   "adminModuleAutodiscovery": {

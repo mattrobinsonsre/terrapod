@@ -12,6 +12,9 @@
  *
  * So this walks the other direction: extract `useTranslations('ns')` +
  * `t('key')` pairs from the source, and resolve each against every catalog.
+ * `t.rich('key')` counts too: it was invisible here until #2621, which is how
+ * two keys this form asks for came to render as their own dotted names in the
+ * UI, in every locale, with this gate green.
  *
  * It is deliberately conservative. Only statically-analysable literals are
  * checked — a key built at runtime (`t(\`status.${x}\`)`) is skipped rather
@@ -63,7 +66,7 @@ for (const file of walk(SRC)) {
   // One namespace per module in this codebase; take them all and try each.
   const namespaces = [...src.matchAll(/useTranslations\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1])
   if (namespaces.length === 0) continue
-  for (const m of src.matchAll(/\bt\(\s*['"]([^'"${}]+)['"]/g)) {
+  for (const m of src.matchAll(/\bt(?:\.rich)?\(\s*['"]([^'"${}]+)['"]/g)) {
     requested.push({ file, key: m[1], namespaces })
   }
 }

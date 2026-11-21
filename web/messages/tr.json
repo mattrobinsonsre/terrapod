@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Kural ekle",
       "debugModeHint": "Bu kuralın oluşturduğu çalışma alanlarında başarısız çalıştırıcı pod'larını açık tutun. Varsayılan olarak kapalı — açık tutulan bir pod o çalışma alanının kimlik bilgilerini barındırır.",
       "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Varsayılan olarak kapalı: bir fork''tan gelen pull request spekülatif plan almaz, çünkü yazarının kodunu çalışma alanının kimlik bilgileriyle çalıştırırdı.",
-      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanına uygulanan audience geçersiz kılmaları; bir token''ın ait olduğu provider yapılandırmasına göre anahtarlanır — aws ya da alias''lı bir yapılandırma için aws.west. Boş bırakın, o çalışma alanları dağıtımın kendi yapılandırmasını kullanır."
+      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanına uygulanan audience geçersiz kılmaları; bir token''ın ait olduğu provider yapılandırmasına göre anahtarlanır — aws ya da alias''lı bir yapılandırma için aws.west. Boş bırakın, o çalışma alanları dağıtımın kendi yapılandırmasını kullanır.",
+      "matchPatternHint": "Değişen dosyaların yollarıyla gitignore tarzında eşleştirilir. <code>*</code> tek bir yol parçasının içinde kalır; <code>**</code> herhangi bir sayıda parçayı kapsar.",
+      "varFilesHint": "Her girdi, listelendiği sırayla bir <code>-var-file</code> argümanına dönüşür. Göreli bir yol, çalışma dizinine göre yorumlanır.",
+      "nameTemplateHint": "Yer tutucular: <path></path> (her <code>/</code>, <code>-</code> ile değiştirilir) ve <root></root> (dizin yazıldığı gibi). Boş bırakılırsa <path></path> kullanılır.",
+      "executionHooksHint": "Burada seçilen her kanca, bu kuralın oluşturduğu her çalışma alanına eklenir. Kancalar <page>Yürütme Kancaları</page> yönetim sayfasında tanımlanır."
     },
     "table": {
       "name": "Ad",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Önizlemeden önce VCS bağlantısı, repo URL''si ve deseni ayarlayın",
       "scanFailed": "Tarama başarısız ({status})",
       "scan": "Tarama başarısız"
+    },
+    "propagate": {
+      "button": "Kaydet ve yansıt…",
+      "buttonTitle": "Bu kuralı kaydedin, ardından değiştirdiği ayarları oluşturduğu çalışma alanlarına uygulayın",
+      "title": "\"{ruleName}\" kuralını yansıt",
+      "lead": "Yansıtma iki kez sınırlandırılır: bu güncellemenin değiştirdiği ayarlarla ve bunların içinde de kuralın en son belirlediği değeri hâlâ taşıyan çalışma alanlarıyla. O zamandan beri elle değiştirilen her şey olduğu gibi bırakılır.",
+      "computing": "Nelerin değişeceği hesaplanıyor…",
+      "matched": "{count, plural, =0 {Bu kural tarafından hiçbir çalışma alanı oluşturulmadı} one {Bu kural tarafından # çalışma alanı oluşturuldu} other {Bu kural tarafından # çalışma alanı oluşturuldu}}",
+      "skippedLifecycle": "{count, plural, one {# çalışma alanı} other {# çalışma alanı}} oluşturuluyor veya yok ediliyor ve değerlendirmeye alınmadı.",
+      "nothingToDo": "Hiçbir şey değişmez. Her çalışma alanı ya kuralla zaten eşleşiyor ya da birinin elle belirlediği bir değer taşıyor.",
+      "willChange": "Değişecek",
+      "leftAlone": "Dokunulmadan bırakılır",
+      "leftAloneLead": "Bunlar kuralın en son belirlediği değeri artık taşımıyor; bu nedenle yansıtma, yapılan seçimin üzerine yazmak yerine ayarı atlar.",
+      "alreadyMatch": "{count, plural, one {# çalışma alanı kuralla zaten eşleşiyor} other {# çalışma alanı kuralla zaten eşleşiyor}}",
+      "colWorkspace": "Çalışma Alanı",
+      "colSetting": "Ayar",
+      "colFrom": "Eski",
+      "colTo": "Yeni",
+      "colCurrent": "Elle belirlenmiş",
+      "colRuleNow": "Kuralın şimdiki değeri",
+      "empty": "(yok)",
+      "apply": "{count, plural, one {# çalışma alanına yansıt} other {# çalışma alanına yansıt}}",
+      "applying": "Yansıtılıyor…",
+      "applied": "{count, plural, one {# çalışma alanına yansıtıldı.} other {# çalışma alanına yansıtıldı.}}",
+      "confirmApply": "Bu değişiklikler {count, plural, one {# çalışma alanına} other {# çalışma alanına}} uygulansın mı?",
+      "dryRunFailed": "Nelerin değişeceği hesaplanamadı."
     }
   },
   "adminModuleAutodiscovery": {

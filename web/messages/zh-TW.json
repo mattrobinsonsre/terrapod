@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "新增規則",
       "debugModeHint": "在此規則建立的工作區上讓失敗執行器的 Pod 保持開啟。預設關閉 — 保持開啟的 Pod 會保留該工作區的憑證。",
       "allowForkPrPlansHint": "適用於此規則建立的每個工作區。預設關閉：來自 fork 的拉取請求不會取得推測性計畫，因為那會以工作區的憑證執行其作者的程式碼。",
-      "oidcAudiencesHint": "套用到此規則建立的每個工作區上的受眾覆寫，以權杖所對應的 provider 設定為鍵 — aws，或帶別名的設定用 aws.west。留空則這些工作區使用部署自身的設定。"
+      "oidcAudiencesHint": "套用到此規則建立的每個工作區上的受眾覆寫，以權杖所對應的 provider 設定為鍵 — aws，或帶別名的設定用 aws.west。留空則這些工作區使用部署自身的設定。",
+      "matchPatternHint": "依 gitignore 的方式與已變更檔案的路徑進行比對。<code>*</code> 僅在單一路徑區段內比對；<code>**</code> 可跨任意數量的路徑區段。",
+      "varFilesHint": "每一項都會依列出的順序成為一個 <code>-var-file</code> 參數。相對路徑以工作目錄為基準解析。",
+      "nameTemplateHint": "預留位置：<path></path>（每個 <code>/</code> 都替換為 <code>-</code>）和 <root></root>（按原樣書寫的目錄）。留空時使用 <path></path>。",
+      "executionHooksHint": "此處選擇的每個鉤子都會附加到此規則建立的每個工作區。鉤子在 <page>執行鉤子</page> 管理頁面中定義。"
     },
     "table": {
       "name": "名稱",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "預覽前請先設定 VCS 連線、倉庫 URL 和模式",
       "scanFailed": "掃描失敗（{status}）",
       "scan": "掃描失敗"
+    },
+    "propagate": {
+      "button": "儲存並下發…",
+      "buttonTitle": "儲存此規則，然後將其變更的設定套用到它建立的工作區",
+      "title": "下發 \"{ruleName}\"",
+      "lead": "下發範圍經過兩重限定：僅限本次更新變更的設定，且在這些設定中僅限仍保持規則上次所設值的工作區。此後被手動改動過的內容將保持原樣。",
+      "computing": "正在計算將發生哪些變更…",
+      "matched": "{count, plural, =0 {此規則未建立任何工作區} one {此規則建立了 # 個工作區} other {此規則建立了 # 個工作區}}",
+      "skippedLifecycle": "{count, plural, one {# 個工作區} other {# 個工作區}}正在建立或銷毀中，未納入考量。",
+      "nothingToDo": "不會有任何變更。每個工作區要麼已匹配規則，要麼持有手動設定的值。",
+      "willChange": "將變更",
+      "leftAlone": "保持不變",
+      "leftAloneLead": "這些工作區已不再保持規則上次所設的值，因此下發會跳過該設定，而不會覆寫已做出的選擇。",
+      "alreadyMatch": "{count, plural, one {# 個工作區已匹配規則} other {# 個工作區已匹配規則}}",
+      "colWorkspace": "工作區",
+      "colSetting": "設定",
+      "colFrom": "變更前",
+      "colTo": "變更後",
+      "colCurrent": "手動設定的值",
+      "colRuleNow": "規則目前值",
+      "empty": "（無）",
+      "apply": "{count, plural, one {下發到 # 個工作區} other {下發到 # 個工作區}}",
+      "applying": "正在下發…",
+      "applied": "{count, plural, one {已下發到 # 個工作區。} other {已下發到 # 個工作區。}}",
+      "confirmApply": "要將這些變更套用到 {count, plural, one {# 個工作區} other {# 個工作區}}嗎？",
+      "dryRunFailed": "無法計算將發生哪些變更。"
     }
   },
   "adminModuleAutodiscovery": {

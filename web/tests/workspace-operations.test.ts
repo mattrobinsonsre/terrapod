@@ -207,9 +207,12 @@ test('every surface blocks the both-false save the server refuses', () => {
   assert.equal(occurrences(page, /disabled=\{saving \|\| editHasNoOperations\}/g), 1)
 
   assert.match(autodiscovery, /ruleHasNoOperations = !planApplyEnabled && !configureEnabled/)
-  // TWO guarded controls: the submit and the preview. A preview of a rule that
-  // cannot be saved is a plan for workspaces nobody can create.
-  assert.equal(occurrences(autodiscovery, /disabled=\{submitting \|\| ruleHasNoOperations\}/g), 2)
+  // THREE guarded controls: the submit, the preview, and save-and-propagate.
+  // A preview of a rule that cannot be saved is a plan for workspaces nobody
+  // can create; propagation SAVES the rule before it propagates (#2621 item
+  // 50), so a rule the server would refuse cannot be propagated either -- and
+  // its dry run would describe a payload that is never going to be stored.
+  assert.equal(occurrences(autodiscovery, /disabled=\{submitting \|\| ruleHasNoOperations\}/g), 3)
 
   // The fleet form blocks only BOTH explicitly false: turning plan/apply off
   // alone is legitimate across a set that already has configure on, and the
