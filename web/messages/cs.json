@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply. Přihlašovací údaje samotné flotily — SSH klíč ke strojům, heslo become — nemají s ani jedním z nich nic společného.",
       "phaseSlotExclusive": "Proměnná zabírá vždy jen jedno místo. „Pouze apply“ se dostane do apply a do konfigurace, „Pouze konfigurace“ jen do konfigurace.",
       "configureOnlyLead": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply.",
-      "applyOnlyLead": "Zadržena u plan a doručena pouze do apply."
+      "applyOnlyLead": "Zadržena u plan a doručena pouze do apply.",
+      "ruleExclude": "Vyloučení",
+      "ruleExcludeEntries": "{count, plural, one {# podmínka} few {# podmínky} many {# podmínky} other {# podmínek}}",
+      "exclusionRemoved": "{count, plural, one {Vyloučení této sady odebrala z výběru pravidla # pracovní prostor} few {Vyloučení této sady odebrala z výběru pravidla # pracovní prostory} many {Vyloučení této sady odebrala z výběru pravidla # pracovního prostoru} other {Vyloučení této sady odebrala z výběru pravidla # pracovních prostorů}}. Pracovní prostor přiřazený výslovně sadu i tak dostává.",
+      "exclusionEmpty": "{count, plural, one {Položka vyloučení {indices} neodpovídá žádnému pracovnímu prostoru} few {Položky vyloučení {indices} neodpovídají žádnému pracovnímu prostoru} many {Položky vyloučení {indices} neodpovídají žádnému pracovnímu prostoru} other {Položky vyloučení {indices} neodpovídají žádnému pracovnímu prostoru}}, takže zatím k žádnému zúžení nedochází."
     }
   },
   "adminAutodiscovery": {
@@ -3967,7 +3971,7 @@
       "offline": "Žádný živý listener",
       "offlineWarning": "K těmto fondům není připojen žádný listener: {pools}. Běhy směrované do nich se zařadí do fronty místo spuštění.",
       "count": "{count, plural, one {# listener} few {# listenery} many {# listeneru} other {# listenerů}}",
-      "countWithPods": "{count, plural, one {# listener} other {# listenerů}} · {pods, plural, one {# pod} other {# podů}}",
+      "countWithPods": "{count, plural, one {# listener} few {# listenery} many {# listeneru} other {# listenerů}} · {pods, plural, one {# pod} few {# pody} many {# podu} other {# podů}}",
       "singlePod": "Jediný pod"
     },
     "inbound": "Přijímá od protějšku",

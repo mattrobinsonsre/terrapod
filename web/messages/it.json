@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "Consegnata solo a un configurare e trattenuta sia da un plan sia da un apply. La credenziale della flotta stessa — una chiave SSH verso il parco macchine, una password become — non ha nulla a che fare con nessuno dei due.",
       "phaseSlotExclusive": "Una variabile occupa un solo posto alla volta. Solo apply raggiunge un apply e un configurare; Solo configurare raggiunge soltanto un configurare.",
       "configureOnlyLead": "Consegnata solo a un configurare e trattenuta sia da un plan sia da un apply.",
-      "applyOnlyLead": "Trattenuta da un plan e consegnata solo a un apply."
+      "applyOnlyLead": "Trattenuta da un plan e consegnata solo a un apply.",
+      "ruleExclude": "Esclusione",
+      "ruleExcludeEntries": "{count, plural, one {# condizione} other {# condizioni}}",
+      "exclusionRemoved": "{count, plural, one {# workspace rimosso dalla corrispondenza della regola per via delle esclusioni di questo set} other {# workspace rimossi dalla corrispondenza della regola per via delle esclusioni di questo set}}. Un workspace assegnato esplicitamente riceve comunque il set.",
+      "exclusionEmpty": "{count, plural, one {La voce di esclusione {indices} non corrisponde ad alcun workspace} other {Le voci di esclusione {indices} non corrispondono ad alcun workspace}}, quindi non si restringe ancora nulla."
     }
   },
   "adminAutodiscovery": {

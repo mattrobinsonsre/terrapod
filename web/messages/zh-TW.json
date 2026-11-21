@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "僅交付給設定，對 plan 與 apply 皆隱藏。機群自身的憑證 — 通往設備的 SSH 金鑰、become 密碼 — 與這兩者都無關。",
       "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。",
       "configureOnlyLead": "僅交付給設定，對 plan 與 apply 皆隱藏。",
-      "applyOnlyLead": "對 plan 隱藏，僅交付給 apply。"
+      "applyOnlyLead": "對 plan 隱藏，僅交付給 apply。",
+      "ruleExclude": "排除",
+      "ruleExcludeEntries": "{count, plural, one {# 個條件} other {# 個條件}}",
+      "exclusionRemoved": "{count, plural, one {此變數集的排除條件使 # 個工作區不再屬於規則比對結果} other {此變數集的排除條件使 # 個工作區不再屬於規則比對結果}}。已明確指派的工作區仍會取得該變數集。",
+      "exclusionEmpty": "{count, plural, one {排除項目 {indices} 未比對到任何工作區} other {排除項目 {indices} 未比對到任何工作區}}，因此目前尚未縮小任何範圍。"
     }
   },
   "adminAutodiscovery": {

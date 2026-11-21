@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta. Laitekannan oma tunnistetieto — SSH-avain koneille, become-salasana — ei kuulu kumpaankaan niistä.",
       "phaseSlotExclusive": "Muuttuja on kerrallaan vain yhdessä paikassa. Vain apply yltää apply- ja määritysvaiheeseen; Vain määritys yltää pelkästään määritysvaiheeseen.",
       "configureOnlyLead": "Toimitetaan vain määritysvaiheelle ja pidätetään sekä plan- että apply-vaiheelta.",
-      "applyOnlyLead": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle."
+      "applyOnlyLead": "Pidätetään plan-vaiheelta ja toimitetaan vain apply-vaiheelle.",
+      "ruleExclude": "Poissulkeminen",
+      "ruleExcludeEntries": "{count, plural, one {# ehto} other {# ehtoa}}",
+      "exclusionRemoved": "{count, plural, one {# työtila on poistettu säännön osumista tämän joukon poissulkemisten vuoksi} other {# työtilaa on poistettu säännön osumista tämän joukon poissulkemisten vuoksi}}. Nimenomaisesti määritetty työtila saa silti joukon.",
+      "exclusionEmpty": "{count, plural, one {Poissulkuehto {indices} ei vastaa yhtään työtilaa} other {Poissulkuehdot {indices} eivät vastaa yhtään työtilaa}}, joten mitään ei vielä rajata."
     }
   },
   "adminAutodiscovery": {

@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다. 플릿 자체의 자격 증명 — 설비에 대한 SSH 키나 become 암호 — 은 둘 중 어느 쪽과도 상관이 없습니다.",
       "phaseSlotExclusive": "변수는 한 번에 하나의 슬롯만 차지합니다. 'apply 전용'은 apply와 구성에 도달하고, '구성 전용'은 구성에만 도달합니다.",
       "configureOnlyLead": "구성에만 전달하고 plan과 apply 모두에 전달하지 않습니다.",
-      "applyOnlyLead": "plan에는 전달하지 않고 apply에만 전달합니다."
+      "applyOnlyLead": "plan에는 전달하지 않고 apply에만 전달합니다.",
+      "ruleExclude": "제외",
+      "ruleExcludeEntries": "{count, plural, one {조건 #개} other {조건 #개}}",
+      "exclusionRemoved": "{count, plural, one {이 변수 집합의 제외 조건으로 워크스페이스 #개가 규칙 일치에서 빠졌습니다} other {이 변수 집합의 제외 조건으로 워크스페이스 #개가 규칙 일치에서 빠졌습니다}}. 명시적으로 할당된 워크스페이스는 계속 집합을 받습니다.",
+      "exclusionEmpty": "{count, plural, one {제외 항목 {indices}번은 어떤 워크스페이스와도 일치하지 않습니다} other {제외 항목 {indices}번은 어떤 워크스페이스와도 일치하지 않습니다}}. 따라서 아직 아무것도 좁히지 않습니다."
     }
   },
   "adminAutodiscovery": {

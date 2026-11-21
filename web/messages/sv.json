@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "Levereras endast till en konfigurera och undanhålls både från en plan och från en apply. Flottans egen behörighet — en SSH-nyckel till maskinparken, ett become-lösenord — hör inte hemma i någon av dem.",
       "phaseSlotExclusive": "En variabel upptar bara en plats i taget. Endast apply når en apply och en konfigurera; Endast konfigurera når bara en konfigurera.",
       "configureOnlyLead": "Levereras endast till en konfigurera och undanhålls både från en plan och från en apply.",
-      "applyOnlyLead": "Undanhålls från en plan och levereras endast till en apply."
+      "applyOnlyLead": "Undanhålls från en plan och levereras endast till en apply.",
+      "ruleExclude": "Undantag",
+      "ruleExcludeEntries": "{count, plural, one {# villkor} other {# villkor}}",
+      "exclusionRemoved": "{count, plural, one {# arbetsyta har tagits bort från regelns träffar av denna uppsättnings undantag} other {# arbetsytor har tagits bort från regelns träffar av denna uppsättnings undantag}}. En arbetsyta som tilldelats uttryckligen får ändå uppsättningen.",
+      "exclusionEmpty": "{count, plural, one {Undantagsvillkor {indices} matchar ingen arbetsyta} other {Undantagsvillkoren {indices} matchar ingen arbetsyta}}, så ingenting begränsas ännu."
     }
   },
   "adminAutodiscovery": {

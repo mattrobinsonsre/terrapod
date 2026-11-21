@@ -1596,6 +1596,9 @@ field VariableSetVariable.UpdatedAt string `json:"updated-at,omitempty"`
 field VariableSetVariable.Value string `json:"value,omitempty"`
 field VariableSetVariable.ValueSource string `json:"value-source,omitempty"`
 field VariableSetVariable.VersionID string `json:"version-id,omitempty"`
+field VarsetExclusionMeta.Empty []int
+field VarsetExclusionMeta.Excluded int
+field VarsetExclusionMeta.Present bool
 field VarsetWorkspace.AssignmentSource string `json:"assignment-source"`
 field VarsetWorkspace.ID string `json:"id"`
 field VarsetWorkspace.Name string `json:"name"`
@@ -2106,7 +2109,7 @@ method (*Client) ListVCSConnections(ctx context.Context) ([]VCSConnection, error
 method (*Client) ListVariableSets(ctx context.Context) ([]VariableSet, error)
 method (*Client) ListVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListVarsetVariables(ctx context.Context, varsetID string) ([]VariableSetVariable, error)
-method (*Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]VarsetWorkspace, error)
+method (*Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]VarsetWorkspace, VarsetExclusionMeta, error)
 method (*Client) ListWorkspaceRuns(ctx context.Context, workspaceID string, pageNumber, pageSize int) ([]Run, error)
 method (*Client) ListWorkspaceVarsets(ctx context.Context, workspaceID string) ([]WorkspaceVarset, error)
 method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
@@ -2442,6 +2445,7 @@ type VarOriginLevel struct
 type Variable struct
 type VariableSet struct
 type VariableSetVariable struct
+type VarsetExclusionMeta struct
 type VarsetWorkspace struct
 type VaultInstanceStatus struct
 type VaultReferenceCheck struct

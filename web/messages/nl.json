@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden. De credential van de vloot zelf — een SSH-sleutel naar het machinepark, een become-wachtwoord — hoort in geen van beide thuis.",
       "phaseSlotExclusive": "Een variabele bezet maar één plek tegelijk. Alleen apply bereikt een apply en een configureren; Alleen configureren bereikt alleen een configureren.",
       "configureOnlyLead": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden.",
-      "applyOnlyLead": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd."
+      "applyOnlyLead": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd.",
+      "ruleExclude": "Uitsluiting",
+      "ruleExcludeEntries": "{count, plural, one {# voorwaarde} other {# voorwaarden}}",
+      "exclusionRemoved": "{count, plural, one {# workspace is door de uitsluitingen van deze set uit de regelselectie gehaald} other {# workspaces zijn door de uitsluitingen van deze set uit de regelselectie gehaald}}. Een workspace die expliciet is toegewezen krijgt de set nog steeds.",
+      "exclusionEmpty": "{count, plural, one {Uitsluitingsvoorwaarde {indices} komt met geen enkele workspace overeen} other {Uitsluitingsvoorwaarden {indices} komen met geen enkele workspace overeen}}, dus daarmee wordt nog niets beperkt."
     }
   },
   "adminAutodiscovery": {

@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply. Dane uwierzytelniające samej floty — klucz SSH do maszyn, hasło become — nie mają nic wspólnego z żadnym z nich.",
       "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji.",
       "configureOnlyLead": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply.",
-      "applyOnlyLead": "Wstrzymywana przy plan i dostarczana tylko do apply."
+      "applyOnlyLead": "Wstrzymywana przy plan i dostarczana tylko do apply.",
+      "ruleExclude": "Wykluczenie",
+      "ruleExcludeEntries": "{count, plural, one {# warunek} few {# warunki} many {# warunków} other {# warunków}}",
+      "exclusionRemoved": "{count, plural, one {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzeń roboczą} few {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzenie robocze} many {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzeni roboczych} other {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzeni roboczej}}. Przestrzeń robocza przypisana jawnie nadal otrzymuje zestaw.",
+      "exclusionEmpty": "{count, plural, one {Wpis wykluczenia {indices} nie pasuje do żadnej przestrzeni roboczej} few {Wpisy wykluczeń {indices} nie pasują do żadnej przestrzeni roboczej} many {Wpisy wykluczeń {indices} nie pasują do żadnej przestrzeni roboczej} other {Wpisy wykluczeń {indices} nie pasują do żadnej przestrzeni roboczej}}, więc na razie nie ma żadnego zawężenia."
     }
   },
   "adminAutodiscovery": {
@@ -3967,7 +3971,7 @@
       "offline": "Brak żywego listenera",
       "offlineWarning": "Żaden listener nie jest podłączony do: {pools}. Uruchomienia kierowane do tych pul trafią do kolejki zamiast się wykonać.",
       "count": "{count, plural, one {# listener} few {# listenery} many {# listenerów} other {# listenera}}",
-      "countWithPods": "{count, plural, one {# listener} other {# listenery}} · {pods, plural, one {# pod} other {# pody}}",
+      "countWithPods": "{count, plural, one {# listener} few {# listenery} many {# listenerów} other {# listenera}} · {pods, plural, one {# pod} few {# pody} many {# podów} other {# poda}}",
       "singlePod": "Jeden pod"
     },
     "inbound": "Akceptuje od partnera",

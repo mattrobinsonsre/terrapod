@@ -989,7 +989,7 @@ def _refuse_unusable_exclude_entries(rule: dict) -> None:
     from terrapod.services.label_validation import RESERVED_LABEL_KEYS
 
     for i, entry in enumerate(rule.get("exclude") or []):
-        norm = {str(k).replace("-", "_"): v for k, v in entry.items()}
+        norm = workspace_search_service.normalise_filter_keys(entry)
         if "workspace_ids" in norm:
             raise HTTPException(
                 status_code=422,
@@ -1001,8 +1001,10 @@ def _refuse_unusable_exclude_entries(rule: dict) -> None:
             hint = _RESERVED_LABEL_HINTS.get(key, "it is a filter-bar term, not a label")
             raise HTTPException(
                 status_code=422,
-                detail=f'exclude[{i}]: label key "{key}" is reserved, so no workspace can '
-                f"carry it and this entry would match nothing ({hint}).",
+                detail=f'exclude[{i}]: label key "{key}" is reserved, so a workspace '
+                f"cannot be given it and this entry would match nothing ({hint}). A "
+                "workspace labelled before the key was reserved can still carry it, so "
+                "exclude by a label you control instead.",
             )
 
 
@@ -1034,7 +1036,7 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
         )
     # Normalise first: parse_filter accepts hyphens, so an underscore-only guard
     # below would be decorative — `workspace-ids` sailed straight past it.
-    rule = {str(k).replace("-", "_"): v for k, v in rule.items()}
+    rule = workspace_search_service.normalise_filter_keys(rule)
 
     # GHSA-49q6-pm68-3xgw. Some dimensions are platform STATE, not identity, and a
     # workspace's own owner can move them through endpoints that have no business
@@ -1533,7 +1535,17 @@ async def _exclusion_meta(db: AsyncSession, vs: VariableSet) -> dict | None:
     """What the rule's `exclude` removed and which entries match nothing, if it has one.
 
     Non-blocking: a rule is standing, so an entry matching nothing yet is reported
-    here rather than refused at write. None when there is no usable exclusion.
+    here rather than refused at write. None when there is no usable exclusion --
+    which is a DIFFERENT answer from `excluded: 0`, and the SDK carries a
+    `Present` flag for exactly that reason: "nothing was excluded" and "there is
+    nothing to exclude with" lead an operator to different actions.
+
+    `excluded` counts removals from the RULE's match, and says nothing about who
+    receives the set: a workspace that is also assigned explicitly still gets it
+    and still appears in `data` with `assignment-source: "explicit"` (#2621).
+    Literally accurate and easy to read as the stronger claim, so both the wire
+    documentation and the screen say "removed from the rule match" rather than
+    "excluded".
     """
     from terrapod.services.varset_self_join import rule_refused_dimensions
 

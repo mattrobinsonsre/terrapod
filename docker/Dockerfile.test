@@ -105,6 +105,10 @@ COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/
 # Without these two files the gate raises rather than passing vacuously; the
 # `_surface()` helper says so in its own error.
 COPY web/src/lib/workspace-fields.ts ./web/src/lib/workspace-fields.ts
+# Read by tests/api/test_assignment_rule_labels.py: every assignment-rule
+# dimension an operator can store must have a human label, or the
+# blast-radius screen renders a bare untranslated key (#2621).
+COPY web/src/components/assignment-rule-editor.tsx ./web/src/components/assignment-rule-editor.tsx
 # The whole route, deliberately, because COPY globs its source: `[id]` is a
 # character class matching one of `i`/`d`, never the literal directory, and
 # quoting does not help -- the parser strips quotes and still globs. A per-file

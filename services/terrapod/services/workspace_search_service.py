@@ -297,20 +297,55 @@ async def _missing_ids(db: AsyncSession, entries: list[WorkspaceFilter]) -> dict
     return {i: ids for i, ids in absent.items() if ids}
 
 
+def normalise_filter_keys(raw: dict) -> dict:
+    """A filter dict's keys with hyphens folded to underscores, and nothing else.
+
+    One producer for a comprehension four places had written by hand (#2621).
+    Safe on a path that STORES the rule: a hyphen is a wire spelling of the same
+    key, not a different selector.
+    """
+    return {str(k).replace("-", "_"): v for k, v in raw.items()}
+
+
+def canonical_filter_keys(raw: dict) -> dict:
+    """`normalise_filter_keys`, plus the legacy `terraform_version` alias.
+
+    `terraform-version` was this selector's name before the column became
+    `engine_version` (#1559). A stored rule -- a dynamic variable-set assignment,
+    a saved bulk-update selector -- keeps the old spelling, and unknown keys are
+    rejected, so dropping it would turn those rules into errors. The canonical
+    spelling wins where a caller sends both.
+
+    FOR EVALUATION ONLY. It must never run on a path that stores the rule, and
+    that is a contract rather than a preference: `assignmentRuleModel` in the
+    Terraform provider maps `engine_version` and `terraform_version` to separate
+    attributes and says why -- "a stored rule must round-trip byte-identical or
+    every Read produces drift" -- so canonicalising at the write boundary turns
+    one `terraform_version` into a permanent diff on every plan. That is the
+    "Provider produced inconsistent result" class the v1.9.0 advisories were
+    about, and it is why this is a second function rather than a flag: the write
+    path cannot reach it by forgetting an argument.
+
+    The evaluation side needs it for the reason the review found: the refusal
+    predicate and the matcher must agree about a spelling, or the day
+    `engine_version` joins `RULE_DIMENSIONS_REFUSED` a rule stored as
+    `terraform-version` is refused by NOTHING while the selector matches it
+    perfectly well -- the refusal/matcher disagreement GHSA-49q6-pm68-3xgw was
+    about, reintroduced by an alias.
+    """
+    norm = normalise_filter_keys(raw)
+    legacy_version = norm.pop("terraform_version", None)
+    if legacy_version is not None:
+        norm.setdefault("engine_version", legacy_version)
+    return norm
+
+
 def _parse_entry(raw: Any, label: str | None = None) -> WorkspaceFilter:
     """Parse one filter dict; `label` (e.g. `exclude[0]`) marks an exclude entry."""
     prefix = f"{label}: " if label else ""
     if not isinstance(raw, dict):
         raise WorkspaceFilterError(f"{prefix}must be an object")
-    norm = {k.replace("-", "_"): v for k, v in raw.items()}
-    # `terraform-version` was this selector's name before the column became
-    # `engine_version` (#1559). A stored rule -- a dynamic variable-set
-    # assignment, a saved bulk-update selector -- keeps the old spelling, and
-    # unknown keys are rejected, so dropping it would turn those rules into
-    # errors. The canonical spelling wins where a caller sends both.
-    legacy_version = norm.pop("terraform_version", None)
-    if legacy_version is not None:
-        norm.setdefault("engine_version", legacy_version)
+    norm = canonical_filter_keys(raw)
     unknown = set(norm) - set(WorkspaceFilter.model_fields)
     if unknown:
         raise WorkspaceFilterError(f"{prefix}unknown filter key(s): {', '.join(sorted(unknown))}")

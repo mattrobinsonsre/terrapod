@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu. Nid oes a wnelo tystlythyr y fflyd ei hun — allwedd SSH i'r ystad, cyfrinair become — â'r naill na'r llall.",
       "phaseSlotExclusive": "Mae newidyn mewn un slot ar y tro. Mae Gweithredu yn unig yn cyrraedd gweithredu a chyflunio; dim ond cyflunio y mae Cyflunio yn unig yn ei gyrraedd.",
       "configureOnlyLead": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu.",
-      "applyOnlyLead": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig."
+      "applyOnlyLead": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig.",
+      "ruleExclude": "Eithrio",
+      "ruleExcludeEntries": "{count, plural, one {# amod} other {# amod}}",
+      "exclusionRemoved": "{count, plural, one {Mae # gweithfan wedi'i thynnu o gydweddiad y rheol gan eithriadau'r set hon} other {Mae # gweithfan wedi'u tynnu o gydweddiad y rheol gan eithriadau'r set hon}}. Mae gweithfan sydd wedi'i neilltuo'n benodol yn dal i gael y set.",
+      "exclusionEmpty": "{count, plural, one {Nid yw amod eithrio {indices} yn cydweddu ag unrhyw weithfan} other {Nid yw amodau eithrio {indices} yn cydweddu ag unrhyw weithfan}}, felly nid oes dim yn cael ei gulhau eto."
     }
   },
   "adminAutodiscovery": {

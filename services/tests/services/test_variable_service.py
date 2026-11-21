@@ -597,7 +597,7 @@ class TestTheBlastRadiusViewAgreesWithTheMatcher:
         and still let an exclusion entry through, so ask each of them."""
         from fastapi import HTTPException
 
-        from terrapod.api.routers.variables import _validated_assignment_rule
+        from terrapod.api.routers.variables import _exclusion_meta, _validated_assignment_rule
         from terrapod.services.variable_service import (
             _rule_matches,
             workspaces_for_varset,
@@ -613,36 +613,189 @@ class TestTheBlastRadiusViewAgreesWithTheMatcher:
                 assert not await _rule_matches(None, rule, uuid.uuid4()), rule
                 db = self._db()
                 assert await workspaces_for_varset(db, self._varset(rule)) == [], rule
+                # The blast-radius view's exclusion summary is the fourth consumer, and
+                # it was the one with no test: deleting its guard left the whole suite
+                # green (#2621). Without it the view reports `meta.exclusion` as though
+                # the rule had carved workspaces out of a match that is in fact EMPTY --
+                # the view-vs-matcher divergence GHSA-49q6-pm68-3xgw was about, in the
+                # same view, one release later.
+                assert await _exclusion_meta(self._db(), self._varset(rule)) is None, rule
+
+    def test_the_refusal_predicate_sees_a_dimension_under_its_legacy_spelling(self):
+        """The latent half of the four-copy divergence (#2621).
+
+        The predicate and the selector must agree about a SPELLING. Before this
+        the predicate folded no alias while `_parse_entry` did, so the day
+        `engine_version` joins the denylist a rule stored as `terraform-version`
+        would be refused by NOTHING and matched perfectly well -- the
+        refusal/matcher disagreement GHSA-49q6-pm68-3xgw was about, reintroduced
+        by an alias rather than by a nesting.
+
+        Driven with the denylist patched rather than waiting for that day: the
+        property is that the predicate reads the canonical spelling, and asserting
+        it on a dimension that is not yet refused would assert nothing.
+        """
+        from unittest.mock import patch
+
+        from terrapod.services import varset_self_join as vsj
+
+        with patch.dict(vsj.RULE_DIMENSIONS_REFUSED, {"engine_version": "a reason"}):
+            for spelling in ("engine_version", "terraform_version", "terraform-version"):
+                assert vsj.rule_refused_dimensions({spelling: "1.9.0"}) == ["engine_version"], (
+                    spelling
+                )
+
+    def test_the_write_path_stores_the_rule_byte_identically(self):
+        """The other side of that fix, and the reason it is two functions.
+
+        `assignmentRuleModel` maps `engine_version` and `terraform_version` to
+        separate provider attributes because "a stored rule must round-trip
+        byte-identical or every Read produces drift". Canonicalising here turns
+        one `terraform_version` into a permanent diff on every plan.
+        """
+        from terrapod.api.routers.variables import _validated_assignment_rule
+
+        stored = _validated_assignment_rule({"assignment-rule": {"terraform_version": "1.9.0"}})
+        assert stored == {"terraform_version": "1.9.0"}, (
+            "the write path canonicalised the alias; the provider would see permanent drift"
+        )
+        # A hyphen IS folded here, and always was: it is a wire spelling of the
+        # same key rather than a different selector.
+        assert _validated_assignment_rule({"assignment-rule": {"name-prefix": "p"}}) == {
+            "name_prefix": "p"
+        }
+
+    def test_no_storing_path_reaches_the_canonicalising_form(self):
+        """Structural, because the behavioural test above pins one attribute.
+
+        A second write path -- or this one widened -- would reintroduce the drift
+        silently, and no round-trip test exists for a rule key nobody has added
+        yet.
+        """
+        import ast
+        import pathlib
+
+        from terrapod.api.routers import variables as mod
+
+        tree = ast.parse(pathlib.Path(mod.__file__).read_text())
+        offenders = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            seg = ast.get_source_segment(pathlib.Path(mod.__file__).read_text(), node) or ""
+            if "canonical_filter_keys" in seg:
+                offenders.append(node.name)
+        assert not offenders, (
+            "these are on the router that STORES an assignment rule and reach the "
+            "canonicalising normaliser, which breaks the provider's byte-identical "
+            f"round-trip: {offenders}"
+        )
 
     def test_every_assignment_rule_consumer_refuses_the_same_dimensions(self):
         """A fourth consumer added later would diverge in silence, exactly as the view
-        did — and no behavioural test can see a reader that does not exist yet."""
+        did -- and no behavioural test can see a reader that does not exist yet.
+
+        PER FUNCTION, not per file (#2621). This used to skip any file whose source
+        merely CONTAINED `rule_refused_dimensions`, so once `variables.py` mentioned
+        the predicate anywhere, every later consumer added to that file passed
+        trivially -- presence-not-application, in the gate written to prevent exactly
+        that. `_exclusion_meta` was added to that file and the gate could not see it.
+
+        A function "reaches" the predicate if its own body applies it, or if it calls
+        something in the same module that does. That indirection is real and has to be
+        followed: `applicable_varsets` goes through `_rule_matches`,
+        `workspaces_for_varset` through `_rule_refused`, and both `create_varset` and
+        `update_varset` through `_validated_assignment_rule`. A gate that demanded a
+        direct call would report four correct functions.
+        """
+        import ast
         import pathlib
         import re
 
         from terrapod.services import varset_self_join
 
-        #: Files that mention an assignment rule without DECIDING anything from it.
-        #: Each needs a reason, or this becomes the place a diverging consumer hides.
+        #: Functions that read an assignment rule without DECIDING anything about its
+        #: refused dimensions. Each needs a reason, or this becomes the place a
+        #: diverging consumer hides.
         not_deciders = {
-            "models.py": "declares the column; stores and returns it, never evaluates it",
+            "_varset_json": "serialises the rule for the wire; decides nothing from it",
+            "_refuse_unusable_exclude_entries": (
+                "refuses an entry for a DIFFERENT property -- an entry that could never "
+                "match -- and is called by `_validated_assignment_rule`, which does apply "
+                "the predicate"
+            ),
         }
 
+        READS = re.compile(r"assignment_rule|assignment-rule|_rule_matches\(")
+        APPLIED = {"rule_refused_dimensions"}
         root = pathlib.Path(varset_self_join.__file__).resolve().parents[1]
-        offenders = []
-        for path in root.rglob("*.py"):
-            if path.name == "varset_self_join.py" or path.name in not_deciders:
+
+        def applies(node: ast.AST) -> bool:
+            """Whether this function CALLS the predicate -- not merely names it.
+
+            A substring match counts the `from ... import rule_refused_dimensions`
+            line, so deleting the guard below it leaves the import and the gate
+            passes. That is presence-not-application inside the gate written
+            against presence-not-application, and a mutation found it (#2621).
+            """
+            for n in ast.walk(node):
+                if isinstance(n, ast.Call):
+                    f = n.func
+                    if isinstance(f, ast.Name) and f.id in APPLIED:
+                        return True
+                    if isinstance(f, ast.Attribute) and f.attr in APPLIED:
+                        return True
+                # Reading the denylist directly is applying it; an `import` of the
+                # name is an ast.alias, never a Name load, so it cannot match here.
+                if isinstance(n, ast.Name) and n.id == "RULE_DIMENSIONS_REFUSED":
+                    return True
+            return False
+
+        offenders: list[str] = []
+        examined = 0
+        for path in sorted(root.rglob("*.py")):
+            if path.name == "varset_self_join.py":
                 continue
             src = path.read_text()
-            # A consumer is a file that reads an assignment rule to decide something.
-            if not re.search(r"assignment_rule|_rule_matches\(", src):
+            if not READS.search(src):
                 continue
-            if "rule_refused_dimensions" in src or "_rule_refused" in src:
-                continue
-            # Writers that only store or serialize the rule are not deciders.
-            if re.search(r"rule_refused_dimensions|RULE_DIMENSIONS_REFUSED", src):
-                continue
-            offenders.append(path.name)
+            tree = ast.parse(src)
+            funcs: dict[str, tuple[bool, set[str]]] = {}
+            readers: set[str] = set()
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                    continue
+                seg = ast.get_source_segment(src, node) or ""
+                called = {
+                    n.func.id
+                    for n in ast.walk(node)
+                    if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                }
+                funcs[node.name] = (applies(node), called)
+                if READS.search(seg):
+                    readers.add(node.name)
+
+            # Transitive closure within the module: a caller of a function that
+            # applies the predicate has applied it.
+            reaching = {n for n, (direct, _) in funcs.items() if direct}
+            changed = True
+            while changed:
+                changed = False
+                for name, (_, called) in funcs.items():
+                    if name not in reaching and called & reaching:
+                        reaching.add(name)
+                        changed = True
+
+            for name in sorted(readers):
+                examined += 1
+                if name in reaching or name in not_deciders:
+                    continue
+                offenders.append(f"{path.name}::{name}")
+
+        assert examined >= 9, (
+            f"only {examined} rule-reading function(s) examined; the matcher stopped "
+            "matching rather than the tree losing consumers"
+        )
         assert not offenders, (
             "these read an assignment rule without applying the refused-dimension "
             "predicate, so they can disagree with the matcher about who receives a "

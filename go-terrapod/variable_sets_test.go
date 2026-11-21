@@ -166,6 +166,54 @@ func TestDeleteVariableSet(t *testing.T) {
 
 // ── Association views (#1440) ────────────────────────────────────────
 
+func TestListVarsetWorkspacesCarriesTheExclusionReport(t *testing.T) {
+	// The SDK used to parse `data` and drop `meta` on the floor (#2621). That
+	// mattered more than an unread field usually does: the server's reason for
+	// ACCEPTING an exclusion that matches nothing is that this report flags it
+	// rather than the write refusing a rule that is merely premature — and the
+	// report reached a raw curl and nothing else.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[
+			{"id":"ws-a","type":"workspaces","attributes":{"name":"alpha","assignment-source":"rule"}}
+		],"meta":{"pagination":{"current-page":1},"exclusion":{"excluded":3,"empty":[1]}}}`))
+	}))
+	defer srv.Close()
+
+	rows, meta, err := mustClient(t, srv).ListVarsetWorkspaces(context.Background(), "varset-1")
+	if err != nil {
+		t.Fatalf("ListVarsetWorkspaces: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want 1 row, got %d", len(rows))
+	}
+	if !meta.Present {
+		t.Error("meta.exclusion was present in the body and Present is false")
+	}
+	if meta.Excluded != 3 {
+		t.Errorf("want Excluded 3, got %d", meta.Excluded)
+	}
+	if len(meta.Empty) != 1 || meta.Empty[0] != 1 {
+		t.Errorf("want Empty [1], got %v", meta.Empty)
+	}
+}
+
+func TestAnUnparseableBodyDoesNotInventAnExclusionReport(t *testing.T) {
+	// Present must never be true on a guess: an operator reads it to decide
+	// whether "0 excluded" means "nothing matched" or "there is no exclusion".
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[],"meta":{"exclusion":"not an object"}}`))
+	}))
+	defer srv.Close()
+
+	_, meta, err := mustClient(t, srv).ListVarsetWorkspaces(context.Background(), "varset-1")
+	if err != nil {
+		t.Fatalf("ListVarsetWorkspaces: %v", err)
+	}
+	if meta.Present {
+		t.Errorf("invented a report from an unparseable meta: %+v", meta)
+	}
+}
+
 func TestListVarsetWorkspacesCarriesTheSource(t *testing.T) {
 	// The source is the point of the endpoint, not decoration: it tells a
 	// consumer which rows it may offer to unbind and which are derived.
@@ -185,12 +233,15 @@ func TestListVarsetWorkspacesCarriesTheSource(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := mustClient(t, srv).ListVarsetWorkspaces(context.Background(), "varset-1")
+	got, meta, err := mustClient(t, srv).ListVarsetWorkspaces(context.Background(), "varset-1")
 	if err != nil {
 		t.Fatalf("ListVarsetWorkspaces: %v", err)
 	}
 	if len(got) != 2 {
 		t.Fatalf("want 2 workspaces, got %d", len(got))
+	}
+	if meta.Present {
+		t.Errorf("a response with no meta.exclusion must report Present false, got %+v", meta)
 	}
 	if got[0].AssignmentSource != AssignmentExplicit || got[1].AssignmentSource != AssignmentRuleBased {
 		t.Errorf("sources not carried through: %+v", got)
@@ -304,7 +355,7 @@ func TestAssociationViewsSurfaceServerErrors(t *testing.T) {
 	defer srv.Close()
 	c := mustClient(t, srv)
 
-	if _, err := c.ListVarsetWorkspaces(context.Background(), "varset-1"); err == nil {
+	if _, _, err := c.ListVarsetWorkspaces(context.Background(), "varset-1"); err == nil {
 		t.Error("ListVarsetWorkspaces swallowed a 403")
 	}
 	if _, err := c.ListWorkspaceVarsets(context.Background(), "ws-1"); err == nil {

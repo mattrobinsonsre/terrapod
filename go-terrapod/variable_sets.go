@@ -270,15 +270,41 @@ func variableSetFromResource(res *Resource) *VariableSet {
 // receives this" — and it is not answerable from WorkspaceCount alone, which
 // counts only explicitly-assigned rows. A global or rule-based set applies to
 // workspaces that appear in no assignment table at all.
-func (c *Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]VarsetWorkspace, error) {
+// VarsetExclusionMeta is what a rule's `exclude` did, from the response `meta`.
+//
+// Carried because the server's reason for ACCEPTING an exclusion that matches
+// nothing is that the report flags it rather than the write refusing it — a
+// standing rule may come to match later, so refusing at save time would reject a
+// rule that is merely premature. That reason only holds if the report reaches
+// somebody, and this method used to parse `data` and drop `meta` on the floor,
+// which left it true for a raw curl and nothing else.
+type VarsetExclusionMeta struct {
+	// Present is false when the set has no usable exclusion at all: it is
+	// global, has no rule, the rule has no `exclude`, or the rule names a
+	// refused dimension and so matches nothing. Zero values are ambiguous
+	// otherwise — "nothing was excluded" and "there is nothing to exclude
+	// with" are different answers and an operator acts on them differently.
+	Present bool
+	// Excluded counts workspaces the exclusion removed FROM THE RULE MATCH.
+	// It is not "workspaces that stopped receiving the set": one that is also
+	// assigned explicitly still receives it, and still appears in the rows
+	// beside this with AssignmentSource "explicit".
+	Excluded int
+	// Empty holds the indices of `exclude` entries matching no workspace at
+	// all. Not an error — see the type comment — but worth surfacing, because
+	// an entry that matches nothing silently widens the rule.
+	Empty []int
+}
+
+func (c *Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]VarsetWorkspace, VarsetExclusionMeta, error) {
 	data, err := c.Get(ctx, fmt.Sprintf(
 		"/api/v1/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)))
 	if err != nil {
-		return nil, err
+		return nil, VarsetExclusionMeta{}, err
 	}
 	resources, err := ParseResourceList(data)
 	if err != nil {
-		return nil, err
+		return nil, VarsetExclusionMeta{}, err
 	}
 	out := make([]VarsetWorkspace, 0, len(resources))
 	for i := range resources {
@@ -288,7 +314,27 @@ func (c *Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]V
 			AssignmentSource: GetStringAttr(&resources[i], "assignment-source"),
 		})
 	}
-	return out, nil
+	return out, parseVarsetExclusionMeta(data), nil
+}
+
+// parseVarsetExclusionMeta reads `meta.exclusion`, absent on most responses.
+func parseVarsetExclusionMeta(data []byte) VarsetExclusionMeta {
+	var body struct {
+		Meta struct {
+			Exclusion *struct {
+				Excluded int   `json:"excluded"`
+				Empty    []int `json:"empty"`
+			} `json:"exclusion"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(data, &body); err != nil || body.Meta.Exclusion == nil {
+		return VarsetExclusionMeta{}
+	}
+	return VarsetExclusionMeta{
+		Present:  true,
+		Excluded: body.Meta.Exclusion.Excluded,
+		Empty:    body.Meta.Exclusion.Empty,
+	}
 }
 
 // ListWorkspaceVarsets returns every variable set applying to a workspace, and

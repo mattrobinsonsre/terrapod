@@ -1077,7 +1077,11 @@
       "configureOnlyHint": "仅交付给配置，对 plan 和 apply 都隐藏。机群自身的凭据 — 通往设备的 SSH 密钥、become 口令 — 与这两者都无关。",
       "phaseSlotExclusive": "一个变量一次只占用一个槽位。“仅 apply”会到达 apply 和配置；“仅配置”只会到达配置。",
       "configureOnlyLead": "仅交付给配置，对 plan 和 apply 都隐藏。",
-      "applyOnlyLead": "对 plan 隐藏，仅交付给 apply。"
+      "applyOnlyLead": "对 plan 隐藏，仅交付给 apply。",
+      "ruleExclude": "排除",
+      "ruleExcludeEntries": "{count, plural, one {# 个条件} other {# 个条件}}",
+      "exclusionRemoved": "{count, plural, one {此变量集的排除条件使 # 个工作区不再属于规则匹配结果} other {此变量集的排除条件使 # 个工作区不再属于规则匹配结果}}。已显式分配的工作区仍会获得该变量集。",
+      "exclusionEmpty": "{count, plural, one {排除条目 {indices} 未匹配任何工作区} other {排除条目 {indices} 未匹配任何工作区}}，因此目前还没有缩小任何范围。"
     }
   },
   "adminAutodiscovery": {
