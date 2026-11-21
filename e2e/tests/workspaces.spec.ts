@@ -892,7 +892,13 @@ test.describe("Workspaces", () => {
     expect(seen[0]).toContain("(2)");
     expect(posts, "declining the confirm must send nothing").toEqual([]);
 
-    // Enter on an item hands focus back to the trigger before the confirm opens.
+    // Enter on an item closes the menu and leaves focus on the trigger.
+    //
+    // It does NOT prove the close happens BEFORE the action, which an earlier
+    // version of this comment claimed: React batches state updates inside the
+    // handler, so swapping the two lines passes here just the same. That order
+    // is real and load-bearing, and it is pinned where it is visible --
+    // `web/tests/menu-close-before-run.test.ts`, which reads the source.
     const trigger = page.getByTestId("ws-selection");
     await trigger.click();
     await page.getByTestId("ws-selection-apply").focus();
