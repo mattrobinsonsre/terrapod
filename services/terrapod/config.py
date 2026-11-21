@@ -3482,8 +3482,12 @@ class BackupConfig(BaseModel):
 
     prefix: str = Field(
         default="backups/",
-        description="Object-store key prefix backups are written under; not under a "
-        "workspace-scoped prefix (state/, plans/, logs/, config/, runs/, inventory/)",
+        description="Object-store key prefix backups are written under. Normalised to "
+        "one trailing slash with no leading './' or '/'. Give it a prefix of its own: "
+        "one under a workspace-scoped prefix (state/, plans/, logs/, config/, runs/, "
+        "inventory/) would be read as a workspace's objects, and one under a prefix "
+        "Terrapod sweeps by age (vcs_archives/) would be deleted on that schedule. "
+        "Both are refused",
     )
     retention_keep: int = Field(
         default=0,

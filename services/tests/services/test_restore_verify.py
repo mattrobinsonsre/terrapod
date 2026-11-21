@@ -61,17 +61,15 @@ async def test_latest_backup_key_picks_newest(monkeypatch):
     ]
     store = _FakeStore(keys)
     monkeypatch.setattr(rv, "get_storage", lambda: store)
-    monkeypatch.setattr(rv.settings, "backup", type("B", (), {"prefix": "backups/"})())
-    assert await rv._latest_backup_key() == "backups/20260103T000000Z.dump"
+    assert await rv._latest_backup_key("backups/") == "backups/20260103T000000Z.dump"
 
 
 @pytest.mark.asyncio
 async def test_latest_backup_key_errors_when_empty(monkeypatch):
     store = _FakeStore(["backups/notes.txt"])
     monkeypatch.setattr(rv, "get_storage", lambda: store)
-    monkeypatch.setattr(rv.settings, "backup", type("B", (), {"prefix": "backups/"})())
     with pytest.raises(RuntimeError):
-        await rv._latest_backup_key()
+        await rv._latest_backup_key("backups/")
 
 
 @pytest.mark.asyncio
@@ -131,3 +129,78 @@ async def test_an_unreadable_location_is_a_drill_failure(monkeypatch):
     failures = await rv._verify_invariants("postgresql+asyncpg://scratch/db")
 
     assert any(f.startswith("eu-west:") for f in failures)
+
+
+class TestTheBackupPrefixIsRefusedEarly:
+    """`restore_verify` must refuse a bad `backup.prefix` the way `backup` does.
+
+    It used to resolve it inside `_latest_backup_key`, which is an untested call
+    site three ways over (#2621): every test drove the helper directly, the call is
+    SKIPPED entirely when `TP_RESTORE_KEY` names a key, and it runs after
+    `init_storage()` and `mkstemp` -- so the refusal was late, skippable, and
+    arrived as an uncaught `ValueError` traceback rather than the one-line error
+    the operator doc promises of both jobs.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _target(self, monkeypatch):
+        monkeypatch.setenv("TP_RESTORE_TARGET_URL", "postgresql://u@h:5432/throwaway")
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("TP_RESTORE_KEY", raising=False)
+
+    @pytest.fixture
+    def never_starts(self, monkeypatch):
+        """Anything past the refusal must not run."""
+        reached = MagicMock()
+        monkeypatch.setattr(rv, "init_storage", AsyncMock(side_effect=reached))
+        return reached
+
+    @pytest.mark.parametrize("prefix", ["state/", "vcs_archives/", "", "./"])
+    async def test_a_bad_prefix_exits_one_before_storage_is_touched(
+        self, monkeypatch, never_starts, prefix
+    ):
+        monkeypatch.setattr(rv.settings, "backup", type("B", (), {"prefix": prefix})())
+        with pytest.raises(SystemExit) as exc:
+            await rv.restore_verify()
+        assert exc.value.code == 1
+        never_starts.assert_not_called()
+
+    async def test_it_is_refused_even_when_the_key_is_named(self, monkeypatch, never_starts):
+        """The branch that reads the latest key is skipped; the refusal is not."""
+        monkeypatch.setenv("TP_RESTORE_KEY", "backups/20260101T000000Z.dump")
+        monkeypatch.setattr(rv.settings, "backup", type("B", (), {"prefix": "state/"})())
+        with pytest.raises(SystemExit) as exc:
+            await rv.restore_verify()
+        assert exc.value.code == 1
+        never_starts.assert_not_called()
+
+    async def test_the_refusal_is_one_line_and_names_the_setting(self, monkeypatch, never_starts):
+        """Not a traceback: an uncaught ValueError is what this replaced."""
+        log = MagicMock()
+        monkeypatch.setattr(rv, "logger", log)
+        monkeypatch.setattr(rv.settings, "backup", type("B", (), {"prefix": "state/"})())
+        with pytest.raises(SystemExit):
+            await rv.restore_verify()
+        assert log.error.call_count == 1
+        assert "backup.prefix" in str(log.error.call_args)
+
+    async def test_the_normalised_prefix_is_what_reaches_the_listing(self, monkeypatch):
+        """`./backups/` must list `backups/`, or the drill reports no backups found
+        on a store that holds them."""
+        store = _FakeStore(["backups/20260101T000000Z.dump"])
+        monkeypatch.setattr(rv, "get_storage", lambda: store)
+        monkeypatch.setattr(rv.settings, "backup", type("B", (), {"prefix": "./backups/"})())
+
+        seen: list[str] = []
+        original = store.list_prefix
+
+        async def record(prefix, **kw):
+            seen.append(prefix)
+            return await original(prefix, **kw)
+
+        store.list_prefix = record
+        from terrapod.storage.keys import shared_prefix
+
+        prefix = shared_prefix("backup.prefix", rv.settings.backup.prefix)
+        assert await rv._latest_backup_key(prefix) == "backups/20260101T000000Z.dump"
+        assert seen == ["backups/"]

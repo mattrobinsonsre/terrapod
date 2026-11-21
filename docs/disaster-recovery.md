@@ -217,8 +217,22 @@ identity. It works across S3 / Azure / GCS / filesystem and across
 static-password **and** cloud-IAM database auth (it mints the same short-lived
 token the API uses).
 
-`prefix` must not sit under a workspace-scoped one (`state/`, `plans/`, `logs/`,
-`config/`, `runs/`, `inventory/`): the job refuses to start with it.
+**Give `prefix` a prefix of its own.** It is normalised to one trailing slash
+with no leading `./` or `/`, and both jobs refuse to start on one they cannot
+accept, with a one-line error naming the setting:
+
+| refused | why |
+|---|---|
+| a workspace-scoped prefix (`state/`, `plans/`, `logs/`, `config/`, `runs/`, `inventory/`) | its objects would be read as a workspace's |
+| a prefix Terrapod sweeps by age (`vcs_archives/`) | everything there is deleted on that prefix's own schedule — `vcs.archive_cache_retention_days`, 7 days by default — with no filter on what the objects are, so the dumps go with it |
+| nothing at all (`""`, `.`, `/`) | the dumps would land at the store's root, which the filesystem backend refuses outright, and the retention sweep would list every object in the store |
+
+**Not being on that list is not the same as being safe.** The other prefixes
+hold Terrapod's own objects — `cache/`, `uploads/`, `registry/`, `oci/`,
+`policies/`, `module_overrides/` — and nothing sweeps them by age, so dumps put
+there are not deleted; they are merely mixed in with unrelated data, which makes
+both the retention count and any bucket-level policy harder to reason about. A
+prefix nobody else writes to costs nothing and avoids the question.
 
 This is a **logical** dump: RPO is the dump interval, not point-in-time. Treat
 it as the floor — for tighter RPO keep using RDS snapshots / WAL-G / pgBackRest

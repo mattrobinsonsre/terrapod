@@ -60,9 +60,14 @@ def _async_dsn(url: str) -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
-async def _latest_backup_key() -> str:
-    cfg = settings.backup
-    prefix = shared_prefix("backup.prefix", cfg.prefix)
+async def _latest_backup_key(prefix: str) -> str:
+    """The newest dump under an ALREADY-NORMALISED prefix.
+
+    Takes the prefix rather than resolving it, because `restore_verify` must refuse
+    a bad one before it reaches here: this call is skipped entirely when
+    `TP_RESTORE_KEY` names a key, and it runs after `init_storage()` and `mkstemp`,
+    so resolving it here made the refusal both skippable and late (#2621).
+    """
     entries = [m for m in await get_storage().list_prefix(prefix) if m.key.endswith(".dump")]
     if not entries:
         raise RuntimeError(f"no backups found under {prefix!r}")
@@ -203,6 +208,17 @@ async def restore_verify() -> None:
         logger.error("TP_RESTORE_TARGET_URL must not equal DATABASE_URL — refusing")
         sys.exit(1)
 
+    # Before init_storage and the tempfile, and NOT inside the branch that reads the
+    # latest key: the drill has to refuse a bad prefix however it was told which dump
+    # to use, and a one-line error beats the traceback an uncaught ValueError gave.
+    # `backup.py` already refuses the same way, which is what the operator doc claims
+    # of both jobs.
+    try:
+        prefix = shared_prefix("backup.prefix", settings.backup.prefix)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+
     target_async = _async_dsn(target)
     target_libpq = _libpq_dsn(target)
 
@@ -211,7 +227,7 @@ async def restore_verify() -> None:
     fd, tmp_path = tempfile.mkstemp(suffix=".dump", dir=_resolve_tmpdir())
     os.close(fd)
     try:
-        key = os.environ.get("TP_RESTORE_KEY", "").strip() or await _latest_backup_key()
+        key = os.environ.get("TP_RESTORE_KEY", "").strip() or await _latest_backup_key(prefix)
         logger.info("Restoring backup %s", key)
         await _download(key, tmp_path)
 
