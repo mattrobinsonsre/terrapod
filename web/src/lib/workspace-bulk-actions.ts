@@ -1,7 +1,7 @@
 // Which bulk run actions a selection can take. The server's answer (`actions`) decides;
 // this adds only the lock and the workspace's declared operations.
 
-import { isCompositeRun, isConfigureOnlyRun, isPlanApplyRun } from './run-badges.ts'
+import { isCompositeRun, isConfigureOnlyRun, isPlanApplyRun } from './run-kinds.ts'
 
 export type BulkActionId = 'plan' | 'retry' | 'cancel' | 'apply' | 'discard'
 

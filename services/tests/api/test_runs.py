@@ -4,6 +4,7 @@ import json
 import textwrap
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -1995,6 +1996,153 @@ class TestRetryRun:
                 )
             assert resp.status_code == 201, is_destroy
             assert mock_create_run.await_args.kwargs["is_destroy"] is is_destroy
+
+
+class TestRetryResolvesACompositeFromTheWorkspace:
+    """What a COMPOSITE retry asks for, which nothing drove before (#2621).
+
+    The bulk menu requires `planApplyEnabled && configureEnabled` to offer Retry
+    on a composite run, and `docs/getting-started.md` stated that as the SERVER's
+    rule. It is not: the route deliberately does not carry the composite flag
+    forward, so the shape is resolved from the workspace's CURRENT
+    `configure_after_apply`, and `require_run_operations` then demands the flags
+    for whatever shape that resolved to. The two rules therefore agree only while
+    the workspace still declares the composite -- and they were asserted to agree
+    in prose and nowhere else.
+
+    The UI is the stricter of the two, so it fails closed and nobody is offered an
+    action the server refuses. That is worth keeping AS a measurement rather than
+    as a claim, which is what these are.
+    """
+
+    async def _retry(self, *, is_configure: bool, configure_after_apply: bool):
+        original = _mock_run(status="errored")
+        original.is_destroy = False
+        original.is_configure = is_configure
+        original.configure_after_apply = configure_after_apply
+        original.ansible_limit = ""
+        original.playbook = ""
+        ws = _mock_workspace(ws_id=original.workspace_id)
+        new_run = _mock_run(status="pending", ws_id=ws.id)
+        create = AsyncMock(return_value=new_run)
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch(
+                "terrapod.api.routers.runs.run_service.get_run", AsyncMock(return_value=original)
+            ),
+            patch("terrapod.api.routers.runs.run_service.create_run", create),
+            patch(
+                "terrapod.api.routers.runs.run_service.queue_run", AsyncMock(return_value=new_run)
+            ),
+            patch(
+                "terrapod.api.routers.runs.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps_for_level("admin")),
+            ),
+        ):
+            app, mock_db = _make_app(_user())
+            mock_db.get.return_value = ws
+            cv_result = MagicMock()
+            cv_result.scalar_one_or_none.return_value = uuid.uuid4()
+            mock_db.execute.return_value = cv_result
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{original.id}/actions/retry", headers=_AUTH
+                )
+        return resp, create
+
+    async def test_a_composite_retry_does_not_carry_its_own_configure_flags(self):
+        """So the workspace decides the shape, not the run being retried."""
+        resp, create = await self._retry(is_configure=True, configure_after_apply=True)
+        assert resp.status_code == 201
+        kwargs = create.await_args.kwargs
+        assert kwargs["is_configure"] is False, (
+            "a composite carried its standalone flag forward, which pins the retry "
+            "to a shape the workspace may no longer declare"
+        )
+        assert "configure_after_apply" not in kwargs, (
+            "passing it would pin the retry to the setting at the time of the "
+            "original run; the resolver reads the workspace instead"
+        )
+
+    async def test_a_standalone_configure_retry_does_carry_its_flag(self):
+        """The asymmetry is the point, and only the pair pins it.
+
+        A standalone configure that dropped the flag would come back as an
+        ordinary apply -- refused on a configure-only workspace, and an apply
+        nobody asked for on a workspace with both.
+        """
+        resp, create = await self._retry(is_configure=True, configure_after_apply=False)
+        assert resp.status_code == 201
+        assert create.await_args.kwargs["is_configure"] is True
+
+    async def test_a_plain_run_retry_asks_for_no_configure_at_all(self):
+        resp, create = await self._retry(is_configure=False, configure_after_apply=False)
+        assert resp.status_code == 201
+        assert create.await_args.kwargs["is_configure"] is False
+
+
+class TestTheRuleTheBulkMenuRestates:
+    """`require_run_operations` per resolved shape, which is what the menu mirrors.
+
+    Driven directly rather than through the route because the route patches
+    `create_run`, and this is the rule INSIDE it. Together with the class above
+    -- which pins what the route hands it -- the pair is what makes the menu's
+    rule checkable instead of a sentence in a doc.
+    """
+
+    @staticmethod
+    def _ws(*, plan_apply: bool, configure: bool):
+        return SimpleNamespace(
+            id=uuid.uuid4(), plan_apply_enabled=plan_apply, configure_enabled=configure
+        )
+
+    @pytest.mark.parametrize(
+        ("shape", "plan_apply", "configure", "allowed"),
+        [
+            # (is_configure, configure_after_apply)
+            ((False, False), True, False, True),  # plain run: configure is irrelevant
+            ((False, False), False, True, False),
+            ((True, False), False, True, True),  # standalone configure: plan/apply irrelevant
+            ((True, False), True, False, False),
+            ((True, True), True, True, True),  # composite: BOTH
+            ((True, True), True, False, False),
+            ((True, True), False, True, False),
+        ],
+    )
+    def test_the_rule_per_shape(self, shape, plan_apply, configure, allowed):
+        from terrapod.services import workspace_settings
+
+        ws = self._ws(plan_apply=plan_apply, configure=configure)
+        call = lambda: workspace_settings.require_run_operations(  # noqa: E731
+            ws, is_configure=shape[0], configure_after_apply=shape[1]
+        )
+        if allowed:
+            call()
+        else:
+            with pytest.raises(ValueError):
+                call()
+
+    def test_a_composite_needs_plan_apply_too_which_a_standalone_does_not(self):
+        """The one asymmetry the menu's single rule flattens.
+
+        A standalone configure on a workspace with plan/apply OFF is permitted;
+        a composite on the same workspace is not. The menu requires both for a
+        composite and configure-only for a standalone, which matches -- it is the
+        case where the WORKSPACE has since dropped `configure_after_apply` that
+        the two part company, and there the server is the more permissive.
+        """
+        from terrapod.services import workspace_settings
+
+        ws = self._ws(plan_apply=False, configure=True)
+        workspace_settings.require_run_operations(
+            ws, is_configure=True, configure_after_apply=False
+        )
+        with pytest.raises(ValueError):
+            workspace_settings.require_run_operations(
+                ws, is_configure=True, configure_after_apply=True
+            )
 
 
 class TestRetryNeedsWhatCreatingTheRunNeeds:

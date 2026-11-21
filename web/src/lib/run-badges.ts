@@ -67,9 +67,6 @@ export function primaryRunBadge(
  * hint then describes the standalone case, and a standalone configure is the
  * run somebody is likelier to be looking at on a configure-only workspace.
  */
-export function isCompositeRun(run: RunBadgeInput): boolean {
-  return run.runKind === 'full'
-}
 
 /**
  * Whether the configure badge is shown.
@@ -87,12 +84,3 @@ export function showsConfigureBadge(run: RunBadgeInput): boolean {
   return Boolean(run.isConfigure)
 }
 
-/** Whether the run is a standalone configure: no plan or apply half. */
-export function isConfigureOnlyRun(run: RunBadgeInput): boolean {
-  return run.runKind === 'configure'
-}
-
-/** Whether the run is a plan/apply run with no configure half; `false` where the kind is absent or new. */
-export function isPlanApplyRun(run: RunBadgeInput): boolean {
-  return run.runKind === 'plan_apply'
-}

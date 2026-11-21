@@ -208,10 +208,19 @@ It has no default action; choosing an item runs it:
 | Action | Applies to | Asks first |
 |---|---|---|
 | **Plan** | a workspace with plan/apply enabled; queues a plan-only run | on a touch screen |
-| **Retry run** | the server says the latest run can be retried; a configure run needs configure enabled and an unlocked workspace, a combined apply-and-configure run needs both enabled and an unlocked workspace, any other needs plan/apply enabled | on every pointer when it can apply, on a touch screen when every selected run is plan-only and not a destroy |
+| **Retry run** | the server says the latest run can be retried, and **the menu** additionally requires: a configure run needs configure enabled and an unlocked workspace, a combined apply-and-configure run needs both enabled and an unlocked workspace, any other needs plan/apply enabled | on every pointer when it can apply, on a touch screen when every selected run is plan-only and not a destroy |
 | **Cancel run** | the server says the latest run can be cancelled | on a touch screen |
 | **Apply** | the server says the latest run can be confirmed; not on a locked workspace | always |
 | **Discard** | the server says the latest run can be discarded, including a run held after its plan | always |
+
+**The Retry conditions above are the menu's, not the server's**, and the menu is
+the stricter of the two on one shape. A retry of a combined apply-and-configure
+run does not carry that run's own configure flag forward: the server resolves the
+shape from the workspace's *current* declaration, so if the workspace has since
+stopped declaring a configure-after-apply, the retry is an ordinary apply and
+needs only plan/apply enabled. The menu asks for both either way. It therefore
+refuses a little more than the server would, which is the safe direction — it
+never offers an action that would be rejected on press.
 
 Each item shows `N of M eligible`, and is enabled only when every selected
 workspace qualifies. Each asks for confirmation first, showing the count and the

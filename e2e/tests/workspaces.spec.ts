@@ -1110,6 +1110,102 @@ test.describe("Workspaces", () => {
     await expect(result).toContainText(`${prefix}-b: Request failed (500)`);
     await page.unrouteAll({ behavior: "ignoreErrors" });
   });
+
+  /**
+   * The page's own read of `configure-enabled`, which only an e2e can reach.
+   *
+   * `workspace-bulk-actions.ts` is pinned at the unit tier -- two named tests
+   * fail if either `w.configureEnabled` is hardcoded there. But the PLUMBING
+   * that fills it, `page.tsx`'s `configureEnabled: w.attributes['configure-enabled']
+   * === true`, is in a `.tsx`, and `web/tests` runs under bare `node --test`
+   * with no transpiler, so nothing there can import it. Hardcoding the flag at
+   * THAT line passed every test: no existing row is configure-shaped, because
+   * `stubLatestRun` defaults a run to `plan_apply` and the retry rule only
+   * consults the flag on a configure or composite run (#2621).
+   *
+   * So the pair below is the gate, and it needs both halves: the refusal alone
+   * passes if the flag is hardcoded false, and the eligibility alone passes if
+   * it is hardcoded true.
+   */
+  const compositeRetryRow = async (page: Page, prefix: string, configureEnabled: boolean) => {
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    await stubLatestRun(
+      page,
+      [id],
+      () => ({
+        status: "errored",
+        // A composite: an apply followed by a configure. This is the shape whose
+        // Retry rule reads `configureEnabled` at all.
+        "run-kind": "full",
+        actions: { ...NO_ACTIONS, "is-retryable": true },
+      }),
+      { "configure-enabled": configureEnabled },
+    );
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+    return page.getByTestId("ws-selection-retry");
+  };
+
+  test("Retry refuses a combined run on a workspace with configure disabled", async ({ page }) => {
+    const retry = await compositeRetryRow(page, uniqueName("e2e-sel-cfg-off"), false);
+    await expect(retry).toHaveAttribute("aria-disabled", "true");
+    await expect(retry).toContainText("0 of 1 eligible");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
+  test("and offers the same run once configure is enabled", async ({ page }) => {
+    const retry = await compositeRetryRow(page, uniqueName("e2e-sel-cfg-on"), true);
+    await expect(retry).toHaveAttribute("aria-disabled", "false");
+    await expect(retry).toContainText("1 of 1 eligible");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
+  /**
+   * The selection is frozen while it is the input to something already running.
+   *
+   * The boxes used to stay live, and the completion handler filters the
+   * selection down to the workspaces that FAILED -- so a row ticked mid-batch
+   * was in the selection, absent from the results, and silently cleared: never
+   * acted on, never reported, and gone from the screen as if it had been
+   * (#2621). Freezing them removes the state rather than papering over it, and
+   * then the filter is correct by construction because nothing can be added.
+   */
+  test("row and header checkboxes are off while a bulk action is in flight", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-frozen");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    await stubLatestRun(page, [id], () => ({
+      status: "errored",
+      actions: { ...NO_ACTIONS, "is-retryable": true },
+    }));
+    // Hold the action open so the in-flight state can be observed at all.
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    await page.route("**/api/v1/runs/*/actions/retry", async (route) => {
+      await held;
+      await route.fulfill({ status: 200, contentType: "application/vnd.api+json", body: "{}" });
+    });
+
+    await listOnly(page, prefix, 1);
+    const row = page.getByTestId("ws-row-select");
+    const all = page.getByTestId("ws-select-all");
+    await expect(row).toBeEnabled();
+    await row.check();
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-retry").click();
+
+    await expect(row).toBeDisabled();
+    await expect(all).toBeDisabled();
+    release();
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Retry run: 1 of 1", { timeout: 15_000 });
+    // And back on afterwards: a frozen selection that never thaws is worse.
+    await expect(row).toBeEnabled();
+    await expect(all).toBeEnabled();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
 });
 
 test.describe("Workspaces: bulk confirmations at tablet width with a touch pointer", () => {

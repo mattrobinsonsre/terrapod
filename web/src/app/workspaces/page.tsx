@@ -172,11 +172,13 @@ function RowCheckbox({
   name,
   checked,
   onToggle,
+  disabled,
 }: {
   id: string
   name: string
   checked: boolean
   onToggle: (id: string) => void
+  disabled: boolean
 }) {
   const t = useTranslations('workspaces')
   return (
@@ -184,6 +186,7 @@ function RowCheckbox({
       <Checkbox
         checked={checked}
         onChange={() => onToggle(id)}
+        disabled={disabled}
         ariaLabel={t('bulk.selectRow', { name })}
         testId="ws-row-select"
       />
@@ -194,9 +197,11 @@ function RowCheckbox({
 function HeaderCheckbox({
   state,
   onToggle,
+  disabled,
 }: {
   state: 'none' | 'some' | 'all'
   onToggle: () => void
+  disabled: boolean
 }) {
   const t = useTranslations('workspaces')
   return (
@@ -205,6 +210,7 @@ function HeaderCheckbox({
         checked={state === 'all'}
         indeterminate={state === 'some'}
         onChange={onToggle}
+        disabled={disabled}
         ariaLabel={t('bulk.selectAll')}
         testId="ws-select-all"
       />
@@ -221,6 +227,7 @@ function WorkspaceGroupRows({
   setFilterInput,
   selected,
   onToggleRow,
+  selectionFrozen,
   depth = 0,
 }: {
   groups: WorkspaceGroup[]
@@ -231,6 +238,8 @@ function WorkspaceGroupRows({
   setFilterInput: (v: string) => void
   selected: ReadonlySet<string>
   onToggleRow: (id: string) => void
+  /** Frozen while a bulk action is in flight; see `runBulk`. */
+  selectionFrozen: boolean
   depth?: number
 }) {
   const t = useTranslations('workspaces')
@@ -270,7 +279,13 @@ function WorkspaceGroupRows({
               const { def, runId, phaseStarts } = resolveStatus(ws)
               return (
                 <tr key={item.id} className="hover:bg-slate-700/20 transition-colors border-t border-slate-700/30">
-                  <RowCheckbox id={item.id} name={item.name} checked={selected.has(item.id)} onToggle={onToggleRow} />
+                  <RowCheckbox
+                    id={item.id}
+                    name={item.name}
+                    checked={selected.has(item.id)}
+                    onToggle={onToggleRow}
+                    disabled={selectionFrozen}
+                  />
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1.5" style={{ paddingLeft: `${(depth + 1) * 16}px` }}>
                       <Link
@@ -354,6 +369,7 @@ function WorkspaceGroupRows({
                 setFilterInput={setFilterInput}
                 selected={selected}
                 onToggleRow={onToggleRow}
+                selectionFrozen={selectionFrozen}
                 depth={depth + 1}
               />
             )}
@@ -2707,7 +2723,7 @@ function WorkspacesPageInner() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <HeaderCheckbox state={selectionHeader} onToggle={toggleAllRows} />
+                  <HeaderCheckbox state={selectionHeader} onToggle={toggleAllRows} disabled={bulkBusy} />
                   <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('table.mode')} sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
                   <SortableHeader label={t('table.pool')} sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
@@ -2726,6 +2742,7 @@ function WorkspacesPageInner() {
                   setFilterInput={setFilterInput}
                   selected={selected}
                   onToggleRow={toggleRow}
+                  selectionFrozen={bulkBusy}
                 />
               </tbody>
             </table>
@@ -2735,7 +2752,7 @@ function WorkspacesPageInner() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <HeaderCheckbox state={selectionHeader} onToggle={toggleAllRows} />
+                  <HeaderCheckbox state={selectionHeader} onToggle={toggleAllRows} disabled={bulkBusy} />
                   <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('table.mode')} sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
                   <SortableHeader label={t('table.pool')} sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
@@ -2749,7 +2766,13 @@ function WorkspacesPageInner() {
                   const { def, runId, phaseStarts } = resolveStatus(ws)
                   return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
-                    <RowCheckbox id={ws.id} name={ws.attributes.name} checked={selected.has(ws.id)} onToggle={toggleRow} />
+                    <RowCheckbox
+                      id={ws.id}
+                      name={ws.attributes.name}
+                      checked={selected.has(ws.id)}
+                      onToggle={toggleRow}
+                      disabled={bulkBusy}
+                    />
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1.5">
                         <Link
