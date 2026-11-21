@@ -76,7 +76,10 @@ MAX_VALUE_LENGTH = 120
 MAX_NAME_LENGTH = 200
 
 #: Scan steps one build may spend hiding secrets; running out while building the secret matcher
-#: hides the whole list, running out later hides only the entries after that point.
+#: hides the whole list. Running out later hides every entry after the one being built -- and that
+#: entry keeps whatever had already been scanned, which can mean its attributes but not its address,
+#: since the address is capped last in the dict literal and so falls off the end first. Nothing that
+#: is shown went unscanned, which is what makes a partial entry acceptable rather than a leak.
 MAX_SCRUB_STEPS = 1_000_000
 
 #: Most registered secrets and escaped forms in one build; past it everything is hidden.

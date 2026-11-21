@@ -960,6 +960,111 @@ class TestADeeplyEscapedLeafIsHidden:
         assert self._after("a", "x" + "\\" * 7 + "y") == "x" + "\\" * 7 + "y"
 
 
+class TestTheBudgetBoundaryIsPartial:
+    """What the ENTRY being built when the budget runs out keeps.
+
+    `plan_resource_list.py` and `docs/vcs-workflows.md` both said an overrun
+    hides "only the entries after that point", which reads as a clean cut
+    between whole entries. It is not: the entry under construction keeps
+    whatever had already been scanned, and because the attribute loop runs
+    before `"address": _cap(...)` in the dict literal, the address is capped
+    LAST and so falls off the end FIRST. An entry can therefore carry a real
+    attribute value under an address reading `(sensitive value)` (#2629).
+
+    Not a leak, and that is the reason to pin it rather than change it:
+    everything retained was scanned against the complete matcher, so nothing
+    unscanned is ever shown. What was wrong was the sentence, and nothing held
+    the sentence to the shape -- reordering the dict literal would silently make
+    it true and these tests fail, which is the right way round.
+    """
+
+    @staticmethod
+    def _entry_at(monkeypatch, steps: int):
+        from terrapod.services import plan_resource_list as prl
+
+        monkeypatch.setattr(prl, "MAX_SCRUB_STEPS", steps)
+        raw = _plan(_rc("aws_instance.web", ["update"], {"ami": "old"}, {"ami": "plain text here"}))
+        result = build_resource_list(raw, ["secret-value"])
+        if not result or not result["entries"]:
+            return None
+        return result["entries"][0]
+
+    def test_an_entry_can_keep_a_whole_attribute_under_a_hidden_address(self, monkeypatch):
+        """The exact shape the corrected sentence claims.
+
+        Searched rather than hardcoded: the budget at which it happens is an
+        artefact of how many scan steps this fixture costs, so pinning the
+        number would make the test fail on any unrelated change to the scanner
+        while saying nothing about the property.
+        """
+        from terrapod.services import plan_resource_list as prl
+
+        found = []
+        for steps in range(1, 600):
+            entry = self._entry_at(monkeypatch, steps)
+            if entry is None:
+                continue
+            attrs = entry.get("attributes") or []
+            if (
+                entry["address"] == prl.PLACEHOLDER
+                and attrs
+                and attrs[0].get("after") == "plain text here"
+            ):
+                found.append(steps)
+        assert found, (
+            "no budget leaves a whole attribute value beside a hidden address, so the "
+            "boundary is a clean cut between entries after all -- which would make the "
+            "corrected sentence in plan_resource_list.py and docs/vcs-workflows.md wrong"
+        )
+
+    def test_the_address_is_the_first_thing_to_go(self, monkeypatch):
+        """The converse, which is what makes the asymmetry a property and not a fluke.
+
+        If the address survived while an attribute was hidden, the order would be
+        the other way round and the sentence would need inverting.
+        """
+        from terrapod.services import plan_resource_list as prl
+
+        inverted = []
+        for steps in range(1, 600):
+            entry = self._entry_at(monkeypatch, steps)
+            if entry is None:
+                continue
+            attrs = entry.get("attributes") or []
+            if (
+                attrs
+                and attrs[0].get("after") == prl.PLACEHOLDER
+                and entry["address"] == "aws_instance.web"
+            ):
+                inverted.append(steps)
+        assert inverted == [], (
+            "an address survived while its attribute was hidden, so the address is no "
+            f"longer capped last: {inverted[:5]}"
+        )
+
+    def test_nothing_unscanned_is_ever_shown(self, monkeypatch):
+        """The safety property the shape rests on, asserted separately from it.
+
+        A partial survivor is only acceptable because what survives was scanned
+        against the complete matcher. So no retained text may contain the secret.
+        """
+        from terrapod.services import plan_resource_list as prl
+
+        for steps in range(1, 600):
+            monkeypatch.setattr(prl, "MAX_SCRUB_STEPS", steps)
+            raw = _plan(
+                _rc("aws_instance.web", ["update"], {"ami": "old"}, {"ami": "a secret-value b"})
+            )
+            result = build_resource_list(raw, ["secret-value"])
+            if not result:
+                continue
+            for entry in result["entries"]:
+                assert "secret-value" not in entry["address"], steps
+                for a in entry.get("attributes") or []:
+                    assert "secret-value" not in str(a.get("after")), steps
+                    assert "secret-value" not in str(a.get("path")), steps
+
+
 class TestConstructionIsCharged:
     """Every literal and every escaped form costs budget, so no plan can make
     building the scrubber unbounded."""
