@@ -277,9 +277,12 @@ def _refresh_in_background() -> None:
     if _node.refresh_task is None or _node.refresh_task.done():
         # Per-process reachability: a scheduler task runs on one replica, so cannot carry it.
         refresh = _refresh()
-        _node.refresh_task = asyncio.create_task(
-            refresh
-        )  # nosemgrep: terrapod-no-raw-background-tasks
+        # The directive must sit on the line semgrep anchors the finding to, and
+        # `ruff format` wrapped the longer `_node.` assignment across three lines,
+        # which moved it two lines clear and turned the suppression off. A short
+        # local keeps the call and its directive on one line for good.
+        task = asyncio.create_task(refresh)  # nosemgrep: terrapod-no-raw-background-tasks
+        _node.refresh_task = task
 
 
 async def stop_probing() -> None:
