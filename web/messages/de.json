@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen. Das Zugangsdatum der Flotte selbst — ein SSH-Schlüssel zum Bestand, ein become-Passwort — hat in keinem von beiden etwas zu suchen.",
       "phaseSlotExclusive": "Eine Variable belegt immer nur einen Platz. Nur apply erreicht einen apply und ein Konfigurieren; Nur Konfigurieren erreicht allein ein Konfigurieren.",
       "configureOnlyLead": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen.",
-      "applyOnlyLead": "Wird einem plan entzogen und nur an einen apply geliefert."
+      "applyOnlyLead": "Wird einem plan entzogen und nur an einen apply geliefert.",
+      "ruleExclude": "Ausschluss",
+      "ruleExcludeEntries": "{count, plural, one {# Bedingung} other {# Bedingungen}}"
     }
   },
   "adminAutodiscovery": {

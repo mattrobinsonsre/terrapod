@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "僅交付給設定，對 plan 與 apply 皆隱藏。機群自身的憑證 — 通往設備的 SSH 金鑰、become 密碼 — 與這兩者都無關。",
       "phaseSlotExclusive": "一個變數一次只佔用一個槽位。「僅 apply」會到達 apply 與設定；「僅設定」只會到達設定。",
       "configureOnlyLead": "僅交付給設定，對 plan 與 apply 皆隱藏。",
-      "applyOnlyLead": "對 plan 隱藏，僅交付給 apply。"
+      "applyOnlyLead": "對 plan 隱藏，僅交付給 apply。",
+      "ruleExclude": "排除",
+      "ruleExcludeEntries": "{count, plural, one {# 個條件} other {# 個條件}}"
     }
   },
   "adminAutodiscovery": {

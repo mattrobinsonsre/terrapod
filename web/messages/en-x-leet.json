@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "D3l1v3r3d 0nly 70 4 c0nf1gur3, 4nd w17hh3ld fr0m 4 pl4n 4nd fr0m 4n 4pply. 7h3 fl337'5 0wn cr3d3n714l — 4n 55H k3y 70 7h3 357473, 4 b3c0m3 p455w0rd — h45 n0 bu51n355 1n 317h3r.",
       "phaseSlotExclusive": "4 v4r14bl3 5175 1n 0n3 5l07 47 4 71m3. 4pply 0nly r34ch35 4n 4pply 4nd 4 c0nf1gur3; C0nf1gur3 0nly r34ch35 4 c0nf1gur3 4l0n3.",
       "configureOnlyLead": "D3l1v3r3d 0nly 70 4 c0nf1gur3, 4nd w17hh3ld fr0m 4 pl4n 4nd fr0m 4n 4pply.",
-      "applyOnlyLead": "W17hh3ld fr0m 4 pl4n 4nd d3l1v3r3d 0nly 70 4n 4pply."
+      "applyOnlyLead": "W17hh3ld fr0m 4 pl4n 4nd d3l1v3r3d 0nly 70 4n 4pply.",
+      "ruleExclude": "3xclud1ng",
+      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}"
     }
   },
   "adminAutodiscovery": {

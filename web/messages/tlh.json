@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Qum neH vInob; nab je lo' je vIghoj. Duj De' — SSH ngaQHa'moHwI', become mu'qaD — nab 'ebDaq lo' 'ebDaq je tu'lu'be'nIS.",
       "phaseSlotExclusive": "wa' 'eb neH ghaj De'. lo' neH: lo' Qum je luSIch. Qum neH: Qum neH SIch.",
       "configureOnlyLead": "Qum neH vInob; nab je lo' je vIghoj.",
-      "applyOnlyLead": "nab vIghoj 'ach lo' neH vInob."
+      "applyOnlyLead": "nab vIghoj 'ach lo' neH vInob.",
+      "ruleExclude": "Hutlh",
+      "ruleExcludeEntries": "{count, plural, one {# chut} other {# chutmey}}"
     }
   },
   "adminAutodiscovery": {

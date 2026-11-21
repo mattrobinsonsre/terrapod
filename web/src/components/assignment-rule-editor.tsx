@@ -334,13 +334,20 @@ export function AssignmentRuleSummary({ rule }: { rule: AssignmentRule }) {
     name_glob: t('ruleNameGlob'),
     execution_backend: t('ruleExecutionBackend'),
     execution_mode: t('ruleExecutionMode'),
+    // Both spellings of one selector (#1559). The canonical column is
+    // `engine_version` and the API stores whichever the caller sent, byte-identical,
+    // so BOTH reach this view — and only the legacy one was labelled, which means
+    // every rule written with the canonical name rendered a bare `engine_version`
+    // as its term (#2621). The label text is already engine-neutral.
     terraform_version: t('ruleTerraformVersion'),
+    engine_version: t('ruleTerraformVersion'),
     owner_email: t('ruleOwnerEmail'),
     agent_pool_id: t('ruleAgentPoolId'),
     vcs_connection_id: t('ruleVcsConnectionId'),
     drift_status: t('ruleDriftStatus'),
     locked: t('ruleLocked'),
     has_vcs: t('ruleHasVcs'),
+    exclude: t('ruleExclude'),
   }
 
   const rows = Object.entries(rule).filter(([, v]) => v !== undefined && v !== null)
@@ -360,6 +367,15 @@ export function AssignmentRuleSummary({ rule }: { rule: AssignmentRule }) {
                   {k}={v}
                 </span>
               ))
+            ) : key === 'exclude' && Array.isArray(value) ? (
+              // A count, not the entries: an exclusion entry is itself a rule and
+              // can nest, so rendering it inline would be unbounded. Before this it
+              // fell through to `String(value)` and read `[object Object]` on the one
+              // screen that answers "who receives this credential" (#2621) — which is
+              // the leak this component's own docstring warns about.
+              <span className="px-2 py-0.5 rounded bg-slate-700 text-xs text-slate-200">
+                {t('ruleExcludeEntries', { count: value.length })}
+              </span>
             ) : typeof value === 'boolean' ? (
               <span className="px-2 py-0.5 rounded bg-slate-700 text-xs text-slate-200">
                 {value ? t('yes') : t('no')}

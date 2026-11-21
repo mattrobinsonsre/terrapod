@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Передається лише в налаштування і не передається ні в plan, ні в apply. Облікові дані самого парку машин — SSH-ключ до хостів, пароль become — не стосуються жодного з них.",
       "phaseSlotExclusive": "Змінна займає лише одне місце за раз. «Лише apply» досягає apply та налаштування, а «Лише налаштування» — тільки налаштування.",
       "configureOnlyLead": "Передається лише в налаштування і не передається ні в plan, ні в apply.",
-      "applyOnlyLead": "Не передається в plan і доставляється лише в apply."
+      "applyOnlyLead": "Не передається в plan і доставляється лише в apply.",
+      "ruleExclude": "Виключення",
+      "ruleExcludeEntries": "{count, plural, one {# умова} few {# умови} many {# умов} other {# умови}}"
     }
   },
   "adminAutodiscovery": {

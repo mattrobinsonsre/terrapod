@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Передаётся только в настройку и не передаётся ни в plan, ни в apply. Учётные данные самого парка машин — SSH-ключ к хостам, пароль become — не имеют отношения ни к одному из них.",
       "phaseSlotExclusive": "Переменная занимает только одну ячейку за раз. «Только apply» достигает apply и настройки, а «Только настройка» — одной лишь настройки.",
       "configureOnlyLead": "Передаётся только в настройку и не передаётся ни в plan, ни в apply.",
-      "applyOnlyLead": "Не передаётся в plan и доставляется только в apply."
+      "applyOnlyLead": "Не передаётся в plan и доставляется только в apply.",
+      "ruleExclude": "Исключение",
+      "ruleExcludeEntries": "{count, plural, one {# условие} few {# условия} many {# условий} other {# условий}}"
     }
   },
   "adminAutodiscovery": {

@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Livré uniquement à un configurer, et retiré d'un plan comme d'un apply. L'identifiant de la flotte elle-même — une clé SSH vers le parc, un mot de passe become — n'a rien à faire ni dans l'un ni dans l'autre.",
       "phaseSlotExclusive": "Une variable n'occupe qu'un emplacement à la fois. apply uniquement atteint un apply et un configurer ; Configurer uniquement n'atteint qu'un configurer.",
       "configureOnlyLead": "Livré uniquement à un configurer, et retiré d'un plan comme d'un apply.",
-      "applyOnlyLead": "Retiré d'un plan et livré uniquement à un apply."
+      "applyOnlyLead": "Retiré d'un plan et livré uniquement à un apply.",
+      "ruleExclude": "Exclusion",
+      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}"
     }
   },
   "adminAutodiscovery": {

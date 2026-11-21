@@ -128,8 +128,12 @@ def rule_refused_dimensions(rule) -> list[str]:
     """
     if not isinstance(rule, dict):
         return []
-    # The selector accepts hyphenated keys, so a stored `drift-status` must not slip by.
-    norm = {str(k).replace("-", "_"): v for k, v in rule.items()}
+    # The selector accepts hyphenated keys, so a stored `drift-status` must not slip
+    # by -- and the same normaliser the SELECTOR uses, so the two cannot disagree
+    # about a spelling (#2621).
+    from terrapod.services.workspace_search_service import canonical_filter_keys
+
+    norm = canonical_filter_keys(rule)
     refused = {k for k in RULE_DIMENSIONS_REFUSED if k in norm}
     exclude = norm.get("exclude")
     if isinstance(exclude, list):

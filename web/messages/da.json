@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply. Flådens egen legitimation — en SSH-nøgle til maskinparken, en become-adgangskode — hører ikke hjemme i nogen af dem.",
       "phaseSlotExclusive": "En variabel optager kun én plads ad gangen. Kun apply når en apply og en konfigurer; Kun konfigurer når kun en konfigurer.",
       "configureOnlyLead": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply.",
-      "applyOnlyLead": "Tilbageholdes fra en plan og leveres kun til en apply."
+      "applyOnlyLead": "Tilbageholdes fra en plan og leveres kun til en apply.",
+      "ruleExclude": "Undtagelse",
+      "ruleExcludeEntries": "{count, plural, one {# betingelse} other {# betingelser}}"
     }
   },
   "adminAutodiscovery": {

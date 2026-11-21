@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply. Přihlašovací údaje samotné flotily — SSH klíč ke strojům, heslo become — nemají s ani jedním z nich nic společného.",
       "phaseSlotExclusive": "Proměnná zabírá vždy jen jedno místo. „Pouze apply“ se dostane do apply a do konfigurace, „Pouze konfigurace“ jen do konfigurace.",
       "configureOnlyLead": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply.",
-      "applyOnlyLead": "Zadržena u plan a doručena pouze do apply."
+      "applyOnlyLead": "Zadržena u plan a doručena pouze do apply.",
+      "ruleExclude": "Vyloučení",
+      "ruleExcludeEntries": "{count, plural, one {# podmínka} few {# podmínky} many {# podmínky} other {# podmínek}}"
     }
   },
   "adminAutodiscovery": {

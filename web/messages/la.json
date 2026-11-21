@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Soli configurare traditur et tam a plan quam ab apply retinetur. Credentia ipsius classis — clavis SSH ad praedium, tessera become — in neutro quicquam agunt.",
       "phaseSlotExclusive": "Variabilis uno tantum loculo simul tenetur. Tantum apply ad apply et ad configurare pervenit; Tantum configurare ad solum configurare pervenit.",
       "configureOnlyLead": "Soli configurare traditur et tam a plan quam ab apply retinetur.",
-      "applyOnlyLead": "A plan retinetur et soli apply traditur."
+      "applyOnlyLead": "A plan retinetur et soli apply traditur.",
+      "ruleExclude": "Exclusio",
+      "ruleExcludeEntries": "{count, plural, one {# conditio} other {# conditiones}}"
     }
   },
   "adminAutodiscovery": {

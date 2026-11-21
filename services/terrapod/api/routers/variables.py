@@ -989,7 +989,7 @@ def _refuse_unusable_exclude_entries(rule: dict) -> None:
     from terrapod.services.label_validation import RESERVED_LABEL_KEYS
 
     for i, entry in enumerate(rule.get("exclude") or []):
-        norm = {str(k).replace("-", "_"): v for k, v in entry.items()}
+        norm = workspace_search_service.normalise_filter_keys(entry)
         if "workspace_ids" in norm:
             raise HTTPException(
                 status_code=422,
@@ -1001,8 +1001,10 @@ def _refuse_unusable_exclude_entries(rule: dict) -> None:
             hint = _RESERVED_LABEL_HINTS.get(key, "it is a filter-bar term, not a label")
             raise HTTPException(
                 status_code=422,
-                detail=f'exclude[{i}]: label key "{key}" is reserved, so no workspace can '
-                f"carry it and this entry would match nothing ({hint}).",
+                detail=f'exclude[{i}]: label key "{key}" is reserved, so a workspace '
+                f"cannot be given it and this entry would match nothing ({hint}). A "
+                "workspace labelled before the key was reserved can still carry it, so "
+                "exclude by a label you control instead.",
             )
 
 
@@ -1034,7 +1036,7 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
         )
     # Normalise first: parse_filter accepts hyphens, so an underscore-only guard
     # below would be decorative — `workspace-ids` sailed straight past it.
-    rule = {str(k).replace("-", "_"): v for k, v in rule.items()}
+    rule = workspace_search_service.normalise_filter_keys(rule)
 
     # GHSA-49q6-pm68-3xgw. Some dimensions are platform STATE, not identity, and a
     # workspace's own owner can move them through endpoints that have no business

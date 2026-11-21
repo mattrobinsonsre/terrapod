@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "נמסר רק לשלב התצורה, ונמנע הן מ-plan והן מ-apply. פרטי ההתחברות של הצי עצמו — מפתח SSH למערך, סיסמת become — אינם שייכים לאף אחד מהשניים.",
       "phaseSlotExclusive": "משתנה תופס משבצת אחת בכל רגע. האפשרות apply בלבד מגיעה ל-apply ולתצורה, והאפשרות תצורה בלבד מגיעה לתצורה בלבד.",
       "configureOnlyLead": "נמסר רק לשלב התצורה, ונמנע הן מ-plan והן מ-apply.",
-      "applyOnlyLead": "נמנע מ-plan ונמסר רק ל-apply."
+      "applyOnlyLead": "נמנע מ-plan ונמסר רק ל-apply.",
+      "ruleExclude": "החרגה",
+      "ruleExcludeEntries": "{count, plural, one {תנאי #} two {# תנאים} many {# תנאים} other {# תנאים}}"
     }
   },
   "adminAutodiscovery": {

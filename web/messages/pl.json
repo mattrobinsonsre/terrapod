@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply. Dane uwierzytelniające samej floty — klucz SSH do maszyn, hasło become — nie mają nic wspólnego z żadnym z nich.",
       "phaseSlotExclusive": "Zmienna zajmuje naraz tylko jedno miejsce. „Tylko apply” trafia do apply i do konfiguracji, a „Tylko konfiguracja” wyłącznie do konfiguracji.",
       "configureOnlyLead": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply.",
-      "applyOnlyLead": "Wstrzymywana przy plan i dostarczana tylko do apply."
+      "applyOnlyLead": "Wstrzymywana przy plan i dostarczana tylko do apply.",
+      "ruleExclude": "Wykluczenie",
+      "ruleExcludeEntries": "{count, plural, one {# warunek} few {# warunki} many {# warunków} other {# warunków}}"
     }
   },
   "adminAutodiscovery": {

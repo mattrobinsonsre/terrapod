@@ -1059,6 +1059,8 @@
       "ruleDriftStatus": "Drift status",
       "ruleLocked": "Locked",
       "ruleHasVcs": "VCS-connected",
+      "ruleExclude": "Excluding",
+      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}",
       "ruleAny": "Any",
       "ruleEmpty": "Add at least one filter — an empty rule matches nothing.",
       "rulePreview": "{count, plural, =0 {Matches no workspaces} one {Matches # workspace} other {Matches # workspaces}}",

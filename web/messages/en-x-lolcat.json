@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Only gived to da konfigur, an hidden from da plan AN da apply. Da fleetz own sekrit — a SSH key to all da boxes, a become passwurd — haz no bizniz in either one. srsly.",
       "phaseSlotExclusive": "A variabul sitz in one slot at a time. apply onlee getz to da apply an da konfigur; konfigur onlee getz to da konfigur, dats all.",
       "configureOnlyLead": "Only gived to da konfigur, an hidden from da plan AN da apply.",
-      "applyOnlyLead": "Hidden from da plan an only gived to da apply."
+      "applyOnlyLead": "Hidden from da plan an only gived to da apply.",
+      "ruleExclude": "Excludin",
+      "ruleExcludeEntries": "{count, plural, one {# kondishun} other {# kondishunz}}"
     }
   },
   "adminAutodiscovery": {

@@ -9,6 +9,7 @@ import uuid
 
 import pytest
 
+from terrapod.services import workspace_search_service as wss
 from terrapod.services.workspace_search_service import (
     MAX_EXCLUDE_ENTRIES,
     WorkspaceFilter,
@@ -384,3 +385,50 @@ class TestBuildQueryDimensions:
         assert "workspaces.execution_backend" in compiled
         assert "workspaces.locked" in compiled
         assert " AND " in compiled
+
+
+class TestFilterKeyNormalisation:
+    """Two functions, because the write path must not reach the second one (#2621).
+
+    Four places had hand-written the hyphen comprehension and ONE of them also
+    folded the legacy `terraform_version` alias, which is the divergence the
+    review found. Extracting one producer for both jobs was the obvious fix and
+    is wrong: `assignmentRuleModel` in the Terraform provider maps
+    `engine_version` and `terraform_version` to separate attributes, with the
+    reason written down -- "a stored rule must round-trip byte-identical or every
+    Read produces drift" -- so canonicalising at the write boundary turns one
+    `terraform_version` into a permanent diff on every plan.
+    """
+
+    def test_hyphens_fold_on_both(self):
+        for fn in (wss.normalise_filter_keys, wss.canonical_filter_keys):
+            assert fn({"name-prefix": "p", "has-vcs": True}) == {
+                "name_prefix": "p",
+                "has_vcs": True,
+            }
+
+    def test_the_storing_form_leaves_the_legacy_alias_alone(self):
+        """What the provider round-trips. `engine_version` must NOT appear."""
+        assert wss.normalise_filter_keys({"terraform_version": "1.9.0"}) == {
+            "terraform_version": "1.9.0"
+        }
+        assert wss.normalise_filter_keys({"terraform-version": "1.9.0"}) == {
+            "terraform_version": "1.9.0"
+        }
+
+    def test_the_evaluating_form_folds_the_legacy_alias(self):
+        for spelling in ("terraform_version", "terraform-version"):
+            assert wss.canonical_filter_keys({spelling: "1.9.0"}) == {"engine_version": "1.9.0"}
+
+    def test_the_canonical_spelling_wins_where_both_are_sent(self):
+        assert wss.canonical_filter_keys(
+            {"engine_version": "1.9.0", "terraform_version": "1.5.0"}
+        ) == {"engine_version": "1.9.0"}
+
+    def test_neither_form_invents_a_key(self):
+        assert wss.normalise_filter_keys({}) == {}
+        assert wss.canonical_filter_keys({}) == {}
+
+    def test_a_non_string_key_does_not_raise(self):
+        """`str(k)` rather than `k.replace`: a JSON body can carry anything."""
+        assert wss.normalise_filter_keys({1: "x"}) == {"1": "x"}

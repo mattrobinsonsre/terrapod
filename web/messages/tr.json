@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır. Filonun kendi kimlik bilgisi — makinelere giden SSH anahtarı, become parolası — bunların hiçbiriyle ilgili değildir.",
       "phaseSlotExclusive": "Bir değişken aynı anda yalnızca tek bir yuvada bulunur. “Yalnızca apply” apply ve yapılandırma aşamalarına ulaşır; “Yalnızca yapılandırma” yalnızca yapılandırmaya ulaşır.",
       "configureOnlyLead": "Yalnızca yapılandırma aşamasına verilir; hem plan hem de apply aşamasından saklanır.",
-      "applyOnlyLead": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir."
+      "applyOnlyLead": "plan aşamasından saklanır ve yalnızca apply aşamasına verilir.",
+      "ruleExclude": "Hariç tutma",
+      "ruleExcludeEntries": "{count, plural, one {# koşul} other {# koşul}}"
     }
   },
   "adminAutodiscovery": {

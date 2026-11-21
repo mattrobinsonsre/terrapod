@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Entregue apenas a um configurar e retida tanto de um plan quanto de um apply. A credencial da própria frota — uma chave SSH do parque, uma senha become — não tem o que fazer em nenhum dos dois.",
       "phaseSlotExclusive": "Uma variável ocupa apenas um lugar por vez. Somente apply alcança um apply e um configurar; Somente configurar alcança apenas um configurar.",
       "configureOnlyLead": "Entregue apenas a um configurar e retida tanto de um plan quanto de um apply.",
-      "applyOnlyLead": "Retida de um plan e entregue apenas a um apply."
+      "applyOnlyLead": "Retida de um plan e entregue apenas a um apply.",
+      "ruleExclude": "Exclusão",
+      "ruleExcludeEntries": "{count, plural, one {# condição} other {# condições}}"
     }
   },
   "adminAutodiscovery": {

@@ -1077,7 +1077,9 @@
       "configureOnlyHint": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply. Flåtens egen legitimasjon — en SSH-nøkkel til maskinparken, et become-passord — hører ikke hjemme i noen av dem.",
       "phaseSlotExclusive": "En variabel opptar bare én plass om gangen. Bare apply når en apply og en konfigurer; Bare konfigurer når bare en konfigurer.",
       "configureOnlyLead": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply.",
-      "applyOnlyLead": "Holdes tilbake fra en plan og leveres bare til en apply."
+      "applyOnlyLead": "Holdes tilbake fra en plan og leveres bare til en apply.",
+      "ruleExclude": "Unntak",
+      "ruleExcludeEntries": "{count, plural, one {# betingelse} other {# betingelser}}"
     }
   },
   "adminAutodiscovery": {
