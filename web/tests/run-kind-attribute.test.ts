@@ -183,8 +183,9 @@ describe('nothing re-derives the run kind', () => {
       offenders,
       [],
       'these lines read `configure-after-apply` off a run, which is the derivation ' +
-        '`run-kind` replaced -- ask `lib/run-badges.ts` instead (`isCompositeRun`, ' +
-        `\`primaryRunBadge\`, \`showsConfigureBadge\`): ${offenders.join(' | ')}`,
+        '`run-kind` replaced -- ask `lib/run-kinds.ts` for the kind (`isCompositeRun`, ' +
+        '`isConfigureOnlyRun`, `isPlanApplyRun`) or `lib/run-badges.ts` for the badges ' +
+        `(\`primaryRunBadge\`, \`showsConfigureBadge\`): ${offenders.join(' | ')}`,
     )
   })
 

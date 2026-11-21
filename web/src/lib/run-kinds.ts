@@ -84,6 +84,43 @@ export function runKindFromWire(wire: string | undefined): RunKindId | undefined
   }
 }
 
+/**
+ * What a run already IS, as opposed to what a workspace offers — the three
+ * predicates over `run-kind`.
+ *
+ * Here rather than in `lib/run-badges.ts`, where they were, because none of
+ * them is a badge question and none was used by a badge function: `run-badges`
+ * answers "which badges does this row get" and these answer "what kind is this
+ * run", which is the vocabulary `RunKindId` and `runKindFromWire` above already
+ * own. That module's own docstring says a module answering two questions is one
+ * nobody can name (#2621), and this one's says folding a second question in is
+ * what to avoid — so they belong on this side of the line.
+ *
+ * `false` wherever the server sends no kind, or sends one this build has never
+ * heard of. That is the right failure for all three: an older server's rows get
+ * the treatment they have always had rather than a guess, and a NEW kind is not
+ * silently sorted into an existing one.
+ */
+export interface RunKindOf {
+  /** `plan_apply` | `configure` | `full`, or absent on an older server. */
+  runKind?: string
+}
+
+/** Whether the run is a composite: an apply followed by a configure. */
+export function isCompositeRun(run: RunKindOf): boolean {
+  return run.runKind === 'full'
+}
+
+/** Whether the run is a standalone configure: no plan or apply half. */
+export function isConfigureOnlyRun(run: RunKindOf): boolean {
+  return run.runKind === 'configure'
+}
+
+/** Whether the run is a plan/apply run with no configure half. */
+export function isPlanApplyRun(run: RunKindOf): boolean {
+  return run.runKind === 'plan_apply'
+}
+
 export interface AvailableRunKind {
   id: RunKindId
   /** Present but not runnable now. `undefined` means it can run. */
