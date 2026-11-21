@@ -183,6 +183,48 @@ async def _copy_one(
     return meta.size_bytes
 
 
+async def _location_from_delete_marker(workspace_id: str) -> bool:
+    """Teach the resolver a DELETED workspace's location; True if it could.
+
+    A deferred object self-heals once the workspace row replicates -- unless it
+    never will, because the workspace was deleted on the leader before its row
+    reached here. Then the row is not coming, the objects are never copied, and
+    restoring that workspace on this node brings it back EMPTY (#2621), which
+    is a regression against the behaviour before locations existed, where a
+    follower copied regardless.
+
+    The marker is the row's own last word on where its objects live: written
+    from the workspace at delete time, and NOT workspace-routed
+    (`workspace_id_of_key` returns None for `state/deleted/`), so it is
+    readable without the location this is trying to find.
+
+    Remembered rather than returned, so this costs one marker read per deleted
+    workspace per process and every later object for it takes the cache.
+    """
+    from terrapod.services.deleted_workspace_service import marker_storage_location, read_marker
+    from terrapod.storage import get_storage
+    from terrapod.storage.routing import remember_location
+
+    store = get_storage()
+    marker = await read_marker(store, workspace_id)
+    if marker is None:
+        return False
+    known, location = marker_storage_location(marker)
+    if not known:
+        # The marker never recorded one, so there is nothing to teach. Teaching
+        # None would pin the workspace to `default` and copy its objects into the
+        # wrong store -- the misplacement this function exists to prevent.
+        return False
+    if not remember_location(store, workspace_id, location):
+        return False
+    logger.info(
+        "resolved a deleted workspace's storage location from its marker",
+        workspace=workspace_id,
+        location=location or "default",
+    )
+    return True
+
+
 async def _sync_class(
     client: httpx.AsyncClient,
     token: str,
@@ -261,13 +303,33 @@ async def _sync_class(
                 try:
                     written = await _copy_one(client, token, base, cls.name, key, size)
                 except UnknownWorkspaceLocationError:
-                    # The workspace row has not replicated here yet; the next cycle retries it.
-                    # A follower must configure the same storage locations as the leader.
-                    result.deferred += 1
-                    if workspace_id := workspace_id_of_key(key):
-                        result.deferred_workspaces.add(workspace_id)
-                    logger.info("blob copy deferred until its workspace replicates", key=key)
-                    return
+                    # The workspace row has not replicated here yet. Ordinarily
+                    # the next cycle retries it and it heals -- but a workspace
+                    # DELETED on the leader before its row arrived has no row
+                    # coming, so the deferral would be permanent and a restore
+                    # would bring it back empty. Its marker still knows where
+                    # its objects go, so try that once before giving up.
+                    workspace_id = workspace_id_of_key(key)
+                    if workspace_id and await _location_from_delete_marker(workspace_id):
+                        try:
+                            written = await _copy_one(client, token, base, cls.name, key, size)
+                        except Exception:
+                            result.failed += 1
+                            logger.warning(
+                                "blob copy failed after resolving from the delete marker",
+                                cls=cls.name,
+                                key=key,
+                                exc_info=True,
+                            )
+                            return
+                    else:
+                        # A follower must configure the same storage locations
+                        # as the leader.
+                        result.deferred += 1
+                        if workspace_id:
+                            result.deferred_workspaces.add(workspace_id)
+                        logger.info("blob copy deferred until its workspace replicates", key=key)
+                        return
                 except Exception:
                     # One unreadable object must not abandon the class: the rest
                     # of the estate is still worth copying, and the next cycle
@@ -394,7 +456,24 @@ LEADER_LOCATIONS_MISSING = "the leader's storage locations are not configured he
 
 
 def _leader_locations_missing_here(cls: blob_classes.BlobClass, resp: httpx.Response) -> str:
-    """The leader's locations this node lacks, for a class routed by location; "" if none."""
+    """The leader's locations this node lacks, for a class routed by location; "" if none.
+
+    WHY NAMES, and not a fingerprint of what each name points at (#2621). A
+    location NAME is the routing key: a copied object lands in the store *this*
+    node's own config maps the name to (`storage/__init__.py` builds `locations`
+    from `cfg.locations`), so two nodes pointing `eu-west` at different buckets
+    is not a misconfiguration -- it is what makes them two independent copies
+    rather than one, and `docs/high-availability.md` asks only that both
+    configure the same locations "with the same names".
+
+    So comparing targets would refuse every correct HA pair. Comparing them the
+    other way -- refusing when the targets MATCH, on the grounds that a shared
+    bucket makes the replica illusory -- would refuse a topology that page
+    recommends outright, for app-layer encryption, where the peer's store is
+    populated by bucket replication instead. Neither direction leaves anything
+    to refuse, which is why this is a set difference of names and should stay
+    one.
+    """
     header = resp.headers.get(blob_classes.STORAGE_LOCATIONS_HEADER)
     # No header: a leader predating storage locations keeps every object on default.
     if not header or not blob_classes.holds_workspace_objects(cls):

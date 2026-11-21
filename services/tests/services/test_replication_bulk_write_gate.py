@@ -103,6 +103,70 @@ def _call_sites(models: set[str]) -> list[tuple[str, int]]:
     return sites
 
 
+#: Columns no Core UPDATE may set, whatever its call site, keyed by model.
+#:
+#: `ALLOWED` above keys on the call SITE, which is the right unit for "is this
+#: bulk statement deliberate" and the wrong one for "may it touch this column".
+#: All three `vcs_poller.py` sites are already allowed, so adding
+#: `storage_location=...` to any of their `.values()` passed every test in the
+#: tree while silently relocating a live workspace -- its objects stay where
+#: they are and every later lookup goes somewhere else (#2621).
+#:
+#: The ORM already refuses this on an attribute set (`_storage_location_is_fixed`
+#: in `models.py`), but a Core UPDATE never fires attribute events, so that
+#: listener cannot see one. This closes the other door.
+IMMUTABLE_COLUMNS: dict[str, set[str]] = {
+    "Workspace": {"storage_location"},
+}
+
+
+def _values_of_update(node: ast.Call) -> tuple[str, set[str]] | None:
+    """For a `.values(...)` call, the model its `update(...)` targets and the columns set.
+
+    The chain is `update(M).where(...).values(...).returning(...)`, so `.values`
+    is not the outermost call -- this matches it directly and then walks DOWN
+    the attribute spine to the root `update(...)`.
+    """
+    if not (isinstance(node.func, ast.Attribute) and node.func.attr == "values"):
+        return None
+    cur: ast.expr = node.func.value
+    while isinstance(cur, ast.Call) and isinstance(cur.func, ast.Attribute):
+        cur = cur.func.value
+    if not (isinstance(cur, ast.Call) and isinstance(cur.func, ast.Name)):
+        return None
+    if cur.func.id != "update":
+        return None
+    model = next((a.id for a in cur.args if isinstance(a, ast.Name)), None)
+    if model is None:
+        return None
+    columns = {kw.arg for kw in node.keywords if kw.arg}
+    for arg in node.args:  # the `.values({"col": ...})` form
+        if isinstance(arg, ast.Dict):
+            columns |= {
+                k.value
+                for k in arg.keys
+                if isinstance(k, ast.Constant) and isinstance(k.value, str)
+            }
+    return model, columns
+
+
+def _update_value_sites() -> list[tuple[str, str, set[str]]]:
+    """(file, model, columns) for every `update(Model).…values(…)` in the tree."""
+    found: list[tuple[str, str, set[str]]] = []
+    for path in _SOURCE_ROOT.rglob("*.py"):
+        if path.name in _EXEMPT:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:  # pragma: no cover - source must parse
+            continue
+        rel = str(path.relative_to(_SOURCE_ROOT.parent))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and (hit := _values_of_update(node)) is not None:
+                found.append((f"{rel} (line {node.lineno})", hit[0], hit[1]))
+    return found
+
+
 def _bulk_statements_against(models: set[str]) -> list[str]:
     """The call sites that are NOT explicitly allowed."""
     return sorted(
@@ -128,6 +192,36 @@ class TestNoBulkWritesOnReplicatedModels:
 
         stale = set(ALLOWED) - live
         assert not stale, f"exemptions no longer matching any call site: {sorted(stale)}"
+
+    def test_no_core_update_sets_a_column_that_must_not_move(self):
+        """An ALLOWED call site is allowed to be bulk, not allowed to be anything.
+
+        Mutation that found this: add `storage_location="x"` to any of the
+        three poller `.values()` and the whole suite stayed green.
+        """
+        offenders = [
+            f"{where}: {model}.{column}"
+            for where, model, columns in _update_value_sites()
+            for column in sorted(columns & IMMUTABLE_COLUMNS.get(model, set()))
+        ]
+        assert not offenders, (
+            "a Core UPDATE sets a column that must never change after the row "
+            "is created. The ORM listener cannot see a Core statement, so this "
+            "is the only thing standing between it and a silently misplaced "
+            "workspace:\n  " + "\n  ".join(offenders)
+        )
+
+    def test_the_column_scanner_can_actually_find_something(self):
+        """Guards the scanner above: a `.values()` walk that silently stopped
+        matching would pass that test for ever, whatever the source did."""
+        sites = _update_value_sites()
+        workspace = [s for s in sites if s[1] == "Workspace"]
+        assert len(workspace) >= 3, (
+            f"expected at least the three vcs_poller `update(Workspace).values()` "
+            f"sites, found {len(workspace)}: {[s[0] for s in workspace]}"
+        )
+        # And it reads real column names, not an empty set per site.
+        assert any("vcs_last_commit_sha" in s[2] for s in workspace)
 
     def test_the_scanner_can_actually_find_something(self):
         """Guards the gate: if the AST walk silently matched nothing, the test

@@ -29,9 +29,35 @@ class DbLocationResolver:
     def __init__(self, max_entries: int = 10_000) -> None:
         self._max_entries = max_entries
         self._known: OrderedDict[str, str] = OrderedDict()
+        #: Created on first use: there is no running loop at import.
+        self._gate: asyncio.Semaphore | None = None
         _resolvers.add(self)
         if not event.contains(Session, "after_flush", remember_flushed_workspaces):
             event.listen(Session, "after_flush", remember_flushed_workspaces)
+
+    def _resolution_gate(self) -> asyncio.Semaphore:
+        """Bound how much of the connection pool a cache miss can hold.
+
+        This runs inside a request that ALREADY holds a session, so resolving
+        checks a SECOND connection out of the same pool. Warm, the cache answers
+        and no connection is taken at all; the cold window right after a rollout
+        is the one that bites, because every workspace is a first touch at once
+        and each in-flight request wants two connections (#2621).
+
+        Without a bound that is a race for the pool between requests and the
+        resolutions those same requests are waiting on, which is the shape that
+        stalls rather than merely slowing down. With one, the surplus waits here
+        -- in process, microseconds, no connection held -- instead of on
+        `pool_timeout`.
+
+        Half the persistent pool, so a resolution storm can never take more than
+        the requests themselves can hold. Derived rather than a constant: an
+        operator who raises `pool_size` for exactly this reason should get the
+        benefit without editing code.
+        """
+        if self._gate is None:
+            self._gate = asyncio.Semaphore(max(2, settings.database.pool_size // 2))
+        return self._gate
 
     def remember(self, workspace_id: str, location: str | None) -> None:
         self._known[workspace_id] = location or DEFAULT_STORAGE_LOCATION
@@ -50,12 +76,13 @@ class DbLocationResolver:
         if str(parsed) != workspace_id:
             return None
         try:
-            async with get_db_session() as db:
-                row = (
-                    await db.execute(
-                        select(Workspace.storage_location).where(Workspace.id == parsed)
-                    )
-                ).one_or_none()
+            async with self._resolution_gate():
+                async with get_db_session() as db:
+                    row = (
+                        await db.execute(
+                            select(Workspace.storage_location).where(Workspace.id == parsed)
+                        )
+                    ).one_or_none()
         except Exception as exc:
             raise ObjectStoreError(
                 f"could not resolve the storage location of workspace {workspace_id}"
@@ -92,6 +119,17 @@ _unreachable: dict[str, str] = {}
 
 #: When the locations were last probed (monotonic seconds); None before the first probe.
 _probed_at: float | None = None
+
+#: When the unconfigured-rows check last RAN (monotonic seconds), which is a different
+#: clock from `_probed_at`: that one times a reachability probe of the locations this node
+#: has, and this one times a question about rows it may not have seen yet.
+#:
+#: A standby configured with NO locations is exactly the node that needs the second clock.
+#: Its startup check passes (no row named a location yet), `_unchecked` goes to None, and
+#: the readiness path below used to re-query only when a PREVIOUS check had failed -- so
+#: rows replicated afterwards were never noticed, and a promotion without a restart wrote
+#: a located workspace's objects to the default store (#2621).
+_counted_at: float | None = None
 #: The one in-flight background refresh; held here so it is not garbage-collected.
 _refresh_task: asyncio.Task[None] | None = None
 
@@ -216,9 +254,13 @@ def _record_unchecked(value: str | None) -> str | None:
 
 async def check_locations_at_startup() -> None:
     """Refuse to start on rows naming unconfigured locations; report unreachable locations."""
-    global _probed_at  # noqa: PLW0603
+    global _probed_at, _counted_at  # noqa: PLW0603
     await _probe_locations()
     _probed_at = time.monotonic()
+    # Stamped around the count rather than after it, so a count that RAISED still
+    # marks the attempt: `_unchecked` then holds the reason and the readiness path
+    # re-runs on `pending`, not on a staleness that would fire on every call.
+    _counted_at = time.monotonic()
     try:
         counts = await _location_counts()
     except Exception as exc:
@@ -255,9 +297,19 @@ async def locations_readiness() -> tuple[bool, str]:
 
     The probe result is the last one recorded, never waited for; an old one is refreshed behind.
     """
+    global _counted_at  # noqa: PLW0603
     _refresh_in_background()
     pending = _unchecked
-    if pending is not None:
+    # `None` is NOT stale, deliberately: this is a REFRESH of the count
+    # `check_locations_at_startup` already did, so an unstamped process is one
+    # where startup has not run (a test, or a process still booting) and owes no
+    # query. Reading it as stale made every first readiness call hit the
+    # database, which on a pod whose startup had not run is a RuntimeError
+    # reported as `unchecked` -- readiness refused for the absence of a check
+    # rather than for its result (#2621).
+    stale = _counted_at is not None and (time.monotonic() - _counted_at) >= _PROBE_TTL_SECONDS
+    if pending is not None or stale:
+        _counted_at = time.monotonic()
         try:
             counts = await _location_counts()
         except Exception as exc:
@@ -268,7 +320,12 @@ async def locations_readiness() -> tuple[bool, str]:
             logger.error("Not ready: " + problem, locations=missing)
             return False, problem
         _record_unchecked(None)
-        logger.info("Storage location check passed", earlier=pending)
+        if pending is not None:
+            # Only on RECOVERY. The block above now also runs on the TTL for a
+            # node that is perfectly healthy, and logging a pass every thirty
+            # seconds per replica is how an operator learns to filter the line
+            # that matters.
+            logger.info("Storage location check passed", earlier=pending)
     if _unreachable:
         return True, f"unreachable: {', '.join(sorted(_unreachable))}"
     return True, "healthy"

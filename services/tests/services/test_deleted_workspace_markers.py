@@ -593,3 +593,82 @@ class TestMassOrphanBreaker:
         store = self._expired_orphans(30)
         reaped = await _cleanup_deleted_workspaces(self._db_with_live_count(500), store, 30, 100)
         assert reaped == 30
+
+
+class TestMarkerStorageLocation:
+    """The one producer for "where did this deleted workspace's objects live".
+
+    It exists because the question is asked by the follower copying them and by the
+    reaper deleting them, and both readers took `marker.get("storage_location")` --
+    which is None for EVERY marker ever written, because the writer puts it in
+    `settings` (#2621). Their fixtures carried the same invented shape, so the pair
+    agreed with each other and with nothing real; an integration test against a
+    real S3 was what caught it.
+    """
+
+    def test_the_real_writer_puts_it_under_settings(self):
+        """Derived from `build_marker`, so this cannot drift from the writer again."""
+        body = dws.build_discovery_marker(WS_A)
+        assert "storage_location" not in body, (
+            "the top level is where two readers looked and it has never been there"
+        )
+        assert "settings" in body
+
+    def test_a_discovery_marker_knows_nothing(self):
+        """`settings` is `{}` -- the row was already gone when it was stamped.
+
+        This is the case that broke the reaper: read as "default", it deleted from
+        the default store and left a located workspace's objects untouched while
+        logging a successful reap.
+        """
+        assert dws.marker_storage_location(dws.build_discovery_marker(WS_A)) == (False, None)
+
+    def test_a_recorded_none_means_the_default_location(self):
+        """A real answer, not an absent one -- the workspace was on default."""
+        assert dws.marker_storage_location({"settings": {"storage_location": None}}) == (
+            True,
+            None,
+        )
+
+    def test_a_recorded_location_is_returned(self):
+        assert dws.marker_storage_location({"settings": {"storage_location": "eu-west"}}) == (
+            True,
+            "eu-west",
+        )
+
+    def test_the_legacy_default_literal_is_folded(self):
+        """Folded on the way out, the way the restore path folds it."""
+        from terrapod.config import DEFAULT_STORAGE_LOCATION
+
+        assert dws.marker_storage_location(
+            {"settings": {"storage_location": DEFAULT_STORAGE_LOCATION}}
+        ) == (True, None)
+
+    @pytest.mark.parametrize(
+        "marker",
+        [{}, {"settings": None}, {"settings": []}, {"settings": {}}, {"storage_location": "eu"}],
+    )
+    def test_anything_else_is_unknown(self, marker):
+        assert dws.marker_storage_location(marker) == (False, None)
+
+    @pytest.mark.parametrize("raw", [123, "", True, [], {}])
+    def test_a_non_string_is_unknown_rather_than_coerced(self, raw):
+        assert dws.marker_storage_location({"settings": {"storage_location": raw}}) == (
+            False,
+            None,
+        )
+
+    def test_it_does_not_validate_against_the_configured_locations(self, monkeypatch):
+        """A raise here would take away both callers' correct fallback (#316).
+
+        `workspace_settings.stored_storage_location` RAISES on a location that has
+        left the config, which is right for a restore and wrong for a read whose
+        caller can defer or fan out instead.
+        """
+        from terrapod.config import settings
+
+        monkeypatch.setattr(settings.storage, "locations", {})
+        assert dws.marker_storage_location({"settings": {"storage_location": "gone"}}) == (
+            True,
+            "gone",
+        )

@@ -293,6 +293,45 @@ async def write_marker(storage: ObjectStore, workspace_id: str, body: dict[str, 
         )
 
 
+def marker_storage_location(marker: dict[str, Any]) -> tuple[bool, str | None]:
+    """``(known, location)`` -- where a deleted workspace's objects live.
+
+    One producer, because the same question is asked by the follower copying a
+    deleted workspace's objects and by the reaper deleting them, and both read it
+    off `marker["settings"]` -- NOT the top level, where `storage_location` has
+    never been (#2621). The restore path has always read it correctly; two new
+    readers took `marker.get("storage_location")`, which is None for every marker
+    ever written, and their fixtures carried the same invented shape, so the pair
+    agreed with each other and not with the writer.
+
+    ``known`` is False when the marker never recorded it -- a discovery marker,
+    whose `settings` is `{}` because the row was already gone when the reaper
+    stamped it. Distinguishing that from a RECORDED None is the whole point:
+    a recorded None means the DEFAULT location, which is a real answer, while an
+    absent key means we do not know. `DbLocationResolver.remember` coerces None to
+    `default`, so teaching it an unknown pins every one of that workspace's objects
+    to the wrong store -- fast and wrong, where an untaught resolver misses and
+    fans out, which is slow and right.
+    """
+    snapshot = marker.get("settings")
+    if not isinstance(snapshot, dict) or "storage_location" not in snapshot:
+        return False, None
+    raw = snapshot["storage_location"]
+    # Deliberately NOT `workspace_settings.stored_storage_location`, which RAISES on
+    # a location that has left the config. That is right for a restore -- refusing
+    # beats restoring a workspace whose objects are unreachable -- and wrong here:
+    # re-validating a stored value on a read path is the #316 trap, and these two
+    # callers have a correct fallback (defer, or fan out) that a raise takes away.
+    # The legacy literal `default` is folded the same way it is there.
+    from terrapod.config import DEFAULT_STORAGE_LOCATION
+
+    if raw is None or raw == DEFAULT_STORAGE_LOCATION:
+        return True, None
+    if not isinstance(raw, str) or not raw:
+        return False, None
+    return True, raw
+
+
 async def read_marker(storage: ObjectStore, workspace_id: str) -> dict[str, Any] | None:
     """Read a marker, or None if there isn't one (or it is unreadable)."""
     try:

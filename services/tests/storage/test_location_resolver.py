@@ -156,6 +156,7 @@ class TestTheStartupCheck:
     @pytest.fixture(autouse=True)
     def _fresh(self, monkeypatch):
         monkeypatch.setattr(lr, "_unchecked", None)
+        monkeypatch.setattr(lr, "_counted_at", None)
 
     @pytest.fixture
     def rows(self, monkeypatch):
@@ -187,6 +188,73 @@ class TestTheStartupCheck:
 
     async def test_a_default_deployment_starts_and_is_ready(self, rows, configured):
         await lr.check_locations_at_startup()
+        assert await lr.locations_readiness() == (True, "healthy")
+
+    async def test_a_row_arriving_after_startup_is_noticed_without_a_restart(
+        self, rows, configured
+    ):
+        """The standby case, and the reason the counts check has its own clock.
+
+        A node with no locations configured starts clean -- nothing names one
+        yet -- so `_unchecked` goes to None. Readiness used to re-query only
+        when a PREVIOUS check had failed, so a row replicated afterwards was
+        never seen: the node stayed ready, and a promotion without a restart
+        wrote that workspace's objects to the default store (#2621).
+        """
+        await lr.check_locations_at_startup()
+        assert await lr.locations_readiness() == (True, "healthy")
+
+        rows.named.append(("eu-west", 3))
+
+        # Inside the window the last answer stands, deliberately: the TTL is
+        # what stops /ready querying on every kubelet probe.
+        assert (await lr.locations_readiness())[0] is True
+
+        # Past it, with no restart and no prior failure to trigger the re-query.
+        lr._counted_at = lr.time.monotonic() - lr._PROBE_TTL_SECONDS - 1
+        ready, detail = await lr.locations_readiness()
+        assert ready is False
+        assert "eu-west" in detail
+
+    async def test_readiness_owes_no_query_before_the_startup_check_has_run(self, rows, configured):
+        """The TTL re-count is a REFRESH, so an unstamped process is not stale.
+
+        Reading `_counted_at is None` as stale made the first readiness call in
+        every process query the database. On a process where the startup check
+        has not run -- a test, or one still booting -- that raises, and the raise
+        was reported as `unchecked: RuntimeError`: readiness refused for the
+        ABSENCE of a check rather than for its result, which is the opposite of
+        what holding readiness is for.
+        """
+        rows.error = RuntimeError("Database not initialized")
+        assert await lr.locations_readiness() == (True, "healthy")
+        assert lr._unchecked is None
+
+    async def test_the_startup_check_stamps_the_counts_clock(self, rows, configured):
+        """Or the refresh above fires on the call right after startup.
+
+        Startup has just done this count, so a readiness call a moment later
+        must take the answer rather than repeat the query.
+        """
+        await lr.check_locations_at_startup()
+        assert lr._counted_at is not None
+
+        rows.error = RuntimeError("the clock was not stamped, so this was queried again")
+        assert await lr.locations_readiness() == (True, "healthy")
+
+    async def test_a_startup_count_that_raised_is_still_stamped(self, rows, configured):
+        """A raise leaves `_unchecked` set, so the re-query runs on `pending`.
+
+        Stamping only on success would leave the clock at None on exactly the
+        path that needs re-checking, and `pending` -- not staleness -- is what
+        carries it.
+        """
+        rows.error = RuntimeError("boom")
+        await lr.check_locations_at_startup()
+        assert lr._counted_at is not None
+        assert lr._unchecked == "RuntimeError"
+
+        rows.error = None
         assert await lr.locations_readiness() == (True, "healthy")
 
     async def test_rows_naming_a_location_with_none_configured_hold_readiness(
@@ -259,6 +327,45 @@ class TestTheStartupCheck:
         for _ in range(2):
             ready, detail = await lr.locations_readiness()
             assert not ready and "none are configured" in detail
+
+
+class TestResolutionCannotStarveThePool:
+    """A cache miss resolves INSIDE a request that already holds a session, so it
+    takes a second connection from the same pool. Warm that never happens; the
+    cold window after a rollout is when every workspace is a first touch at
+    once, and an unbounded storm races the requests waiting on it (#2621)."""
+
+    async def test_concurrent_misses_never_hold_more_than_the_gate(self, monkeypatch):
+        from terrapod.config import settings
+
+        limit = max(2, settings.database.pool_size // 2)
+        state = SimpleNamespace(live=0, peak=0)
+
+        @contextlib.asynccontextmanager
+        async def session():
+            state.live += 1
+            state.peak = max(state.peak, state.live)
+            try:
+                # Long enough that every admitted task overlaps; without the
+                # gate they would all be in here together.
+                await asyncio.sleep(0.02)
+                db = AsyncMock()
+                result = MagicMock()
+                result.one_or_none.return_value = (None,)
+                db.execute = AsyncMock(return_value=result)
+                yield db
+            finally:
+                state.live -= 1
+
+        monkeypatch.setattr(lr, "get_db_session", session)
+        resolver = DbLocationResolver()
+        ids = [f"0192f3a1-0000-7000-8000-{i:012d}" for i in range(limit * 4)]
+        await asyncio.gather(*(resolver.location_for(i) for i in ids))
+
+        assert state.peak <= limit
+        # The control: without real overlap the assertion above is vacuous, and
+        # a gate of one would satisfy it while serialising the whole fleet.
+        assert state.peak > 1
 
 
 def test_the_api_runs_the_startup_check_once_the_database_and_storage_are_up():

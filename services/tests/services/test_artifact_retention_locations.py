@@ -101,6 +101,103 @@ class TestTheOrphanScanCoversEveryLocation:
         assert not [c for c in eu.calls if c[0] == "delete"]
 
 
+class TestTheReaperResolvesOncePerWorkspace:
+    """The workspace row is gone -- that is what makes it reapable -- so every
+    per-object delete used to miss the resolver, query the database (negative
+    lookups are deliberately never cached) and then fan the delete across every
+    configured location. The marker the reaper has already read knows where the
+    objects are (#2621)."""
+
+    class _Counting:
+        """Counts UNCACHED resolutions, which is what costs a query.
+
+        Counting calls would not distinguish the fix: the real resolver is still
+        asked once per object, it just answers them from its cache.
+        """
+
+        def __init__(self) -> None:
+            self.known: dict[str, str] = {}
+            self.misses = 0
+
+        async def location_for(self, workspace_id: str) -> str | None:
+            if workspace_id in self.known:
+                return self.known[workspace_id]
+            self.misses += 1
+            return None
+
+        def remember(self, workspace_id: str, location: str | None) -> None:
+            self.known[workspace_id] = location or "default"
+
+    async def test_a_whole_workspace_costs_no_uncached_resolution(self, stores):
+        home, eu = stores
+        for sv in ("sv-1", "sv-2", "sv-3", "sv-4"):
+            eu.objects[keys.state_key(WS_A, sv)] = b"{}"
+        body = json.loads(_marker(WS_A, age_days=31))
+        # Under `settings`, which is where the WRITER puts it. This fixture used to
+        # set it at the top level -- the same invented shape the code read it from,
+        # so the two agreed with each other and with no marker ever written (#2621).
+        body["settings"] = {**body.get("settings", {}), "storage_location": EU}
+        home.objects[keys.deleted_workspace_marker_key(WS_A)] = json.dumps(body).encode()
+
+        resolver = self._Counting()
+        router = _router(stores, resolver)
+
+        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), router, 30, 100) == 1
+        assert not eu.objects and not home.objects
+        assert resolver.misses == 0, f"{resolver.misses} uncached resolutions"
+
+    async def test_a_marker_that_never_recorded_a_location_still_reaps(self, stores):
+        """The case that broke CI, from the other side.
+
+        A DISCOVERY marker is stamped by the reaper itself, after the row is gone,
+        so its `settings` is `{}` and it never knew where the objects were. Teaching
+        the resolver that absence pins the workspace to `default` -- `remember`
+        coerces None -- so the reaper deletes from the default store, logs a
+        successful reap, and leaves these objects exactly where they are.
+
+        Not teaching costs one uncached resolution per object and fans each delete
+        across every store, which is slow and RIGHT. Slow and right beats fast and
+        wrong, so the optimisation is conditional on the marker actually knowing.
+        """
+        home, eu = stores
+        for sv in ("sv-1", "sv-2"):
+            eu.objects[keys.state_key(WS_A, sv)] = b"{}"
+        # `_marker` builds a discovery marker: `settings` is `{}`, no location.
+        home.objects[keys.deleted_workspace_marker_key(WS_A)] = _marker(WS_A, age_days=31)
+
+        resolver = self._Counting()
+        router = _router(stores, resolver)
+
+        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), router, 30, 100) == 1
+        assert not eu.objects, "the objects were in eu-west and the reaper must still reach them"
+        assert not home.objects
+        assert resolver.misses > 0, (
+            "an unknown location must stay unknown; a cached answer here is a WRONG answer"
+        )
+
+    async def test_a_location_this_node_no_longer_configures_is_not_taught(self, stores):
+        """A marker is a file in a bucket: its location may have left the config.
+
+        Teaching a name the store does not have makes every one of that workspace's
+        objects resolve to an ObjectStoreError, which the per-object handler swallows
+        as a warning -- so nothing is deleted and the orphan is immortal. Refusing to
+        teach sends the reaper back to the fan-out, which finds them.
+        """
+        home, eu = stores
+        for sv in ("sv-1", "sv-2"):
+            eu.objects[keys.state_key(WS_A, sv)] = b"{}"
+        body = json.loads(_marker(WS_A, age_days=31))
+        body["settings"] = {"storage_location": "a-location-that-left-the-config"}
+        home.objects[keys.deleted_workspace_marker_key(WS_A)] = json.dumps(body).encode()
+
+        resolver = self._Counting()
+        router = _router(stores, resolver)
+
+        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), router, 30, 100) == 1
+        assert not eu.objects and not home.objects
+        assert "a-location-that-left-the-config" not in resolver.known.values()
+
+
 class TestRowDrivenDeletesGoToTheOwningLocation:
     async def test_excess_state_versions(self, stores):
         home, eu = stores

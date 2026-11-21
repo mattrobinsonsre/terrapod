@@ -380,13 +380,20 @@ class TestAFollowerWithStorageLocations:
     KNOWN = "0192f3a1-0000-7000-8000-000000000001"
     PENDING = "0192f3a1-0000-7000-8000-000000000002"
 
-    async def _sync(self, mapping: dict[str, str], keys: list[str]):
+    async def _sync(self, mapping: dict[str, str], keys: list[str], *, teachable: bool = False):
         from terrapod.storage.routing import RoutingStore
         from tests.storage.test_routing import FakeStore as RecordingStore
         from tests.storage.test_routing import MapResolver
 
+        class _Teachable(MapResolver):
+            """What the database-backed resolver can do and the protocol does not declare."""
+
+            def remember(self, workspace_id: str, location: str | None) -> None:
+                self.mapping[workspace_id] = location or "default"
+
         home, eu = RecordingStore("home", 1), RecordingStore("eu", 1)
-        router = RoutingStore(home, {"eu-west": eu}, MapResolver(mapping))
+        resolver = (_Teachable if teachable else MapResolver)(mapping)
+        router = RoutingStore(home, {"eu-west": eu}, resolver)
         pages = [
             {
                 "data": [{"attributes": {"key": k, "size-bytes": 7}} for k in keys],
@@ -421,6 +428,47 @@ class TestAFollowerWithStorageLocations:
         key = f"state/{self.KNOWN}/a.tfstate"
         with pytest.raises(ObjectStoreError, match="not configured"):
             await self._sync({self.KNOWN: "us-east"}, [key])
+
+    async def test_a_workspace_deleted_before_its_row_arrived_is_still_copied(self):
+        """The deferral is self-healing only if the row is still coming.
+
+        A workspace deleted on the leader before its row replicated has no row
+        coming at all, so deferring it for ever means the objects are never
+        copied and restoring it here brings it back EMPTY (#2621). Its delete
+        marker still records where the objects live, and the marker is not
+        workspace-routed, so it is readable without the location it supplies.
+        """
+        import json
+
+        from terrapod.storage.keys import deleted_workspace_marker_key
+
+        gone = "0192f3a1-0000-7000-8000-00000000000f"
+        key = f"state/{gone}/a.tfstate"
+
+        from terrapod.services import deleted_workspace_service as dws
+        from tests.storage.test_routing import FakeStore as RecordingStore
+
+        # Seed the marker into the default store, where a real one lives, built by
+        # the real writer: an invented `{"storage_location": ...}` at the top level
+        # is not where the marker carries it, and matched the equally invented read
+        # this test was written against (#2621).
+        body = dws.build_discovery_marker(gone)
+        body["settings"] = {"storage_location": "eu-west"}
+        marker = json.dumps(body).encode()
+        original = RecordingStore.__init__
+
+        def seeded(self, name, expiry):
+            original(self, name, expiry)
+            if name == "home":
+                self.objects[deleted_workspace_marker_key(gone)] = marker
+
+        with patch.object(RecordingStore, "__init__", seeded):
+            result, home, eu, log = await self._sync({}, [key], teachable=True)
+
+        assert (result.copied, result.deferred, result.failed) == (1, 0, 0)
+        # In the location the MARKER named, not the default it fell back to.
+        assert set(eu.objects) == {key}
+        assert key not in home.objects
 
     async def test_a_deferred_copy_records_its_workspace(self):
         pending = f"state/{self.PENDING}/a.tfstate"

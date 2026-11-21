@@ -55,6 +55,7 @@ from terrapod.storage.keys import (
     state_key,
 )
 from terrapod.storage.protocol import ObjectStore
+from terrapod.storage.routing import remember_location
 
 logger = get_logger(__name__)
 
@@ -991,6 +992,21 @@ async def _cleanup_deleted_workspaces(
                 workspace_id=ws_id,
             )
             continue
+
+        # Once per workspace, before the loop. The row is gone -- that is what
+        # makes it reapable -- so every `delete` below would resolve its location,
+        # miss (negatives are deliberately never cached), query the database, and
+        # then fan the delete across every configured location. The marker read
+        # above already knows where the objects are (#2621).
+        #
+        # ONLY when it actually recorded one. A discovery marker did not, and
+        # `remember` coerces None to `default`, so teaching it an unknown deletes
+        # from the default store and leaves the real objects where they are --
+        # which is worse than the fan-out it replaces, because the fan-out is
+        # correct.
+        known, location = dws.marker_storage_location(marker)
+        if known:
+            remember_location(storage, str(ws_id), location)
 
         for obj in await storage.list_prefix(f"state/{ws_id}/"):
             try:
