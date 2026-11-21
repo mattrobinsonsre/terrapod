@@ -118,7 +118,7 @@ async def init_storage(resolver: LocationResolver | None = None) -> None:
     if isinstance(resolver, StaticDefaultResolver):
         logger.warning(
             "Storage locations are configured but no workspace is assigned to one yet; "
-            "listings of shared prefixes still read every location",
+            "a listing whose prefix can hold workspace-scoped keys still reads every location",
             locations=sorted(locations),
         )
 

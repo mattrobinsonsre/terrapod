@@ -704,7 +704,10 @@ class StorageConfig(BaseModel):
     locations: dict[str, StorageLocationConfig] = Field(
         default_factory=dict,
         description="Named storage locations, each a full backend definition. The "
-        "top-level backend is the reserved `default` location. Empty = single store.",
+        "top-level backend is the reserved `default` location. Empty = single store. "
+        "Only a listing whose prefix can hold workspace-scoped keys (state/, plans/, "
+        "logs/, config/, runs/, inventory/, or the bare root) fans out across the "
+        "locations; every other prefix is read from the default store alone.",
     )
 
     @field_validator("locations")

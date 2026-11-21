@@ -1681,7 +1681,7 @@
             },
             "locations": {
               "type": "object",
-              "description": "Named storage locations keyed by name. `default` is reserved; filesystem is not allowed.",
+              "description": "Named storage locations keyed by name. `default` is reserved; filesystem is not allowed. Only a listing whose prefix can hold workspace-scoped keys (state/, plans/, logs/, config/, runs/, inventory/, or the bare root) fans out across the locations; every other prefix is read from the default store alone.",
               "propertyNames": {
                 "pattern": "^[a-z0-9-]{1,32}$",
                 "not": {
