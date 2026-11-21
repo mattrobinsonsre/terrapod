@@ -55,6 +55,7 @@ from terrapod.storage.keys import (
     state_key,
 )
 from terrapod.storage.protocol import ObjectStore
+from terrapod.storage.routing import remember_location
 
 logger = get_logger(__name__)
 
@@ -991,6 +992,13 @@ async def _cleanup_deleted_workspaces(
                 workspace_id=ws_id,
             )
             continue
+
+        # Once per workspace, before the loop. The row is gone -- that is what
+        # makes it reapable -- so every `delete` below would resolve its location,
+        # miss (negatives are deliberately never cached), query the database, and
+        # then fan the delete across every configured location. The marker read
+        # above already knows where the objects are (#2621).
+        remember_location(storage, str(ws_id), marker.get("storage_location"))
 
         for obj in await storage.list_prefix(f"state/{ws_id}/"):
             try:

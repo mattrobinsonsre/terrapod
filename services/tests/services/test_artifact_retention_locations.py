@@ -101,6 +101,49 @@ class TestTheOrphanScanCoversEveryLocation:
         assert not [c for c in eu.calls if c[0] == "delete"]
 
 
+class TestTheReaperResolvesOncePerWorkspace:
+    """The workspace row is gone -- that is what makes it reapable -- so every
+    per-object delete used to miss the resolver, query the database (negative
+    lookups are deliberately never cached) and then fan the delete across every
+    configured location. The marker the reaper has already read knows where the
+    objects are (#2621)."""
+
+    class _Counting:
+        """Counts UNCACHED resolutions, which is what costs a query.
+
+        Counting calls would not distinguish the fix: the real resolver is still
+        asked once per object, it just answers them from its cache.
+        """
+
+        def __init__(self) -> None:
+            self.known: dict[str, str] = {}
+            self.misses = 0
+
+        async def location_for(self, workspace_id: str) -> str | None:
+            if workspace_id in self.known:
+                return self.known[workspace_id]
+            self.misses += 1
+            return None
+
+        def remember(self, workspace_id: str, location: str | None) -> None:
+            self.known[workspace_id] = location or "default"
+
+    async def test_a_whole_workspace_costs_no_uncached_resolution(self, stores):
+        home, eu = stores
+        for sv in ("sv-1", "sv-2", "sv-3", "sv-4"):
+            eu.objects[keys.state_key(WS_A, sv)] = b"{}"
+        body = json.loads(_marker(WS_A, age_days=31))
+        body["storage_location"] = EU
+        home.objects[keys.deleted_workspace_marker_key(WS_A)] = json.dumps(body).encode()
+
+        resolver = self._Counting()
+        router = _router(stores, resolver)
+
+        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), router, 30, 100) == 1
+        assert not eu.objects and not home.objects
+        assert resolver.misses == 0, f"{resolver.misses} uncached resolutions"
+
+
 class TestRowDrivenDeletesGoToTheOwningLocation:
     async def test_excess_state_versions(self, stores):
         home, eu = stores

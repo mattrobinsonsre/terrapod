@@ -30,6 +30,29 @@ class LocationResolver(Protocol):
         ...
 
 
+def remember_location(store: ObjectStore, workspace_id: str, location: str | None) -> bool:
+    """Teach a routing store where a workspace's objects live; False if it cannot be taught.
+
+    `LocationResolver` declares only `location_for`. Of the three resolvers only
+    the database-backed one can be taught, and `FanOutResolver` answers None for
+    every workspace -- so it reaches both callers of this on every object. Hence
+    a probe rather than an assumption: calling `remember` on it unguarded turns a
+    handled miss into an AttributeError.
+
+    Both callers are paths where the workspace ROW is gone and its delete marker
+    is the only remaining authority on where the objects are (#2621): a follower
+    copying objects for a workspace deleted before its row replicated, and the
+    reaper deleting them. Without it the reaper re-queries per object -- negative
+    lookups are deliberately never cached -- and fans every delete across every
+    configured location.
+    """
+    remember = getattr(getattr(store, "resolver", None), "remember", None)
+    if remember is None:
+        return False
+    remember(workspace_id, location)
+    return True
+
+
 class StaticDefaultResolver:
     """Places every workspace on the default location."""
 
