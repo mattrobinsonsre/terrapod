@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Regulam addere",
       "debugModeHint": "Podes cursorum defectorum apertos tenere in locis operis quos haec regula creat. Praedefinite exstinctus — pod retentus credentias illius loci operis servat.",
       "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. Praedefinite exstinctum: rogatio tractionis e furca nullum consilium speculativum accipit, quia codicem auctoris sui cum credentiis loci operis exsequeretur.",
-      "oidcAudiencesHint": "Superscriptiones auditorum omni loco operis quem haec regula creat impositae, sub configuratione provider ad quam tessera pertinet — aws, vel aws.west pro configuratione cum alias. Vacuas relinque et illi loci operis configurationem propriam instructionis adhibent."
+      "oidcAudiencesHint": "Superscriptiones auditorum omni loco operis quem haec regula creat impositae, sub configuratione provider ad quam tessera pertinet — aws, vel aws.west pro configuratione cum alias. Vacuas relinque et illi loci operis configurationem propriam instructionis adhibent.",
+      "matchPatternHint": "Cum semitis tabularum mutatarum more gitignore comparatur. <code>*</code> intra unum semitae membrum manet; <code>**</code> quotlibet eorum complectitur.",
+      "varFilesHint": "Quisque ingressus fit argumentum <code>-var-file</code>, ordine enumerato. Semita relativa ex directorio operandi legitur.",
+      "nameTemplateHint": "Signa loci: <path></path> (omne <code>/</code> per <code>-</code> substituitur) et <root></root> (directorium sicut scriptum est). Vacuum relinque pro <path></path>.",
+      "executionHooksHint": "Omnis uncus hic electus omni loco operis quem haec regula creat adiungitur. In pagina administrationis <page>Unci Exsecutionis</page> definiuntur."
     },
     "table": {
       "name": "Nomen",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Pone nexum VCS, URL repositorii et exemplar antequam praevideas",
       "scanFailed": "Scrutinium defecit ({status})",
       "scan": "Scrutinium defecit"
+    },
+    "propagate": {
+      "button": "Servare et propagare…",
+      "buttonTitle": "Hanc regulam serva, deinde optiones quas mutat ad loca operis ab ea creata applica",
+      "title": "«{ruleName}» propagare",
+      "lead": "Propagatio bis circumscribitur: ad optiones quas haec renovatio mutat, et inter illas ad loca operis quae adhuc valorem a regula ultimo positum tenent. Quidquid manu postea mutatum est, sicut est relinquitur.",
+      "computing": "Quid mutaretur computatur…",
+      "matched": "{count, plural, =0 {Nullum locum operis} one {# locum operis} other {# loca operis}} haec regula creavit",
+      "skippedLifecycle": "{count, plural, one {# locus operis nunc creatur aut destruitur, ideoque non est consideratus} other {# loca operis nunc creantur aut destruuntur, ideoque non sunt considerata}}.",
+      "nothingToDo": "Nihil mutaretur. Omnis locus operis aut regulae iam convenit aut valorem ab aliquo manu positum tenet.",
+      "willChange": "Mutabitur",
+      "leftAlone": "Intactum relinquitur",
+      "leftAloneLead": "Haec valorem a regula ultimo positum non amplius tenent, itaque propagatio optionem praeterit potius quam id quod aliquis elegit superscribit.",
+      "alreadyMatch": "{count, plural, one {# locus operis regulae iam convenit} other {# loca operis regulae iam conveniunt}}",
+      "colWorkspace": "Locus Operis",
+      "colSetting": "Optio",
+      "colFrom": "Ex",
+      "colTo": "Ad",
+      "colCurrent": "Manu Positum",
+      "colRuleNow": "Regula Nunc Dicit",
+      "empty": "(nullus)",
+      "apply": "Ad {count, plural, one {# locum operis} other {# loca operis}} propagare",
+      "applying": "Propagatur…",
+      "applied": "Ad {count, plural, one {# locum operis} other {# loca operis}} propagatum est.",
+      "confirmApply": "Has mutationes ad {count, plural, one {# locum operis} other {# loca operis}} applicare?",
+      "dryRunFailed": "Quid mutaretur computari non potuit."
     }
   },
   "adminModuleAutodiscovery": {

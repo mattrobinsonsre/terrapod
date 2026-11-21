@@ -3074,3 +3074,108 @@ test.describe('the artifact detail view (#2589)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 });
+
+test.describe('Autodiscovery rule propagation (#2621 item 50)', () => {
+  // The verdict table is the surface at risk here: four columns of workspace
+  // names, settings and before/after values is exactly the shape that pushes a
+  // page sideways at phone width, and the table only exists once a report has
+  // come back -- so an empty-report assertion would measure nothing.
+  test('the verdict table stays inside the page at phone width', async ({ page }) => {
+    const token = getStoredToken();
+
+    const vcs = await fetch(`${API_URL}/api/terrapod/v1/vcs-connections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vcs-connections',
+          attributes: {
+            name: uniqueName('e2eresp-prop-vcs'),
+            provider: 'gitlab',
+            token: 'glpat-e2e-not-a-real-token' /* gitleaks:allow — fixture, not a credential */,
+          },
+        },
+      }),
+    });
+    expect(vcs.ok).toBeTruthy();
+    const vcsId = (await vcs.json()).data.id;
+
+    const ruleName = uniqueName('e2eresp-prop-rule');
+    const made = await fetch(`${API_URL}/api/terrapod/v1/autodiscovery-rules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'autodiscovery-rules',
+          attributes: {
+            name: ruleName,
+            'vcs-connection-id': vcsId,
+            'repo-url': 'https://gitlab.com/e2e/propagation-probe',
+            pattern: '*',
+          },
+        },
+      }),
+    });
+    expect(made.ok).toBeTruthy();
+    const ruleId = (await made.json()).data.id;
+
+    // Long names and version strings, because the cells have to wrap rather
+    // than widen the page.
+    await page.route(`**/autodiscovery-rules/${ruleId}`, async (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { id: ruleId, type: 'autodiscovery-rules', attributes: { name: ruleName } },
+          meta: {
+            propagation: {
+              dry_run: true,
+              matched: 2,
+              would_change: [
+                {
+                  id: 'ws-1',
+                  name: 'payments-platform-production-eu-west',
+                  diff: { 'terraform-version': { from: '1.9.0', to: '1.13.1' } },
+                },
+              ],
+              customised: [
+                {
+                  id: 'ws-2',
+                  name: 'billing-reconciliation-staging-us-east',
+                  fields: {
+                    'terraform-version': { current: '1.11.4', previous: '1.9.0', new: '1.13.1' },
+                  },
+                },
+              ],
+              unchanged: [],
+              skipped_lifecycle: 0,
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/admin/autodiscovery');
+    await expectNoHorizontalPageScroll(page);
+
+    const row = page.getByRole('row').filter({ hasText: ruleName });
+    await expect(row).toBeVisible({ timeout: 20_000 });
+    const propagate = page.getByRole('button', { name: /Save and propagate/ });
+    await expect(async () => {
+      if ((await propagate.count()) === 0) await row.getByRole('button', { name: 'Edit' }).click();
+      await expect(propagate).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
+    await expectNoHorizontalPageScroll(page);
+
+    await propagate.click();
+    await expect(page.getByText('Will change')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Left alone')).toBeVisible();
+    // The modal is open with both tables rendered: the measurement that matters.
+    await expectNoHorizontalPageScroll(page);
+
+    // And the apply stays reachable rather than being pushed off the dialog.
+    await expect(page.getByRole('button', { name: /^Propagate to/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close' })).toBeVisible();
+  });
+});

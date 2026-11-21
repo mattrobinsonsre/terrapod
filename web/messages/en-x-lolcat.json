@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Add rule",
       "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz.",
       "allowForkPrPlansHint": "Applyz ta evry werkspace dis rule makez. Off by defalt: a pull rekwest from a fork getz no speculativ plan, coz it wud run itz authrs code wif da werkspace credenshulz.",
-      "oidcAudiencesHint": "Audienz overridez templaytd onto evry werkspace dis rool makez, keyd on da providr configurashun a tokin iz fer — aws, or aws.west fer an aliasd configurashun. Leev it empty an doze werkspacez take da deployment''z own configurashun."
+      "oidcAudiencesHint": "Audienz overridez templaytd onto evry werkspace dis rool makez, keyd on da providr configurashun a tokin iz fer — aws, or aws.west fer an aliasd configurashun. Leev it empty an doze werkspacez take da deployment''z own configurashun.",
+      "matchPatternHint": "Matchd agenst teh pathz of changd filez, gitignore-style. <code>*</code> stayz within wun path segment; <code>**</code> spanz any numbr of dem.",
+      "varFilesHint": "Each entree becomez a <code>-var-file</code> argumint, in teh ordr listd. A relativ path iz reed frum teh workin directree.",
+      "nameTemplateHint": "Plaisholdurz: <path></path> (each <code>/</code> swapd 4 a <code>-</code>) an <root></root> (teh directree just as u rote it). Leev it empteh 4 <path></path>.",
+      "executionHooksHint": "Each hook u pik heer getz stuk onto evry werkspace dis rule makez. Dey iz defind on teh <page>Execushun Hookz</page> admin page."
     },
     "table": {
       "name": "Naym",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Set VCS connecshun, repo URL, an pattrn befor previewin",
       "scanFailed": "Scan faild ({status})",
       "scan": "Scan faild"
+    },
+    "propagate": {
+      "button": "Save an propagayt…",
+      "buttonTitle": "Save dis rool, den apply da settingz it changez ta da werkspacez it createded",
+      "title": "Propagayt “{ruleName}”",
+      "lead": "Propagashun iz scopd twyce: ta da settingz dis updayt changez, an wifin doze ta da werkspacez dat still hold da valyoo da rool setted last tym. Enythin changd by hand since iz left as it iz.",
+      "computing": "Figgerin out wat wud change…",
+      "matched": "{count, plural, =0 {No werkspacez wuz} one {# werkspace wuz} other {# werkspacez wuz}} createded by dis rool",
+      "skippedLifecycle": "{count, plural, one {# werkspace iz} other {# werkspacez r}} bein createded or destroyd, an {count, plural, one {wuz} other {wuz}} not considerd.",
+      "nothingToDo": "Nuthin wud change. Evry werkspace eithr alreddy matchez da rool or holdz a valyoo sumwun setted by hand.",
+      "willChange": "Will chaynge",
+      "leftAlone": "Left alown",
+      "leftAloneLead": "Deez no longr hold da valyoo da rool setted last tym, so propagashun skipz da settin insted of overwritin wat sumwun chozed.",
+      "alreadyMatch": "{count, plural, one {# werkspace alreddy matchez} other {# werkspacez alreddy match}}",
+      "colWorkspace": "Werkspace",
+      "colSetting": "Settin",
+      "colFrom": "Frum",
+      "colTo": "Ta",
+      "colCurrent": "Setted by hand",
+      "colRuleNow": "Rool now sez",
+      "empty": "(none)",
+      "apply": "Propagayt ta {count, plural, one {# werkspace} other {# werkspacez}}",
+      "applying": "Propagaytin…",
+      "applied": "Propagayted ta {count, plural, one {# werkspace} other {# werkspacez}}.",
+      "confirmApply": "Apply deez changez ta {count, plural, one {# werkspace} other {# werkspacez}}?",
+      "dryRunFailed": "Coud not figger out wat wud change."
     }
   },
   "adminModuleAutodiscovery": {

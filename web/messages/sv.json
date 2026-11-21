@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Lägg till regel",
       "debugModeHint": "Håll misslyckade runner-poddar öppna på de arbetsytor som den här regeln skapar. Av som standard – en kvarhållen podd behåller den arbetsytans autentiseringsuppgifter.",
       "allowForkPrPlansHint": "Gäller varje arbetsyta som den här regeln skapar. Av som standard: en pull request från en fork får ingen spekulativ plan, eftersom den skulle köra författarens kod med arbetsytans autentiseringsuppgifter.",
-      "oidcAudiencesHint": "Audience-åsidosättanden som läggs på varje arbetsyta den här regeln skapar, nycklade på den providerkonfiguration ett token gäller för — aws, eller aws.west för en konfiguration med alias. Lämna tomt och de arbetsytorna använder deploymentets egen konfiguration."
+      "oidcAudiencesHint": "Audience-åsidosättanden som läggs på varje arbetsyta den här regeln skapar, nycklade på den providerkonfiguration ett token gäller för — aws, eller aws.west för en konfiguration med alias. Lämna tomt och de arbetsytorna använder deploymentets egen konfiguration.",
+      "matchPatternHint": "Matchas mot sökvägarna till ändrade filer, i gitignore-stil. <code>*</code> stannar inom ett sökvägssegment; <code>**</code> omfattar hur många som helst.",
+      "varFilesHint": "Varje post blir ett <code>-var-file</code>-argument, i den ordning de listas. En relativ sökväg läses från arbetskatalogen.",
+      "nameTemplateHint": "Platshållare: <path></path> (varje <code>/</code> ersätts med <code>-</code>) och <root></root> (katalogen precis som den skrivits). Lämna tomt för <path></path>.",
+      "executionHooksHint": "Varje krok som väljs här kopplas till varje arbetsyta som den här regeln skapar. De definieras på admin-sidan <page>Exekveringskrokar</page>."
     },
     "table": {
       "name": "Namn",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Ange VCS-anslutning, repo-URL och mönster innan förhandsgranskning",
       "scanFailed": "Skanning misslyckades ({status})",
       "scan": "Skanning misslyckades"
+    },
+    "propagate": {
+      "button": "Spara och överför…",
+      "buttonTitle": "Spara den här regeln och tillämpa sedan de inställningar den ändrar på de arbetsytor den har skapat",
+      "title": "Överför ”{ruleName}”",
+      "lead": "Överföringen är dubbelt avgränsad: till de inställningar som den här ändringen berör, och inom dessa till de arbetsytor som fortfarande har det värde regeln satte senast. Det som har ändrats manuellt sedan dess lämnas som det är.",
+      "computing": "Räknar ut vad som skulle ändras…",
+      "matched": "{count, plural, =0 {Inga arbetsytor har} one {# arbetsyta har} other {# arbetsytor har}} skapats av den här regeln",
+      "skippedLifecycle": "{count, plural, one {# arbetsyta håller} other {# arbetsytor håller}} på att skapas eller förstöras, och {count, plural, one {den togs} other {de togs}} inte med.",
+      "nothingToDo": "Inget skulle ändras. Varje arbetsyta matchar antingen redan regeln eller har ett värde som någon satt manuellt.",
+      "willChange": "Ändras",
+      "leftAlone": "Lämnas orörda",
+      "leftAloneLead": "Dessa har inte längre det värde regeln satte senast, så överföringen hoppar över inställningen i stället för att skriva över det någon har valt.",
+      "alreadyMatch": "{count, plural, one {# arbetsyta matchar redan regeln} other {# arbetsytor matchar redan regeln}}",
+      "colWorkspace": "Arbetsyta",
+      "colSetting": "Inställning",
+      "colFrom": "Från",
+      "colTo": "Till",
+      "colCurrent": "Satt manuellt",
+      "colRuleNow": "Regeln säger nu",
+      "empty": "(ingen)",
+      "apply": "Överför till {count, plural, one {# arbetsyta} other {# arbetsytor}}",
+      "applying": "Överför…",
+      "applied": "Överfört till {count, plural, one {# arbetsyta} other {# arbetsytor}}.",
+      "confirmApply": "Tillämpa de här ändringarna på {count, plural, one {# arbetsyta} other {# arbetsytor}}?",
+      "dryRunFailed": "Det gick inte att avgöra vad som skulle ändras."
     }
   },
   "adminModuleAutodiscovery": {

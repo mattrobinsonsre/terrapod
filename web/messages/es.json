@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Añadir regla",
       "debugModeHint": "Mantener abiertos los pods de runners fallidos en los espacios de trabajo que crea esta regla. Desactivado de forma predeterminada: un pod mantenido abierto conserva las credenciales de ese espacio de trabajo.",
       "allowForkPrPlansHint": "Se aplica a todos los espacios de trabajo que crea esta regla. Desactivado de forma predeterminada: una pull request desde un fork no recibe ningún plan especulativo, porque ejecutaría el código de su autor con las credenciales del espacio de trabajo.",
-      "oidcAudiencesHint": "Sustituciones de audiencias aplicadas a cada espacio de trabajo que crea esta regla, indexadas por la configuración de provider a la que corresponde un token: aws, o aws.west para una configuración con alias. Déjalas vacías y esos espacios de trabajo usan la configuración propia del despliegue."
+      "oidcAudiencesHint": "Sustituciones de audiencias aplicadas a cada espacio de trabajo que crea esta regla, indexadas por la configuración de provider a la que corresponde un token: aws, o aws.west para una configuración con alias. Déjalas vacías y esos espacios de trabajo usan la configuración propia del despliegue.",
+      "matchPatternHint": "Se compara con las rutas de los archivos modificados, al estilo de gitignore. <code>*</code> no sale de un único segmento de ruta; <code>**</code> abarca cualquier número de ellos.",
+      "varFilesHint": "Cada entrada se convierte en un argumento <code>-var-file</code>, en el orden indicado. Una ruta relativa se interpreta desde el directorio de trabajo.",
+      "nameTemplateHint": "Marcadores: <path></path> (cada <code>/</code> sustituido por <code>-</code>) y <root></root> (el directorio tal cual se escribe). Déjalo vacío para <path></path>.",
+      "executionHooksHint": "Cada hook seleccionado aquí se asocia a todos los espacios de trabajo que crea esta regla. Se definen en la página de administración <page>Hooks de ejecución</page>."
     },
     "table": {
       "name": "Nombre",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Establezca la conexión VCS, la URL del repositorio y el patrón antes de previsualizar",
       "scanFailed": "Error en el escaneo ({status})",
       "scan": "Error en el escaneo"
+    },
+    "propagate": {
+      "button": "Guardar y propagar…",
+      "buttonTitle": "Guardar esta regla y luego aplicar los ajustes que cambia a los espacios de trabajo que creó",
+      "title": "Propagar «{ruleName}»",
+      "lead": "La propagación está delimitada dos veces: a los ajustes que cambia esta actualización y, dentro de esos, a los espacios de trabajo que todavía conservan el valor que la regla fijó la última vez. Lo que se haya cambiado a mano desde entonces se deja como está.",
+      "computing": "Calculando qué cambiaría…",
+      "matched": "{count, plural, =0 {Ningún espacio de trabajo fue creado} one {# espacio de trabajo fue creado} other {# espacios de trabajo fueron creados}} por esta regla",
+      "skippedLifecycle": "{count, plural, one {# espacio de trabajo se está creando o destruyendo} other {# espacios de trabajo se están creando o destruyendo}}, así que no se {count, plural, one {tuvo} other {tuvieron}} en cuenta.",
+      "nothingToDo": "No cambiaría nada. Cada espacio de trabajo o ya coincide con la regla o conserva un valor que alguien fijó a mano.",
+      "willChange": "Cambiará",
+      "leftAlone": "Se deja intacto",
+      "leftAloneLead": "Estos ya no conservan el valor que la regla fijó la última vez, así que la propagación omite el ajuste en lugar de sobrescribir lo que alguien eligió.",
+      "alreadyMatch": "{count, plural, one {# espacio de trabajo ya coincide} other {# espacios de trabajo ya coinciden}}",
+      "colWorkspace": "Espacio de trabajo",
+      "colSetting": "Ajuste",
+      "colFrom": "De",
+      "colTo": "A",
+      "colCurrent": "Fijado a mano",
+      "colRuleNow": "La regla ahora dice",
+      "empty": "(ninguno)",
+      "apply": "Propagar a {count, plural, one {# espacio de trabajo} other {# espacios de trabajo}}",
+      "applying": "Propagando…",
+      "applied": "Propagado a {count, plural, one {# espacio de trabajo} other {# espacios de trabajo}}.",
+      "confirmApply": "¿Aplicar estos cambios a {count, plural, one {# espacio de trabajo} other {# espacios de trabajo}}?",
+      "dryRunFailed": "No se pudo calcular qué cambiaría."
     }
   },
   "adminModuleAutodiscovery": {

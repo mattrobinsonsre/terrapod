@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Dodaj regułę",
       "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej.",
       "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie wyłączone: pull request z forka nie otrzymuje planu spekulatywnego, ponieważ uruchomiłby kod swojego autora z poświadczeniami przestrzeni roboczej.",
-      "oidcAudiencesHint": "Nadpisania audience nakładane na każdą przestrzeń roboczą tworzoną przez tę regułę, zaindeksowane na konfiguracji providera, dla której jest token — aws lub aws.west dla konfiguracji z aliasem. Zostaw puste i te przestrzenie robocze użyją własnej konfiguracji wdrożenia."
+      "oidcAudiencesHint": "Nadpisania audience nakładane na każdą przestrzeń roboczą tworzoną przez tę regułę, zaindeksowane na konfiguracji providera, dla której jest token — aws lub aws.west dla konfiguracji z aliasem. Zostaw puste i te przestrzenie robocze użyją własnej konfiguracji wdrożenia.",
+      "matchPatternHint": "Dopasowywane do ścieżek zmienionych plików, w stylu gitignore. <code>*</code> pozostaje w obrębie jednego segmentu ścieżki; <code>**</code> obejmuje dowolną ich liczbę.",
+      "varFilesHint": "Każdy wpis staje się argumentem <code>-var-file</code>, w podanej kolejności. Ścieżka względna jest odczytywana względem katalogu roboczego.",
+      "nameTemplateHint": "Symbole zastępcze: <path></path> (każdy <code>/</code> zamieniony na <code>-</code>) i <root></root> (katalog dokładnie tak, jak został zapisany). Puste pole oznacza <path></path>.",
+      "executionHooksHint": "Każdy wybrany tutaj punkt zaczepienia jest dołączany do każdego obszaru roboczego tworzonego przez tę regułę. Definiuje się je na stronie administracyjnej <page>Punkty zaczepienia wykonania</page>."
     },
     "table": {
       "name": "Nazwa",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Przed podglądem ustaw połączenie VCS, adres URL repozytorium i wzorzec",
       "scanFailed": "Skanowanie nie powiodło się ({status})",
       "scan": "Skanowanie nie powiodło się"
+    },
+    "propagate": {
+      "button": "Zapisz i propaguj…",
+      "buttonTitle": "Zapisz tę regułę, a następnie zastosuj zmieniane przez nią ustawienia do utworzonych przez nią obszarów roboczych",
+      "title": "Propaguj \"{ruleName}\"",
+      "lead": "Propagacja jest zawężona dwukrotnie: do ustawień, które zmienia ta aktualizacja, a w ich obrębie do obszarów roboczych, które nadal mają wartość ustawioną przez regułę ostatnim razem. Wszystko, co od tego czasu zmieniono ręcznie, pozostaje bez zmian.",
+      "computing": "Ustalanie, co by się zmieniło…",
+      "matched": "{count, plural, =0 {Ta reguła nie utworzyła żadnego obszaru roboczego} one {Ta reguła utworzyła # obszar roboczy} few {Ta reguła utworzyła # obszary robocze} many {Ta reguła utworzyła # obszarów roboczych} other {Ta reguła utworzyła # obszaru roboczego}}",
+      "skippedLifecycle": "{count, plural, one {# obszar roboczy jest właśnie tworzony lub niszczony i nie został uwzględniony.} few {# obszary robocze są właśnie tworzone lub niszczone i nie zostały uwzględnione.} many {# obszarów roboczych jest właśnie tworzonych lub niszczonych i nie zostało uwzględnionych.} other {# obszaru roboczego jest właśnie tworzone lub niszczone i nie zostało uwzględnione.}}",
+      "nothingToDo": "Nic by się nie zmieniło. Każdy obszar roboczy albo już pasuje do reguły, albo ma wartość ustawioną ręcznie przez kogoś.",
+      "willChange": "Zostanie zmienione",
+      "leftAlone": "Pozostaje bez zmian",
+      "leftAloneLead": "Te nie mają już wartości ustawionej przez regułę ostatnim razem, więc propagacja pomija to ustawienie, zamiast nadpisywać dokonany wybór.",
+      "alreadyMatch": "{count, plural, one {# obszar roboczy już pasuje do reguły} few {# obszary robocze już pasują do reguły} many {# obszarów roboczych już pasuje do reguły} other {# obszaru roboczego już pasuje do reguły}}",
+      "colWorkspace": "Obszar roboczy",
+      "colSetting": "Ustawienie",
+      "colFrom": "Było",
+      "colTo": "Będzie",
+      "colCurrent": "Ustawione ręcznie",
+      "colRuleNow": "Teraz według reguły",
+      "empty": "(brak)",
+      "apply": "Propaguj do {count, plural, one {# obszaru roboczego} few {# obszarów roboczych} many {# obszarów roboczych} other {# obszaru roboczego}}",
+      "applying": "Propagowanie…",
+      "applied": "Propagowano do {count, plural, one {# obszaru roboczego} few {# obszarów roboczych} many {# obszarów roboczych} other {# obszaru roboczego}}.",
+      "confirmApply": "Zastosować te zmiany do {count, plural, one {# obszaru roboczego} few {# obszarów roboczych} many {# obszarów roboczych} other {# obszaru roboczego}}?",
+      "dryRunFailed": "Nie udało się ustalić, co by się zmieniło."
     }
   },
   "adminModuleAutodiscovery": {

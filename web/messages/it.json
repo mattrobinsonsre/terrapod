@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Aggiungi regola",
       "debugModeHint": "Mantenere aperti i pod dei runner falliti sugli spazi di lavoro creati da questa regola. Disattivato per impostazione predefinita: un pod mantenuto aperto conserva le credenziali di quello spazio di lavoro.",
       "allowForkPrPlansHint": "Si applica a ogni spazio di lavoro creato da questa regola. Disattivato per impostazione predefinita: una pull request da un fork non riceve alcun plan speculativo, perché eseguirebbe il codice del suo autore con le credenziali dello spazio di lavoro.",
-      "oidcAudiencesHint": "Sovrascritture di audience applicate a ogni spazio di lavoro creato da questa regola, indicizzate sulla configurazione di provider a cui corrisponde un token — aws, oppure aws.west per una configurazione con alias. Lasciale vuote e quegli spazi di lavoro usano la configurazione propria del deployment."
+      "oidcAudiencesHint": "Sovrascritture di audience applicate a ogni spazio di lavoro creato da questa regola, indicizzate sulla configurazione di provider a cui corrisponde un token — aws, oppure aws.west per una configurazione con alias. Lasciale vuote e quegli spazi di lavoro usano la configurazione propria del deployment.",
+      "matchPatternHint": "Confrontato con i percorsi dei file modificati, in stile gitignore. <code>*</code> resta all'interno di un singolo segmento di percorso; <code>**</code> ne copre un numero qualsiasi.",
+      "varFilesHint": "Ogni voce diventa un argomento <code>-var-file</code>, nell'ordine elencato. Un percorso relativo viene interpretato dalla directory di lavoro.",
+      "nameTemplateHint": "Segnaposto: <path></path> (ogni <code>/</code> sostituito da <code>-</code>) e <root></root> (la directory così com'è scritta). Lascialo vuoto per <path></path>.",
+      "executionHooksHint": "Ogni hook selezionato qui viene associato a ogni workspace creato da questa regola. Sono definiti nella pagina di amministrazione <page>Hook di esecuzione</page>."
     },
     "table": {
       "name": "Nome",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Imposta la connessione VCS, l''URL del repository e il pattern prima di visualizzare l''anteprima",
       "scanFailed": "Scansione non riuscita ({status})",
       "scan": "Scansione non riuscita"
+    },
+    "propagate": {
+      "button": "Salva e propaga…",
+      "buttonTitle": "Salva questa regola, poi applica le impostazioni che modifica ai workspace che ha creato",
+      "title": "Propaga «{ruleName}»",
+      "lead": "La propagazione è delimitata due volte: alle impostazioni che questo aggiornamento modifica e, tra quelle, ai workspace che mantengono ancora il valore impostato dalla regola l'ultima volta. Ciò che è stato cambiato a mano da allora viene lasciato così come è.",
+      "computing": "Calcolo di ciò che cambierebbe…",
+      "matched": "{count, plural, =0 {Nessun workspace è stato creato} one {# workspace è stato creato} other {# workspace sono stati creati}} da questa regola",
+      "skippedLifecycle": "{count, plural, one {# workspace è in fase di creazione o distruzione} other {# workspace sono in fase di creazione o distruzione}}, quindi non {count, plural, one {è stato preso} other {sono stati presi}} in considerazione.",
+      "nothingToDo": "Non cambierebbe nulla. Ogni workspace corrisponde già alla regola oppure mantiene un valore impostato a mano da qualcuno.",
+      "willChange": "Verrà modificato",
+      "leftAlone": "Lasciato intatto",
+      "leftAloneLead": "Questi non mantengono più il valore impostato dalla regola l'ultima volta, quindi la propagazione salta l'impostazione invece di sovrascrivere la scelta fatta da qualcuno.",
+      "alreadyMatch": "{count, plural, one {# workspace corrisponde già} other {# workspace corrispondono già}}",
+      "colWorkspace": "Workspace",
+      "colSetting": "Impostazione",
+      "colFrom": "Da",
+      "colTo": "A",
+      "colCurrent": "Impostato a mano",
+      "colRuleNow": "Ora la regola dice",
+      "empty": "(nessuno)",
+      "apply": "Propaga a {count, plural, one {# workspace} other {# workspace}}",
+      "applying": "Propagazione…",
+      "applied": "Propagato a {count, plural, one {# workspace} other {# workspace}}.",
+      "confirmApply": "Applicare queste modifiche a {count, plural, one {# workspace} other {# workspace}}?",
+      "dryRunFailed": "Non è stato possibile calcolare ciò che cambierebbe."
     }
   },
   "adminModuleAutodiscovery": {

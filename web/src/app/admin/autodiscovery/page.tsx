@@ -39,6 +39,8 @@ import { engineWord } from '@/lib/phase-vocabulary'
 import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
+import { useIsTouch } from '@/lib/use-media-query'
+import { propagationCell, type PropagationReport } from '@/lib/rule-propagation'
 import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
@@ -236,6 +238,9 @@ export default function AutodiscoveryPage() {
   // The yes/no pair the templated booleans need is read by `RuleYesNo` itself,
   // so the page no longer binds `runDetail.common`.
   const fmt = useFormat()
+  // Pointer type, not width: the propagation apply is a fleet write, so it is
+  // confirmed where a mis-tap is easy regardless of how wide the window is.
+  const isTouch = useIsTouch()
   const [rules, setRules] = useState<AutodiscoveryRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
   const [pools, setPools] = useState<AgentPool[]>([])
@@ -382,6 +387,18 @@ export default function AutodiscoveryPage() {
       existing_autodiscovered: boolean
     }>
     scanning?: boolean
+  } | null>(null)
+
+  // The propagation review (#2621 item 50). A dry run comes first because the
+  // verdicts are per workspace AND per setting, and `customised` means the
+  // setting is SKIPPED rather than overwritten -- the one thing an operator
+  // must not have to guess at before pressing anything.
+  const [propagateModal, setPropagateModal] = useState<{
+    ruleName: string
+    loading?: boolean
+    applying?: boolean
+    error?: string
+    report?: PropagationReport
   } | null>(null)
 
   const accessor = useCallback((r: AutodiscoveryRule, key: SortKey) => {
@@ -617,12 +634,11 @@ export default function AutodiscoveryPage() {
     setShowForm(true)
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    setError('')
-    setSuccess('')
-
+  // ONE producer for the rule's attributes, shared by the plain save and by
+  // the propagation dry run. Two copies would drift, and a dry run describing
+  // a different payload from the one the apply sends is worse than no dry run
+  // at all -- the operator would be reading a table about something else.
+  function buildRuleAttrs(): Record<string, unknown> {
     const ignorePatterns = ignorePatternsText
       .split('\n')
       .map(s => s.trim())
@@ -735,6 +751,16 @@ export default function AutodiscoveryPage() {
       'run-task-templates': runTaskTemplates,
       'notification-templates': notificationTemplates,
     }
+    return attrs
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError('')
+    setSuccess('')
+
+    const attrs = buildRuleAttrs()
 
     try {
       const path = editingId
@@ -763,6 +789,68 @@ export default function AutodiscoveryPage() {
       setError(err instanceof Error ? err.message : t('errors.save'))
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // The dry run: save-and-propagate with `dry_run`, which the endpoint runs
+  // inside a transaction it rolls back, so this writes nothing. `dry_run`
+  // without `propagate` is a 422, so the two always travel together.
+  async function runPropagationDryRun() {
+    if (!editingId) return
+    setError('')
+    setSuccess('')
+    setPropagateModal({ ruleName: name, loading: true })
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/autodiscovery-rules/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'autodiscovery-rules', attributes: buildRuleAttrs() },
+          propagate: true,
+          dry_run: true,
+        }),
+      })
+      if (!res.ok) throw new Error(await parseApiError(res, t('propagate.dryRunFailed')))
+      const body = await res.json()
+      setPropagateModal({ ruleName: name, report: body?.meta?.propagation })
+    } catch (err) {
+      setPropagateModal({
+        ruleName: name,
+        error: err instanceof Error ? err.message : t('propagate.dryRunFailed'),
+      })
+    }
+  }
+
+  async function applyPropagation() {
+    if (!editingId || !propagateModal?.report) return
+    const count = propagateModal.report.would_change.length
+    // A fleet write, so it is confirmed on touch where a mis-tap is easy; on a
+    // precise pointer the table above it is the deliberate review.
+    if (isTouch && !confirm(t('propagate.confirmApply', { count }))) return
+    setPropagateModal({ ...propagateModal, applying: true, error: undefined })
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/autodiscovery-rules/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'autodiscovery-rules', attributes: buildRuleAttrs() },
+          propagate: true,
+        }),
+      })
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.save')))
+      const body = await res.json()
+      const applied = body?.meta?.propagation?.would_change?.length ?? count
+      setPropagateModal(null)
+      setSuccess(t('propagate.applied', { count: applied }))
+      setShowForm(false)
+      resetForm()
+      loadAll()
+    } catch (err) {
+      setPropagateModal({
+        ...propagateModal,
+        applying: false,
+        error: err instanceof Error ? err.message : t('errors.save'),
+      })
     }
   }
 
@@ -2100,7 +2188,10 @@ export default function AutodiscoveryPage() {
               </section>
             </section>
 
-            <div className="flex gap-2 pt-2">
+            {/* `flex-wrap`: this row gained a fourth control, and at phone
+                width four buttons cannot shrink below their longest word --
+                so the row set the page's width and it scrolled sideways. */}
+            <div className="flex flex-wrap gap-2 pt-2">
               <button
                 type="submit"
                 // A rule that declares neither operation would materialise
@@ -2120,6 +2211,19 @@ export default function AutodiscoveryPage() {
               >
                 {t('actions.preview')}
               </button>
+              {/* Propagation applies a rule update to the workspaces the rule
+                  has already created, so it is offered only when editing one. */}
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={runPropagationDryRun}
+                  disabled={submitting || ruleHasNoOperations}
+                  className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 text-sm disabled:opacity-50"
+                  title={t('propagate.buttonTitle')}
+                >
+                  {t('propagate.button')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setShowForm(false); resetForm() }}
@@ -2214,6 +2318,205 @@ export default function AutodiscoveryPage() {
                 >
                   {t('actions.delete')}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {propagateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] flex flex-col">
+              {/* A rule name is user data and can be one unbroken token, so the
+                  heading has to wrap rather than set the dialog's width. */}
+              <h3 className="text-lg font-semibold text-slate-100 mb-1 break-words min-w-0">
+                {t('propagate.title', { ruleName: propagateModal.ruleName })}
+              </h3>
+              <p className="text-xs text-slate-500 mb-4">{t('propagate.lead')}</p>
+
+              {propagateModal.loading && (
+                <div className="py-2">
+                  <LoadingSpinner />
+                  <p className="text-sm text-slate-400 mt-2">{t('propagate.computing')}</p>
+                </div>
+              )}
+
+              {propagateModal.error && (
+                <div className="text-sm text-red-300 bg-red-900/20 border border-red-800/50 rounded p-3 mb-4">
+                  {propagateModal.error}
+                </div>
+              )}
+
+              {propagateModal.report && (
+                <div className="overflow-auto flex-1 mb-4 flex flex-col gap-4 min-w-0">
+                  <p className="text-xs text-slate-500">
+                    {t('propagate.matched', { count: propagateModal.report.matched })}
+                    {propagateModal.report.skipped_lifecycle > 0 && (
+                      <>
+                        {' '}
+                        {t('propagate.skippedLifecycle', {
+                          count: propagateModal.report.skipped_lifecycle,
+                        })}
+                      </>
+                    )}
+                  </p>
+
+                  {propagateModal.report.would_change.length === 0 &&
+                    propagateModal.report.customised.length === 0 && (
+                      <p className="text-sm text-slate-400">{t('propagate.nothingToDo')}</p>
+                    )}
+
+                  {propagateModal.report.would_change.length > 0 && (
+                    <section>
+                      <h4 className="text-sm font-medium text-slate-200 mb-2">
+                        {t('propagate.willChange')}
+                      </h4>
+                      {/* Four columns of names and values cannot be read at phone
+                          width, and a flex item's `min-width: auto` means the
+                          scroll container will not shrink below the table's
+                          min-content width either -- so the page itself goes
+                          sideways. Cards below `md`, table above (#719). */}
+                      <div className="hidden md:block overflow-x-auto border border-slate-700/50 rounded">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-800/50">
+                            <tr className="border-b border-slate-700/50">
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colWorkspace')}</th>
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colSetting')}</th>
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colFrom')}</th>
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colTo')}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-700/30">
+                            {propagateModal.report.would_change.flatMap(w =>
+                              Object.entries(w.diff ?? {}).map(([field, value]) => (
+                                <tr key={`${w.id}:${field}`}>
+                                  <td className="px-3 py-2 text-slate-200">{w.name}</td>
+                                  <td className="px-3 py-2 font-mono text-xs text-slate-300">{field}</td>
+                                  <td className="px-3 py-2 font-mono text-xs text-slate-400">
+                                    {Array.isArray(value)
+                                      ? '\u2014'
+                                      : propagationCell(value.from, t('propagate.empty'))}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs text-slate-200">
+                                    {Array.isArray(value)
+                                      ? propagationCell(value, t('propagate.empty'))
+                                      : propagationCell(value.to, t('propagate.empty'))}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      <ul className="md:hidden flex flex-col gap-2 min-w-0">
+                        {propagateModal.report.would_change.map(w => (
+                          <li key={w.id} className="min-w-0 border border-slate-700/50 rounded p-3">
+                            <p className="text-sm text-slate-200 break-words mb-2">{w.name}</p>
+                            <dl className="flex flex-col gap-1.5 min-w-0">
+                              {Object.entries(w.diff ?? {}).map(([field, value]) => (
+                                <div key={field} className="min-w-0">
+                                  <dt className="font-mono text-xs text-slate-400 break-all">{field}</dt>
+                                  <dd className="font-mono text-xs text-slate-200 break-all">
+                                    {Array.isArray(value)
+                                      ? propagationCell(value, t('propagate.empty'))
+                                      : `${propagationCell(value.from, t('propagate.empty'))} \u2192 ${propagationCell(value.to, t('propagate.empty'))}`}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {propagateModal.report.customised.length > 0 && (
+                    <section>
+                      <h4 className="text-sm font-medium text-slate-200 mb-1">
+                        {t('propagate.leftAlone')}
+                      </h4>
+                      <p className="text-xs text-slate-500 mb-2">{t('propagate.leftAloneLead')}</p>
+                      <div className="hidden md:block overflow-x-auto border border-slate-700/50 rounded">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-800/50">
+                            <tr className="border-b border-slate-700/50">
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colWorkspace')}</th>
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colSetting')}</th>
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colCurrent')}</th>
+                              <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('propagate.colRuleNow')}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-700/30">
+                            {propagateModal.report.customised.flatMap(w =>
+                              Object.entries(w.fields).map(([field, v]) => (
+                                <tr key={`${w.id}:${field}`}>
+                                  <td className="px-3 py-2 text-slate-200">{w.name}</td>
+                                  <td className="px-3 py-2 font-mono text-xs text-slate-300">{field}</td>
+                                  <td className="px-3 py-2 font-mono text-xs text-slate-200">
+                                    {propagationCell(v.current, t('propagate.empty'))}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs text-slate-400">
+                                    {propagationCell(v.new, t('propagate.empty'))}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      <ul className="md:hidden flex flex-col gap-2 min-w-0">
+                        {propagateModal.report.customised.map(w => (
+                          <li key={w.id} className="min-w-0 border border-slate-700/50 rounded p-3">
+                            <p className="text-sm text-slate-200 break-words mb-2">{w.name}</p>
+                            <dl className="flex flex-col gap-1.5 min-w-0">
+                              {Object.entries(w.fields).map(([field, v]) => (
+                                <div key={field} className="min-w-0">
+                                  <dt className="font-mono text-xs text-slate-400 break-all">{field}</dt>
+                                  <dd className="font-mono text-xs text-slate-200 break-all">
+                                    {t('propagate.colCurrent')}: {propagationCell(v.current, t('propagate.empty'))}
+                                  </dd>
+                                  <dd className="font-mono text-xs text-slate-400 break-all">
+                                    {t('propagate.colRuleNow')}: {propagationCell(v.new, t('propagate.empty'))}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {propagateModal.report.unchanged.length > 0 && (
+                    <p className="text-xs text-slate-500">
+                      {t('propagate.alreadyMatch', {
+                        count: propagateModal.report.unchanged.length,
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setPropagateModal(null)}
+                  disabled={propagateModal.applying}
+                  className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm disabled:opacity-50"
+                >
+                  {t('actions.close')}
+                </button>
+                {propagateModal.report && propagateModal.report.would_change.length > 0 && (
+                  <button
+                    onClick={applyPropagation}
+                    disabled={propagateModal.applying}
+                    className="px-4 py-2 rounded bg-brand-600 hover:bg-brand-600/80 text-white text-sm disabled:opacity-50"
+                  >
+                    {propagateModal.applying
+                      ? t('propagate.applying')
+                      : t('propagate.apply', {
+                          count: propagateModal.report.would_change.length,
+                        })}
+                  </button>
+                )}
               </div>
             </div>
           </div>

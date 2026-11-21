@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Lisää sääntö",
       "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset.",
       "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena pois päältä: forkista avattu pull request ei saa spekulatiivista suunnitelmaa, koska se ajaisi tekijänsä koodin työtilan tunnuksilla.",
-      "oidcAudiencesHint": "Audience-ohitukset, jotka asetetaan jokaiseen tämän säännön luomaan työtilaan, avaimena provider-konfiguraatio, jota token koskee — aws tai aws.west alias-konfiguraatiolle. Jätä tyhjäksi, niin nämä työtilat käyttävät käyttöönoton omaa konfiguraatiota."
+      "oidcAudiencesHint": "Audience-ohitukset, jotka asetetaan jokaiseen tämän säännön luomaan työtilaan, avaimena provider-konfiguraatio, jota token koskee — aws tai aws.west alias-konfiguraatiolle. Jätä tyhjäksi, niin nämä työtilat käyttävät käyttöönoton omaa konfiguraatiota.",
+      "matchPatternHint": "Verrataan muutettujen tiedostojen polkuihin gitignore-tyyliin. <code>*</code> pysyy yhden polkuosan sisällä; <code>**</code> kattaa niitä minkä tahansa määrän.",
+      "varFilesHint": "Jokaisesta kohdasta tulee <code>-var-file</code>-argumentti luettelon järjestyksessä. Suhteellinen polku luetaan työhakemistosta.",
+      "nameTemplateHint": "Paikkamerkit: <path></path> (jokainen <code>/</code> korvataan merkillä <code>-</code>) ja <root></root> (hakemisto täsmälleen kirjoitetussa muodossa). Jätä tyhjäksi, niin käytetään <path></path>.",
+      "executionHooksHint": "Jokainen tässä valittu koukku liitetään jokaiseen työtilaan, jonka tämä sääntö luo. Ne määritetään <page>Suorituskoukut</page>-hallintasivulla."
     },
     "table": {
       "name": "Nimi",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "Aseta VCS-yhteys, repon URL ja malli ennen esikatselua",
       "scanFailed": "Skannaus epäonnistui ({status})",
       "scan": "Skannaus epäonnistui"
+    },
+    "propagate": {
+      "button": "Tallenna ja levitä…",
+      "buttonTitle": "Tallenna tämä sääntö ja vie sen muuttamat asetukset sen luomiin työtiloihin",
+      "title": "Levitä ”{ruleName}”",
+      "lead": "Levittäminen on rajattu kahdesti: niihin asetuksiin, joita tämä päivitys muuttaa, ja niiden sisällä niihin työtiloihin, joissa on vielä se arvo, jonka sääntö asetti viimeksi. Kaikki sen jälkeen käsin muutettu jätetään ennalleen.",
+      "computing": "Selvitetään, mikä muuttuisi…",
+      "matched": "{count, plural, =0 {Tämä sääntö ei luonut yhtään työtilaa} one {Tämä sääntö loi # työtilan} other {Tämä sääntö loi # työtilaa}}",
+      "skippedLifecycle": "{count, plural, one {# työtilaa ollaan luomassa tai tuhoamassa, eikä sitä otettu huomioon.} other {# työtilaa ollaan luomassa tai tuhoamassa, eikä niitä otettu huomioon.}}",
+      "nothingToDo": "Mikään ei muuttuisi. Jokainen työtila vastaa jo sääntöä tai siinä on arvo, jonka joku on asettanut käsin.",
+      "willChange": "Muuttuu",
+      "leftAlone": "Jätetään ennalleen",
+      "leftAloneLead": "Näissä ei enää ole sitä arvoa, jonka sääntö asetti viimeksi, joten levittäminen ohittaa asetuksen sen sijaan että korvaisi jonkun tekemän valinnan.",
+      "alreadyMatch": "{count, plural, one {# työtila vastaa jo sääntöä} other {# työtilaa vastaa jo sääntöä}}",
+      "colWorkspace": "Työtila",
+      "colSetting": "Asetus",
+      "colFrom": "Mistä",
+      "colTo": "Mihin",
+      "colCurrent": "Asetettu käsin",
+      "colRuleNow": "Sääntö sanoo nyt",
+      "empty": "(ei mitään)",
+      "apply": "Levitä {count, plural, one {# työtilaan} other {# työtilaan}}",
+      "applying": "Levitetään…",
+      "applied": "Levitetty {count, plural, one {# työtilaan} other {# työtilaan}}.",
+      "confirmApply": "Otetaanko nämä muutokset käyttöön {count, plural, one {# työtilassa} other {# työtilassa}}?",
+      "dryRunFailed": "Ei voitu selvittää, mikä muuttuisi."
     }
   },
   "adminModuleAutodiscovery": {

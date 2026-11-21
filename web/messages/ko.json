@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "규칙 추가",
       "debugModeHint": "이 규칙이 만드는 워크스페이스에서 실패한 러너 파드를 유지합니다. 기본값은 꺼짐 — 유지된 파드는 해당 워크스페이스의 자격 증명을 보관합니다.",
       "allowForkPrPlansHint": "이 규칙이 만드는 모든 워크스페이스에 적용됩니다. 기본값은 꺼짐: 포크에서 온 풀 리퀘스트는 예상 계획을 받지 않습니다. 작성자의 코드를 워크스페이스의 자격 증명으로 실행하게 되기 때문입니다.",
-      "oidcAudiencesHint": "이 규칙이 생성하는 각 워크스페이스에 적용되는 대상 재정의. 키는 토큰이 해당하는 프로바이더 구성입니다 — aws, 별칭이 있는 구성이면 aws.west. 비워 두면 해당 워크스페이스는 배포 자체의 구성을 사용합니다."
+      "oidcAudiencesHint": "이 규칙이 생성하는 각 워크스페이스에 적용되는 대상 재정의. 키는 토큰이 해당하는 프로바이더 구성입니다 — aws, 별칭이 있는 구성이면 aws.west. 비워 두면 해당 워크스페이스는 배포 자체의 구성을 사용합니다.",
+      "matchPatternHint": "변경된 파일의 경로와 gitignore 방식으로 비교됩니다. <code>*</code>는 하나의 경로 세그먼트 안에 머물고, <code>**</code>는 임의 개수의 세그먼트에 걸칩니다.",
+      "varFilesHint": "각 항목은 나열된 순서대로 <code>-var-file</code> 인수가 됩니다. 상대 경로는 작업 디렉터리를 기준으로 해석됩니다.",
+      "nameTemplateHint": "자리 표시자: <path></path>(각 <code>/</code>가 <code>-</code>로 바뀝니다)와 <root></root>(디렉터리를 쓴 그대로). 비워 두면 <path></path>가 사용됩니다.",
+      "executionHooksHint": "여기서 선택한 각 훅은 이 규칙이 생성하는 모든 워크스페이스에 연결됩니다. 훅은 <page>실행 훅</page> 관리 페이지에서 정의합니다."
     },
     "table": {
       "name": "이름",
@@ -1192,6 +1196,32 @@
       "previewPrereq": "미리 보기 전에 VCS 연결, 저장소 URL, 패턴을 설정하세요",
       "scanFailed": "스캔 실패 ({status})",
       "scan": "스캔에 실패했습니다"
+    },
+    "propagate": {
+      "button": "저장 후 전파…",
+      "buttonTitle": "이 규칙을 저장한 뒤, 규칙이 변경하는 설정을 규칙이 생성한 워크스페이스에 적용합니다",
+      "title": "\"{ruleName}\" 전파",
+      "lead": "전파 범위는 두 번 좁혀집니다. 이번 업데이트가 변경하는 설정으로, 그리고 그중에서도 규칙이 지난번에 설정한 값을 아직 그대로 가지고 있는 워크스페이스로 좁혀집니다. 그 이후에 수동으로 변경된 값은 그대로 유지됩니다.",
+      "computing": "무엇이 변경될지 계산 중…",
+      "matched": "{count, plural, =0 {이 규칙으로 생성된 워크스페이스가 없습니다} one {이 규칙으로 워크스페이스 #개가 생성되었습니다} other {이 규칙으로 워크스페이스 #개가 생성되었습니다}}",
+      "skippedLifecycle": "{count, plural, one {워크스페이스 #개가} other {워크스페이스 #개가}} 생성 또는 삭제 중이어서 고려되지 않았습니다.",
+      "nothingToDo": "변경되는 항목이 없습니다. 모든 워크스페이스가 이미 규칙과 일치하거나, 누군가 수동으로 설정한 값을 가지고 있습니다.",
+      "willChange": "변경 예정",
+      "leftAlone": "그대로 유지",
+      "leftAloneLead": "이 워크스페이스들은 규칙이 지난번에 설정한 값을 더 이상 가지고 있지 않으므로, 전파는 선택된 값을 덮어쓰지 않고 해당 설정을 건너뜁니다.",
+      "alreadyMatch": "{count, plural, one {워크스페이스 #개는 이미 규칙과 일치합니다} other {워크스페이스 #개는 이미 규칙과 일치합니다}}",
+      "colWorkspace": "워크스페이스",
+      "colSetting": "설정",
+      "colFrom": "변경 전",
+      "colTo": "변경 후",
+      "colCurrent": "수동 설정값",
+      "colRuleNow": "현재 규칙 값",
+      "empty": "(없음)",
+      "apply": "{count, plural, one {워크스페이스 #개에 전파} other {워크스페이스 #개에 전파}}",
+      "applying": "전파 중…",
+      "applied": "{count, plural, one {워크스페이스 #개에 전파했습니다.} other {워크스페이스 #개에 전파했습니다.}}",
+      "confirmApply": "이 변경 사항을 {count, plural, one {워크스페이스 #개} other {워크스페이스 #개}}에 적용하시겠습니까?",
+      "dryRunFailed": "무엇이 변경될지 계산할 수 없습니다."
     }
   },
   "adminModuleAutodiscovery": {
