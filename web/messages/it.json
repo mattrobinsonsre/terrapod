@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Aggiungi regola",
       "debugModeHint": "Mantenere aperti i pod dei runner falliti sugli spazi di lavoro creati da questa regola. Disattivato per impostazione predefinita: un pod mantenuto aperto conserva le credenziali di quello spazio di lavoro.",
       "allowForkPrPlansHint": "Si applica a ogni spazio di lavoro creato da questa regola. Disattivato per impostazione predefinita: una pull request da un fork non riceve alcun plan speculativo, perché eseguirebbe il codice del suo autore con le credenziali dello spazio di lavoro.",
-      "oidcAudiencesHint": "Sovrascritture di audience applicate a ogni spazio di lavoro creato da questa regola, indicizzate sulla configurazione di provider a cui corrisponde un token — aws, oppure aws.west per una configurazione con alias. Lasciale vuote e quegli spazi di lavoro usano la configurazione propria del deployment."
+      "oidcAudiencesHint": "Sovrascritture di audience applicate a ogni spazio di lavoro creato da questa regola, indicizzate sulla configurazione di provider a cui corrisponde un token — aws, oppure aws.west per una configurazione con alias. Lasciale vuote e quegli spazi di lavoro usano la configurazione propria del deployment.",
+      "matchPatternHint": "Confrontato con i percorsi dei file modificati, in stile gitignore. <code>*</code> resta all'interno di un singolo segmento di percorso; <code>**</code> ne copre un numero qualsiasi.",
+      "varFilesHint": "Ogni voce diventa un argomento <code>-var-file</code>, nell'ordine elencato. Un percorso relativo viene interpretato dalla directory di lavoro.",
+      "nameTemplateHint": "Segnaposto: <path></path> (ogni <code>/</code> sostituito da <code>-</code>) e <root></root> (la directory così com'è scritta). Lascialo vuoto per <path></path>.",
+      "executionHooksHint": "Ogni hook selezionato qui viene associato a ogni workspace creato da questa regola. Sono definiti nella pagina di amministrazione <page>Hook di esecuzione</page>."
     },
     "table": {
       "name": "Nome",

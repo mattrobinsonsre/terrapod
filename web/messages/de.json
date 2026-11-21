@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Regel hinzufügen",
       "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Standardmäßig deaktiviert – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
       "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Standardmäßig aus: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde.",
-      "oidcAudiencesHint": "Audience-Überschreibungen, die auf jeden von dieser Regel angelegten Arbeitsbereich übertragen werden, geschlüsselt auf die Provider-Konfiguration, für die ein Token gilt — aws, oder aws.west für eine mit Alias versehene Konfiguration. Leer lassen, dann übernehmen diese Arbeitsbereiche die Konfiguration der Bereitstellung."
+      "oidcAudiencesHint": "Audience-Überschreibungen, die auf jeden von dieser Regel angelegten Arbeitsbereich übertragen werden, geschlüsselt auf die Provider-Konfiguration, für die ein Token gilt — aws, oder aws.west für eine mit Alias versehene Konfiguration. Leer lassen, dann übernehmen diese Arbeitsbereiche die Konfiguration der Bereitstellung.",
+      "matchPatternHint": "Wird mit den Pfaden der geänderten Dateien abgeglichen, im gitignore-Stil. <code>*</code> bleibt innerhalb eines Pfadsegments; <code>**</code> umfasst beliebig viele davon.",
+      "varFilesHint": "Jeder Eintrag wird in der aufgeführten Reihenfolge zu einem <code>-var-file</code>-Argument. Ein relativer Pfad wird vom Arbeitsverzeichnis aus gelesen.",
+      "nameTemplateHint": "Platzhalter: <path></path> (jedes <code>/</code> durch <code>-</code> ersetzt) und <root></root> (das Verzeichnis so, wie es geschrieben ist). Leer lassen für <path></path>.",
+      "executionHooksHint": "Jeder hier ausgewählte Hook wird jedem Arbeitsbereich zugeordnet, den diese Regel erstellt. Sie werden auf der Verwaltungsseite <page>Ausführungs-Hooks</page> definiert."
     },
     "table": {
       "name": "Name",

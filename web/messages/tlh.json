@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "chu'wI' chel",
       "debugModeHint": "Qumwo'mey chenmoHbogh chu'wI'vam, pa' poSqu'moH vumwI' pod lujpu'bogh. motlh chu'Ha'lu' — pod pollu'bogh Qumwo'vetlh pegh pol.",
       "allowForkPrPlansHint": "Qumwo'mey chenmoHbogh chu'wI'vam Hoch chel. motlh chu'Ha'lu': fork-vo' PR Hech nab Hevbe', qaStaHvIS Qumwo' pegh lo'taHvIS qonwI'Daj ngoq vumqu'.",
-      "oidcAudiencesHint": "HevwI'' ngoDmey, nabvam chenmoHbogh Hoch Qumwo''Daq lanlu''; chaw'' ngaSbogh provider chenmoHghach ngaQHa''wI'' — aws, pagh pongqa''bogh chenmoHghachvaD aws.west. chIm yIlan ''ej Qumwo''mey nISwI'' chenmoHghach lo''."
+      "oidcAudiencesHint": "HevwI'' ngoDmey, nabvam chenmoHbogh Hoch Qumwo''Daq lanlu''; chaw'' ngaSbogh provider chenmoHghach ngaQHa''wI'' — aws, pagh pongqa''bogh chenmoHghachvaD aws.west. chIm yIlan ''ej Qumwo''mey nISwI'' chenmoHghach lo''.",
+      "matchPatternHint": "choHlu'bogh teywI'mey Hemey rurmoHlu', gitignore mIw. wa' He 'ay'Daq ratlh <code>*</code>; 'ay'mey Hoch Sach <code>**</code>.",
+      "varFilesHint": "tetlhlu'bogh mIwDaq, Hoch 'el <code>-var-file</code> DIvI' moj. vum tetlhvo' laDlu' He Sum.",
+      "nameTemplateHint": "Daqmey: <path></path> (<code>/</code> Hoch <code>-</code> moj) je <root></root> (pa' ghItlhlu'bogh rur). chImchugh <path></path> lo'lu'.",
+      "executionHooksHint": "naDev wIvlu'bogh vangmeH ghItlh Hoch, chu'wI'vam chenmoHbogh Qumwo'mey Hoch rarlu'. <page>vangmeH ghItlhmey</page> che'wI' navDaq maQlu'."
     },
     "table": {
       "name": "pong",

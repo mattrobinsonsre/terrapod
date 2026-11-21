@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Ychwanegu rheol",
       "debugModeHint": "Cadw podiau rhedwyr a fethodd ar agor ar y gweithleoedd y mae'r rheol hon yn eu creu. I ffwrdd yn ddiofyn — mae pod sy'n cael ei gadw yn cadw tystlythyrau'r gweithle hwnnw.",
       "allowForkPrPlansHint": "Mae'n berthnasol i bob gweithle y mae'r rheol hon yn ei greu. I ffwrdd yn ddiofyn: nid yw cais tynnu o fforch yn cael cynllun tybiannol, am y byddai'n rhedeg cod ei awdur gyda thystlythyrau'r gweithle.",
-      "oidcAudiencesHint": "Disodliadau cynulleidfa a roddir ar bob gweithle a grëir gan y rheol hon, wedi'u hallweddu ar y cyfluniad provider y mae tocyn ar ei gyfer — aws, neu aws.west ar gyfer cyfluniad ag alias. Gadewch yn wag ac mae'r gweithleoedd hynny'n defnyddio cyfluniad y defnydd ei hun."
+      "oidcAudiencesHint": "Disodliadau cynulleidfa a roddir ar bob gweithle a grëir gan y rheol hon, wedi'u hallweddu ar y cyfluniad provider y mae tocyn ar ei gyfer — aws, neu aws.west ar gyfer cyfluniad ag alias. Gadewch yn wag ac mae'r gweithleoedd hynny'n defnyddio cyfluniad y defnydd ei hun.",
+      "matchPatternHint": "Yn cael ei gyfateb â llwybrau'r ffeiliau a newidiwyd, ar ddull gitignore. Mae <code>*</code> yn aros o fewn un segment llwybr; mae <code>**</code> yn rhychwantu unrhyw nifer ohonynt.",
+      "varFilesHint": "Caiff pob cofnod ei drosglwyddo fel <code>-var-file</code>, yn y drefn a restrir. Darllenir llwybr cymharol o'r cyfeiriadur gwaith.",
+      "nameTemplateHint": "Dalfannau: <path></path> (pob <code>/</code> wedi'i ddisodli gan <code>-</code>) a <root></root> (y cyfeiriadur fel y'i hysgrifennwyd). Gadewch yn wag ar gyfer <path></path>.",
+      "executionHooksHint": "Caiff pob bach a ddewisir yma ei gysylltu â phob gweithfan a grëir gan y rheol hon. Cânt eu diffinio ar dudalen weinyddol <page>Bachau Gweithredu</page>."
     },
     "table": {
       "name": "Enw",

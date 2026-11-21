@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Add a rule",
       "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. Off by default — a held pod keeps that work-deck''s credentials.",
       "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. Off by default: a pull request from a fork gets no speculative plan, fer it would run its author''s code with the work-deck''s credentials.",
-      "oidcAudiencesHint": "Audience overrides lashed onto every work-deck this rule creates, keyed on th'' provider riggin'' a token be fer — aws, or aws.west fer a riggin'' wi'' an alias. Leave it empty an'' those work-decks take th'' deployment''s own riggin''."
+      "oidcAudiencesHint": "Audience overrides lashed onto every work-deck this rule creates, keyed on th'' provider riggin'' a token be fer — aws, or aws.west fer a riggin'' wi'' an alias. Leave it empty an'' those work-decks take th'' deployment''s own riggin''.",
+      "matchPatternHint": "Matched against th'' paths o'' th'' changed files, gitignore-fashion. <code>*</code> stays within one path segment; <code>**</code> spans any number o'' ''em.",
+      "varFilesHint": "Each entry becomes a <code>-var-file</code> argument, in th'' order listed. A relative path be read from th'' workin'' directory.",
+      "nameTemplateHint": "Placeholders: <path></path> (every <code>/</code> swapped fer a <code>-</code>) an'' <root></root> (the directory just as ye wrote it). Leave it empty an'' ye get <path></path>.",
+      "executionHooksHint": "Every hook ye pick here be lashed onto each work-deck this rule creates. They be defined on th'' <page>Execution Hooks</page> admin page."
     },
     "table": {
       "name": "Name",

@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Ajouter une règle",
       "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Désactivé par défaut — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
       "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Désactivé par défaut : une pull request depuis un fork ne reçoit aucun plan spéculatif, car cela exécuterait le code de son auteur avec les identifiants de l'espace de travail.",
-      "oidcAudiencesHint": "Surcharges d''audiences appliquées à chaque espace de travail créé par cette règle, indexées sur la configuration de provider à laquelle un jeton correspond — aws, ou aws.west pour une configuration avec alias. Laissez vide et ces espaces de travail utilisent la configuration propre du déploiement."
+      "oidcAudiencesHint": "Surcharges d''audiences appliquées à chaque espace de travail créé par cette règle, indexées sur la configuration de provider à laquelle un jeton correspond — aws, ou aws.west pour une configuration avec alias. Laissez vide et ces espaces de travail utilisent la configuration propre du déploiement.",
+      "matchPatternHint": "Comparé aux chemins des fichiers modifiés, à la manière de gitignore. <code>*</code> reste dans un seul segment de chemin ; <code>**</code> en couvre un nombre quelconque.",
+      "varFilesHint": "Chaque entrée devient un argument <code>-var-file</code>, dans l'ordre indiqué. Un chemin relatif est interprété depuis le répertoire de travail.",
+      "nameTemplateHint": "Espaces réservés : <path></path> (chaque <code>/</code> remplacé par <code>-</code>) et <root></root> (le répertoire tel qu'il est écrit). Laissez vide pour <path></path>.",
+      "executionHooksHint": "Chaque hook sélectionné ici est associé à chaque espace de travail créé par cette règle. Ils sont définis sur la page d'administration <page>Hooks d'exécution</page>."
     },
     "table": {
       "name": "Nom",

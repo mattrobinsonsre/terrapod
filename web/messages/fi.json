@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Lisää sääntö",
       "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset.",
       "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena pois päältä: forkista avattu pull request ei saa spekulatiivista suunnitelmaa, koska se ajaisi tekijänsä koodin työtilan tunnuksilla.",
-      "oidcAudiencesHint": "Audience-ohitukset, jotka asetetaan jokaiseen tämän säännön luomaan työtilaan, avaimena provider-konfiguraatio, jota token koskee — aws tai aws.west alias-konfiguraatiolle. Jätä tyhjäksi, niin nämä työtilat käyttävät käyttöönoton omaa konfiguraatiota."
+      "oidcAudiencesHint": "Audience-ohitukset, jotka asetetaan jokaiseen tämän säännön luomaan työtilaan, avaimena provider-konfiguraatio, jota token koskee — aws tai aws.west alias-konfiguraatiolle. Jätä tyhjäksi, niin nämä työtilat käyttävät käyttöönoton omaa konfiguraatiota.",
+      "matchPatternHint": "Verrataan muutettujen tiedostojen polkuihin gitignore-tyyliin. <code>*</code> pysyy yhden polkuosan sisällä; <code>**</code> kattaa niitä minkä tahansa määrän.",
+      "varFilesHint": "Jokaisesta kohdasta tulee <code>-var-file</code>-argumentti luettelon järjestyksessä. Suhteellinen polku luetaan työhakemistosta.",
+      "nameTemplateHint": "Paikkamerkit: <path></path> (jokainen <code>/</code> korvataan merkillä <code>-</code>) ja <root></root> (hakemisto täsmälleen kirjoitetussa muodossa). Jätä tyhjäksi, niin käytetään <path></path>.",
+      "executionHooksHint": "Jokainen tässä valittu koukku liitetään jokaiseen työtilaan, jonka tämä sääntö luo. Ne määritetään <page>Suorituskoukut</page>-hallintasivulla."
     },
     "table": {
       "name": "Nimi",

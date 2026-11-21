@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Regulam addere",
       "debugModeHint": "Podes cursorum defectorum apertos tenere in locis operis quos haec regula creat. Praedefinite exstinctus — pod retentus credentias illius loci operis servat.",
       "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. Praedefinite exstinctum: rogatio tractionis e furca nullum consilium speculativum accipit, quia codicem auctoris sui cum credentiis loci operis exsequeretur.",
-      "oidcAudiencesHint": "Superscriptiones auditorum omni loco operis quem haec regula creat impositae, sub configuratione provider ad quam tessera pertinet — aws, vel aws.west pro configuratione cum alias. Vacuas relinque et illi loci operis configurationem propriam instructionis adhibent."
+      "oidcAudiencesHint": "Superscriptiones auditorum omni loco operis quem haec regula creat impositae, sub configuratione provider ad quam tessera pertinet — aws, vel aws.west pro configuratione cum alias. Vacuas relinque et illi loci operis configurationem propriam instructionis adhibent.",
+      "matchPatternHint": "Cum semitis tabularum mutatarum more gitignore comparatur. <code>*</code> intra unum semitae membrum manet; <code>**</code> quotlibet eorum complectitur.",
+      "varFilesHint": "Quisque ingressus fit argumentum <code>-var-file</code>, ordine enumerato. Semita relativa ex directorio operandi legitur.",
+      "nameTemplateHint": "Signa loci: <path></path> (omne <code>/</code> per <code>-</code> substituitur) et <root></root> (directorium sicut scriptum est). Vacuum relinque pro <path></path>.",
+      "executionHooksHint": "Omnis uncus hic electus omni loco operis quem haec regula creat adiungitur. In pagina administrationis <page>Unci Exsecutionis</page> definiuntur."
     },
     "table": {
       "name": "Nomen",

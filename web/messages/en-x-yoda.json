@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "A rule, add",
       "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. Off by default, it is — that workspace's credentials, a held pod keeps.",
       "allowForkPrPlansHint": "To every workspace this rule creates, applies it. Off by default, it is: no speculative plan a pull request from a fork gets, because run its author's code with the workspace's credentials, it would.",
-      "oidcAudiencesHint": "Audience overrides templated onto every workspace this rule creates, keyed on the provider configuration a token is for — aws, or aws.west for an aliased configuration. Empty it leave, and the deployment''s own configuration those workspaces take."
+      "oidcAudiencesHint": "Audience overrides templated onto every workspace this rule creates, keyed on the provider configuration a token is for — aws, or aws.west for an aliased configuration. Empty it leave, and the deployment''s own configuration those workspaces take.",
+      "matchPatternHint": "Against the paths of changed files, matched it is, gitignore-style. Within one path segment, <code>*</code> stays; any number of them, <code>**</code> spans.",
+      "varFilesHint": "A <code>-var-file</code> argument, each entry becomes, in the order listed. From the working directory, a relative path is read.",
+      "nameTemplateHint": "Placeholders: <path></path> (each <code>/</code> replaced by <code>-</code>, it is) and <root></root> (the directory as written). Empty leave it, and <path></path> you get.",
+      "executionHooksHint": "To every workspace this rule creates, each hook selected here is attached. On the <page>Hooks, Execution</page> admin page, defined they are."
     },
     "table": {
       "name": "Name",

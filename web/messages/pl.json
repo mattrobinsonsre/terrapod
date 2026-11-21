@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Dodaj regułę",
       "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej.",
       "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie wyłączone: pull request z forka nie otrzymuje planu spekulatywnego, ponieważ uruchomiłby kod swojego autora z poświadczeniami przestrzeni roboczej.",
-      "oidcAudiencesHint": "Nadpisania audience nakładane na każdą przestrzeń roboczą tworzoną przez tę regułę, zaindeksowane na konfiguracji providera, dla której jest token — aws lub aws.west dla konfiguracji z aliasem. Zostaw puste i te przestrzenie robocze użyją własnej konfiguracji wdrożenia."
+      "oidcAudiencesHint": "Nadpisania audience nakładane na każdą przestrzeń roboczą tworzoną przez tę regułę, zaindeksowane na konfiguracji providera, dla której jest token — aws lub aws.west dla konfiguracji z aliasem. Zostaw puste i te przestrzenie robocze użyją własnej konfiguracji wdrożenia.",
+      "matchPatternHint": "Dopasowywane do ścieżek zmienionych plików, w stylu gitignore. <code>*</code> pozostaje w obrębie jednego segmentu ścieżki; <code>**</code> obejmuje dowolną ich liczbę.",
+      "varFilesHint": "Każdy wpis staje się argumentem <code>-var-file</code>, w podanej kolejności. Ścieżka względna jest odczytywana względem katalogu roboczego.",
+      "nameTemplateHint": "Symbole zastępcze: <path></path> (każdy <code>/</code> zamieniony na <code>-</code>) i <root></root> (katalog dokładnie tak, jak został zapisany). Puste pole oznacza <path></path>.",
+      "executionHooksHint": "Każdy wybrany tutaj punkt zaczepienia jest dołączany do każdego obszaru roboczego tworzonego przez tę regułę. Definiuje się je na stronie administracyjnej <page>Punkty zaczepienia wykonania</page>."
     },
     "table": {
       "name": "Nazwa",

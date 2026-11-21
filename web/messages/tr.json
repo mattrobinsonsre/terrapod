@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Kural ekle",
       "debugModeHint": "Bu kuralın oluşturduğu çalışma alanlarında başarısız çalıştırıcı pod'larını açık tutun. Varsayılan olarak kapalı — açık tutulan bir pod o çalışma alanının kimlik bilgilerini barındırır.",
       "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Varsayılan olarak kapalı: bir fork''tan gelen pull request spekülatif plan almaz, çünkü yazarının kodunu çalışma alanının kimlik bilgileriyle çalıştırırdı.",
-      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanına uygulanan audience geçersiz kılmaları; bir token''ın ait olduğu provider yapılandırmasına göre anahtarlanır — aws ya da alias''lı bir yapılandırma için aws.west. Boş bırakın, o çalışma alanları dağıtımın kendi yapılandırmasını kullanır."
+      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanına uygulanan audience geçersiz kılmaları; bir token''ın ait olduğu provider yapılandırmasına göre anahtarlanır — aws ya da alias''lı bir yapılandırma için aws.west. Boş bırakın, o çalışma alanları dağıtımın kendi yapılandırmasını kullanır.",
+      "matchPatternHint": "Değişen dosyaların yollarıyla gitignore tarzında eşleştirilir. <code>*</code> tek bir yol parçasının içinde kalır; <code>**</code> herhangi bir sayıda parçayı kapsar.",
+      "varFilesHint": "Her girdi, listelendiği sırayla bir <code>-var-file</code> argümanına dönüşür. Göreli bir yol, çalışma dizinine göre yorumlanır.",
+      "nameTemplateHint": "Yer tutucular: <path></path> (her <code>/</code>, <code>-</code> ile değiştirilir) ve <root></root> (dizin yazıldığı gibi). Boş bırakılırsa <path></path> kullanılır.",
+      "executionHooksHint": "Burada seçilen her kanca, bu kuralın oluşturduğu her çalışma alanına eklenir. Kancalar <page>Yürütme Kancaları</page> yönetim sayfasında tanımlanır."
     },
     "table": {
       "name": "Ad",

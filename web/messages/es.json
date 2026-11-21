@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Añadir regla",
       "debugModeHint": "Mantener abiertos los pods de runners fallidos en los espacios de trabajo que crea esta regla. Desactivado de forma predeterminada: un pod mantenido abierto conserva las credenciales de ese espacio de trabajo.",
       "allowForkPrPlansHint": "Se aplica a todos los espacios de trabajo que crea esta regla. Desactivado de forma predeterminada: una pull request desde un fork no recibe ningún plan especulativo, porque ejecutaría el código de su autor con las credenciales del espacio de trabajo.",
-      "oidcAudiencesHint": "Sustituciones de audiencias aplicadas a cada espacio de trabajo que crea esta regla, indexadas por la configuración de provider a la que corresponde un token: aws, o aws.west para una configuración con alias. Déjalas vacías y esos espacios de trabajo usan la configuración propia del despliegue."
+      "oidcAudiencesHint": "Sustituciones de audiencias aplicadas a cada espacio de trabajo que crea esta regla, indexadas por la configuración de provider a la que corresponde un token: aws, o aws.west para una configuración con alias. Déjalas vacías y esos espacios de trabajo usan la configuración propia del despliegue.",
+      "matchPatternHint": "Se compara con las rutas de los archivos modificados, al estilo de gitignore. <code>*</code> no sale de un único segmento de ruta; <code>**</code> abarca cualquier número de ellos.",
+      "varFilesHint": "Cada entrada se convierte en un argumento <code>-var-file</code>, en el orden indicado. Una ruta relativa se interpreta desde el directorio de trabajo.",
+      "nameTemplateHint": "Marcadores: <path></path> (cada <code>/</code> sustituido por <code>-</code>) y <root></root> (el directorio tal cual se escribe). Déjalo vacío para <path></path>.",
+      "executionHooksHint": "Cada hook seleccionado aquí se asocia a todos los espacios de trabajo que crea esta regla. Se definen en la página de administración <page>Hooks de ejecución</page>."
     },
     "table": {
       "name": "Nombre",

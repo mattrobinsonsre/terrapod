@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Add rule",
       "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz.",
       "allowForkPrPlansHint": "Applyz ta evry werkspace dis rule makez. Off by defalt: a pull rekwest from a fork getz no speculativ plan, coz it wud run itz authrs code wif da werkspace credenshulz.",
-      "oidcAudiencesHint": "Audienz overridez templaytd onto evry werkspace dis rool makez, keyd on da providr configurashun a tokin iz fer — aws, or aws.west fer an aliasd configurashun. Leev it empty an doze werkspacez take da deployment''z own configurashun."
+      "oidcAudiencesHint": "Audienz overridez templaytd onto evry werkspace dis rool makez, keyd on da providr configurashun a tokin iz fer — aws, or aws.west fer an aliasd configurashun. Leev it empty an doze werkspacez take da deployment''z own configurashun.",
+      "matchPatternHint": "Matchd agenst teh pathz of changd filez, gitignore-style. <code>*</code> stayz within wun path segment; <code>**</code> spanz any numbr of dem.",
+      "varFilesHint": "Each entree becomez a <code>-var-file</code> argumint, in teh ordr listd. A relativ path iz reed frum teh workin directree.",
+      "nameTemplateHint": "Plaisholdurz: <path></path> (each <code>/</code> swapd 4 a <code>-</code>) an <root></root> (teh directree just as u rote it). Leev it empteh 4 <path></path>.",
+      "executionHooksHint": "Each hook u pik heer getz stuk onto evry werkspace dis rule makez. Dey iz defind on teh <page>Execushun Hookz</page> admin page."
     },
     "table": {
       "name": "Naym",

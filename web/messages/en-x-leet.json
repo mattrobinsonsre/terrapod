@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "4dd rul3",
       "debugModeHint": "H0ld f41l3d runn3r p0d5 0p3n 0n 7h3 w0rk5p4c35 7h15 rul3 cr34735. 0ff by d3f4ul7 — 4 h3ld p0d k33p5 7h47 w0rk5p4c3'5 cr3d3n714l5.",
       "allowForkPrPlansHint": "4ppl135 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 0ff by d3f4ul7: 4 pull r3qu357 fr0m 4 f0rk g375 n0 5p3cul471v3 pl4n, b3c4u53 17 w0uld run 175 4u7h0r'5 c0d3 w17h 7h3 w0rk5p4c3'5 cr3d3n714l5.",
-      "oidcAudiencesHint": "4ud13nc3 0v3rr1d35 73mpl473d 0n70 3v3ry w0rk5p4c3 7h15 rul3 cr34735, k3y3d 0n 7h3 pr0v1d3r c0nf1gur4710n 4 70k3n 15 f0r — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n. L34v3 17 3mp7y 4nd 7h053 w0rk5p4c35 74k3 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n."
+      "oidcAudiencesHint": "4ud13nc3 0v3rr1d35 73mpl473d 0n70 3v3ry w0rk5p4c3 7h15 rul3 cr34735, k3y3d 0n 7h3 pr0v1d3r c0nf1gur4710n 4 70k3n 15 f0r — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n. L34v3 17 3mp7y 4nd 7h053 w0rk5p4c35 74k3 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n.",
+      "matchPatternHint": "M47ch3d 4g41n57 7h3 p47h5 0f ch4ng3d f1l35, g171gn0r3-57yl3. <code>*</code> 574y5 w17h1n 0n3 p47h 53gm3n7; <code>**</code> 5p4n5 4ny numb3r 0f 7h3m.",
+      "varFilesHint": "34ch 3n7ry b3c0m35 4 <code>-var-file</code> 4rgum3n7, 1n 7h3 0rd3r l1573d. 4 r3l471v3 p47h 15 r34d fr0m 7h3 w0rk1ng d1r3c70ry.",
+      "nameTemplateHint": "Pl4c3h0ld3r5: <path></path> (34ch <code>/</code> r3pl4c3d by <code>-</code>) 4nd <root></root> (7h3 d1r3c70ry 45 wr1773n). L34v3 17 3mp7y f0r <path></path>.",
+      "executionHooksHint": "34ch h00k 53l3c73d h3r3 15 4774ch3d 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 7h3y 4r3 d3f1n3d 0n 7h3 <page>3x3cu710n H00k5</page> 4dm1n p4g3."
     },
     "table": {
       "name": "N4m3",

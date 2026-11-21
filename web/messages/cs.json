@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Přidat pravidlo",
       "debugModeHint": "Ponechat pody neúspěšných runnerů otevřené v pracovních prostorech, které toto pravidlo vytvoří. Ve výchozím stavu vypnuto — ponechaný pod si drží přihlašovací údaje daného pracovního prostoru.",
       "allowForkPrPlansHint": "Platí pro každý pracovní prostor, který toto pravidlo vytvoří. Ve výchozím stavu vypnuto: pull request z forku nedostane spekulativní plán, protože by spustil kód svého autora s přihlašovacími údaji pracovního prostoru.",
-      "oidcAudiencesHint": "Přepisy audience vložené do každého pracovního prostoru, který toto pravidlo vytvoří, zaklíčované na konfiguraci provideru, pro kterou token platí — aws, nebo aws.west pro konfiguraci s aliasem. Nechte prázdné a tyto pracovní prostory použijí vlastní konfiguraci nasazení."
+      "oidcAudiencesHint": "Přepisy audience vložené do každého pracovního prostoru, který toto pravidlo vytvoří, zaklíčované na konfiguraci provideru, pro kterou token platí — aws, nebo aws.west pro konfiguraci s aliasem. Nechte prázdné a tyto pracovní prostory použijí vlastní konfiguraci nasazení.",
+      "matchPatternHint": "Porovnává se s cestami změněných souborů, ve stylu gitignore. <code>*</code> zůstává v jednom segmentu cesty; <code>**</code> zahrnuje libovolný počet segmentů.",
+      "varFilesHint": "Každá položka se v uvedeném pořadí stane argumentem <code>-var-file</code>. Relativní cesta se vyhodnocuje od pracovního adresáře.",
+      "nameTemplateHint": "Zástupné symboly: <path></path> (každé <code>/</code> nahrazeno znakem <code>-</code>) a <root></root> (adresář přesně tak, jak je zapsán). Prázdné pole znamená <path></path>.",
+      "executionHooksHint": "Každý zde vybraný háček se připojí ke každému pracovnímu prostoru, který toto pravidlo vytvoří. Definují se na admin stránce <page>Prováděcí háčky</page>."
     },
     "table": {
       "name": "Název",

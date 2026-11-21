@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "新增規則",
       "debugModeHint": "在此規則建立的工作區上讓失敗執行器的 Pod 保持開啟。預設關閉 — 保持開啟的 Pod 會保留該工作區的憑證。",
       "allowForkPrPlansHint": "適用於此規則建立的每個工作區。預設關閉：來自 fork 的拉取請求不會取得推測性計畫，因為那會以工作區的憑證執行其作者的程式碼。",
-      "oidcAudiencesHint": "套用到此規則建立的每個工作區上的受眾覆寫，以權杖所對應的 provider 設定為鍵 — aws，或帶別名的設定用 aws.west。留空則這些工作區使用部署自身的設定。"
+      "oidcAudiencesHint": "套用到此規則建立的每個工作區上的受眾覆寫，以權杖所對應的 provider 設定為鍵 — aws，或帶別名的設定用 aws.west。留空則這些工作區使用部署自身的設定。",
+      "matchPatternHint": "依 gitignore 的方式與已變更檔案的路徑進行比對。<code>*</code> 僅在單一路徑區段內比對；<code>**</code> 可跨任意數量的路徑區段。",
+      "varFilesHint": "每一項都會依列出的順序成為一個 <code>-var-file</code> 參數。相對路徑以工作目錄為基準解析。",
+      "nameTemplateHint": "預留位置：<path></path>（每個 <code>/</code> 都替換為 <code>-</code>）和 <root></root>（按原樣書寫的目錄）。留空時使用 <path></path>。",
+      "executionHooksHint": "此處選擇的每個鉤子都會附加到此規則建立的每個工作區。鉤子在 <page>執行鉤子</page> 管理頁面中定義。"
     },
     "table": {
       "name": "名稱",

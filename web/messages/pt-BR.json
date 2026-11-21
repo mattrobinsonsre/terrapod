@@ -1140,7 +1140,11 @@
       "addDriftIgnoreRule": "Adicionar regra",
       "debugModeHint": "Manter abertos os pods de runners com falha nos espaços de trabalho criados por esta regra. Desativado por padrão — um pod mantido aberto conserva as credenciais daquele espaço de trabalho.",
       "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho criados por esta regra. Desativado por padrão: uma pull request de um fork não recebe plano especulativo, porque executaria o código de seu autor com as credenciais do espaço de trabalho.",
-      "oidcAudiencesHint": "Sobreposições de audiences aplicadas a cada espaço de trabalho que esta regra cria, indexadas pela configuração de provider à qual um token corresponde — aws, ou aws.west para uma configuração com alias. Deixe vazia e esses espaços de trabalho usam a configuração própria da implantação."
+      "oidcAudiencesHint": "Sobreposições de audiences aplicadas a cada espaço de trabalho que esta regra cria, indexadas pela configuração de provider à qual um token corresponde — aws, ou aws.west para uma configuração com alias. Deixe vazia e esses espaços de trabalho usam a configuração própria da implantação.",
+      "matchPatternHint": "Comparado com os caminhos dos arquivos alterados, no estilo gitignore. <code>*</code> permanece dentro de um único segmento de caminho; <code>**</code> abrange qualquer número deles.",
+      "varFilesHint": "Cada entrada se torna um argumento <code>-var-file</code>, na ordem listada. Um caminho relativo é lido a partir do diretório de trabalho.",
+      "nameTemplateHint": "Marcadores: <path></path> (cada <code>/</code> substituído por <code>-</code>) e <root></root> (o diretório como foi escrito). Deixe vazio para <path></path>.",
+      "executionHooksHint": "Cada hook selecionado aqui é associado a todos os workspaces criados por esta regra. Eles são definidos na página de administração <page>Hooks de Execução</page>."
     },
     "table": {
       "name": "Nome",
