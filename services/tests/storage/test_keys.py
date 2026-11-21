@@ -41,11 +41,66 @@ class TestKeyHelpers:
 
 
 class TestSharedPrefix:
-    @pytest.mark.parametrize("prefix", ["backups/", "backups", "dr/state-dumps/", ""])
-    def test_a_shared_prefix_is_normalised(self, prefix: str) -> None:
-        assert shared_prefix("backup.prefix", prefix) == (
-            prefix if prefix.endswith("/") else prefix + "/"
-        )
+    #: Literal (input, expected) pairs, NOT computed from the implementation's own
+    #: expression (#2621). The old table asserted
+    #: `prefix if prefix.endswith("/") else prefix + "/"`, which is the body of the
+    #: function under test -- so it could not surprise anyone, and it passed happily
+    #: on `("", "/")`, an absolute key. Written out, the empty case is in front of
+    #: whoever reads it.
+    NORMALISED = [
+        ("backups/", "backups/"),
+        ("backups", "backups/"),
+        ("dr/state-dumps/", "dr/state-dumps/"),
+        # A leading `./` comes OFF, rather than being stripped for the check and
+        # handed back: the filesystem store writes `./backups/x` to `root/backups/x`
+        # and then lists `./backups/` to nothing, so retention never pruned.
+        ("./backups/", "backups/"),
+        ("./backups", "backups/"),
+        ("././backups/", "backups/"),
+        ("/backups/", "backups/"),
+        ("//backups", "backups/"),
+        # Only `./` is leading junk. A hidden directory is a real prefix.
+        (".backups/", ".backups/"),
+    ]
+
+    def test_the_table_is_not_empty(self) -> None:
+        """An emptied parametrize is a skipped test, not a failing one."""
+        assert len(self.NORMALISED) >= 9
+
+    @pytest.mark.parametrize(("prefix", "expected"), NORMALISED)
+    def test_a_shared_prefix_is_normalised(self, prefix: str, expected: str) -> None:
+        assert shared_prefix("backup.prefix", prefix) == expected
+
+    @pytest.mark.parametrize("prefix", ["", ".", "./", "/", "././", "//", ".//"])
+    def test_a_prefix_naming_nothing_is_refused(self, prefix: str) -> None:
+        """`""` used to return `/`, and three legs disagreed about it (#2621).
+
+        The filesystem store refuses an absolute key -- after a full pg_dump has
+        run -- and the retention sweep would list every object in the store.
+        """
+        with pytest.raises(ValueError, match="names no prefix"):
+            shared_prefix("backup.prefix", prefix)
+
+    @pytest.mark.parametrize("prefix", ["vcs_archives/", "vcs_archives", "vcs_archives/db/"])
+    def test_an_age_swept_prefix_is_refused(self, prefix: str) -> None:
+        """Its own refusal and its own message: the hazard is deletion, not misreading.
+
+        `artifact_retention_service` lists this prefix whole and deletes by age with
+        no filter on what the objects are, so dumps there last until the sweep
+        reaches them -- `vcs.archive_cache_retention_days`, 7 days by default.
+        """
+        with pytest.raises(ValueError, match="sweeps by age"):
+            shared_prefix("backup.prefix", prefix)
+
+    @pytest.mark.parametrize("prefix", ["./vcs_archives/", "/vcs_archives/"])
+    def test_the_age_swept_refusal_sees_through_a_spelling(self, prefix: str) -> None:
+        with pytest.raises(ValueError, match="sweeps by age"):
+            shared_prefix("backup.prefix", prefix)
+
+    def test_the_refusals_do_not_claim_the_list_is_exhaustive(self) -> None:
+        """The message used to read as "anything not on this list is fine"."""
+        with pytest.raises(ValueError, match="not the same as being"):
+            shared_prefix("backup.prefix", "state/")
 
     @pytest.mark.parametrize("workspace_prefix", WORKSPACE_KEY_PREFIXES)
     @pytest.mark.parametrize("suffix", ["", "db/"])

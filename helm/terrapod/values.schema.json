@@ -933,7 +933,7 @@
           "type": "string",
           "description": "Object-store key prefix for dumps; not under a workspace-scoped prefix.",
           "not": {
-            "pattern": "^(\\./)*(state|plans|logs|config|runs|inventory)(/|$)"
+            "pattern": "^(\\./|/)*((state|plans|logs|config|runs|inventory|vcs_archives)(/|$)|\\.?$)"
           }
         },
         "retention": {

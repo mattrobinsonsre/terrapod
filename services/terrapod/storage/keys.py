@@ -65,19 +65,69 @@ def workspace_id_of_key(key: str) -> str | None:
     return workspace_id if sep and workspace_id else None
 
 
+#: Prefixes Terrapod sweeps BY AGE with no key-shape filter, and the setting that
+#: decides when. An object written here is deleted on that schedule whatever it is,
+#: so a backup lasts until the sweep reaches it -- a different hazard from the
+#: workspace prefixes above, which is why it earns its own refusal and its own
+#: message rather than being folded into that list (#2621).
+#:
+#: Measured rather than assumed: `vcs_archives/` is the ONLY such sweep in the tree
+#: (`artifact_retention_service`). `cache/`, `uploads/`, `registry/`, `oci/`,
+#: `policies/` and `module_overrides/` hold Terrapod's own objects and are reasons
+#: not to mix dumps in with them, but nothing sweeps them by age, and listing them
+#: here would refuse a prefix on a hazard that does not exist.
+AGE_SWEPT_PREFIXES: dict[str, str] = {
+    "vcs_archives/": "vcs.archive_cache_retention_days",
+}
+
+
 def shared_prefix(setting: str, prefix: str) -> str:
-    """`prefix` with a trailing slash; ValueError if it sits under a workspace-scoped
-    prefix, where its objects would be read as a workspace's."""
-    prefix = prefix if prefix.endswith("/") else prefix + "/"
-    bare = prefix
-    while bare.startswith("./"):
-        bare = bare[2:]
+    """`prefix` normalised to exactly one trailing slash and no leading `./` or `/`.
+
+    Returns the NORMALISED form, and that is the point of it. It used to check the
+    stripped spelling and return the one the operator wrote, so `./backups/` was
+    accepted and handed back verbatim -- after which the behaviour DIVERGED BY
+    BACKEND, which is the one thing a normaliser exists to erase (#2621). On the
+    filesystem store `_full_path("./backups/x.dump")` writes to `root/backups/x.dump`
+    (pathlib drops the `.`) while `list_prefix("./backups/")` filters on the literal
+    and matches nothing, so retention never pruned, dumps accumulated for ever, and
+    the DR drill reported "no backups found under './backups/'" on a store that
+    demonstrably held them. S3, Azure and GCS keep the key verbatim and so stay
+    self-consistent.
+
+    ValueError when nothing is left once normalised, when it sits under a
+    workspace-scoped prefix (its objects would be read as a workspace's), or when
+    Terrapod sweeps it by age (its objects would be deleted on that schedule).
+    """
+    # The trailing slash goes on FIRST, then the leading junk comes off. The other
+    # order leaves a bare "." as "./" -- it starts with neither "./" nor "/", so
+    # nothing strips it, and the un-normalised spelling this exists to remove is
+    # returned by the function that removes it.
+    bare = prefix if prefix.endswith("/") else prefix + "/"
+    while bare.startswith(("./", "/")):
+        bare = bare[2:] if bare.startswith("./") else bare[1:]
+    if not bare:
+        raise ValueError(
+            f"{setting}={prefix!r} names no prefix, so backups would be written to the "
+            "store's root: the filesystem backend refuses an absolute key outright -- "
+            "after a full pg_dump has run -- and the retention sweep would list every "
+            "object in the store. Use a prefix of its own, such as 'backups/'"
+        )
     if clash := next((p for p in WORKSPACE_KEY_PREFIXES if bare.startswith(p)), None):
         raise ValueError(
-            f"{setting}={prefix!r} is under the workspace-scoped prefix {clash!r}; "
-            "use a shared prefix such as 'backups/'"
+            f"{setting}={prefix!r} is under the workspace-scoped prefix {clash!r}, where "
+            "its objects would be read as a workspace's. Use a prefix of its own, such "
+            "as 'backups/' -- note that NOT being on this list is not the same as being "
+            "safe; see the age-swept prefixes below"
         )
-    return prefix
+    if swept := next((p for p in AGE_SWEPT_PREFIXES if bare.startswith(p)), None):
+        raise ValueError(
+            f"{setting}={prefix!r} is under {swept!r}, which Terrapod sweeps by age on "
+            f"{AGE_SWEPT_PREFIXES[swept]} with no filter on what the objects are -- so "
+            "backups written there are deleted on that schedule. Use a prefix of its "
+            "own, such as 'backups/'"
+        )
+    return bare
 
 
 def prefix_may_hold_workspace_keys(prefix: str) -> bool:

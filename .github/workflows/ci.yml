@@ -603,6 +603,14 @@ jobs:
       - name: (docs-audit) no Go consumer addresses the deprecated native alias
         run: python3 scripts/docs-audit/check_native_prefix.py
 
+      # `backup.prefix` is refused for two different reasons -- its objects would be
+      # read as a workspace's, or swept by age on another prefix's schedule -- and
+      # both lists are copied into prose a reader acts on. A doc naming five of six
+      # refused prefixes is worse than one naming none, because the omission reads as
+      # permission (#2621).
+      - name: (docs-audit) every refused backup prefix is named where operators read
+        run: python3 scripts/docs-audit/check_backup_prefix_prose.py
+
   # ── Platform-tool artifacts (#2066) ───────────────
   # `platform_tools.py` holds a static table of the platforms each publisher
   # ships, and the table cannot express the thing that actually varies:

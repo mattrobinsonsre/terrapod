@@ -2306,3 +2306,46 @@ resolve to a host reserved never to resolve. Operators on S3, Azure Blob or GCS
 are unaffected in substance — those presign against the provider — but the init
 container is rendered regardless, which is why the admission note above applies
 to everyone.
+
+### `backup.prefix` is normalised, and refuses a prefix Terrapod sweeps
+
+**Who is affected:** operators who set `api.config.backup.prefix` (or
+`backup.prefix` in the chart) to something other than a plain prefix like
+`backups/`. A default install sets `backups/` and is unaffected.
+
+Three changes, all of them refusals or normalisations at startup:
+
+| you set | 1.x did | 2.0 does |
+|---|---|---|
+| `./backups/` | stored it verbatim | normalises to `backups/` |
+| `/backups/` | stored it verbatim | normalises to `backups/` |
+| `""` (or `.`, or `/`) | the chart rewrote it to `backups/`; a hand-written config or env var made it `/` | **refused** — `helm lint` fails, and the job exits 1 naming the setting |
+| `vcs_archives/` (or anything under it) | accepted | **refused** |
+
+**If you set a `./`- or `/`-prefixed value on S3, Azure or GCS, move your existing
+dumps.** Those backends store the key verbatim, so your dumps are at
+`./backups/…`; after the upgrade the job writes to and lists `backups/…`, and the
+old objects are still there but are no longer found by the DR drill or by
+retention. Copy them to the normalised prefix, or set `prefix` to the literal
+value you want without the leading `./`.
+
+**On the filesystem backend the same setting was already broken**, which is why
+this changed: `pathlib` drops the `.`, so a dump written under `./backups/` landed
+at `root/backups/` while `list_prefix("./backups/")` matched nothing. Retention
+never pruned and the drill reported "no backups found" on a store that held them.
+After the upgrade those dumps are found, and retention applies to them — so if you
+have been accumulating dumps there for longer than `retention.days`, expect the
+first run after the upgrade to prune them. Check what is there first if that
+matters.
+
+**`vcs_archives/` is refused because Terrapod deletes everything under it by age**
+— `vcs.archive_cache_retention_days`, 7 days by default, with no filter on what
+the objects are. A backup written there was being destroyed after a week. If you
+were using it, move the dumps to a prefix of their own before upgrading; nothing
+is deleted by the upgrade itself, but the job will refuse to start until the
+setting changes.
+
+The other prefixes Terrapod writes to (`cache/`, `uploads/`, `registry/`, `oci/`,
+`policies/`, `module_overrides/`) are **not** refused: nothing sweeps them by age,
+so dumps there are not deleted. They are merely mixed in with unrelated objects.
+See [Disaster recovery](disaster-recovery.md).

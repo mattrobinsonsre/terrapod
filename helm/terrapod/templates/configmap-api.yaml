@@ -849,6 +849,10 @@ data:
     {{- end }}
     {{- if .Values.backup }}
     backup:
+      {{- /* `default` rather than `dig` deliberately, unlike the retention lines
+             below: "" is not a legitimate value for this one -- values.schema.json
+             refuses it, as does `shared_prefix` -- so there is no empty value for
+             `default` to swallow, and an ABSENT key is exactly what it is for. */}}
       prefix: {{ .Values.backup.prefix | default "backups/" | quote }}
       retention_keep: {{ (.Values.backup.retention).keep | default 0 }}
       retention_days: {{ (.Values.backup.retention).days | default 0 | int64 }}
