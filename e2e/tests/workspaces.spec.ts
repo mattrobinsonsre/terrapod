@@ -1110,6 +1110,56 @@ test.describe("Workspaces", () => {
     await expect(result).toContainText(`${prefix}-b: Request failed (500)`);
     await page.unrouteAll({ behavior: "ignoreErrors" });
   });
+
+  /**
+   * The page's own read of `configure-enabled`, which only an e2e can reach.
+   *
+   * `workspace-bulk-actions.ts` is pinned at the unit tier -- two named tests
+   * fail if either `w.configureEnabled` is hardcoded there. But the PLUMBING
+   * that fills it, `page.tsx`'s `configureEnabled: w.attributes['configure-enabled']
+   * === true`, is in a `.tsx`, and `web/tests` runs under bare `node --test`
+   * with no transpiler, so nothing there can import it. Hardcoding the flag at
+   * THAT line passed every test: no existing row is configure-shaped, because
+   * `stubLatestRun` defaults a run to `plan_apply` and the retry rule only
+   * consults the flag on a configure or composite run (#2621).
+   *
+   * So the pair below is the gate, and it needs both halves: the refusal alone
+   * passes if the flag is hardcoded false, and the eligibility alone passes if
+   * it is hardcoded true.
+   */
+  const compositeRetryRow = async (page: Page, prefix: string, configureEnabled: boolean) => {
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    await stubLatestRun(
+      page,
+      [id],
+      () => ({
+        status: "errored",
+        // A composite: an apply followed by a configure. This is the shape whose
+        // Retry rule reads `configureEnabled` at all.
+        "run-kind": "full",
+        actions: { ...NO_ACTIONS, "is-retryable": true },
+      }),
+      { "configure-enabled": configureEnabled },
+    );
+    await listOnly(page, prefix, 1);
+    await page.getByTestId("ws-row-select").check();
+    await page.getByTestId("ws-selection").click();
+    return page.getByTestId("ws-selection-retry");
+  };
+
+  test("Retry refuses a combined run on a workspace with configure disabled", async ({ page }) => {
+    const retry = await compositeRetryRow(page, uniqueName("e2e-sel-cfg-off"), false);
+    await expect(retry).toHaveAttribute("aria-disabled", "true");
+    await expect(retry).toContainText("0 of 1 eligible");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
+  test("and offers the same run once configure is enabled", async ({ page }) => {
+    const retry = await compositeRetryRow(page, uniqueName("e2e-sel-cfg-on"), true);
+    await expect(retry).toHaveAttribute("aria-disabled", "false");
+    await expect(retry).toContainText("1 of 1 eligible");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
 });
 
 test.describe("Workspaces: bulk confirmations at tablet width with a touch pointer", () => {
