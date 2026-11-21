@@ -10,7 +10,17 @@ import assert from 'node:assert/strict'
 import { runBulkAction, endpointFor, type Fetcher } from '../src/lib/workspace-bulk-run.ts'
 import type { BulkWorkspace } from '../src/lib/workspace-bulk-actions.ts'
 
-function ws(id: string, run: string | null): BulkWorkspace {
+/**
+ * A workspace for the HTTP layer, with or without a latest run.
+ *
+ * The second parameter is a PRESENCE flag and says so. It used to be
+ * `run: string | null`, and every call site passed a plausible status --
+ * `'planned'`, `'planning'`, `'errored'` -- while the body read it only for
+ * truthiness (#2621). So the type invited a reader to believe this file models
+ * a run's status, which it does not: eligibility is decided by the menu before
+ * `runBulkAction` is called, and these tests are about request shaping.
+ */
+function ws(id: string, hasRun: boolean): BulkWorkspace {
   return {
     id: `ws-${id}`,
     name: `name-${id}`,
@@ -21,7 +31,7 @@ function ws(id: string, run: string | null): BulkWorkspace {
     // list the menu has already filtered, so granting everything keeps these
     // tests about request shaping.
     permissions: { canQueueRun: true, canQueueApply: true, canQueueDestroy: true },
-    latestRun: run ? { id: `run-${id}`, runKind: 'plan_apply', actions: null } : null,
+    latestRun: hasRun ? { id: `run-${id}`, runKind: 'plan_apply', actions: null } : null,
   }
 }
 
@@ -48,7 +58,7 @@ function recorder(answer: (path: string) => { ok: boolean; status: number; detai
 
 describe('endpointFor', () => {
   it('maps the run actions onto the existing run endpoints', () => {
-    const w = ws('a', 'planned')
+    const w = ws('a', true)
     assert.equal(endpointFor('apply', w)?.path, '/api/v1/runs/run-a/actions/apply')
     assert.equal(endpointFor('discard', w)?.path, '/api/v1/runs/run-a/actions/discard')
     assert.equal(endpointFor('cancel', w)?.path, '/api/v1/runs/run-a/actions/cancel')
@@ -56,7 +66,7 @@ describe('endpointFor', () => {
   })
 
   it('plan creates a plan-only run on the workspace, not an action on a run', () => {
-    const e = endpointFor('plan', ws('a', null))
+    const e = endpointFor('plan', ws('a', false))
     assert.equal(e?.path, '/api/v1/runs')
     assert.deepEqual(e?.body, {
       data: {
@@ -68,14 +78,14 @@ describe('endpointFor', () => {
   })
 
   it('has no endpoint for an action that needs a run the workspace does not have', () => {
-    assert.equal(endpointFor('apply', ws('a', null)), null)
+    assert.equal(endpointFor('apply', ws('a', false)), null)
   })
 })
 
 describe('runBulkAction', () => {
   it('calls the endpoint once per workspace, with POST', async () => {
     const { calls, fetcher } = recorder(() => ({ ok: true, status: 200 }))
-    await runBulkAction('apply', [ws('a', 'planned'), ws('b', 'planned')], fetcher)
+    await runBulkAction('apply', [ws('a', true), ws('b', true)], fetcher)
     assert.deepEqual(
       calls.map((c) => [c.method, c.path]),
       [
@@ -91,7 +101,7 @@ describe('runBulkAction', () => {
         ? { ok: false, status: 409, detail: 'workspace is locked — unlock before applying' }
         : { ok: true, status: 200 },
     )
-    const results = await runBulkAction('apply', [ws('a', 'planned'), ws('b', 'planned')], fetcher)
+    const results = await runBulkAction('apply', [ws('a', true), ws('b', true)], fetcher)
     assert.deepEqual(results, [
       { id: 'ws-a', name: 'name-a', ok: true },
       { id: 'ws-b', name: 'name-b', ok: false, failure: { kind: 'refused', detail: 'workspace is locked — unlock before applying' } },
@@ -102,7 +112,7 @@ describe('runBulkAction', () => {
     const { calls, fetcher } = recorder((path) =>
       path.includes('run-a') ? { ok: false, status: 403, detail: 'forbidden' } : { ok: true, status: 200 },
     )
-    const results = await runBulkAction('cancel', [ws('a', 'planning'), ws('b', 'planning'), ws('c', 'planning')], fetcher)
+    const results = await runBulkAction('cancel', [ws('a', true), ws('b', true), ws('c', true)], fetcher)
     assert.equal(calls.length, 3)
     assert.deepEqual(results.map((r) => r.ok), [false, true, true])
   })
@@ -111,13 +121,13 @@ describe('runBulkAction', () => {
     const fetcher: Fetcher = async () => {
       throw new TypeError('network down')
     }
-    const results = await runBulkAction('retry', [ws('a', 'errored')], fetcher)
+    const results = await runBulkAction('retry', [ws('a', true)], fetcher)
     assert.deepEqual(results, [{ id: 'ws-a', name: 'name-a', ok: false, failure: { kind: 'network' } }])
   })
 
   it('does not send the request for a workspace that no longer has the run, and says so', async () => {
     const { calls, fetcher } = recorder(() => ({ ok: true, status: 200 }))
-    const results = await runBulkAction('apply', [ws('a', null)], fetcher)
+    const results = await runBulkAction('apply', [ws('a', false)], fetcher)
     assert.equal(calls.length, 0)
     assert.deepEqual(results, [{ id: 'ws-a', name: 'name-a', ok: false, failure: { kind: 'noRun' } }])
   })
@@ -130,9 +140,10 @@ describe('runBulkAction', () => {
 })
 
 describe('why a workspace failed', () => {
-  const resultOf = async (run: string | null, fetcher: Fetcher) => (await runBulkAction('apply', [ws('a', run)], fetcher))[0]
-  const failureOf = async (run: string | null, fetcher: Fetcher) => {
-    const r = await resultOf(run, fetcher)
+  const resultOf = async (hasRun: boolean, fetcher: Fetcher) =>
+    (await runBulkAction('apply', [ws('a', hasRun)], fetcher))[0]
+  const failureOf = async (hasRun: boolean, fetcher: Fetcher) => {
+    const r = await resultOf(hasRun, fetcher)
     assert.equal(r.ok, false)
     return r.ok ? null : r.failure
   }
@@ -141,14 +152,14 @@ describe('why a workspace failed', () => {
 
   it('a refusal carries the server detail, from the errors array or the legacy detail', async () => {
     const jsonApi = answering(403, async () => ({ errors: [{ detail: 'Requires run:apply' }] }))
-    assert.deepEqual(await failureOf('planned', jsonApi), { kind: 'refused', detail: 'Requires run:apply' })
+    assert.deepEqual(await failureOf(true, jsonApi), { kind: 'refused', detail: 'Requires run:apply' })
     const legacy = answering(404, async () => ({ detail: 'not found' }))
-    assert.deepEqual(await failureOf('planned', legacy), { kind: 'refused', detail: 'not found' })
+    assert.deepEqual(await failureOf(true, legacy), { kind: 'refused', detail: 'not found' })
   })
 
   it('an empty detail is not a refusal with nothing in it: it falls through to the status', async () => {
-    assert.deepEqual(await failureOf('planned', answering(502, async () => ({ detail: '' }))), { kind: 'status', status: 502 })
-    assert.deepEqual(await failureOf('planned', answering(502, async () => ({ errors: [{ detail: '' }] }))), {
+    assert.deepEqual(await failureOf(true, answering(502, async () => ({ detail: '' }))), { kind: 'status', status: 502 })
+    assert.deepEqual(await failureOf(true, answering(502, async () => ({ errors: [{ detail: '' }] }))), {
       kind: 'status',
       status: 502,
     })
@@ -158,16 +169,16 @@ describe('why a workspace failed', () => {
     const notJson = answering(500, async () => {
       throw new SyntaxError('Unexpected end of JSON input')
     })
-    assert.deepEqual(await failureOf('planned', notJson), { kind: 'status', status: 500 })
+    assert.deepEqual(await failureOf(true, notJson), { kind: 'status', status: 500 })
   })
 
   it('writes no string of its own: every string in a failure is the server detail, an id, a name or a kind', async () => {
-    const cases: Array<[string | null, Fetcher, string[]]> = [
-      ['planned', answering(403, async () => ({ errors: [{ detail: 'server words' }] })), ['server words']],
-      ['planned', answering(500, async () => ({})), []],
-      [null, answering(200, async () => ({})), []],
+    const cases: Array<[boolean, Fetcher, string[]]> = [
+      [true, answering(403, async () => ({ errors: [{ detail: 'server words' }] })), ['server words']],
+      [true, answering(500, async () => ({})), []],
+      [false, answering(200, async () => ({})), []],
       [
-        'planned',
+        true,
         async () => {
           throw new TypeError('Failed to fetch')
         },
@@ -175,7 +186,7 @@ describe('why a workspace failed', () => {
       ],
     ]
     const kinds = new Set(['refused', 'status', 'noRun', 'network'])
-    for (const [run, fetcher, fromServer] of cases) {
+    for (const [hasRun, fetcher, fromServer] of cases) {
       const allowed = new Set(['ws-a', 'name-a', ...fromServer])
       const strings: string[] = []
       const walk = (v: unknown, key?: string) => {
@@ -185,7 +196,7 @@ describe('why a workspace failed', () => {
           for (const [k, x] of Object.entries(v)) walk(x, k)
         }
       }
-      walk(await resultOf(run, fetcher))
+      walk(await resultOf(hasRun, fetcher))
       assert.deepEqual(
         strings.filter((x) => !allowed.has(x)),
         [],
