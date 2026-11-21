@@ -26,6 +26,7 @@ nested relationships, UI-only health rollups).
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -73,6 +74,16 @@ _PROVIDER_WS_DATASOURCE = next(
 # intentionally NOT mirrored in the SDK Workspace struct or the
 # provider's workspace resource. Each entry should be documented so
 # future contributors don't need to re-discover why.
+_SDK_RUNS = next(
+    p
+    for p in (
+        _TESTS_DIR.parent.parent / "go-terrapod/runs.go",  # local
+        _TESTS_DIR.parent / "go-terrapod/runs.go",  # docker
+    )
+    if p.exists()
+)
+
+
 WORKSPACE_API_ONLY: frozenset[str] = frozenset(
     {
         # Derived from `execution_mode` ("agent" → True). Cosmetic flag
@@ -284,6 +295,109 @@ def _provider_to_api(tfsdk_tag: str) -> str:
 
 def _provider_attrs_as_api(tfsdk_tags: set[str]) -> set[str]:
     return {_provider_to_api(t) for t in tfsdk_tags}
+
+
+def _go_struct_tags(path: Path, struct: str) -> set[str]:
+    """The `json:"..."` tags of one Go struct, `,omitempty` stripped.
+
+    The sibling above is hardcoded to `Workspace`; this takes the struct, since
+    the nested contract needs two more.
+    """
+    m = re.search(r"^type " + struct + r" struct \{(.*?)^\}", path.read_text(), re.M | re.S)
+    if m is None:
+        raise AssertionError(f"`type {struct} struct` not found in {path.name}")
+    return {tag.split(",", 1)[0] for tag in re.findall(r'json:"([a-z][a-z0-9-]+)', m.group(1))}
+
+
+def _latest_run_literal() -> ast.Dict:
+    """The `latest_run_attr = {...}` dict in `tfe_v2.py`.
+
+    By AST, and it REFUSES rather than guesses if the literal stops being one:
+    a reader that quietly returned nothing would report the SDK complete.
+    """
+    tree = ast.parse(_API_TFE_V2.read_text())
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Dict)
+            and any(isinstance(t, ast.Name) and t.id == "latest_run_attr" for t in node.targets)
+        ):
+            return node.value
+    raise AssertionError("`latest_run_attr = {...}` not found as a dict literal in tfe_v2.py")
+
+
+def _dict_keys(d: ast.Dict) -> set[str]:
+    out = set()
+    for k in d.keys:
+        if not isinstance(k, ast.Constant) or not isinstance(k.value, str):
+            raise AssertionError(f"unreadable key: {ast.dump(k) if k is not None else '**spread'}")
+        out.add(k.value)
+    return out
+
+
+#: `latest-run` sub-keys deliberately not on `WorkspaceLatestRun`, each with its reason.
+LATEST_RUN_API_ONLY: frozenset[str] = frozenset()
+
+
+class TestTheNestedLatestRunReachesTheSDK:
+    """Every sub-key of `latest-run` is on `WorkspaceLatestRun`, or exempted.
+
+    Nothing forced this, by construction rather than by oversight.
+    `WORKSPACE_API_ONLY` exempts `latest-run` as a WHOLE, and
+    `_extract_workspace_api_attrs` parses top-level keys only, so a nested
+    sub-key fell outside both halves of the test that exists for exactly this
+    contract. `surface.golden` is additive-only, so it stays green when a field
+    is simply never added, and `wire_completeness_test.go` covers request
+    structs rather than this one. The last attribute to go in was carried
+    because the API-consumer contract says to carry it, not because anything
+    would have failed (#2630).
+    """
+
+    def test_every_latest_run_sub_key_is_on_the_sdk_struct(self):
+        missing = sorted(
+            _dict_keys(_latest_run_literal())
+            - _go_struct_tags(_SDK_WORKSPACES, "WorkspaceLatestRun")
+            - LATEST_RUN_API_ONLY
+        )
+        assert missing == [], (
+            "the workspace document's `latest-run` carries these and "
+            "`WorkspaceLatestRun` does not: " + ", ".join(missing) + ". Add the field "
+            "and its provider/MCP consumers, or exempt it in LATEST_RUN_API_ONLY with "
+            "the reason."
+        )
+
+    def test_the_nested_actions_block_is_covered_too(self):
+        """One level further, where the same blindness repeats: `actions` is an
+        object inside an object, so neither reader above sees its keys either."""
+        literal = _latest_run_literal()
+        actions = next(
+            (
+                v
+                for k, v in zip(literal.keys, literal.values, strict=True)
+                if isinstance(k, ast.Constant) and k.value == "actions" and isinstance(v, ast.Dict)
+            ),
+            None,
+        )
+        assert actions is not None, "`actions` inside latest_run_attr is no longer a dict literal"
+        missing = sorted(_dict_keys(actions) - _go_struct_tags(_SDK_RUNS, "RunActions"))
+        assert missing == [], f"`RunActions` is missing: {missing}"
+
+    def test_both_readers_see_something(self):
+        """Floors. A reader that stops matching reports nothing missing, which is
+        indistinguishable from the SDK being complete -- the direction that lets
+        a carry be forgotten, which is the whole defect."""
+        assert len(_dict_keys(_latest_run_literal())) >= 7
+        assert len(_go_struct_tags(_SDK_WORKSPACES, "WorkspaceLatestRun")) >= 7
+        assert len(_go_struct_tags(_SDK_RUNS, "RunActions")) == 4
+
+    def test_the_tag_reader_strips_omitempty_and_stays_inside_its_struct(self):
+        """Its own fixtures: `phase-started-at` carries `,omitempty`, so a reader
+        keeping the suffix would report it missing and invite a spurious
+        exemption -- a gate inventing work is as bad as one missing it."""
+        tags = _go_struct_tags(_SDK_WORKSPACES, "WorkspaceLatestRun")
+        assert "phase-started-at" in tags
+        assert not any("," in t for t in tags)
+        assert "name" not in tags, "the reader escaped WorkspaceLatestRun into a sibling struct"
 
 
 class TestWorkspaceContract:
