@@ -1160,6 +1160,52 @@ test.describe("Workspaces", () => {
     await expect(retry).toContainText("1 of 1 eligible");
     await page.unrouteAll({ behavior: "ignoreErrors" });
   });
+
+  /**
+   * The selection is frozen while it is the input to something already running.
+   *
+   * The boxes used to stay live, and the completion handler filters the
+   * selection down to the workspaces that FAILED -- so a row ticked mid-batch
+   * was in the selection, absent from the results, and silently cleared: never
+   * acted on, never reported, and gone from the screen as if it had been
+   * (#2621). Freezing them removes the state rather than papering over it, and
+   * then the filter is correct by construction because nothing can be added.
+   */
+  test("row and header checkboxes are off while a bulk action is in flight", async ({ page }) => {
+    const prefix = uniqueName("e2e-sel-frozen");
+    const id = await createWorkspace(getStoredToken(), `${prefix}-a`);
+    await stubLatestRun(page, [id], () => ({
+      status: "errored",
+      actions: { ...NO_ACTIONS, "is-retryable": true },
+    }));
+    // Hold the action open so the in-flight state can be observed at all.
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    await page.route("**/api/v1/runs/*/actions/retry", async (route) => {
+      await held;
+      await route.fulfill({ status: 200, contentType: "application/vnd.api+json", body: "{}" });
+    });
+
+    await listOnly(page, prefix, 1);
+    const row = page.getByTestId("ws-row-select");
+    const all = page.getByTestId("ws-select-all");
+    await expect(row).toBeEnabled();
+    await row.check();
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("ws-selection").click();
+    await page.getByTestId("ws-selection-retry").click();
+
+    await expect(row).toBeDisabled();
+    await expect(all).toBeDisabled();
+    release();
+    await expect(page.getByTestId("ws-bulk-result")).toContainText("Retry run: 1 of 1", { timeout: 15_000 });
+    // And back on afterwards: a frozen selection that never thaws is worse.
+    await expect(row).toBeEnabled();
+    await expect(all).toBeEnabled();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
 });
 
 test.describe("Workspaces: bulk confirmations at tablet width with a touch pointer", () => {
