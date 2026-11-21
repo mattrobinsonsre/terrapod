@@ -3092,7 +3092,7 @@ test.describe('Autodiscovery rule propagation (#2621 item 50)', () => {
           attributes: {
             name: uniqueName('e2eresp-prop-vcs'),
             provider: 'gitlab',
-            token: 'glpat-e2e-not-a-real-token',
+            token: 'glpat-e2e-not-a-real-token' /* gitleaks:allow — fixture, not a credential */,
           },
         },
       }),

@@ -2323,7 +2323,9 @@ export default function AutodiscoveryPage() {
         {propagateModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] flex flex-col">
-              <h3 className="text-lg font-semibold text-slate-100 mb-1">
+              {/* A rule name is user data and can be one unbroken token, so the
+                  heading has to wrap rather than set the dialog's width. */}
+              <h3 className="text-lg font-semibold text-slate-100 mb-1 break-words min-w-0">
                 {t('propagate.title', { ruleName: propagateModal.ruleName })}
               </h3>
               <p className="text-xs text-slate-500 mb-4">{t('propagate.lead')}</p>
@@ -2342,7 +2344,7 @@ export default function AutodiscoveryPage() {
               )}
 
               {propagateModal.report && (
-                <div className="overflow-auto flex-1 mb-4 flex flex-col gap-4">
+                <div className="overflow-auto flex-1 mb-4 flex flex-col gap-4 min-w-0">
                   <p className="text-xs text-slate-500">
                     {t('propagate.matched', { count: propagateModal.report.matched })}
                     {propagateModal.report.skipped_lifecycle > 0 && (
@@ -2365,7 +2367,12 @@ export default function AutodiscoveryPage() {
                       <h4 className="text-sm font-medium text-slate-200 mb-2">
                         {t('propagate.willChange')}
                       </h4>
-                      <div className="overflow-x-auto border border-slate-700/50 rounded">
+                      {/* Four columns of names and values cannot be read at phone
+                          width, and a flex item's `min-width: auto` means the
+                          scroll container will not shrink below the table's
+                          min-content width either -- so the page itself goes
+                          sideways. Cards below `md`, table above (#719). */}
+                      <div className="hidden md:block overflow-x-auto border border-slate-700/50 rounded">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-800/50">
                             <tr className="border-b border-slate-700/50">
@@ -2397,6 +2404,25 @@ export default function AutodiscoveryPage() {
                           </tbody>
                         </table>
                       </div>
+                      <ul className="md:hidden flex flex-col gap-2 min-w-0">
+                        {propagateModal.report.would_change.map(w => (
+                          <li key={w.id} className="min-w-0 border border-slate-700/50 rounded p-3">
+                            <p className="text-sm text-slate-200 break-words mb-2">{w.name}</p>
+                            <dl className="flex flex-col gap-1.5 min-w-0">
+                              {Object.entries(w.diff ?? {}).map(([field, value]) => (
+                                <div key={field} className="min-w-0">
+                                  <dt className="font-mono text-xs text-slate-400 break-all">{field}</dt>
+                                  <dd className="font-mono text-xs text-slate-200 break-all">
+                                    {Array.isArray(value)
+                                      ? propagationCell(value, t('propagate.empty'))
+                                      : `${propagationCell(value.from, t('propagate.empty'))} \u2192 ${propagationCell(value.to, t('propagate.empty'))}`}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          </li>
+                        ))}
+                      </ul>
                     </section>
                   )}
 
@@ -2406,7 +2432,7 @@ export default function AutodiscoveryPage() {
                         {t('propagate.leftAlone')}
                       </h4>
                       <p className="text-xs text-slate-500 mb-2">{t('propagate.leftAloneLead')}</p>
-                      <div className="overflow-x-auto border border-slate-700/50 rounded">
+                      <div className="hidden md:block overflow-x-auto border border-slate-700/50 rounded">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-800/50">
                             <tr className="border-b border-slate-700/50">
@@ -2434,6 +2460,26 @@ export default function AutodiscoveryPage() {
                           </tbody>
                         </table>
                       </div>
+                      <ul className="md:hidden flex flex-col gap-2 min-w-0">
+                        {propagateModal.report.customised.map(w => (
+                          <li key={w.id} className="min-w-0 border border-slate-700/50 rounded p-3">
+                            <p className="text-sm text-slate-200 break-words mb-2">{w.name}</p>
+                            <dl className="flex flex-col gap-1.5 min-w-0">
+                              {Object.entries(w.fields).map(([field, v]) => (
+                                <div key={field} className="min-w-0">
+                                  <dt className="font-mono text-xs text-slate-400 break-all">{field}</dt>
+                                  <dd className="font-mono text-xs text-slate-200 break-all">
+                                    {t('propagate.colCurrent')}: {propagationCell(v.current, t('propagate.empty'))}
+                                  </dd>
+                                  <dd className="font-mono text-xs text-slate-400 break-all">
+                                    {t('propagate.colRuleNow')}: {propagationCell(v.new, t('propagate.empty'))}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          </li>
+                        ))}
+                      </ul>
                     </section>
                   )}
 

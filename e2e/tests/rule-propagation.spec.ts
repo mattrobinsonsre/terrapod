@@ -27,7 +27,11 @@ async function createVcsConnection(token: string, name: string): Promise<string>
     body: JSON.stringify({
       data: {
         type: 'vcs-connections',
-        attributes: { name, provider: 'gitlab', token: 'glpat-e2e-not-a-real-token' },
+        attributes: {
+          name,
+          provider: 'gitlab',
+          token: 'glpat-e2e-not-a-real-token' /* gitleaks:allow — fixture, not a credential */,
+        },
       },
     }),
   });
@@ -161,7 +165,10 @@ test('the verdict table distinguishes a change from a value set by hand', async 
 
   // The change: both halves of the scalar diff, and the template field by name.
   await expect(page.getByText('Will change')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole('cell', { name: 'payments-prod' })).toBeVisible();
+  // TWO rows, not one: the table is one row per (workspace, setting) pair, and
+  // this workspace has two changed settings. Asserted as a count rather than
+  // `.first()` so the expansion is pinned instead of merely tolerated.
+  await expect(page.getByRole('cell', { name: 'payments-prod' })).toHaveCount(2);
   await expect(page.getByRole('cell', { name: '1.9.0', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '1.13.1', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: 'nightly-scan' })).toBeVisible();
