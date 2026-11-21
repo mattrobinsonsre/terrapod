@@ -1054,7 +1054,7 @@ Workspace responses (show and list, on both the native and TFE-compatible surfac
 
 It answers about the run's state only. It carries no RBAC and does not predict the destroy capability (`run:apply-destroy`, which `is-destroy` lets a client check), the workspace's `plan-apply-enabled` or `configure-enabled`, the workspace lock, or the refusal of a non-destroy apply of CLI-uploaded code on a VCS-connected workspace; an action it offers can still be refused.
 
-A server that predates `actions` and `run-kind` omits both keys; treat an absent `actions` as "nothing is offered".
+A server that predates `actions` and `run-kind` omits both keys; treat an absent `actions` as "nothing is offered". A server that predates `is-destroy` omits that too, and an absent boolean decodes to `false` in a typed client -- go-terrapod's `LatestRun.IsDestroy` is a plain `bool`, so there is no value it can report as "not said". A newer client against such a server therefore reads every destroy as an ordinary run and offers Apply and Retry for it, earning exactly the `403` that `is-destroy` exists to predict. Treat an absent `is-destroy` as unknown rather than as `false`: let the server refuse, rather than deciding locally that `run:apply` will do.
 
 ### Delete Workspace
 
