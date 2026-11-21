@@ -7,6 +7,7 @@ import time
 import uuid
 import weakref
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import event, func, select
@@ -111,27 +112,46 @@ _PROBE_TIMEOUT_SECONDS = 5.0
 #: How long a probe result answers `/ready` before the locations are probed again.
 _PROBE_TTL_SECONDS = 30.0
 
-#: Why the storage location check could not run; None once one has run (or none was tried).
-_unchecked: str | None = None
 
-#: Configured locations whose last probe failed, with the reason.
-_unreachable: dict[str, str] = {}
+@dataclass
+class _NodeView:
+    """This node's view of its own storage locations, as one object.
 
-#: When the locations were last probed (monotonic seconds); None before the first probe.
-_probed_at: float | None = None
+    These were five module globals, which is what they are -- process-wide state
+    written by one call and read by another, deliberately. The cost was that every
+    writer needed a `global` statement, each carrying a `# noqa: PLW0603`, and
+    CodeQL read the rebinds as unused globals because no single function both
+    writes and reads one (`py/unused-global-variable`, alert 680). Both complaints
+    are false here and both would keep coming back: a dismissal is bound to one
+    alert number, so the next edit to this file raises a fresh one.
 
-#: When the unconfigured-rows check last RAN (monotonic seconds), which is a different
-#: clock from `_probed_at`: that one times a reachability probe of the locations this node
-#: has, and this one times a question about rows it may not have seen yet.
-#:
-#: A standby configured with NO locations is exactly the node that needs the second clock.
-#: Its startup check passes (no row named a location yet), `_unchecked` goes to None, and
-#: the readiness path below used to re-query only when a PREVIOUS check had failed -- so
-#: rows replicated afterwards were never noticed, and a promotion without a restart wrote
-#: a located workspace's objects to the default store (#2621).
-_counted_at: float | None = None
-#: The one in-flight background refresh; held here so it is not garbage-collected.
-_refresh_task: asyncio.Task[None] | None = None
+    Holding them on one instance settles it structurally rather than by argument.
+    Assigning an attribute is not a global rebind, so there is nothing left for
+    either tool to flag, and a reader can see the whole of this module's mutable
+    state in one place (#2623).
+    """
+
+    #: Why the storage location check could not run; None once one has run (or none was tried).
+    unchecked: str | None = None
+    #: Configured locations whose last probe failed, with the reason.
+    unreachable: dict[str, str] = field(default_factory=dict)
+    #: When the locations were last probed (monotonic seconds); None before the first probe.
+    probed_at: float | None = None
+    #: When the unconfigured-rows check last RAN (monotonic seconds), which is a different
+    #: clock from `probed_at`: that one times a reachability probe of the locations this node
+    #: has, and this one times a question about rows it may not have seen yet.
+    #:
+    #: A standby configured with NO locations is exactly the node that needs the second clock.
+    #: Its startup check passes (no row named a location yet), `unchecked` goes to None, and
+    #: the readiness path below used to re-query only when a PREVIOUS check had failed -- so
+    #: rows replicated afterwards were never noticed, and a promotion without a restart wrote
+    #: a located workspace's objects to the default store (#2621).
+    counted_at: float | None = None
+    #: The one in-flight background refresh; held here so it is not garbage-collected.
+    refresh_task: asyncio.Task[None] | None = None
+
+
+_node = _NodeView()
 
 
 def _is_pre_migration(exc: BaseException) -> bool:
@@ -195,43 +215,42 @@ async def _probe_locations() -> None:
     reasons = await asyncio.gather(*(_probe(s) for s in stores.values()))
     for name, reason in zip(stores, reasons, strict=True):
         STORAGE_LOCATION_REACHABLE.labels(location=name).set(0 if reason else 1)
-        if reason and name not in _unreachable:
+        if reason and name not in _node.unreachable:
             logger.error("Storage location unreachable", location=name, reason=reason)
-        elif not reason and name in _unreachable:
+        elif not reason and name in _node.unreachable:
             logger.info("Storage location reachable again", location=name)
         if reason:
-            _unreachable[name] = reason
+            _node.unreachable[name] = reason
         else:
-            _unreachable.pop(name, None)
+            _node.unreachable.pop(name, None)
 
 
 async def _refresh() -> None:
     """Probe the locations and stamp the result; a failure is logged and keeps the old result."""
-    global _probed_at  # noqa: PLW0603
     try:
         await _probe_locations()
     except Exception as exc:
         logger.warning("Storage location probe refresh failed", error=str(exc))
-    _probed_at = time.monotonic()
+    _node.probed_at = time.monotonic()
 
 
 def _refresh_in_background() -> None:
     """Start one refresh when the last result is older than the TTL; never waits for it."""
-    global _refresh_task  # noqa: PLW0603
-    if not settings.storage.locations or _probed_at is None:
+    if not settings.storage.locations or _node.probed_at is None:
         return
-    if time.monotonic() - _probed_at < _PROBE_TTL_SECONDS:
+    if time.monotonic() - _node.probed_at < _PROBE_TTL_SECONDS:
         return
-    if _refresh_task is None or _refresh_task.done():
+    if _node.refresh_task is None or _node.refresh_task.done():
         # Per-process reachability: a scheduler task runs on one replica, so cannot carry it.
         refresh = _refresh()
-        _refresh_task = asyncio.create_task(refresh)  # nosemgrep: terrapod-no-raw-background-tasks
+        _node.refresh_task = asyncio.create_task(
+            refresh
+        )  # nosemgrep: terrapod-no-raw-background-tasks
 
 
 async def stop_probing() -> None:
     """Cancel a refresh still in flight; called on shutdown."""
-    global _refresh_task  # noqa: PLW0603
-    task, _refresh_task = _refresh_task, None
+    task, _node.refresh_task = _node.refresh_task, None
     if task is not None and not task.done():
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
@@ -247,20 +266,18 @@ def _record_unchecked(value: str | None) -> str | None:
     writes whose value nothing local reads. Returning the global rather than the
     parameter is deliberate -- that is what makes the assignment used.
     """
-    global _unchecked  # noqa: PLW0603
-    _unchecked = value
-    return _unchecked
+    _node.unchecked = value
+    return _node.unchecked
 
 
 async def check_locations_at_startup() -> None:
     """Refuse to start on rows naming unconfigured locations; report unreachable locations."""
-    global _probed_at, _counted_at  # noqa: PLW0603
     await _probe_locations()
-    _probed_at = time.monotonic()
+    _node.probed_at = time.monotonic()
     # Stamped around the count rather than after it, so a count that RAISED still
-    # marks the attempt: `_unchecked` then holds the reason and the readiness path
+    # marks the attempt: `_node.unchecked` then holds the reason and the readiness path
     # re-runs on `pending`, not on a staleness that would fire on every call.
-    _counted_at = time.monotonic()
+    _node.counted_at = time.monotonic()
     try:
         counts = await _location_counts()
     except Exception as exc:
@@ -282,7 +299,7 @@ async def check_locations_at_startup() -> None:
         # also what `lifespan` already does for a schema behind the app, twelve
         # lines above where this is called from.
         #
-        # `_unchecked` is assigned HERE rather than cleared above, so the
+        # `_node.unchecked` is assigned HERE rather than cleared above, so the
         # readiness path cannot report healthy on a deployment this check has
         # refused. Clearing it first and relying on the raise was the ordering
         # that made a swallowed raise look fine.
@@ -297,9 +314,8 @@ async def locations_readiness() -> tuple[bool, str]:
 
     The probe result is the last one recorded, never waited for; an old one is refreshed behind.
     """
-    global _counted_at  # noqa: PLW0603
     _refresh_in_background()
-    pending = _unchecked
+    pending = _node.unchecked
     # `None` is NOT stale, deliberately: this is a REFRESH of the count
     # `check_locations_at_startup` already did, so an unstamped process is one
     # where startup has not run (a test, or a process still booting) and owes no
@@ -307,9 +323,11 @@ async def locations_readiness() -> tuple[bool, str]:
     # database, which on a pod whose startup had not run is a RuntimeError
     # reported as `unchecked` -- readiness refused for the absence of a check
     # rather than for its result (#2621).
-    stale = _counted_at is not None and (time.monotonic() - _counted_at) >= _PROBE_TTL_SECONDS
+    stale = (
+        _node.counted_at is not None and (time.monotonic() - _node.counted_at) >= _PROBE_TTL_SECONDS
+    )
     if pending is not None or stale:
-        _counted_at = time.monotonic()
+        _node.counted_at = time.monotonic()
         try:
             counts = await _location_counts()
         except Exception as exc:
@@ -326,6 +344,6 @@ async def locations_readiness() -> tuple[bool, str]:
             # seconds per replica is how an operator learns to filter the line
             # that matters.
             logger.info("Storage location check passed", earlier=pending)
-    if _unreachable:
-        return True, f"unreachable: {', '.join(sorted(_unreachable))}"
+    if _node.unreachable:
+        return True, f"unreachable: {', '.join(sorted(_node.unreachable))}"
     return True, "healthy"

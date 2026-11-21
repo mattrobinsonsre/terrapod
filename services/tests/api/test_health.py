@@ -128,7 +128,7 @@ class TestReady:
         mock_db.return_value = mock_redis.return_value = True
         mock_storage.return_value = object()
         mock_schema.return_value = (True, "abc123")
-        monkeypatch.setattr(lr, "_unchecked", "connection refused")
+        monkeypatch.setattr(lr._node, "unchecked", "connection refused")
         verdict = {"value": {}}
 
         async def unconfigured():
@@ -159,9 +159,9 @@ class TestReady:
         mock_db.return_value = mock_redis.return_value = True
         mock_storage.return_value = object()
         mock_schema.return_value = (True, "abc123")
-        monkeypatch.setattr(lr, "_unchecked", None)
-        monkeypatch.setattr(lr, "_unreachable", {"eu-west": "OSError: refused"})
-        monkeypatch.setattr(lr, "_probed_at", lr.time.monotonic())
+        monkeypatch.setattr(lr._node, "unchecked", None)
+        monkeypatch.setattr(lr._node, "unreachable", {"eu-west": "OSError: refused"})
+        monkeypatch.setattr(lr._node, "probed_at", lr.time.monotonic())
         async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
             resp = await c.get("/ready")
         assert resp.status_code == 200

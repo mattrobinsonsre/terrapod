@@ -152,11 +152,83 @@ class _PreMigration(Exception):
         self.orig = SimpleNamespace(sqlstate=sqlstate)
 
 
+class TestTheModulesMutableState:
+    """Every piece of it is on `_node`, and nothing rebinds a module global.
+
+    These were five module-level names. They are process-wide state written by
+    one call and read by another, which is deliberate -- but it cost a `global`
+    statement per writer, each needing a `# noqa: PLW0603`, and CodeQL read the
+    rebinds as unused globals because no single function both writes and reads
+    one (`py/unused-global-variable`). Both complaints were false and both would
+    have kept returning: an alert dismissal is bound to one alert number, so the
+    next edit to the file raises a fresh one (#2623).
+
+    Holding them on one instance removes the construction both tools object to,
+    so this asserts the construction rather than the alert -- there is nothing to
+    silence, and a `global` reintroduced here fails by name.
+    """
+
+    def test_the_module_rebinds_no_global(self):
+        import ast
+        import inspect
+
+        tree = ast.parse(inspect.getsource(lr))
+        offenders = [
+            f"{n.lineno}: global {', '.join(n.names)}"
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Global)
+        ]
+        assert offenders == [], (
+            "this module's mutable state lives on `_node` so that no writer needs a "
+            "`global` -- put the new field on the holder rather than beside it: "
+            + "; ".join(offenders)
+        )
+
+    def test_every_mutable_field_is_on_the_holder(self):
+        """The converse, so the holder cannot be bypassed by a mutable module default.
+
+        A `global` is only one way back: a plain module-level dict or list is
+        mutated in place without one, and would be invisible to the test above.
+        Constants are fine and are what the UPPER_CASE convention marks.
+        """
+        import ast
+        import inspect
+
+        tree = ast.parse(inspect.getsource(lr))
+        offenders = []
+        for node in tree.body:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                if not isinstance(t, ast.Name) or t.id.lstrip("_").isupper():
+                    continue
+                if isinstance(
+                    node.value, (ast.Dict, ast.List, ast.Set, ast.DictComp, ast.ListComp)
+                ):
+                    offenders.append(f"{node.lineno}: {t.id}")
+        assert offenders == [], (
+            "a mutable module-level default is state outside `_node` that no `global` "
+            "check can see; put it on the holder: " + "; ".join(offenders)
+        )
+
+    def test_the_holder_carries_the_five_it_replaced(self):
+        """Named, because losing one silently would turn a read into an AttributeError
+        at the point of use rather than here."""
+        assert {f.name for f in __import__("dataclasses").fields(lr._node)} == {
+            "unchecked",
+            "unreachable",
+            "probed_at",
+            "counted_at",
+            "refresh_task",
+        }
+
+
 class TestTheStartupCheck:
     @pytest.fixture(autouse=True)
     def _fresh(self, monkeypatch):
-        monkeypatch.setattr(lr, "_unchecked", None)
-        monkeypatch.setattr(lr, "_counted_at", None)
+        monkeypatch.setattr(lr._node, "unchecked", None)
+        monkeypatch.setattr(lr._node, "counted_at", None)
 
     @pytest.fixture
     def rows(self, monkeypatch):
@@ -211,7 +283,7 @@ class TestTheStartupCheck:
         assert (await lr.locations_readiness())[0] is True
 
         # Past it, with no restart and no prior failure to trigger the re-query.
-        lr._counted_at = lr.time.monotonic() - lr._PROBE_TTL_SECONDS - 1
+        lr._node.counted_at = lr.time.monotonic() - lr._PROBE_TTL_SECONDS - 1
         ready, detail = await lr.locations_readiness()
         assert ready is False
         assert "eu-west" in detail
@@ -228,7 +300,7 @@ class TestTheStartupCheck:
         """
         rows.error = RuntimeError("Database not initialized")
         assert await lr.locations_readiness() == (True, "healthy")
-        assert lr._unchecked is None
+        assert lr._node.unchecked is None
 
     async def test_the_startup_check_stamps_the_counts_clock(self, rows, configured):
         """Or the refresh above fires on the call right after startup.
@@ -237,7 +309,7 @@ class TestTheStartupCheck:
         must take the answer rather than repeat the query.
         """
         await lr.check_locations_at_startup()
-        assert lr._counted_at is not None
+        assert lr._node.counted_at is not None
 
         rows.error = RuntimeError("the clock was not stamped, so this was queried again")
         assert await lr.locations_readiness() == (True, "healthy")
@@ -251,8 +323,8 @@ class TestTheStartupCheck:
         """
         rows.error = RuntimeError("boom")
         await lr.check_locations_at_startup()
-        assert lr._counted_at is not None
-        assert lr._unchecked == "RuntimeError"
+        assert lr._node.counted_at is not None
+        assert lr._node.unchecked == "RuntimeError"
 
         rows.error = None
         assert await lr.locations_readiness() == (True, "healthy")
@@ -409,10 +481,10 @@ class _ProbeStore:
 class TestTheReachabilityProbe:
     @pytest.fixture(autouse=True)
     def _fresh(self, monkeypatch):
-        monkeypatch.setattr(lr, "_unchecked", None)
-        monkeypatch.setattr(lr, "_unreachable", {})
-        monkeypatch.setattr(lr, "_probed_at", None)
-        monkeypatch.setattr(lr, "_refresh_task", None)
+        monkeypatch.setattr(lr._node, "unchecked", None)
+        monkeypatch.setattr(lr._node, "unreachable", {})
+        monkeypatch.setattr(lr._node, "probed_at", None)
+        monkeypatch.setattr(lr._node, "refresh_task", None)
         monkeypatch.setattr(lr, "_PROBE_TIMEOUT_SECONDS", 0.2)
 
     @pytest.fixture
@@ -481,7 +553,7 @@ class TestTheReachabilityProbe:
         await lr.check_locations_at_startup()
         for _ in range(5):
             assert await lr.locations_readiness() == (True, "healthy")
-        assert node.eu.listed == 1 and lr._refresh_task is None
+        assert node.eu.listed == 1 and lr._node.refresh_task is None
 
     async def test_a_hanging_probe_never_delays_ready(self, node, monkeypatch):
         monkeypatch.setattr(lr, "_PROBE_TTL_SECONDS", 0.0)
@@ -492,9 +564,9 @@ class TestTheReachabilityProbe:
         answer = await asyncio.wait_for(lr.locations_readiness(), timeout=0.1)
 
         assert answer == (True, "healthy")
-        assert lr._refresh_task is not None and not lr._refresh_task.done()
+        assert lr._node.refresh_task is not None and not lr._node.refresh_task.done()
         await lr.stop_probing()
-        assert lr._refresh_task is None
+        assert lr._node.refresh_task is None
 
     async def test_concurrent_calls_start_one_refresh_and_the_result_updates(
         self, node, monkeypatch
@@ -506,7 +578,7 @@ class TestTheReachabilityProbe:
 
         answers = await asyncio.gather(*(lr.locations_readiness() for _ in range(5)))
         assert set(answers) == {(True, "healthy")}
-        await lr._refresh_task
+        await lr._node.refresh_task
 
         assert node.eu.listed == before + 1
         assert await lr.locations_readiness() == (True, "unreachable: eu-west")
@@ -521,7 +593,7 @@ class TestTheReachabilityProbe:
 
         monkeypatch.setattr(lr, "_probe_locations", boom)
         assert await lr.locations_readiness() == (True, "healthy")
-        await lr._refresh_task
+        await lr._node.refresh_task
 
         assert any("refresh failed" in c.args[0] for c in node.log.warning.call_args_list)
         assert await lr.locations_readiness() == (True, "healthy")
@@ -535,11 +607,11 @@ class TestTheReachabilityProbe:
         node.eu.hang = True
         monkeypatch.setattr(lr, "_PROBE_TIMEOUT_SECONDS", 5.0)
         await lr.locations_readiness()
-        task = lr._refresh_task
+        task = lr._node.refresh_task
 
         await lr.stop_probing()
 
-        assert task.cancelled() and lr._refresh_task is None
+        assert task.cancelled() and lr._node.refresh_task is None
 
     async def test_the_gauge_and_the_detail_follow_the_latest_probe_both_ways(
         self, node, monkeypatch
@@ -550,21 +622,21 @@ class TestTheReachabilityProbe:
 
         node.us.error = OSError("AccessDenied")
         await lr.locations_readiness()
-        await lr._refresh_task
+        await lr._node.refresh_task
         assert await lr.locations_readiness() == (True, "unreachable: us-east")
         assert self._gauge("us-east") == 0
         assert any(c.kwargs.get("location") == "us-east" for c in node.log.error.call_args_list)
 
         node.us.error = None
         await lr.locations_readiness()
-        await lr._refresh_task
+        await lr._node.refresh_task
         assert await lr.locations_readiness() == (True, "healthy")
         assert self._gauge("us-east") == 1
 
     async def test_the_reason_carries_the_error_not_the_configuration(self, node):
         node.eu.error = OSError("x" * 500)
         await lr.check_locations_at_startup()
-        reason = lr._unreachable["eu-west"]
+        reason = lr._node.unreachable["eu-west"]
         assert reason.startswith("OSError: ") and len(reason) <= 210
 
     async def test_a_default_deployment_probes_nothing(self, monkeypatch):

@@ -324,7 +324,7 @@ class TestAgainstPostgres:
 
         await _rows("removed")
         await lr.check_locations_at_startup()
-        assert lr._unchecked is not None, (
+        assert lr._node.unchecked is not None, (
             "the refusal must leave _unchecked set, or readiness reports healthy "
             "on a deployment the check refused"
         )
@@ -488,9 +488,9 @@ class TestTheReachabilityProbeAgainstS3:
                 "no-endpoint": StorageLocationConfig(backend=StorageBackend.S3, s3=no_endpoint),
             },
         )
-        monkeypatch.setattr(lr, "_unchecked", None)
-        monkeypatch.setattr(lr, "_unreachable", {})
-        monkeypatch.setattr(lr, "_probed_at", None)
+        monkeypatch.setattr(lr._node, "unchecked", None)
+        monkeypatch.setattr(lr._node, "unreachable", {})
+        monkeypatch.setattr(lr._node, "probed_at", None)
         monkeypatch.setattr(lr, "_PROBE_TIMEOUT_SECONDS", 3.0)
         await close_storage()
         await init_storage()
@@ -498,8 +498,8 @@ class TestTheReachabilityProbeAgainstS3:
 
         await lr.check_locations_at_startup()
 
-        assert set(lr._unreachable) == {"missing-bucket", "no-endpoint"}
-        assert "NoSuchBucket" in lr._unreachable["missing-bucket"]
+        assert set(lr._node.unreachable) == {"missing-bucket", "no-endpoint"}
+        assert "NoSuchBucket" in lr._node.unreachable["missing-bucket"]
         assert await lr.locations_readiness() == (
             True,
             "unreachable: missing-bucket, no-endpoint",
