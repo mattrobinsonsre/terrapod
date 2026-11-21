@@ -998,7 +998,15 @@ async def _cleanup_deleted_workspaces(
         # miss (negatives are deliberately never cached), query the database, and
         # then fan the delete across every configured location. The marker read
         # above already knows where the objects are (#2621).
-        remember_location(storage, str(ws_id), marker.get("storage_location"))
+        #
+        # ONLY when it actually recorded one. A discovery marker did not, and
+        # `remember` coerces None to `default`, so teaching it an unknown deletes
+        # from the default store and leaves the real objects where they are --
+        # which is worse than the fan-out it replaces, because the fan-out is
+        # correct.
+        known, location = dws.marker_storage_location(marker)
+        if known:
+            remember_location(storage, str(ws_id), location)
 
         for obj in await storage.list_prefix(f"state/{ws_id}/"):
             try:

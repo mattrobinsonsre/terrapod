@@ -49,6 +49,12 @@ def remember_location(store: ObjectStore, workspace_id: str, location: str | Non
     remember = getattr(getattr(store, "resolver", None), "remember", None)
     if remember is None:
         return False
+    if location is not None and location not in getattr(store, "locations", {}):
+        # A marker naming a location this node no longer configures. Teaching it
+        # would make every one of that workspace's objects resolve to an
+        # ObjectStoreError; answering False sends the caller back to the
+        # slow-but-correct path it already handles.
+        return False
     remember(workspace_id, location)
     return True
 

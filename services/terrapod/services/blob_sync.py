@@ -201,7 +201,7 @@ async def _location_from_delete_marker(workspace_id: str) -> bool:
     Remembered rather than returned, so this costs one marker read per deleted
     workspace per process and every later object for it takes the cache.
     """
-    from terrapod.services.deleted_workspace_service import read_marker
+    from terrapod.services.deleted_workspace_service import marker_storage_location, read_marker
     from terrapod.storage import get_storage
     from terrapod.storage.routing import remember_location
 
@@ -209,7 +209,12 @@ async def _location_from_delete_marker(workspace_id: str) -> bool:
     marker = await read_marker(store, workspace_id)
     if marker is None:
         return False
-    location = marker.get("storage_location")
+    known, location = marker_storage_location(marker)
+    if not known:
+        # The marker never recorded one, so there is nothing to teach. Teaching
+        # None would pin the workspace to `default` and copy its objects into the
+        # wrong store -- the misplacement this function exists to prevent.
+        return False
     if not remember_location(store, workspace_id, location):
         return False
     logger.info(

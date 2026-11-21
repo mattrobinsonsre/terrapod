@@ -445,10 +445,16 @@ class TestAFollowerWithStorageLocations:
         gone = "0192f3a1-0000-7000-8000-00000000000f"
         key = f"state/{gone}/a.tfstate"
 
+        from terrapod.services import deleted_workspace_service as dws
         from tests.storage.test_routing import FakeStore as RecordingStore
 
-        # Seed the marker into the default store, where a real one lives.
-        marker = json.dumps({"storage_location": "eu-west"}).encode()
+        # Seed the marker into the default store, where a real one lives, built by
+        # the real writer: an invented `{"storage_location": ...}` at the top level
+        # is not where the marker carries it, and matched the equally invented read
+        # this test was written against (#2621).
+        body = dws.build_discovery_marker(gone)
+        body["settings"] = {"storage_location": "eu-west"}
+        marker = json.dumps(body).encode()
         original = RecordingStore.__init__
 
         def seeded(self, name, expiry):
