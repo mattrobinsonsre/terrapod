@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Handed only to a riggin', an' kept from a plan an' from an apply.",
       "applyOnlyLead": "Kept from a plan an' handed only to an apply.",
       "ruleExclude": "Excludin''",
-      "ruleExcludeEntries": "{count, plural, one {# stipulation} other {# stipulations}}"
+      "ruleExcludeEntries": "{count, plural, one {# stipulation} other {# stipulations}}",
+      "exclusionRemoved": "{count, plural, one {# work-deck struck from th'' code''s reckonin'' by this set''s exclusions} other {# work-decks struck from th'' code''s reckonin'' by this set''s exclusions}}. A work-deck assigned outright still be given the set.",
+      "exclusionEmpty": "{count, plural, one {Exclusion entry {indices} matches naught a work-deck} other {Exclusion entries {indices} match naught a work-deck}}, so it be narrowin'' naught as yet."
     }
   },
   "adminAutodiscovery": {

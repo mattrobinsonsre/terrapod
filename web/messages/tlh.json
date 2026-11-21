@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Qum neH vInob; nab je lo' je vIghoj.",
       "applyOnlyLead": "nab vIghoj 'ach lo' neH vInob.",
       "ruleExclude": "Hutlh",
-      "ruleExcludeEntries": "{count, plural, one {# chut} other {# chutmey}}"
+      "ruleExcludeEntries": "{count, plural, one {# chut} other {# chutmey}}",
+      "exclusionRemoved": "{count, plural, one {# Qumwo'' chut rurbogh ''ach Segh vam Hutlhmeymo'' teqlu''} other {# Qumwo''mey chut rurbogh ''ach Segh vam Hutlhmeymo'' teqlu''}}. DIch ch''amlu''pu''bogh Qumwo'' Segh SuqtaH.",
+      "exclusionEmpty": "{count, plural, one {Hutlh chut {indices} pagh Qumwo'' rur} other {Hutlh chutmey {indices} pagh Qumwo'' rur}}, vaj DaH vay'' machmoHbe''."
     }
   },
   "adminAutodiscovery": {

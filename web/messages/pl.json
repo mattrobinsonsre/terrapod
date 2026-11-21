@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Dostarczana tylko do konfiguracji i wstrzymywana zarówno przy plan, jak i przy apply.",
       "applyOnlyLead": "Wstrzymywana przy plan i dostarczana tylko do apply.",
       "ruleExclude": "Wykluczenie",
-      "ruleExcludeEntries": "{count, plural, one {# warunek} few {# warunki} many {# warunków} other {# warunków}}"
+      "ruleExcludeEntries": "{count, plural, one {# warunek} few {# warunki} many {# warunków} other {# warunków}}",
+      "exclusionRemoved": "{count, plural, one {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzeń roboczą} few {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzenie robocze} many {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzeni roboczych} other {Wykluczenia tego zestawu usunęły z dopasowania reguły # przestrzeni roboczej}}. Przestrzeń robocza przypisana jawnie nadal otrzymuje zestaw.",
+      "exclusionEmpty": "{count, plural, one {Wpis wykluczenia {indices} nie pasuje do żadnej przestrzeni roboczej} few {Wpisy wykluczeń {indices} nie pasują do żadnej przestrzeni roboczej} many {Wpisy wykluczeń {indices} nie pasują do żadnej przestrzeni roboczej} other {Wpisy wykluczeń {indices} nie pasują do żadnej przestrzeni roboczej}}, więc na razie nie ma żadnego zawężenia."
     }
   },
   "adminAutodiscovery": {

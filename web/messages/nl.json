@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Wordt alleen aan een configureren geleverd en zowel bij een plan als bij een apply achtergehouden.",
       "applyOnlyLead": "Wordt achtergehouden bij een plan en alleen aan een apply geleverd.",
       "ruleExclude": "Uitsluiting",
-      "ruleExcludeEntries": "{count, plural, one {# voorwaarde} other {# voorwaarden}}"
+      "ruleExcludeEntries": "{count, plural, one {# voorwaarde} other {# voorwaarden}}",
+      "exclusionRemoved": "{count, plural, one {# workspace is door de uitsluitingen van deze set uit de regelselectie gehaald} other {# workspaces zijn door de uitsluitingen van deze set uit de regelselectie gehaald}}. Een workspace die expliciet is toegewezen krijgt de set nog steeds.",
+      "exclusionEmpty": "{count, plural, one {Uitsluitingsvoorwaarde {indices} komt met geen enkele workspace overeen} other {Uitsluitingsvoorwaarden {indices} komen met geen enkele workspace overeen}}, dus daarmee wordt nog niets beperkt."
     }
   },
   "adminAutodiscovery": {

@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Wird nur an ein Konfigurieren geliefert und sowohl einem plan als auch einem apply entzogen.",
       "applyOnlyLead": "Wird einem plan entzogen und nur an einen apply geliefert.",
       "ruleExclude": "Ausschluss",
-      "ruleExcludeEntries": "{count, plural, one {# Bedingung} other {# Bedingungen}}"
+      "ruleExcludeEntries": "{count, plural, one {# Bedingung} other {# Bedingungen}}",
+      "exclusionRemoved": "{count, plural, one {# Workspace wurde durch die Ausschlüsse dieses Satzes aus der Regelauswahl entfernt} other {# Workspaces wurden durch die Ausschlüsse dieses Satzes aus der Regelauswahl entfernt}}. Ein ausdrücklich zugewiesener Workspace erhält den Satz weiterhin.",
+      "exclusionEmpty": "{count, plural, one {Ausschlussbedingung {indices} trifft auf keinen Workspace zu} other {Ausschlussbedingungen {indices} treffen auf keinen Workspace zu}}, sodass damit noch nichts eingeschränkt wird."
     }
   },
   "adminAutodiscovery": {

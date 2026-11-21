@@ -238,6 +238,13 @@ export default function VariableSetDetailPage() {
 
   // Workspaces
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[]>([])
+  /** `meta.exclusion` from the association view: what the rule's `exclude` did.
+   *
+   *  `null` means the set has no usable exclusion at all — global, no rule, no
+   *  `exclude`, or a rule naming a refused dimension. That is NOT the same as
+   *  "nothing was excluded", and an operator acts on the two differently, so the
+   *  absent case renders nothing rather than a zero. */
+  const [exclusion, setExclusion] = useState<{ excluded: number; empty: number[] } | null>(null)
   const [wsLoading, setWsLoading] = useState(false)
   const [allWorkspaces, setAllWorkspaces] = useState<WorkspaceRef[]>([])
   const [showAddWs, setShowAddWs] = useState(false)
@@ -309,13 +316,32 @@ export default function VariableSetDetailPage() {
       // and listing an entire estate to repeat it is not worth the round trips.
       if (varset?.attributes.global) {
         setWorkspaces([])
+        setExclusion(null)
         return
       }
-      setWorkspaces(
-        await fetchAllPages<WorkspaceRef>(
-          `/api/terrapod/v1/varsets/${varsetId}/relationships/workspaces`,
-        ),
-      )
+      const path = `/api/v1/varsets/${varsetId}/relationships/workspaces`
+      setWorkspaces(await fetchAllPages<WorkspaceRef>(path))
+      // A second, deliberately tiny request for the response `meta`, which
+      // `fetchAllPages` concatenates `data` out of and drops. The server's reason
+      // for ACCEPTING an exclusion that matches nothing is that this report flags
+      // it rather than the write refusing a rule that is merely premature — and
+      // before this the report reached a raw curl and nothing else (#2621).
+      try {
+        const res = await apiFetch(`${path}?page[size]=1`, { credentials: 'include' })
+        if (res.ok) {
+          const body = await res.json()
+          const ex = body?.meta?.exclusion
+          setExclusion(
+            ex && typeof ex === 'object'
+              ? { excluded: Number(ex.excluded) || 0, empty: Array.isArray(ex.empty) ? ex.empty : [] }
+              : null,
+          )
+        }
+      } catch {
+        // The rows are the answer to "who receives this"; the report is detail
+        // about how the rule got there, so losing it must not fail the panel.
+        setExclusion(null)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('detail.errors.loadWorkspaces'))
     } finally {
@@ -1081,6 +1107,26 @@ export default function VariableSetDetailPage() {
                 </table>
               </div>
             ) : null}
+            {exclusion && (
+              <p className="mt-3 text-xs text-slate-500">
+                {/* "removed from the rule match", never "stopped receiving this":
+                    a workspace that is ALSO assigned explicitly still receives the
+                    set and is still listed above as explicit. The number is
+                    literally accurate and easy to read as the stronger claim. */}
+                {t('detail.exclusionRemoved', { count: exclusion.excluded })}
+                {exclusion.empty.length > 0 && (
+                  <>
+                    {' '}
+                    <span className="text-amber-400">
+                      {t('detail.exclusionEmpty', {
+                        count: exclusion.empty.length,
+                        indices: exclusion.empty.join(', '),
+                      })}
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
           </div>
         )}
       </main>

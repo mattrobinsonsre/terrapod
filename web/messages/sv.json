@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Levereras endast till en konfigurera och undanhålls både från en plan och från en apply.",
       "applyOnlyLead": "Undanhålls från en plan och levereras endast till en apply.",
       "ruleExclude": "Undantag",
-      "ruleExcludeEntries": "{count, plural, one {# villkor} other {# villkor}}"
+      "ruleExcludeEntries": "{count, plural, one {# villkor} other {# villkor}}",
+      "exclusionRemoved": "{count, plural, one {# arbetsyta har tagits bort från regelns träffar av denna uppsättnings undantag} other {# arbetsytor har tagits bort från regelns träffar av denna uppsättnings undantag}}. En arbetsyta som tilldelats uttryckligen får ändå uppsättningen.",
+      "exclusionEmpty": "{count, plural, one {Undantagsvillkor {indices} matchar ingen arbetsyta} other {Undantagsvillkoren {indices} matchar ingen arbetsyta}}, så ingenting begränsas ännu."
     }
   },
   "adminAutodiscovery": {

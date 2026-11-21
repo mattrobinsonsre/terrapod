@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Fe'i danfonir i gyflunio yn unig, a'i gadw rhag cynllun a rhag gweithredu.",
       "applyOnlyLead": "Fe'i cedwir rhag cynllun a'i ddanfon i weithredu yn unig.",
       "ruleExclude": "Eithrio",
-      "ruleExcludeEntries": "{count, plural, one {# amod} other {# amod}}"
+      "ruleExcludeEntries": "{count, plural, one {# amod} other {# amod}}",
+      "exclusionRemoved": "{count, plural, one {Mae # gweithfan wedi'i thynnu o gydweddiad y rheol gan eithriadau'r set hon} other {Mae # gweithfan wedi'u tynnu o gydweddiad y rheol gan eithriadau'r set hon}}. Mae gweithfan sydd wedi'i neilltuo'n benodol yn dal i gael y set.",
+      "exclusionEmpty": "{count, plural, one {Nid yw amod eithrio {indices} yn cydweddu ag unrhyw weithfan} other {Nid yw amodau eithrio {indices} yn cydweddu ag unrhyw weithfan}}, felly nid oes dim yn cael ei gulhau eto."
     }
   },
   "adminAutodiscovery": {

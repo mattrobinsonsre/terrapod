@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Leveres kun til en konfigurer og tilbageholdes både fra en plan og fra en apply.",
       "applyOnlyLead": "Tilbageholdes fra en plan og leveres kun til en apply.",
       "ruleExclude": "Undtagelse",
-      "ruleExcludeEntries": "{count, plural, one {# betingelse} other {# betingelser}}"
+      "ruleExcludeEntries": "{count, plural, one {# betingelse} other {# betingelser}}",
+      "exclusionRemoved": "{count, plural, one {# workspace er fjernet fra reglens match af dette sæts undtagelser} other {# workspaces er fjernet fra reglens match af dette sæts undtagelser}}. Workspaces, der er tildelt eksplicit, får fortsat sættet.",
+      "exclusionEmpty": "{count, plural, one {Undtagelsesbetingelse {indices} matcher ingen workspace} other {Undtagelsesbetingelser {indices} matcher ingen workspace}}, så der indsnævres endnu ingenting."
     }
   },
   "adminAutodiscovery": {

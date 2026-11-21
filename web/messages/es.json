@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Se entrega solo a un configurar y se retiene tanto en un plan como en un apply.",
       "applyOnlyLead": "Se retiene en un plan y se entrega solo a un apply.",
       "ruleExclude": "Exclusión",
-      "ruleExcludeEntries": "{count, plural, one {# condición} other {# condiciones}}"
+      "ruleExcludeEntries": "{count, plural, one {# condición} other {# condiciones}}",
+      "exclusionRemoved": "{count, plural, one {# espacio de trabajo excluido de la coincidencia de la regla por las exclusiones de este conjunto} other {# espacios de trabajo excluidos de la coincidencia de la regla por las exclusiones de este conjunto}}. Un espacio de trabajo asignado explícitamente sigue recibiendo el conjunto.",
+      "exclusionEmpty": "{count, plural, one {La entrada de exclusión {indices} no coincide con ningún espacio de trabajo} other {Las entradas de exclusión {indices} no coinciden con ningún espacio de trabajo}}, por lo que todavía no se restringe nada."
     }
   },
   "adminAutodiscovery": {

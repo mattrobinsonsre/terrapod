@@ -3313,7 +3313,7 @@ otherwise opt itself out of the set (`assignment-rule cannot select on locked`).
 
 Unlike a bulk update, saving a rule does **not** require every `exclude` entry to
 match a workspace today: a rule is standing, so an entry matching nothing yet is
-accepted. The varset's [association view](#association-views) reports `meta.exclusion` (how many workspaces were excluded and which entries match nothing) so a mistyped entry is visible after saving.
+accepted. The varset's [association view](#association-views) reports `meta.exclusion` (how many workspaces the exclusion removed **from the rule's match**, and which entries match nothing) so a mistyped entry is visible after saving.
 
 The Terraform provider's `assignment_rule` does not model `exclude`. On every update it reads the set's current rule and carries its `exclude` across unchanged, so an exclusion set through the API or UI survives an apply; removing the `assignment_rule` block clears the whole rule, exclusion included.
 
@@ -3374,7 +3374,9 @@ GET /api/v1/workspaces/{workspace_id}/varsets
 workspaces; for a global or rule-based set it is not the whole answer, and these
 views are.
 
-When the set's rule has an `exclude`, the varset-side view's `meta` also carries `exclusion`: `{"excluded": N, "empty": [i, ...]}`, the number of workspaces the exclusion removed from the rule's match and the indexes of `exclude` entries that match no workspace fleet-wide (usually a typo that protects nothing). It is absent when the rule has no `exclude`, or when the rule is unusable and matches nothing.
+When the set's rule has an `exclude`, the varset-side view's `meta` also carries `exclusion`: `{"excluded": N, "empty": [i, ...]}`, the number of workspaces the exclusion removed from the rule's match and the indexes of `exclude` entries that match no workspace fleet-wide (usually a typo that protects nothing). It is absent when the rule has no `exclude`, or when the rule is unusable and matches nothing — and absent is a different answer from `"excluded": 0`, which says the exclusion ran and removed nobody.
+
+**`excluded` is not "workspaces that stopped receiving this set".** It counts removals from the *rule's* match, and a workspace that is also assigned **explicitly** still receives the set — it stays in `data` with `assignment-source: "explicit"`. So a non-zero `excluded` alongside that row is not a contradiction, and an exclusion is not a way to withhold a set from a workspace somebody has assigned by hand. To stop a workspace receiving it, remove the explicit assignment.
 
 **Required permission:** platform `admin` for the varset-side view;
 `workspace:read` for the workspace-side view.

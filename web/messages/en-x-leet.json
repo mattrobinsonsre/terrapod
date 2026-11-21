@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "D3l1v3r3d 0nly 70 4 c0nf1gur3, 4nd w17hh3ld fr0m 4 pl4n 4nd fr0m 4n 4pply.",
       "applyOnlyLead": "W17hh3ld fr0m 4 pl4n 4nd d3l1v3r3d 0nly 70 4n 4pply.",
       "ruleExclude": "3xclud1ng",
-      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}"
+      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}",
+      "exclusionRemoved": "{count, plural, one {# workspace removed from the rule match by this set's exclusions} other {# workspaces removed from the rule match by this set's exclusions}}. 4 w0rk5p4c3 4551gn3d 3xpl1c17ly 571ll r3c31v35 7h3 537.",
+      "exclusionEmpty": "{count, plural, one {Exclusion entry {indices} matches no workspace} other {Exclusion entries {indices} match no workspace}}, 50 17 15 n07 n4rr0w1ng 4ny7h1ng y37."
     }
   },
   "adminAutodiscovery": {

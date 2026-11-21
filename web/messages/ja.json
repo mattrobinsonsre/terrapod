@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "構成にのみ渡し、plan にも apply にも渡しません。",
       "applyOnlyLead": "plan には渡さず、apply にのみ渡します。",
       "ruleExclude": "除外",
-      "ruleExcludeEntries": "{count, plural, one {# 件の条件} other {# 件の条件}}"
+      "ruleExcludeEntries": "{count, plural, one {# 件の条件} other {# 件の条件}}",
+      "exclusionRemoved": "{count, plural, one {この変数セットの除外により # 個のワークスペースがルールの一致対象から外れました} other {この変数セットの除外により # 個のワークスペースがルールの一致対象から外れました}}。明示的に割り当てられたワークスペースは、引き続きこのセットを受け取ります。",
+      "exclusionEmpty": "{count, plural, one {除外条件 {indices} はどのワークスペースにも一致していません} other {除外条件 {indices} はどのワークスペースにも一致していません}}。そのため、まだ何も絞り込んでいません。"
     }
   },
   "adminAutodiscovery": {

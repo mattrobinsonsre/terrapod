@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Doručena pouze do konfigurace a zadržena jak u plan, tak u apply.",
       "applyOnlyLead": "Zadržena u plan a doručena pouze do apply.",
       "ruleExclude": "Vyloučení",
-      "ruleExcludeEntries": "{count, plural, one {# podmínka} few {# podmínky} many {# podmínky} other {# podmínek}}"
+      "ruleExcludeEntries": "{count, plural, one {# podmínka} few {# podmínky} many {# podmínky} other {# podmínek}}",
+      "exclusionRemoved": "{count, plural, one {Vyloučení této sady odebrala z výběru pravidla # pracovní prostor} few {Vyloučení této sady odebrala z výběru pravidla # pracovní prostory} many {Vyloučení této sady odebrala z výběru pravidla # pracovního prostoru} other {Vyloučení této sady odebrala z výběru pravidla # pracovních prostorů}}. Pracovní prostor přiřazený výslovně sadu i tak dostává.",
+      "exclusionEmpty": "{count, plural, one {Položka vyloučení {indices} neodpovídá žádnému pracovnímu prostoru} few {Položky vyloučení {indices} neodpovídají žádnému pracovnímu prostoru} many {Položky vyloučení {indices} neodpovídají žádnému pracovnímu prostoru} other {Položky vyloučení {indices} neodpovídají žádnému pracovnímu prostoru}}, takže zatím k žádnému zúžení nedochází."
     }
   },
   "adminAutodiscovery": {

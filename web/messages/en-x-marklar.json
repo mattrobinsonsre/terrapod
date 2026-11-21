@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Delivered only to a configure, and withheld from a marklar and from a marklar.",
       "applyOnlyLead": "Withheld from a marklar and delivered only to a marklar.",
       "ruleExclude": "Excluding",
-      "ruleExcludeEntries": "{count, plural, one {# marklar} other {# marklars}}"
+      "ruleExcludeEntries": "{count, plural, one {# marklar} other {# marklars}}",
+      "exclusionRemoved": "{count, plural, one {# marklar removed from the marklar marklar by this marklar's marklars} other {# marklars removed from the marklar marklar by this marklar's marklars}}. A marklar assigned explicitly still receives the marklar.",
+      "exclusionEmpty": "{count, plural, one {Marklar marklar {indices} matches no marklar} other {Marklar marklars {indices} match no marklar}}, so it is not narrowing anything yet."
     }
   },
   "adminAutodiscovery": {

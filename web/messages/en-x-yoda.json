@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Only to a configure, delivered. From a plan and from an apply, withheld.",
       "applyOnlyLead": "From a plan, withheld. Only to an apply, delivered.",
       "ruleExclude": "Excluding",
-      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}"
+      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}",
+      "exclusionRemoved": "{count, plural, one {# workspace, from the rule match by this set's exclusions removed} other {# workspaces, from the rule match by this set's exclusions removed}}. The set, a workspace assigned explicitly still receives.",
+      "exclusionEmpty": "{count, plural, one {No workspace, exclusion entry {indices} matches} other {No workspace, exclusion entries {indices} match}}, so narrowing anything it is not, yet."
     }
   },
   "adminAutodiscovery": {

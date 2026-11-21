@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Only gived to da konfigur, an hidden from da plan AN da apply.",
       "applyOnlyLead": "Hidden from da plan an only gived to da apply.",
       "ruleExclude": "Excludin",
-      "ruleExcludeEntries": "{count, plural, one {# kondishun} other {# kondishunz}}"
+      "ruleExcludeEntries": "{count, plural, one {# kondishun} other {# kondishunz}}",
+      "exclusionRemoved": "{count, plural, one {# wurkspace remoovd frum teh rool match by dis setz exclooshunz} other {# wurkspacez remoovd frum teh rool match by dis setz exclooshunz}}. A wurkspace assignd explicitlee stil getz teh set anyway.",
+      "exclusionEmpty": "{count, plural, one {Exclooshun entree {indices} matchez no wurkspace} other {Exclooshun entreez {indices} match no wurkspace}}, so it aint narrowin nuffin yet."
     }
   },
   "adminAutodiscovery": {

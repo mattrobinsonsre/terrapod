@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Livré uniquement à un configurer, et retiré d'un plan comme d'un apply.",
       "applyOnlyLead": "Retiré d'un plan et livré uniquement à un apply.",
       "ruleExclude": "Exclusion",
-      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}"
+      "ruleExcludeEntries": "{count, plural, one {# condition} other {# conditions}}",
+      "exclusionRemoved": "{count, plural, one {# espace de travail retiré de la correspondance de la règle par les exclusions de cet ensemble} other {# espaces de travail retirés de la correspondance de la règle par les exclusions de cet ensemble}}. Un espace de travail attribué explicitement reçoit tout de même l''ensemble.",
+      "exclusionEmpty": "{count, plural, one {L''entrée d''exclusion {indices} ne correspond à aucun espace de travail} other {Les entrées d''exclusion {indices} ne correspondent à aucun espace de travail}}, de sorte que rien n''est encore restreint."
     }
   },
   "adminAutodiscovery": {

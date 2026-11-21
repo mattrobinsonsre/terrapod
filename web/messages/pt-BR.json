@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Entregue apenas a um configurar e retida tanto de um plan quanto de um apply.",
       "applyOnlyLead": "Retida de um plan e entregue apenas a um apply.",
       "ruleExclude": "Exclusão",
-      "ruleExcludeEntries": "{count, plural, one {# condição} other {# condições}}"
+      "ruleExcludeEntries": "{count, plural, one {# condição} other {# condições}}",
+      "exclusionRemoved": "{count, plural, one {# workspace removido da correspondência da regra pelas exclusões deste conjunto} other {# workspaces removidos da correspondência da regra pelas exclusões deste conjunto}}. Um workspace atribuído explicitamente continua recebendo o conjunto.",
+      "exclusionEmpty": "{count, plural, one {A entrada de exclusão {indices} não corresponde a nenhum workspace} other {As entradas de exclusão {indices} não correspondem a nenhum workspace}}, portanto nada está sendo restringido ainda."
     }
   },
   "adminAutodiscovery": {

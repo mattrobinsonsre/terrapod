@@ -1079,7 +1079,9 @@
       "configureOnlyLead": "Leveres bare til en konfigurer og holdes tilbake både fra en plan og fra en apply.",
       "applyOnlyLead": "Holdes tilbake fra en plan og leveres bare til en apply.",
       "ruleExclude": "Unntak",
-      "ruleExcludeEntries": "{count, plural, one {# betingelse} other {# betingelser}}"
+      "ruleExcludeEntries": "{count, plural, one {# betingelse} other {# betingelser}}",
+      "exclusionRemoved": "{count, plural, one {# arbeidsområde er fjernet fra regelens treff av unntakene i dette settet} other {# arbeidsområder er fjernet fra regelens treff av unntakene i dette settet}}. Et arbeidsområde som er tildelt eksplisitt, får fortsatt settet.",
+      "exclusionEmpty": "{count, plural, one {Unntaksbetingelse {indices} treffer ingen arbeidsområder} other {Unntaksbetingelser {indices} treffer ingen arbeidsområder}}, så ingenting innsnevres ennå."
     }
   },
   "adminAutodiscovery": {

@@ -1039,6 +1039,8 @@
       },
       "assignedBy": "Assigned by",
       "managedByRule": "Managed by rule",
+      "exclusionRemoved": "{count, plural, one {# workspace removed from the rule match by this set's exclusions} other {# workspaces removed from the rule match by this set's exclusions}}. A workspace assigned explicitly still receives the set.",
+      "exclusionEmpty": "{count, plural, one {Exclusion entry {indices} matches no workspace} other {Exclusion entries {indices} match no workspace}}, so it is not narrowing anything yet.",
       "assignmentRule": "Assignment rule",
       "assignmentRuleNone": "No rule. Workspaces are assigned one by one.",
       "assignmentRuleDescription": "Workspaces matching this rule receive the set automatically, re-evaluated on every run.",

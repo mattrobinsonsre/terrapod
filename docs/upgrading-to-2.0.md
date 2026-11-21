@@ -2349,3 +2349,47 @@ The other prefixes Terrapod writes to (`cache/`, `uploads/`, `registry/`, `oci/`
 `policies/`, `module_overrides/`) are **not** refused: nothing sweeps them by age,
 so dumps there are not deleted. They are merely mixed in with unrelated objects.
 See [Disaster recovery](disaster-recovery.md).
+### `ListVarsetWorkspaces` returns the exclusion report alongside the rows
+
+**Who is affected:** anyone importing `go-terrapod` and calling
+`ListVarsetWorkspaces`. Nothing inside this repository called it, so the
+provider, `terrapod-migrate`, `terrapod-publish` and the MCP server are
+unaffected.
+
+The signature gains a second return value:
+
+```go
+// 1.x
+rows, err := client.ListVarsetWorkspaces(ctx, varsetID)
+
+// 2.0
+rows, exclusion, err := client.ListVarsetWorkspaces(ctx, varsetID)
+```
+
+Discard it with `_` if you do not want it; nothing else about the call changes,
+and the rows are identical.
+
+**Why it is not an addition.** The endpoint has always returned
+`meta.exclusion` — what a rule's `exclude` removed, and which entries match
+nothing — and the SDK parsed `data` and dropped `meta` on the floor. That mattered
+more than an unread field usually does, because it was the server's stated reason
+for *accepting* an exclusion that matches nothing: a standing rule may come to
+match later, so refusing at save time would reject a rule that is merely
+premature, and the report is what flags it instead. That reason only holds if the
+report reaches somebody, and it reached a raw `curl` and nothing else.
+
+A third return value is the shape the SDK already uses for a list with meta
+(`PackageCacheTotals`, `VCSArchiveCacheTotals`), so this is the convention rather
+than a new one.
+
+**`VarsetExclusionMeta.Present` is the field to read first.** False means the set
+has no usable exclusion at all — it is global, has no rule, the rule has no
+`exclude`, or the rule names a refused dimension and so matches nothing. Without
+it, `Excluded: 0` is ambiguous: "nothing was excluded" and "there is nothing to
+exclude with" are different answers and an operator acts on them differently.
+
+**And `Excluded` counts removals from the RULE MATCH**, which is not the same as
+"workspaces that stopped receiving the set". A workspace that is also assigned
+explicitly still receives it, and still appears in the rows beside this with
+`AssignmentSource` `"explicit"`. The field comment says so, because the number is
+literally accurate and easy to read as the stronger claim.
