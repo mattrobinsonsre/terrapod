@@ -2188,7 +2188,10 @@ export default function AutodiscoveryPage() {
               </section>
             </section>
 
-            <div className="flex gap-2 pt-2">
+            {/* `flex-wrap`: this row gained a fourth control, and at phone
+                width four buttons cannot shrink below their longest word --
+                so the row set the page's width and it scrolled sideways. */}
+            <div className="flex flex-wrap gap-2 pt-2">
               <button
                 type="submit"
                 // A rule that declares neither operation would materialise
