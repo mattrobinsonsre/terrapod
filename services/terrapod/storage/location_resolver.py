@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import event, func, select
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
 from terrapod.config import DEFAULT_STORAGE_LOCATION, settings
@@ -35,6 +36,8 @@ class DbLocationResolver:
         _resolvers.add(self)
         if not event.contains(Session, "after_flush", remember_flushed_workspaces):
             event.listen(Session, "after_flush", remember_flushed_workspaces)
+        if not event.contains(Workspace, "load", remember_loaded_workspace):
+            event.listen(Workspace, "load", remember_loaded_workspace)
 
     def _resolution_gate(self) -> asyncio.Semaphore:
         """Bound how much of the connection pool a cache miss can hold.
@@ -101,6 +104,37 @@ def remember_flushed_workspaces(session: Any, _flush_context: Any) -> None:
         if isinstance(obj, Workspace) and obj.id is not None:
             for resolver in list(_resolvers):
                 resolver.remember(str(obj.id), obj.storage_location)
+
+
+def remember_loaded_workspace(target: Workspace, _context: Any) -> None:
+    """Cache a workspace's location whenever its row is loaded, from the caller's own session.
+
+    This is what keeps `location_for` off the database on the request path.
+    Resolving a miss there opens a SECOND connection inside a request that
+    already holds one, and `_resolution_gate` bounds that race without being
+    able to remove it: SQLAlchemy's pool cannot reserve capacity, so when the
+    pool is genuinely exhausted the surplus still waits on `pool_timeout`. The
+    cold window right after a rollout is exactly when every workspace is a first
+    touch at once (#2623).
+
+    So the answer is to not need the second connection. Nearly every request
+    that reaches storage has already loaded its workspace -- RBAC needs the row
+    -- and `storage_location` is on it, undeferred. Taking it from there costs
+    one dict write and no query at all, and a list page warms every row it shows.
+    This is `remember_flushed_workspaces`' pattern, which already seeds the
+    resolver from the caller's own session for a workspace being created; this is
+    the same move for one being read.
+
+    Guarded on the attribute being LOADED. A query using `load_only()` without
+    this column would otherwise have the access here trigger a lazy refresh --
+    one query per row, which is worse than the miss it is avoiding. Nothing in
+    the tree does that today; the guard is what keeps that true cheaply rather
+    than by convention.
+    """
+    if target.id is None or "storage_location" in sa_inspect(target).unloaded:
+        return
+    for resolver in list(_resolvers):
+        resolver.remember(str(target.id), target.storage_location)
 
 
 #: Postgres sqlstates for a schema the storage-location migration has not reached yet.

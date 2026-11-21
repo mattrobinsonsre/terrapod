@@ -10,8 +10,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 
 from terrapod.config import S3Config, StorageBackend, StorageLocationConfig, settings
+from terrapod.db.models import Workspace
 from terrapod.db.session import get_db_session
 from terrapod.services import deleted_workspace_service as dws
 from terrapod.services.artifact_retention_service import _cleanup_deleted_workspaces
@@ -356,6 +358,78 @@ class TestAgainstPostgres:
             async with get_db_session() as db:
                 await db.execute(text(sql))
         assert _is_pre_migration(caught.value)
+
+
+class TestTheResolverIsSeededFromRowsTheCallerLoads:
+    """Loading a workspace caches its location, so the request path needs no query.
+
+    `location_for` on a miss opens a SECOND connection inside a request that
+    already holds one. `_resolution_gate` bounds that race and cannot remove it
+    -- SQLAlchemy's pool has no way to reserve capacity, so an exhausted pool
+    still makes the surplus wait on `pool_timeout`, and the cold window right
+    after a rollout is when every workspace is a first touch at once (#2623).
+
+    Nearly every request that reaches storage has already loaded its workspace,
+    because RBAC needs the row, so the location is already in memory. Taking it
+    from there is the same move `remember_flushed_workspaces` already makes for
+    a workspace being created.
+    """
+
+    async def test_loading_a_row_caches_it_and_then_no_database_is_needed(self, app, monkeypatch):
+        eu, home = await _rows("eu-west", None)
+        resolver = DbLocationResolver()
+        assert resolver._known == {}
+
+        # An ordinary load, as a handler does it.
+        async with get_db_session() as db:
+            for wid in (eu, home):
+                assert await db.get(Workspace, uuid.UUID(wid)) is not None
+
+        assert resolver._known == {eu: "eu-west", home: "default"}
+
+        # The point of the cache, asserted by denying the thing it replaces: with
+        # the session factory broken, the answers still come back. A test that
+        # only checked `_known` would pass just as well if `location_for` queried
+        # anyway and happened to agree.
+        from terrapod.storage import location_resolver as lr
+
+        def no_sessions():
+            raise AssertionError("location_for must not open a session for a cached workspace")
+
+        monkeypatch.setattr(lr, "get_db_session", no_sessions)
+        assert await resolver.location_for(eu) == "eu-west"
+        assert await resolver.location_for(home) == "default"
+
+    async def test_a_load_only_query_without_the_column_triggers_no_refresh(self, app):
+        """The guard, and it is not hypothetical politeness.
+
+        Without it the listener's attribute access on a row loaded by a
+        `load_only()` that excludes this column issues a lazy refresh -- one
+        query per row, which is worse than the single miss it was avoiding, and
+        it would fire on whatever list query first reached for `load_only`.
+        """
+        from sqlalchemy import inspect as sa_inspect
+        from sqlalchemy.orm import load_only
+
+        eu, _ = await _rows("eu-west", None)
+        resolver = DbLocationResolver()
+
+        async with get_db_session() as db:
+            ws = (
+                await db.execute(
+                    select(Workspace)
+                    .options(load_only(Workspace.name))
+                    .where(Workspace.id == uuid.UUID(eu))
+                )
+            ).scalar_one()
+            # Still unloaded is the whole assertion: had the listener read it,
+            # the refresh would have loaded it here.
+            assert "storage_location" in sa_inspect(ws).unloaded
+
+        assert eu not in resolver._known, (
+            "a row whose location was never loaded must not be cached -- the value "
+            "cached would be whatever the lazy read returned, at the cost of a query"
+        )
 
 
 class TestAFollowerResolvesLocallyFromItsReplicatedRow:
