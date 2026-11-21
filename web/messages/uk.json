@@ -3971,7 +3971,7 @@
       "offline": "Немає живого слухача",
       "offlineWarning": "Жодного слухача не під'єднано для: {pools}. Запуски, спрямовані в ці пули, стануть у чергу, а не виконаються.",
       "count": "{count, plural, one {# слухач} few {# слухачі} many {# слухачів} other {# слухача}}",
-      "countWithPods": "{count, plural, one {# слухач} other {# слухачів}} · {pods, plural, one {# под} other {# подів}}",
+      "countWithPods": "{count, plural, one {# слухач} few {# слухачі} many {# слухачів} other {# слухача}} · {pods, plural, one {# под} few {# поди} many {# подів} other {# пода}}",
       "singlePod": "Один под"
     },
     "inbound": "Приймає від партнера",
