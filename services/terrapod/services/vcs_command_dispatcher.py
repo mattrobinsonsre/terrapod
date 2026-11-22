@@ -984,10 +984,25 @@ async def _route_unlock(
 ) -> None:
     """Release the workspace lock if stuck.
 
-    Unlock is a manual escape hatch (Atlantis ships the same). Per the
-    authorization model, anyone who can comment on the PR can unlock —
-    branch protection isn't a meaningful gate here because no apply is
-    happening.
+    Unlock is a manual escape hatch (Atlantis ships the same). It is the FORCE
+    variant: every locked candidate is released with no capability check and no
+    test of whose lock it is. The API, for the same operation, requires
+    `workspace:lock` at minimum and `workspace:force-unlock` -- admin tier -- to
+    break a lock held by someone else (`tfe_v2.unlock_workspace`). So this path
+    performs an admin-tier operation on the strength of push access.
+
+    Two claims this docstring used to make are no longer true (#2670). "Anyone
+    who can comment on the PR can unlock" predates
+    `vcs.require_push_permission_for_commands`, which is on by default, so the
+    bar is push rather than comment. And "no apply is happening" was the
+    argument for the gate not mattering -- but releasing a state lock is not
+    inert, because the lock exists to stop concurrent state writes, so breaking
+    someone else's is safety-relevant even though it applies nothing itself.
+
+    Closing the asymmetry needs a Terrapod identity for the commenter, which
+    this path does not have: authorization here is delegated to the VCS and no
+    VCS-login-to-Terrapod-user mapping exists (#2618). Until one does, the
+    enforced model is the push-access gate, and that is what this says.
     """
     for ws in candidates:
         if ws.locked:

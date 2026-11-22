@@ -253,8 +253,10 @@ Commands must start with `terrapod` (or the configured mention prefix — e.g. `
 | `terrapod plan -W <workspace>` | Same, scoped to one workspace (monorepo) |
 | `terrapod apply` | Apply the current `planned` run for all PR-affected workspaces |
 | `terrapod apply -W <workspace>` | Apply a single workspace |
-| `terrapod unlock` | Release the workspace lock if stuck |
+| `terrapod unlock` | Release the workspace lock if stuck — the *force* variant, see below |
 | `terrapod help` | List commands |
+
+`terrapod unlock` releases the lock on every affected workspace without testing whose lock it is. Through the API that same operation needs `workspace:lock` at minimum, and `workspace:force-unlock` — an admin-tier capability — to break a lock held by another user; by comment it needs push access to the repository. The asymmetry is deliberate for now: closing it requires a Terrapod identity for the commenter, and authorization on this surface is delegated to the VCS instead (#2670). Keeping `vcs.require_push_permission_for_commands` at its default of `true` is what ensures a comment alone cannot do it.
 
 Every one of them **except `help`** requires the commenter to have push access to the repository — `help` only prints the table above, so gating it would refuse to tell someone why they were refused — see [Authorization model](#authorization-model-for-apply-then-merge--read-this-carefully).
 
