@@ -109,6 +109,114 @@ WORKSPACE_API_ONLY: frozenset[str] = frozenset(
 )
 
 
+def _either_layout(*candidates: str) -> Path:
+    """The first candidate that exists, so one path works locally and in the test image.
+
+    `docker/Dockerfile.test` flattens `services/` into `/app`, so the test tree
+    sits one directory shallower there than it does here. Counting `parents[N]`
+    is therefore right in at most one of the two layouts.
+    """
+    for rel in candidates:
+        for base in (_TESTS_DIR.parent.parent, _TESTS_DIR.parent):
+            p = base / rel
+            if p.exists():
+                return p
+    raise AssertionError(f"none of {candidates} resolves in either layout")
+
+
+#: Every consumer file that would carry `storage-location` once it is mirrored,
+#: with the surface it belongs to. Both surfaces emit the attribute: the
+#: workspace serializer and the autodiscovery rule's.
+_STORAGE_LOCATION_CONSUMERS: tuple[tuple[str, str], ...] = (
+    ("go-terrapod/workspaces.go", "SDK workspace"),
+    ("go-terrapod/autodiscovery_rules.go", "SDK autodiscovery rule"),
+    ("provider/internal/resources/workspace/model.go", "provider workspace"),
+    ("provider/internal/resources/autodiscovery_rule/resource.go", "provider autodiscovery rule"),
+    ("mcp/internal/mcpserver/crud.go", "MCP workspace"),
+    ("mcp/internal/mcpserver/autodiscovery.go", "MCP autodiscovery rule"),
+)
+
+
+class TestTheStorageLocationExemptionExpires:
+    """`storage-location` is exempted because no consumer carries it YET.
+
+    That is a reason with an end, and nothing was enforcing the end: the entry
+    would have outlived it silently, and an exemption whose reason has expired
+    reads as a decision rather than as a gap -- which is the one state that stops
+    anyone looking (#2623).
+
+    So this asserts the reason rather than the entry, in both directions. It also
+    covers the autodiscovery rule, which emits and accepts the same attribute and
+    had no SDK/provider/MCP gate of any kind, because the contract test above
+    reads the workspace serializer only.
+    """
+
+    @staticmethod
+    def _carried() -> list[str]:
+        """The surfaces that now carry the field, by reading their source.
+
+        Comment lines are dropped first. A file's own comment explaining why it
+        does NOT carry the attribute would otherwise register as carrying it,
+        which is the failure direction that matters here: it would retire a live
+        exemption.
+        """
+        carried = []
+        for rel, surface in _STORAGE_LOCATION_CONSUMERS:
+            text = _either_layout(rel).read_text()
+            code = "\n".join(
+                line for line in text.split("\n") if not line.lstrip().startswith("//")
+            )
+            lowered = code.lower().replace("-", "_")
+            if "storagelocation" in lowered or "storage_location" in lowered:
+                carried.append(surface)
+        return carried
+
+    def test_the_exemption_stands_only_while_no_consumer_carries_it(self):
+        carried = self._carried()
+        if carried:
+            assert "storage-location" not in WORKSPACE_API_ONLY, (
+                "the exemption's reason -- that no consumer carries this yet -- has "
+                "expired: " + ", ".join(carried) + " now does. Remove the entry from "
+                "WORKSPACE_API_ONLY and let the contract test above check the mirroring."
+            )
+        else:
+            assert "storage-location" in WORKSPACE_API_ONLY, (
+                "no consumer carries `storage-location`, so the contract test needs "
+                "the exemption back -- removing it without mirroring the attribute "
+                "makes this suite fail for the right reason in the wrong place."
+            )
+
+    def test_the_matcher_sees_the_field_it_looks_for(self):
+        """The gate's own fixtures, because a count over real files cannot show
+        that the matcher still matches -- a narrowed one would simply report
+        nothing carried, which is the state that keeps the exemption alive."""
+        import re as _re
+
+        samples = {
+            'StorageLocation string `json:"storage-location"`': True,
+            'StorageLocation types.String `tfsdk:"storage_location"`': True,
+            "Storage_Location string": True,
+            "// storage-location is deliberately not mirrored here": False,
+            "    // StorageLocation: see the API-only exemption": False,
+            'Name string `json:"name"`': False,
+        }
+        for text, expected in samples.items():
+            code = "\n".join(
+                line for line in text.split("\n") if not line.lstrip().startswith("//")
+            )
+            lowered = code.lower().replace("-", "_")
+            got = "storagelocation" in lowered or "storage_location" in lowered
+            assert got is expected, f"matcher disagrees on {text!r}: got {got}"
+        assert _re is not None  # keep the import honest if the samples shrink
+
+    def test_every_named_consumer_file_resolves(self):
+        """A path that stops resolving would make the gate report nothing carried,
+        which is indistinguishable from the exemption being correct."""
+        for rel, _surface in _STORAGE_LOCATION_CONSUMERS:
+            assert _either_layout(rel).is_file(), rel
+        assert len(_STORAGE_LOCATION_CONSUMERS) >= 6
+
+
 def _extract_workspace_api_attrs() -> set[str]:
     """Return the set of attribute keys emitted by `_workspace_json`.
 

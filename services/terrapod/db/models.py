@@ -31,7 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.orm.base import NEVER_SET, NO_VALUE
+from sqlalchemy.orm.base import NO_VALUE
 
 from terrapod.crypto.types import EncryptedText
 
@@ -1170,7 +1170,15 @@ def _storage_location_is_fixed(
     if state.transient or state.pending:
         return
     # An expired or unloaded value cannot be compared, so it is refused rather than trusted.
-    unknown = oldvalue in (NO_VALUE, NEVER_SET)
+    #
+    # `NO_VALUE` alone, deliberately. This read `(NO_VALUE, NEVER_SET)`, and
+    # `NEVER_SET is NO_VALUE` -- SQLAlchemy 2.0 collapsed the two into one member
+    # of `LoaderCallableStatus` and kept the old name as an alias, so the second
+    # arm could never match anything the first did not. It is not merely
+    # redundant: the alias is deprecated, and a 2.1 that drops it breaks the
+    # import at the top of this module, which is application start-up rather
+    # than a failure at this line (#2623).
+    unknown = oldvalue is NO_VALUE
     if unknown or (value or "default") != (oldvalue or "default"):
         raise ValueError("storage-location cannot be changed after the workspace is created")
 
