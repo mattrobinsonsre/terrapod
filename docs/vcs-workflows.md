@@ -563,7 +563,7 @@ Existing installations have to accept the permission upgrade once via the GitHub
 
 ## GitLab token scope
 
-Project / Group access tokens need `api` scope (the existing requirement covers the new endpoints). Webhook events: enable `Comments` and `Merge request events`.
+Project / Group access tokens need `api` scope (the existing requirement covers the new endpoints). Webhook events: enable `Merge request events`. Enabling `Comments` achieves nothing: the GitLab receiver consumes push, tag-push and merge-request hooks only, so `terrapod ...` commands arrive through the comment poller rather than a webhook, within one poll interval as noted above.
 
 ## Troubleshooting
 
