@@ -161,6 +161,49 @@ def _upgrade_flag_values() -> set[str]:
     raise _fail(f"{UPGRADE_DOC}: no `{UPGRADE_ROW}` row found in the rewrite table")
 
 
+#: Number words the upgrade row might reasonably use. An unlisted one fails
+#: loudly below rather than passing: a count we cannot read is one we cannot check.
+WORDS = {
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+}
+
+
+def _upgrade_count_problem(expected: int) -> str | None:
+    """The row's "(all **seven** health conditions)", which no gate could see.
+
+    The flag list beside it is checked above, and that is most of the claim --
+    but the row also states how many there are, in a WORD, and `check_counts.py`
+    matches digit forms only. So an eighth condition left the number stale while
+    every list check passed, and a reader who trusts the number over the list
+    writes a filter that silently misses the workspace it was meant to find
+    (#2632).
+    """
+    for line in UPGRADE_DOC.read_text().splitlines():
+        if not line.startswith(UPGRADE_ROW):
+            continue
+        m = re.search(r"all \*\*([a-z]+|\d+)\*\* health conditions", line)
+        if m is None:
+            return f"{UPGRADE_DOC} `status:unhealthy` row: no longer says how many conditions there are"
+        raw = m.group(1)
+        got = int(raw) if raw.isdigit() else WORDS.get(raw)
+        if got is None:
+            return f"{UPGRADE_DOC}: unreadable count word {raw!r}; add it to WORDS or use a digit"
+        if got != expected:
+            return (
+                f"{UPGRADE_DOC}: says {raw} ({got}) health conditions; {FUNCTION} emits {expected}"
+            )
+        return None
+    return None  # the missing-row case is already raised by `_upgrade_flag_values`
+
+
 def main() -> int:
     produced = _producer_codes()
     kebab = {_kebab(c) for c in produced}
@@ -173,6 +216,9 @@ def main() -> int:
     )
 
     problems: list[str] = []
+    count_problem = _upgrade_count_problem(len(produced))
+    if count_problem:
+        problems.append(count_problem)
     for name, found, expected in readers:
         missing = sorted(expected - found)
         extra = sorted(found - expected)
@@ -186,7 +232,10 @@ def main() -> int:
         print("Update every reader together with the producer.")
         return 1
 
-    print(f"PASS — {len(produced)} health-condition codes; all {len(readers)} readers agree.")
+    print(
+        f"PASS — {len(produced)} health-condition codes; all {len(readers)} readers agree, "
+        "and the upgrade row's count says so too."
+    )
     return 0
 
 
