@@ -303,8 +303,11 @@ api:
         presigned_url_expiry_seconds: 3600
         base_url: ""  # Auto-detected from ingress hostname if empty
 
-      # Named storage locations (s3 | azure | gcs); `default` is reserved. Empty = one store. None is assigned
-      # to a workspace yet, but listings outside one workspace's prefix (state/, ...) read all: a wrong bucket breaks them.
+      # Named storage locations (s3 | azure | gcs); `default` is reserved. Empty = one store. No workspace is
+      # assigned to one yet. Only a listing whose prefix can hold workspace-scoped keys fans out across the
+      # locations: state/, plans/, logs/, config/, runs/, inventory/ and the bare root. cache/, registry/,
+      # oci/, policies/, uploads/, vcs_archives/ and module_overrides/ are read from the default store alone,
+      # as are state/deleted/ and state/index.yaml. So a wrong bucket breaks the first set and nothing else.
       locations: {}
       # A location's `credentials.type` is a placeholder: only `default` exists, nothing reads it.
 

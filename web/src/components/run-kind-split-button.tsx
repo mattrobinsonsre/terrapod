@@ -113,6 +113,13 @@ export function RunKindSplitButton({
   // menu is gone before the click lands on whatever is underneath.
   useEffect(() => {
     if (!open) return
+    // `setOpen(false)` and not `close(true)`, deliberately: on a click-away the
+    // pointer has already chosen where focus should go, and pulling it back to
+    // the caret would fight that. APG asks for focus to return when the menu
+    // closes without a new target -- Escape, or activating an item -- and a
+    // click elsewhere is the case that has one. So this path drops focus to
+    // `<body>` and that is the intended behaviour rather than the oversight it
+    // resembles (#2632).
     const onDown = (e: MouseEvent) => {
       if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false)
     }
@@ -210,7 +217,14 @@ export function RunKindSplitButton({
               disabled={busy || !!o.blockedReason}
               title={o.title}
               onClick={() => {
-                setOpen(false)
+                // Close FIRST, then run. Both orders look identical in a test --
+                // React batches state updates inside a handler -- but if `o.run()`
+                // throws, a `close` after it never happens and the menu is left
+                // open over whatever the error did. Closing first also returns
+                // focus to the caret, which `setOpen(false)` alone did not: the
+                // focus landed on `<body>` and the keyboard user lost their place
+                // in the page (#2621).
+                close(true)
                 o.run()
               }}
               onKeyDown={(e) => onMenuKey(e, i)}

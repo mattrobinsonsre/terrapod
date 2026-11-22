@@ -100,7 +100,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 
 | Tool | What it does |
 |---|---|
-| `terrapod_workspace_list` | List workspaces with status, execution mode, lock, drift, labels. Takes an `engine` filter — narrow with it before anything that assumes one engine. |
+| `terrapod_workspace_list` | List workspaces with status, execution mode, lock, drift, labels, and each one's newest run — its status, kind, whether it is a destroy, and the actions offered on it — so an agent can see what is actionable without reading every workspace in turn. Takes an `engine` filter — narrow with it before anything that assumes one engine. |
 | `terrapod_workspace_get` | One workspace by id or name — full config + status. |
 | `terrapod_run_list` | Recent runs for a workspace (status, `run_kind`, plan-only/destroy, has-changes). `run_kind` says in one word what each run IS — `plan_apply`, `configure` (an ansible configure and nothing else) or `full` (an apply followed by a configure) — so a kind need not be derived from the configure flags. |
 | `terrapod_run_queue` | Why a run has not started: the deployment queue oldest-first with each run's position, plus pending and running counts. Terraform/OpenTofu only. |

@@ -22,6 +22,57 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		Search   string `json:"search,omitempty" jsonschema:"filter workspaces by name substring"`
 		Engine   string `json:"engine,omitempty" jsonschema:"return only workspaces on this execution engine: terraform or pulumi. Omit for every engine. Narrow with this before doing anything that assumes one engine — the tools differ by engine"`
 	}
+	// Mapped rather than embedding `terrapod.WorkspaceLatestRun` directly: the
+	// SDK's tags are the API's JSON:API kebab-case, and everything an MCP tool
+	// returns is snake_case. Embedding it produced one object that switched
+	// convention half way down -- `execution_mode` beside `run-kind` -- which an
+	// agent has to notice rather than read.
+	type runActionsSummary struct {
+		IsConfirmable bool `json:"is_confirmable"`
+		IsDiscardable bool `json:"is_discardable"`
+		IsCancelable  bool `json:"is_cancelable"`
+		IsRetryable   bool `json:"is_retryable"`
+	}
+	type latestRunSummary struct {
+		ID       string `json:"id"`
+		Status   string `json:"status"`
+		PlanOnly bool   `json:"plan_only"`
+		// RFC3339.
+		CreatedAt string `json:"created_at,omitempty"`
+		// `plan_apply`, `configure` or `full`.
+		RunKind string `json:"run_kind,omitempty"`
+		// Neither `run_kind` nor `plan_only` can say it: a destroy reports
+		// `plan_apply`, and applying one needs `run:apply-destroy`.
+		IsDestroy bool `json:"is_destroy"`
+		// Keyed `planning_at`, `applying_at`, `configuring_at`; a phase that has
+		// not started is absent rather than empty.
+		PhaseStartedAt map[string]string `json:"phase_started_at,omitempty"`
+		Actions        runActionsSummary `json:"actions"`
+	}
+
+	summariseRun := func(r *terrapod.WorkspaceLatestRun) *latestRunSummary {
+		if r == nil {
+			return nil
+		}
+		phases := map[string]string{}
+		for k, v := range r.PhaseStartedAt {
+			phases[strings.ReplaceAll(k, "-", "_")] = v
+		}
+		if len(phases) == 0 {
+			phases = nil
+		}
+		return &latestRunSummary{
+			ID: r.ID, Status: r.Status, PlanOnly: r.PlanOnly, CreatedAt: r.CreatedAt,
+			RunKind: r.RunKind, IsDestroy: r.IsDestroy, PhaseStartedAt: phases,
+			Actions: runActionsSummary{
+				IsConfirmable: r.Actions.IsConfirmable,
+				IsDiscardable: r.Actions.IsDiscardable,
+				IsCancelable:  r.Actions.IsCancelable,
+				IsRetryable:   r.Actions.IsRetryable,
+			},
+		}
+	}
+
 	type workspaceSummary struct {
 		ID            string `json:"id"`
 		Name          string `json:"name"`
@@ -41,6 +92,18 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		LockedBy         string            `json:"locked_by,omitempty"`
 		DriftStatus      string            `json:"drift_status,omitempty"`
 		Labels           map[string]string `json:"labels,omitempty"`
+		// The newest run, for the same reason the two operation booleans are
+		// here: without it an agent orienting itself -- which workspaces have a
+		// run it can act on, which are mid-plan, which last errored -- has to
+		// `get` every workspace to find out, paying per workspace for a
+		// question about the fleet (#2630). It carries the run document's own
+		// `actions`, so the answer needs no second call either.
+		//
+		// `omitempty` on the pointer: a workspace that has never run has no
+		// latest run, and an empty object would read as one with every field
+		// at its zero value -- a `status` of "" and every action false, which
+		// is a different and wrong claim.
+		LatestRun *latestRunSummary `json:"latest_run,omitempty"`
 	}
 	type workspaceListOut struct {
 		// Returned is how many workspaces this response contains; Total is the
@@ -53,7 +116,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_list",
-		Description: "List workspaces on this Terrapod instance with their engine, declared operations, status, execution mode, lock state, drift status, and labels. Use this to orient before acting. Each workspace reports its `engine` — `terraform` (OpenTofu/Terraform) or `pulumi` — and several tools answer for one engine only, so read it before choosing one; `engine` also narrows the list server-side. Each also reports which OPERATIONS it has as two independent booleans: `plan_apply_enabled` (the terraform/tofu/pulumi lifecycle) and `configure_enabled` (the ansible configure operation). Read them for the same reason as `engine`: they decide which tools apply, so queueing a plan on a workspace with `plan_apply_enabled` false, or reaching for the inventory tools where `configure_enabled` is false, is a refusal you can see coming. A workspace may have both; it can never have neither. Returns up to page_size workspaces; `total` reports the full count so you know if the result was truncated (narrow with `search` or `engine`).",
+		Description: "List workspaces on this Terrapod instance with their engine, declared operations, status, execution mode, lock state, drift status, and labels. Use this to orient before acting. Each workspace reports its `engine` — `terraform` (OpenTofu/Terraform) or `pulumi` — and several tools answer for one engine only, so read it before choosing one; `engine` also narrows the list server-side. Each also reports which OPERATIONS it has as two independent booleans: `plan_apply_enabled` (the terraform/tofu/pulumi lifecycle) and `configure_enabled` (the ansible configure operation). Read them for the same reason as `engine`: they decide which tools apply, so queueing a plan on a workspace with `plan_apply_enabled` false, or reaching for the inventory tools where `configure_enabled` is false, is a refusal you can see coming. A workspace may have both; it can never have neither. Each workspace also reports its newest run as `latest_run` -- status, kind, whether it is a destroy, when each phase started, and the run document's own `actions` block saying what is offered on it right now -- so you can see which workspaces have something to act on without reading each one in turn. It is absent on a workspace that has never run, which is not the same as a run with no actions. Returns up to page_size workspaces; `total` reports the full count so you know if the result was truncated (narrow with `search` or `engine`).",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceListIn) (*mcp.CallToolResult, workspaceListOut, error) {
 		size := in.PageSize
@@ -79,6 +142,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 				ID: w.ID, Name: w.Name, Engine: w.Engine, ExecutionMode: w.ExecutionMode,
 				PlanApplyEnabled: w.PlanApplyEnabled, ConfigureEnabled: w.ConfigureEnabled,
 				Locked: w.Locked, LockReason: w.LockReason, LockedBy: w.LockedBy, DriftStatus: w.DriftStatus, Labels: w.Labels,
+				LatestRun: summariseRun(w.LatestRun),
 			})
 		}
 		return nil, out, nil
