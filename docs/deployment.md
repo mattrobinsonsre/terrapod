@@ -466,8 +466,11 @@ Terrapod delegates encryption at rest to the underlying infrastructure services.
 |---|---|---|
 | Sensitive variables, VCS tokens | PostgreSQL | Database encryption-at-rest (RDS, Cloud SQL, Azure Database) |
 | State files, config tarballs, logs | Object storage | Object store encryption-at-rest (S3 SSE, Azure Storage, GCS default) |
+| Sessions, and short-lived decrypted values | Redis | Provider encryption-at-rest (ElastiCache, MemoryDB, Azure Cache for Redis) |
 
-Enable encryption on your managed database and object storage services. For filesystem-backed storage, use encrypted volumes.
+Enable encryption on your managed database, object storage **and Redis** services. For filesystem-backed storage, use encrypted volumes.
+
+Redis is in that list for the same reason as the other two, and it is the one people miss. It holds live session tokens, so a principal who can read it can act as any signed-in user; and caches — the resolved inventory for 300 seconds, for instance — hold values that were decrypted to build them. Both are within the same delegation: Terrapod does not encrypt them a second time at the application layer, so the provider's at-rest encryption is what protects them.
 
 ### Runner Listener
 
