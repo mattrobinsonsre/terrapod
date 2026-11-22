@@ -218,3 +218,49 @@ class TestACapabilityIsNeverRecordedVerbatim:
         # audit trail to fix a leak.
         rtype, rid = parse_resource("/api/v2/workspaces/ws-abc123")
         assert (rtype, rid) == ("workspaces", "ws-abc123")
+
+
+class TestTheActorFilters:
+    """`filter[actor]` is the email; `filter[actor-login]` is the VCS login (#2669).
+
+    `log_vcs_action` records a login and an id and leaves `actor_email` empty, by
+    design, so an email filter could never reach a PR-comment entry and that class
+    of action was unfindable by actor at all. These assert the predicate rather
+    than the rendered statement: `str(select(AuditLog))` contains every column of
+    the table, so an assertion over it passes whatever the WHERE says.
+    """
+
+    @staticmethod
+    async def _whereclause(**kwargs):
+        from terrapod.services.audit_service import query_audit_log
+
+        mock_db = AsyncMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = []
+        result.all.return_value = []
+        mock_db.execute.return_value = result
+        await query_audit_log(mock_db, **kwargs)
+        stmt = mock_db.execute.await_args_list[0].args[0]
+        return str(stmt.whereclause) if stmt.whereclause is not None else ""
+
+    async def test_the_login_filter_matches_the_login_column(self):
+        where = await self._whereclause(actor_login="octocat")
+        assert "audit_logs.actor_login" in where
+        assert "audit_logs.actor_email" not in where
+
+    async def test_the_actor_filter_still_matches_the_email_column(self):
+        """Unchanged: a separate filter rather than a widening of this one."""
+        where = await self._whereclause(actor="alice@example.com")
+        assert "audit_logs.actor_email" in where
+        assert "audit_logs.actor_login" not in where
+
+    async def test_both_filters_compose(self):
+        where = await self._whereclause(actor="alice@example.com", actor_login="octocat")
+        assert "audit_logs.actor_email" in where
+        assert "audit_logs.actor_login" in where
+
+    async def test_neither_filter_constrains_nothing(self):
+        """The pair for the three above: no filter must not silently add a clause."""
+        where = await self._whereclause()
+        assert "actor_login" not in where
+        assert "actor_email" not in where

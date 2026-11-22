@@ -42,11 +42,22 @@ def _mock_audit_entry(
     resource_id="ws-123",
     status_code=200,
     duration_ms=42,
+    actor_type="terrapod_user",
+    actor_login="",
+    actor_id="",
+    origin="api",
 ):
     entry = MagicMock()
     entry.id = entry_id or uuid.uuid4()
     entry.timestamp = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
     entry.actor_email = actor_email
+    # Set explicitly, not left to the MagicMock: every serialised field must be a
+    # real value or it reaches json.dumps as a mock and raises with a message that
+    # names neither the attribute nor this fixture.
+    entry.actor_type = actor_type
+    entry.actor_login = actor_login
+    entry.actor_id = actor_id
+    entry.origin = origin
     entry.actor_ip = "127.0.0.1"
     entry.action = action
     entry.resource_type = resource_type
@@ -121,6 +132,61 @@ class TestAuditLogReturnsEntries:
         assert resp.status_code == 200
 
 
+class TestTheVCSActorSurfaces:
+    """A PR-comment entry must identify its actor (#2669).
+
+    `log_vcs_action` records a login and a provider id and leaves `actor_email`
+    empty, deliberately. The serialiser emitted neither, so the dual-actor model
+    the schema has always carried reached no consumer: the admin page renders the
+    actor column from `actor-email`, so every PR-comment action showed blank, and
+    the only actor filter the API offered could not match one either.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.audit.query_audit_log")
+    async def test_a_vcs_entry_carries_its_login_and_origin(self, mock_query, *mocks):
+        entry = _mock_audit_entry(
+            actor_email="",
+            actor_type="vcs_user",
+            actor_login="octocat",
+            actor_id="12345",
+            origin="pr_comment",
+        )
+        mock_query.return_value = ([entry], 1)
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/terrapod/v1/admin/audit-log", headers=_AUTH)
+
+        assert resp.status_code == 200
+        attrs = resp.json()["data"][0]["attributes"]
+        # The email is empty by design; these are what identify the actor.
+        assert attrs["actor-email"] == ""
+        assert attrs["actor-type"] == "vcs_user"
+        assert attrs["actor-login"] == "octocat"
+        assert attrs["actor-id"] == "12345"
+        assert attrs["origin"] == "pr_comment"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.audit.query_audit_log")
+    async def test_a_terrapod_entry_still_carries_its_email(self, mock_query, *mocks):
+        """The pair: adding the VCS fields must not displace the email."""
+        mock_query.return_value = ([_mock_audit_entry()], 1)
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/terrapod/v1/admin/audit-log", headers=_AUTH)
+
+        attrs = resp.json()["data"][0]["attributes"]
+        assert attrs["actor-email"] == "user@example.com"
+        assert attrs["actor-type"] == "terrapod_user"
+        assert attrs["actor-login"] == ""
+
+
 class TestAuditLogPassesFilters:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -136,6 +202,7 @@ class TestAuditLogPassesFilters:
                 "/api/terrapod/v1/admin/audit-log",
                 params={
                     "filter[actor]": "admin@test.com",
+                    "filter[actor-login]": "octocat",
                     "filter[resource-type]": "runs",
                     "filter[action]": "POST",
                     "page[number]": "2",
@@ -147,6 +214,7 @@ class TestAuditLogPassesFilters:
         mock_query.assert_called_once()
         kwargs = mock_query.call_args
         assert kwargs[1]["actor"] == "admin@test.com"
+        assert kwargs[1]["actor_login"] == "octocat"
         assert kwargs[1]["resource_type"] == "runs"
         assert kwargs[1]["action"] == "POST"
         assert kwargs[1]["page_number"] == 2

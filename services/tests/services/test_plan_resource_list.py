@@ -1591,7 +1591,17 @@ class TestItStaysFastOnABigPlan:
         result = build_resource_list(raw, [])
         elapsed = time.perf_counter() - started
         assert result is not None and len(result["entries"]) == MAX_ENTRIES
-        assert elapsed < 1.5, f"took {elapsed:.2f}s"
+        # The budget guards a quadratic blow-up, so it has to be loose enough to
+        # survive a loaded runner and tight enough to catch one. The defect this
+        # replaced "held the interpreter for seconds" on a multi-MB plan, so a
+        # regression here is seconds to tens of seconds, not a few per cent.
+        #
+        # 1.5s was calibrated on an unloaded workstation and had no margin: this
+        # section costs well under a second locally (the whole class runs in
+        # ~0.95s) and a CI runner measured 1.56s, failing on a 4% overshoot with
+        # nothing wrong. 5s keeps roughly three times that headroom and still
+        # fails on anything quadratic.
+        assert elapsed < 5.0, f"took {elapsed:.2f}s"
 
     def test_big_values_with_registered_secrets_build_quickly(self):
         import time
