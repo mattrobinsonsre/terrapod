@@ -90,8 +90,16 @@ async def link_account(
     except slack_link_service.LinkStateError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # The IdP as well as the address: role assignments are keyed (provider, email),
+    # so a link that records only the email resolves to no roles at all and every
+    # Slack action is refused (#2665, GHSA-3m8x-ff8g-7x8c). It comes from the
+    # authenticated principal doing the binding, never from Slack.
     link = await slack_link_service.create_link(
-        db, team_id=team_id, user_id=slack_user_id, email=user.email
+        db,
+        team_id=team_id,
+        user_id=slack_user_id,
+        email=user.email,
+        identity_provider=user.identity_provider,
     )
     # A binding is a standing ability to act as this account from Slack, so it gets
     # a row naming who was bound to what (GHSA-5899-fm2p-88x3). There is no

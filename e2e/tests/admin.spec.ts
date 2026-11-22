@@ -155,14 +155,24 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
 
     // 1. Select by name prefix — scoped to this test's own workspaces so the
     //    assertions never depend on what else is in the org.
-    await adminPage.getByPlaceholder('prod-').fill(prefix);
-    // Search is a client component, so a click landing before React hydrates is
+    // Search is a client component, so anything landing before React hydrates is
     // lost and no result ever renders -- the #902 pre-hydration flake, which
-    // showed up here as `getByText(/Matched/)` finding no element at all. Retry
-    // the click while the result is still absent.
+    // shows up here as `getByText(/Matched/)` finding no element at all.
+    //
+    // The FILL has to be retried too, not just the click. A fill discarded when
+    // the controlled input mounts leaves the prefix empty, and `handleSearch`
+    // nulls the result before every request and restores it only on success --
+    // so an empty or rejected filter renders an ErrorBanner and no "Matched" at
+    // all, rather than a wrong count. The previous loop re-clicked Search up to
+    // fifteen times against an empty input and could only report that the
+    // element was missing. Asserting the value before each click makes a lost
+    // fill fail saying so.
+    const prefixInput = adminPage.getByPlaceholder('prod-');
     const matched = adminPage.getByText(/Matched/);
     await expect(async () => {
       if (!(await matched.isVisible())) {
+        await prefixInput.fill(prefix);
+        await expect(prefixInput).toHaveValue(prefix, { timeout: 1_000 });
         await adminPage.getByRole('button', { name: 'Search' }).click();
       }
       await expect(matched).toBeVisible({ timeout: 1_000 });

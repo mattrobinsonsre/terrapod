@@ -57,6 +57,11 @@ _RELEASE_1_11_HEAD = "7a27d4747b9e"
 #: must fail rather than pass on nothing.
 _MIN_CONSTRAINTS = 25
 
+#: Columns the models declare, across every table. Same purpose as the floor
+#: above: a walk that stops walking must fail rather than report nothing to
+#: check. Well below the real figure, which only ever grows.
+_MIN_COLUMNS = 800
+
 
 def _alembic(url: str):
     # Imported here, not at module level: ruff sorts `alembic` as third-party
@@ -104,6 +109,36 @@ async def _db_unique_constraints(engine, names: set[str]) -> dict[str, frozenset
     found: dict[str, set[str]] = {}
     for name, col in rows:
         found.setdefault(name, set()).add(col)
+    return {k: frozenset(v) for k, v in found.items()}
+
+
+def _model_columns() -> dict[str, frozenset[str]]:
+    """Every column the ORM declares, as table name -> column names.
+
+    Derived from `Base.metadata`, so a column added later is covered without
+    anyone remembering this file -- which is the whole point, because a column
+    on a model and in no migration is invisible to every other tier: they all
+    build their tables from the metadata rather than by migrating (#2665).
+    """
+    return {
+        str(t.name): frozenset(c.name for c in t.columns) for t in Base.metadata.tables.values()
+    }
+
+
+async def _db_columns(engine, tables: set[str]) -> dict[str, frozenset[str]]:
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT table_name, column_name FROM information_schema.columns "
+                    "WHERE table_schema = 'public' AND table_name = ANY(:tables)"
+                ),
+                {"tables": sorted(tables)},
+            )
+        ).all()
+    found: dict[str, set[str]] = {}
+    for table, col in rows:
+        found.setdefault(table, set()).add(col)
     return {k: frozenset(v) for k, v in found.items()}
 
 
@@ -167,6 +202,56 @@ async def test_every_named_unique_constraint_matches_its_model(app, monkeypatch)
         assert not disagree, (
             "the migration chain and the models disagree about these unique "
             f"constraints: {disagree}"
+        )
+    finally:
+        await engine.dispose()
+        await _drop_database(base, url)
+
+
+@pytest.mark.asyncio
+async def test_every_model_column_exists_in_the_migrated_schema(app, monkeypatch):
+    """A column on a model must be created by the migration chain (#2665).
+
+    `SlackIdentityLink.identity_provider` was declared on the model and created
+    by no migration, so on any Alembic-built database the ORM selected a column
+    the schema did not have and every query against that table failed. The
+    constraint test above could not see it: it compares named unique
+    constraints, and a missing column is outside its subject. Nor could any
+    other tier -- unit, services-api and the rest of integration create their
+    tables from `Base.metadata`, so the models and the chain can disagree
+    indefinitely with every test green.
+
+    One direction only, deliberately. A model column absent from the schema is
+    always a defect. A schema column absent from the models is not: a
+    contraction keeps the column for a release so a rolling upgrade's older
+    replica can still read it, which is the expand/contract discipline working.
+    """
+    expected = _model_columns()
+    total = sum(len(cols) for cols in expected.values())
+    assert total >= _MIN_COLUMNS, (
+        f"only found {total} columns across {len(expected)} model tables; the walk "
+        "has stopped walking rather than the schema having shrunk"
+    )
+
+    url, base = await _throwaway_database(monkeypatch)
+    engine = create_async_engine(url)
+    from alembic import command  # see _alembic for why this is not at module level
+
+    try:
+        await asyncio.to_thread(command.upgrade, _alembic(url), "head")
+        actual = await _db_columns(engine, set(expected))
+
+        absent_tables = sorted(set(expected) - set(actual))
+        assert not absent_tables, f"declared by a model, created by no migration: {absent_tables}"
+
+        missing = {
+            table: sorted(expected[table] - actual[table])
+            for table in expected
+            if expected[table] - actual[table]
+        }
+        assert not missing, (
+            "these columns are declared on a model and created by no migration, so "
+            f"the ORM would select a column the schema lacks: {missing}"
         )
     finally:
         await engine.dispose()
