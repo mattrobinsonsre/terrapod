@@ -16,13 +16,14 @@ _AUTH = {"Authorization": "Bearer dummy"}
 _LINK = "/api/terrapod/v1/slack/link"
 
 
-def _user(email="alice@example.com"):
+def _user(email="alice@example.com", identity_provider=None):
     return AuthenticatedUser(
         email=email,
         display_name="Alice",
         roles=["everyone"],
         provider_name="local",
         auth_method="session",
+        identity_provider=identity_provider,
     )
 
 
@@ -88,6 +89,55 @@ class TestLinkAccount:
         # The binding is attributed to the AUTHENTICATED user, not the payload.
         _args, kwargs = create.call_args
         assert kwargs["email"] == "alice@example.com"
+
+    @patch("terrapod.services.slack_link_service.create_link", new_callable=AsyncMock)
+    @patch("terrapod.services.slack_link_service.verify_and_consume_state")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_link_records_the_principals_identity_provider(
+        self, _idb, _ir, _is, verify, create
+    ):
+        """The IdP is stored, not just the address (#2665).
+
+        Role assignments are keyed (provider, email), so a link that records only
+        the email resolves to no roles and every Slack action is refused
+        (GHSA-3m8x-ff8g-7x8c). The route had always passed `email` and never the
+        provider, and nothing asserted the provider -- which is how the omission
+        survived. Assert the argument rather than the stored row, because the
+        defect was at the call site.
+        """
+        verify.return_value = ("T123", "U456", "")
+        create.return_value = _fake_link("alice@example.com")
+        app, _db = _make_app(_user("alice@example.com", identity_provider="okta"))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.post(_LINK, json={"state": "good"}, headers=_AUTH)
+        assert r.status_code == 200
+        _args, kwargs = create.call_args
+        assert kwargs["identity_provider"] == "okta"
+
+    @patch("terrapod.services.slack_link_service.create_link", new_callable=AsyncMock)
+    @patch("terrapod.services.slack_link_service.verify_and_consume_state")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unattributable_principal_stores_no_provider(
+        self, _idb, _ir, _is, verify, create
+    ):
+        """A principal with no IdP records None rather than a guess.
+
+        The pair with the test above: the route must pass the provider THROUGH,
+        not substitute one. A NULL resolves to no roles, which is the fail-closed
+        direction the model comment asks for.
+        """
+        verify.return_value = ("T123", "U456", "")
+        create.return_value = _fake_link("alice@example.com")
+        app, _db = _make_app(_user("alice@example.com", identity_provider=None))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.post(_LINK, json={"state": "good"}, headers=_AUTH)
+        assert r.status_code == 200
+        _args, kwargs = create.call_args
+        assert kwargs["identity_provider"] is None
 
 
 class TestPreviewLink:
