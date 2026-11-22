@@ -19,6 +19,13 @@ interface AuditEntry {
   attributes: {
     'timestamp': string
     'actor-email': string
+    // A vcs_user entry carries a login and an id and an empty email, by design
+    // (#2669). Without these the actor column rendered '-' for every action
+    // driven from a pull-request comment.
+    'actor-type': string
+    'actor-login': string
+    'actor-id': string
+    'origin': string
     'actor-ip': string
     'action': string
     'resource-type': string
@@ -64,7 +71,7 @@ export default function AuditLogPage() {
   const accessor = useCallback((item: AuditEntry, key: SortKey) => {
     switch (key) {
       case 'timestamp': return item.attributes.timestamp
-      case 'actor': return item.attributes['actor-email'] || ''
+      case 'actor': return item.attributes['actor-email'] || item.attributes['actor-login'] || ''
       case 'action': return item.attributes.action
       case 'resourceType': return item.attributes['resource-type']
       case 'resourceId': return item.attributes['resource-id']
@@ -267,7 +274,9 @@ export default function AuditLogPage() {
                             {new Date(a.timestamp).toLocaleString()}
                           </td>
                           <td className="px-4 py-2.5 text-sm text-slate-300">
-                            {a['actor-email'] || <span className="text-slate-500">-</span>}
+                            {a['actor-email'] || a['actor-login'] || (
+                              <span className="text-slate-500">-</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-slate-700/50 text-slate-300">

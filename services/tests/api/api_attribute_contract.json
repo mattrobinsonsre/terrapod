@@ -81,9 +81,13 @@
   "audit.list_audit_log": [
     "action",
     "actor-email",
+    "actor-id",
     "actor-ip",
+    "actor-login",
+    "actor-type",
     "detail",
     "duration-ms",
+    "origin",
     "request-id",
     "resource-id",
     "resource-type",

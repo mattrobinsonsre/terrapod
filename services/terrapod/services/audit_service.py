@@ -192,6 +192,7 @@ async def query_audit_log(
     db: AsyncSession,
     *,
     actor: str | None = None,
+    actor_login: str | None = None,
     resource_type: str | None = None,
     action: str | None = None,
     since: datetime | None = None,
@@ -206,6 +207,13 @@ async def query_audit_log(
     if actor:
         stmt = stmt.where(AuditLog.actor_email == actor)
         count_stmt = count_stmt.where(AuditLog.actor_email == actor)
+    # A separate filter rather than widening `actor`, which is documented as the
+    # email. An entry whose actor_type is vcs_user carries a login and an empty
+    # actor_email by design (`log_vcs_action`), so `filter[actor]` could never
+    # reach one and a PR-comment action was unfindable by actor at all (#2669).
+    if actor_login:
+        stmt = stmt.where(AuditLog.actor_login == actor_login)
+        count_stmt = count_stmt.where(AuditLog.actor_login == actor_login)
     if resource_type:
         stmt = stmt.where(AuditLog.resource_type == resource_type)
         count_stmt = count_stmt.where(AuditLog.resource_type == resource_type)

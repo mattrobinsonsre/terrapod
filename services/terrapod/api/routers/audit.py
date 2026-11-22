@@ -29,6 +29,7 @@ async def list_audit_log(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
     filter_actor: str | None = Query(None, alias="filter[actor]"),
+    filter_actor_login: str | None = Query(None, alias="filter[actor-login]"),
     filter_resource_type: str | None = Query(None, alias="filter[resource-type]"),
     filter_action: str | None = Query(None, alias="filter[action]"),
     filter_since: datetime | None = Query(None, alias="filter[since]"),
@@ -40,6 +41,7 @@ async def list_audit_log(
     entries, total = await query_audit_log(
         db,
         actor=filter_actor,
+        actor_login=filter_actor_login,
         resource_type=filter_resource_type,
         action=filter_action,
         since=filter_since,
@@ -56,6 +58,14 @@ async def list_audit_log(
                 "attributes": {
                     "timestamp": _format_timestamp(entry.timestamp),
                     "actor-email": entry.actor_email,
+                    # The dual-actor model the schema has always carried, which no
+                    # consumer could see: a vcs_user entry holds a login and an id
+                    # and an empty email, so without these the UI rendered a blank
+                    # actor for every PR-comment action (#2669).
+                    "actor-type": entry.actor_type,
+                    "actor-login": entry.actor_login,
+                    "actor-id": entry.actor_id,
+                    "origin": entry.origin,
                     "actor-ip": entry.actor_ip,
                     "action": entry.action,
                     "resource-type": entry.resource_type,
