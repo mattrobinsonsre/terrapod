@@ -354,6 +354,26 @@ def outline_self_test(pal: dict[str, dict[int, tuple[int, int, int]]]) -> list[s
         out.append("checkbox outline: a solid checked border and fill is reported as failing")
     if not checked(fixture("border-brand-500/20", "bg-brand-600/20")):
         out.append("checkbox outline: a checked border and fill at 20% is not reported")
+    # The check has two halves -- read the border's alpha, and composite the FILL
+    # under it -- and the two fixtures above pin only the first: at 20%/20% the
+    # answer is "reported" whether or not the fill is composited, so dropping that
+    # half survives them both.
+    #
+    # This one separates them. A 20% border over a SOLID fill is clean, measured,
+    # because the fill is what the border sits on and brand-600 carries the
+    # contrast; drop the composite and the border is measured against the page
+    # instead, which reports it. So a failure here means the fill stopped being
+    # composited rather than anything about the border.
+    #
+    # It is also the case the DARK gate exists for: there the same classes are a
+    # real defect, because the dark page gives the composited fill nothing to
+    # stand against. The two gates disagreeing on this fixture is correct, and is
+    # why neither can be dropped in favour of the other.
+    if checked(fixture("border-brand-500/20", "bg-brand-600")):
+        out.append(
+            "checkbox outline: a 20% checked border over a SOLID fill is reported on light; "
+            "the fill is no longer composited under the border"
+        )
     return out
 
 

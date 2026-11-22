@@ -92,6 +92,65 @@ const contrast = (a: RGB, b: RGB) => {
 const composite = (fg: RGB, alpha: number, bg: RGB): RGB =>
   fg.map((f, i) => Math.round(f * alpha + bg[i] * (1 - alpha))) as RGB
 
+/**
+ * The checkbox outline's problems on dark, measured from a className source.
+ *
+ * Extracted so it can be driven with fixtures. It was inline, and the dark half
+ * of the fix had no self-test at all -- reverting its two lines left the whole
+ * suite green, and this is the ONLY gate that can see the defect class: on
+ * light, `brand-600` is 8.43:1 against the page, so a lone border alpha can
+ * never drop below 3:1 there (#2632).
+ */
+function checkboxOutlineProblems(pal: Record<string, RGB>, source: string): string[] {
+  const m = source.match(/className=\{([^}]*appearance-none[^}]*)\}/)
+  if (!m) return ['checkbox.tsx: no className with `appearance-none`']
+  const toks = [...m[1].matchAll(/'([^']*)'/g)].flatMap((q) => q[1].split(/\s+/)).filter(Boolean)
+  // Unprefixed or `hover:`/`checked:` only: `light:` classes are the light gate's.
+  const paint = (variant: string, prop: string): [RGB, number, string] | null => {
+    for (const t of toks) {
+      const k = t.match(/^(?:([a-z]+:))?(bg|border)-([a-z]+-\d+)(?:\/(\d+))?$/)
+      if (!k || (k[1] ?? '') !== variant || k[2] !== prop || !pal[k[3]]) continue
+      return [pal[k[3]], k[4] === undefined ? 1 : +k[4] / 100, t]
+    }
+    return null
+  }
+  const page = pal['slate-900']
+  const panel = composite(pal['slate-800'], 0.5, page)
+  const row = composite(pal['slate-700'], 0.2, panel)
+  const baseFill = paint('', 'bg')
+  const hovFill = paint('hover:', 'bg')
+  const baseEdge = paint('', 'border')
+  const hovEdge = paint('hover:', 'border')
+  const chkEdge = paint('checked:', 'border')
+  const chkFill = paint('checked:', 'bg')
+  if (!(baseFill && hovFill && baseEdge && hovEdge && chkEdge && chkFill)) {
+    return ['checkbox.tsx: a base, hover or checked border or fill class is missing']
+  }
+  const states: [string, RGB, [RGB, number, string], [RGB, number, string]][] = [
+    ['on the page', page, baseFill, baseEdge],
+    ['on the panel', panel, baseFill, baseEdge],
+    ['on a hovered row', row, baseFill, baseEdge],
+    ['hovered, on a hovered row', row, hovFill, hovEdge],
+  ]
+  const NON_TEXT = 3
+  const offenders: string[] = []
+  for (const [name, backdrop, fill, edge] of states) {
+    const under = composite(fill[0], fill[1], backdrop)
+    const painted = composite(edge[0], edge[1], under)
+    for (const [what, other] of [['its own fill', under], ['the surface behind it', backdrop]] as [string, RGB][]) {
+      const c = contrast(painted, other)
+      if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  \`${edge[2]}\` ${name}, against ${what}`)
+    }
+  }
+  // A lone border alpha shows here; the light gate's solid fill would mask it.
+  for (const [name, backdrop] of [['the page', page], ['the panel', panel], ['a hovered row', row]] as [string, RGB][]) {
+    const under = composite(chkFill[0], chkFill[1], backdrop)
+    const c = contrast(composite(chkEdge[0], chkEdge[1], under), backdrop)
+    if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  checked \`${chkEdge[2]}\` on ${name}`)
+  }
+  return offenders
+}
+
 /** The DARK palette: Tailwind's stock stops, overridden by globals.css `:root`. */
 function darkPalette(): { pal: Record<string, RGB>; stock: number } {
   const theme = readFileSync(
@@ -241,61 +300,62 @@ describe('the dark theme is checked too', () => {
     assert.ok(stock >= MIN_STOCK, `only ${stock} stock stops parsed from theme.css`)
   })
 
-  it('the checkbox outline clears 3:1 on dark (WCAG 1.4.11)', () => {
-    // Classes are read from checkbox.tsx; each state is measured against the box's
-    // own fill and the surface behind it (hovering the box also hovers its row).
-    const file = path.join(WEB, 'src', 'components', 'checkbox.tsx')
-    const m = readFileSync(file, 'utf8').match(/className=\{([^}]*appearance-none[^}]*)\}/)
-    assert.ok(m, 'checkbox.tsx: no className with `appearance-none`')
-    const toks = [...m[1].matchAll(/'([^']*)'/g)].flatMap((q) => q[1].split(/\s+/)).filter(Boolean)
-    // Unprefixed or `hover:`/`checked:` only: `light:` classes are the light gate's.
-    const paint = (variant: string, prop: string): [RGB, number, string] | null => {
-      for (const t of toks) {
-        const k = t.match(/^(?:([a-z]+:))?(bg|border)-([a-z]+-\d+)(?:\/(\d+))?$/)
-        if (!k || (k[1] ?? '') !== variant || k[2] !== prop || !pal[k[3]]) continue
-        return [pal[k[3]], k[4] === undefined ? 1 : +k[4] / 100, t]
-      }
-      return null
-    }
-    const page = pal['slate-900']
-    const panel = composite(pal['slate-800'], 0.5, page)
-    const row = composite(pal['slate-700'], 0.2, panel)
-    const baseFill = paint('', 'bg')
-    const hovFill = paint('hover:', 'bg')
-    const baseEdge = paint('', 'border')
-    const hovEdge = paint('hover:', 'border')
-    const chkEdge = paint('checked:', 'border')
-    const chkFill = paint('checked:', 'bg')
-    assert.ok(
-      baseFill && hovFill && baseEdge && hovEdge && chkEdge && chkFill,
-      'checkbox.tsx: a base, hover or checked border or fill class is missing',
+  it('the outline check sees what it is for', () => {
+    // Its own fixtures, which this gate had none of: reverting its two lines
+    // left the whole suite green, and it is the ONLY gate that can see the
+    // defect class -- on light, `brand-600` is 8.43:1 against the page, so a
+    // lone border alpha can never drop below 3:1 there (#2632).
+    const fixture = (border: string, fill: string) =>
+      "className={'appearance-none border-slate-500 bg-slate-800/60 " +
+      "hover:border-slate-400 hover:bg-slate-700/60 " +
+      `checked:${border} checked:${fill}'}`
+    const checked = (border: string, fill: string) =>
+      checkboxOutlineProblems(pal, fixture(border, fill)).filter((p) => p.includes('checked'))
+
+    assert.deepEqual(
+      checked('border-brand-500', 'bg-brand-600'),
+      [],
+      'a solid checked border and fill is reported as failing',
     )
-    const states: [string, RGB, [RGB, number, string], [RGB, number, string]][] = [
-      ['on the page', page, baseFill, baseEdge],
-      ['on the panel', panel, baseFill, baseEdge],
-      ['on a hovered row', row, baseFill, baseEdge],
-      ['hovered, on a hovered row', row, hovFill, hovEdge],
-    ]
-    const NON_TEXT = 3
-    const offenders: string[] = []
-    for (const [name, backdrop, fill, edge] of states) {
-      const under = composite(fill[0], fill[1], backdrop)
-      const painted = composite(edge[0], edge[1], under)
-      for (const [what, other] of [['its own fill', under], ['the surface behind it', backdrop]] as [string, RGB][]) {
-        const c = contrast(painted, other)
-        if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  \`${edge[2]}\` ${name}, against ${what}`)
-      }
-    }
-    // A lone border alpha shows here; the light gate's solid fill would mask it.
-    for (const [name, backdrop] of [['the page', page], ['the panel', panel], ['a hovered row', row]] as [string, RGB][]) {
-      const under = composite(chkFill[0], chkFill[1], backdrop)
-      const c = contrast(composite(chkEdge[0], chkEdge[1], under), backdrop)
-      if (c < NON_TEXT) offenders.push(`${c.toFixed(2)}:1  checked \`${chkEdge[2]}\` on ${name}`)
-    }
+    assert.notDeepEqual(
+      checked('border-brand-500/20', 'bg-brand-600/20'),
+      [],
+      'a checked border and fill at 20% is not reported',
+    )
+    // The case this gate exists for, and the one the light gate cannot see: a
+    // lone border alpha over a SOLID fill. On the dark page the composited fill
+    // has nothing to stand against, so it is a real defect here while being
+    // clean on light -- the two gates disagreeing on this fixture is correct,
+    // and is why neither can be dropped in favour of the other.
+    assert.notDeepEqual(
+      checked('border-brand-500/20', 'bg-brand-600'),
+      [],
+      'a lone checked border alpha over a solid fill is not reported; this gate is the only one that can see it',
+    )
+    // The check has two halves -- read the border's alpha, and composite the
+    // FILL under it -- and the three fixtures above pin only the first: each
+    // reports either way, so dropping the composite survives them all.
+    //
+    // This one separates them, at the alpha where the two answers part company
+    // (measured, not chosen): a border at 80% over a solid fill is clean,
+    // because it sits on brand-600 and inherits its contrast. Drop the
+    // composite and the border is measured against the dark page instead, which
+    // reports it. A failure here means the fill stopped being composited rather
+    // than anything about the border.
+    assert.deepEqual(
+      checked('border-brand-500/80', 'bg-brand-600'),
+      [],
+      'a checked border at 80% over a solid fill is reported; the fill is no longer composited under it',
+    )
+  })
+
+  it('the checkbox outline clears 3:1 on dark (WCAG 1.4.11)', () => {
+    const file = path.join(WEB, 'src', 'components', 'checkbox.tsx')
+    const offenders = checkboxOutlineProblems(pal, readFileSync(file, 'utf8'))
     assert.deepEqual(
       offenders,
       [],
-      `checkbox.tsx outline needs ${NON_TEXT}:1 (WCAG 1.4.11):\n  ${offenders.join('\n  ')}`,
+      `checkbox.tsx outline needs 3:1 (WCAG 1.4.11):\n  ${offenders.join('\n  ')}`,
     )
   })
 
