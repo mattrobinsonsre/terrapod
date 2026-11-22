@@ -74,16 +74,6 @@ _PROVIDER_WS_DATASOURCE = next(
 # intentionally NOT mirrored in the SDK Workspace struct or the
 # provider's workspace resource. Each entry should be documented so
 # future contributors don't need to re-discover why.
-_SDK_RUNS = next(
-    p
-    for p in (
-        _TESTS_DIR.parent.parent / "go-terrapod/runs.go",  # local
-        _TESTS_DIR.parent / "go-terrapod/runs.go",  # docker
-    )
-    if p.exists()
-)
-
-
 WORKSPACE_API_ONLY: frozenset[str] = frozenset(
     {
         # Derived from `execution_mode` ("agent" → True). Cosmetic flag
@@ -133,6 +123,11 @@ def _either_layout(*candidates: str) -> Path:
             if p.exists():
                 return p
     raise AssertionError(f"none of {candidates} resolves in either layout")
+
+
+#: The SDK file holding `RunActions`, through `_either_layout` rather than a
+#: second copy of the same idiom -- its siblings above predate that helper.
+_SDK_RUNS = _either_layout("go-terrapod/runs.go")
 
 
 #: Every consumer file that would carry `storage-location` once it is mirrored,
