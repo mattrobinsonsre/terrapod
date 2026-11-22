@@ -30,7 +30,7 @@ redis:
   url: "rediss://default:password@redis.example.com:6380"
 ```
 
-For ElastiCache, MemoryDB, or Azure Cache for Redis, enable in-transit encryption at the provider level.
+For ElastiCache, MemoryDB, or Azure Cache for Redis, enable in-transit **and at-rest** encryption at the provider level. Redis holds live session tokens and short-lived decrypted cache values, so treat it as credential-bearing storage rather than a disposable cache — see [Deployment: Encryption at Rest](deployment.md#encryption-at-rest).
 
 ### Ingress
 
