@@ -309,6 +309,16 @@ class TestTheCredentialFieldIsRetired:
         Source-introspected because the defect it guards is a missing CONDITION
         rather than a wrong value, and an unconditional call produced correct
         behaviour for every input that existed before `known_hosts` did.
+
+        The BEHAVIOURAL half of this pair is gone, and that is the reason this one
+        is kept. It lived in `tests/runner/test_phase_ansible_auth.py` as
+        `test_a_non_secret_field_is_never_registered_however_short`, and its
+        subject had already been withdrawn once -- it was `user` until #2413 F9 --
+        before `known_hosts` was withdrawn under it too. With no non-secret machine
+        field left there is no value to drive it with, and a credential carrying
+        only a retired field now raises before the assertion is reached. A test
+        that cannot be written is not evidence the property is safe, so the
+        structural one carries it alone until a non-secret file field exists again.
         """
         import ast
         import inspect
