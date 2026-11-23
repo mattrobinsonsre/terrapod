@@ -61,6 +61,49 @@ func collectAttrs[A introspectable](typeName string, attrs map[string]A) []strin
 	return out
 }
 
+// collectResourceBlocks freezes a resource's schema Blocks, recursively.
+//
+// Two lines per block, because neither alone is the contract. The `block` line
+// carries attr.Type.String(), which renders the whole nested object shape and
+// the nesting mode with it (a SetNestedBlock is types.SetType[types.ObjectType[
+// …]], a ListNestedBlock a ListType) — so a nested rename, retype, or a set
+// silently becoming a list all fail here. The per-attribute lines then carry
+// the required/optional/computed/sensitive flags, which a type string cannot
+// express and which are just as breaking to change.
+//
+// It switches on the CONCRETE framework block types rather than the Block
+// interface, because the interface's GetNestedObject returns a type from the
+// framework's internal/fwschema package, which this package cannot name. The
+// default case refuses rather than skipping: a block kind this gate cannot read
+// is a public surface nothing freezes, which is the thing it exists to prevent.
+func collectResourceBlocks(t *testing.T, prefix string, blocks map[string]rschema.Block) []string {
+	t.Helper()
+	var out []string
+	for name, block := range blocks {
+		qualified := prefix + "." + name
+		out = append(out, fmt.Sprintf("%s block type=%s", qualified, block.Type().String()))
+
+		var (
+			attrs  map[string]rschema.Attribute
+			nested map[string]rschema.Block
+		)
+		switch b := block.(type) {
+		case rschema.SetNestedBlock:
+			attrs, nested = b.NestedObject.Attributes, b.NestedObject.Blocks
+		case rschema.ListNestedBlock:
+			attrs, nested = b.NestedObject.Attributes, b.NestedObject.Blocks
+		case rschema.SingleNestedBlock:
+			attrs, nested = b.Attributes, b.Blocks
+		default:
+			t.Fatalf("%s is a %T, which this gate cannot read — extend collectResourceBlocks",
+				qualified, block)
+		}
+		out = append(out, collectAttrs(qualified, attrs)...)
+		out = append(out, collectResourceBlocks(t, qualified, nested)...)
+	}
+	return out
+}
+
 func providerSchemaSurface(t *testing.T) []string {
 	t.Helper()
 	ctx := context.Background()
@@ -78,9 +121,7 @@ func providerSchemaSurface(t *testing.T) []string {
 			t.Fatalf("resource %s schema error: %v", md.TypeName, sr.Diagnostics)
 		}
 		out = append(out, collectAttrs("resource "+md.TypeName, sr.Schema.Attributes)...)
-		if len(sr.Schema.Blocks) > 0 {
-			t.Fatalf("resource %s uses schema Blocks, which this gate does not yet freeze — extend the gate", md.TypeName)
-		}
+		out = append(out, collectResourceBlocks(t, "resource "+md.TypeName, sr.Schema.Blocks)...)
 	}
 
 	for _, factory := range p.DataSources(ctx) {
@@ -94,6 +135,10 @@ func providerSchemaSurface(t *testing.T) []string {
 		}
 		out = append(out, collectAttrs("data "+md.TypeName, sr.Schema.Attributes)...)
 		if len(sr.Schema.Blocks) > 0 {
+			// No data source uses blocks yet. When one does, give it the same
+			// treatment collectResourceBlocks gives a resource -- the refusal
+			// stays rather than being widened to a silent skip, because a block
+			// nothing freezes is a public surface nothing freezes.
 			t.Fatalf("data source %s uses schema Blocks, which this gate does not yet freeze — extend the gate", md.TypeName)
 		}
 	}

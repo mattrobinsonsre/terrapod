@@ -42,6 +42,7 @@ import (
 	inventoryGroupVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_group_var"
 	inventoryHostRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host"
 	inventoryHostGroupRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_group"
+	inventoryHostKeysRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_keys"
 	inventoryHostVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_var"
 	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
@@ -233,6 +234,12 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		inventoryHostVarRes.NewResource,
 		inventoryGroupVarRes.NewResource,
 		inventoryGlobalVarRes.NewResource,
+		// The eighth structure (#2592), and the one exception to the rule
+		// above: a host's approved SSH host keys are one resource per HOST
+		// with a `key` block per key, because the trust set is the thing that
+		// has to be complete. A key nobody declared becoming trusted is the
+		// failure it exists to prevent, so the whole set has one owner.
+		inventoryHostKeysRes.NewResource,
 	}
 }
 
