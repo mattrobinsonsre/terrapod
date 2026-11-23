@@ -169,6 +169,69 @@ def built_to_source(built: dict[str, Any], *, resolved: dict[str, str] | None = 
     return json.dumps(built, indent=2, sort_keys=True)
 
 
+def is_terrapod_rendered(path: Path) -> bool:
+    """Whether this `-i` entry is a file this module wrote.
+
+    The `-i` list is ours in the ordinary case and MIXED in the dynamic handoff
+    (#2033), where it carries the repository's own inventory sources -- ini,
+    yaml, or an executable script -- in the operator's order, followed by our
+    declared rows. Matched on the name rather than by trying to parse, because
+    "this parsed as JSON" is a weaker claim than "we wrote it": a repository
+    source could legitimately be JSON, and reading one as though it had our
+    shape would silently resolve nothing.
+    """
+    return path.name in (RENDERED_NAME, DECLARED_NAME)
+
+
+def hosts_from_rendered(text: str) -> dict[str, dict[str, Any]]:
+    """The host-to-effective-variables map inside a source this module wrote.
+
+    Here rather than in the caller because this module owns that file's format,
+    and a second reader of a format is how two readers come to disagree about
+    it. The one caller today is the host-key anchor (#2592), which needs each
+    host's `ansible_host` and `ansible_port` to know what name OpenSSH will be
+    asked to match -- so it reads the file ansible will read, which is strictly
+    more faithful than re-deriving from the stored artifact: this is
+    post-render and post-placeholder-substitution, exactly as ansible sees it.
+
+    `build_inventory_document` emits every host at the `all` root, including a
+    host in no group, so the root map is the complete set and the group blocks
+    need no walking. A host with no variables is emitted as `None` there and
+    arrives here as an empty mapping.
+
+    **An unrecognised SHAPE is an empty map and not an error**, because the
+    empty inventory is one: a document with no hosts is a legitimate answer, and
+    whether the caller expected hosts is the caller's question rather than this
+    function's.
+
+    Raises:
+        ValueError: the text is not JSON at all, which is a different thing from
+            a shape with no hosts in it. A caller holding a mixed `-i` list
+            filters with `is_terrapod_rendered` first, so reaching this means a
+            file Terrapod wrote minutes earlier is unreadable -- a defect in the
+            image rather than an operator's input, and one the caller translates
+            into its own refusal. `document_to_source` serialises with
+            `json.dumps` precisely so neither side needs PyYAML, which the
+            runner image deliberately ships none of, and
+            `test_the_anchor_reads_what_the_renderer_writes` pins the two
+            together so that coupling is a gated contract rather than an
+            assumption.
+    """
+    parsed = json.loads(text)
+    if not isinstance(parsed, dict):
+        return {}
+    root = parsed.get("all")
+    if not isinstance(root, dict):
+        return {}
+    hosts = root.get("hosts")
+    if not isinstance(hosts, dict):
+        return {}
+    return {
+        str(name): (variables if isinstance(variables, dict) else {})
+        for name, variables in hosts.items()
+    }
+
+
 def _refuse_unresolved(built: dict[str, Any]) -> None:
     """Refuse a render still carrying a placeholder.
 

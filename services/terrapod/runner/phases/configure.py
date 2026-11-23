@@ -129,7 +129,7 @@ def _enabled_plugins(cfg: RunnerConfig) -> str:
     return ",".join(enabled)
 
 
-def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
+def _forced_env(cfg: RunnerConfig, *, ssh_args: str | None = None) -> dict[str, str]:
     """The environment ansible runs under, with inherited `ANSIBLE_*` stripped.
 
     Stripping rather than overriding is the point. Env beats `ansible.cfg`, so an
@@ -137,8 +137,27 @@ def _forced_env(cfg: RunnerConfig) -> dict[str, str]:
     dispatcher that `_FORCED_ENV` exists to disable -- and the set of ansible
     settings is far larger than the set anyone thinks about, so an allowlist of
     what we set is not the same as a bound on what reaches the process.
+
+    `ssh_args` is the host-key anchor (#2592) when this workspace declared
+    approved keys, and `None` when it declared none. It is forced HERE rather
+    than passed as `extra_env` because it is a non-negotiable in the same sense
+    as the two settings above: once a workspace says what a host is trusted to
+    present, nothing another phase contributes may displace where OpenSSH looks
+    it up. Replacing rather than appending to `ANSIBLE_SSH_ARGS` is not a choice
+    -- a variable sets an option whole -- so the value carries ansible's own
+    default along with ours; `configure_known_hosts.ssh_args` is where that is
+    assembled and argued.
+
+    It also means an operator's `[ssh_connection] ssh_args` in their own
+    `ansible.cfg` is overridden for a run that has an anchor, which is the same
+    trade `ANSIBLE_INVENTORY_ENABLED` already makes against their
+    `[inventory] enable_plugins`: the rest of their file stays in force, and
+    anything they had there still reaches ssh from `ssh_common_args` or
+    `ssh_extra_args`, which this phase never sets.
     """
     env = dict(_FORCED_ENV)
+    if ssh_args:
+        env["ANSIBLE_SSH_ARGS"] = ssh_args
     env["ANSIBLE_INVENTORY_ENABLED"] = _enabled_plugins(cfg)
     # Temp directories must be writable, which a read-only root filesystem makes
     # a live concern: ansible exits `rc 250` with "No usable temporary directory
@@ -208,6 +227,7 @@ def run(
     inventory: Sequence[Path],
     log_file: str | None = None,
     extra_env: dict[str, str] | None = None,
+    ssh_args: str | None = None,
 ) -> int:
     """Execute the playbook in the execution environment; return ansible's code.
 
@@ -227,6 +247,11 @@ def run(
             configure would run with no vault password, silently. The forced
             settings still win over it, so a credential cannot re-enable the
             plugin dispatcher by supplying a variable of its own.
+        ssh_args: the host-key anchor (#2592), from
+            `configure_known_hosts.materialise`. Separate from `extra_env`
+            because it is forced rather than contributed -- see `_forced_env`.
+            `None` for a workspace that declared no approved keys, which leaves
+            host-key checking exactly as it was before the anchor existed.
 
     Raises:
         ConfigureNotConfigured: the run names no playbook.
@@ -256,11 +281,16 @@ def run(
         limit=cfg.ansible_limit or None,
         inventory=[str(source) for source in inventory],
         cwd=str(cwd),
+        # Whether approved host keys are being enforced on this run (#2592),
+        # in the line an operator reads first. Without it the two cases are
+        # indistinguishable from the log, and they are the difference between
+        # a verified fleet and an unverified one.
+        host_keys_enforced=bool(ssh_args),
     )
     # `_forced_env` LAST, so the non-negotiables outrank anything a credential
     # contributed -- the same precedence the Job spec gives our own env over an
     # operator's `extraEnv`, and for the same reason.
-    env = {**(extra_env or {}), **_forced_env(cfg)}
+    env = {**(extra_env or {}), **_forced_env(cfg, ssh_args=ssh_args)}
     result = ee_client.run(
         "ansible-playbook",
         arguments,

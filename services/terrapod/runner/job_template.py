@@ -182,6 +182,21 @@ _EE_CALLBACK_DIR = f"{_EE_SHARED_DIR}/callback"
 #: inventory and the credentials: the file is Terrapod's, not part of the
 #: operator's fetched tree.
 _EE_OIDC_DIR = f"{_EE_SHARED_DIR}/oidc"
+#: Where the orchestrator writes the `known_hosts` file built from this
+#: workspace's approved SSH host keys (#2592).
+#:
+#: On the SHARED volume for the same reason as the inventory and the
+#: credentials: the thing that reads it is `ssh`, which ansible invokes inside
+#: the EE, and the EE mounts only this volume and the workspace. A trust anchor
+#: written to the orchestrator's own `/tmp` -- where the PVC-tempfile rule
+#: otherwise sends runner tempfiles -- is rendered correctly and invisible to
+#: the only process that enforces it, so every host would be refused for a
+#: reason nothing in the log names.
+#:
+#: Here rather than on the workspace volume, though that is shared too: the
+#: file is Terrapod's, not part of the operator's fetched tree, and anything
+#: inside `config_directory` risks being read as something it is not.
+_EE_KNOWN_HOSTS_DIR = f"{_EE_SHARED_DIR}/known-hosts"
 #: The group both containers reach the shared volumes through. The orchestrator
 #: runs 1000:1000; our own EE runs 1000:0; an operator's EE runs whatever its
 #: image says. `fsGroup` is what makes all three work: kubelet chowns every
@@ -536,6 +551,11 @@ def _add_execution_environment(
             {"name": "TP_EE_CREDENTIALS_DIR", "value": _EE_CREDENTIALS_DIR},
             {"name": "TP_EE_CALLBACK_DIR", "value": _EE_CALLBACK_DIR},
             {"name": "TP_EE_OIDC_DIR", "value": _EE_OIDC_DIR},
+            # Where the host-key anchor is written (#2592). Set on the
+            # ORCHESTRATOR alone, which does the writing: the EE never reads
+            # this variable, because the path reaches `ssh` as an explicit
+            # `-o UserKnownHostsFile=` rather than through its environment.
+            {"name": "TP_EE_KNOWN_HOSTS_DIR", "value": _EE_KNOWN_HOSTS_DIR},
             # Where `git_auth` writes for a configure (#2320). Set on the
             # ORCHESTRATOR, which does the writing; the EE reads the result
             # through `GIT_CONFIG_GLOBAL` above. Its presence is also how the
@@ -565,7 +585,7 @@ def _add_execution_environment(
                 "-c",
                 f"mkdir -p {_EE_TMPDIR} {_EE_COLLECTIONS_DIR} {_EE_ROLES_DIR} {_EE_HOME} "
                 f"{_EE_INVENTORY_DIR} {_EE_CREDENTIALS_DIR} {_EE_CALLBACK_DIR} "
-                f"{_EE_OIDC_DIR} {_EE_GIT_DIR} "
+                f"{_EE_OIDC_DIR} {_EE_GIT_DIR} {_EE_KNOWN_HOSTS_DIR} "
                 # Touched so it always EXISTS. `GIT_CONFIG_GLOBAL` is set
                 # unconditionally below, and a run that declares no git
                 # credential writes nothing here -- git tolerates a missing

@@ -234,6 +234,7 @@ local_resource(
         'services/terrapod/services/cost',
         'services/terrapod/services/inventory_render.py',
         'services/terrapod/services/ansible_auth.py',
+        'services/terrapod/services/known_hosts_render.py',
     ],
     labels=['build'],
 )
