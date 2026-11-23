@@ -128,16 +128,43 @@ def _encrypt(home: Path, plaintext: str, password: str, *, label: str | None = N
     return out.stdout
 
 
-def _play(home: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
-    (home / "site.yml").write_text(
-        "- hosts: all\n"
-        "  gather_facts: false\n"
-        "  tasks:\n"
-        "    - debug:\n"
-        "        msg: 'DECRYPTED={{ the_secret }}'\n"
+def _play(
+    home: Path, env: dict[str, str], variables: tuple[str, ...] = ("the_secret",)
+) -> subprocess.CompletedProcess:
+    """Write each decrypted value through a real module rather than printing it.
+
+    ansible-core 2.22 masks vault-sourced values in its OWN output -- a `debug`
+    of one renders `$REDACTED$`, which is ansible's marker and not Terrapod's
+    (`runner/exec_subprocess.py` writes `[redacted]`, and these tests do not go
+    through it). That is a change in the safer direction, so the tests move with
+    it rather than pinning 2.21's behaviour.
+
+    Asserting the value is USABLE is the better test either way, and it is a
+    stronger claim than the one it replaces: `copy` is a real module that has to
+    receive the plaintext to write it, so a file holding the right bytes proves
+    decryption reached something that consumed it. Printing only ever proved it
+    reached the display layer -- which is precisely the layer that changed.
+    """
+    tasks = "".join(
+        "    - copy:\n"
+        f'        content: "{{{{ {var} }}}}"\n'
+        f'        dest: "{{{{ playbook_dir }}}}/{var}.out"\n'
+        '        mode: "0600"\n'
+        for var in variables
     )
+    (home / "site.yml").write_text("- hosts: all\n  gather_facts: false\n  tasks:\n" + tasks)
+    # localhost is in BOTH groups so `group_vars/web.yml` applies to it too --
+    # without that the two-identity test's second secret is never resolved and
+    # the test proves half of what it claims.
     (home / "inv.yml").write_text(
-        json.dumps({"all": {"hosts": {"localhost": {"ansible_connection": "local"}}}})
+        json.dumps(
+            {
+                "all": {
+                    "hosts": {"localhost": {"ansible_connection": "local"}},
+                    "children": {"web": {"hosts": {"localhost": {}}}},
+                }
+            }
+        )
     )
     return subprocess.run(  # noqa: S603
         [PLAYBOOK, "-i", str(home / "inv.yml"), str(home / "site.yml")],
@@ -147,6 +174,12 @@ def _play(home: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
         env=env,
         check=False,
     )
+
+
+def _decrypted(home: Path, var: str = "the_secret") -> str | None:
+    """What the play actually wrote, or None if it never got that far."""
+    written = home / f"{var}.out"
+    return written.read_text() if written.exists() else None
 
 
 def _deliver(home: Path, entries: list[dict]) -> dict[str, str]:
@@ -179,7 +212,8 @@ class TestAVaultEncryptedFileDecryptsDuringARun:
 
         out = _play(tmp_path, _env(env, tmp_path))
         assert out.returncode == 0, f"the play failed:\n{out.stdout}\n{out.stderr}"
-        assert "DECRYPTED=the-plaintext-value" in out.stdout, out.stdout
+        assert _decrypted(tmp_path) == "the-plaintext-value", out.stdout
+        assert "the-plaintext-value" not in out.stdout, "the value reached the output"
 
     def test_without_the_phase_the_same_play_fails(self, tmp_path):
         """The control. Without it, a play that decrypts for some other reason --
@@ -194,6 +228,7 @@ class TestAVaultEncryptedFileDecryptsDuringARun:
         out = _play(tmp_path, _env({}, tmp_path))
         assert out.returncode != 0, "the play decrypted with NO credential delivered"
         assert "the-plaintext-value" not in out.stdout
+        assert _decrypted(tmp_path) is None, "a value was written with no credential"
 
 
 class TestMultipleVaultIDs:
@@ -214,9 +249,10 @@ class TestMultipleVaultIDs:
         env = _deliver(tmp_path, [_vault_entry("prod", prod_pw), _vault_entry("dev", dev_pw)])
         assert env["ANSIBLE_VAULT_IDENTITY_LIST"].count(",") == 1, env
 
-        out = _play(tmp_path, _env(env, tmp_path))
+        out = _play(tmp_path, _env(env, tmp_path), variables=("the_secret", "other_secret"))
         assert out.returncode == 0, f"{out.stdout}\n{out.stderr}"
-        assert "DECRYPTED=prod-value" in out.stdout, out.stdout
+        assert _decrypted(tmp_path) == "prod-value", out.stdout
+        assert _decrypted(tmp_path, "other_secret") == "dev-value", out.stdout
 
     def test_an_unlabelled_secret_decrypts_against_a_labelled_identity(self, tmp_path):
         """Measured on #1933 and relied on by the single-password case: an
@@ -231,7 +267,7 @@ class TestMultipleVaultIDs:
         env = _deliver(tmp_path, [_vault_entry("whatever", password)])
         out = _play(tmp_path, _env(env, tmp_path))
         assert out.returncode == 0, f"{out.stdout}\n{out.stderr}"
-        assert "DECRYPTED=unlabelled-value" in out.stdout
+        assert _decrypted(tmp_path) == "unlabelled-value", out.stdout
 
 
 class TestTheWrongPasswordFailsClearly:
