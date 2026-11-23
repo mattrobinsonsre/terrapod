@@ -97,6 +97,32 @@ def attributes(src: str) -> dict[str, tuple[str, str]]:
     return out
 
 
+#: `XNestedAttribute` -> `XNestedBlock` for the same X. The two spell the SAME
+#: cty type -- a single nested attribute and a single nested block are both
+#: `object(...)`, a list of either is `list(object(...))` -- so a 1.x state reads
+#: under the new schema and no upgrader is needed. This gate reads the schema kind
+#: as WRITTEN, which cannot see that, and #2681 converts five such attributes.
+#:
+#: Measured rather than reasoned: the schema golden records each attribute's
+#: resulting type, and it is byte-identical across all five conversions.
+#:
+#: What this does NOT excuse is a change to the nested shape underneath, which
+#: would be a real type change wearing this one's clothes. `TestProviderSchemaContract`
+#: is what covers that residue: since those conversions it pins every nested
+#: attribute's own type on its own row, so a nested field changing type shows there
+#: as a REMOVAL and fails.
+_BLOCK_FORMS = {
+    ("SingleNestedAttribute", "SingleNestedBlock"),
+    ("ListNestedAttribute", "ListNestedBlock"),
+    ("SetNestedAttribute", "SetNestedBlock"),
+}
+
+
+def type_preserving(before: tuple[str, str], after: tuple[str, str]) -> bool:
+    """True when the only change is attribute-to-block of the same shape."""
+    return (before[0], after[0]) in _BLOCK_FORMS and before[1] == after[1]
+
+
 def main() -> int:
     tag = newest_1x_tag()
     if tag is None:
@@ -122,7 +148,11 @@ def main() -> int:
         checked += 1
         now = Path(path).read_text()
         a, b = attributes(then), attributes(now)
-        diffs = [(k, a[k], b[k]) for k in sorted(set(a) & set(b)) if a[k] != b[k]]
+        diffs = [
+            (k, a[k], b[k])
+            for k in sorted(set(a) & set(b))
+            if a[k] != b[k] and not type_preserving(a[k], b[k])
+        ]
         if not diffs:
             continue
         changed += 1

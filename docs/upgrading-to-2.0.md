@@ -2393,3 +2393,96 @@ exclude with" are different answers and an operator acts on them differently.
 explicitly still receives it, and still appears in the rows beside this with
 `AssignmentSource` `"explicit"`. The field comment says so, because the number is
 literally accurate and easy to read as the stronger claim.
+
+### Five provider inputs become blocks, and three of them stop meaning "leave alone"
+
+Five inputs on the Terraform provider change shape. Two were opaque JSON strings
+and three were nested attributes; all five are now blocks, which is the idiomatic
+HCL and what `for_each` and dynamic blocks assume.
+
+| 1.x | 2.0 |
+|---|---|
+| `terrapod_provider_template.parameters_json = jsonencode([...])` | repeated `parameter { ... }` blocks |
+| `terrapod_catalog_item.variable_options_json = jsonencode([...])` | repeated `variable_option { ... }` blocks |
+| `terrapod_variable_set.assignment_rule = { ... }` | one `assignment_rule { ... }` block |
+| `terrapod_autodiscovery_rule.ansible_collections = [{...}]` | repeated `ansible_collections { ... }` blocks |
+| `terrapod_autodiscovery_rule.run_task_templates = [{...}]` | repeated `run_task_templates { ... }` blocks |
+
+**Read the rest of this entry before upgrading an autodiscovery rule.** Three of
+the five are a change of MEANING and not only of syntax.
+
+#### What you gain
+
+A parameter's `name`, `type` and `description` are readable in a plan again. The
+JSON string carried a sensitive default, and a schema cannot mark sub-fields of a
+string, so the whole attribute took `Sensitive` and a plan redacted the entire
+list even when nothing in it was secret. Only the value leaf is masked now.
+
+A misspelled field is refused instead of ignored. `requried = true` inside a JSON
+string round-tripped, was stored, and was silently dropped by everything that read
+it; the server keeps these in an unvalidated JSONB column, so the provider is the
+only place you can be told.
+
+And one changed description no longer re-diffs the whole blob.
+
+#### `default` and `options` are still JSON, and only those two
+
+```hcl
+parameter {
+  name         = "region"
+  description  = "Which region to deploy into"
+  required     = true
+  default_json = jsonencode("eu-west-1")
+  options_json = jsonencode(["eu-west-1", "us-east-1"])
+}
+```
+
+They stay encoded because the server accepts any JSON type there and
+terraform-plugin-framework does not permit a dynamic type inside a repeated block
+— *"Dynamic types inside of collections are not currently supported"* — and a
+block is a collection. Its own suggested alternative is to collapse the block back
+into one opaque attribute, which is what this change removes. Every other field is
+typed.
+
+#### The behaviour change: omitting a list no longer leaves it alone
+
+**This affects `terrapod_autodiscovery_rule.ansible_collections` and
+`.run_task_templates` only.**
+
+As list attributes they had three states, and the provider sent a different
+request for each:
+
+| you wrote | 1.x sent | meaning |
+|---|---|---|
+| nothing | the key was **omitted** | leave whatever the rule holds |
+| `= []` | `[]` | clear it |
+| `= [{...}]` | the list | set it |
+
+A block list has two states, so the first is gone. **Writing no block now clears
+the value**, where it previously left it untouched.
+
+So before upgrading, for every `terrapod_autodiscovery_rule` in your
+configuration: if it does **not** declare `ansible_collections` or
+`run_task_templates` and the rule holds collections or run-task templates set
+elsewhere — through the UI, the API, or a bulk update — write them out as blocks,
+or the next apply removes them. `terraform plan` will show the removal, so a
+reviewed plan catches it; this entry exists so it is not a surprise in the plan.
+
+`terrapod_variable_set.assignment_rule` is **not** affected: a single rule is
+written or not written, with no third state to lose.
+
+#### `terrapod_workspace.ansible_collections` is deliberately NOT a block
+
+It stays a nested attribute, and the reason is the three-state behaviour above
+rather than an oversight. It is one of nine workspace attributes that are
+Optional + Computed with `UseStateForUnknown`, so that a value set outside
+Terraform survives an apply by a configuration that does not manage it, and a plan
+*warns* when a configuration stops managing one. A block can express none of that.
+Converting it would make that one attribute of the nine silently clobber
+out-of-band values, which is the opposite of what the mechanism is for.
+
+#### Pulumi
+
+The bridge pluralises a block name that is not already plural, so `parameter`
+becomes `parameters` and `variable_option` becomes `variableOptions`. The
+committed schema carries the new shape.

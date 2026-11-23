@@ -159,6 +159,35 @@
                 "url"
             ]
         },
+        "terrapod:index/CatalogItemVariableOption:CatalogItemVariableOption": {
+            "properties": {
+                "defaultJson": {
+                    "type": "string",
+                    "description": "The value to pre-fill, or -- with hidden -- to wire unconditionally, as a JSON document: `jsonencode(\"eu-west-1\")`. See `terrapod_provider_template.parameter.default_json` for why this one leaf is encoded.\n",
+                    "secret": true
+                },
+                "hidden": {
+                    "type": "boolean",
+                    "description": "Remove the input from the form and wire this entry's default instead. A hidden entry MUST carry a default -- it can neither be supplied nor wired without one -- and that is how an item fixes a value a provisioner must not choose.\n"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "The module input this entry overrides, exactly as the module declares it.\n"
+                },
+                "optionsJson": {
+                    "type": "string",
+                    "description": "Restrict the input to a closed list of permitted values, rendered as a picker, as a JSON array: `jsonencode([\"a\", \"b\"])`. Omit for a free-text field.\n"
+                },
+                "sensitive": {
+                    "type": "boolean",
+                    "description": "Mask the input on the form and do not read the stored value back. Independent of hidden: a sensitive input is still SUPPLIED by the provisioner, where a hidden one is not.\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "name"
+            ]
+        },
         "terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey": {
             "properties": {
                 "keyType": {
@@ -178,6 +207,43 @@
             "required": [
                 "keyType",
                 "publicKey"
+            ]
+        },
+        "terrapod:index/ProviderTemplateParameter:ProviderTemplateParameter": {
+            "properties": {
+                "defaultJson": {
+                    "type": "string",
+                    "description": "The value to pre-fill when a provision does not supply one, as a JSON document: `jsonencode(5)`, `jsonencode(\"eu-west-1\")`. JSON because the server accepts any type here, and terraform-plugin-framework does not permit a dynamic type inside a repeated block.\n",
+                    "secret": true
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What to tell the provisioner on the form.\n"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "The parameter name, as the template body interpolates it.\n"
+                },
+                "optionsJson": {
+                    "type": "string",
+                    "description": "Restrict the parameter to a closed list of permitted values, as a JSON array: `jsonencode([\"a\", \"b\"])`. Omit for a free-text field.\n"
+                },
+                "required": {
+                    "type": "boolean",
+                    "description": "Whether a provision must supply it. Defaults to false.\n"
+                },
+                "sensitive": {
+                    "type": "boolean",
+                    "description": "Mask the value on the form and in responses. Defaults to false.\n"
+                },
+                "type": {
+                    "type": "string",
+                    "description": "The value's type, for form rendering. Defaults to string.\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "name"
             ]
         },
         "terrapod:index/VariableSetAssignmentRule:VariableSetAssignmentRule": {
@@ -2449,10 +2515,12 @@
                     "type": "string",
                     "description": "Last update timestamp."
                 },
-                "variableOptionsJson": {
-                    "type": "string",
-                    "description": "Optional JSON array of variable-option objects controlling how the provision form is rendered. Supplied as a JSON string to track the open-ended server contract.",
-                    "secret": true
+                "variableOptions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/CatalogItemVariableOption:CatalogItemVariableOption"
+                    },
+                    "description": "How this item presents one of the module's inputs on the provision form. An entry naming an input the module does not have is accepted and simply never matches."
                 }
             },
             "required": [
@@ -2543,10 +2611,12 @@
                     "type": "boolean",
                     "description": "Use the module archive as the root configuration rather than generating a wrapper. Requires\u003cspan pulumi-lang-nodejs=\" executionBackendConstraints \" pulumi-lang-dotnet=\" ExecutionBackendConstraints \" pulumi-lang-go=\" executionBackendConstraints \" pulumi-lang-python=\" execution_backend_constraints \" pulumi-lang-yaml=\" executionBackendConstraints \" pulumi-lang-java=\" executionBackendConstraints \" pulumi-lang-hcl=\" execution_backend_constraints \"\u003e executionBackendConstraints \u003c/span\u003eand cannot use provider templates."
                 },
-                "variableOptionsJson": {
-                    "type": "string",
-                    "description": "Optional JSON array of variable-option objects controlling how the provision form is rendered. Supplied as a JSON string to track the open-ended server contract.",
-                    "secret": true
+                "variableOptions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/CatalogItemVariableOption:CatalogItemVariableOption"
+                    },
+                    "description": "How this item presents one of the module's inputs on the provision form. An entry naming an input the module does not have is accepted and simply never matches."
                 }
             },
             "requiredInputs": [
@@ -2635,10 +2705,12 @@
                         "type": "string",
                         "description": "Last update timestamp."
                     },
-                    "variableOptionsJson": {
-                        "type": "string",
-                        "description": "Optional JSON array of variable-option objects controlling how the provision form is rendered. Supplied as a JSON string to track the open-ended server contract.",
-                        "secret": true
+                    "variableOptions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/terrapod:index/CatalogItemVariableOption:CatalogItemVariableOption"
+                        },
+                        "description": "How this item presents one of the module's inputs on the provision form. An entry naming an input the module does not have is accepted and simply never matches."
                     }
                 },
                 "type": "object"
@@ -4436,10 +4508,12 @@
                     "type": "string",
                     "description": "Display name for the provider template."
                 },
-                "parametersJson": {
-                    "type": "string",
-                    "description": "Optional JSON array of parameter objects (each like {name,type,description,required,sensitive,default,options}). Supplied as a JSON string to track the open-ended server contract.",
-                    "secret": true
+                "parameters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/ProviderTemplateParameter:ProviderTemplateParameter"
+                    },
+                    "description": "A parameter the template body interpolates. Ordered, because that is the order of the fields on the provision form."
                 },
                 "providerType": {
                     "type": "string",
@@ -4474,10 +4548,12 @@
                     "type": "string",
                     "description": "Display name for the provider template."
                 },
-                "parametersJson": {
-                    "type": "string",
-                    "description": "Optional JSON array of parameter objects (each like {name,type,description,required,sensitive,default,options}). Supplied as a JSON string to track the open-ended server contract.",
-                    "secret": true
+                "parameters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/ProviderTemplateParameter:ProviderTemplateParameter"
+                    },
+                    "description": "A parameter the template body interpolates. Ordered, because that is the order of the fields on the provision form."
                 },
                 "providerType": {
                     "type": "string",
@@ -4511,10 +4587,12 @@
                         "type": "string",
                         "description": "Display name for the provider template."
                     },
-                    "parametersJson": {
-                        "type": "string",
-                        "description": "Optional JSON array of parameter objects (each like {name,type,description,required,sensitive,default,options}). Supplied as a JSON string to track the open-ended server contract.",
-                        "secret": true
+                    "parameters": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/terrapod:index/ProviderTemplateParameter:ProviderTemplateParameter"
+                        },
+                        "description": "A parameter the template body interpolates. Ordered, because that is the order of the fields on the provision form."
                     },
                     "providerType": {
                         "type": "string",
