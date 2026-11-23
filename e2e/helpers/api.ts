@@ -759,6 +759,52 @@ export async function seedInventoryVar(
 }
 
 /**
+ * Real SSH host-key blobs, for seeding an approved host key (#2592).
+ *
+ * Generated once with `ssh-keygen` and committed, because they have to be REAL:
+ * the API decodes the blob and compares the algorithm name embedded in its wire
+ * format against the declared `key-type`, so a made-up base64 string is refused
+ * and a plausible-looking one declared under the wrong type is refused too.
+ * There is no private half anywhere — a host key's public half is public, which
+ * is the whole premise of the feature.
+ */
+export const SSH_HOST_KEY_BLOBS = {
+  'ssh-ed25519': 'AAAAC3NzaC1lZDI1NTE5AAAAICDyQ2guvBCYq94+KOrxqDZIZJXC9uap1nMDTl/Qt6Ji',
+  // An RSA-2048 blob: 372 characters, which is what makes it the fixture for
+  // "the full key is readable without pushing the page sideways". The ed25519
+  // one is short enough to wrap on its own at any width.
+  'ssh-rsa':
+    'AAAAB3NzaC1yc2EAAAADAQABAAABAQCkNCAb5HK6BbD7WnWiEocGGXWP8rhz+5g7WAS+sug0OHyTUk7mtaQl3dhTYHt8suNGb3+tLXZNgisnKQIh8eX+niQxhz0rg/iNtFsGa03mtYZ7j3osHeCvSdWoHCZZafI6eK6pMScOQys7GFUk5dJe0/+a15MkvSg/2sKjjyEVnbdLkg772AHn9LDvr51MXa68rgFpw5tVL3vikZCwzqaYOW19EOwj1k2L6rZ6Jvqe3JyUkLGPoJgPwL1YQ4UUu5rxoSDCZaUGC+xs0+pVVorFr7kXBnHsXz1Ih7XUfaWs0TcxFzxGT4gOK93Z91PvA4/R1/Vrokl+BaSVwMHWVn+H',
+} as const;
+
+/**
+ * Declare one approved host key for a host. Returns its `invhkey-…` id.
+ *
+ * `marker` is `'revoked'`, `'cert-authority'` or omitted — omitted being an
+ * ordinary trusted key. It is passed WITHOUT the leading `@`: Terrapod adds
+ * that when it renders the `known_hosts` line, and the API refuses a value
+ * that carries one.
+ */
+export async function seedInventoryHostKey(
+  token: string,
+  hostId: string,
+  keyType: keyof typeof SSH_HOST_KEY_BLOBS,
+  opts: { marker?: 'revoked' | 'cert-authority'; publicKey?: string } = {},
+): Promise<string> {
+  const attributes: Record<string, unknown> = {
+    'key-type': keyType,
+    'public-key': opts.publicKey ?? SSH_HOST_KEY_BLOBS[keyType],
+  };
+  if (opts.marker) attributes.marker = opts.marker;
+  return inventoryPost(
+    token,
+    `/api/v1/inventory-hosts/${hostId}/keys`,
+    { data: { type: 'inventory-host-keys', attributes } },
+    `Declare ${keyType} host key on ${hostId}`,
+  );
+}
+
+/**
  * Wait until the API can RESOLVE this workspace's inventory, and fail loudly
  * naming its own reason if it cannot.
  *
