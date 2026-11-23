@@ -615,11 +615,18 @@ test.describe('Approved host keys', () => {
     await expect(revoked.getByText('Revoked', { exact: true })).toBeVisible()
     await expect(revoked.getByText(/recorded as not to be trusted/)).toBeVisible()
 
-    // And the surface says plainly that Terrapod does not yet verify a
-    // connection against any of this. Asserted rather than left to a reader:
-    // an operator who declares a key and is not told stops looking, which is
-    // the one failure a security surface cannot have.
-    await expect(page.getByText(/does not yet use them to verify a connection/)).toBeVisible()
+    // The surface must say what a declared key is FOR. This asserted the
+    // opposite until #2592 -- "does not yet use them to verify a connection" --
+    // which was true while the keys were declared and unenforced, and the copy
+    // was rewritten when this branch wired them to the runner's known_hosts
+    // anchor. The INTENT is unchanged and is why both halves are asserted: an
+    // operator who declares a key and is not told what it does stops looking,
+    // which is the one failure a security surface cannot have. The negative is
+    // the half that matters now -- the retired caveat must not come back and
+    // tell an operator their keys are inert when they are enforcing.
+    const keysSection = page.locator('section', { hasText: 'Approved host keys' }).first()
+    await expect(keysSection.getByText(/a known_hosts file is what this set is for/)).toBeVisible()
+    await expect(page.getByText(/does not yet use them to verify a connection/)).toHaveCount(0)
 
     // Deleting is the IRREVERSIBLE tier: it prompts on a precise pointer too,
     // which is the half the touch suite cannot prove. Dismissed first, so the
