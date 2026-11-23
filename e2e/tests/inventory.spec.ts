@@ -582,6 +582,13 @@ test.describe('Approved host keys', () => {
     // A host has MANY keys: a second algorithm is an addition, not a
     // replacement.
     await page.getByRole('button', { name: 'Declare a key', exact: true }).click()
+    // The TYPE has to be chosen as well as the blob. The form auto-detects it only
+    // from a full known_hosts LINE (`splitKnownHostsEntry`); a bare base64 body
+    // carries no algorithm for it to read, so the picker keeps its first option --
+    // and #2592's server-side check unpacks the algorithm name embedded in the blob
+    // and refuses the mismatch. This used to declare an RSA body as ed25519 and
+    // relied on that going unchecked.
+    await page.locator('#inventory-host-key-type').selectOption('ssh-rsa')
     await page.locator('#inventory-host-key-value').fill(SSH_HOST_KEY_BLOBS['ssh-rsa'])
     await page.getByRole('button', { name: 'Declare key', exact: true }).click()
     await expect(page.getByTestId('inv-host-key')).toHaveCount(2, { timeout: 15_000 })
