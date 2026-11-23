@@ -1216,28 +1216,74 @@ default fails closed.
 What was missing was any way to say "this host is fine". There are two, and the
 first is the one to reach for.
 
-### Supply the key: `known_hosts` on the machine credential
+### Approve the key: host keys on the inventory
 
-The machine credential carries a
-[`known_hosts` field](ansible-credentials.md#the-known_hosts-field). It is a
-**file** field, so a placeholder naming it substitutes the path of a file
-Terrapod writes beside ansible — which is exactly what `ssh`'s
-`UserKnownHostsFile` option takes:
+A host in Terrapod's inventory carries the SSH host keys it is **approved** to
+present. One entry per key, each naming the algorithm and the key itself, with an
+optional marker:
 
-```yaml
-all:
-  vars:
-    ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:web-key.known_hosts}"
+| | |
+|---|---|
+| resource | `terrapod_inventory_host_keys` |
+| routes | `GET`/`POST /api/v1/inventory-hosts/{host_id}/keys`, `GET`/`PATCH`/`DELETE /api/v1/inventory-host-keys/{key_id}` |
+| the whole workspace at once | `GET /api/v1/workspaces/{workspace_id}/inventory/host-keys` |
+| algorithms | `ssh-ed25519`, `ecdsa-sha2-nistp256`, `ecdsa-sha2-nistp384`, `ecdsa-sha2-nistp521`, `ssh-rsa`, `rsa-sha2-256`, `rsa-sha2-512` |
+| markers | `cert-authority`, `revoked`, or none |
+
+```hcl
+resource "terrapod_inventory_host_keys" "web1" {
+  host_id = terrapod_inventory_host.web1.id
+
+  key {
+    key_type   = "ssh-ed25519"
+    public_key = "AAAAC3NzaC1lZDI1NTE5AAAA…"
+  }
+
+  key {
+    key_type   = "ecdsa-sha2-nistp256"
+    public_key = "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY…"
+  }
+}
 ```
 
-Measured: the host connects, and **verification stays on**. This is the shape to
-prefer, because it answers the question ssh is asking rather than withdrawing it
-— a host presenting the wrong key is still refused.
+**Every type the host exposes, not one of them.** A host answering on ed25519,
+ecdsa and rsa has three approved keys and all three belong here; picking one would
+be choosing a trust anchor arbitrarily. Two keys of the *same* algorithm are
+allowed too, which is what a rotation needs — the old key and the new one are both
+approved while hosts are being re-keyed.
+
+`revoked` is the marker to reach for when a key is withdrawn. It is kept rather
+than deleted deliberately: a deleted key is merely unknown, where a revoked one is
+refused by name, which is the difference between "I have not seen this host" and
+"this host is presenting something it must not".
+
+Terrapod renders these into a `known_hosts` file and points `ssh` at it. The
+operator writes no inventory variable and no placeholder — the platform owns the
+trust anchor, which is the whole reason this is a first-class part of the inventory
+rather than a credential field.
+
+> **Ansible is deliberately not the model here.** It has no inventory-level notion
+> of an approved host key: `host_key_checking` is a binary toggle, its
+> `ansible_ssh_host_key_*` facts describe what a host *reported* rather than what
+> anyone approves, and its `known_hosts` module runs *during* a play — after the
+> connection it would have protected. What ansible does get right is deferring
+> verification to OpenSSH, and so does Terrapod: the file is the interface, and
+> OpenSSH does the refusing.
+
+> **Retired:** the machine credential's `known_hosts` field did this job per
+> *credential* before this model existed. It was one opaque blob that could not say
+> which host a key belonged to, could not carry a marker, and required the operator
+> to assemble the file and paste a placeholder into an inventory variable. A
+> credential still carrying the field keeps working — the field is ignored on read
+> rather than refused, so the credential's private key is unaffected — but writing
+> it is refused, and the keys belong on the inventory host instead.
 
 ### Or relax it: `ansible-host-key-checking` on the workspace
 
-Where supplying keys is not practical — ephemeral hosts whose keys are generated
-at boot, say — the workspace can turn verification off for its configure runs:
+Where approving keys is not practical — ephemeral hosts whose keys are generated
+at boot, say — the workspace can turn verification off for its configure runs.
+Prefer the mechanism above where it fits: this one withdraws the question rather
+than answering it, so a host presenting the wrong key is accepted too.
 
 | | |
 |---|---|

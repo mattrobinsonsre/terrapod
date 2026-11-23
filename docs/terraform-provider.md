@@ -529,6 +529,109 @@ narrowed by your own cloud provider's data source to the instances actually
 running, since scanning one the cloud says is stopped can only ever produce a
 warning.
 
+## `terrapod_inventory_host_keys`
+
+The SSH host keys a host is **approved** to present. One resource per host,
+carrying every approved key as a repeated `key` block:
+
+```hcl
+resource "terrapod_inventory_host_keys" "web1" {
+  host_id = terrapod_inventory_host.web1.id
+
+  key {
+    key_type   = "ssh-ed25519"
+    public_key = "AAAAC3NzaC1lZDI1NTE5AAAA…"
+  }
+
+  key {
+    key_type   = "ecdsa-sha2-nistp256"
+    public_key = "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY…"
+  }
+
+  key {
+    key_type   = "ssh-rsa"
+    public_key = "AAAAB3NzaC1yc2EAAAA…"
+    marker     = "revoked"
+  }
+}
+```
+
+`host_id` is required and `RequiresReplace`; there is no provider-level default for
+it, matching the four sibling inventory resources parented on a host or group id
+rather than the three that carry a `workspace_id`.
+
+### It is an aggregate, and that is the one deliberate break from the inventory's shape
+
+Every other inventory resource is a **row**, so a second concern can contribute a
+variable to a host it does not own. This one owns the whole set: **two
+`terrapod_inventory_host_keys` resources naming the same host will each remove the
+other's keys on every apply.** Do not do that.
+
+The aggregate is the point rather than the price. A trust set's property is
+completeness — the declared keys *are* the approved keys, so a key appearing out of
+band is drift the next apply removes. Under a contributory shape an unapproved key
+could quietly become trusted and nothing would notice, which is what the structure
+exists to prevent.
+
+There is deliberately **no singular `terrapod_inventory_host_key`**. It would
+restore the contributory shape and lose the guarantee, and nothing could stop the
+two kinds managing one host.
+
+### Every type the host exposes
+
+A host answering on ed25519, ecdsa and rsa has three approved keys and all three
+belong in the resource. Two keys of the **same** algorithm are allowed as well,
+which is what a rotation needs: the old key and the new one are both approved while
+hosts are being re-keyed.
+
+`marker` is optional — `cert-authority`, `revoked`, or absent. It is validated at
+plan time against those two values, deliberately unlike `key_type`, which is left to
+the server: the set of algorithms could legitimately grow, and the server's refusal
+names the mistake better than a compiled-in list would. `marker` needs the plan-time
+check because `""` would otherwise be accepted, stored as NULL, and then differ from
+the configuration on every later plan.
+
+### No computed attributes inside the block
+
+A key's id, `created_at` and `updated_at` are **not** available through the
+provider. That is a framework constraint rather than a choice: a set element's
+identity is its whole value, so a Computed attribute leaves the planned element
+unknown and Terraform cannot match configuration to state.
+
+Reach for the API, `terrapod_inventory_detail` or the MCP tools when you need a
+key's id — for example to mark one revoked without rewriting the set.
+
+### Feeding it from the scanner
+
+[`terrapod_ssh_host_keys`](#terrapod_ssh_host_keys) reads a host's live keys. The
+two compose through a `dynamic` block rather than a direct assignment, because this
+resource's block object carries `marker` and the scan cannot supply one — so the
+object types differ and a direct `key = …` will not type-check:
+
+```hcl
+data "terrapod_ssh_host_keys" "scan" {
+  hosts = ["web1.example.com"]
+}
+
+resource "terrapod_inventory_host_keys" "web1" {
+  host_id = terrapod_inventory_host.web1.id
+
+  dynamic "key" {
+    for_each = data.terrapod_ssh_host_keys.scan.entries["web1.example.com"]
+    content {
+      key_type   = key.value.key_type
+      public_key = key.value.public_key
+    }
+  }
+}
+```
+
+Scan only hosts you have confirmed are the right ones — the scanner records what a
+host presents, which is a different question from what it is approved to present.
+A host absent from the scan's `entries` (unreachable, or answering nothing) is
+absent rather than present with an empty list, so a `dynamic` block over it
+contributes nothing instead of emptying the set.
+
 ## Reserved-name note
 
 Terraform schema attribute names can't be `provider`, so the VCS-connection
