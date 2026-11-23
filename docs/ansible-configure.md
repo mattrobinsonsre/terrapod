@@ -1316,88 +1316,80 @@ not what this refuses.
 > rather than refused, so the credential's private key is unaffected — but writing
 > it is refused, and the keys belong on the inventory host instead.
 
-### Or relax it: `ansible-host-key-checking` on the workspace
+### Choose the posture: `ssh-host-key-policy` on the workspace
 
-Where approving keys is not practical — ephemeral hosts whose keys are generated
-at boot, say — the workspace can turn verification off for its configure runs.
-Prefer the mechanism above where it fits: this one withdraws the question rather
-than answering it, so a host presenting the wrong key is accepted too.
-
-**It is incompatible with approved host keys**, and a workspace that has both
-refuses its configure runs rather than letting one of the two silently lose — see
-[Approve the key](#approve-the-key-host-keys-on-the-inventory).
+OpenSSH has three host-key behaviours and the workspace picks one. Ansible can
+express two of them, which is why this is not a boolean.
 
 | | |
 |---|---|
-| wire attribute | `ansible-host-key-checking` |
-| provider / MCP / database spelling | `ansible_host_key_checking` |
-| SDK field | `AnsibleHostKeyChecking` |
-| type | boolean |
-| default | **`true`** — verification on, which is the behaviour every existing workspace already had |
+| wire attribute | `ssh-host-key-policy` |
+| provider / MCP / database spelling | `ssh_host_key_policy` |
+| SDK field | `SSHHostKeyPolicy` |
+| type | one of `strict`, `accept-new`, `off` |
+| default | **`strict`** — verification on, which is the behaviour every existing workspace already had |
 
-It is settable on workspace create, on workspace `PATCH`, through the bulk
-settings update, and on an
-[autodiscovery rule](autodiscovery.md), which templates it onto the
-workspaces it materialises like every other configure setting. A rule that says
-nothing creates workspaces that verify.
+| value | what a configure does |
+|---|---|
+| `strict` | refuse an unknown host, and refuse a host whose key has changed |
+| `accept-new` | trust a host on **first contact**, refuse it if its key later changes |
+| `off` | verify nothing |
 
-**The setting is not the mechanism, and that is what keeps a per-host exception
-reachable.** Turning it off makes the resolver emit one inventory variable on the
-`all` group:
+It is settable on workspace create, on workspace `PATCH`, through the bulk settings
+update, and on an [autodiscovery rule](autodiscovery.md), which templates it onto
+the workspaces it materialises like every other configure setting. A rule that says
+nothing creates workspaces that verify strictly.
 
-```yaml
-ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-```
+#### `accept-new` is the one ansible cannot express, and it exists for a reason
 
-`UserKnownHostsFile=/dev/null` is there as well as `StrictHostKeyChecking=no`
-because without it ssh writes each accepted key into a `known_hosts` under the
-execution environment's home — a per-run volume, so it is discarded anyway — and
-warns on every connection, putting a line in your log for something you asked
-for.
+The `known_hosts` file Terrapod renders is an **allow-list**, and ssh's arguments
+are per-process rather than per-host. So under `strict`, approving a key for one
+host makes every **address** in that inventory you have not pinned unreachable —
+correct, and a surprise if you were pinning one host at a time.
 
-It is deliberately **not** `ANSIBLE_HOST_KEY_CHECKING` in the environment. That
-variable is per-process: forcing it would override your own `ansible.cfg`, which
-Terrapod reserves for things that are not negotiable, and it would sit *above* a
-per-host override rather than below one — so the exception the setting exists to
-permit would be unreachable.
+`accept-new` is the mixed-fleet answer: a host the file pins is verified strictly
+against its approved keys, and a host nobody has pinned is reachable on first
+contact. That is strictly stronger than `off`, which would also accept a **changed**
+key on a host you had already seen.
 
-### What beats what
+> Note the unit. The cliff is per **address** — what `ansible_host` resolves to —
+> not per inventory name, because that is what ssh asks about. Two inventory names
+> pointing at one address share the pin.
 
-**If the workspace has any approved host key, none of what follows applies** —
-verification is the platform's, nothing in the inventory outranks it, and a
-contradicting statement refuses the run rather than losing quietly. The three
-levels below are how a workspace with *no* approved keys behaves, which is every
-workspace until one is declared.
+#### The policy rides the run's own ssh arguments
 
-Three levels, outermost last:
+It is delivered as part of the anchor described under [Approve the
+key](#approve-the-key-host-keys-on-the-inventory), so nothing in the inventory can
+override it. **That is a deliberate change.** The boolean this replaced was emitted
+as an `ansible_ssh_common_args` variable on the `all` group *specifically* so that a
+host variable could beat it — a host re-enabling verification over a
+workspace-level relaxation was the only per-host exception available when the
+choice was all-or-nothing.
 
-1. **An inventory host variable wins.** A host that sets
-   `ansible_ssh_common_args` itself overrides the workspace-level relaxation, so
-   a single host can keep verification on while the rest of the fleet does not.
-2. **Your own `all`-level `ansible_ssh_common_args` wins too.** If your
-   inventory already declares that variable on `all`, Terrapod leaves it exactly
-   as written and **logs that it did** — a setting that silently does nothing is
-   worse than one that refuses.
-3. **Your `ansible.cfg` is never overridden.** Terrapod writes none and forces
-   no host-key setting, so a `host_key_checking` you have set there is read
-   normally.
+`accept-new` is what makes that override unnecessary: the mixed case is now
+expressible at the workspace instead of needing an escape from a blunt setting. And
+a trust anchor a host variable can override is not an anchor, which is the same
+reason the approved keys are delivered the way they are.
 
-**Ansible replaces `ansible_ssh_common_args` rather than merging it** — measured.
-That is the whole reason level 1 works at all, and it has a consequence that
-surprises people: a host-level override must restate the *entire* argument
-string, not just the part it wants to change. A host that needs a `ProxyJump`
-*and* the group's relaxation writes both:
+The one thing you lose is a per-host re-tightening over a relaxed workspace. If you
+need that, the shape is a second workspace: the policy is per workspace because it
+is per **run**, and a run has one set of ssh arguments.
 
-```yaml
-hosts:
-  bastioned.example.com:
-    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o ProxyJump=bastion"
-```
+#### What is still refused
 
-This example used to reach the machine credential's `known_hosts` field with a
-`${terrapod:…}` placeholder. That field is
-[retired](#approve-the-key-host-keys-on-the-inventory): the placeholder no longer
-resolves, so anything written from it would fail as an unreachable host.
+A **run** whose inventory sets `ansible_ssh_args`, `ansible_ssh_common_args`,
+`ansible_ssh_extra_args` or `ansible_host_key_checking` is refused when the
+workspace has approved host keys — see [Approve the
+key](#approve-the-key-host-keys-on-the-inventory). That is about ansible's own
+inventory variables, not about this setting: the workspace policy and the approved
+keys are two halves of one mechanism and never conflict with each other.
+
+`off` points ssh at `/dev/null` as well as setting `StrictHostKeyChecking=no`,
+which is not cosmetic: without it ssh writes each accepted key into a `known_hosts`
+under the execution environment's home — a per-run volume, so it is discarded
+anyway — and warns on every connection, putting a line in your log for something
+you asked for.
+
 
 ## A play that targets the execution environment itself
 

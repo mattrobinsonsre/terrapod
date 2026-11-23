@@ -596,7 +596,8 @@ Two fixes, in order of preference:
   the inventory](ansible-configure.md#approve-the-key-host-keys-on-the-inventory) —
   which Terrapod renders into a `known_hosts` file and points ssh at, with
   verification left on;
-* or set the workspace's `ansible-host-key-checking` to `false`, which relaxes it
+* or set the workspace's `ssh-host-key-policy` to `accept-new` (trust on first
+  contact, refuse on change) or `off` (verify nothing), which relaxes it
   for every host the workspace configures. See [Host-key verification, and how to
   satisfy it](ansible-configure.md#host-key-verification-and-how-to-satisfy-it).
 

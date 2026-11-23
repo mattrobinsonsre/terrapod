@@ -447,10 +447,15 @@ three optional inputs are applied on read and written back — `port` reads as
 **Why it exists.** Verifying host keys is on by default and fails closed on
 first contact, and the machine credential's `known_hosts` field is what makes
 that default satisfiable. Satisfying it by hand means obtaining and pasting a
-key per host, and an operator with a fleet reaches for
-`ansible_host_key_checking = false` instead. So the baseline this is measured
-against is not out-of-band key distribution; it is verification switched off,
-which checks nothing, ever.
+key per host, and an operator with a fleet reaches for the weakest setting instead
+— historically `ansible_host_key_checking = false`, now `ssh_host_key_policy =
+"off"`. So the baseline this is measured against is not out-of-band key
+distribution; it is verification switched off, which checks nothing, ever.
+
+(`ssh_host_key_policy = "accept-new"` is a better fallback than `off` and did not
+exist when this was written: it trusts a host on first contact and refuses a
+CHANGED key thereafter. It is still weaker than approving the keys, which is what
+this data source is for.)
 
 **It is trust-on-first-use.** What arrives is a key the responder demonstrably
 holds the private half of — the signature over the exchange hash is verified
