@@ -121,10 +121,12 @@ def _mock_workspace(
     # validator and answers 422 on a request that never mentioned the field.
     # `[]` is the real default, and it means NO restriction.
     ws.playbooks = []
-    # #2318's, set explicitly for the same reason as #2033's pair above -- and
-    # to its REAL default, TRUE, so a test that reads it off this fixture reads
-    # what a workspace actually has rather than whatever a mock would coerce to.
-    ws.ansible_host_key_checking = True
+    # #2592's, set explicitly for the same reason as #2033's pair above -- and
+    # to its REAL default, `strict`, so a test that reads it off this fixture
+    # reads what a workspace actually has. An unset MagicMock attribute is not
+    # merely truthy here: it reaches `json.dumps` as a mock and fails the whole
+    # document, which is how the rename from the boolean announced itself.
+    ws.ssh_host_key_policy = "strict"
     ws.locked = locked
     ws.lock_id = lock_id
     ws.lock_reason = lock_reason

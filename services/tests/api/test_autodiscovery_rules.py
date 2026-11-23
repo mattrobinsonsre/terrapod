@@ -76,9 +76,9 @@ def _mock_rule(
     # delete these as noise.
     r.dynamic_inventory_enabled = False
     r.inventory_scripts_enabled = False
-    # #2318's, same reason, and to its REAL default -- TRUE, because a rule
+    # #2592's, same reason, and to its REAL default -- `strict`, because a rule
     # written before the column materialises a workspace that verifies.
-    r.ansible_host_key_checking = True
+    r.ssh_host_key_policy = "strict"
     r.config_directory = ""
     r.inventory_paths = []
     r.default_playbook = ""
@@ -2246,3 +2246,116 @@ class TestTheRuleCarriesAStorageLocation:
         assert resp.status_code == 422, resp.text
         assert rule.storage_location is None
         db.commit.assert_not_awaited()
+
+
+class TestTheHostKeyPolicyIsValidatedAsAPolicyNotABoolean:
+    """The rename left `ssh-host-key-policy` in the boolean loop (#2592).
+
+    `_coerce_attrs` validates most of the configure switches by iterating a
+    table of `(kebab-key, column)` pairs through `validate_bool`. When
+    `ansible-host-key-checking` became `ssh-host-key-policy` its row stayed in
+    that table, so on an autodiscovery rule -- and only there, since both
+    workspace surfaces reach for `validate_ssh_host_key_policy` -- the attribute
+    was UNSETTABLE: every one of the three values was refused with a message
+    about booleans, and the one shape that passed wrote a Python `bool` into a
+    `String(16)` NOT NULL column.
+
+    Measured both ways before the fix. The parity gate could not see it: it
+    derives the settable set from this function and reads both of its forms, so
+    the attribute was "settable" on its terms either way. Which validator a key
+    reaches is a different question from whether a surface offers it.
+
+    Both directions are asserted, because the careless fix is to drop the
+    membership test along with the row and leave the attribute reaching nothing
+    at all -- which refuses no boolean and is indistinguishable from working.
+    """
+
+    BASE = {
+        "name": "r",
+        "repo-url": "https://github.com/o/r",
+        "pattern": "envs/*",
+    }
+
+    def _coerce(self, extra, *, on_create=True):
+        import uuid as _uuid
+
+        from terrapod.api.routers import autodiscovery_rules as ar
+
+        attrs = {**self.BASE, "vcs-connection-id": f"vcs-{_uuid.uuid4()}", **extra}
+        return ar._coerce_attrs(attrs, on_create=on_create, existing=None)
+
+    @pytest.mark.parametrize("policy", ["strict", "accept-new", "off"])
+    def test_every_policy_the_server_defines_is_accepted(self, policy):
+        out = self._coerce({"ssh-host-key-policy": policy})
+        assert out["ssh_host_key_policy"] == policy
+        # The type as well as the value: a bool reaching a String(16) column is
+        # the other half of what the boolean loop did.
+        assert isinstance(out["ssh_host_key_policy"], str)
+
+    @pytest.mark.parametrize("bad", [True, False])
+    def test_a_boolean_is_refused_and_the_message_names_the_retired_attribute(self, bad):
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc:
+            self._coerce({"ssh-host-key-policy": bad})
+        assert exc.value.status_code == 422
+        # The caller most likely to send a boolean is one written against the
+        # attribute this replaced, so the message has to name it rather than
+        # list three strings at somebody who does not know theirs is stale.
+        assert "ansible-host-key-checking" in str(exc.value.detail)
+
+    @pytest.mark.parametrize("bad", ["", "paranoid", "yes", 1])
+    def test_a_non_policy_is_refused(self, bad):
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc:
+            self._coerce({"ssh-host-key-policy": bad})
+        assert exc.value.status_code == 422
+
+    def test_omitting_it_writes_nothing_so_the_column_default_stands(self):
+        out = self._coerce({})
+        assert "ssh_host_key_policy" not in out
+
+    def test_the_retired_attribute_is_accepted_nowhere(self):
+        """A rename is only done when the old spelling stops working.
+
+        Silently ignored, a configuration written against the boolean would
+        report success and leave the policy at whatever it was -- which on a
+        caller trying to RELAX verification is the safe direction, and on one
+        trying to tighten it is not.
+        """
+        out = self._coerce({"ansible-host-key-checking": True})
+        assert "ansible_host_key_checking" not in out
+        assert "ssh_host_key_policy" not in out
+
+
+class TestTheHostKeyPolicyIsPropagatable:
+    """`PROPAGATED_FIELDS` still named the retired attribute (#2592).
+
+    That map is maintained by the propagation service independently of the
+    router, so the rename missed it: `classify` raises on any changed field the
+    map does not know, which made a PROPAGATING rule update that moved the
+    host-key policy fail outright -- while the key the map did carry could never
+    arrive, the server having stopped accepting that spelling anywhere.
+    """
+
+    def test_a_changed_policy_classifies_rather_than_raising(self):
+        from terrapod.services import rule_propagation_service as rp
+
+        class _WS:
+            id = "ws-1"
+            name = "a"
+            ssh_host_key_policy = "strict"
+
+        verdicts = rp.classify(
+            _WS(),
+            {"ssh-host-key-policy": "strict"},
+            {"ssh-host-key-policy": "accept-new"},
+        )
+        assert [(v.field, v.verdict) for v in verdicts] == [("ssh-host-key-policy", "apply")]
+
+    def test_the_retired_name_is_gone_from_the_map(self):
+        from terrapod.services import rule_propagation_service as rp
+
+        assert "ansible-host-key-checking" not in rp.PROPAGATED_FIELDS
+        assert rp.PROPAGATED_FIELDS["ssh-host-key-policy"] == "ssh-host-key-policy"

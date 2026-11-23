@@ -959,6 +959,73 @@
     }
   },
   {
+    "name": "terrapod_inventory_host_key_declare",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "host_id": {
+          "description": "the host id (invhost-...) this key is approved for",
+          "type": "string"
+        },
+        "key_type": {
+          "description": "the algorithm, spelled as OpenSSH spells it in the second field of a known_hosts line: ssh-ed25519, ecdsa-sha2-nistp256, ecdsa-sha2-nistp384, ecdsa-sha2-nistp521, ssh-rsa, rsa-sha2-256 or rsa-sha2-512. Validated against that closed set, because a typo in a trust anchor silently never matches and reads as the host having rotated its key",
+          "type": "string"
+        },
+        "marker": {
+          "description": "cert-authority or revoked, WITHOUT the leading '@'. Omit for an ordinary entry. Supplying it for a key that is already declared CHANGES its marker, which is how a key is revoked by value rather than by id",
+          "type": "string"
+        },
+        "public_key": {
+          "description": "the base64 blob ALONE -- the THIRD field of a known_hosts line, with no algorithm prefix and no host. A whole line is refused. The blob's own embedded algorithm name is checked against key_type; note an rsa-sha2-256 or rsa-sha2-512 key embeds 'ssh-rsa', because those name signature algorithms over an RSA key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host_id",
+        "key_type",
+        "public_key"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_host_key_mark",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "description": "the approved key's id (invhkey-...), from terrapod_inventory_detail on its host",
+          "type": "string"
+        },
+        "marker": {
+          "description": "cert-authority or revoked, WITHOUT the leading '@'. OMIT IT TO CLEAR the marker and make this an ordinary entry -- this tool always writes the marker, so an omitted value removes one rather than leaving it alone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_host_keys",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose approved host keys to read",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_inventory_link",
     "input_schema": {
       "additionalProperties": false,
@@ -1006,7 +1073,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "description": "the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable. A workspace id (ws-) is NOT accepted: the inventory roots are workspace settings, changed with terrapod_workspace_update",
+          "description": "the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable, invhkey- an approved host key. A workspace id (ws-) is NOT accepted: the inventory roots are workspace settings, changed with terrapod_workspace_update",
           "type": "string"
         }
       },
@@ -2484,13 +2551,6 @@
           "description": "label of one of the deployment's own execution environments; OVERRIDES ansible_version when set, so the line is then ignored; omit or empty to use the built-in image for the line",
           "type": "string"
         },
-        "ansible_host_key_checking": {
-          "description": "whether a configure on this workspace VERIFIES the SSH host key of each host it targets. DEFAULTS TO TRUE, which is ansible's own default and the behaviour every workspace already had: with no known_hosts shipped, first contact with an unseen host fails closed with Host key verification failed. Pass false only for an exception you mean -- it makes the server emit ansible_ssh_common_args as a variable on the all group, NOT an environment variable, so an inventory HOST variable still overrides it and one host may keep verification on over a relaxed workspace. Prefer the other route: an ansible_machine_auth credential carries a known_hosts field, referenced from an inventory variable as ${terrapod:\u003ccredential-name\u003e.known_hosts}, which gets a run past an unknown host with verification left ON",
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
         "ansible_version": {
           "description": "ansible-core LINE whose execution environment this workspace's configure operations run in, e.g. 2.21; an exact patch is accepted and names its own line; omit or empty to inherit the deployment default",
           "type": "string"
@@ -2657,6 +2717,10 @@
           "description": "the IANA zone the cron expression is read in, e.g. Europe/London; UTC by default. This is what makes it a schedule rather than an interval -- 0 2 * * * in Europe/London is 02:00 there in January AND in July, which are different instants in UTC. Empty or omitted takes the default",
           "type": "string"
         },
+        "ssh_host_key_policy": {
+          "description": "how a configure on this workspace VERIFIES the SSH host key of each host it targets. One of strict, accept-new or off; DEFAULTS TO strict, which is ansible's own behaviour and what every workspace already had -- with no approved keys declared, first contact with an unseen host fails closed with Host key verification failed. These are OpenSSH's StrictHostKeyChecking behaviours rather than a boolean, and accept-new is the one worth knowing about: it trusts a host on FIRST CONTACT and refuses it once its key CHANGES. Reach for accept-new rather than off on a fleet that has begun declaring approved host keys with terrapod_inventory_host_declare -- Terrapod renders those into a known_hosts ALLOW-LIST and points ssh at it -- because ssh_args is process-wide -- declaring one approved key under strict makes every address nobody has pinned yet unreachable, and off would then be the only alternative, which verifies nothing for ever. The policy rides the run's own ssh anchor, so unlike the ansible_host_key_checking boolean it replaced, nothing in the inventory can override it",
+          "type": "string"
+        },
         "terraform_version": {
           "description": "the same version under its original name; prefer engine_version. Setting both to different values is rejected",
           "type": "string"
@@ -2810,13 +2874,6 @@
           "type": [
             "null",
             "string"
-          ]
-        },
-        "ansible_host_key_checking": {
-          "description": "turn SSH HOST-KEY VERIFICATION for this workspace's configure runs off or back on: true verifies the host key of each host a configure targets, false relaxes it by emitting ansible_ssh_common_args as a variable on the all group -- which an inventory HOST variable still overrides, so relaxing the workspace does not stop a single host re-enabling it. Omitting the field leaves the stored value alone. TRUE is the default and the pre-existing behaviour, so before reaching for false consider the known_hosts field on an ansible_machine_auth credential, referenced as ${terrapod:\u003ccredential-name\u003e.known_hosts}, which supplies the host key and keeps verification ON",
-          "type": [
-            "null",
-            "boolean"
           ]
         },
         "ansible_version": {
@@ -3099,6 +3156,10 @@
             "null",
             "string"
           ]
+        },
+        "ssh_host_key_policy": {
+          "description": "move how this workspace's configure runs verify SSH host keys: strict, accept-new or off. Omitting the field leaves the stored value alone; an empty string is REFUSED rather than read as the default. strict verifies every host and refuses an unknown one, accept-new trusts a host on first contact and refuses it once its key CHANGES, off verifies nothing. strict is the default and the pre-existing behaviour, so before reaching for off consider accept-new first: it is what keeps an unpinned host reachable on a workspace that has begun declaring approved keys with terrapod_inventory_host_declare, where strict would otherwise make every unpinned address unreachable. A RUN SNAPSHOTS the policy at creation, so changing this cannot weaken a run already in flight -- while the approved keys themselves are read live, so a revocation does reach a queued run",
+          "type": "string"
         },
         "terraform_version": {
           "description": "the same version under its original name; prefer engine_version. Setting both to different values is rejected",

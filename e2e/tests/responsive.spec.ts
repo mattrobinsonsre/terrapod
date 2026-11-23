@@ -3,7 +3,7 @@ import { test, expect, type Page, type Route, type Dialog } from '@playwright/te
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
 import { expectRunKindOffered, queueRunKind } from '../helpers/run-kinds';
-import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedVariable, seedInventoryHost, seedInventoryGroup, seedInventoryMembership, seedInventoryVar, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedVariable, seedInventoryHost, seedInventoryGroup, seedInventoryMembership, seedInventoryVar, seedInventoryHostKey, SSH_HOST_KEY_BLOBS, uniqueName } from '../helpers/api';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -2493,6 +2493,196 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     await page.getByRole('button', { name: /Remove this host from web/ }).click()
     await expect.poll(() => message, { timeout: 5_000 }).toContain('web')
     await expect(page.getByText(/in no group/i)).toBeVisible({ timeout: 10_000 })
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('a 372-character host key is readable in full at phone width (#2592)', async ({ page }) => {
+    // The hardest value on the whole tab. A base64 blob has NO break
+    // opportunities, so a word-boundary wrap rule leaves one unbroken
+    // 372-character line and the page scrolls sideways — and the obvious fix,
+    // truncating it, removes the one thing an operator came here to read: this
+    // is the value they compare when a host presents something unexpected.
+    //
+    // So both halves are asserted. Truncation would pass the overflow check on
+    // its own, and wrapping would pass a text check on its own.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespkeys'))
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+    await seedInventoryHostKey(token, h1, 'ssh-ed25519')
+    await seedInventoryHostKey(token, h1, 'ssh-rsa')
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory&inv=${h1}`)
+    const blocks = page.getByTestId('inv-host-key')
+    await expect(blocks).toHaveCount(2, { timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // The whole blob, character for character, against the fixture rather than
+    // against a prefix — a `toContainText` on the first forty characters is
+    // exactly what a truncating render would satisfy.
+    const rsa = page.getByTestId('inv-host-key-value').filter({ hasText: /^AAAAB3NzaC1yc2E/ })
+    await expect(rsa).toHaveText(SSH_HOST_KEY_BLOBS['ssh-rsa'])
+
+    // And it wraps rather than hiding the overflow in an inner scroller, which
+    // the touch model forbids nested in a scrolling page.
+    const vw = page.viewportSize()!.width
+    const box = await rsa.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(vw)
+    const scrolls = await rsa.evaluate((el) => el.scrollWidth - el.clientWidth)
+    expect(scrolls, 'the key value has an inner horizontal scroller').toBeLessThanOrEqual(1)
+
+    // The copy control is what makes a 372-character value usable at all on a
+    // phone, where selecting it by hand is not realistic.
+    await expect(page.getByRole('button', { name: /Copy the ssh-rsa public key/ })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('a revoked host key is distinct by its WORD, and marking is the touch tier (#2592)', async ({
+    page,
+  }) => {
+    // Revoked is the case the feature exists to catch, so it must not be
+    // carried by a tint alone: a tint is invisible in greyscale, to a
+    // colour-vision deficiency and to a screen reader. The badge word is what
+    // survives all three, and it is what this asserts.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespkeyrev'))
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+    await seedInventoryHostKey(token, h1, 'ssh-ed25519', { marker: 'revoked' })
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory&inv=${h1}`)
+    const revoked = page.getByTestId('inv-host-key-revoked')
+    await expect(revoked).toHaveCount(1, { timeout: 15_000 })
+    // Scoped INSIDE the block: "Revoked" is also the label of the Mark revoked
+    // action elsewhere on the page, so an unscoped match says nothing about
+    // which element carries the state.
+    await expect(revoked.getByText('Revoked', { exact: true })).toBeVisible()
+    // What the marker MEANS, not just its name — that the entry stays declared
+    // and recorded as not to be trusted is the whole point of it, and a badge
+    // cannot say that.
+    await expect(revoked.getByText(/recorded as not to be trusted/)).toBeVisible()
+    // An ordinary trusted key must NOT render as the revoked one, or the
+    // distinction is decorative.
+    await expect(page.getByTestId('inv-host-key')).toHaveCount(0)
+    await expectNoHorizontalPageScroll(page)
+
+    // Tier 2 of the #719 policy: clearing a marker is reversible — it can be
+    // set straight back and the key itself is untouched — so it prompts on a
+    // COARSE pointer, where a mis-tap is easy, and proceeds without one on a
+    // precise pointer. This is the only project running a coarse pointer.
+    let message = ''
+    page.once('dialog', async (d: Dialog) => {
+      message = d.message()
+      await d.accept()
+    })
+    await page.getByRole('button', { name: 'Clear marker', exact: true }).click()
+    await expect.poll(() => message, { timeout: 5_000 }).toContain('ssh-ed25519')
+    await expect(page.getByTestId('inv-host-key')).toHaveCount(1, { timeout: 10_000 })
+    await expect(page.getByTestId('inv-host-key-revoked')).toHaveCount(0)
+    await expectNoHorizontalPageScroll(page)
+
+    // Tier 1: a delete cannot be undone, so it prompts in BOTH modes — asserted
+    // here for touch, and in inventory.spec.ts for a precise pointer, which is
+    // the half a touch-only guard would silently drop.
+    let deleteMessage = ''
+    page.once('dialog', async (d: Dialog) => {
+      deleteMessage = d.message()
+      await d.dismiss()
+    })
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect.poll(() => deleteMessage, { timeout: 5_000 }).toContain('ssh-ed25519')
+    // Dismissed, so it is still there — the guard aborts rather than merely
+    // asking.
+    await expect(page.getByTestId('inv-host-key')).toHaveCount(1)
+  })
+
+  test('the declare form is operable at phone width (#2592)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespkeyform'))
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory&inv=${h1}`)
+    await expect(page.getByText(/No approved keys/)).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: 'Declare a key', exact: true }).click()
+
+    // A textarea rather than a single-line input, because the value is
+    // hundreds of characters and a one-line field shows about forty of them —
+    // so a mistyped paste could not be read back in the field it was typed
+    // into, which is the worst place for that on a phone.
+    const field = page.getByLabel('Public key')
+    await expect(field).toBeVisible()
+    expect(await field.evaluate((el) => el.tagName)).toBe('TEXTAREA')
+    await expectNoHorizontalPageScroll(page)
+
+    // Pasting a whole `.pub` file fills BOTH fields: that paste is what an
+    // operator has to hand, and the API refuses it as a stored value, so
+    // splitting it here is the difference between a declaration and a 422.
+    await field.fill(`ssh-ed25519 ${SSH_HOST_KEY_BLOBS['ssh-ed25519']} root@web-1`)
+    await expect(field).toHaveValue(SSH_HOST_KEY_BLOBS['ssh-ed25519'])
+    await expect(page.getByText(/Read as a ssh-ed25519 key/)).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    await page.getByRole('button', { name: 'Declare key', exact: true }).click()
+    await expect(page.getByTestId('inv-host-key')).toHaveCount(1, { timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the host-key policy select is operable, and gated, at phone width (#2592)', async ({
+    page,
+  }) => {
+    // The control that replaced a checkbox, so this is the first time three
+    // option labels have to fit here. A `<select>` takes its intrinsic width
+    // from its WIDEST option -- `min-inline-size: min-content` -- which is the
+    // same mechanism that put 122px of overflow on the one `<fieldset>` in
+    // this application (#2406). Hence the measurement below rather than only
+    // the page-level check.
+    //
+    // The tap-target floor is NOT asserted on the select itself, and that is
+    // deliberate rather than an omission: it carries the shared input class
+    // every other select on this form carries, so a bar met here and nowhere
+    // else would be a gate whose only finding is correct work. The floor that
+    // does apply to a select lives on its OPTIONS -- `select option` is given
+    // `min-height: 2.75rem` in `globals.css` once the picker is page content
+    // -- and `web/tests/select-picker-styling.test.ts` already pins it.
+    await page.goto('/workspaces')
+    await page.click('button:has-text("New Workspace")')
+
+    const select = page.getByTestId('ws-ssh-host-key-policy')
+    await expect(select).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // BOTH halves of the gate (#2413 F20). It renders disabled-but-visible
+    // until the workspace declares a configure operation, so asserting only
+    // that it is present would pass on a control nobody can operate, and
+    // asserting only that it works would pass on one that is never gated.
+    await expect(select).toBeDisabled()
+    await page.getByTestId('ws-configure-enabled').check()
+    await expect(select).toBeEnabled()
+
+    // `strict` -- the column default and ansible's own behaviour -- so a
+    // workspace nobody has touched is verifying rather than reading as off,
+    // which is what the seed in `createDefaults` is for. A blank select here
+    // would submit nothing and misreport what the workspace will do.
+    await expect(select).toHaveValue('strict')
+
+    // The middle state is the whole reason this is not a checkbox, so it has
+    // to be REACHABLE with a thumb rather than merely present in the DOM.
+    await select.selectOption('accept-new')
+    await expect(select).toHaveValue('accept-new')
+    await expectNoHorizontalPageScroll(page)
+
+    // Inside the viewport at its widest option, which is what the intrinsic
+    // minimum above would break.
+    const box = await select.boundingBox()
+    expect(box).not.toBeNull()
+    const vw = page.viewportSize()!.width
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(vw)
+
+    // The consequence of relaxing it is on SCREEN rather than behind the ⓘ
+    // (#2413 F15): a reader must not have to open anything to learn that not
+    // verifying accepts any key a host presents.
+    await expect(page.getByText(/so the connection can be intercepted/)).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 })

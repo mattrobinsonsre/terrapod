@@ -44,6 +44,7 @@ from terrapod.api.routers.workspace_bulk import (
 from terrapod.api.serialization import engine_version_attr
 from terrapod.db.models import (
     DEFAULT_ANSIBLE_LINE,
+    DEFAULT_SSH_HOST_KEY_POLICY,
     AgentPool,
     AutodiscoveryRule,
     VCSConnection,
@@ -122,7 +123,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             # And how a configure starts on them (#1974), both default false.
             "auto-configure-enabled": rule.auto_configure_enabled,
             "configure-all-hosts": rule.configure_all_hosts,
-            "ansible-host-key-checking": rule.ansible_host_key_checking,
+            "ssh-host-key-policy": rule.ssh_host_key_policy,
             "dynamic-inventory-enabled": rule.dynamic_inventory_enabled,
             "inventory-scripts-enabled": rule.inventory_scripts_enabled,
             "configure-after-apply": rule.configure_after_apply,
@@ -350,6 +351,20 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
+    # The host-key policy (#2592). Its own rule rather than a row in the boolean
+    # loop below, which is where the rename left it: `validate_bool` refuses
+    # every one of the three values with a message about booleans, so the
+    # attribute was unsettable, and the one shape it DID accept wrote a Python
+    # bool into a String(16) column. The workspace surfaces both reach for
+    # `validate_ssh_host_key_policy`, and so does this one -- a second opinion
+    # about what the three values are is how two surfaces come to disagree.
+    if "ssh-host-key-policy" in attrs:
+        try:
+            out["ssh_host_key_policy"] = workspace_settings.validate_ssh_host_key_policy(
+                attrs["ssh-host-key-policy"]
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
     if "ansible-collections" in attrs:
         try:
             out["ansible_collections"] = validate_ansible_collections(attrs["ansible-collections"])
@@ -367,7 +382,6 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         # declaring the two in either order.
         ("auto-configure-enabled", "auto_configure_enabled"),
         ("configure-all-hosts", "configure_all_hosts"),
-        ("ansible-host-key-checking", "ansible_host_key_checking"),
         ("dynamic-inventory-enabled", "dynamic_inventory_enabled"),
         ("inventory-scripts-enabled", "inventory_scripts_enabled"),
         ("configure-after-apply", "configure_after_apply"),
@@ -1041,7 +1055,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         configure_enabled=fields.get("configure_enabled", False),
         auto_configure_enabled=fields.get("auto_configure_enabled", False),
         configure_all_hosts=fields.get("configure_all_hosts", False),
-        ansible_host_key_checking=fields.get("ansible_host_key_checking", True),
+        ssh_host_key_policy=fields.get("ssh_host_key_policy", DEFAULT_SSH_HOST_KEY_POLICY),
         dynamic_inventory_enabled=fields.get("dynamic_inventory_enabled", False),
         inventory_scripts_enabled=fields.get("inventory_scripts_enabled", False),
         configure_after_apply=fields.get("configure_after_apply", False),

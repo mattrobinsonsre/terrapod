@@ -95,6 +95,11 @@ field AnsibleExecutionEnvironment.Kind string
 field AnsibleExecutionEnvironment.Label string
 field AnsibleExecutionEnvironments.Environments []AnsibleExecutionEnvironment
 field AnsibleExecutionEnvironments.Listing string
+field ApprovedHostKey.CreatedAt string `json:"created-at,omitempty"`
+field ApprovedHostKey.KeyType string `json:"key-type"`
+field ApprovedHostKey.Marker string `json:"marker,omitempty"`
+field ApprovedHostKey.PublicKey string `json:"public-key"`
+field ApprovedHostKey.UpdatedAt string `json:"updated-at,omitempty"`
 field ArchitectureCritique.Architecture ArchitectureCritiqueArchitecture `json:"architecture"`
 field ArchitectureCritique.CreatedAt string `json:"created-at,omitempty"`
 field ArchitectureCritique.Deferred []string `json:"deferred,omitempty"`
@@ -340,6 +345,9 @@ field CreateGPGKeyRequest.ASCIIArmor string
 field CreateGPGKeyRequest.Namespace string
 field CreateGPGKeyRequest.Source string
 field CreateGPGKeyRequest.SourceURL string
+field CreateInventoryHostKeyRequest.KeyType string
+field CreateInventoryHostKeyRequest.Marker string
+field CreateInventoryHostKeyRequest.PublicKey string
 field CreateInventoryVarRequest.Key string
 field CreateInventoryVarRequest.Sensitive bool
 field CreateInventoryVarRequest.Structured bool
@@ -476,7 +484,6 @@ field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitemp
 field CreateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field CreateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field CreateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
-field CreateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
@@ -515,6 +522,7 @@ field CreateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field CreateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field CreateWorkspaceRequest.SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 field CreateWorkspaceRequest.ScheduledConfigureCron string `json:"scheduled-configure-cron,omitempty"`
 field CreateWorkspaceRequest.ScheduledConfigureEnabled *bool `json:"scheduled-configure-enabled,omitempty"`
 field CreateWorkspaceRequest.ScheduledConfigureTimezone string `json:"scheduled-configure-timezone,omitempty"`
@@ -676,6 +684,11 @@ field InventoryHostGroup.GroupID string `json:"group-id,omitempty"`
 field InventoryHostGroup.HostID string `json:"host-id,omitempty"`
 field InventoryHostGroup.ID string `json:"id"`
 field InventoryHostGroup.WorkspaceID string `json:"workspace-id,omitempty"`
+field InventoryHostKey.ApprovedHostKey
+field InventoryHostKey.HostID string `json:"host-id,omitempty"`
+field InventoryHostKey.ID string `json:"id"`
+field InventoryHostKeysByHost.HostName string `json:"host-name"`
+field InventoryHostKeysByHost.Keys []ApprovedHostKey `json:"keys,omitempty"`
 field InventoryVar.CreatedAt string `json:"created-at,omitempty"`
 field InventoryVar.GroupID string `json:"group-id,omitempty"`
 field InventoryVar.HostID string `json:"host-id,omitempty"`
@@ -1168,6 +1181,7 @@ field Run.RunVariableKeys []string `json:"run-variable-keys,omitempty"`
 field Run.RunnerExitCode *int64 `json:"runner-exit-code,omitempty"`
 field Run.RunnerExitReason string `json:"runner-exit-reason,omitempty"`
 field Run.RunnerExitStatus string `json:"runner-exit-status,omitempty"`
+field Run.SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 field Run.SavePlan bool `json:"save-plan,omitempty"`
 field Run.Source string `json:"source,omitempty"`
 field Run.StateDiverged bool `json:"state-diverged"`
@@ -1337,6 +1351,7 @@ field UpdateExecutionHookRequest.HookPoint *string
 field UpdateExecutionHookRequest.Name string
 field UpdateExecutionHookRequest.Priority *int64
 field UpdateExecutionHookRequest.Script *string
+field UpdateInventoryHostKeyRequest.Marker *string
 field UpdateInventoryVarRequest.Key *string
 field UpdateInventoryVarRequest.Sensitive *bool
 field UpdateInventoryVarRequest.Structured *bool
@@ -1433,7 +1448,6 @@ field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitemp
 field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field UpdateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field UpdateWorkspaceRequest.AnsibleExecutionEnvironment *string `json:"ansible-execution-environment,omitempty"`
-field UpdateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
@@ -1470,6 +1484,7 @@ field UpdateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field UpdateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field UpdateWorkspaceRequest.SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 field UpdateWorkspaceRequest.ScheduledConfigureCron *string `json:"scheduled-configure-cron,omitempty"`
 field UpdateWorkspaceRequest.ScheduledConfigureEnabled *bool `json:"scheduled-configure-enabled,omitempty"`
 field UpdateWorkspaceRequest.ScheduledConfigureTimezone *string `json:"scheduled-configure-timezone,omitempty"`
@@ -1692,7 +1707,6 @@ field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
 field Workspace.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field Workspace.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
-field Workspace.AnsibleHostKeyChecking bool `json:"ansible-host-key-checking"`
 field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoConfigureEnabled bool `json:"auto-configure-enabled"`
@@ -1742,6 +1756,7 @@ field Workspace.Playbooks []string `json:"playbooks,omitempty"`
 field Workspace.PulumiBindPlan bool `json:"pulumi-bind-plan"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`
+field Workspace.SSHHostKeyPolicy string `json:"ssh-host-key-policy"`
 field Workspace.ScheduledConfigureCron string `json:"scheduled-configure-cron,omitempty"`
 field Workspace.ScheduledConfigureEnabled bool `json:"scheduled-configure-enabled"`
 field Workspace.ScheduledConfigureLastAt string `json:"scheduled-configure-last-at,omitempty"`
@@ -1897,6 +1912,7 @@ method (*Client) CreateInventoryGlobalVar( ctx context.Context, workspaceID stri
 method (*Client) CreateInventoryGroup( ctx context.Context, workspaceID, name string, ) (*InventoryGroup, error)
 method (*Client) CreateInventoryGroupVar( ctx context.Context, groupID string, req CreateInventoryVarRequest, ) (*InventoryVar, error)
 method (*Client) CreateInventoryHost( ctx context.Context, workspaceID, name string, ) (*InventoryHost, error)
+method (*Client) CreateInventoryHostKey( ctx context.Context, hostID string, req CreateInventoryHostKeyRequest, ) (*InventoryHostKey, error)
 method (*Client) CreateInventoryHostVar( ctx context.Context, hostID string, req CreateInventoryVarRequest, ) (*InventoryVar, error)
 method (*Client) CreateModuleAutodiscoveryRule(ctx context.Context, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryRule, error)
 method (*Client) CreateModuleWorkspaceLink(ctx context.Context, req CreateModuleWorkspaceLinkRequest) (*ModuleWorkspaceLink, error)
@@ -1931,6 +1947,7 @@ method (*Client) DeleteInventoryGroupChild(ctx context.Context, id string) error
 method (*Client) DeleteInventoryGroupVar(ctx context.Context, id string) error
 method (*Client) DeleteInventoryHost(ctx context.Context, id string) error
 method (*Client) DeleteInventoryHostGroup(ctx context.Context, id string) error
+method (*Client) DeleteInventoryHostKey(ctx context.Context, id string) error
 method (*Client) DeleteInventoryHostVar(ctx context.Context, id string) error
 method (*Client) DeleteModuleAutodiscoveryRule(ctx context.Context, id string) error
 method (*Client) DeleteModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) error
@@ -1985,6 +2002,7 @@ method (*Client) GetInventoryGroupChild( ctx context.Context, id string, ) (*Inv
 method (*Client) GetInventoryGroupVar(ctx context.Context, id string) (*InventoryVar, error)
 method (*Client) GetInventoryHost(ctx context.Context, id string) (*InventoryHost, error)
 method (*Client) GetInventoryHostGroup( ctx context.Context, id string, ) (*InventoryHostGroup, error)
+method (*Client) GetInventoryHostKey( ctx context.Context, id string, ) (*InventoryHostKey, error)
 method (*Client) GetInventoryHostVar(ctx context.Context, id string) (*InventoryVar, error)
 method (*Client) GetModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryRule, error)
 method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
@@ -2047,6 +2065,7 @@ method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]
 method (*Client) ListAllDeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error)
 method (*Client) ListAllInventoryGroupMembers( ctx context.Context, groupID string, ) ([]InventoryHostGroup, error)
 method (*Client) ListAllInventoryGroups( ctx context.Context, workspaceID string, ) ([]InventoryGroup, error)
+method (*Client) ListAllInventoryHostKeysByHost( ctx context.Context, workspaceID string, ) ([]InventoryHostKeysByHost, error)
 method (*Client) ListAllInventoryHosts( ctx context.Context, workspaceID string, ) ([]InventoryHost, error)
 method (*Client) ListAllModuleAutodiscoveryRuleRepositories(ctx context.Context, id, status string) ([]ModuleAutodiscoveryRepository, error)
 method (*Client) ListAllModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
@@ -2072,6 +2091,8 @@ method (*Client) ListInventoryGroupMembers( ctx context.Context, groupID string,
 method (*Client) ListInventoryGroupParents( ctx context.Context, groupID string, ) ([]InventoryGroupChild, error)
 method (*Client) ListInventoryGroupVars( ctx context.Context, groupID string, ) ([]InventoryVar, error)
 method (*Client) ListInventoryGroups( ctx context.Context, workspaceID string, ) ([]InventoryGroup, error)
+method (*Client) ListInventoryHostKeys( ctx context.Context, hostID string, ) ([]InventoryHostKey, error)
+method (*Client) ListInventoryHostKeysByHost( ctx context.Context, workspaceID string, ) ([]InventoryHostKeysByHost, error)
 method (*Client) ListInventoryHostMemberships( ctx context.Context, hostID string, ) ([]InventoryHostGroup, error)
 method (*Client) ListInventoryHostVars( ctx context.Context, hostID string, ) ([]InventoryVar, error)
 method (*Client) ListInventoryHosts( ctx context.Context, workspaceID string, ) ([]InventoryHost, error)
@@ -2171,6 +2192,7 @@ method (*Client) UpdateInventoryGlobalVar( ctx context.Context, id string, req U
 method (*Client) UpdateInventoryGroup( ctx context.Context, id, name string, ) (*InventoryGroup, error)
 method (*Client) UpdateInventoryGroupVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
 method (*Client) UpdateInventoryHost( ctx context.Context, id, name string, ) (*InventoryHost, error)
+method (*Client) UpdateInventoryHostKey( ctx context.Context, id string, req UpdateInventoryHostKeyRequest, ) (*InventoryHostKey, error)
 method (*Client) UpdateInventoryHostVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
 method (*Client) UpdateModuleAutodiscoveryRule(ctx context.Context, id string, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryRule, error)
 method (*Client) UpdateNotificationConfiguration(ctx context.Context, id string, req UpdateNotificationConfigurationRequest) (*NotificationConfiguration, error)
@@ -2228,6 +2250,7 @@ type AgentPoolToken struct
 type AnsibleCollection struct
 type AnsibleExecutionEnvironment struct
 type AnsibleExecutionEnvironments struct
+type ApprovedHostKey struct
 type ArchitectureCritique struct
 type ArchitectureCritiqueArchitecture struct
 type ArchitectureCritiqueFinding struct
@@ -2271,6 +2294,7 @@ type CreateAgentPoolRequest struct
 type CreateAgentPoolTokenRequest struct
 type CreateExecutionHookRequest struct
 type CreateGPGKeyRequest struct
+type CreateInventoryHostKeyRequest struct
 type CreateInventoryVarRequest struct
 type CreateModuleWorkspaceLinkRequest struct
 type CreateNotificationConfigurationRequest struct
@@ -2319,6 +2343,8 @@ type InventoryGroup struct
 type InventoryGroupChild struct
 type InventoryHost struct
 type InventoryHostGroup struct
+type InventoryHostKey struct
+type InventoryHostKeysByHost struct
 type InventoryVar struct
 type LabelEntity struct
 type LabelKey struct
@@ -2417,6 +2443,7 @@ type StateVersion struct
 type UnpricedResource struct
 type UpdateAgentPoolRequest struct
 type UpdateExecutionHookRequest struct
+type UpdateInventoryHostKeyRequest struct
 type UpdateInventoryVarRequest struct
 type UpdateNotificationConfigurationRequest struct
 type UpdatePolicyRequest struct

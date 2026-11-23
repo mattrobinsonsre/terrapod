@@ -102,6 +102,30 @@ def _mock_var(*, workspace_id, parent_attr, parent_id, key="ansible_user", sensi
     return var
 
 
+def _pubkey(name="ssh-ed25519", fill=b"\x01"):
+    """A blob of the real shape: a length-prefixed algorithm name, then key bytes.
+
+    Built rather than hardcoded so the embedded name and the declared `key_type`
+    agree. The validator refuses a disagreement, so a hardcoded blob would make
+    every fixture here depend on my having typed base64 correctly.
+    """
+    import base64
+    import struct
+
+    return base64.b64encode(struct.pack(">I", len(name)) + name.encode() + fill * 32).decode()
+
+
+def _mock_host_key(*, workspace_id, host_id, key_type="ssh-ed25519", marker=None):
+    row = _ts(MagicMock())
+    row.id = uuid.uuid4()
+    row.workspace_id = workspace_id
+    row.host_id = host_id
+    row.key_type = key_type
+    row.public_key = _pubkey(key_type if key_type.startswith("ssh-ed") else "ssh-ed25519")
+    row.marker = marker
+    return row
+
+
 def _make_app(user):
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: user
@@ -666,3 +690,263 @@ class TestTheRoutesAreNativeOnly:
         alias = paths("/api/terrapod/v1/")
         assert canonical, "no canonical inventory routes at all"
         assert alias == canonical
+
+
+# ── Approved SSH host keys (#2592) ───────────────────────────────────────────
+
+
+class TestApprovedHostKeys:
+    """The platform's own host-key model, which hands off to OpenSSH.
+
+    Ansible is not modelled on here: it has no inventory-level notion of an
+    approved key, its `ansible_ssh_host_key_*` facts describe what a host REPORTED
+    rather than what anyone approves, and its `known_hosts` module runs during a
+    play -- after the connection it would have protected.
+    """
+
+    async def test_declaring_a_key_returns_the_wire_shape(self):
+        ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
+        row = _mock_host_key(workspace_id=ws.id, host_id=host.id)
+        app, db = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._host": AsyncMock(return_value=host),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+                f"{_R}.inv.create_host_key": AsyncMock(return_value=row),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.post(
+                    f"{V1}/inventory-hosts/invhost-{host.id}/keys",
+                    json={
+                        "data": {
+                            "attributes": {
+                                "key-type": "ssh-ed25519",
+                                "public-key": row.public_key,
+                            }
+                        }
+                    },
+                    headers=_AUTH,
+                )
+        assert res.status_code == 201, res.text
+        data = res.json()["data"]
+        assert data["type"] == "inventory-host-keys"
+        assert data["id"] == f"invhkey-{row.id}"
+        assert data["attributes"]["key-type"] == "ssh-ed25519"
+        # NOT masked. A host's public key is public, and hiding it would hide the
+        # one value an operator reads when a host presents something else.
+        assert data["attributes"]["public-key"] == row.public_key
+        assert data["attributes"]["marker"] is None
+        assert data["relationships"]["host"]["data"]["id"] == f"invhost-{host.id}"
+
+    async def test_every_exposed_type_is_listed_not_one_per_family(self):
+        """The property the whole model exists for.
+
+        An ideal host configuration carries every key type the host exposes. A
+        shape that held one key per algorithm family -- which is what ansible's
+        facts are -- would make an ordinary three-key host unrepresentable, and
+        would have nowhere to put the second key of a type during a rotation.
+        """
+        ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
+        rows = [
+            _mock_host_key(workspace_id=ws.id, host_id=host.id, key_type="ssh-ed25519"),
+            _mock_host_key(workspace_id=ws.id, host_id=host.id, key_type="ecdsa-sha2-nistp256"),
+            _mock_host_key(workspace_id=ws.id, host_id=host.id, key_type="rsa-sha2-512"),
+            _mock_host_key(
+                workspace_id=ws.id, host_id=host.id, key_type="ssh-rsa", marker="revoked"
+            ),
+        ]
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._host": AsyncMock(return_value=host),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+                f"{_R}.inv.list_host_keys": AsyncMock(return_value=rows),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.get(f"{V1}/inventory-hosts/invhost-{host.id}/keys", headers=_AUTH)
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert [d["attributes"]["key-type"] for d in body["data"]] == [
+            "ssh-ed25519",
+            "ecdsa-sha2-nistp256",
+            "rsa-sha2-512",
+            "ssh-rsa",
+        ]
+        # The revoked one is carried rather than filtered. It is the case the
+        # feature exists to catch, so a reader must be able to see it.
+        assert [d["attributes"]["marker"] for d in body["data"]] == [
+            None,
+            None,
+            None,
+            "revoked",
+        ]
+        assert body["meta"]["pagination"]["total-count"] == 4
+
+    @pytest.mark.parametrize("frozen", ["key-type", "public-key"])
+    async def test_the_key_itself_cannot_be_edited_in_place(self, frozen):
+        """A PATCH changing the algorithm or the blob would rewrite what a host is
+        trusted to present while keeping the row's id -- and that id is the audit
+        trail. It is a delete and a declare, so the route refuses."""
+        ws = _mock_ws()
+        row = _mock_host_key(workspace_id=ws.id, host_id=uuid.uuid4())
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._host_key": AsyncMock(return_value=row),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.patch(
+                    f"{V1}/inventory-host-keys/invhkey-{row.id}",
+                    json={"data": {"attributes": {frozen: "ssh-rsa"}}},
+                    headers=_AUTH,
+                )
+        assert res.status_code == 422, res.text
+        assert frozen in res.text
+        assert "identity" in res.text
+
+    async def test_the_marker_is_editable(self):
+        """The pair to the test above: refusing the key must not refuse a
+        revocation, which is the one change this row exists to accept."""
+        ws = _mock_ws()
+        row = _mock_host_key(workspace_id=ws.id, host_id=uuid.uuid4())
+        marked = _mock_host_key(workspace_id=ws.id, host_id=row.host_id, marker="revoked")
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._host_key": AsyncMock(return_value=row),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+                f"{_R}.inv.update_host_key": AsyncMock(return_value=marked),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.patch(
+                    f"{V1}/inventory-host-keys/invhkey-{row.id}",
+                    json={"data": {"attributes": {"marker": "revoked"}}},
+                    headers=_AUTH,
+                )
+        assert res.status_code == 200, res.text
+        assert res.json()["data"]["attributes"]["marker"] == "revoked"
+
+    @pytest.mark.parametrize(
+        ("key_type", "public_key", "why"),
+        [
+            ("ssh-dss", None, "an algorithm outside the closed set"),
+            ("ssh-ed25519", "not base64 at all!!", "a blob that is not base64"),
+            ("ssh-ed25519", "WHOLE LINE", "a whole known_hosts line pasted in"),
+            ("ssh-rsa", "MISMATCH", "a blob whose embedded name is a different algorithm"),
+        ],
+    )
+    async def test_a_malformed_declaration_is_refused(self, key_type, public_key, why):
+        """Driven through the REAL validators, via the real service call, so these
+        say something about what the API accepts rather than about a mock."""
+        ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
+        if public_key is None:
+            public_key = _pubkey()
+        elif public_key == "WHOLE LINE":
+            public_key = f"web-1 ssh-ed25519 {_pubkey()}"
+        elif public_key == "MISMATCH":
+            public_key = _pubkey("ssh-ed25519")  # declared ssh-rsa, carries ed25519
+
+        app, db = _make_app(_user())
+        db.flush = AsyncMock()
+        with _Patches(
+            {
+                f"{_R}._host": AsyncMock(return_value=host),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.post(
+                    f"{V1}/inventory-hosts/invhost-{host.id}/keys",
+                    json={"data": {"attributes": {"key-type": key_type, "public-key": public_key}}},
+                    headers=_AUTH,
+                )
+        assert res.status_code == 422, f"{why}: {res.status_code} {res.text}"
+
+    async def test_the_workspace_wide_read_is_keyed_on_the_host_name(self):
+        """It is an extension beside `inventory/resolved`, meant to be read with
+        it -- so it is keyed the way that document is keyed, on the name, not on
+        the host's id."""
+        ws = _mock_ws()
+        host_id = uuid.uuid4()
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+                f"{_R}.inv.host_keys_by_host_name": AsyncMock(
+                    return_value={
+                        "web-1": [
+                            _mock_host_key(workspace_id=ws.id, host_id=host_id),
+                            _mock_host_key(
+                                workspace_id=ws.id,
+                                host_id=host_id,
+                                key_type="ecdsa-sha2-nistp256",
+                            ),
+                        ],
+                        "db-1": [_mock_host_key(workspace_id=ws.id, host_id=uuid.uuid4())],
+                    }
+                ),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/host-keys", headers=_AUTH)
+        assert res.status_code == 200, res.text
+        data = res.json()["data"]
+        assert [d["id"] for d in data] == ["db-1", "web-1"]
+        by_host = {d["id"]: d for d in data}
+        assert len(by_host["web-1"]["attributes"]["keys"]) == 2
+        assert len(by_host["db-1"]["attributes"]["keys"]) == 1
+
+    async def test_a_reader_cannot_declare_a_key(self):
+        """Declaring an approved key is granting trust, so it is a write."""
+        ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._host": AsyncMock(return_value=host),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.post(
+                    f"{V1}/inventory-hosts/invhost-{host.id}/keys",
+                    json={
+                        "data": {
+                            "attributes": {
+                                "key-type": "ssh-ed25519",
+                                "public-key": _pubkey(),
+                            }
+                        }
+                    },
+                    headers=_AUTH,
+                )
+        assert res.status_code == 403, res.text

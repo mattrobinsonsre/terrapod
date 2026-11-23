@@ -102,7 +102,6 @@
     "allow-fork-pr-plans",
     "ansible-collections",
     "ansible-execution-environment",
-    "ansible-host-key-checking",
     "ansible-version",
     "auto-apply-mode",
     "auto-configure-enabled",
@@ -160,6 +159,7 @@
     "security-scan-severity-threshold",
     "security-scan-skip-rules",
     "slack-channel",
+    "ssh-host-key-policy",
     "storage-location",
     "terraform-version",
     "terragrunt-enabled",
@@ -586,6 +586,13 @@
     "updated-at",
     "variable-count"
   ],
+  "inventory._host_key_json": [
+    "created-at",
+    "key-type",
+    "marker",
+    "public-key",
+    "updated-at"
+  ],
   "inventory._var_json": [
     "created-at",
     "key",
@@ -593,6 +600,9 @@
     "structured",
     "updated-at",
     "value"
+  ],
+  "inventory.show_inventory_host_keys": [
+    "keys"
   ],
   "inventory.show_resolved_inventory": [
     "group-children",
@@ -1120,6 +1130,7 @@
     "runner-exit-status",
     "save-plan",
     "source",
+    "ssh-host-key-policy",
     "status",
     "status-timestamps",
     "target-addrs",
@@ -1298,7 +1309,6 @@
     "allow-fork-pr-plans",
     "ansible-collections",
     "ansible-execution-environment",
-    "ansible-host-key-checking",
     "ansible-version",
     "auto-apply",
     "auto-apply-mode",
@@ -1385,6 +1395,7 @@
     "security-scan-severity-threshold",
     "security-scan-skip-rules",
     "slack-channel",
+    "ssh-host-key-policy",
     "state-diverged",
     "storage-location",
     "tag-names",

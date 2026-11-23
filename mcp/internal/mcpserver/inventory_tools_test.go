@@ -211,6 +211,13 @@ func TestInventoryDetailDispatchesOnTheIDPrefix(t *testing.T) {
 			  "type":"inventory-host-groups","attributes":{},
 			  "relationships":{"host":{"data":{"id":"invhost-1","type":"inventory-hosts"}},
 			    "group":{"data":{"id":"invgroup-1","type":"inventory-groups"}}}}]}`,
+			// The host's approved SSH host keys (#2592). A host detail carries
+			// them WITH their ids, which is the only place an agent can get the
+			// id it needs to mark or remove one.
+			"/api/v1/inventory-hosts/invhost-1/keys": `{"data":[{"id":"invhkey-1",
+			  "type":"inventory-host-keys","attributes":{"key-type":"ssh-ed25519",
+			  "public-key":"AAAAC3NzaC1lZDI1NTE5AAAAIFNluHur5rQdQnsTP1TO9Ufn1yB6H/Ax9J25aVber+U6",
+			  "marker":null}}]}`,
 		})
 
 		res := callInventoryTool(t, sess, "terrapod_inventory_detail",
@@ -227,6 +234,11 @@ func TestInventoryDetailDispatchesOnTheIDPrefix(t *testing.T) {
 			Groups []struct {
 				ID string `json:"id"`
 			} `json:"groups"`
+			Keys []struct {
+				ID        string `json:"id"`
+				KeyType   string `json:"key-type"`
+				PublicKey string `json:"public-key"`
+			} `json:"keys"`
 		}
 		invStructured(t, res, &out)
 		if out.Host == nil || out.Host.Name != "web-1" {
@@ -237,6 +249,12 @@ func TestInventoryDetailDispatchesOnTheIDPrefix(t *testing.T) {
 		}
 		if len(out.Vars) != 1 || len(out.Groups) != 1 {
 			t.Errorf("a host's variables and memberships must both come back: %+v", out)
+		}
+		// With its ID, which the workspace-wide host-keys view does not carry --
+		// so this read is the only route to the id a mark or a removal needs.
+		if len(out.Keys) != 1 || out.Keys[0].ID != "invhkey-1" ||
+			out.Keys[0].KeyType != "ssh-ed25519" || out.Keys[0].PublicKey == "" {
+			t.Errorf("a host's approved keys must come back with their ids: %+v", out.Keys)
 		}
 		for _, p := range seen.paths {
 			if strings.Contains(p, "inventory-groups/") {
@@ -578,7 +596,34 @@ func TestInventoryRemoveDispatchesEveryPrefix(t *testing.T) {
 		{"invvar-1", "/api/v1/inventory-global-vars/invvar-1", "variable under all"},
 		{"invhg-1", "/api/v1/inventory-host-groups/invhg-1", "group membership"},
 		{"invgc-1", "/api/v1/inventory-group-children/invgc-1", "group nesting"},
+		{"invhkey-1", "/api/v1/inventory-host-keys/invhkey-1", "approved host key"},
 	}
+
+	// DERIVED, so the name of this test stays true. The cases above are the
+	// contract -- which route each prefix reaches and what it is called -- and
+	// this asserts they cover every kind the handler's own table declares, so a
+	// ninth kind added there fails here instead of being quietly untested.
+	// Which is how `invhkey-` nearly shipped: the table and this list were two
+	// hand-written copies with nothing keeping them in step.
+	covered := make(map[string]bool, len(cases))
+	for _, tc := range cases {
+		for _, k := range inventoryRemoveKinds(nil) {
+			if strings.HasPrefix(tc.id, k.prefix) {
+				covered[k.prefix] = true
+			}
+		}
+	}
+	declared := inventoryRemoveKinds(nil)
+	if len(declared) < 7 {
+		t.Fatalf("only %d kinds declared; the derivation is not reading the table", len(declared))
+	}
+	for _, k := range declared {
+		if !covered[k.prefix] {
+			t.Errorf("terrapod_inventory_remove accepts %q and no case here drives it, so "+
+				"nothing checks which route it reaches or what it is called", k.prefix)
+		}
+	}
+
 	for _, tc := range cases {
 		t.Run(tc.id, func(t *testing.T) {
 			sess, seen := inventoryRouter(t, map[string]string{

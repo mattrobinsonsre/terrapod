@@ -91,7 +91,7 @@ Two consequences worth knowing before you write path-matching code:
 | `services/terrapod/` | API server (FastAPI) **and** the runner listener — one codebase, different entrypoints. Implicit namespace package (no `__init__.py`). | Python 3.14 |
 | `web/` | Next.js frontend + BFF (the single ingress; proxies `/api/*` to the API). | TypeScript / React |
 | `go-terrapod/` | Public, canonical Go SDK for the Terrapod API. Source of truth for the Go-side view of every endpoint. | Go |
-| `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (35 `terrapod_*` resources + 14 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |
+| `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (36 `terrapod_*` resources + 15 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |
 | `pulumi-provider/` | The **Pulumi provider for Terrapod**, bridged from `provider/` with `pulumi-terraform-bridge` so the Terraform schema stays the single canonical surface — a resource added there appears in Pulumi with no edit here. Published as a plugin; the per-language SDK is generated on the practitioner's machine with `pulumi package add`. See [`docs/pulumi-provider.md`](docs/pulumi-provider.md). | Go |
 | `migrate/` | `terrapod-migrate` — TFE/HCP + Atlantis migration CLI. | Go |
 | `publish/` | `terrapod-publish` — registry publish CLI (client-signed provider/module uploads). | Go |

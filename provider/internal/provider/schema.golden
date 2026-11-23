@@ -59,6 +59,12 @@ data terrapod_role.pool_permission required=false optional=false computed=true s
 data terrapod_role.registry_permission required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_role.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_role.workspace_permission required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_ssh_host_keys.entries required=false optional=false computed=true sensitive=false type=types.MapType[types.ListType[types.ObjectType["key_type":basetypes.StringType, "public_key":basetypes.StringType]]]
+data terrapod_ssh_host_keys.hosts required=true optional=false computed=false sensitive=false type=types.SetType[basetypes.StringType]
+data terrapod_ssh_host_keys.key_types required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
+data terrapod_ssh_host_keys.port required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_ssh_host_keys.scan_timeout_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_ssh_host_keys.unreachable_hosts required=false optional=false computed=true sensitive=false type=types.SetType[basetypes.StringType]
 data terrapod_user.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.display_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.email required=true optional=false computed=false sensitive=false type=basetypes.StringType
@@ -92,7 +98,6 @@ data terrapod_workspace.ai_summary_mode required=false optional=false computed=t
 data terrapod_workspace.allow_fork_pr_plans required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.ansible_collections required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
 data terrapod_workspace.ansible_execution_environment required=false optional=false computed=true sensitive=false type=basetypes.StringType
-data terrapod_workspace.ansible_host_key_checking required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.ansible_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_apply_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_configure_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
@@ -148,6 +153,7 @@ data terrapod_workspace.security_scan_engine required=false optional=false compu
 data terrapod_workspace.security_scan_severity_threshold required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.security_scan_skip_rules required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_workspace.slack_channel required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.ssh_host_key_policy required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.state_diverged required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.terraform_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.terragrunt_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
@@ -257,6 +263,7 @@ resource terrapod_autodiscovery_rule.security_scan_engine required=false optiona
 resource terrapod_autodiscovery_rule.security_scan_severity_threshold required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.security_scan_skip_rules required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.slack_channel required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.ssh_host_key_policy required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.terraform_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.terragrunt_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.terragrunt_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -350,6 +357,12 @@ resource terrapod_inventory_host_group.created_at required=false optional=false 
 resource terrapod_inventory_host_group.group_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_group.host_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_group.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.host_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.key block type=types.SetType[types.ObjectType["key_type":basetypes.StringType, "marker":basetypes.StringType, "public_key":basetypes.StringType]]
+resource terrapod_inventory_host_keys.key.key_type required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.key.marker required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.key.public_key required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_var.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_var.host_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_var.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -584,7 +597,6 @@ resource terrapod_workspace.ai_summary_mode required=false optional=true compute
 resource terrapod_workspace.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.ansible_collections required=false optional=true computed=true sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
 resource terrapod_workspace.ansible_execution_environment required=false optional=true computed=false sensitive=false type=basetypes.StringType
-resource terrapod_workspace.ansible_host_key_checking required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_configure_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -643,6 +655,7 @@ resource terrapod_workspace.security_scan_engine required=false optional=true co
 resource terrapod_workspace.security_scan_severity_threshold required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.security_scan_skip_rules required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_workspace.slack_channel required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.ssh_host_key_policy required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.state_diverged required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.terraform_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.terragrunt_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType

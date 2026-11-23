@@ -286,21 +286,6 @@ class TestAMachinePasswordHasNoMechanismBehindIt:
         ansible_auth.run(path=_auth_file(tmp_path, [_machine("web", password="prod")]))
         assert b"prod" not in exec_subprocess._SECRETS
 
-    def test_a_non_secret_field_is_never_registered_however_short(self, tmp_path):
-        """A host's PUBLIC key is public, and registering it would black out the
-        one value an operator needs to read when a host key does not match.
-
-        The subject used to be `user`, which #2413 F9 withdrew -- a connection
-        setting is not a credential. The property it asserts did not go with
-        it: `known_hosts` is a machine-credential FILE field and deliberately
-        not a SECRET one, so it is the same test with a subject that exists."""
-        ansible_auth.run(
-            path=_auth_file(
-                tmp_path, [_machine("web", known_hosts="h.example.com ssh-ed25519 PUBLICKEY")]
-            )
-        )
-        assert b"PUBLICKEY" not in exec_subprocess._SECRETS
-
 
 class TestTheMachineCredential:
     """Every field resolves to a REFERENCE an inventory can substitute (#1933).

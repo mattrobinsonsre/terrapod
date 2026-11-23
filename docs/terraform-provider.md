@@ -31,7 +31,7 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | Governance | `terrapod_policy_set`, `terrapod_policy`, `terrapod_run_task`, `terrapod_run_trigger`, `terrapod_notification_configuration`, `terrapod_execution_hook`, `terrapod_execution_hook_workspace` |
 | Registry | `terrapod_registry_module`, `terrapod_module_autodiscovery_rule`, `terrapod_registry_provider`, `terrapod_gpg_key` |
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
-| [Ansible inventory](ansible-inventory.md) | `terrapod_inventory_host`, `terrapod_inventory_group`, `terrapod_inventory_host_group`, `terrapod_inventory_group_child`, `terrapod_inventory_host_var`, `terrapod_inventory_group_var`, `terrapod_inventory_global_var` (the inventory's roots and defaults are attributes on `terrapod_workspace` itself) |
+| [Ansible inventory](ansible-inventory.md) | `terrapod_inventory_host`, `terrapod_inventory_group`, `terrapod_inventory_host_group`, `terrapod_inventory_group_child`, `terrapod_inventory_host_var`, `terrapod_inventory_group_var`, `terrapod_inventory_global_var`, `terrapod_inventory_host_keys` (the inventory's roots and defaults are attributes on `terrapod_workspace` itself) |
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`
 (each entry reports its `engine`, and an optional `engine` argument returns only
@@ -68,7 +68,10 @@ with its merged variables, each group's **direct** membership, and the nesting
 carried separately, with an optional `limit` that ansible itself expands through
 that nesting; a data source rather than an attribute on a resource for the same
 reason as `oidc_audiences` below, since a data source has no round-trip
-requirement and a derived value belongs there), and
+requirement and a derived value belongs there), `terrapod_ssh_host_keys` (the
+SSH host keys a set of hosts present, read by connecting to each one — the
+provider's only data source that talks to something other than the Terrapod
+API; see below), and
 `terrapod_ansible_execution_environments` (which Ansible
 [execution environments](runners.md#choosing-an-execution-environment) this
 deployment can run — the built-in image per ansible-core line and any the
@@ -412,6 +415,227 @@ Two things to know before reaching for them:
   row. Full semantics: [Cloud Identity → Apply-only
   variables](cloud-identity.md#apply-only-variables) and [Configure-only
   variables](cloud-identity.md#configure-only-variables).
+
+## `terrapod_ssh_host_keys`
+
+The SSH host keys a set of hosts present, read by **connecting to each one** and
+taking the key it offers during the key exchange — the same thing `ssh-keyscan`
+does. It is the provider's only data source that opens a socket to something
+other than the Terrapod API, and the reason is that the thing being read exists
+nowhere else: a host key is held by the host, Terrapod has never seen it, and no
+API can be asked for it.
+
+```hcl
+data "terrapod_ssh_host_keys" "fleet" {
+  hosts = ["web1.example.com", "web2.example.com:2222", "[2001:db8::1]:22"]
+}
+```
+
+| attribute | kind | |
+|---|---|---|
+| `hosts` | required, set of string | A hostname or address, optionally `:port`, which overrides `port` for that entry alone. An IPv6 literal with a port needs the bracket form. An entry keys `entries` and appears in `unreachable_hosts` **exactly as written**. |
+| `port` | optional, default 22 | The port for entries that do not name one. |
+| `key_types` | optional | Defaults to `["ssh-ed25519", "ecdsa-sha2-nistp256", "rsa-sha2-512"]`. |
+| `scan_timeout_seconds` | optional, default 5 | Bounds **one** connection attempt, not the whole read. |
+| `entries` | computed | Per host, a list of `{ key_type, public_key }`. |
+| `unreachable_hosts` | computed | Every entry this read got no key out of. |
+
+A data source attribute has no schema default in the plugin framework, so the
+three optional inputs are applied on read and written back — `port` reads as
+`22` rather than as null.
+
+**Why it exists.** Verifying host keys is on by default and fails closed on
+first contact, and the machine credential's `known_hosts` field is what makes
+that default satisfiable. Satisfying it by hand means obtaining and pasting a
+key per host, and an operator with a fleet reaches for the weakest setting instead
+— historically `ansible_host_key_checking = false`, now `ssh_host_key_policy =
+"off"`. So the baseline this is measured against is not out-of-band key
+distribution; it is verification switched off, which checks nothing, ever.
+
+(`ssh_host_key_policy = "accept-new"` is a better fallback than `off` and did not
+exist when this was written: it trusts a host on first contact and refuses a
+CHANGED key thereafter. It is still weaker than approving the keys, which is what
+this data source is for.)
+
+**It is trust-on-first-use.** What arrives is a key the responder demonstrably
+holds the private half of — the signature over the exchange hash is verified
+before the key is accepted — and that is all it is. It says nothing about
+whether the responder is the host you meant. The value is in what happens next:
+a key anchored through `terrapod_inventory_host_keys` is compared on every later
+connection.
+
+**Nothing is authenticated and no username is sent.** The handshake is version
+exchange, key exchange, then authentication; this abandons the connection in the
+host-key callback, which fires during the key exchange. The target's log records
+a connection from `SSH-2.0-terrapod_hostkeyscan` and no attempted login.
+
+**One connection per algorithm**, which is necessary rather than wasteful:
+`HostKeyAlgorithms` is the set the *client* accepts and the server picks one, so
+a single connection offering three returns one key of the server's choosing.
+Two consequences worth knowing:
+
+- `key_type` is the key's own **format**, not the algorithm asked for.
+  `rsa-sha2-512` and `rsa-sha2-256` are signature algorithms over one `ssh-rsa`
+  key, so either returns a `key_type` of `ssh-rsa`, and asking for both yields
+  one entry.
+- `ssh-rsa` is deliberately not in the default. It is RSA signed with SHA-1,
+  which OpenSSH has disabled server-side since 8.8, so it would fail on most of
+  a modern fleet while `rsa-sha2-512` reaches the same key.
+
+### Where the scan runs
+
+In **agent** mode the provider executes on the runner, which is the same network
+position an Ansible configure will connect from — the right vantage point. In
+**local** mode it runs wherever you ran `plan`, which may not reach the hosts at
+all. The same configuration can therefore read a whole fleet from one place and
+nothing from the other, and the symptom is a pile of warnings rather than an
+error.
+
+### An unreachable host warns; it does not fail the plan
+
+A host this read got no key out of goes in `unreachable_hosts` and raises a
+**warning** carrying the error per algorithm attempted. That tolerance is
+load-bearing even when the host list has been narrowed to the instances a cloud
+provider says are running, because "running" is not "reachable from here" — a
+security group, an sshd that has not started, an instance still in cloud-init.
+If it failed, one booting fleet member would block every other host's keys from
+being read. Gate on `unreachable_hosts` yourself if a missing key should stop
+something.
+
+The warning's text is what distinguishes the two cases the attribute covers
+together: a connection error means the host is unreachable from wherever the
+provider ran, while an error naming a host-key algorithm means the host answered
+and holds none of the types `key_types` asked for.
+
+A host that answered with nothing is **absent from `entries`**, not present with
+an empty list — deliberately unlike `terrapod_inventory_resolved`, which is
+exhaustive. Absence is the signal: a consumer that looks a host up and gets null
+can keep whatever it already had, where an empty list would tell it to store
+none.
+
+A value this data source cannot **interpret** is a different matter and fails
+the plan: an unrecognised `key_types` entry, a port that is not a number or is
+out of range, or two entries of `hosts` naming the same host and port — which a
+Terraform set holds as two distinct members, so nothing upstream catches it.
+
+### What to do with `entries`
+
+This data source keeps nothing between reads: it scans and returns. Feed
+`entries` into `terrapod_inventory_host_keys`, which owns state and is where a
+host's keys persist — including across a read in which the host was briefly
+unreachable. Scanning is a read, so it is a data source; keeping is a write, so
+it is a resource. The algorithm and the key are carried separately rather than
+as a rendered `known_hosts` line because that is the identity an
+`inventory_host_keys` row has, and because a host legitimately holds two keys of
+one type mid-rotation.
+
+Draw `hosts` from the authoritative host list — `terrapod_inventory_resolved` —
+narrowed by your own cloud provider's data source to the instances actually
+running, since scanning one the cloud says is stopped can only ever produce a
+warning.
+
+## `terrapod_inventory_host_keys`
+
+The SSH host keys a host is **approved** to present. One resource per host,
+carrying every approved key as a repeated `key` block:
+
+```hcl
+resource "terrapod_inventory_host_keys" "web1" {
+  host_id = terrapod_inventory_host.web1.id
+
+  key {
+    key_type   = "ssh-ed25519"
+    public_key = "AAAAC3NzaC1lZDI1NTE5AAAA…"
+  }
+
+  key {
+    key_type   = "ecdsa-sha2-nistp256"
+    public_key = "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY…"
+  }
+
+  key {
+    key_type   = "ssh-rsa"
+    public_key = "AAAAB3NzaC1yc2EAAAA…"
+    marker     = "revoked"
+  }
+}
+```
+
+`host_id` is required and `RequiresReplace`; there is no provider-level default for
+it, matching the four sibling inventory resources parented on a host or group id
+rather than the three that carry a `workspace_id`.
+
+### It is an aggregate, and that is the one deliberate break from the inventory's shape
+
+Every other inventory resource is a **row**, so a second concern can contribute a
+variable to a host it does not own. This one owns the whole set: **two
+`terrapod_inventory_host_keys` resources naming the same host will each remove the
+other's keys on every apply.** Do not do that.
+
+The aggregate is the point rather than the price. A trust set's property is
+completeness — the declared keys *are* the approved keys, so a key appearing out of
+band is drift the next apply removes. Under a contributory shape an unapproved key
+could quietly become trusted and nothing would notice, which is what the structure
+exists to prevent.
+
+There is deliberately **no singular `terrapod_inventory_host_key`**. It would
+restore the contributory shape and lose the guarantee, and nothing could stop the
+two kinds managing one host.
+
+### Every type the host exposes
+
+A host answering on ed25519, ecdsa and rsa has three approved keys and all three
+belong in the resource. Two keys of the **same** algorithm are allowed as well,
+which is what a rotation needs: the old key and the new one are both approved while
+hosts are being re-keyed.
+
+`marker` is optional — `cert-authority`, `revoked`, or absent. It is validated at
+plan time against those two values, deliberately unlike `key_type`, which is left to
+the server: the set of algorithms could legitimately grow, and the server's refusal
+names the mistake better than a compiled-in list would. `marker` needs the plan-time
+check because `""` would otherwise be accepted, stored as NULL, and then differ from
+the configuration on every later plan.
+
+### No computed attributes inside the block
+
+A key's id, `created_at` and `updated_at` are **not** available through the
+provider. That is a framework constraint rather than a choice: a set element's
+identity is its whole value, so a Computed attribute leaves the planned element
+unknown and Terraform cannot match configuration to state.
+
+Reach for the API, `terrapod_inventory_detail` or the MCP tools when you need a
+key's id — for example to mark one revoked without rewriting the set.
+
+### Feeding it from the scanner
+
+[`terrapod_ssh_host_keys`](#terrapod_ssh_host_keys) reads a host's live keys. The
+two compose through a `dynamic` block rather than a direct assignment, because this
+resource's block object carries `marker` and the scan cannot supply one — so the
+object types differ and a direct `key = …` will not type-check:
+
+```hcl
+data "terrapod_ssh_host_keys" "scan" {
+  hosts = ["web1.example.com"]
+}
+
+resource "terrapod_inventory_host_keys" "web1" {
+  host_id = terrapod_inventory_host.web1.id
+
+  dynamic "key" {
+    for_each = data.terrapod_ssh_host_keys.scan.entries["web1.example.com"]
+    content {
+      key_type   = key.value.key_type
+      public_key = key.value.public_key
+    }
+  }
+}
+```
+
+Scan only hosts you have confirmed are the right ones — the scanner records what a
+host presents, which is a different question from what it is approved to present.
+A host absent from the scan's `entries` (unreachable, or answering nothing) is
+absent rather than present with an empty list, so a `dynamic` block over it
+contributes nothing instead of emptying the set.
 
 ## Reserved-name note
 

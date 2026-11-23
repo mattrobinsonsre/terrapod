@@ -74,6 +74,7 @@ from terrapod.db.models import (
     InventoryGroupVar,
     InventoryHost,
     InventoryHostGroup,
+    InventoryHostKey,
     InventoryHostVar,
     Run,
     Workspace,
@@ -253,6 +254,32 @@ def _host_var_json(var: InventoryHostVar) -> dict:
     )
 
 
+def _host_key_json(row: InventoryHostKey) -> dict:
+    """An approved host key as JSON:API.
+
+    `public-key` is NOT masked, unlike `_var_json`'s treatment of a sensitive
+    variable, and that is deliberate rather than an oversight: a host's public key
+    is public. Masking it would hide the one value an operator needs to read when a
+    host presents something else, which is the moment the whole feature exists for
+    -- the same reasoning that keeps it out of `MACHINE_SECRET_FIELDS` and out of
+    the log redactor.
+    """
+    return {
+        "type": "inventory-host-keys",
+        "id": f"invhkey-{row.id}",
+        "attributes": {
+            "key-type": row.key_type,
+            "public-key": row.public_key,
+            "marker": row.marker,
+            "created-at": _rfc3339(row.created_at),
+            "updated-at": _rfc3339(row.updated_at),
+        },
+        "relationships": {
+            "host": {"data": {"id": f"invhost-{row.host_id}", "type": "inventory-hosts"}}
+        },
+    }
+
+
 def _group_var_json(var: InventoryGroupVar) -> dict:
     return _var_json(
         var,
@@ -338,6 +365,14 @@ async def _host(host_id: str, db: AsyncSession) -> InventoryHost:
     if host is None:
         raise HTTPException(status_code=404, detail="Host not found")
     return host
+
+
+async def _host_key(key_id: str, db: AsyncSession) -> InventoryHostKey:
+    key_uuid = parse_id_for(key_id, "inventory-host-keys", detail="Host key not found")
+    row = await inv.get_host_key(db, key_uuid)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Host key not found")
+    return row
 
 
 async def _group(group_id: str, db: AsyncSession) -> InventoryGroup:
@@ -1499,3 +1534,197 @@ async def show_resolved_inventory(
             }
         }
     )
+
+
+# ── Approved SSH host keys ───────────────────────────────────────────────────
+#
+# A platform feature that hands off to OpenSSH, and deliberately NOT modelled on
+# ansible (#2592). Ansible has no inventory-level notion of an approved host key at
+# all: `host_key_checking` is a binary toggle, its `ansible_ssh_host_key_*` facts
+# describe what a host REPORTED rather than what anyone approves, and its
+# `known_hosts` module runs during a play -- after the connection it would have
+# protected. So the model is Terrapod's own and the only thing downstream of it is
+# a `known_hosts` file, which is what OpenSSH actually enforces.
+#
+# These rows are NOT part of the resolved inventory document. That document is
+# ansible's answer to "what does this inventory resolve to", normalised, and a
+# Terrapod-only section inside it would be exactly the compromise this design
+# rejects. The workspace-wide read below is the extension beside it instead.
+
+
+@router.get("/workspaces/{workspace_id}/inventory/host-keys")
+async def show_inventory_host_keys(
+    workspace_id: str = Path(...),
+    request: Request = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Every approved host key in this workspace's inventory, keyed by host name.
+
+    **An extension beside `inventory/resolved`, not a part of it.** Same position,
+    same gate, and read together they answer "what would a configure target, and
+    what is each of those hosts trusted to present". Kept separate because the
+    resolved document is ansible's own answer and this is Terrapod's: folding them
+    would mean a consumer could no longer tell which half it was reading, and the
+    runner renders that document back into a YAML inventory where a foreign section
+    has no meaning.
+
+    **Live, and it writes nothing.** A function of the rows, like the resolution
+    beside it -- there is no other answer this could be, so there is no freshness
+    to reason about and no timestamp to mislead anyone.
+
+    Keyed on the host NAME rather than its id, because that is what the resolved
+    document is keyed on and the two are meant to be read side by side.
+
+    **A key can only exist for a host Terrapod DECLARES.** A host that appears only
+    in a VCS-sourced inventory file has no `inventory_hosts` row, so it can hold no
+    approved key -- exactly as it can hold no Terrapod-declared variable, for the
+    same composite-foreign-key reason. That is the established inventory model
+    rather than a limitation this introduces.
+
+    Unphased for a runner token: a plan reads inventory to diff it.
+    """
+    ws = await _get_workspace(workspace_id, db)
+    await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
+
+    by_name = await inv.host_keys_by_host_name(db, ws.id)
+    hosts = [
+        {
+            "type": "inventory-host-keys-by-host",
+            "id": name,
+            "attributes": {"keys": [_host_key_json(r)["attributes"] for r in rows]},
+        }
+        for name, rows in sorted(by_name.items())
+    ]
+    page, meta = paginate(hosts, request)
+    return JSONResponse(content={"data": page, "meta": meta})
+
+
+@router.get("/inventory-hosts/{host_id}/keys")
+async def list_inventory_host_keys(
+    host_id: str = Path(...),
+    request: Request = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    host = await _host(host_id, db)
+    ws = await _get_workspace(f"ws-{host.workspace_id}", db)
+    await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
+    page, meta = paginate(
+        [_host_key_json(r) for r in await inv.list_host_keys(db, host.id)], request
+    )
+    return JSONResponse(content={"data": page, "meta": meta})
+
+
+@router.post("/inventory-hosts/{host_id}/keys", status_code=201)
+async def create_inventory_host_key(
+    host_id: str = Path(...),
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Declare one approved host key for this host."""
+    host = await _host(host_id, db)
+    ws = await _get_workspace(f"ws-{host.workspace_id}", db)
+    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db, phase="apply")
+
+    attrs = (body.get("data") or {}).get("attributes") or {}
+    try:
+        row = await inv.create_host_key(
+            db,
+            workspace_id=ws.id,
+            host_id=host.id,
+            key_type=attrs.get("key-type"),
+            public_key=attrs.get("public-key"),
+            marker=attrs.get("marker"),
+        )
+    except (InventoryValidationError, inv.InventoryLimitExceeded) as exc:
+        raise await _fail(db, HTTPException(status_code=422, detail=str(exc))) from exc
+    except IntegrityError as exc:
+        raise await _fail(
+            db,
+            _integrity_error(
+                exc,
+                duplicate=(
+                    "This host already has that exact key declared for that algorithm. "
+                    "Two keys of one algorithm are allowed -- a rotation needs it -- but "
+                    "the same key twice is not."
+                ),
+                parent="That host does not exist in this workspace",
+            ),
+        ) from exc
+
+    await db.commit()
+    return JSONResponse(content={"data": _host_key_json(row)}, status_code=201)
+
+
+@router.get("/inventory-host-keys/{key_id}")
+async def show_inventory_host_key(
+    key_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    row = await _host_key(key_id, db)
+    ws = await _get_workspace(f"ws-{row.workspace_id}", db)
+    await _authorize(ws, required=cap.INVENTORY_READ, user=user, db=db)
+    return JSONResponse(content={"data": _host_key_json(row)})
+
+
+@router.patch("/inventory-host-keys/{key_id}")
+async def update_inventory_host_key(
+    key_id: str = Path(...),
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Change this key's marker, which is the only mutable thing about it.
+
+    The algorithm and the blob are the row's IDENTITY -- two thirds of its unique
+    constraint -- so changing either means a different key, which is a delete and a
+    declare. Allowing them to be edited in place would let a caller rewrite what a
+    host is trusted to present while keeping the row's id, which is the one audit
+    trail a trust anchor should not have.
+    """
+    row = await _host_key(key_id, db)
+    ws = await _get_workspace(f"ws-{row.workspace_id}", db)
+    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db, phase="apply")
+
+    attrs = (body.get("data") or {}).get("attributes") or {}
+    for frozen in ("key-type", "public-key"):
+        if frozen in attrs:
+            raise await _fail(
+                db,
+                HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"{frozen!r} cannot be changed: it is part of this key's "
+                        f"identity. Delete this entry and declare the new key, so the "
+                        f"change is visible as what it is."
+                    ),
+                ),
+            )
+    try:
+        row = await inv.update_host_key(
+            db,
+            row,
+            marker=attrs.get("marker"),
+            marker_supplied="marker" in attrs,
+        )
+    except InventoryValidationError as exc:
+        raise await _fail(db, HTTPException(status_code=422, detail=str(exc))) from exc
+
+    await db.commit()
+    return JSONResponse(content={"data": _host_key_json(row)})
+
+
+@router.delete("/inventory-host-keys/{key_id}", status_code=204)
+async def delete_inventory_host_key(
+    key_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    row = await _host_key(key_id, db)
+    ws = await _get_workspace(f"ws-{row.workspace_id}", db)
+    await _authorize(ws, required=cap.INVENTORY_WRITE, user=user, db=db, phase="apply")
+    await inv.delete_host_key(db, row)
+    await db.commit()

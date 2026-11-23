@@ -374,6 +374,83 @@ class TestAWorkspacesStorageLocationSurvivesDeletion:
         db.add.assert_not_called()
 
 
+class TestAWorkspacesHostKeyPolicySurvivesDeletion:
+    """The three-state policy through delete and undelete (#2592).
+
+    The DIRECTION is the whole of it, and it is the same argument the boolean
+    version made (#2318) with one more state to get wrong. An absent key means a
+    marker written before the policy existed, and every such workspace verified
+    strictly, so `strict` is the faithful reading of silence.
+
+    What must NOT happen is defaulting a STORED value away. A workspace whose
+    operator had set `off` or `accept-new` for a reason -- a fleet behind a
+    bastion that rewrites host keys, a fleet still being pinned -- would come
+    back as `strict`, which refuses every host it has no approved key for. That
+    arrives as `Host key verification failed` on a workspace nobody changed,
+    which points at the hosts rather than at the restore.
+
+    Driven through the real `restore_workspace` rather than through
+    `_restored_host_key_policy`, because the defect this guards can equally be
+    the ROUTE not reading the helper: a test that calls the helper by hand passes
+    with the call site deleted.
+    """
+
+    async def _restore(self, settings: dict, db):
+        store = FakeStore()
+        body = dws.build_discovery_marker(WS_A)
+        body["workspace_name"] = "app-prod"
+        body["settings"] = {"engine": "terraform", **settings}
+        store.objects[deleted_workspace_marker_key(WS_A)] = json.dumps(body).encode()
+        return await dws.restore_workspace(db, store, WS_A, restored_by="admin@example.com")
+
+    def test_the_snapshot_records_it(self):
+        ws = MagicMock()
+        ws.labels = {}
+        ws.ssh_host_key_policy = "accept-new"
+        assert dws._settings_snapshot(ws)["ssh_host_key_policy"] == "accept-new"
+
+    @pytest.mark.parametrize("policy", ["strict", "accept-new", "off"])
+    async def test_a_stored_policy_is_preserved_exactly(self, policy):
+        """Every state, and the two that are not the default are the point.
+
+        A single-value test would pass against `return DEFAULT` -- so the
+        parametrisation is what makes this mean anything.
+        """
+        db = _db()
+        db.add = MagicMock()
+
+        ws, _ = await self._restore({"ssh_host_key_policy": policy}, db)
+
+        assert ws.ssh_host_key_policy == policy
+
+    @pytest.mark.parametrize("settings", [{}, {"ssh_host_key_policy": None}])
+    async def test_a_marker_that_predates_the_policy_restores_as_strict(self, settings):
+        """Absent, and explicitly null, both mean a marker from before the
+        column -- and every workspace then verified, so `strict` is faithful
+        rather than merely safe."""
+        db = _db()
+        db.add = MagicMock()
+
+        ws, _ = await self._restore(settings, db)
+
+        assert ws.ssh_host_key_policy == "strict"
+
+    async def test_an_unrecognised_value_is_carried_rather_than_corrected(self):
+        """It came from a release that knew something this one does not.
+
+        Refusing the restore outright, or silently folding it to `strict`, are
+        both worse: the first loses the workspace over a string, and the second
+        is the tightening this class exists to prevent, arriving by a different
+        door. The column is `String(16)` with no CHECK, so it stores.
+        """
+        db = _db()
+        db.add = MagicMock()
+
+        ws, _ = await self._restore({"ssh_host_key_policy": "accept-new-ish"}, db)
+
+        assert ws.ssh_host_key_policy == "accept-new-ish"
+
+
 @contextlib.asynccontextmanager
 async def _fake_db_session():
     """The cycle opens a session per category; none of these tests touch the

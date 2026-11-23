@@ -22,6 +22,7 @@ import (
 	moduleRuleRepositoriesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/module_autodiscovery_rule_repositories"
 	oidcAudienceDefaultsDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/oidc_audience_defaults"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
+	sshHostKeysDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/ssh_host_keys"
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
 	workspaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/workspace"
@@ -41,6 +42,7 @@ import (
 	inventoryGroupVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_group_var"
 	inventoryHostRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host"
 	inventoryHostGroupRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_group"
+	inventoryHostKeysRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_keys"
 	inventoryHostVarRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_host_var"
 	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
@@ -232,6 +234,12 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		inventoryHostVarRes.NewResource,
 		inventoryGroupVarRes.NewResource,
 		inventoryGlobalVarRes.NewResource,
+		// The eighth structure (#2592), and the one exception to the rule
+		// above: a host's approved SSH host keys are one resource per HOST
+		// with a `key` block per key, because the trust set is the thing that
+		// has to be complete. A key nobody declared becoming trusted is the
+		// failure it exists to prevent, so the whole set has one owner.
+		inventoryHostKeysRes.NewResource,
 	}
 }
 
@@ -251,5 +259,6 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		oidcAudienceDefaultsDS.NewDataSource,
 		inventoryResolvedDS.NewDataSource,
 		ansibleEEDS.NewDataSource,
+		sshHostKeysDS.NewDataSource,
 	}
 }

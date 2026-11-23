@@ -162,6 +162,12 @@ COPY services/terrapod/services/cost/ ./terrapod/services/cost/
 # database and storage dependencies into this image.
 COPY services/terrapod/services/inventory_render.py ./terrapod/services/inventory_render.py
 COPY services/terrapod/services/ansible_auth.py ./terrapod/services/ansible_auth.py
+# The known_hosts renderer (#2592). Pure -- it imports nothing at all beyond
+# typing -- for the same reason as the inventory renderer above: it has to be
+# one COPYed file rather than a reason to install anything, because
+# `job_entrypoint` imports the configure phase at module level, so an import
+# this image cannot satisfy makes EVERY run of EVERY kind fail at startup.
+COPY services/terrapod/services/known_hosts_render.py ./terrapod/services/known_hosts_render.py
 
 # /home/runner is the writable HOME for UID 1000, and UID 1000 gets a real
 # /etc/passwd entry. The passwd entry matters twice over:

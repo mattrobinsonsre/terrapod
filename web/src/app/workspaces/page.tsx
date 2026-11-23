@@ -66,6 +66,8 @@ import {
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
 import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
+import { SshHostKeyPolicySelect } from '@/components/ssh-host-key-policy-field'
+import { DEFAULT_SSH_HOST_KEY_POLICY } from '@/lib/ssh-host-keys'
 import { LabelsEditor } from '@/components/labels-editor'
 import {
   OidcAudiencesEditor,
@@ -429,9 +431,10 @@ function createDefaults(engine: string): Record<string, unknown> {
     // column defaults to it and an empty value is substituted server-side, so
     // an empty box would misreport what a new workspace will actually use.
     'scheduled-configure-timezone': 'UTC',
-    // ansible — verification on is ansible's own behaviour, so the column
-    // defaults TRUE and the box has to show that (#2318).
-    'ansible-host-key-checking': true,
+    // ansible — `strict` is both the column default and ansible's own
+    // behaviour, so the select has to show it rather than render blank
+    // (#2318, three-state since #2592).
+    'ssh-host-key-policy': DEFAULT_SSH_HOST_KEY_POLICY,
     // pools
     'agent-pool-ids': [],
     // vcs
@@ -1410,8 +1413,8 @@ function WorkspacesPageInner() {
         return hintText(tDetail('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
         return hintText(tDetail('fields.dynamicInventoryModeHint'))
-      case 'ansible-host-key-checking':
-        return tieredHint(tDetail, 'fields.ansibleHostKeyCheckingHint')
+      case 'ssh-host-key-policy':
+        return tieredHint(tDetail, 'fields.sshHostKeyPolicyHint')
       case 'ansible-collections':
         return tieredHint(tDetail, 'fields.ansibleCollectionsHint')
       case 'agent-pool-ids':
@@ -1816,10 +1819,18 @@ function WorkspacesPageInner() {
           kind="select"
           control={<DynamicInventorySelect ctx={createCtx} />}
         />
-        {/* Whether a configure verifies the host key of the hosts it targets
-            (#2318). On is ansible's own behaviour; `createDefaults` seeds it
-            so the box shows that rather than reading as off. */}
-        <Field attr="ansible-host-key-checking" ctx={createCtx} kind="checkbox" />
+        {/* How a configure verifies the host keys of the hosts it targets
+            (#2318). THREE states rather than two since #2592: `accept-new`
+            keeps the hosts somebody has pinned strictly verified while leaving
+            the rest reachable, which a boolean could not say. `strict` is
+            ansible's own behaviour and the column default; `createDefaults`
+            seeds it so the select shows it rather than rendering blank. */}
+        <Field
+          attr="ssh-host-key-policy"
+          ctx={createCtx}
+          kind="select"
+          control={<SshHostKeyPolicySelect ctx={createCtx} />}
+        />
         <Field
           attr="ansible-version"
           ctx={createCtx}

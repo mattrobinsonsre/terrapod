@@ -315,14 +315,18 @@ export const FIELDS: readonly FieldSpec[] = [
     group: 'ansible',
     dependsOn: 'configure-enabled',
   },
-  // Whether a configure verifies the SSH host key of the hosts it targets
-  // (#2318). The only boolean in this group whose default is TRUE, which is
-  // why both forms seed it rather than letting an absent value read as off:
-  // on IS ansible's own behaviour, so an unchecked box would misreport a
-  // workspace nobody has touched as accepting any host key.
+  // How a configure verifies the SSH host keys of the hosts it targets
+  // (#2318, three-state since #2592). No longer a boolean, and the shape
+  // change is the point: OpenSSH has three behaviours and the box could name
+  // two, so `accept-new` -- trust on first contact, refuse once a key changes
+  // -- was unreachable from the UI, and it is the state a fleet with some
+  // hosts pinned and some not actually wants. Every form seeds it rather than
+  // letting an absent value read as `off`: `strict` is the column default and
+  // ansible's own behaviour, so a blank select would misreport a workspace
+  // nobody has touched as accepting any host key.
   {
-    attr: 'ansible-host-key-checking',
-    id: 'ws-ansible-host-key-checking',
+    attr: 'ssh-host-key-policy',
+    id: 'ws-ssh-host-key-policy',
     group: 'ansible',
     dependsOn: 'configure-enabled',
   },
@@ -639,7 +643,7 @@ export const LABEL_KEY: Record<string, string> = {
   // own labels, so it is unaffected.
   'dynamic-inventory-enabled': 'fields.dynamicInventoryMode',
   'inventory-scripts-enabled': 'fields.inventoryScriptsEnabled',
-  'ansible-host-key-checking': 'fields.ansibleHostKeyChecking',
+  'ssh-host-key-policy': 'fields.sshHostKeyPolicy',
   'ansible-version': 'fields.ansibleVersion',
   'ansible-execution-environment': 'fields.ansibleExecutionEnvironment',
   'ansible-collections': 'fields.ansibleCollections',

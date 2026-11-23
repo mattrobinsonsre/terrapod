@@ -335,6 +335,43 @@ class AgentPoolToken(Base):
 DEFAULT_ANSIBLE_LINE = "2.21"
 
 
+#: How a configure VERIFIES a host key, and the values are OpenSSH's three
+#: behaviours rather than a boolean, because OpenSSH has three and ansible can only
+#: express two (#2592).
+#:
+#: This replaced `ansible_host_key_checking`, a boolean that named ansible's own
+#: `HOST_KEY_CHECKING` flag. The rename is the point rather than tidying: a
+#: tri-state is not that flag, it is OpenSSH's `StrictHostKeyChecking`, and keeping
+#: ansible's name on it would have been a third instance of modelling our own
+#: feature on the weaker of the two tools. Ansible defers verification to OpenSSH;
+#: so do we, and the setting now says which of OpenSSH's answers we want.
+#:
+#: * `strict` -- refuse an unknown host and a changed key. The default, and what
+#:   the boolean's `true` meant.
+#: * `accept-new` -- trust a host on FIRST contact, refuse it if its key later
+#:   changes. **Ansible cannot express this at all**, and it is the state a growing
+#:   fleet actually wants: approved keys are verified strictly while a host nobody
+#:   has pinned yet is still reachable. Without it, declaring one approved key
+#:   makes every unpinned ADDRESS in that inventory unreachable, because
+#:   `ssh_args` is process-wide.
+#: * `off` -- verify nothing. What the boolean's `false` meant.
+SSH_HOST_KEY_POLICIES: tuple[str, ...] = ("strict", "accept-new", "off")
+
+#: The default, and it is the behaviour that already existed rather than a new
+#: restriction: ansible's own `HOST_KEY_CHECKING` defaults to true, so first
+#: contact with an unseen host already failed closed.
+DEFAULT_SSH_HOST_KEY_POLICY = "strict"
+
+#: Policy -> the `StrictHostKeyChecking` value OpenSSH takes. One producer, because
+#: the orchestrator and the inventory resolver both need the mapping and a second
+#: copy is how they come to disagree about what `accept-new` means.
+SSH_HOST_KEY_POLICY_TO_OPENSSH: dict[str, str] = {
+    "strict": "yes",
+    "accept-new": "accept-new",
+    "off": "no",
+}
+
+
 class Workspace(Base):
     """Terraform workspace — isolates state, variables, and runs."""
 
@@ -583,26 +620,28 @@ class Workspace(Base):
         Boolean, nullable=False, server_default="false", default=False
     )
 
-    #: Whether a configure run verifies the SSH host key of the hosts it
-    #: targets. TRUE is verification on, and that is the EXISTING behaviour
-    #: rather than a new restriction: measured against the published EE image,
-    #: ansible's own `HOST_KEY_CHECKING` defaults to true, the configure phase
-    #: forces nothing about it, and no `known_hosts` file ships -- so first
-    #: contact with an unseen host already fails closed with `Host key
-    #: verification failed`. What was missing was any way to express an
-    #: exception, which this and the machine credential's `known_hosts` field
-    #: supply between them (#2318).
+    #: How a configure run verifies the SSH host keys of the hosts it targets:
+    #: `strict`, `accept-new` or `off`. See `SSH_HOST_KEY_POLICIES`.
     #:
-    #: Setting it false makes the resolver emit `ansible_ssh_common_args` as a
-    #: variable on `all`, NOT an environment variable. That is the whole of why
-    #: a host can still beat it: measured, a host variable REPLACES a group
-    #: `all` variable, so a host may re-enable verification over a
-    #: workspace-level relaxation. Forcing `ANSIBLE_HOST_KEY_CHECKING` into the
-    #: environment would have overridden the operator's own `ansible.cfg` --
-    #: which this project reserves for non-negotiables -- and would have sat
-    #: ABOVE the per-host override rather than below it.
-    ansible_host_key_checking: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true", default=True
+    #: **It is delivered through the run's own ssh anchor, which nothing in the
+    #: inventory can beat, and that is a deliberate change from the boolean this
+    #: replaced.** That boolean was emitted as an `ansible_ssh_common_args`
+    #: variable on `all` precisely SO a host variable could beat it -- a host
+    #: re-enabling verification over a workspace-level relaxation was the only
+    #: per-host exception available when the choice was all-or-nothing.
+    #:
+    #: `accept-new` is what makes that override unnecessary, which is why losing it
+    #: is a trade rather than a regression: the mixed case is now expressible at
+    #: the workspace -- pinned hosts verified strictly, unpinned ones reachable on
+    #: first contact -- instead of needing a per-host escape from a blunt setting.
+    #: And a trust anchor a host variable can override is not an anchor; measured,
+    #: `ANSIBLE_SSH_ARGS` lands FIRST in argv and OpenSSH takes the first `-o` for
+    #: each parameter, which is what makes this authoritative at all.
+    ssh_host_key_policy: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=DEFAULT_SSH_HOST_KEY_POLICY,
+        default=DEFAULT_SSH_HOST_KEY_POLICY,
     )
 
     #: Permit ansible's `auto` inventory plugin -- a declared plugin config, a
@@ -2319,29 +2358,15 @@ class AutodiscoveryRule(Base):
         Boolean, nullable=False, server_default="false", default=False
     )
 
-    #: Whether a configure run verifies the SSH host key of the hosts it
-    #: targets. TRUE is verification on, and that is the EXISTING behaviour
-    #: rather than a new restriction: measured against the published EE image,
-    #: ansible's own `HOST_KEY_CHECKING` defaults to true, the configure phase
-    #: forces nothing about it, and no `known_hosts` file ships -- so first
-    #: contact with an unseen host already fails closed with `Host key
-    #: verification failed`. What was missing was any way to express an
-    #: exception, which this and the machine credential's `known_hosts` field
-    #: supply between them (#2318).
-    #:
-    #: Templated onto the workspaces this rule materialises, like every other
-    #: setting here, so a rule that says nothing creates workspaces that verify.
-    #:
-    #: Setting it false makes the resolver emit `ansible_ssh_common_args` as a
-    #: variable on `all`, NOT an environment variable. That is the whole of why
-    #: a host can still beat it: measured, a host variable REPLACES a group
-    #: `all` variable, so a host may re-enable verification over a
-    #: workspace-level relaxation. Forcing `ANSIBLE_HOST_KEY_CHECKING` into the
-    #: environment would have overridden the operator's own `ansible.cfg` --
-    #: which this project reserves for non-negotiables -- and would have sat
-    #: ABOVE the per-host override rather than below it.
-    ansible_host_key_checking: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true", default=True
+    #: How a configure run verifies SSH host keys: `strict`, `accept-new` or
+    #: `off`. See `SSH_HOST_KEY_POLICIES` and the workspace column of the same
+    #: name, which this templates onto the workspaces it materialises -- so a rule
+    #: that says nothing creates workspaces that verify strictly.
+    ssh_host_key_policy: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=DEFAULT_SSH_HOST_KEY_POLICY,
+        default=DEFAULT_SSH_HOST_KEY_POLICY,
     )
 
     #: Templated onto the workspaces this rule materialises, like every other
@@ -3349,6 +3374,24 @@ class Run(Base):
     #: `NULL` only on a run created before this column existed; the options
     #: builder falls back to `parallelism` for those, in one place.
     configure_parallelism: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+
+    #: The host-key policy this run enforces, SNAPSHOTTED from the workspace at
+    #: creation like `configure_parallelism` beside it -- so a run behaves as it was
+    #: created and editing the workspace cannot change a queued run's posture.
+    #:
+    #: **Deliberately the opposite of how the approved KEYS are read**, and the
+    #: asymmetry is principled rather than an oversight. Both choices are the safe
+    #: direction: snapshotting the policy means a relaxation cannot weaken a run
+    #: already in flight, while the keys are read LIVE so a key marked `revoked`
+    #: while a run sits queued is refused BY THAT RUN. Pinning the keys would let a
+    #: withdrawn key stay trusted for the length of a queue; making the policy live
+    #: would let someone turn verification off under a running configure.
+    ssh_host_key_policy: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=DEFAULT_SSH_HOST_KEY_POLICY,
+        default=DEFAULT_SSH_HOST_KEY_POLICY,
+    )
     # The **RESOLVED** map — the workspace's override already merged over the
     # deployment catalogue — snapshotted at creation like the resources above
     # (#1901).
@@ -5610,6 +5653,112 @@ class InventoryGlobalVar(Base):
     __table_args__ = (
         UniqueConstraint("workspace_id", "key", name="uq_inventory_global_vars_workspace_key"),
         Index("ix_inventory_global_vars_workspace_id", "workspace_id"),
+    )
+
+
+#: The host-key algorithms an approved key may be declared under, as OpenSSH names
+#: them in a `known_hosts` line's second field.
+#:
+#: Validated rather than free text, and that is the point: a typo'd algorithm in a
+#: declared TRUST ANCHOR silently never matches anything, and the symptom -- a host
+#: whose key is refused -- reads as "the host changed its key" rather than as a
+#: configuration error.
+#:
+#: `ssh-rsa` is here beside `rsa-sha2-*` because the two SIGNATURE algorithms both
+#: present a key whose own type is `ssh-rsa`: measured against `x/crypto/ssh`,
+#: `rsa-sha2-512` and `rsa-sha2-256` each yield a key whose `.Type()` is `ssh-rsa`.
+#: A comparison keyed on the key's type therefore has to accept the key's spelling,
+#: or an RSA pin could never match itself.
+SSH_HOST_KEY_TYPES: frozenset[str] = frozenset(
+    {
+        "ssh-ed25519",
+        "ecdsa-sha2-nistp256",
+        "ecdsa-sha2-nistp384",
+        "ecdsa-sha2-nistp521",
+        "ssh-rsa",
+        "rsa-sha2-256",
+        "rsa-sha2-512",
+    }
+)
+
+#: The optional first field of a `known_hosts` line, without its `@`.
+#:
+#: Per LINE rather than per key type, which is why this is a column on a row and not
+#: a key in a map: ansible's own `known_hosts` module documents the field that way,
+#: and `x/crypto/ssh/knownhosts` keys its revoked set on the MARSHALLED KEY rather
+#: than on the algorithm. `revoked` is what makes a rotation safe -- the outgoing key
+#: stays declared and refused, so a replay of it is rejected rather than silently
+#: trusted as an unknown host.
+SSH_HOST_KEY_MARKERS: frozenset[str] = frozenset({"cert-authority", "revoked"})
+
+
+class InventoryHostKey(Base):
+    """One approved SSH host key for an inventory host (#2592).
+
+    The eighth inventory structure, and a structure rather than a host VARIABLE for
+    two measured reasons. There is no reserved-name guard for inventory variables, so
+    a magic variable name would need one built and applied at every write path; and a
+    host variable lands in ansible's own variable namespace, where `setup` gathers
+    `ansible_ssh_host_key_{rsa,ecdsa,ed25519}_public` from the node and ansible's
+    `vars/clean.py` carves those names out of its restricted-key stripping so they
+    survive -- putting a DECLARED trust anchor next to a GATHERED one with precedence
+    deciding which a play sees.
+
+    One row per `known_hosts` LINE, which is what makes the shape right: a marker
+    belongs to a key rather than to an algorithm, and a host legitimately holds two
+    keys of one type while it is being rotated.
+
+    **Deliberately not encrypted**, unlike the sibling variable tables. A host's
+    public key is public, and registering it with the run's log redactor would
+    replace the one value an operator needs to read when a key does not match -- the
+    same reasoning that keeps it out of `MACHINE_SECRET_FIELDS`. So it is absent from
+    `crypto/columns.py::ENCRYPTED_COLUMNS` on purpose, not by omission.
+    """
+
+    __tablename__ = "inventory_host_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: No standalone foreign key, exactly as the sibling tables do it: the composite
+    #: constraint below carries it, which is what makes a key for a host in another
+    #: workspace structurally impossible rather than merely refused in a service.
+    host_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    key_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: The base64 blob alone -- no algorithm prefix and no host field. Those are the
+    #: line's other two fields and storing them here would be storing the rendering.
+    public_key: Mapped[str] = mapped_column(Text, nullable=False)
+    marker: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        #: NOT `(host_id, key_type)`, which is what the sibling constraint
+        #: `uq_inventory_host_vars_host_key` transliterates to and which would be
+        #: wrong: two keys of one type is exactly the mid-rotation state this table
+        #: exists to be able to hold. The identity of a `known_hosts` line is the
+        #: host, the algorithm and the key.
+        UniqueConstraint(
+            "host_id", "key_type", "public_key", name="uq_inventory_host_keys_host_type_key"
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "host_id"],
+            ["inventory_hosts.workspace_id", "inventory_hosts.id"],
+            ondelete="CASCADE",
+            name="fk_inventory_host_keys_host",
+        ),
+        Index("ix_inventory_host_keys_workspace_id", "workspace_id"),
+        Index("ix_inventory_host_keys_host_id", "host_id"),
     )
 
 

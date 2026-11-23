@@ -262,13 +262,16 @@ Ansible is the ordinary default rather than a problem, and
 | Tool | Safety | What it does |
 |---|---|---|
 | `terrapod_inventory_list` | read-only | A workspace's hosts, groups and the variables under `all`, each carrying counts rather than the rows themselves. |
-| `terrapod_inventory_detail` | read-only | One host or group with its variables and links. Dispatches on the typed id prefix, so there is no `kind` argument to get wrong. |
+| `terrapod_inventory_detail` | read-only | One host or group with its variables and links, and for a host its approved SSH host keys **with their ids**. Dispatches on the typed id prefix, so there is no `kind` argument to get wrong. |
 | `terrapod_inventory_resolved` | read-only | The merged resolution — every host with its variables, each group's **direct** membership, and the nesting. An optional `limit` is expanded by ansible itself, **through** the nesting, which is the authoritative "what would this target". |
 | `terrapod_inventory_host_declare` | — | Declare a host. |
 | `terrapod_inventory_group_declare` | — | Declare a group. `all` and `ungrouped` are refused: ansible derives both. |
 | `terrapod_inventory_link` | — | A membership (host in group) or a nesting (group in group). |
 | `terrapod_inventory_var_set` | — | Set a variable on a host, on a group, or on the inventory (`group_vars/all`). |
-| `terrapod_inventory_remove` | destructive | Remove any row by its typed id. A host takes its memberships and variables with it; a group takes its memberships, nestings and variables. |
+| `terrapod_inventory_host_keys` | read-only | Every approved SSH host key in a workspace, keyed by host **name** — the same key `terrapod_inventory_resolved` uses, so the two read side by side: what a configure would target, and what each of those hosts is trusted to present. Carries no ids; `terrapod_inventory_detail` does. |
+| `terrapod_inventory_host_key_declare` | — | Declare one key a host is approved to present. Idempotent: declaring a key the host already has sets its marker, so "this key, revoked" is sayable without knowing what is there. |
+| `terrapod_inventory_host_key_mark` | — | Set or clear one key's marker by id — the only mutable thing about a key, since the algorithm and the blob are its identity. Omitting the marker **clears** it. |
+| `terrapod_inventory_remove` | destructive | Remove any row by its typed id. A host takes its memberships, its variables **and its approved host keys** with it; a group takes its memberships, nestings and variables. To retire a host key, prefer marking it `revoked` — the entry stays declared and the key is refused, where removing it leaves the key merely unknown. |
 
 ### Service catalog (gated) — publish items and provision from them
 

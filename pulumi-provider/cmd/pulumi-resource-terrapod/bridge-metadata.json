@@ -15,6 +15,7 @@
             "terrapod_inventory_group_var": {},
             "terrapod_inventory_host": {},
             "terrapod_inventory_host_group": {},
+            "terrapod_inventory_host_keys": {},
             "terrapod_inventory_host_var": {},
             "terrapod_module_autodiscovery_rule": {},
             "terrapod_module_workspace_link": {},

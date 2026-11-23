@@ -81,6 +81,7 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.config import DEFAULT_STORAGE_LOCATION
 from terrapod.db.models import (
     DEFAULT_ANSIBLE_LINE,
+    DEFAULT_SSH_HOST_KEY_POLICY,
     AuditLog,
     Run,
     StateVersion,
@@ -1070,7 +1071,7 @@ def _workspace_json(
                 # which is exactly what it has.
                 "auto-configure-enabled": ws.auto_configure_enabled,
                 "configure-all-hosts": ws.configure_all_hosts,
-                "ansible-host-key-checking": ws.ansible_host_key_checking,
+                "ssh-host-key-policy": ws.ssh_host_key_policy,
                 "dynamic-inventory-enabled": ws.dynamic_inventory_enabled,
                 "inventory-scripts-enabled": ws.inventory_scripts_enabled,
                 "configure-after-apply": ws.configure_after_apply,
@@ -1317,7 +1318,13 @@ def _workspace_json(
             "configure-enabled",
             "auto-configure-enabled",
             "configure-all-hosts",
-            "ansible-host-key-checking",
+            # Renamed with the column it serves (#2592). The pop is
+            # `pop(key, None)`, so a stale entry here is a SILENT no-op -- which
+            # is how the renamed attribute came to leak onto this wire until
+            # `test_a_terraform_workspace_reads_the_same_on_both_surfaces`
+            # caught it. The contract snapshot cannot: it AST-reads the literal
+            # above and has no view of this list.
+            "ssh-host-key-policy",
             "dynamic-inventory-enabled",
             "inventory-scripts-enabled",
             "configure-after-apply",
@@ -2017,15 +2024,14 @@ async def _create_workspace_impl(
         # new restriction -- ansible's own default is on and the configure phase
         # forces nothing -- so a new workspace verifies and an operator opts out
         # per workspace or, more narrowly, per host.
-        ansible_host_key_checking=(
+        ssh_host_key_policy=(
             _422(
-                lambda: workspace_settings.validate_bool(
-                    attrs["ansible-host-key-checking"],
-                    "ansible-host-key-checking",
+                lambda: workspace_settings.validate_ssh_host_key_policy(
+                    attrs["ssh-host-key-policy"]
                 )
             )
-            if "ansible-host-key-checking" in attrs
-            else True
+            if "ssh-host-key-policy" in attrs
+            else DEFAULT_SSH_HOST_KEY_POLICY
         ),
         dynamic_inventory_enabled=(
             _422(
@@ -2891,12 +2897,9 @@ async def update_workspace(
     # Whether a configure verifies the SSH host key of the hosts it targets
     # (#2318). No cross-field invariant: relaxing it on a workspace with no
     # configure operation is inert rather than incoherent.
-    if "ansible-host-key-checking" in attrs:
-        ws.ansible_host_key_checking = _422(
-            lambda: workspace_settings.validate_bool(
-                attrs["ansible-host-key-checking"],
-                "ansible-host-key-checking",
-            )
+    if "ssh-host-key-policy" in attrs:
+        ws.ssh_host_key_policy = _422(
+            lambda: workspace_settings.validate_ssh_host_key_policy(attrs["ssh-host-key-policy"])
         )
     if "dynamic-inventory-enabled" in attrs:
         ws.dynamic_inventory_enabled = _422(

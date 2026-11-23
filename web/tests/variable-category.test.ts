@@ -181,7 +181,9 @@ function pythonSetMembers(source: string, name: string): string[] {
  * and `text(...)` are the two field renderers" and a third, `multiline(...)`,
  * was added for `known_hosts` — a public host key, which must not be masked.
  * The regex matched neither it nor the new field, so the gate reported the form
- * as missing a field the form had (#2318).
+ * as missing a field the form had (#2318). That renderer has since gone again
+ * with the field's retirement (#2592), which is the second time the listed
+ * version would have been wrong and the derivation was not.
  *
  * `set(...)` is included explicitly: it is the writer the `become` select calls
  * directly rather than a `(field: string, …)` helper, so no derivation finds it.
@@ -252,11 +254,21 @@ test('the machine form writes exactly the fields the server accepts', () => {
   // a reader which parses nothing cannot pass on an empty set -- and #2413 F9
   // narrowed the server to four, which would have meant lowering the floor.
   // A floor that moves with the thing it guards stops guarding anything, and
-  // the set is small enough to name: the two FILE fields, plus the two VALUE
-  // fields, which are secrets and nothing else. `user`, `become`,
-  // `become_method` and `become_user` were here and are ordinary connection
-  // settings with a home in the inventory, so they are refused now.
-  assert.deepEqual(expected, ['become_password', 'known_hosts', 'password', 'private_key'])
+  // the set is small enough to name.
+  //
+  // It has narrowed twice more since. `user`, `become`, `become_method` and
+  // `become_user` are ordinary connection settings with a home in the inventory
+  // (#2413 F9). And `known_hosts` is retired (#2592): approved host keys are now
+  // one row per host per key on the INVENTORY, with markers, rendered into a
+  // `known_hosts` file by the platform -- so a credential is no longer where a
+  // host's public keys live, and the form must not offer a field the server
+  // refuses on write.
+  //
+  // So the set is now the one FILE field and the two VALUE fields, every one of
+  // which is a secret. That is why the component no longer has a `multiline(...)`
+  // renderer at all; the docstring above records why deriving them beats listing
+  // them.
+  assert.deepEqual(expected, ['become_password', 'password', 'private_key'])
   assert.deepEqual(formFields(panelBranches().machine), expected)
 })
 

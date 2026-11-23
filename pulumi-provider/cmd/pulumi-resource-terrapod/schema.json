@@ -159,6 +159,27 @@
                 "url"
             ]
         },
+        "terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey": {
+            "properties": {
+                "keyType": {
+                    "type": "string",
+                    "description": "The algorithm, spelled as OpenSSH spells it in the second field of a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line: `ssh-ed25519`, `ecdsa-sha2-nistp256`, `ecdsa-sha2-nistp384`, `ecdsa-sha2-nistp521`, `ssh-rsa`, `rsa-sha2-256` or `rsa-sha2-512`. The server validates it against that closed set, and the reason is the direction a typo fails in: an unrecognised algorithm in a trust anchor silently never matches, and the symptom reads as the host having rotated its key rather than as a configuration error.\n"
+                },
+                "marker": {
+                    "type": "string",
+                    "description": "The optional first field of a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line, WITHOUT its `@`: `cert-authority` or \u003cspan pulumi-lang-nodejs=\"`revoked`\" pulumi-lang-dotnet=\"`Revoked`\" pulumi-lang-go=\"`revoked`\" pulumi-lang-python=\"`revoked`\" pulumi-lang-yaml=\"`revoked`\" pulumi-lang-java=\"`revoked`\" pulumi-lang-hcl=\"`revoked`\"\u003e`revoked`\u003c/span\u003e. Omit it for an ordinary entry.\n\nPer key rather than per algorithm, which is what makes \u003cspan pulumi-lang-nodejs=\"`revoked`\" pulumi-lang-dotnet=\"`Revoked`\" pulumi-lang-go=\"`revoked`\" pulumi-lang-python=\"`revoked`\" pulumi-lang-yaml=\"`revoked`\" pulumi-lang-java=\"`revoked`\" pulumi-lang-hcl=\"`revoked`\"\u003e`revoked`\u003c/span\u003e useful: the outgoing key of a rotation stays declared and is refused, so a replay of it is rejected rather than silently treated as an unknown host. Changing only the marker is applied in place, so a rotation never leaves the host momentarily untrusted.\n"
+                },
+                "publicKey": {
+                    "type": "string",
+                    "description": "The base64 blob ALONE — the third field of a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line, with no algorithm prefix and no host. The server refuses a whole line, because stored as the blob it would render with the host and algorithm doubled and nothing would match it; it also checks the blob's own embedded algorithm name against \u003cspan pulumi-lang-nodejs=\"`keyType`\" pulumi-lang-dotnet=\"`KeyType`\" pulumi-lang-go=\"`keyType`\" pulumi-lang-python=\"`key_type`\" pulumi-lang-yaml=\"`keyType`\" pulumi-lang-java=\"`keyType`\" pulumi-lang-hcl=\"`key_type`\"\u003e`keyType`\u003c/span\u003e. Not marked sensitive: a host's public key is public, and hiding it would hide the one value an operator needs to read when a host presents something else.\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "keyType",
+                "publicKey"
+            ]
+        },
         "terrapod:index/VariableSetAssignmentRule:VariableSetAssignmentRule": {
             "properties": {
                 "agentPoolId": {
@@ -710,6 +731,26 @@
             "required": [
                 "path",
                 "url"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredInputs": []
+                }
+            }
+        },
+        "terrapod:index/getSshHostKeysEntries:getSshHostKeysEntries": {
+            "properties": {
+                "keyType": {
+                    "type": "string"
+                },
+                "publicKey": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "keyType",
+                "publicKey"
             ],
             "language": {
                 "nodejs": {
@@ -1438,6 +1479,10 @@
                     "type": "string",
                     "description": "Slack channel for run notifications on workspaces this rule creates. Empty means silent."
                 },
+                "sshHostKeyPolicy": {
+                    "type": "string",
+                    "description": "How a configure verifies the SSH host keys of the hosts it targets, templated onto the workspaces this rule creates: \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, `accept-new` or \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e. Defaults to \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, so a rule that says nothing creates workspaces that verify. These are OpenSSH's StrictHostKeyChecking behaviours; `accept-new` trusts a host on first contact and refuses it once its key CHANGES, which is what keeps an unpinned host reachable on a fleet that has begun declaring approved keys. Optional + Computed, so a rule that does not set it never drifts."
+                },
                 "terraformVersion": {
                     "type": "string",
                     "description": "Default terraform/tofu version for created workspaces. Superseded by \u003cspan pulumi-lang-nodejs=\"`engineVersion`\" pulumi-lang-dotnet=\"`EngineVersion`\" pulumi-lang-go=\"`engineVersion`\" pulumi-lang-python=\"`engine_version`\" pulumi-lang-yaml=\"`engineVersion`\" pulumi-lang-java=\"`engineVersion`\" pulumi-lang-hcl=\"`engine_version`\"\u003e`engineVersion`\u003c/span\u003e, which is the same version named for the fact that a workspace may run an engine other than Terraform.",
@@ -1520,6 +1565,7 @@
                 "securityScanEngine",
                 "securityScanSeverityThreshold",
                 "slackChannel",
+                "sshHostKeyPolicy",
                 "terraformVersion",
                 "terragruntEnabled",
                 "terragruntVersion",
@@ -1795,6 +1841,10 @@
                 "slackChannel": {
                     "type": "string",
                     "description": "Slack channel for run notifications on workspaces this rule creates. Empty means silent."
+                },
+                "sshHostKeyPolicy": {
+                    "type": "string",
+                    "description": "How a configure verifies the SSH host keys of the hosts it targets, templated onto the workspaces this rule creates: \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, `accept-new` or \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e. Defaults to \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, so a rule that says nothing creates workspaces that verify. These are OpenSSH's StrictHostKeyChecking behaviours; `accept-new` trusts a host on first contact and refuses it once its key CHANGES, which is what keeps an unpinned host reachable on a fleet that has begun declaring approved keys. Optional + Computed, so a rule that does not set it never drifts."
                 },
                 "terraformVersion": {
                     "type": "string",
@@ -2104,6 +2154,10 @@
                     "slackChannel": {
                         "type": "string",
                         "description": "Slack channel for run notifications on workspaces this rule creates. Empty means silent."
+                    },
+                    "sshHostKeyPolicy": {
+                        "type": "string",
+                        "description": "How a configure verifies the SSH host keys of the hosts it targets, templated onto the workspaces this rule creates: \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, `accept-new` or \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e. Defaults to \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, so a rule that says nothing creates workspaces that verify. These are OpenSSH's StrictHostKeyChecking behaviours; `accept-new` trusts a host on first contact and refuses it once its key CHANGES, which is what keeps an unpinned host reachable on a fleet that has begun declaring approved keys. Optional + Computed, so a rule that does not set it never drifts."
                     },
                     "terraformVersion": {
                         "type": "string",
@@ -3283,6 +3337,57 @@
                     "hostId": {
                         "type": "string",
                         "description": "The host joining the group (e.g. \"invhost-abc123\")."
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "terrapod:index/inventoryHostKeys:InventoryHostKeys": {
+            "properties": {
+                "hostId": {
+                    "type": "string",
+                    "description": "The host whose keys these are (e.g. \"invhost-abc123\"). A trust set belongs to one host, so moving it is a destroy and create. Not defaulted from the provider's \u003cspan pulumi-lang-nodejs=\"`workspace`\" pulumi-lang-dotnet=\"`Workspace`\" pulumi-lang-go=\"`workspace`\" pulumi-lang-python=\"`workspace`\" pulumi-lang-yaml=\"`workspace`\" pulumi-lang-java=\"`workspace`\" pulumi-lang-hcl=\"`workspace`\"\u003e`workspace`\u003c/span\u003e attribute: this is a HOST id, not a workspace id, so there is nothing for TERRAPOD_WORKSPACE to supply — declare the host and reference it."
+                },
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey"
+                    },
+                    "description": "One approved host key. Repeat the block per key; a SET, because a trust set has no order and a list would plan a diff whenever two blocks were swapped. Declaring no \u003cspan pulumi-lang-nodejs=\"`key`\" pulumi-lang-dotnet=\"`Key`\" pulumi-lang-go=\"`key`\" pulumi-lang-python=\"`key`\" pulumi-lang-yaml=\"`key`\" pulumi-lang-java=\"`key`\" pulumi-lang-hcl=\"`key`\"\u003e`key`\u003c/span\u003e blocks at all is a valid statement that this host is approved to present nothing, and it removes any keys the host already has."
+                }
+            },
+            "required": [
+                "hostId"
+            ],
+            "inputProperties": {
+                "hostId": {
+                    "type": "string",
+                    "description": "The host whose keys these are (e.g. \"invhost-abc123\"). A trust set belongs to one host, so moving it is a destroy and create. Not defaulted from the provider's \u003cspan pulumi-lang-nodejs=\"`workspace`\" pulumi-lang-dotnet=\"`Workspace`\" pulumi-lang-go=\"`workspace`\" pulumi-lang-python=\"`workspace`\" pulumi-lang-yaml=\"`workspace`\" pulumi-lang-java=\"`workspace`\" pulumi-lang-hcl=\"`workspace`\"\u003e`workspace`\u003c/span\u003e attribute: this is a HOST id, not a workspace id, so there is nothing for TERRAPOD_WORKSPACE to supply — declare the host and reference it."
+                },
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey"
+                    },
+                    "description": "One approved host key. Repeat the block per key; a SET, because a trust set has no order and a list would plan a diff whenever two blocks were swapped. Declaring no \u003cspan pulumi-lang-nodejs=\"`key`\" pulumi-lang-dotnet=\"`Key`\" pulumi-lang-go=\"`key`\" pulumi-lang-python=\"`key`\" pulumi-lang-yaml=\"`key`\" pulumi-lang-java=\"`key`\" pulumi-lang-hcl=\"`key`\"\u003e`key`\u003c/span\u003e blocks at all is a valid statement that this host is approved to present nothing, and it removes any keys the host already has."
+                }
+            },
+            "requiredInputs": [
+                "hostId"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering InventoryHostKeys resources.\n",
+                "properties": {
+                    "hostId": {
+                        "type": "string",
+                        "description": "The host whose keys these are (e.g. \"invhost-abc123\"). A trust set belongs to one host, so moving it is a destroy and create. Not defaulted from the provider's \u003cspan pulumi-lang-nodejs=\"`workspace`\" pulumi-lang-dotnet=\"`Workspace`\" pulumi-lang-go=\"`workspace`\" pulumi-lang-python=\"`workspace`\" pulumi-lang-yaml=\"`workspace`\" pulumi-lang-java=\"`workspace`\" pulumi-lang-hcl=\"`workspace`\"\u003e`workspace`\u003c/span\u003e attribute: this is a HOST id, not a workspace id, so there is nothing for TERRAPOD_WORKSPACE to supply — declare the host and reference it."
+                    },
+                    "keys": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey"
+                        },
+                        "description": "One approved host key. Repeat the block per key; a SET, because a trust set has no order and a list would plan a diff whenever two blocks were swapped. Declaring no \u003cspan pulumi-lang-nodejs=\"`key`\" pulumi-lang-dotnet=\"`Key`\" pulumi-lang-go=\"`key`\" pulumi-lang-python=\"`key`\" pulumi-lang-yaml=\"`key`\" pulumi-lang-java=\"`key`\" pulumi-lang-hcl=\"`key`\"\u003e`key`\u003c/span\u003e blocks at all is a valid statement that this host is approved to present nothing, and it removes any keys the host already has."
                     }
                 },
                 "type": "object"
@@ -6259,10 +6364,6 @@
                     "type": "string",
                     "description": "One of the deployment's OWN execution environments, by label — `rhel8-hardened`, say. Overrides \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e outright, so a workspace carrying this ignores its line entirely. A label rather than an image reference, so a workspace cannot name an arbitrary image and so the whole estate can be re-pointed in one place. Available labels come from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-dotnet=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-go=\"`getAnsibleExecutionEnvironments`\" pulumi-lang-python=\"`get_ansible_execution_environments`\" pulumi-lang-yaml=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-java=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-hcl=\"`data.terrapod_ansible_execution_environments`\"\u003e`terrapod.getAnsibleExecutionEnvironments`\u003c/span\u003e data source; naming one the deployment has not configured is refused at apply with a 422. Leave unset to run the built-in image for \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e, which is the ordinary case."
                 },
-                "ansibleHostKeyChecking": {
-                    "type": "boolean",
-                    "description": "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit \u003cspan pulumi-lang-nodejs=\"`ansibleSshCommonArgs`\" pulumi-lang-dotnet=\"`AnsibleSshCommonArgs`\" pulumi-lang-go=\"`ansibleSshCommonArgs`\" pulumi-lang-python=\"`ansible_ssh_common_args`\" pulumi-lang-yaml=\"`ansibleSshCommonArgs`\" pulumi-lang-java=\"`ansibleSshCommonArgs`\" pulumi-lang-hcl=\"`ansible_ssh_common_args`\"\u003e`ansibleSshCommonArgs`\u003c/span\u003e as a variable on the \u003cspan pulumi-lang-nodejs=\"`all`\" pulumi-lang-dotnet=\"`All`\" pulumi-lang-go=\"`all`\" pulumi-lang-python=\"`all`\" pulumi-lang-yaml=\"`all`\" pulumi-lang-java=\"`all`\" pulumi-lang-hcl=\"`all`\"\u003e`all`\u003c/span\u003e group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures."
-                },
                 "ansibleVersion": {
                     "type": "string",
                     "description": "The ansible-core LINE whose execution environment this workspace's configure operations run in — `2.21`, say. Terrapod publishes one execution-environment image per line, and the line is what decides which Python versions a managed host may have, so it is the unit to pin. An exact patch (`2.21.5`) is accepted and names its own line. No HCL constraint operators and not \u003cspan pulumi-lang-nodejs=\"`latest`\" pulumi-lang-dotnet=\"`Latest`\" pulumi-lang-go=\"`latest`\" pulumi-lang-python=\"`latest`\" pulumi-lang-yaml=\"`latest`\" pulumi-lang-java=\"`latest`\" pulumi-lang-hcl=\"`latest`\"\u003e`latest`\u003c/span\u003e. Left unset the server supplies the platform's current line at creation, which is then the workspace's own value — changing the platform default moves only workspaces created afterwards, exactly as \u003cspan pulumi-lang-nodejs=\"`engineVersion`\" pulumi-lang-dotnet=\"`EngineVersion`\" pulumi-lang-go=\"`engineVersion`\" pulumi-lang-python=\"`engine_version`\" pulumi-lang-yaml=\"`engineVersion`\" pulumi-lang-java=\"`engineVersion`\" pulumi-lang-hcl=\"`engine_version`\"\u003e`engineVersion`\u003c/span\u003e behaves. This does not affect how Terrapod reads the workspace's inventory: that is done server-side with the ansible in the API image."
@@ -6515,6 +6616,10 @@
                     "type": "string",
                     "description": "Slack channel this workspace's run notifications post to (#556) — approval / applied / errored / drift. Opt-in: leave empty and the workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled server-side."
                 },
+                "sshHostKeyPolicy": {
+                    "type": "string",
+                    "description": "How a configure **verifies the SSH host keys** of the hosts it targets: \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, `accept-new` or \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e. **Defaults to \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e**, and that default is the behaviour that already existed rather than a new restriction — ansible's own `HOST_KEY_CHECKING` defaults on, so first contact with an unseen host already failed closed with `Host key verification failed`.\n\nThese are OpenSSH's `StrictHostKeyChecking` behaviours rather than ansible's boolean flag, and the middle one is the point:\n\n- \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e — a host must already be approved. Verifies every host, refuses an unknown one.\n- `accept-new` — trust a host on **first contact**, refuse it if its key later **changes**. **Ansible cannot express this at all**, and it is what a growing fleet wants: approved keys are verified strictly while a host nobody has pinned yet is still reachable. Without it, declaring one approved key with \u003cspan pulumi-lang-nodejs=\"`terrapod.InventoryHostKeys`\" pulumi-lang-dotnet=\"`terrapod.InventoryHostKeys`\" pulumi-lang-go=\"`InventoryHostKeys`\" pulumi-lang-python=\"`InventoryHostKeys`\" pulumi-lang-yaml=\"`terrapod.InventoryHostKeys`\" pulumi-lang-java=\"`terrapod.InventoryHostKeys`\" pulumi-lang-hcl=\"`terrapod_inventory_host_keys`\"\u003e`terrapod.InventoryHostKeys`\u003c/span\u003e makes every unpinned **address** in that inventory unreachable, because \u003cspan pulumi-lang-nodejs=\"`sshArgs`\" pulumi-lang-dotnet=\"`SshArgs`\" pulumi-lang-go=\"`sshArgs`\" pulumi-lang-python=\"`ssh_args`\" pulumi-lang-yaml=\"`sshArgs`\" pulumi-lang-java=\"`sshArgs`\" pulumi-lang-hcl=\"`ssh_args`\"\u003e`sshArgs`\u003c/span\u003e is process-wide.\n- \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e — verify nothing.\n\nThe policy rides the run's own SSH anchor, which **nothing in the inventory can override**. That is a deliberate change from the \u003cspan pulumi-lang-nodejs=\"`ansibleHostKeyChecking`\" pulumi-lang-dotnet=\"`AnsibleHostKeyChecking`\" pulumi-lang-go=\"`ansibleHostKeyChecking`\" pulumi-lang-python=\"`ansible_host_key_checking`\" pulumi-lang-yaml=\"`ansibleHostKeyChecking`\" pulumi-lang-java=\"`ansibleHostKeyChecking`\" pulumi-lang-hcl=\"`ansible_host_key_checking`\"\u003e`ansibleHostKeyChecking`\u003c/span\u003e boolean this replaced, which was emitted as a group variable precisely so a host variable could beat it — the only per-host exception available when the choice was all-or-nothing. `accept-new` is what makes that override unnecessary, so losing it is a trade rather than a regression: the mixed case is now expressible on the workspace."
+                },
                 "stateDiverged": {
                     "type": "boolean",
                     "description": "True when an apply Job succeeded but uploading the resulting state to Terrapod failed; the recorded state is out of sync with reality. Stable across PATCHes — only the state-upload pathway changes this."
@@ -6601,7 +6706,6 @@
                 "aiSummaryMode",
                 "allowForkPrPlans",
                 "ansibleCollections",
-                "ansibleHostKeyChecking",
                 "ansibleVersion",
                 "autoApplyMode",
                 "autoConfigureEnabled",
@@ -6657,6 +6761,7 @@
                 "securityScanSeverityThreshold",
                 "securityScanSkipRules",
                 "slackChannel",
+                "sshHostKeyPolicy",
                 "stateDiverged",
                 "terraformVersion",
                 "terragruntEnabled",
@@ -6713,10 +6818,6 @@
                 "ansibleExecutionEnvironment": {
                     "type": "string",
                     "description": "One of the deployment's OWN execution environments, by label — `rhel8-hardened`, say. Overrides \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e outright, so a workspace carrying this ignores its line entirely. A label rather than an image reference, so a workspace cannot name an arbitrary image and so the whole estate can be re-pointed in one place. Available labels come from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-dotnet=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-go=\"`getAnsibleExecutionEnvironments`\" pulumi-lang-python=\"`get_ansible_execution_environments`\" pulumi-lang-yaml=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-java=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-hcl=\"`data.terrapod_ansible_execution_environments`\"\u003e`terrapod.getAnsibleExecutionEnvironments`\u003c/span\u003e data source; naming one the deployment has not configured is refused at apply with a 422. Leave unset to run the built-in image for \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e, which is the ordinary case."
-                },
-                "ansibleHostKeyChecking": {
-                    "type": "boolean",
-                    "description": "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit \u003cspan pulumi-lang-nodejs=\"`ansibleSshCommonArgs`\" pulumi-lang-dotnet=\"`AnsibleSshCommonArgs`\" pulumi-lang-go=\"`ansibleSshCommonArgs`\" pulumi-lang-python=\"`ansible_ssh_common_args`\" pulumi-lang-yaml=\"`ansibleSshCommonArgs`\" pulumi-lang-java=\"`ansibleSshCommonArgs`\" pulumi-lang-hcl=\"`ansible_ssh_common_args`\"\u003e`ansibleSshCommonArgs`\u003c/span\u003e as a variable on the \u003cspan pulumi-lang-nodejs=\"`all`\" pulumi-lang-dotnet=\"`All`\" pulumi-lang-go=\"`all`\" pulumi-lang-python=\"`all`\" pulumi-lang-yaml=\"`all`\" pulumi-lang-java=\"`all`\" pulumi-lang-hcl=\"`all`\"\u003e`all`\u003c/span\u003e group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures."
                 },
                 "ansibleVersion": {
                     "type": "string",
@@ -6926,6 +7027,10 @@
                     "type": "string",
                     "description": "Slack channel this workspace's run notifications post to (#556) — approval / applied / errored / drift. Opt-in: leave empty and the workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled server-side."
                 },
+                "sshHostKeyPolicy": {
+                    "type": "string",
+                    "description": "How a configure **verifies the SSH host keys** of the hosts it targets: \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, `accept-new` or \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e. **Defaults to \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e**, and that default is the behaviour that already existed rather than a new restriction — ansible's own `HOST_KEY_CHECKING` defaults on, so first contact with an unseen host already failed closed with `Host key verification failed`.\n\nThese are OpenSSH's `StrictHostKeyChecking` behaviours rather than ansible's boolean flag, and the middle one is the point:\n\n- \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e — a host must already be approved. Verifies every host, refuses an unknown one.\n- `accept-new` — trust a host on **first contact**, refuse it if its key later **changes**. **Ansible cannot express this at all**, and it is what a growing fleet wants: approved keys are verified strictly while a host nobody has pinned yet is still reachable. Without it, declaring one approved key with \u003cspan pulumi-lang-nodejs=\"`terrapod.InventoryHostKeys`\" pulumi-lang-dotnet=\"`terrapod.InventoryHostKeys`\" pulumi-lang-go=\"`InventoryHostKeys`\" pulumi-lang-python=\"`InventoryHostKeys`\" pulumi-lang-yaml=\"`terrapod.InventoryHostKeys`\" pulumi-lang-java=\"`terrapod.InventoryHostKeys`\" pulumi-lang-hcl=\"`terrapod_inventory_host_keys`\"\u003e`terrapod.InventoryHostKeys`\u003c/span\u003e makes every unpinned **address** in that inventory unreachable, because \u003cspan pulumi-lang-nodejs=\"`sshArgs`\" pulumi-lang-dotnet=\"`SshArgs`\" pulumi-lang-go=\"`sshArgs`\" pulumi-lang-python=\"`ssh_args`\" pulumi-lang-yaml=\"`sshArgs`\" pulumi-lang-java=\"`sshArgs`\" pulumi-lang-hcl=\"`ssh_args`\"\u003e`sshArgs`\u003c/span\u003e is process-wide.\n- \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e — verify nothing.\n\nThe policy rides the run's own SSH anchor, which **nothing in the inventory can override**. That is a deliberate change from the \u003cspan pulumi-lang-nodejs=\"`ansibleHostKeyChecking`\" pulumi-lang-dotnet=\"`AnsibleHostKeyChecking`\" pulumi-lang-go=\"`ansibleHostKeyChecking`\" pulumi-lang-python=\"`ansible_host_key_checking`\" pulumi-lang-yaml=\"`ansibleHostKeyChecking`\" pulumi-lang-java=\"`ansibleHostKeyChecking`\" pulumi-lang-hcl=\"`ansible_host_key_checking`\"\u003e`ansibleHostKeyChecking`\u003c/span\u003e boolean this replaced, which was emitted as a group variable precisely so a host variable could beat it — the only per-host exception available when the choice was all-or-nothing. `accept-new` is what makes that override unnecessary, so losing it is a trade rather than a regression: the mixed case is now expressible on the workspace."
+                },
                 "terraformVersion": {
                     "type": "string",
                     "description": "The Terraform/OpenTofu version to use. Superseded by \u003cspan pulumi-lang-nodejs=\"`engineVersion`\" pulumi-lang-dotnet=\"`EngineVersion`\" pulumi-lang-go=\"`engineVersion`\" pulumi-lang-python=\"`engine_version`\" pulumi-lang-yaml=\"`engineVersion`\" pulumi-lang-java=\"`engineVersion`\" pulumi-lang-hcl=\"`engine_version`\"\u003e`engineVersion`\u003c/span\u003e, which is the same version named for the fact that a workspace may run an engine other than Terraform.",
@@ -7025,10 +7130,6 @@
                     "ansibleExecutionEnvironment": {
                         "type": "string",
                         "description": "One of the deployment's OWN execution environments, by label — `rhel8-hardened`, say. Overrides \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e outright, so a workspace carrying this ignores its line entirely. A label rather than an image reference, so a workspace cannot name an arbitrary image and so the whole estate can be re-pointed in one place. Available labels come from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-dotnet=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-go=\"`getAnsibleExecutionEnvironments`\" pulumi-lang-python=\"`get_ansible_execution_environments`\" pulumi-lang-yaml=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-java=\"`terrapod.getAnsibleExecutionEnvironments`\" pulumi-lang-hcl=\"`data.terrapod_ansible_execution_environments`\"\u003e`terrapod.getAnsibleExecutionEnvironments`\u003c/span\u003e data source; naming one the deployment has not configured is refused at apply with a 422. Leave unset to run the built-in image for \u003cspan pulumi-lang-nodejs=\"`ansibleVersion`\" pulumi-lang-dotnet=\"`AnsibleVersion`\" pulumi-lang-go=\"`ansibleVersion`\" pulumi-lang-python=\"`ansible_version`\" pulumi-lang-yaml=\"`ansibleVersion`\" pulumi-lang-java=\"`ansibleVersion`\" pulumi-lang-hcl=\"`ansible_version`\"\u003e`ansibleVersion`\u003c/span\u003e, which is the ordinary case."
-                    },
-                    "ansibleHostKeyChecking": {
-                        "type": "boolean",
-                        "description": "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit \u003cspan pulumi-lang-nodejs=\"`ansibleSshCommonArgs`\" pulumi-lang-dotnet=\"`AnsibleSshCommonArgs`\" pulumi-lang-go=\"`ansibleSshCommonArgs`\" pulumi-lang-python=\"`ansible_ssh_common_args`\" pulumi-lang-yaml=\"`ansibleSshCommonArgs`\" pulumi-lang-java=\"`ansibleSshCommonArgs`\" pulumi-lang-hcl=\"`ansible_ssh_common_args`\"\u003e`ansibleSshCommonArgs`\u003c/span\u003e as a variable on the \u003cspan pulumi-lang-nodejs=\"`all`\" pulumi-lang-dotnet=\"`All`\" pulumi-lang-go=\"`all`\" pulumi-lang-python=\"`all`\" pulumi-lang-yaml=\"`all`\" pulumi-lang-java=\"`all`\" pulumi-lang-hcl=\"`all`\"\u003e`all`\u003c/span\u003e group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures."
                     },
                     "ansibleVersion": {
                         "type": "string",
@@ -7281,6 +7382,10 @@
                     "slackChannel": {
                         "type": "string",
                         "description": "Slack channel this workspace's run notifications post to (#556) — approval / applied / errored / drift. Opt-in: leave empty and the workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled server-side."
+                    },
+                    "sshHostKeyPolicy": {
+                        "type": "string",
+                        "description": "How a configure **verifies the SSH host keys** of the hosts it targets: \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e, `accept-new` or \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e. **Defaults to \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e**, and that default is the behaviour that already existed rather than a new restriction — ansible's own `HOST_KEY_CHECKING` defaults on, so first contact with an unseen host already failed closed with `Host key verification failed`.\n\nThese are OpenSSH's `StrictHostKeyChecking` behaviours rather than ansible's boolean flag, and the middle one is the point:\n\n- \u003cspan pulumi-lang-nodejs=\"`strict`\" pulumi-lang-dotnet=\"`Strict`\" pulumi-lang-go=\"`strict`\" pulumi-lang-python=\"`strict`\" pulumi-lang-yaml=\"`strict`\" pulumi-lang-java=\"`strict`\" pulumi-lang-hcl=\"`strict`\"\u003e`strict`\u003c/span\u003e — a host must already be approved. Verifies every host, refuses an unknown one.\n- `accept-new` — trust a host on **first contact**, refuse it if its key later **changes**. **Ansible cannot express this at all**, and it is what a growing fleet wants: approved keys are verified strictly while a host nobody has pinned yet is still reachable. Without it, declaring one approved key with \u003cspan pulumi-lang-nodejs=\"`terrapod.InventoryHostKeys`\" pulumi-lang-dotnet=\"`terrapod.InventoryHostKeys`\" pulumi-lang-go=\"`InventoryHostKeys`\" pulumi-lang-python=\"`InventoryHostKeys`\" pulumi-lang-yaml=\"`terrapod.InventoryHostKeys`\" pulumi-lang-java=\"`terrapod.InventoryHostKeys`\" pulumi-lang-hcl=\"`terrapod_inventory_host_keys`\"\u003e`terrapod.InventoryHostKeys`\u003c/span\u003e makes every unpinned **address** in that inventory unreachable, because \u003cspan pulumi-lang-nodejs=\"`sshArgs`\" pulumi-lang-dotnet=\"`SshArgs`\" pulumi-lang-go=\"`sshArgs`\" pulumi-lang-python=\"`ssh_args`\" pulumi-lang-yaml=\"`sshArgs`\" pulumi-lang-java=\"`sshArgs`\" pulumi-lang-hcl=\"`ssh_args`\"\u003e`sshArgs`\u003c/span\u003e is process-wide.\n- \u003cspan pulumi-lang-nodejs=\"`off`\" pulumi-lang-dotnet=\"`Off`\" pulumi-lang-go=\"`off`\" pulumi-lang-python=\"`off`\" pulumi-lang-yaml=\"`off`\" pulumi-lang-java=\"`off`\" pulumi-lang-hcl=\"`off`\"\u003e`off`\u003c/span\u003e — verify nothing.\n\nThe policy rides the run's own SSH anchor, which **nothing in the inventory can override**. That is a deliberate change from the \u003cspan pulumi-lang-nodejs=\"`ansibleHostKeyChecking`\" pulumi-lang-dotnet=\"`AnsibleHostKeyChecking`\" pulumi-lang-go=\"`ansibleHostKeyChecking`\" pulumi-lang-python=\"`ansible_host_key_checking`\" pulumi-lang-yaml=\"`ansibleHostKeyChecking`\" pulumi-lang-java=\"`ansibleHostKeyChecking`\" pulumi-lang-hcl=\"`ansible_host_key_checking`\"\u003e`ansibleHostKeyChecking`\u003c/span\u003e boolean this replaced, which was emitted as a group variable precisely so a host variable could beat it — the only per-host exception available when the choice was all-or-nothing. `accept-new` is what makes that override unnecessary, so losing it is a trade rather than a regression: the mixed case is now expressible on the workspace."
                     },
                     "stateDiverged": {
                         "type": "boolean",
@@ -7893,6 +7998,82 @@
                 "type": "object"
             }
         },
+        "terrapod:index/getSshHostKeys:getSshHostKeys": {
+            "inputs": {
+                "description": "A collection of arguments for invoking getSshHostKeys.\n",
+                "properties": {
+                    "hosts": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "keyTypes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "port": {
+                        "type": "integer"
+                    },
+                    "scanTimeoutSeconds": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "hosts"
+                ]
+            },
+            "outputs": {
+                "description": "A collection of values returned by getSshHostKeys.\n",
+                "properties": {
+                    "entries": {
+                        "additionalProperties": {
+                            "items": {
+                                "$ref": "#/types/terrapod:index/getSshHostKeysEntries:getSshHostKeysEntries"
+                            },
+                            "type": "array"
+                        },
+                        "type": "object"
+                    },
+                    "hosts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "keyTypes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "port": {
+                        "type": "integer"
+                    },
+                    "scanTimeoutSeconds": {
+                        "type": "integer"
+                    },
+                    "unreachableHosts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "entries",
+                    "hosts",
+                    "keyTypes",
+                    "port",
+                    "scanTimeoutSeconds",
+                    "unreachableHosts"
+                ],
+                "type": "object"
+            }
+        },
         "terrapod:index/getUser:getUser": {
             "inputs": {
                 "description": "A collection of arguments for invoking getUser.\n",
@@ -8090,9 +8271,6 @@
                     "ansibleExecutionEnvironment": {
                         "type": "string"
                     },
-                    "ansibleHostKeyChecking": {
-                        "type": "boolean"
-                    },
                     "ansibleVersion": {
                         "type": "string"
                     },
@@ -8279,6 +8457,9 @@
                     "slackChannel": {
                         "type": "string"
                     },
+                    "sshHostKeyPolicy": {
+                        "type": "string"
+                    },
                     "stateDiverged": {
                         "type": "boolean"
                     },
@@ -8345,7 +8526,6 @@
                     "allowForkPrPlans",
                     "ansibleCollections",
                     "ansibleExecutionEnvironment",
-                    "ansibleHostKeyChecking",
                     "ansibleVersion",
                     "autoApplyMode",
                     "autoConfigureEnabled",
@@ -8401,6 +8581,7 @@
                     "securityScanSeverityThreshold",
                     "securityScanSkipRules",
                     "slackChannel",
+                    "sshHostKeyPolicy",
                     "stateDiverged",
                     "terraformVersion",
                     "terragruntEnabled",

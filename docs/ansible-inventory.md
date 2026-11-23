@@ -48,7 +48,7 @@ the variables set at each level.*
 
 ---
 
-## The seven structures
+## The eight structures
 
 | Structure | Id prefix | What it is in ansible's terms |
 |---|---|---|
@@ -59,6 +59,7 @@ the variables set at each level.*
 | Host variable | `invhvar-` | One entry in that host's `host_vars` |
 | Group variable | `invgvar-` | One entry in that group's `group_vars` |
 | Inventory variable | `invvar-` | One entry in `group_vars/all` |
+| Approved host key | `invhkey-` | **Nothing in ansible's terms** — one `known_hosts` line. See below |
 
 **A host carries nothing but its name.** There is no `address` field:
 `ansible_host` is a variable like any other, because that is what it is to
@@ -72,16 +73,61 @@ cannot be a declared group — the rendered inventory document is rooted at
 land at that root's `vars:`, which is the consequence of the refusal rather than
 a way round it.
 
+### The eighth structure has no ansible equivalent
+
+Seven of the eight are ansible's own concepts under Terrapod's names. The eighth
+is not: an **approved host key** is one `known_hosts` line — a host, an algorithm,
+a key, and an optional `cert-authority` or `revoked` marker — and ansible has no
+inventory-level notion of one.
+
+That is a deliberate departure rather than a gap we are filling in ansible's
+shape. What ansible offers is a binary `host_key_checking` toggle, a set of
+`ansible_ssh_host_key_<family>_public` **facts** describing what a host *reported*
+rather than what anyone approves, and a `known_hosts` module that runs *during* a
+play — after the connection it would have protected. None of those is a place to
+say "this host is trusted to present these keys".
+
+Where ansible is right is in deferring verification to OpenSSH, and Terrapod does
+the same: these rows render into a `known_hosts` file, and OpenSSH does the
+refusing. Terrapod owns the model; it does not reimplement the crypto.
+
+**Every type the host exposes, not one of them.** A host answering on ed25519,
+ecdsa and rsa has three approved keys and all three belong here. Two keys of the
+same algorithm are allowed as well, which is what a rotation needs — the old key
+and the new one are both approved while hosts are being re-keyed.
+
+A key's identity is `(host, algorithm, key)`, so the **marker is the only mutable
+part**. Changing the algorithm or the key means a different key, which is a delete
+and a declare; editing them in place would let someone rewrite what a host is
+trusted to present while keeping the row's id, and that id is the audit trail.
+
+See [Running a Configure](ansible-configure.md) for how a configure uses them.
+
 ### Why a variable is a row and not a map
 
 Each variable is a row with **one writer**. That is the whole reason the shape is
-seven structures rather than a host object carrying its groups in a list and its
+eight structures rather than a host object carrying its groups in a list and its
 variables in a map.
 
 With rows, a second concern can contribute a variable to a host or a group it
 does not own, and can add its own hosts to a shared group without owning the
 group. With a map, every writer owns the whole map, so two concerns cannot both
-contribute without one of them reverting the other on its next apply. The same
+contribute without one of them reverting the other on its next apply.
+
+**Approved host keys are the one deliberate exception, and the reason is worth
+stating.** `terrapod_inventory_host_keys` is an aggregate: one resource per host,
+carrying every approved key as a repeated `key` block. So two such resources
+naming one host *would* each remove the other's keys on every apply — exactly the
+failure the rows shape exists to avoid.
+
+That is the property here rather than the cost. The other seven structures hold
+independent facts, where a partial contribution is meaningful. A trust set is not
+that: what matters is that the declared keys are **the** approved keys, so a key
+appearing out of band is drift the next apply removes. Under a contributory
+shape an unapproved key could quietly become trusted and nothing would notice,
+which is the thing the whole structure exists to prevent. The API keeps the rows
+per key, so a second concern can still *read* them and the UI can mark one
+revoked without rewriting the set. The same
 argument makes a membership its own row: a Terraform resource needs something it
 can address, and a membership that is only a list on one side cannot be one.
 
@@ -317,7 +363,7 @@ A Redis entry does back it, and it is deliberately invisible. The key is
 content-addressed — an equality token over the rows, plus the resolved commit —
 so a write **supersedes** the entry rather than needing to invalidate it. There
 is nothing for an operator to tune and nothing to flush. Invalidating on write
-would instead mean a call site in every one of the seven structures' writers, and
+would instead mean a call site in every one of the eight structures' writers, and
 missing one is a silent stale read.
 
 **It fails closed.** A resolution that cannot be performed is refused, never
@@ -858,7 +904,7 @@ Request and response shapes for every route are in
 
 ## Managing it as code
 
-Seven resources and one data source, in
+Eight resources and two data sources, in
 [the Terrapod provider](terraform-provider.md). The roots and defaults are
 attributes on `terrapod_workspace` itself:
 
@@ -871,11 +917,41 @@ attributes on `terrapod_workspace` itself:
 | `terrapod_inventory_host_var` | One `host_vars` entry |
 | `terrapod_inventory_group_var` | One `group_vars` entry |
 | `terrapod_inventory_global_var` | One `group_vars/all` entry |
+| `terrapod_inventory_host_keys` | The SSH host keys one host is approved to present — one resource per host, with a `key` block per key |
 
 The data source **`terrapod_inventory_resolved`** is the merged view. It is a
 data source rather than an attribute on a resource because a data source has no
 round-trip requirement, so a derived value belongs there — the same reasoning
 that keeps a workspace's effective cloud-identity audiences off its resource.
+
+**`terrapod_ssh_host_keys`** is the second data source: the keys a set of hosts
+actually present, read by connecting to each one. Feed it into
+`terrapod_inventory_host_keys` through a `dynamic "key"` block — a direct
+assignment cannot type-check, because the scan cannot supply a `marker`:
+
+```hcl
+resource "terrapod_inventory_host_keys" "web1" {
+  host_id = terrapod_inventory_host.web1.id
+
+  dynamic "key" {
+    for_each = data.terrapod_ssh_host_keys.fleet.entries["web-01.example.com"]
+    content {
+      key_type   = key.value.key_type
+      public_key = key.value.public_key
+    }
+  }
+}
+```
+
+`terrapod_inventory_host_keys` owns a host's WHOLE trust set, so a key that
+appears out of band is drift the next apply removes — which is the point, because
+the alternative is a key nobody approved quietly becoming trusted. Declare one
+per host. Declare every key the host offers rather than one per algorithm family:
+a client picks by its own `HostKeyAlgorithms` preference, so a trust set holding
+one key per family refuses the host whenever the two disagree. Two keys of one
+algorithm are allowed, which is what makes a rotation safe — declare the incoming
+key and mark the outgoing one `revoked`, so a replay of it is refused rather than
+merely unknown.
 
 ---
 

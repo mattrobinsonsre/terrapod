@@ -21,7 +21,7 @@ before the playbook runs.
 
 | Category | Scope (`key`) | Value | Materialized as |
 |---|---|---|---|
-| `ansible_machine_auth` | the credential's **name** — the inventory refers to it as `${terrapod:<name>.<field>}` and decides which hosts get it | `{private_key?, known_hosts?, password?, become_password?}` | a `0600` key file on the volume shared with the execution environment; the placeholder is substituted with its **path**, or with the value for a non-file field |
+| `ansible_machine_auth` | the credential's **name** — the inventory refers to it as `${terrapod:<name>.<field>}` and decides which hosts get it | `{private_key?, password?, become_password?}` | a `0600` key file on the volume shared with the execution environment; the placeholder is substituted with its **path**, or with the value for a non-file field |
 | `ansible_vault_auth` | the **vault ID label** | `{"password": "…"}` | a `0600` password file, named in the execution environment's `ANSIBLE_VAULT_IDENTITY_LIST` as `label@path` |
 
 Because these are ordinary variables they inherit the whole variable model:
@@ -88,65 +88,32 @@ below.
 | Field | Typical target variable | Notes |
 |---|---|---|
 | `private_key` | `ansible_ssh_private_key_file` | the **path** to a `0600` file Terrapod writes. The key itself never enters the inventory document. A trailing newline is added if you omit one, because ssh otherwise refuses the key with an error naming neither the key nor the missing byte |
-| `known_hosts` | `ansible_ssh_common_args`, as `-o UserKnownHostsFile=…` | the **path** to a file holding the host keys this credential's hosts present. See [the `known_hosts` field](#the-known_hosts-field) |
 | `password` | `ansible_password` | |
 | `become_password` | `ansible_become_password` | |
 
 **At least one of `private_key` or `password` is required.** With neither,
 ansible has no way to authenticate and the credential does nothing, so it is
-refused rather than stored. `known_hosts` is not an authentication field and does
-not count towards that pair.
+refused rather than stored.
 
-### The `known_hosts` field
+### The `known_hosts` field is retired
 
-Host-key verification is **on** for a configure, and has always been — see
-[Host-key verification, and how to satisfy
-it](ansible-configure.md#host-key-verification-and-how-to-satisfy-it). This field
-is how you satisfy it rather than withdraw it: put the host keys your fleet
-presents in it, point ssh at the file Terrapod writes, and the hosts connect with
-verification left in place.
+This field used to hold the host keys a credential's hosts present, delivered as a
+file for `-o UserKnownHostsFile=` to point at. **It is retired.** Approved host keys
+are now part of the inventory — see [Approve the key: host keys on the
+inventory](ansible-configure.md#approve-the-key-host-keys-on-the-inventory) — where
+they are one row per host per key, carry `cert-authority` and `revoked` markers, and
+are rendered into a `known_hosts` file by Terrapod rather than assembled by hand.
 
-```yaml
-all:
-  vars:
-    ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:web-key.known_hosts}"
-```
+**A credential still carrying the field keeps working.** It is ignored on read rather
+than refused, so the credential's `private_key` and `password` are unaffected and
+nothing stops being delivered. **Writing it is refused**, naming the field, so the
+next edit of that credential is where you remove it.
 
-The value is whatever `ssh-keyscan` or your own records give you — one key per
-line, in `known_hosts` format:
-
-```hcl
-resource "terrapod_variable" "web_key" {
-  workspace_id = terrapod_workspace.fleet.id
-  key          = "web-key"
-  category     = "ansible_machine_auth"
-  sensitive    = true
-  value = jsonencode({
-    private_key = file("~/.ssh/fleet")
-    known_hosts = <<-EOT
-      web1.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
-      web2.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...
-    EOT
-  })
-}
-```
-
-Two things about it differ from every other field, and both are deliberate.
-
-**It is a file, like `private_key`** — a placeholder naming it substitutes the
-*path*, never the content. That is not a convenience: `-o UserKnownHostsFile=`
-takes a path, so a field delivered any other way could not be used for this at
-all. A trailing newline is added if you omit one, because an unterminated final
-entry is not read — which presents as the host key simply not being trusted,
-naming nothing.
-
-**It is NOT redacted in the run's log**, where every other credential field is. A
-host's **public** key is public; it is what the host hands to anyone who
-connects. Registering it with the log redactor would replace it in the log with a
-marker and hide nothing — while destroying the one value you need to read when a
-host key does not match, which is the moment you are most likely to be reading
-that log. The private key, the passwords and the vault passphrases are redacted
-exactly as before.
+Why it moved rather than stayed: the field was a *credential* holding nothing secret,
+it was one opaque blob that could not say which host a key belonged to or carry a
+marker, and it made the operator assemble the file and paste a placeholder into an
+inventory variable — so the platform's trust anchor was only as good as that one line
+of someone else's YAML.
 
 ### `key` is the credential's name, and the inventory says where it is used
 
@@ -340,7 +307,7 @@ Setting `value_source: "vault"` on either category is refused with a 422, and th
 reason is structural: **a credential in these categories is a JSON object, while
 an OpenBao/Vault reference resolves to a single field.** A reference is one
 `{mount, path, field}` read producing one string — there is no shape in which it
-could deliver `{"private_key": …, "known_hosts": …, "become_password": …}`.
+could deliver `{"private_key": …, "password": …, "become_password": …}`.
 
 If you want the secret to live in OpenBao/Vault rather than in Terrapod, put the
 credential's own secret fields there and reference them from a `static` value —
@@ -508,43 +475,13 @@ than the backstop:
   a vault password — is additionally **registered with the redactor before the
   file exists**, so there is no window in which ansible could print one
   unredacted.
-- **The secret fields, not every field.** `known_hosts` is a file like
-  `private_key` and is deliberately left unredacted, because a host's public key
-  is public and hiding it would cost you the one value worth reading when a key
-  does not match. See [the `known_hosts` field](#the-known_hosts-field).
-
-### Both of a configure's streams are covered
-
-A configure writes two durable things, and the redactor covers both:
-
-| stream | what it is |
-|---|---|
-| the run log | ansible's own output, as you read it on the run page |
-| the per-host event stream | the structured capture behind the **Hosts** tab, and the failure text stored against each host |
-
-The second matters more than it looks. A callback plugin records each module's
-whole return value, so a task that *prints* a credential puts it there — and the
-failure message lifted out of that stream is readable at a lower permission tier
-than the stream itself. Both objects are redacted by the orchestrator before
-they leave the runner, so the value never reaches storage, the database or the
-API.
-
-**The value is matched in the forms a log actually carries it in, not only as you
-typed it.** Inside a JSON document a newline is two characters, so a private key
-appears as `-----BEGIN …-----\nb3Blb…` rather than across three lines, and a
-password containing a quote appears as `p@ss\"word`. A pass that looked only for
-the value as given would find nothing in that file and report success — so the
-encoded forms are matched too, to two levels of nesting. Beyond that (JSON
-inside JSON inside JSON) is a stated limit rather than a covered case.
-
-### Length decides how a credential is matched, not whether it is redacted
-
-**No length leaves a credential in the clear.** A short value used to be skipped
-entirely, and the reasoning was right about the cost and wrong about the
-conclusion: a short string replaced *wherever it occurs* really would black out
-ordinary output, but that is an argument for matching it more carefully rather
-than for leaving it in the log. So length chooses the matcher.
-
+- **The secret fields, not every field.** `MACHINE_SECRET_FIELDS` is what the
+  runner registers with the log redactor, and it is narrower than
+  `MACHINE_FILE_FIELDS` on purpose — a file is not automatically a secret. Today
+  every machine file field happens to be one (`private_key` is the only member of
+  both), because the field that made the distinction load-bearing was `known_hosts`
+  and it is retired. The condition stays, because the next non-secret file field
+  needs it on the day it is added, which is exactly when nobody would think of it.
 - **At or above the substring floor**, the value is removed wherever it appears,
   including inside a longer string — which is what you want for a token that can
   turn up in a URL or a base64 blob.
@@ -655,10 +592,12 @@ left unredacted precisely so this is readable.
 
 Two fixes, in order of preference:
 
-* put the keys in the credential's
-  [`known_hosts` field](#the-known_hosts-field) and point
-  `ansible_ssh_common_args` at the file — verification stays on;
-* or set the workspace's `ansible-host-key-checking` to `false`, which relaxes it
+* approve the host's keys on the **inventory** — see [Approve the key: host keys on
+  the inventory](ansible-configure.md#approve-the-key-host-keys-on-the-inventory) —
+  which Terrapod renders into a `known_hosts` file and points ssh at, with
+  verification left on;
+* or set the workspace's `ssh-host-key-policy` to `accept-new` (trust on first
+  contact, refuse on change) or `off` (verify nothing), which relaxes it
   for every host the workspace configures. See [Host-key verification, and how to
   satisfy it](ansible-configure.md#host-key-verification-and-how-to-satisfy-it).
 

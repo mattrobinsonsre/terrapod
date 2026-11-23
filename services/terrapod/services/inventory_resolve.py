@@ -1058,54 +1058,31 @@ def make_tempdir() -> str:
 # ── The orchestrator ─────────────────────────────────────────────────────────
 
 
-#: The variable a host-key relaxation is expressed as. ONE string, because
-#: `ansible_ssh_common_args` is one string and ansible does not merge it -- which
-#: is exactly what makes a host able to override this (measured: a host variable
-#: REPLACES a group `all` variable), and also means a host that overrides it
-#: restates the whole argument string rather than adding to it.
-_HOST_KEY_VAR = "ansible_ssh_common_args"
-
-#: `UserKnownHostsFile=/dev/null` as well as `StrictHostKeyChecking=no`, because
-#: without it ssh writes the accepted key into a known_hosts under the EE's HOME
-#: -- a per-run `emptyDir`, so it is discarded anyway -- and warns on every
-#: connection, which puts a line in the operator's log for something they asked
-#: for.
-_RELAXED_HOST_KEY_ARGS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-
-
-def _relax_host_key_checking(ws, declared: dict[str, Any]) -> None:
-    """Express the workspace's host-key relaxation as a variable on `all` (#2318).
-
-    A VARIABLE and not an environment variable, which is the whole of why a host
-    can still beat it. `ANSIBLE_HOST_KEY_CHECKING` is per-process: forcing it
-    would override the operator's own `ansible.cfg` -- which this project
-    reserves for non-negotiables -- and would sit ABOVE a per-host override
-    rather than below it, so the per-host exception the setting exists to permit
-    would be unreachable.
-
-    Mutates `declared` in place so BOTH consumers get it from one producer: the
-    platform source rendered for the API's own `ansible-inventory` run, and the
-    document handed to the runner. Injecting at either call site alone would have
-    left the other path quietly unrelaxed.
-
-    An absent workspace means verification stays on, which is the safe direction
-    for a row we could not read.
-    """
-    if ws is None or getattr(ws, "ansible_host_key_checking", True):
-        return
-    global_vars = declared.setdefault("global_vars", {})
-    if _HOST_KEY_VAR in global_vars:
-        # Their own statement is more specific than a workspace toggle, so it
-        # wins -- and it is logged, because a setting that silently does nothing
-        # is worse than one that refuses.
-        logger.info(
-            "host-key verification is relaxed on this workspace, but its inventory "
-            "already declares this variable on `all`; theirs is used unchanged",
-            variable=_HOST_KEY_VAR,
-            declared_value=global_vars[_HOST_KEY_VAR],
-        )
-        return
-    global_vars[_HOST_KEY_VAR] = _RELAXED_HOST_KEY_ARGS
+# NOTHING HERE WRITES A HOST-KEY VARIABLE ANY MORE (#2592), and the comment is
+# what is left rather than a constant: `_HOST_KEY_VAR` held
+# `"ansible_ssh_common_args"` and was deleted with the last thing that read it.
+# `runner/phases/configure_known_hosts._statements_about_host_keys` names that
+# variable itself, from its own literal tuple, so keeping a copy here would have
+# been a constant nothing reads carrying a reason that was not true.
+#
+# The relaxation that used to live here is gone with the boolean it served (#2592).
+# It emitted that variable on `all` when `ansible_host_key_checking` was false, as
+# ONE string -- ansible does not merge `ansible_ssh_common_args`, which is exactly
+# what let a host override it (measured: a host variable REPLACES a group `all`
+# variable, so a host that overrode it restated the whole argument string rather
+# than adding to it). A variable rather than an environment variable was
+# DELIBERATE, and that override was the point: a host re-enabling verification over
+# a workspace-level relaxation was the only per-host exception available when the
+# choice was all-or-nothing.
+#
+# `ssh_host_key_policy` replaces both halves of that. The policy is delivered
+# through the run's own ssh anchor, which nothing in the inventory can beat, and
+# `accept-new` is what makes the per-host override unnecessary: the mixed case is
+# now expressible at the workspace -- pinned hosts verified strictly, unpinned ones
+# reachable on first contact -- instead of needing an escape from a blunt setting.
+#
+# The anchor has to be unbeatable for the same reason the keys exist at all: a
+# trust anchor a host variable can override is not an anchor.
 
 
 async def _declared_document(db, workspace_id: uuid.UUID) -> dict[str, Any]:
@@ -1543,7 +1520,6 @@ async def _resolve_uncached(
         # defined empty result from the same path as everything else rather than
         # from a special case.
         declared = await _declared_document(db, workspace_id)
-        _relax_host_key_checking(ws, declared)
         platform_file = workdir / _PLATFORM_SOURCE_NAME
         await asyncio.to_thread(platform_file.write_text, render_inventory_yaml(**declared))
         sources.append(platform_file)

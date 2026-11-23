@@ -82,7 +82,7 @@ what exists and each machine becomes rows, so the host set is versioned,
 diffable, and visible in a plan **before** it is adopted — where a plugin
 discovers hosts by running code and shows you the result afterwards.
 
-→ [Ansible inventory](ansible-inventory.md) for the seven structures, why a
+→ [Ansible inventory](ansible-inventory.md) for the eight structures, why a
 variable is a row rather than a map, [the two sources and which one
 wins](ansible-inventory.md#the-two-sources), [declaring hosts alongside the
 infrastructure](ansible-inventory.md#declaring-hosts-alongside-the-infrastructure),
@@ -196,7 +196,7 @@ placeholder that joins the last two — the smallest complete thing, with nothin
 left to click.
 
 It is written as OpenTofu/Terraform because that is the idiom every piece already
-has: the seven inventory structures and both credential categories are
+has: the eight inventory structures and both credential categories are
 first-class resources, so a configure is declarable in full rather than
 half-declared and half-configured. The same objects are reachable from the API,
 the Pulumi provider, the MCP tools and the UI.
@@ -491,7 +491,7 @@ every combination.
 
 | Page | What it covers |
 |---|---|
-| [Ansible inventory](ansible-inventory.md) | The seven structures, the two sources, the live resolved read and `?limit=`, why plugins are refused, the name rules |
+| [Ansible inventory](ansible-inventory.md) | The eight structures, the two sources, the live resolved read and `?limit=`, why plugins are refused, the name rules |
 | [Running a configure](ansible-configure.md) | How one starts, the blast radius, who may, per-run overrides, per-host results, troubleshooting |
 | [Ansible credentials](ansible-credentials.md) | `ansible_machine_auth` and `ansible_vault_auth`, where the files land, what outranks what |
 | [Runners](runners.md#what-a-configure-actually-runs) | The execution environment, the Job a configure runs in |

@@ -14,11 +14,17 @@ import (
 // # Eight structures, because that is what an ansible inventory is
 //
 // A host, a group, a host's membership of a group, a group's nesting inside
-// another, and a variable attached to a host, to a group or to `all`. The two
-// memberships are many-to-many and each is its own addressable row, so a
-// second concern can put a host in a group it does not own, and a variable has
+// another, a variable attached to a host, to a group or to `all`, and the SSH
+// host keys a host is approved to present (#2592, in inventory_host_keys.go).
+// The two memberships are many-to-many and each is its own addressable row, so
+// a second concern can put a host in a group it does not own, and a variable has
 // exactly one writer -- which is the whole reason variables are rows here
 // rather than a map on their parent.
+//
+// This header said eight and listed seven until #2592, which is what the eighth
+// being added found -- and the stale enumeration is how that work first
+// described host keys as a ninth structure. A count in prose has nothing
+// keeping it in step with the list beside it.
 //
 // There is no inventory object to create: there is one inventory per workspace,
 // and the roots that feed it -- the config directory, the inventory paths, and

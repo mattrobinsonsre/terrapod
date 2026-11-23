@@ -28,6 +28,12 @@ import re
 from terrapod.db.models import now_utc
 from terrapod.services.cloud_identity_resolver import unsafe_target_reason
 
+# From the PURE renderer module, not the model, for the reason stated just
+# above: this module stays free of the ORM. `known_hosts_render` imports
+# nothing beyond the standard library, and its copies are pinned equal to the
+# model's in `tests/services/test_known_hosts_render.py`.
+from terrapod.services.known_hosts_render import SSH_HOST_KEY_POLICIES
+
 SCAN_ENFORCEMENTS = frozenset({"off", "advisory", "enforced"})
 SCAN_ENGINES = frozenset({"checkov", "trivy", "both"})
 SCAN_SEVERITY_THRESHOLDS = frozenset({"critical", "high", "medium", "low"})
@@ -426,6 +432,32 @@ def validate_scan_skip_rules(raw: object) -> list[str]:
             )
         out.append(v.strip())
     return out
+
+
+def validate_ssh_host_key_policy(raw: object) -> str:
+    """How a configure verifies host keys: `strict`, `accept-new` or `off` (#2592).
+
+    Refused here rather than at the column so the caller gets the three values
+    back instead of a 500 from a length or check violation -- the same reasoning
+    as `validate_ai_summary_mode` below, and the same shape.
+
+    **A boolean is refused explicitly**, because this replaced one and `true` is
+    what a caller written against the old attribute sends. Coercing it would be the
+    worse failure: `bool` is not in the set, so a bare membership test refuses it
+    anyway, but with a message naming three strings and no hint that the caller is
+    using a retired spelling. Saying so is the difference between an operator
+    fixing their call and an operator guessing.
+    """
+    if isinstance(raw, bool):
+        raise ValueError(
+            "ssh-host-key-policy is not a boolean -- it replaced "
+            "ansible-host-key-checking, which was one. Use 'strict' (what true "
+            "meant), 'accept-new' (trust on first contact, refuse on change) or "
+            "'off' (what false meant)"
+        )
+    if raw not in SSH_HOST_KEY_POLICIES:
+        raise ValueError("ssh-host-key-policy must be 'strict', 'accept-new', or 'off'")
+    return str(raw)
 
 
 def validate_ai_summary_mode(raw: object) -> str:

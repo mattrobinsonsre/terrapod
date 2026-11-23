@@ -30,6 +30,7 @@ from terrapod.db.models import (
     InventoryGroupVar,
     InventoryHost,
     InventoryHostGroup,
+    InventoryHostKey,
     InventoryHostVar,
 )
 from terrapod.services import replication, replication_registry
@@ -39,6 +40,7 @@ GROUPS = replication_registry.INVENTORY_GROUPS
 HOST_GROUPS = replication_registry.INVENTORY_HOST_GROUPS
 GROUP_CHILDREN = replication_registry.INVENTORY_GROUP_CHILDREN
 HOST_VARS = replication_registry.INVENTORY_HOST_VARS
+HOST_KEYS = replication_registry.INVENTORY_HOST_KEYS
 GROUP_VARS = replication_registry.INVENTORY_GROUP_VARS
 GLOBAL_VARS = replication_registry.INVENTORY_GLOBAL_VARS
 
@@ -84,6 +86,35 @@ def _host(host_id=HOST_ID, **kw):
     base = {"id": host_id, "workspace_id": WS_ID, "name": "web-01", **_stamps()}
     base.update(kw)
     return InventoryHost(**base)
+
+
+#: A real ed25519 blob shape: a length-prefixed algorithm name, then key bytes.
+#: Built rather than hardcoded so the embedded name and the declared `key_type`
+#: agree -- the validators refuse a disagreement, and a fixture that could not pass
+#: them would be testing a row the API cannot create.
+def _pubkey(name: str = "ssh-ed25519") -> str:
+    import base64
+    import struct
+
+    return base64.b64encode(struct.pack(">I", len(name)) + name.encode() + b"\x01" * 32).decode()
+
+
+HOST_KEY_ID = uuid.UUID("77777777-7777-7777-7777-777777777777")
+OTHER_HOST_KEY_ID = uuid.UUID("88888888-8888-8888-8888-888888888888")
+
+
+def _host_key(key_id=HOST_KEY_ID, **kw):
+    base = {
+        "id": key_id,
+        "workspace_id": WS_ID,
+        "host_id": HOST_ID,
+        "key_type": "ssh-ed25519",
+        "public_key": _pubkey(),
+        "marker": None,
+        **_stamps(),
+    }
+    base.update(kw)
+    return InventoryHostKey(**base)
 
 
 def _group(group_id=GROUP_ID, **kw):
@@ -642,3 +673,87 @@ class TestInventoryGlobalVars:
         removed = await replication.reconcile_deletions(db, GLOBAL_VARS, {str(VAR_ID)})
 
         assert removed == [str(OTHER_VAR_ID)]
+
+
+class TestApprovedHostKeysReplicate:
+    """The eighth inventory class (#2592), and the failure it guards is the sharpest.
+
+    A host whose approved keys are lost at promotion has NO approved key -- and
+    `ssh_host_key_policy` defaults `strict`, which fails closed on first contact, so
+    a configure against that host does not degrade, it refuses the host outright.
+    The symptom on the promoted node is every host unreachable with nothing in the
+    inventory looking wrong, which is why these rows are not optional.
+
+    No `encrypted-columns` row, and that is DERIVED rather than claimed: the matrix
+    gate computes the required set from the model, and `public_key` is plain `Text`
+    because a host's public key is public. Nothing secret crosses the peer link
+    here, unlike the three variable classes above.
+    """
+
+    @pytest.mark.replication_matrix("inventory_host_keys", "backfill-from-empty")
+    async def test_backfill_carries_the_key_its_type_and_its_marker(self):
+        db = _rows_db([_host_key(marker="revoked")])
+
+        page = await replication.read_backfill(db, HOST_KEYS)
+
+        assert page[0]["public_key"] == _pubkey()
+        assert page[0]["key_type"] == "ssh-ed25519"
+        # The marker travels. A `revoked` key that arrived unmarked would be read as
+        # APPROVED on the promoted node -- the exact key a rotation retired, trusted
+        # again, which is worse than losing it.
+        assert page[0]["marker"] == "revoked"
+        assert page[0]["host_id"] == str(HOST_ID)
+
+    @pytest.mark.replication_matrix("inventory_host_keys", "delta-apply")
+    async def test_marking_a_key_revoked_reaches_the_peer(self):
+        """The one mutable field, and the one whose loss is unsafe rather than
+        merely lossy: a revocation that does not replicate leaves the peer
+        trusting a key the leader has withdrawn."""
+        db = AsyncMock()
+        existing = _host_key()
+        db.scalar.return_value = existing
+
+        await replication.apply_upsert(db, HOST_KEYS, {"id": str(HOST_KEY_ID), "marker": "revoked"})
+
+        assert existing.marker == "revoked"
+
+    @pytest.mark.replication_matrix("inventory_host_keys", "idempotent-reapply")
+    async def test_reapplying_changes_nothing(self):
+        db = AsyncMock()
+        existing = _host_key(marker="revoked")
+        db.scalar.return_value = existing
+
+        await replication.apply_upsert(db, HOST_KEYS, {"id": str(HOST_KEY_ID), "marker": "revoked"})
+
+        assert existing.marker == "revoked"
+        assert existing.key_type == "ssh-ed25519"
+        assert existing.public_key == _pubkey()
+
+    @pytest.mark.replication_matrix("inventory_host_keys", "delete")
+    async def test_a_deleted_key_is_deleted_on_the_peer(self):
+        """Deletion has to carry, and not only for tidiness: an operator deleting a
+        key is withdrawing trust, so a peer that keeps it goes on accepting a host
+        the leader no longer approves."""
+        db = AsyncMock()
+
+        await replication.apply_delete(db, HOST_KEYS, str(HOST_KEY_ID))
+
+        db.execute.assert_awaited()
+        # Stronger than the siblings' bare `assert_awaited()`: the statement has to
+        # be a DELETE against THIS class's table. A delete that reached `execute`
+        # having targeted the wrong table would satisfy the weaker form, and on this
+        # class the wrong table is a sibling holding the host's variables.
+        statement = str(db.execute.await_args.args[0])
+        assert statement.startswith("DELETE FROM inventory_host_keys"), statement
+
+    @pytest.mark.replication_matrix("inventory_host_keys", "backfill-converges-deletion")
+    async def test_a_removed_key_does_not_come_back(self):
+        """Separate from `delete` deliberately (#1115 was exactly the case where one
+        path worked and the other silently did not): this is the RECOVERY path, so a
+        key withdrawn while a peer was unreachable must not be reinstated when the
+        peer catches up by backfill."""
+        db = _keys_db([(HOST_KEY_ID,), (OTHER_HOST_KEY_ID,)])
+
+        removed = await replication.reconcile_deletions(db, HOST_KEYS, {str(HOST_KEY_ID)})
+
+        assert removed == [str(OTHER_HOST_KEY_ID)]

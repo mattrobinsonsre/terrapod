@@ -110,11 +110,14 @@ machines outside the cluster — so it deserves its own pass.
 - [ ] **Every configure-enabled workspace has a `default-limit`** — an empty one
       means **every host in the inventory**. The Runs tab states the reach before
       the button is pressed, but the setting is where you decide it.
-- [ ] **Host-key verification is left on** — `ansible-host-key-checking` defaults
-      true, which is ansible's own behaviour. Turning it off accepts any key a
-      host presents, so the connection can be intercepted; supply the host's key
-      via a `known_hosts` credential field instead. See
-      [Running a Configure](ansible-configure.md#host-key-verification-and-how-to-satisfy-it).
+- [ ] **Host-key verification is left strict** — `ssh-host-key-policy` defaults to
+      `strict`, which is ansible's own behaviour. `off` accepts any key a host
+      presents, so the connection can be intercepted. Prefer **approving the host's
+      keys on the inventory** (`terrapod_inventory_host_keys`), which Terrapod
+      renders into a `known_hosts` file and points ssh at; where a fleet is still
+      being pinned, `accept-new` is the middle setting — it trusts a host on first
+      contact and refuses it if its key later changes, which `off` does not. See
+      [Running a Configure](ansible-configure.md#choose-the-posture-ssh-host-key-policy-on-the-workspace).
 - [ ] **Dynamic inventory stays off unless you need it** — both switches permit
       repository code to resolve the inventory on the runner, and
       `inventory-scripts-enabled` permits an **arbitrary executable** with the

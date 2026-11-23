@@ -417,7 +417,7 @@ async def find_or_autocreate_workspace(
         # (#2318). It defaults TRUE on the rule, so a rule written before this
         # materialises a workspace that verifies -- which is the direction a
         # default must fail in, since relaxing it is what needs a decision.
-        ansible_host_key_checking=rule.ansible_host_key_checking,
+        ssh_host_key_policy=rule.ssh_host_key_policy,
         # Which operations the materialised workspace has, and the roots each
         # one uses (#1966, #1929). `configure_enabled` defaults FALSE on the
         # rule, so every rule that existed before this goes on producing

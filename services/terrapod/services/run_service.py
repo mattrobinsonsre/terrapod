@@ -1743,6 +1743,13 @@ async def create_run(
         configure_parallelism=workspace_settings.effective_configure_parallelism(
             workspace.configure_parallelism, workspace.parallelism
         ),
+        # The host-key policy, snapshotted for a reason the neighbours share and
+        # one they do not. Shared: a run should behave as it was created. Its own:
+        # this one is a SECURITY posture, so making it live would let someone
+        # relax verification under a configure already in flight -- whereas the
+        # approved KEYS are read live, so a revocation takes effect on a queued
+        # run. Both are the safe direction, which is why they differ.
+        ssh_host_key_policy=workspace.ssh_host_key_policy,
         # #2033's pair, snapshotted for the reason the neighbours are: the
         # runner composes its `ANSIBLE_INVENTORY_ENABLED` from what the run was
         # DISPATCHED with, so flipping the workspace setting mid-run cannot

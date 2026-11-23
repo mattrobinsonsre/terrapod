@@ -238,11 +238,6 @@ _UNTYPED_SURFACES: dict[str, str] = {
 #: is a stale excuse, which `test_no_debt_entry_is_stale` refuses.
 _SURFACE_DEBT: dict[str, dict[str, str]] = {
     "Terraform provider": {
-        "ansible-host-key-checking": (
-            "#2621: not ported. The rule templates it onto the workspaces it creates, "
-            "and terrapod_workspace does not carry it either, so porting it here first "
-            "would let a rule set something no workspace resource can then manage."
-        ),
         "default-run-kind": (
             "#2621: not ported. Refused by the server against the RESULTING row, so a "
             "provider attribute needs the operations booleans alongside it to be usable."
@@ -535,4 +530,99 @@ class TestEverySurfaceFileReachesTheTestImage:
             "these files are read by a parity gate and are NOT in the test image, so "
             "the module will fail to collect in CI while passing locally. Add a COPY "
             f"line to docker/Dockerfile.test for each: {missing}"
+        )
+
+
+class TestEveryKeyInABooleanTableIsABooleanColumn:
+    """The gate that would have caught #2592's rename defect, derived from the model.
+
+    `_coerce_attrs` carries two tuples of `(wire-key, column)` pairs whose whole
+    purpose is that each one feeds `workspace_settings.validate_bool`. Renaming
+    `ansible-host-key-checking` to `ssh-host-key-policy` moved a key into one of
+    them while the column underneath stopped being a Boolean, and the result was
+    worse than a refusal in both directions at once: `'strict'`, `'accept-new'` and
+    `'off'` each answered 422 "must be true or false", so the attribute was
+    UNSETTABLE on a rule -- while `True` was ACCEPTED and put a Python bool into a
+    `String(16)` NOT NULL column.
+
+    **No existing gate could see it.** `TestTheSettableSetMatches` derives the
+    settable set from `_coerce_attrs` and reads BOTH of its forms, so the attribute
+    was "settable" on its terms whichever table it sat in. And no grep could find
+    it either: after the rename the old spelling was gone, and the defect was the
+    NEW spelling sitting in the wrong place.
+
+    So the subject has to be the MODEL. For each key in a boolean table, the column
+    it names must actually be Boolean on `AutodiscoveryRule`. That cannot be
+    satisfied by renaming, by moving a key between the two tables, or by any edit
+    that keeps the file internally consistent -- which is what the other gates
+    check and what let this through.
+    """
+
+    def _boolean_tables(self) -> list[tuple[str, str]]:
+        """Every `(wire-key, column)` pair in a tuple that feeds `validate_bool`.
+
+        Derived from the source rather than listed: a hand-kept list is what this
+        gate exists to replace, and a second boolean table added later must be
+        covered on the day it is written rather than when someone remembers.
+        """
+        import ast
+        import inspect
+
+        from terrapod.api.routers import autodiscovery_rules
+
+        tree = ast.parse(inspect.getsource(autodiscovery_rules._coerce_attrs).lstrip())
+        pairs: list[tuple[str, str]] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.For) or not isinstance(node.iter, ast.Tuple):
+                continue
+            # Only a loop whose BODY reaches `validate_bool`. A tuple of pairs that
+            # feeds something else is not this gate's subject.
+            calls = {
+                n.func.attr
+                for n in ast.walk(node)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            }
+            if "validate_bool" not in calls:
+                continue
+            for elt in node.iter.elts:
+                if (
+                    isinstance(elt, ast.Tuple)
+                    and len(elt.elts) == 2
+                    and all(isinstance(e, ast.Constant) for e in elt.elts)
+                ):
+                    pairs.append((elt.elts[0].value, elt.elts[1].value))
+        return pairs
+
+    def test_the_matcher_still_finds_the_tables(self):
+        """A floor, because a derived gate that stops matching passes on nothing.
+
+        Two tables today. The number is not asserted -- a third is fine -- but
+        finding almost none means the AST shape moved and the gate is inspecting
+        air.
+        """
+        pairs = self._boolean_tables()
+        assert len(pairs) >= 8, (
+            f"only found {len(pairs)} boolean pairs; the matcher has stopped "
+            f"matching and this gate is checking nothing"
+        )
+
+    def test_every_key_in_a_boolean_table_names_a_boolean_column(self):
+        import sqlalchemy as sa
+
+        from terrapod.db.models import AutodiscoveryRule
+
+        columns = AutodiscoveryRule.__table__.c
+        wrong: list[str] = []
+        for key, col in self._boolean_tables():
+            if col not in columns:
+                wrong.append(f"{key!r} -> {col!r} (no such column)")
+            elif not isinstance(columns[col].type, sa.Boolean):
+                wrong.append(f"{key!r} -> {col!r} is {columns[col].type}, not Boolean")
+
+        assert not wrong, (
+            "a key in a boolean-validation table does not name a Boolean column: "
+            + "; ".join(wrong)
+            + ". Such an attribute is refused in BOTH directions -- a correct value "
+            "gets 422 'must be true or false', and a literal true is written into a "
+            "column that is not one. Give it its own validator instead."
         )

@@ -59,6 +59,9 @@
   "a7e74cad11d5_drop_role_level_columns": [
     "drop_column(roles)"
   ],
+  "b56cc921fd47_ssh_host_key_policy": [
+    "drop_column(ansible_host_key_checking)"
+  ],
   "bb5e7f11d575_unify_working_directory": [
     "drop_column(workspaces, vcs_working_directory)"
   ],

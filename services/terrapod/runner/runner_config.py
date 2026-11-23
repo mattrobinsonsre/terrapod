@@ -113,6 +113,8 @@ class RunnerConfig:
     #: number, which is how a run's recorded concurrency comes to differ from
     #: the one its Job was given.
     configure_parallelism: int
+    #: How this run verifies host keys: `strict`, `accept-new` or `off` (#2592).
+    ssh_host_key_policy: str
     refresh: bool
     refresh_only: bool
     allow_empty_apply: bool
@@ -210,6 +212,10 @@ class RunnerConfig:
             refresh=_bool("TP_REFRESH", default=True),
             parallelism=_int("TP_PARALLELISM", 10),
             configure_parallelism=_int("TP_CONFIGURE_PARALLELISM", 10),
+            # `strict` when absent, which is the safe direction for a runner
+            # claiming a run from an API that predates the policy: it enforces
+            # rather than relaxing.
+            ssh_host_key_policy=e.get("TP_SSH_HOST_KEY_POLICY") or "strict",
             refresh_only=_bool("TP_REFRESH_ONLY"),
             allow_empty_apply=_bool("TP_ALLOW_EMPTY_APPLY"),
             destroy=_bool("TP_DESTROY"),

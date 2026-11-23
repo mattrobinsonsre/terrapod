@@ -183,6 +183,10 @@ class TerraformRunOptions:
     #: The configure phase's own `forks` (#2499). Concrete by the time it gets
     #: here -- `options_from_attrs` is where the inherit falls back, once.
     configure_parallelism: int = 10
+    #: How a configure verifies host keys: `strict`, `accept-new` or `off`
+    #: (#2592). Snapshotted on the run, so a workspace edited mid-queue cannot
+    #: change what a queued run enforces.
+    ssh_host_key_policy: str = "strict"
     #: The collections a configure installs, in `name[:version]` form (#1931).
     ansible_collections: list[str] | None = None
     #: #2033's pair, taken from the RUN's snapshot rather than the workspace,
@@ -289,6 +293,7 @@ class TerraformStrategy:
         is_destroy = options.is_destroy
         parallelism = options.parallelism
         configure_parallelism = options.configure_parallelism
+        ssh_host_key_policy = options.ssh_host_key_policy
         ansible_collections = options.ansible_collections
         dynamic_inventory_enabled = options.dynamic_inventory_enabled
         inventory_scripts_enabled = options.inventory_scripts_enabled
@@ -377,6 +382,12 @@ class TerraformStrategy:
         # (#2499). A plan or apply Job carries it harmlessly; only the configure
         # phase reads it.
         env.append({"name": "TP_CONFIGURE_PARALLELISM", "value": str(configure_parallelism)})
+        # And the host-key policy, always emitted for the same reason as the two
+        # above: the runner cannot otherwise know it, and a default that drifted
+        # between API and runner across a version skew would be invisible -- here
+        # in the direction that matters, since the runner's fallback is `strict`
+        # and an API that stopped sending it would silently tighten every run.
+        env.append({"name": "TP_SSH_HOST_KEY_POLICY", "value": str(ssh_host_key_policy)})
         # Cost estimation (#871). The runner defaults to enabled, so only emit the
         # env when the API instructs OFF; always ship the fallback region so a
         # resource whose region can't be resolved is priced consistently.
@@ -480,6 +491,10 @@ class TerraformStrategy:
             configure_parallelism=(
                 attrs.get("configure-parallelism") or attrs.get("parallelism", 10)
             ),
+            # `or` the default, not `.get(key, default)`: an API old enough not to
+            # send the key, and one sending null for a run created before the
+            # column existed, must both land on `strict`.
+            ssh_host_key_policy=attrs.get("ssh-host-key-policy") or "strict",
             ansible_collections=attrs.get("ansible-collections", []),
             # Defaulting FALSE rather than True, which is the safe direction
             # for a switch that widens what may execute: a runner claiming a

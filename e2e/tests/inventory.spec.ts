@@ -37,6 +37,8 @@ import {
   seedInventoryMembership,
   seedInventoryNesting,
   seedInventoryVar,
+  seedInventoryHostKey,
+  SSH_HOST_KEY_BLOBS,
   waitForInventoryResolution,
   uniqueName,
 } from '../helpers/api'
@@ -49,6 +51,20 @@ function acceptNextDialog(page: import('@playwright/test').Page): { message: () 
   page.once('dialog', async (d: Dialog) => {
     seen = d.message()
     await d.accept()
+  })
+  return { message: () => seen }
+}
+
+/** As above but DISMISSES, so the guard is shown to abort rather than to ask.
+ *  A guard that prompts and then proceeds either way is not a guard, and
+ *  accepting every dialog cannot tell the two apart. */
+function acceptNextDialogDismissing(page: import('@playwright/test').Page): {
+  message: () => string
+} {
+  let seen = ''
+  page.once('dialog', async (d: Dialog) => {
+    seen = d.message()
+    await d.dismiss()
   })
   return { message: () => seen }
 }
@@ -497,5 +513,208 @@ test.describe('The operations and configure attributes on the workspace Configur
     await page.getByLabel('Configure', { exact: true }).check()
     await expect(page.getByTestId('ws-operations-none')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled()
+  })
+})
+
+/**
+ * Approved SSH host keys (#2592) — which keys Terrapod will trust a host to
+ * present, declared here and handed off to OpenSSH as a `known_hosts` file.
+ *
+ * Three properties carry these tests, and each would be invisible to the
+ * others:
+ *
+ * A host has MANY keys, all of which belong in its trust set — one per
+ * algorithm, and two of one algorithm through a rotation — so a surface that
+ * modelled it as a field on the host would look right until the second key.
+ *
+ * The algorithm and the blob are the row's IDENTITY, two thirds of the
+ * server's unique constraint, so there is no edit: changing either means a
+ * different key, which is a delete and a declare. An Edit control here would
+ * promise a rewrite of what a host is trusted to present while keeping the
+ * row's id, and that id is the audit trail — so its ABSENCE is asserted.
+ *
+ * And the two confirm tiers differ on this surface, which is the half a
+ * single-tier guard gets wrong. A marker change is reversible and prompts on
+ * touch only (the responsive project proves the touch half); a delete cannot
+ * be undone and prompts in BOTH modes, which only a precise-pointer project
+ * can prove. Hence the delete assertion lives here.
+ */
+test.describe('Approved host keys', () => {
+  test('a key is declared, marked and deleted — and never edited', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2ehostkeys'))
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory&inv=${h1}`)
+    await expect(page.getByRole('heading', { name: 'Approved host keys' })).toBeVisible({
+      timeout: 15_000,
+    })
+    // The empty state says what the absence MEANS, rather than reading as an
+    // unset field: with no key declared a configure has nothing to check the
+    // host against.
+    await expect(page.getByText(/No approved keys/)).toBeVisible()
+
+    // Declare one, through the form rather than the API, because the form is
+    // what is under test.
+    await page.getByRole('button', { name: 'Declare a key', exact: true }).click()
+    await page.locator('#inventory-host-key-value').fill(SSH_HOST_KEY_BLOBS['ssh-ed25519'])
+    await page.getByRole('button', { name: 'Declare key', exact: true }).click()
+
+    const block = page.getByTestId('inv-host-key')
+    await expect(block).toHaveCount(1, { timeout: 15_000 })
+    // In FULL. There is nothing to mask — a host's public key is public — and
+    // it is the value an operator compares when a host presents something
+    // else, so a truncated render would hide the one thing this exists to show.
+    await expect(page.getByTestId('inv-host-key-value')).toHaveText(
+      SSH_HOST_KEY_BLOBS['ssh-ed25519'],
+    )
+    // "Approved", not "Trusted": the badge names the state of the DECLARATION.
+    // Nothing in the runner reads these rows yet — #2592's own outstanding list
+    // names the known_hosts renderer and the ssh handoff — so a badge asserting
+    // trust would be claiming an enforcement that does not exist.
+    await expect(block.getByText('Approved', { exact: true })).toBeVisible()
+
+    // THE ABSENCE OF AN EDIT. Scoped to the key block, because the host's
+    // other sections legitimately have one.
+    await expect(block.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0)
+    await expect(page.getByText(/cannot be edited/)).toBeVisible()
+
+    // A host has MANY keys: a second algorithm is an addition, not a
+    // replacement.
+    await page.getByRole('button', { name: 'Declare a key', exact: true }).click()
+    // The TYPE has to be chosen as well as the blob. The form auto-detects it only
+    // from a full known_hosts LINE (`splitKnownHostsEntry`); a bare base64 body
+    // carries no algorithm for it to read, so the picker keeps its first option --
+    // and #2592's server-side check unpacks the algorithm name embedded in the blob
+    // and refuses the mismatch. This used to declare an RSA body as ed25519 and
+    // relied on that going unchecked.
+    await page.locator('#inventory-host-key-type').selectOption('ssh-rsa')
+    await page.locator('#inventory-host-key-value').fill(SSH_HOST_KEY_BLOBS['ssh-rsa'])
+    await page.getByRole('button', { name: 'Declare key', exact: true }).click()
+    await expect(page.getByTestId('inv-host-key')).toHaveCount(2, { timeout: 15_000 })
+
+    // Marking is the REVERSIBLE tier, so on a precise pointer it proceeds with
+    // no prompt. A dialog here would mean the two tiers had been collapsed
+    // into one, which is the drift `useConfirm` exists to prevent.
+    let prompted = false
+    page.on('dialog', async (d: Dialog) => {
+      prompted = true
+      await d.accept()
+    })
+    await page
+      .locator('li', { hasText: 'AAAAC3NzaC1lZDI1NTE5' })
+      .getByRole('button', { name: 'Mark revoked', exact: true })
+      .click()
+    await expect(page.getByTestId('inv-host-key-revoked')).toHaveCount(1, { timeout: 10_000 })
+    expect(prompted, 'a reversible marker change must not prompt on a precise pointer').toBe(false)
+
+    // Revoked is what the whole feature exists to catch, so it is distinct by
+    // its WORD and by its consequence, not by a tint a screen reader cannot
+    // report.
+    const revoked = page.getByTestId('inv-host-key-revoked')
+    await expect(revoked.getByText('Revoked', { exact: true })).toBeVisible()
+    await expect(revoked.getByText(/recorded as not to be trusted/)).toBeVisible()
+
+    // The surface must say what a declared key is FOR. This asserted the
+    // opposite until #2592 -- "does not yet use them to verify a connection" --
+    // which was true while the keys were declared and unenforced, and the copy
+    // was rewritten when this branch wired them to the runner's known_hosts
+    // anchor. The INTENT is unchanged and is why both halves are asserted: an
+    // operator who declares a key and is not told what it does stops looking,
+    // which is the one failure a security surface cannot have. The negative is
+    // the half that matters now -- the retired caveat must not come back and
+    // tell an operator their keys are inert when they are enforcing.
+    const keysSection = page.locator('section', { hasText: 'Approved host keys' }).first()
+    await expect(keysSection.getByText(/a known_hosts file is what this set is for/)).toBeVisible()
+    await expect(page.getByText(/does not yet use them to verify a connection/)).toHaveCount(0)
+
+    // Deleting is the IRREVERSIBLE tier: it prompts on a precise pointer too,
+    // which is the half the touch suite cannot prove. Dismissed first, so the
+    // guard is shown to ABORT rather than merely to ask.
+    page.removeAllListeners('dialog')
+    const dismissed = acceptNextDialogDismissing(page)
+    await revoked.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect.poll(() => dismissed.message(), { timeout: 5_000 }).toContain('ssh-ed25519')
+    // And the message points at revoking instead, which is the safe move
+    // through a rotation — a delete lets the host present the key again as an
+    // unknown one.
+    expect(dismissed.message()).toMatch(/revoked instead/)
+    await expect(page.getByTestId('inv-host-key-revoked')).toHaveCount(1)
+
+    const accepted = acceptNextDialog(page)
+    await revoked.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect.poll(() => accepted.message(), { timeout: 5_000 }).toContain('ssh-ed25519')
+    await expect(page.getByTestId('inv-host-key-revoked')).toHaveCount(0, { timeout: 10_000 })
+    await expect(page.getByTestId('inv-host-key')).toHaveCount(1)
+  })
+
+  test('the server refusals reach the operator as they were written', async ({ page }) => {
+    // The API's refusals name the mistake — a whole pasted line, a blob whose
+    // embedded algorithm disagrees with the declared type — and each is far
+    // more use than "failed to save". So they are surfaced verbatim, and this
+    // is what proves the handler is not swallowing them.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2ehostkeybad'))
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory&inv=${h1}`)
+    await page.getByRole('button', { name: 'Declare a key', exact: true }).click({ timeout: 15_000 })
+
+    // An ed25519 blob declared as ssh-rsa. The blob itself names its algorithm,
+    // so the server can tell — and a key stored under the wrong type is
+    // accepted happily by anything that does not look, and then never matches
+    // the host.
+    await page.getByLabel('Algorithm').selectOption('ssh-rsa')
+    await page.locator('#inventory-host-key-value').fill(SSH_HOST_KEY_BLOBS['ssh-ed25519'])
+    await page.getByRole('button', { name: 'Declare key', exact: true }).click()
+    await expect(page.getByText(/declared as/)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('inv-host-key')).toHaveCount(0)
+  })
+
+  test('the workspace-wide keys read sits BESIDE the resolution', async ({ page }) => {
+    // The API serves them as two documents on purpose: the resolved inventory
+    // is ansible's own answer, normalised, and the runner renders it back into
+    // a YAML inventory where a Terrapod-only section would have no meaning. So
+    // this read is an extension beside it, keyed on the host NAME so the two
+    // can be read side by side.
+    //
+    // Deliberately WITHOUT waiting for resolution. The two halves carry
+    // separate load and error state, and that is the property under test:
+    // resolution can refuse (a source that will not parse, ansible not yet
+    // installed from the cache) and the keys are a plain row read that cannot,
+    // so an unrelated failure must not hide the trust anchors at the moment
+    // they are most worth reading.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2ehostkeyover'))
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+    const h2 = await seedInventoryHost(token, wsId, 'web-2')
+    await seedInventoryHostKey(token, h1, 'ssh-ed25519')
+    await seedInventoryHostKey(token, h1, 'ssh-rsa', { marker: 'revoked' })
+    await seedInventoryHostKey(token, h2, 'ssh-ed25519', { marker: 'cert-authority' })
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory&inv=resolved`)
+    await expect(page.getByRole('heading', { name: 'Approved host keys' })).toBeVisible({
+      timeout: 15_000,
+    })
+
+    // Three keys over two hosts, one of them revoked. The revoked COUNT is
+    // shown whether or not it is zero: a chip that appears only on a bad day
+    // teaches a reader to read its absence as "not checked".
+    const section = page.locator('section', { hasText: 'Approved host keys' }).first()
+    await expect(section.getByText('web-1', { exact: true })).toBeVisible()
+    await expect(section.getByText('web-2', { exact: true })).toBeVisible()
+    await expect(section.getByTestId('inv-host-key-revoked')).toHaveCount(1)
+    await expect(section.getByTestId('inv-host-key')).toHaveCount(2)
+
+    // No editing here, because this document carries no key ids — a second
+    // editing surface would be a second place for the two to drift.
+    await expect(section.getByRole('button', { name: 'Mark revoked', exact: true })).toHaveCount(0)
+    await expect(section.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0)
+
+    // But a reader who spots the revoked key can get to the host that owns it,
+    // which is the only place it can be acted on.
+    await section.getByRole('button', { name: 'Open host', exact: true }).first().click()
+    await expect(page.getByRole('heading', { name: /Host web-/ })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'Approved host keys' })).toBeVisible()
   })
 })
