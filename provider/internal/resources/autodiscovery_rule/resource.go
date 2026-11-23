@@ -187,24 +187,6 @@ type autodiscoveryRuleModel struct {
 	UpdatedAt types.String `tfsdk:"updated_at"`
 }
 
-// runTaskTemplateAttrTypes is the object attribute type map for a single
-// element of run_task_templates. Used for nested list (un)marshalling.
-// ruleCollectionAttrTypes is the object shape of one `ansible_collections`
-// entry on a rule (#1931), mirroring the workspace resource's own.
-var ruleCollectionAttrTypes = map[string]attr.Type{
-	"name":    types.StringType,
-	"version": types.StringType,
-}
-
-var runTaskTemplateAttrTypes = map[string]attr.Type{
-	"name":              types.StringType,
-	"url":               types.StringType,
-	"hmac_key":          types.StringType,
-	"stage":             types.StringType,
-	"enforcement_level": types.StringType,
-	"enabled":           types.BoolType,
-}
-
 // notificationTemplateAttrTypes is the object attribute type map for a
 // single element of notification_templates.
 var notificationTemplateAttrTypes = map[string]attr.Type{
