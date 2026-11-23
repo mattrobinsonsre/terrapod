@@ -3429,7 +3429,6 @@
       "hostKeys": {
         "heading": "Approved host keys",
         "body": "The keys this host is approved to present. A host exposes one per algorithm and all of them belong here. The markers are OpenSSH's own, because a known_hosts file is what this set is for.",
-        "notWiredNote": "Terrapod records these keys. It does not yet use them to verify a connection, so a configure still checks host keys the way the workspace setting and the machine credential say it does.",
         "empty": "No approved keys. Nothing here yet records which keys this host is allowed to present.",
         "markerNone": "Approved",
         "markerRevoked": "Revoked",

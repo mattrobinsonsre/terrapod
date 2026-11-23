@@ -819,8 +819,14 @@ function VariableTable({
    does the enforcing" — and it read design intent as present behaviour: "a host
    presenting it is rejected outright". For a security surface that is the
    expensive direction, because an operator told their fleet is protected stops
-   looking. The copy now describes what is recorded and never what happens to a
-   connection, and `notWiredNote` states the gap outright on both sections.
+   looking. The copy still describes what is RECORDED rather than what happens
+   to a connection -- which is now an understatement rather than the whole
+   truth, because #2592's renderer landed and OpenSSH does enforce these keys.
+   `notWiredNote`, which stated the gap outright on both sections, is deleted
+   with it. What the copy does not yet say is that the file is an ALLOW-LIST:
+   from the first approved key, a host this inventory targets and has not
+   pinned is refused rather than merely unverified. That wants a string of its
+   own in all 32 catalogues.
 
    ## A HOST HAS MANY KEYS, and the list is the surface
 
@@ -1207,21 +1213,6 @@ function HostKeysTable({ hostId, onChanged }: { hostId: string; onChanged?: () =
 
   return (
     <Section heading={t('hostKeys.heading')} body={t('hostKeys.body')}>
-      {/* DELETE THIS WHEN THE RENDERER LANDS, and the string with it.
-          #2592's own outstanding list names "the known_hosts renderer and the
-          ssh handoff", and `grep -rln InventoryHostKey services/terrapod`
-          agrees: these rows are read by the model, this API, the inventory
-          service and the replication registry, and by nothing in the runner.
-          So today they are a declaration with no consumer, and a surface
-          called "Approved host keys" reads as the control an operator uses to
-          decide host-key trust. Someone who declares a key and is not told
-          this stops looking — which is the one failure a security surface
-          cannot have. It points at the two mechanisms that DO enforce
-          something today rather than leaving a reader with nowhere to go. */}
-      <p className="mt-2 rounded-lg border border-amber-800/50 bg-amber-900/20 p-3 text-sm text-amber-200">
-        {t('hostKeys.notWiredNote')}
-      </p>
-
       <ErrorText message={error} />
 
       {keys === null && <LoadingSpinner />}
@@ -1353,13 +1344,6 @@ function HostKeysOverview({
 
   return (
     <Section heading={t('hostKeys.overviewHeading')} body={t('hostKeys.overviewBody')}>
-      {/* The same note, for the same reason, and deleted at the same time. It
-          is on BOTH surfaces deliberately: this one is the fleet-wide read,
-          which is where a reader is most likely to conclude the fleet is
-          covered. */}
-      <p className="mt-2 rounded-lg border border-amber-800/50 bg-amber-900/20 p-3 text-sm text-amber-200">
-        {t('hostKeys.notWiredNote')}
-      </p>
       <ErrorText message={error} />
       {rows === null && <LoadingSpinner />}
 

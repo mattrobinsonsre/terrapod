@@ -3483,8 +3483,7 @@
         "overviewEmpty": "此清單中沒有任何主機宣告了已核准的金鑰。",
         "overviewHosts": "主機",
         "overviewKeys": "金鑰",
-        "overviewOpenHost": "開啟主機",
-        "notWiredNote": "Terrapod 會記錄這些金鑰，但還沒有用它們來驗證連線，因此設定作業仍按工作區設定與機器憑證所規定的方式檢查主機金鑰。"
+        "overviewOpenHost": "開啟主機"
       }
     },
     "sharing": {

@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "Allweddi gwesteiwr cymeradwy",
         "body": "Yr allweddi y mae’r gwesteiwr hwn wedi’i gymeradwyo i’w cyflwyno. Mae gwesteiwr yn datgelu un fesul algorithm ac mae pob un ohonynt yn perthyn yma. Marciau OpenSSH ei hun yw’r marciau, am mai ar gyfer ffeil known_hosts y mae’r set hon.",
-        "notWiredNote": "Mae Terrapod yn cofnodi’r allweddi hyn. Nid yw’n eu defnyddio eto i wirio cysylltiad, felly mae cyflunio yn dal i wirio allweddi gwesteiwr yn y modd y mae gosodiad y weithfan a thystlythyr y peiriant yn ei ddweud.",
         "empty": "Dim allweddi cymeradwy. Nid oes dim yma eto yn cofnodi pa allweddi y caniateir i’r gwesteiwr hwn eu cyflwyno.",
         "markerNone": "Cymeradwy",
         "markerRevoked": "Dirymwyd",

@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Aucun hôte de cet inventaire n’a de clé approuvée déclarée.",
         "overviewHosts": "Hôtes",
         "overviewKeys": "Clés",
-        "overviewOpenHost": "Ouvrir l’hôte",
-        "notWiredNote": "Terrapod enregistre ces clés. Il ne les utilise pas encore pour vérifier une connexion : un configurer continue donc de contrôler les clés d’hôte comme le disent le réglage de l’espace de travail et l’identifiant machine."
+        "overviewOpenHost": "Ouvrir l’hôte"
       }
     },
     "sharing": {

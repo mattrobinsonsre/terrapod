@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Ingen värd i det här inventariet har någon godkänd nyckel deklarerad.",
         "overviewHosts": "Värdar",
         "overviewKeys": "Nycklar",
-        "overviewOpenHost": "Öppna värd",
-        "notWiredNote": "Terrapod registrerar dessa nycklar. Den använder dem ännu inte för att verifiera en anslutning, så en konfigurationskörning kontrollerar värdnycklar fortfarande så som arbetsytans inställning och maskinuppgifterna anger."
+        "overviewOpenHost": "Öppna värd"
       }
     },
     "sharing": {

@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "Hyväksytyt isäntäavaimet",
         "body": "Avaimet, jotka tällä isännällä on hyväksytty esittää. Isäntä paljastaa yhden kutakin algoritmia kohden, ja ne kaikki kuuluvat tänne. Merkinnät ovat OpenSSH:n omia, koska juuri known_hosts-tiedostoa varten tämä joukko on.",
-        "notWiredNote": "Terrapod kirjaa nämä avaimet muistiin. Se ei vielä käytä niitä yhteyden varmistamiseen, joten määritysajo tarkistaa isäntäavaimet edelleen niin kuin työtilan asetus ja koneen tunnistetiedot sanovat.",
         "empty": "Ei hyväksyttyjä avaimia. Täällä ei ole vielä kirjattuna, mitä avaimia tämä isäntä saa esittää.",
         "markerNone": "Hyväksytty",
         "markerRevoked": "Peruutettu",

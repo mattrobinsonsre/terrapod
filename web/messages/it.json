@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Nessun host di questo inventario ha una chiave approvata dichiarata.",
         "overviewHosts": "Host",
         "overviewKeys": "Chiavi",
-        "overviewOpenHost": "Apri host",
-        "notWiredNote": "Terrapod registra queste chiavi. Non le usa ancora per verificare una connessione, quindi un configurare continua a controllare le chiavi host come dicono l’impostazione dello spazio di lavoro e la credenziale macchina."
+        "overviewOpenHost": "Apri host"
       }
     },
     "sharing": {

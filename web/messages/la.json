@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Nullus hospes in hoc inventario clavem probatam declaratam habet.",
         "overviewHosts": "Hospites",
         "overviewKeys": "Claves",
-        "overviewOpenHost": "Hospitem aperire",
-        "notWiredNote": "Terrapod has claves notat. Eis ad conexionem verificandam nondum utitur, itaque configurare claves hospitum adhuc ita probat ut optio spatii operis et credentiale machinae dicunt."
+        "overviewOpenHost": "Hospitem aperire"
       }
     },
     "sharing": {

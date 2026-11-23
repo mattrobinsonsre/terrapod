@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "Approovd host keyz",
         "body": "Teh keyz dis host is allowd 2 show u. A host haz wun per algorifm an dey all belong heer. Teh markz r OpenSSHz own wunz, coz a known_hosts fyle is wot dis pile is for.",
-        "notWiredNote": "Terrapod ritez deez keyz down. It dont yet uze em 2 chek a konekshun, so a konfigur still chekz host keyz teh way teh wurkspace settin an teh masheen kredenshul sez it duz.",
         "empty": "No approovd keyz. Nuffin heer ritez down yet wich keyz dis host is allowd 2 show u.",
         "markerNone": "Approovd",
         "markerRevoked": "Revokd",

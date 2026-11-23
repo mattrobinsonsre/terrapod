@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "Zatwierdzone klucze hosta",
         "body": "Klucze, które ten host ma zatwierdzone do przedstawiania. Host udostępnia po jednym na algorytm i wszystkie należą tutaj. Znaczniki są własnymi znacznikami OpenSSH, bo ten zbiór istnieje właśnie na potrzeby pliku known_hosts.",
-        "notWiredNote": "Terrapod zapisuje te klucze. Jeszcze nie używa ich do weryfikacji połączenia, więc konfiguracja nadal sprawdza klucze hostów tak, jak mówią o tym ustawienie obszaru roboczego i dane uwierzytelniające maszyny.",
         "empty": "Brak zatwierdzonych kluczy. Nic tutaj jeszcze nie zapisuje, które klucze ten host może przedstawiać.",
         "markerNone": "Zatwierdzony",
         "markerRevoked": "Unieważniony",

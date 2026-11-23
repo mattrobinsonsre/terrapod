@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Für keinen Host in diesem Inventar ist ein freigegebener Schlüssel deklariert.",
         "overviewHosts": "Hosts",
         "overviewKeys": "Schlüssel",
-        "overviewOpenHost": "Host öffnen",
-        "notWiredNote": "Terrapod erfasst diese Schlüssel. Es verwendet sie noch nicht, um eine Verbindung zu prüfen; ein Konfigurationslauf prüft Hostschlüssel also weiterhin so, wie es die Workspace-Einstellung und die Maschinen-Zugangsdaten vorgeben."
+        "overviewOpenHost": "Host öffnen"
       }
     },
     "sharing": {

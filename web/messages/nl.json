@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Voor geen enkele host in deze inventaris is een goedgekeurde sleutel gedeclareerd.",
         "overviewHosts": "Hosts",
         "overviewKeys": "Sleutels",
-        "overviewOpenHost": "Host openen",
-        "notWiredNote": "Terrapod legt deze sleutels vast. Het gebruikt ze nog niet om een verbinding te verifiëren, dus een configure-run controleert hostsleutels nog steeds zoals de workspace-instelling en de machinereferentie dat voorschrijven."
+        "overviewOpenHost": "Host openen"
       }
     },
     "sharing": {
