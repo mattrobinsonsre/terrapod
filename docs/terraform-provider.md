@@ -32,6 +32,7 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | Registry | `terrapod_registry_module`, `terrapod_module_autodiscovery_rule`, `terrapod_registry_provider`, `terrapod_gpg_key` |
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
 | [Ansible inventory](ansible-inventory.md) | `terrapod_inventory_host`, `terrapod_inventory_group`, `terrapod_inventory_host_group`, `terrapod_inventory_group_child`, `terrapod_inventory_host_var`, `terrapod_inventory_group_var`, `terrapod_inventory_global_var` (the inventory's roots and defaults are attributes on `terrapod_workspace` itself) |
+| [SSH host keys](ansible-configure.md#get-the-keys-terrapod_ssh_host_keys) | `terrapod_ssh_host_keys` — scans a fleet's SSH host keys and pins them, rendering the `known_hosts` body a machine credential takes. The one resource that owns nothing on the server: it connects to the **hosts**, never to the API |
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`
 (each entry reports its `engine`, and an optional `engine` argument returns only
@@ -412,6 +413,56 @@ Two things to know before reaching for them:
   row. Full semantics: [Cloud Identity → Apply-only
   variables](cloud-identity.md#apply-only-variables) and [Configure-only
   variables](cloud-identity.md#configure-only-variables).
+
+## Scanning SSH host keys
+
+`terrapod_ssh_host_keys` is the odd one out in this provider, in two ways that
+are both deliberate: it is the only resource that **owns nothing on the server**,
+and the only one that **opens a connection to something other than the Terrapod
+API**. It scans a fleet's SSH host keys, pins them, and renders the
+`known_hosts` body a machine credential's `known_hosts` field takes — so
+host-key verification for an ansible configure can be *satisfied* rather than
+turned off. The operator story, the trade-offs and a worked three-resource
+example are on [Running a Configure →
+Get the keys](ansible-configure.md#get-the-keys-terrapod_ssh_host_keys); what
+follows is the reference.
+
+| attribute | | |
+|---|---|---|
+| `hosts` | **Required**, set of string | `host` or `host:port`; `[::1]:2222` for an IPv6 literal with a port. Used verbatim as the key of `entries`, `unreachable_hosts`, `changed_hosts` and `pinned_entries` |
+| `port` | Optional, number, default `22` | For entries that carry no port of their own |
+| `key_types` | Optional, list of string | Host-key **algorithm** names, not `ssh-keyscan`'s `-t` aliases. Accepted: `ssh-ed25519`, `ecdsa-sha2-nistp256`, `ecdsa-sha2-nistp384`, `ecdsa-sha2-nistp521`, `rsa-sha2-256`, `rsa-sha2-512`, `ssh-rsa`. Defaults to `ssh-ed25519`, `ecdsa-sha2-nistp256`, `rsa-sha2-512` |
+| `scan_timeout_seconds` | Optional, number, default `5` | Per **connection attempt**, and each key type is its own connection |
+| `pinned_entries` | Optional, map of string | Hand-written `known_hosts` line(s) per host. A host named here is **never scanned** |
+| `known_hosts` | Computed, string | The rendered file. This is what feeds `terrapod_variable` |
+| `entries` | Computed, map of string | Per host, its pinned line(s) as one block. A host with nothing pinned is **absent** |
+| `unreachable_hosts` | Computed, set of string | Hosts this read got no key out of |
+| `changed_hosts` | Computed, set of string | Hosts that answered with a key differing from the pinned one |
+| `scanned_at` | Computed, string | RFC3339 UTC. When a pin was last **established or added** — not the time of the last scan |
+| `id` | Computed, string | Opaque, assigned once. Nothing on the server for it to be the id of |
+
+Four things about it that are easy to get wrong:
+
+- **`key_types` decides what the scan asks for, not what stays pinned.**
+  Narrowing it stops new key types being added and un-pins nothing. Removing
+  trust is deliberate: drop the host from `hosts`, or replace the resource.
+- **An entry of `hosts` is the identity of its pin.** Rewriting one — `web1` to
+  `web1:22` — re-pins that host, even though both address the same machine. Two
+  entries that resolve to the same address are refused rather than silently
+  having one win.
+- **The map key of `pinned_entries` is not the line's host field.** The key is
+  how this resource addresses the entry and must match an entry of `hosts`; what
+  ssh matches on is the line's own host field, which may legitimately be a
+  comma-separated list, a `*` pattern or a hashed host. The two are not required
+  to agree.
+- **`scanned_at` deliberately does not move on every read.** Advancing it each
+  time would make every plan report the resource as having changed outside
+  Terraform for a file whose content had not moved, which is exactly the noise
+  that teaches an operator to stop reading the diff.
+
+There is **no import**: there is nothing on the server to import from, and an
+import carrying no pins would produce an empty `known_hosts` file, which is
+worse than a refusal. `terraform destroy` discards the pins and touches no host.
 
 ## Reserved-name note
 

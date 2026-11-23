@@ -55,6 +55,7 @@ import (
 	roleAssignmentRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/role_assignment"
 	runTaskRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/run_task"
 	runTriggerRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/run_trigger"
+	sshHostKeysRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/ssh_host_keys"
 	userRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/user"
 	variableRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/variable"
 	variableSetRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/variable_set"
@@ -232,6 +233,12 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		inventoryHostVarRes.NewResource,
 		inventoryGroupVarRes.NewResource,
 		inventoryGlobalVarRes.NewResource,
+		// Not an inventory structure, and listed here because it exists for
+		// the same story: it scans the fleet an inventory names and pins what
+		// it finds, so host-key verification can be satisfied rather than
+		// turned off (#2592). It is the one resource that owns nothing on the
+		// server -- it talks to the HOSTS, never to the API.
+		sshHostKeysRes.NewResource,
 	}
 }
 

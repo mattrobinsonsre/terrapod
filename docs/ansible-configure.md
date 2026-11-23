@@ -1234,6 +1234,158 @@ Measured: the host connects, and **verification stays on**. This is the shape to
 prefer, because it answers the question ssh is asking rather than withdrawing it
 — a host presenting the wrong key is still refused.
 
+The keys themselves come from wherever you keep them, or from the scanner
+below.
+
+### Get the keys: `terrapod_ssh_host_keys`
+
+The field above makes the default satisfiable. Satisfying it for a fleet is a
+different problem: obtaining a key per host and pasting each one in is work
+nobody does twice, and the realistic alternative is not careful out-of-band key
+distribution — it is the setting in the next section, turned off. So the
+provider has a resource that scans the hosts and pins what it finds.
+
+It is **trust-on-first-use**, and that is worth stating plainly: it trusts
+whatever answers on the first read, so it is weaker than obtaining keys through
+a channel the hosts' own network cannot influence. What it is stronger than is
+the thing it realistically replaces. Against `ansible-host-key-checking = false`
+a pinned key detects a later change; `false` detects nothing, ever.
+
+```hcl
+# The hosts the inventory resolves to. `limit` narrows it the way a configure
+# would, so this is the same host set the playbook will reach.
+data "terrapod_inventory_resolved" "fleet" {
+  workspace_id = terrapod_workspace.fleet.id
+  limit        = "web"
+}
+
+resource "terrapod_ssh_host_keys" "fleet" {
+  # AN INVENTORY NAME IS NOT NECESSARILY RESOLVABLE. Take `ansible_host` where
+  # the inventory sets it and the inventory name only otherwise -- this is the
+  # first thing to get wrong, and it presents as every host being unreachable
+  # from a runner that can reach them all.
+  hosts = toset([
+    for name, vars in data.terrapod_inventory_resolved.fleet.hosts :
+    lookup(vars, "ansible_host", name)
+  ])
+
+  # Optional. 22 and a modern algorithm per key family are the defaults.
+  port      = 22
+  key_types = ["ssh-ed25519", "ecdsa-sha2-nistp256", "rsa-sha2-512"]
+
+  # Optional, and the answer to "if there isn't one already": a host named here
+  # is never scanned, because you have already said what you trust.
+  pinned_entries = {
+    "bastion.example.com" = "bastion.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+  }
+}
+
+# One credential, one `known_hosts` blob holding every host's entry -- which is
+# the shape the field wants, because `-o UserKnownHostsFile=` takes one path.
+resource "terrapod_variable" "fleet_key" {
+  workspace_id = terrapod_workspace.fleet.id
+  key          = "web-key"
+  category     = "ansible_machine_auth"
+  sensitive    = true
+  value = jsonencode({
+    private_key = var.fleet_private_key
+    known_hosts = terrapod_ssh_host_keys.fleet.known_hosts
+  })
+}
+```
+
+The inventory then points ssh at the file, exactly as it would for a
+hand-written blob:
+
+```yaml
+all:
+  vars:
+    ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:web-key.known_hosts}"
+```
+
+#### A pinned key is never overwritten
+
+A later read re-scans, and what it does with the answer is the whole of the
+feature:
+
+| what the read finds | what happens |
+|---|---|
+| the pinned key | nothing; `known_hosts` does not move |
+| a **different** key for a key type already pinned | the **pin is kept**, the host is listed in `changed_hosts`, and a warning names both keys |
+| a key type that was **not** pinned | added — the host grew an algorithm, it did not replace a key |
+| nothing at all (down, firewalled, or holding none of `key_types`) | the host keeps whatever it had and is listed in `unreachable_hosts` |
+
+Accepting a new key silently is what SSH itself does after first contact, and it
+detects nothing — so the resource refuses to. **A rebuilt host and an
+impersonated one look identical from here**, which is why re-pinning is a
+deliberate act rather than a flag:
+
+```sh
+# Re-pin one host: remove it from `hosts`, apply, add it back, apply.
+# Re-pin everything this resource manages:
+tofu apply -replace=terrapod_ssh_host_keys.fleet
+```
+
+#### An unreachable host answers from state
+
+A host that is down, rebooting, or not yet built keeps its pinned entry and is
+reported in `unreachable_hosts`. It is a **warning**, never an error: a fleet
+where one host is restarting must not have that host silently drop out of the
+file the rest of the fleet is verified against, because the next configure would
+then fail on it for a reason with nothing to do with its key.
+
+A host with nothing pinned yet — unreachable on the read that would first have
+pinned it — is simply absent from `known_hosts` until a later read reaches it.
+`entries` omits it rather than carrying an empty value, so
+`contains(keys(terrapod_ssh_host_keys.fleet.entries), h)` answers "is this host
+pinned yet" truthfully, and a `for` over `entries` yields only the hosts that
+are.
+
+The warning carries each attempt's error verbatim, which is what distinguishes
+the two cases `unreachable_hosts` deliberately covers together: `connection
+refused` or a timeout is a host problem, where `no common algorithm for host
+key` means the host is up and holds none of the key types `key_types` asked for.
+
+#### Where the scan runs matters
+
+The provider does the scanning, so the scan happens wherever the provider runs:
+
+| execution mode | where the scan comes from |
+|---|---|
+| **agent** | the runner — the same network position the execution environment will connect from, which is the right vantage point |
+| **local** | your own machine, which may not reach the fleet at all |
+
+"It worked on my laptop and the plan is empty on the runner" is a confusing
+first experience, and this is why. Prefer agent mode for a workspace that uses
+this; in local mode, expect the keys you pin to be the ones *your* network can
+see.
+
+#### The rest of it, briefly
+
+- **It owns nothing on the server.** No API call, no RBAC permission beyond what
+  the provider block itself needs, and it keeps working while the Terrapod API
+  is unreachable. The pin lives in Terraform state, which is the only place it
+  can live: it has to be compared against on the next read.
+- **Nothing it holds is sensitive.** A host's public key is public — it is what
+  the host hands to anyone who connects — which is also why the `known_hosts`
+  credential field is deliberately not redacted in a run's log.
+- **One connection per host per key type**, which is how `ssh-keyscan` works
+  (the server picks one algorithm per handshake, so asking for three in one
+  connection returns one key of the server's choosing). The scan aborts the
+  handshake as soon as the key is in hand, before a username is ever sent, so it
+  leaves a connection in the host's log and no attempted login. The key is
+  verified against the server's signature over the exchange hash before it is
+  taken, so it is one the responder demonstrably holds — which rules out a
+  passive observer forging an answer, and says nothing about whether the
+  responder is the host you meant.
+- **`rsa-sha2-256` and `rsa-sha2-512` are two signature algorithms over one
+  `ssh-rsa` key**, so asking for both yields one entry rather than two.
+- `scan_timeout_seconds` bounds **one attempt**, so the worst case for a wholly
+  unresponsive host is that times the length of `key_types`.
+
+See [the provider page](terraform-provider.md#scanning-ssh-host-keys) for the
+attribute reference.
+
 ### Or relax it: `ansible-host-key-checking` on the workspace
 
 Where supplying keys is not practical — ephemeral hosts whose keys are generated

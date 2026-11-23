@@ -29,6 +29,7 @@
             "terrapod_role_assignment": {},
             "terrapod_run_task": {},
             "terrapod_run_trigger": {},
+            "terrapod_ssh_host_keys": {},
             "terrapod_user": {},
             "terrapod_variable": {},
             "terrapod_variable_set": {},

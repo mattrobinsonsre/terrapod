@@ -5312,6 +5312,177 @@
                 "type": "object"
             }
         },
+        "terrapod:index/sshHostKeys:SshHostKeys": {
+            "properties": {
+                "changedHosts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Every host that answered with a key DIFFERING from the one pinned for the same key type. The pin is kept and the offered key discarded, so this is a report rather than a state change. A rebuilt host and an impersonated one look identical from here, which is why re-pinning is a deliberate act: remove the host from \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e and add it back to re-pin that host alone, or `terraform apply -replace=…` to re-pin every host this resource manages. Named `*_hosts` because a bare \u003cspan pulumi-lang-nodejs=\"`changed`\" pulumi-lang-dotnet=\"`Changed`\" pulumi-lang-go=\"`changed`\" pulumi-lang-python=\"`changed`\" pulumi-lang-yaml=\"`changed`\" pulumi-lang-java=\"`changed`\" pulumi-lang-hcl=\"`changed`\"\u003e`changed`\u003c/span\u003e reads as a boolean, and because the Pulumi bridge would render it \u003cspan pulumi-lang-nodejs=\"`changeds`\" pulumi-lang-dotnet=\"`Changeds`\" pulumi-lang-go=\"`changeds`\" pulumi-lang-python=\"`changeds`\" pulumi-lang-yaml=\"`changeds`\" pulumi-lang-java=\"`changeds`\" pulumi-lang-hcl=\"`changeds`\"\u003e`changeds`\u003c/span\u003e."
+                },
+                "entries": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Per host, its pinned line(s) joined by newlines and with no trailing one — a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e body for that host alone. Keyed as \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e is written. A host with nothing pinned (unreachable on the read that would first have pinned it) is ABSENT rather than present and empty, so `contains(keys(…), h)` answers \"is this host pinned yet\" truthfully and a \u003cspan pulumi-lang-nodejs=\"`for`\" pulumi-lang-dotnet=\"`For`\" pulumi-lang-go=\"`for`\" pulumi-lang-python=\"`for`\" pulumi-lang-yaml=\"`for`\" pulumi-lang-java=\"`for`\" pulumi-lang-hcl=\"`for`\"\u003e`for`\u003c/span\u003e over it yields only hosts that are."
+                },
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The hosts to scan, each \u003cspan pulumi-lang-nodejs=\"`host`\" pulumi-lang-dotnet=\"`Host`\" pulumi-lang-go=\"`host`\" pulumi-lang-python=\"`host`\" pulumi-lang-yaml=\"`host`\" pulumi-lang-java=\"`host`\" pulumi-lang-hcl=\"`host`\"\u003e`host`\u003c/span\u003e or `host:port` (a bracketed `[::1]:2222` for an IPv6 literal with a port). A per-entry port overrides \u003cspan pulumi-lang-nodejs=\"`port`\" pulumi-lang-dotnet=\"`Port`\" pulumi-lang-go=\"`port`\" pulumi-lang-python=\"`port`\" pulumi-lang-yaml=\"`port`\" pulumi-lang-java=\"`port`\" pulumi-lang-hcl=\"`port`\"\u003e`port`\u003c/span\u003e. An entry is used verbatim as the key of \u003cspan pulumi-lang-nodejs=\"`entries`\" pulumi-lang-dotnet=\"`Entries`\" pulumi-lang-go=\"`entries`\" pulumi-lang-python=\"`entries`\" pulumi-lang-yaml=\"`entries`\" pulumi-lang-java=\"`entries`\" pulumi-lang-hcl=\"`entries`\"\u003e`entries`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`unreachableHosts`\" pulumi-lang-dotnet=\"`UnreachableHosts`\" pulumi-lang-go=\"`unreachableHosts`\" pulumi-lang-python=\"`unreachable_hosts`\" pulumi-lang-yaml=\"`unreachableHosts`\" pulumi-lang-java=\"`unreachableHosts`\" pulumi-lang-hcl=\"`unreachable_hosts`\"\u003e`unreachableHosts`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`changedHosts`\" pulumi-lang-dotnet=\"`ChangedHosts`\" pulumi-lang-go=\"`changedHosts`\" pulumi-lang-python=\"`changed_hosts`\" pulumi-lang-yaml=\"`changedHosts`\" pulumi-lang-java=\"`changedHosts`\" pulumi-lang-hcl=\"`changed_hosts`\"\u003e`changedHosts`\u003c/span\u003e and of \u003cspan pulumi-lang-nodejs=\"`pinnedEntries`\" pulumi-lang-dotnet=\"`PinnedEntries`\" pulumi-lang-go=\"`pinnedEntries`\" pulumi-lang-python=\"`pinned_entries`\" pulumi-lang-yaml=\"`pinnedEntries`\" pulumi-lang-java=\"`pinnedEntries`\" pulumi-lang-hcl=\"`pinned_entries`\"\u003e`pinnedEntries`\u003c/span\u003e, so rewriting one — \u003cspan pulumi-lang-nodejs=\"`web1`\" pulumi-lang-dotnet=\"`Web1`\" pulumi-lang-go=\"`web1`\" pulumi-lang-python=\"`web1`\" pulumi-lang-yaml=\"`web1`\" pulumi-lang-java=\"`web1`\" pulumi-lang-hcl=\"`web1`\"\u003e`web1`\u003c/span\u003e to `web1:22`, say — re-pins that host even though it addresses the same machine. NOTE that an inventory NAME is not necessarily resolvable: take \u003cspan pulumi-lang-nodejs=\"`ansibleHost`\" pulumi-lang-dotnet=\"`AnsibleHost`\" pulumi-lang-go=\"`ansibleHost`\" pulumi-lang-python=\"`ansible_host`\" pulumi-lang-yaml=\"`ansibleHost`\" pulumi-lang-java=\"`ansibleHost`\" pulumi-lang-hcl=\"`ansible_host`\"\u003e`ansibleHost`\u003c/span\u003e where the inventory sets it, and the inventory name only otherwise."
+                },
+                "keyTypes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The SSH host-key algorithms to ask each host for, in order. These are algorithm names, not `ssh-keyscan`'s short `-t` aliases: \"ssh-ed25519\", not \"ed25519\". Accepted: ssh-ed25519, ecdsa-sha2-nistp256, ecdsa-sha2-nistp384, ecdsa-sha2-nistp521, rsa-sha2-256, rsa-sha2-512, ssh-rsa. Defaults to ssh-ed25519, ecdsa-sha2-nistp256, rsa-sha2-512 — one current algorithm per key family, with `ssh-rsa` left out because it is RSA over SHA-1, which a current sshd refuses by default, and `rsa-sha2-512` reaches the same RSA key. `rsa-sha2-256` and `rsa-sha2-512` are two signature algorithms over ONE `ssh-rsa` key, so asking for both yields one entry. This decides what the scan ASKS FOR and not what stays pinned: narrowing it stops new key types being added and un-pins nothing."
+                },
+                "knownHosts": {
+                    "type": "string",
+                    "description": "The rendered \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e file: every pinned line, hosts in sorted order, one per line with a trailing newline. This is what feeds a \u003cspan pulumi-lang-nodejs=\"`terrapod.Variable`\" pulumi-lang-dotnet=\"`terrapod.Variable`\" pulumi-lang-go=\"`Variable`\" pulumi-lang-python=\"`Variable`\" pulumi-lang-yaml=\"`terrapod.Variable`\" pulumi-lang-java=\"`terrapod.Variable`\" pulumi-lang-hcl=\"`terrapod_variable`\"\u003e`terrapod.Variable`\u003c/span\u003e of category \u003cspan pulumi-lang-nodejs=\"`ansibleMachineAuth`\" pulumi-lang-dotnet=\"`AnsibleMachineAuth`\" pulumi-lang-go=\"`ansibleMachineAuth`\" pulumi-lang-python=\"`ansible_machine_auth`\" pulumi-lang-yaml=\"`ansibleMachineAuth`\" pulumi-lang-java=\"`ansibleMachineAuth`\" pulumi-lang-hcl=\"`ansible_machine_auth`\"\u003e`ansibleMachineAuth`\u003c/span\u003e. Byte-stable across reads of an unchanged fleet, so it does not produce a diff of its own."
+                },
+                "pinnedEntries": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Hand-written \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line(s) per host, which WIN over anything scanned: a host named here is never scanned at all. This is the answer to \"if there isn't one already\" — you declare what you already trust, and the scanner fills in the rest. A value may hold several lines, for a host offering several key types; blank lines and `#` comments are dropped and everything else is kept verbatim, so a `@cert-authority` marker or a trailing comment survives. The map KEY is how this resource addresses the entry and must match an entry of \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e; what ssh matches on is the line's own host field, which may legitimately be a comma-separated list, a `*` pattern or a hashed host, so the two are deliberately not required to agree."
+                },
+                "port": {
+                    "type": "integer",
+                    "description": "The port for entries of \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e that do not carry one. Defaults to 22."
+                },
+                "scanTimeoutSeconds": {
+                    "type": "integer",
+                    "description": "How long one connection attempt may take, in seconds. Defaults to 5. Each key type is its own connection — which is how `ssh-keyscan` works, because the server picks one algorithm per handshake — so the worst case for a wholly unresponsive host is this times the length of \u003cspan pulumi-lang-nodejs=\"`keyTypes`\" pulumi-lang-dotnet=\"`KeyTypes`\" pulumi-lang-go=\"`keyTypes`\" pulumi-lang-python=\"`key_types`\" pulumi-lang-yaml=\"`keyTypes`\" pulumi-lang-java=\"`keyTypes`\" pulumi-lang-hcl=\"`key_types`\"\u003e`keyTypes`\u003c/span\u003e."
+                },
+                "scannedAt": {
+                    "type": "string",
+                    "description": "RFC3339, UTC. When this resource last ESTABLISHED or ADDED a pin — not the time of the last scan, deliberately. Advancing it on every read would make every plan report the resource as having changed outside Terraform, for a file whose content had not moved, which is precisely the noise that teaches an operator to stop reading the diff."
+                },
+                "unreachableHosts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Every host this read got no key out of — which covers a host that is down or firewalled AND a host that is up but holds none of the key types \u003cspan pulumi-lang-nodejs=\"`keyTypes`\" pulumi-lang-dotnet=\"`KeyTypes`\" pulumi-lang-go=\"`keyTypes`\" pulumi-lang-python=\"`key_types`\" pulumi-lang-yaml=\"`keyTypes`\" pulumi-lang-java=\"`keyTypes`\" pulumi-lang-hcl=\"`key_types`\"\u003e`keyTypes`\u003c/span\u003e asked for. The two are told apart by the warning diagnostic, which carries each attempt's error verbatim. A host listed here keeps whatever was already pinned for it; one with nothing pinned yet is simply absent from \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e until a later read reaches it. Named `*_hosts` rather than \u003cspan pulumi-lang-nodejs=\"`unreachable`\" pulumi-lang-dotnet=\"`Unreachable`\" pulumi-lang-go=\"`unreachable`\" pulumi-lang-python=\"`unreachable`\" pulumi-lang-yaml=\"`unreachable`\" pulumi-lang-java=\"`unreachable`\" pulumi-lang-hcl=\"`unreachable`\"\u003e`unreachable`\u003c/span\u003e because the Pulumi bridge pluralises a set-typed name that is not already plural, and \u003cspan pulumi-lang-nodejs=\"`unreachables`\" pulumi-lang-dotnet=\"`Unreachables`\" pulumi-lang-go=\"`unreachables`\" pulumi-lang-python=\"`unreachables`\" pulumi-lang-yaml=\"`unreachables`\" pulumi-lang-java=\"`unreachables`\" pulumi-lang-hcl=\"`unreachables`\"\u003e`unreachables`\u003c/span\u003e is not a word."
+                }
+            },
+            "required": [
+                "changedHosts",
+                "entries",
+                "hosts",
+                "keyTypes",
+                "knownHosts",
+                "port",
+                "scanTimeoutSeconds",
+                "scannedAt",
+                "unreachableHosts"
+            ],
+            "inputProperties": {
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The hosts to scan, each \u003cspan pulumi-lang-nodejs=\"`host`\" pulumi-lang-dotnet=\"`Host`\" pulumi-lang-go=\"`host`\" pulumi-lang-python=\"`host`\" pulumi-lang-yaml=\"`host`\" pulumi-lang-java=\"`host`\" pulumi-lang-hcl=\"`host`\"\u003e`host`\u003c/span\u003e or `host:port` (a bracketed `[::1]:2222` for an IPv6 literal with a port). A per-entry port overrides \u003cspan pulumi-lang-nodejs=\"`port`\" pulumi-lang-dotnet=\"`Port`\" pulumi-lang-go=\"`port`\" pulumi-lang-python=\"`port`\" pulumi-lang-yaml=\"`port`\" pulumi-lang-java=\"`port`\" pulumi-lang-hcl=\"`port`\"\u003e`port`\u003c/span\u003e. An entry is used verbatim as the key of \u003cspan pulumi-lang-nodejs=\"`entries`\" pulumi-lang-dotnet=\"`Entries`\" pulumi-lang-go=\"`entries`\" pulumi-lang-python=\"`entries`\" pulumi-lang-yaml=\"`entries`\" pulumi-lang-java=\"`entries`\" pulumi-lang-hcl=\"`entries`\"\u003e`entries`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`unreachableHosts`\" pulumi-lang-dotnet=\"`UnreachableHosts`\" pulumi-lang-go=\"`unreachableHosts`\" pulumi-lang-python=\"`unreachable_hosts`\" pulumi-lang-yaml=\"`unreachableHosts`\" pulumi-lang-java=\"`unreachableHosts`\" pulumi-lang-hcl=\"`unreachable_hosts`\"\u003e`unreachableHosts`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`changedHosts`\" pulumi-lang-dotnet=\"`ChangedHosts`\" pulumi-lang-go=\"`changedHosts`\" pulumi-lang-python=\"`changed_hosts`\" pulumi-lang-yaml=\"`changedHosts`\" pulumi-lang-java=\"`changedHosts`\" pulumi-lang-hcl=\"`changed_hosts`\"\u003e`changedHosts`\u003c/span\u003e and of \u003cspan pulumi-lang-nodejs=\"`pinnedEntries`\" pulumi-lang-dotnet=\"`PinnedEntries`\" pulumi-lang-go=\"`pinnedEntries`\" pulumi-lang-python=\"`pinned_entries`\" pulumi-lang-yaml=\"`pinnedEntries`\" pulumi-lang-java=\"`pinnedEntries`\" pulumi-lang-hcl=\"`pinned_entries`\"\u003e`pinnedEntries`\u003c/span\u003e, so rewriting one — \u003cspan pulumi-lang-nodejs=\"`web1`\" pulumi-lang-dotnet=\"`Web1`\" pulumi-lang-go=\"`web1`\" pulumi-lang-python=\"`web1`\" pulumi-lang-yaml=\"`web1`\" pulumi-lang-java=\"`web1`\" pulumi-lang-hcl=\"`web1`\"\u003e`web1`\u003c/span\u003e to `web1:22`, say — re-pins that host even though it addresses the same machine. NOTE that an inventory NAME is not necessarily resolvable: take \u003cspan pulumi-lang-nodejs=\"`ansibleHost`\" pulumi-lang-dotnet=\"`AnsibleHost`\" pulumi-lang-go=\"`ansibleHost`\" pulumi-lang-python=\"`ansible_host`\" pulumi-lang-yaml=\"`ansibleHost`\" pulumi-lang-java=\"`ansibleHost`\" pulumi-lang-hcl=\"`ansible_host`\"\u003e`ansibleHost`\u003c/span\u003e where the inventory sets it, and the inventory name only otherwise."
+                },
+                "keyTypes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The SSH host-key algorithms to ask each host for, in order. These are algorithm names, not `ssh-keyscan`'s short `-t` aliases: \"ssh-ed25519\", not \"ed25519\". Accepted: ssh-ed25519, ecdsa-sha2-nistp256, ecdsa-sha2-nistp384, ecdsa-sha2-nistp521, rsa-sha2-256, rsa-sha2-512, ssh-rsa. Defaults to ssh-ed25519, ecdsa-sha2-nistp256, rsa-sha2-512 — one current algorithm per key family, with `ssh-rsa` left out because it is RSA over SHA-1, which a current sshd refuses by default, and `rsa-sha2-512` reaches the same RSA key. `rsa-sha2-256` and `rsa-sha2-512` are two signature algorithms over ONE `ssh-rsa` key, so asking for both yields one entry. This decides what the scan ASKS FOR and not what stays pinned: narrowing it stops new key types being added and un-pins nothing."
+                },
+                "pinnedEntries": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Hand-written \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line(s) per host, which WIN over anything scanned: a host named here is never scanned at all. This is the answer to \"if there isn't one already\" — you declare what you already trust, and the scanner fills in the rest. A value may hold several lines, for a host offering several key types; blank lines and `#` comments are dropped and everything else is kept verbatim, so a `@cert-authority` marker or a trailing comment survives. The map KEY is how this resource addresses the entry and must match an entry of \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e; what ssh matches on is the line's own host field, which may legitimately be a comma-separated list, a `*` pattern or a hashed host, so the two are deliberately not required to agree."
+                },
+                "port": {
+                    "type": "integer",
+                    "description": "The port for entries of \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e that do not carry one. Defaults to 22."
+                },
+                "scanTimeoutSeconds": {
+                    "type": "integer",
+                    "description": "How long one connection attempt may take, in seconds. Defaults to 5. Each key type is its own connection — which is how `ssh-keyscan` works, because the server picks one algorithm per handshake — so the worst case for a wholly unresponsive host is this times the length of \u003cspan pulumi-lang-nodejs=\"`keyTypes`\" pulumi-lang-dotnet=\"`KeyTypes`\" pulumi-lang-go=\"`keyTypes`\" pulumi-lang-python=\"`key_types`\" pulumi-lang-yaml=\"`keyTypes`\" pulumi-lang-java=\"`keyTypes`\" pulumi-lang-hcl=\"`key_types`\"\u003e`keyTypes`\u003c/span\u003e."
+                }
+            },
+            "requiredInputs": [
+                "hosts"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering SshHostKeys resources.\n",
+                "properties": {
+                    "changedHosts": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Every host that answered with a key DIFFERING from the one pinned for the same key type. The pin is kept and the offered key discarded, so this is a report rather than a state change. A rebuilt host and an impersonated one look identical from here, which is why re-pinning is a deliberate act: remove the host from \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e and add it back to re-pin that host alone, or `terraform apply -replace=…` to re-pin every host this resource manages. Named `*_hosts` because a bare \u003cspan pulumi-lang-nodejs=\"`changed`\" pulumi-lang-dotnet=\"`Changed`\" pulumi-lang-go=\"`changed`\" pulumi-lang-python=\"`changed`\" pulumi-lang-yaml=\"`changed`\" pulumi-lang-java=\"`changed`\" pulumi-lang-hcl=\"`changed`\"\u003e`changed`\u003c/span\u003e reads as a boolean, and because the Pulumi bridge would render it \u003cspan pulumi-lang-nodejs=\"`changeds`\" pulumi-lang-dotnet=\"`Changeds`\" pulumi-lang-go=\"`changeds`\" pulumi-lang-python=\"`changeds`\" pulumi-lang-yaml=\"`changeds`\" pulumi-lang-java=\"`changeds`\" pulumi-lang-hcl=\"`changeds`\"\u003e`changeds`\u003c/span\u003e."
+                    },
+                    "entries": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Per host, its pinned line(s) joined by newlines and with no trailing one — a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e body for that host alone. Keyed as \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e is written. A host with nothing pinned (unreachable on the read that would first have pinned it) is ABSENT rather than present and empty, so `contains(keys(…), h)` answers \"is this host pinned yet\" truthfully and a \u003cspan pulumi-lang-nodejs=\"`for`\" pulumi-lang-dotnet=\"`For`\" pulumi-lang-go=\"`for`\" pulumi-lang-python=\"`for`\" pulumi-lang-yaml=\"`for`\" pulumi-lang-java=\"`for`\" pulumi-lang-hcl=\"`for`\"\u003e`for`\u003c/span\u003e over it yields only hosts that are."
+                    },
+                    "hosts": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "The hosts to scan, each \u003cspan pulumi-lang-nodejs=\"`host`\" pulumi-lang-dotnet=\"`Host`\" pulumi-lang-go=\"`host`\" pulumi-lang-python=\"`host`\" pulumi-lang-yaml=\"`host`\" pulumi-lang-java=\"`host`\" pulumi-lang-hcl=\"`host`\"\u003e`host`\u003c/span\u003e or `host:port` (a bracketed `[::1]:2222` for an IPv6 literal with a port). A per-entry port overrides \u003cspan pulumi-lang-nodejs=\"`port`\" pulumi-lang-dotnet=\"`Port`\" pulumi-lang-go=\"`port`\" pulumi-lang-python=\"`port`\" pulumi-lang-yaml=\"`port`\" pulumi-lang-java=\"`port`\" pulumi-lang-hcl=\"`port`\"\u003e`port`\u003c/span\u003e. An entry is used verbatim as the key of \u003cspan pulumi-lang-nodejs=\"`entries`\" pulumi-lang-dotnet=\"`Entries`\" pulumi-lang-go=\"`entries`\" pulumi-lang-python=\"`entries`\" pulumi-lang-yaml=\"`entries`\" pulumi-lang-java=\"`entries`\" pulumi-lang-hcl=\"`entries`\"\u003e`entries`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`unreachableHosts`\" pulumi-lang-dotnet=\"`UnreachableHosts`\" pulumi-lang-go=\"`unreachableHosts`\" pulumi-lang-python=\"`unreachable_hosts`\" pulumi-lang-yaml=\"`unreachableHosts`\" pulumi-lang-java=\"`unreachableHosts`\" pulumi-lang-hcl=\"`unreachable_hosts`\"\u003e`unreachableHosts`\u003c/span\u003e and \u003cspan pulumi-lang-nodejs=\"`changedHosts`\" pulumi-lang-dotnet=\"`ChangedHosts`\" pulumi-lang-go=\"`changedHosts`\" pulumi-lang-python=\"`changed_hosts`\" pulumi-lang-yaml=\"`changedHosts`\" pulumi-lang-java=\"`changedHosts`\" pulumi-lang-hcl=\"`changed_hosts`\"\u003e`changedHosts`\u003c/span\u003e and of \u003cspan pulumi-lang-nodejs=\"`pinnedEntries`\" pulumi-lang-dotnet=\"`PinnedEntries`\" pulumi-lang-go=\"`pinnedEntries`\" pulumi-lang-python=\"`pinned_entries`\" pulumi-lang-yaml=\"`pinnedEntries`\" pulumi-lang-java=\"`pinnedEntries`\" pulumi-lang-hcl=\"`pinned_entries`\"\u003e`pinnedEntries`\u003c/span\u003e, so rewriting one — \u003cspan pulumi-lang-nodejs=\"`web1`\" pulumi-lang-dotnet=\"`Web1`\" pulumi-lang-go=\"`web1`\" pulumi-lang-python=\"`web1`\" pulumi-lang-yaml=\"`web1`\" pulumi-lang-java=\"`web1`\" pulumi-lang-hcl=\"`web1`\"\u003e`web1`\u003c/span\u003e to `web1:22`, say — re-pins that host even though it addresses the same machine. NOTE that an inventory NAME is not necessarily resolvable: take \u003cspan pulumi-lang-nodejs=\"`ansibleHost`\" pulumi-lang-dotnet=\"`AnsibleHost`\" pulumi-lang-go=\"`ansibleHost`\" pulumi-lang-python=\"`ansible_host`\" pulumi-lang-yaml=\"`ansibleHost`\" pulumi-lang-java=\"`ansibleHost`\" pulumi-lang-hcl=\"`ansible_host`\"\u003e`ansibleHost`\u003c/span\u003e where the inventory sets it, and the inventory name only otherwise."
+                    },
+                    "keyTypes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "The SSH host-key algorithms to ask each host for, in order. These are algorithm names, not `ssh-keyscan`'s short `-t` aliases: \"ssh-ed25519\", not \"ed25519\". Accepted: ssh-ed25519, ecdsa-sha2-nistp256, ecdsa-sha2-nistp384, ecdsa-sha2-nistp521, rsa-sha2-256, rsa-sha2-512, ssh-rsa. Defaults to ssh-ed25519, ecdsa-sha2-nistp256, rsa-sha2-512 — one current algorithm per key family, with `ssh-rsa` left out because it is RSA over SHA-1, which a current sshd refuses by default, and `rsa-sha2-512` reaches the same RSA key. `rsa-sha2-256` and `rsa-sha2-512` are two signature algorithms over ONE `ssh-rsa` key, so asking for both yields one entry. This decides what the scan ASKS FOR and not what stays pinned: narrowing it stops new key types being added and un-pins nothing."
+                    },
+                    "knownHosts": {
+                        "type": "string",
+                        "description": "The rendered \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e file: every pinned line, hosts in sorted order, one per line with a trailing newline. This is what feeds a \u003cspan pulumi-lang-nodejs=\"`terrapod.Variable`\" pulumi-lang-dotnet=\"`terrapod.Variable`\" pulumi-lang-go=\"`Variable`\" pulumi-lang-python=\"`Variable`\" pulumi-lang-yaml=\"`terrapod.Variable`\" pulumi-lang-java=\"`terrapod.Variable`\" pulumi-lang-hcl=\"`terrapod_variable`\"\u003e`terrapod.Variable`\u003c/span\u003e of category \u003cspan pulumi-lang-nodejs=\"`ansibleMachineAuth`\" pulumi-lang-dotnet=\"`AnsibleMachineAuth`\" pulumi-lang-go=\"`ansibleMachineAuth`\" pulumi-lang-python=\"`ansible_machine_auth`\" pulumi-lang-yaml=\"`ansibleMachineAuth`\" pulumi-lang-java=\"`ansibleMachineAuth`\" pulumi-lang-hcl=\"`ansible_machine_auth`\"\u003e`ansibleMachineAuth`\u003c/span\u003e. Byte-stable across reads of an unchanged fleet, so it does not produce a diff of its own."
+                    },
+                    "pinnedEntries": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Hand-written \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line(s) per host, which WIN over anything scanned: a host named here is never scanned at all. This is the answer to \"if there isn't one already\" — you declare what you already trust, and the scanner fills in the rest. A value may hold several lines, for a host offering several key types; blank lines and `#` comments are dropped and everything else is kept verbatim, so a `@cert-authority` marker or a trailing comment survives. The map KEY is how this resource addresses the entry and must match an entry of \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e; what ssh matches on is the line's own host field, which may legitimately be a comma-separated list, a `*` pattern or a hashed host, so the two are deliberately not required to agree."
+                    },
+                    "port": {
+                        "type": "integer",
+                        "description": "The port for entries of \u003cspan pulumi-lang-nodejs=\"`hosts`\" pulumi-lang-dotnet=\"`Hosts`\" pulumi-lang-go=\"`hosts`\" pulumi-lang-python=\"`hosts`\" pulumi-lang-yaml=\"`hosts`\" pulumi-lang-java=\"`hosts`\" pulumi-lang-hcl=\"`hosts`\"\u003e`hosts`\u003c/span\u003e that do not carry one. Defaults to 22."
+                    },
+                    "scanTimeoutSeconds": {
+                        "type": "integer",
+                        "description": "How long one connection attempt may take, in seconds. Defaults to 5. Each key type is its own connection — which is how `ssh-keyscan` works, because the server picks one algorithm per handshake — so the worst case for a wholly unresponsive host is this times the length of \u003cspan pulumi-lang-nodejs=\"`keyTypes`\" pulumi-lang-dotnet=\"`KeyTypes`\" pulumi-lang-go=\"`keyTypes`\" pulumi-lang-python=\"`key_types`\" pulumi-lang-yaml=\"`keyTypes`\" pulumi-lang-java=\"`keyTypes`\" pulumi-lang-hcl=\"`key_types`\"\u003e`keyTypes`\u003c/span\u003e."
+                    },
+                    "scannedAt": {
+                        "type": "string",
+                        "description": "RFC3339, UTC. When this resource last ESTABLISHED or ADDED a pin — not the time of the last scan, deliberately. Advancing it on every read would make every plan report the resource as having changed outside Terraform, for a file whose content had not moved, which is precisely the noise that teaches an operator to stop reading the diff."
+                    },
+                    "unreachableHosts": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Every host this read got no key out of — which covers a host that is down or firewalled AND a host that is up but holds none of the key types \u003cspan pulumi-lang-nodejs=\"`keyTypes`\" pulumi-lang-dotnet=\"`KeyTypes`\" pulumi-lang-go=\"`keyTypes`\" pulumi-lang-python=\"`key_types`\" pulumi-lang-yaml=\"`keyTypes`\" pulumi-lang-java=\"`keyTypes`\" pulumi-lang-hcl=\"`key_types`\"\u003e`keyTypes`\u003c/span\u003e asked for. The two are told apart by the warning diagnostic, which carries each attempt's error verbatim. A host listed here keeps whatever was already pinned for it; one with nothing pinned yet is simply absent from \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e until a later read reaches it. Named `*_hosts` rather than \u003cspan pulumi-lang-nodejs=\"`unreachable`\" pulumi-lang-dotnet=\"`Unreachable`\" pulumi-lang-go=\"`unreachable`\" pulumi-lang-python=\"`unreachable`\" pulumi-lang-yaml=\"`unreachable`\" pulumi-lang-java=\"`unreachable`\" pulumi-lang-hcl=\"`unreachable`\"\u003e`unreachable`\u003c/span\u003e because the Pulumi bridge pluralises a set-typed name that is not already plural, and \u003cspan pulumi-lang-nodejs=\"`unreachables`\" pulumi-lang-dotnet=\"`Unreachables`\" pulumi-lang-go=\"`unreachables`\" pulumi-lang-python=\"`unreachables`\" pulumi-lang-yaml=\"`unreachables`\" pulumi-lang-java=\"`unreachables`\" pulumi-lang-hcl=\"`unreachables`\"\u003e`unreachables`\u003c/span\u003e is not a word."
+                    }
+                },
+                "type": "object"
+            }
+        },
         "terrapod:index/user:User": {
             "properties": {
                 "createdAt": {

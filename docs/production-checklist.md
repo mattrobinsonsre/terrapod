@@ -113,7 +113,9 @@ machines outside the cluster — so it deserves its own pass.
 - [ ] **Host-key verification is left on** — `ansible-host-key-checking` defaults
       true, which is ansible's own behaviour. Turning it off accepts any key a
       host presents, so the connection can be intercepted; supply the host's key
-      via a `known_hosts` credential field instead. See
+      via a `known_hosts` credential field instead — `terrapod_ssh_host_keys`
+      scans a fleet and pins what it finds, so the field is satisfiable without
+      a key paste per host. See
       [Running a Configure](ansible-configure.md#host-key-verification-and-how-to-satisfy-it).
 - [ ] **Dynamic inventory stays off unless you need it** — both switches permit
       repository code to resolve the inventory on the runner, and

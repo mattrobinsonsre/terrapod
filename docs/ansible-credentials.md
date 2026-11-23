@@ -131,6 +131,13 @@ resource "terrapod_variable" "web_key" {
 }
 ```
 
+For a fleet, pasting a key per host is work nobody does twice, which is how a
+default nobody can satisfy becomes a default everybody turns off. The provider
+has a resource that scans the hosts and renders this blob for you, pinning what
+it finds so a later change is reported rather than accepted — see [Running a
+Configure → Get the
+keys](ansible-configure.md#get-the-keys-terrapod_ssh_host_keys).
+
 Two things about it differ from every other field, and both are deliberate.
 
 **It is a file, like `private_key`** — a placeholder naming it substitutes the
