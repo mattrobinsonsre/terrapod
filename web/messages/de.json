@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Erlaubt deklarierte Inventar-Plugins — eine YAML-Quelle mit einem plugin-Schlüssel auf oberster Ebene —, wenn der Runner das Inventar auflöst. Terrapod selbst führt in keinem der beiden Zustände eines aus. Solange dies aus ist, wird eine Plugin-Quelle namentlich abgelehnt, statt zu einer unvollständigen Hostliste aufzulösen; solange es an ist, ist das hier gezeigte Inventar je Quelle ausdrücklich unvollständig, und die vom Runner aufgelöste Menge ist die maßgebliche.",
       "inventoryScriptsEnabled": "Inventar-Skripte",
       "inventoryScriptsEnabledHint": "Erlaubt ausführbare Inventar-Skripte, wenn der Runner das Inventar auflöst. Getrennt von dynamischen Inventar-Plugins, damit deklarierte Plugin-Konfigurationen, die eine Collection benennen und vor der Ausführung gelesen werden können, erlaubt werden können, ohne auch beliebige ausführbare Dateien zu erlauben.",
-      "ansibleHostKeyChecking": "SSH-Hostschlüsselprüfung",
-      "ansibleHostKeyCheckingHint": "Standardmäßig an, und das ist Ansibles eigenes Verhalten: Ein Konfigurationslauf weist einen Host ab, dessen Schlüssel er nicht schon kennt. Schaltet man sie aus, wird jeder Schlüssel akzeptiert, den ein Host vorzeigt, sodass die Verbindung abgehört werden kann — besser ist es, den öffentlichen Schlüssel des Hosts mit den Maschinen-Zugangsdaten mitzugeben und die Prüfung an zu lassen. Eine Ansible-Variable pro Host hat in beiden Fällen Vorrang vor dieser Einstellung.",
       "oidcAudiencesLead": "Terrapod stellt pro Provider-Konfiguration ein kurzlebiges OpenID-Connect-Token aus und schreibt es dorthin, wo der Lauf es lesen kann.",
       "driftIgnoreRulesLead": "Terraform-Adressen und Attributpfade, die der Drift-Klassifikator unterdrückt. Eine bloße Adresse ohne Attribut unterdrückt jede Änderung an dieser Ressource.",
       "dynamicInventoryEnabledLead": "Erlaubt deklarierte Inventar-Plugins, wenn der Runner das Inventar auflöst. Das hier gezeigte Inventar wird dann je Quelle unvollständig, und die vom Runner aufgelöste Menge ist die maßgebliche.",
       "inventoryScriptsEnabledLead": "Erlaubt ausführbare Inventar-Skripte. Eine beliebige ausführbare Datei aus dem Repository läuft dann im Runner-Job, mit dessen Cloud-Identität, bevor das Playbook läuft — und das hier gezeigte Inventar wird unvollständig.",
-      "ansibleHostKeyCheckingLead": "Standardmäßig an, wie Ansible es selbst tut. Schwächt eine Schutzmaßnahme ab, wenn aus: Jeder Schlüssel, den ein Host vorzeigt, wird akzeptiert, sodass die Verbindung abgehört werden kann.",
       "bindPlanLead": "Wenn aktiviert, wendet das Update genau den Plan an, den die Vorschau gespeichert hat; was sich seit der Vorschau geändert hat, lässt das Update fehlschlagen, statt angewendet zu werden.",
       "configDirectoryLead": "Wo ansible.cfg, die Playbooks, roles/, group_vars/ und host_vars/ liegen, relativ zum Repository-Wurzelverzeichnis. Leer bedeutet das Wurzelverzeichnis selbst.",
       "ansibleCollectionsLead": "Collections, die vor einem Configure installiert werden, eine pro Zeile als namespace.name oder namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Zeitzone des Zeitplans",
       "scheduledConfigureTimezoneHint": "Die IANA-Zone, in der der Zeitplan gelesen wird, damit die Stunde der Sommerzeit folgt — zum Beispiel UTC, Europe/London oder America/New_York. Leer bedeutet UTC.",
       "scheduledConfigureTimezonePlaceholder": "z. B. Europe/London",
-      "scheduledConfigureLastAt": "Letzter geplanter Lauf"
+      "scheduledConfigureLastAt": "Letzter geplanter Lauf",
+      "sshHostKeyPolicy": "SSH-Hostschlüsselrichtlinie",
+      "sshHostKeyPolicyStrict": "Jeden Host prüfen",
+      "sshHostKeyPolicyAcceptNew": "Beim ersten Kontakt vertrauen",
+      "sshHostKeyPolicyOff": "Nicht prüfen",
+      "sshHostKeyPolicyLead": "Welche der drei Antworten von OpenSSH ein Konfigurationslauf anfordert. Beim ersten Kontakt zu vertrauen weist einen geänderten Schlüssel weiterhin ab; nicht zu prüfen akzeptiert jeden Schlüssel eines Hosts, sodass die Verbindung abgehört werden kann.",
+      "sshHostKeyPolicyHint": "Terrapod erzeugt aus den freigegebenen Schlüsseln jedes Hosts die known_hosts-Datei, gegen die OpenSSH prüft, und diese Einstellung ist der StrictHostKeyChecking-Wert, den der Lauf anfordert. Die Datei ist eine Positivliste und die Einstellung gilt prozessweit: Wird jeder Host geprüft, ist eine Adresse, für die niemand einen Schlüssel freigegeben hat, nicht nur ungeprüft, sondern unerreichbar. Beim ersten Kontakt zu vertrauen ist die Antwort für gemischte Bestände: freigegebene Schlüssel werden weiterhin streng geprüft, ein nicht freigegebener Host verbindet sich einmal und wird abgewiesen, sobald sich sein Schlüssel ändert. Nichts im Inventar kann dies überschreiben."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

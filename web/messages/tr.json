@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Runner envanteri çözümlerken bildirilmiş envanter eklentilerine — üst düzey bir plugin anahtarı taşıyan bir YAML kaynağına — izin verir. Terrapod bunları hiçbir durumda kendisi çalıştırmaz. Bu kapalıyken bir eklenti kaynağı, eksik bir makine kümesine çözümlenmek yerine adıyla reddedilir; açıkken burada gösterilen envanter kaynak kaynak açıkça eksiktir ve runner''ın çözümlediği küme belirleyici olandır.",
       "inventoryScriptsEnabled": "Envanter betikleri",
       "inventoryScriptsEnabledHint": "Runner envanteri çözümlerken çalıştırılabilir envanter betiklerine izin verir. Dinamik envanter eklentilerinden ayrı tutulur; böylece bir koleksiyon adı veren ve çalışmadan önce okunabilen bildirilmiş eklenti yapılandırmalarına, rastgele çalıştırılabilir dosyalara da izin vermeden izin verilebilir.",
-      "ansibleHostKeyChecking": "SSH ana makine anahtarı denetimi",
-      "ansibleHostKeyCheckingHint": "Öntanımlı olarak açıktır; bu, Ansible''ın kendi davranışıdır: bir yapılandırma, anahtarına henüz güvenmediği bir ana makineyi reddeder. Kapatırsanız bir ana makinenin sunduğu her anahtar kabul edilir, dolayısıyla bağlantı araya girilerek dinlenebilir — ana makinenin açık anahtarını makine kimlik bilgisiyle birlikte vermek ve denetimi açık bırakmak daha iyidir. Ana makine başına tanımlanan bir Ansible değişkeni her durumda bu ayarın önüne geçer.",
       "oidcAudiencesLead": "Terrapod, her provider yapılandırması için kısa ömürlü bir OpenID Connect token''ı üretir ve onu çalıştırmanın okuyabileceği bir yere yazar.",
       "driftIgnoreRulesLead": "Sürüklenme sınıflandırıcısının bastırdığı Terraform adresleri ve öznitelik yolları. Özniteliği olmayan çıplak bir adres, o kaynağa yapılan her değişikliği susturur.",
       "dynamicInventoryEnabledLead": "Runner envanteri çözümlerken bildirilmiş envanter eklentilerine izin verir. Burada gösterilen envanter o zaman kaynak kaynak eksik hâle gelir ve runner''ın çözümlediği küme belirleyici olandır.",
       "inventoryScriptsEnabledLead": "Çalıştırılabilir envanter betiklerine izin verir. Depodan gelen rastgele bir çalıştırılabilir dosya o zaman runner Job''unun içinde, onun bulut kimliğiyle, playbook''tan önce çalışır — ve burada gösterilen envanter eksik hâle gelir.",
-      "ansibleHostKeyCheckingLead": "Öntanımlı olarak açıktır; Ansible''ın kendi davranışı da budur. Kapatıldığında bir korumayı gevşetir: bir ana makinenin sunduğu her anahtar kabul edilir, dolayısıyla bağlantı araya girilerek dinlenebilir.",
       "bindPlanLead": "Açıkken güncelleme, önizlemenin kaydettiği planı birebir uygular; önizlemeden bu yana değişen her şey uygulanmak yerine güncellemenin başarısız olmasına yol açar.",
       "configDirectoryLead": "ansible.cfg, playbook''lar, roles/, group_vars/ ve host_vars/ dosyalarının depo kökünden göreli olarak bulunduğu yer. Boş bırakmak kökün kendisi anlamına gelir.",
       "ansibleCollectionsLead": "Bir configure çalışmadan önce kurulan koleksiyonlar; her satırda bir tane, namespace.name veya namespace.name:version biçiminde.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Zamanlama saat dilimi",
       "scheduledConfigureTimezoneHint": "Zamanlamanın okunduğu IANA saat dilimi; böylece saat yaz saati uygulamasını izler — örneğin UTC, Europe/London veya America/New_York. Boş bırakmak UTC demektir.",
       "scheduledConfigureTimezonePlaceholder": "örn. Europe/London",
-      "scheduledConfigureLastAt": "Son zamanlanmış çalıştırma"
+      "scheduledConfigureLastAt": "Son zamanlanmış çalıştırma",
+      "sshHostKeyPolicy": "SSH ana makine anahtarı ilkesi",
+      "sshHostKeyPolicyStrict": "Her ana makineyi denetle",
+      "sshHostKeyPolicyAcceptNew": "İlk temasta güven",
+      "sshHostKeyPolicyOff": "Denetleme",
+      "sshHostKeyPolicyLead": "Bir yapılandırmanın OpenSSH'ın üç yanıtından hangisini istediği. İlk temasta güvenmek değişmiş bir anahtarı yine de reddeder; denetlememek bir ana makinenin sunduğu her anahtarı kabul eder, dolayısıyla bağlantı araya girilerek dinlenebilir.",
+      "sshHostKeyPolicyHint": "Terrapod her ana makinenin onaylı anahtarlarını OpenSSH'ın karşılaştırdığı known_hosts dosyasına dönüştürür ve bu ayar, çalıştırmanın istediği StrictHostKeyChecking değeridir. O dosya bir izin listesidir ve ayar tüm süreç için geçerlidir: her ana makine denetlenirse, kimsenin anahtar onaylamadığı bir adres yalnızca denetlenmemiş değil, ulaşılamaz olur. İlk temasta güvenmek, karma bir filo için verilen yanıttır: onaylı anahtarlar yine katı biçimde denetlenir, kimsenin sabitlemediği bir ana makine ise bir kez bağlanır ve anahtarı sonradan değişirse reddedilir. Envanterdeki hiçbir şey bunu geçersiz kılamaz."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

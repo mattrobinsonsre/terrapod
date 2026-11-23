@@ -20,7 +20,16 @@ import {
 import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups'
 import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
 import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
+import {
+  SshHostKeyPolicySelect,
+  sshHostKeyPolicyLabel,
+} from '@/components/ssh-host-key-policy-field'
 import { modeFromFlags } from '@/lib/dynamic-inventory'
+import {
+  DEFAULT_SSH_HOST_KEY_POLICY,
+  asSshHostKeyPolicy,
+  type SshHostKeyPolicy,
+} from '@/lib/ssh-host-keys'
 import { explainingPhase } from '@/lib/run-phases'
 import { primaryRunBadge, showsConfigureBadge } from '@/lib/run-badges'
 import { isCompositeRun } from '@/lib/run-kinds'
@@ -143,11 +152,12 @@ interface WorkspaceAttrs {
   // where the answer is the column default -- false.
   'dynamic-inventory-enabled'?: boolean
   'inventory-scripts-enabled'?: boolean
-  // Whether a configure verifies the SSH host key of the hosts it targets
-  // (#2318). Absent from an older API, where the answer is the column default
-  // -- TRUE, unlike the two above, because verification on is ansible's own
-  // behaviour rather than something Terrapod added.
-  'ansible-host-key-checking'?: boolean
+  // How a configure verifies the SSH host keys of the hosts it targets
+  // (#2318, three-state since #2592). Absent from an older API, where the
+  // answer is the column default -- `strict`, which unlike the two above is
+  // ansible's own behaviour rather than something Terrapod added, so the
+  // fallback is the protective state rather than merely the off one.
+  'ssh-host-key-policy'?: string
   'default-playbook'?: string
   // The playbooks a configure here may name, `[]` or absent meaning any
   // (#2527). What turns the run option from a text box into a select.
@@ -605,7 +615,8 @@ function WorkspaceDetailContent() {
   const [editInventoryPaths, setEditInventoryPaths] = useState<string[]>([])
   const [editDynamicInventoryEnabled, setEditDynamicInventoryEnabled] = useState(false)
   const [editInventoryScriptsEnabled, setEditInventoryScriptsEnabled] = useState(false)
-  const [editAnsibleHostKeyChecking, setEditAnsibleHostKeyChecking] = useState(true)
+  const [editSshHostKeyPolicy, setEditSshHostKeyPolicy] =
+    useState<SshHostKeyPolicy>(DEFAULT_SSH_HOST_KEY_POLICY)
   const [editDefaultPlaybook, setEditDefaultPlaybook] = useState('')
   // The allow-list over the playbook run option (#2527). `[]` is the OPEN
   // state, so an empty editor means "any playbook", which is what every
@@ -1515,7 +1526,12 @@ function WorkspaceDetailContent() {
     setEditPlaybooks(workspace.attributes.playbooks || [])
     setEditDynamicInventoryEnabled(workspace.attributes['dynamic-inventory-enabled'] ?? false)
     setEditInventoryScriptsEnabled(workspace.attributes['inventory-scripts-enabled'] ?? false)
-    setEditAnsibleHostKeyChecking(workspace.attributes['ansible-host-key-checking'] ?? true)
+    // Through the coercion rather than `?? 'strict'`: an API that predates
+    // the attribute sends nothing and a 1.x one could send the boolean this
+    // replaced, and `false` has to read as `off` rather than fall through to
+    // the default -- the fallthrough would tell an operator their fleet is
+    // verifying while the server says it is not.
+    setEditSshHostKeyPolicy(asSshHostKeyPolicy(workspace.attributes['ssh-host-key-policy']))
     setEditDefaultPlaybook(workspace.attributes['default-playbook'] || '')
     setEditDefaultLimit(workspace.attributes['default-limit'] || '')
     setEditHardLimit(workspace.attributes['hard-limit'] || '')
@@ -1623,7 +1639,7 @@ function WorkspaceDetailContent() {
               'inventory-paths': editInventoryPaths.filter((entry) => entry !== ''),
               'dynamic-inventory-enabled': editDynamicInventoryEnabled,
               'inventory-scripts-enabled': editInventoryScriptsEnabled,
-              'ansible-host-key-checking': editAnsibleHostKeyChecking,
+              'ssh-host-key-policy': editSshHostKeyPolicy,
               'default-playbook': editDefaultPlaybook,
               // Blank rows dropped for the same reason as `inventory-paths`
               // above: the server refuses an empty entry, so one left behind
@@ -2874,7 +2890,7 @@ function WorkspaceDetailContent() {
         'inventory-paths': editInventoryPaths,
         'dynamic-inventory-enabled': editDynamicInventoryEnabled,
         'inventory-scripts-enabled': editInventoryScriptsEnabled,
-        'ansible-host-key-checking': editAnsibleHostKeyChecking,
+        'ssh-host-key-policy': editSshHostKeyPolicy,
         'agent-pool-ids': editPoolIds,
         'owner-email': editOwner,
         labels: editLabels,
@@ -2909,7 +2925,7 @@ function WorkspaceDetailContent() {
     playbooks: 'fields.playbooksTitle',
     'inventory-paths': 'fields.inventoryPathsHint',
     'dynamic-inventory-enabled': 'fields.dynamicInventoryModeHint',
-    'ansible-host-key-checking': 'fields.ansibleHostKeyCheckingHint',
+    'ssh-host-key-policy': 'fields.sshHostKeyPolicyHint',
     'agent-pool-ids': 'fields.agentPoolsHint',
     'trigger-prefixes': 'fields.triggerPrefixesHint',
     'oidc-audiences': 'fields.oidcAudiencesHint',
@@ -2989,7 +3005,7 @@ function WorkspaceDetailContent() {
     'inventory-paths': (v) => setEditInventoryPaths(v as string[]),
     'dynamic-inventory-enabled': (v) => setEditDynamicInventoryEnabled(Boolean(v)),
     'inventory-scripts-enabled': (v) => setEditInventoryScriptsEnabled(Boolean(v)),
-    'ansible-host-key-checking': (v) => setEditAnsibleHostKeyChecking(Boolean(v)),
+    'ssh-host-key-policy': (v) => setEditSshHostKeyPolicy(asSshHostKeyPolicy(v)),
     'agent-pool-ids': (v) => setEditPoolIds(v as string[]),
     'owner-email': (v) => setEditOwner(String(v)),
     labels: (v) => setEditLabels(v as Record<string, string>),
@@ -3160,6 +3176,21 @@ function WorkspaceDetailContent() {
   const toggleDisplay = (attr: string, fallback: boolean): ReactNode => (
     <span data-testid={FIELD_BY_ATTR[attr]?.id ?? attr}>
       {Boolean(settingsValues[attr] ?? fallback) ? t('common.enabled') : t('common.disabled')}
+    </span>
+  )
+
+  /** The host-key POLICY in view mode (#2592).
+   *
+   *  Its own display rather than `toggleDisplay`, which renders Enabled or
+   *  Disabled and so can only name two of three states -- and the one it would
+   *  lose is `accept-new`, the middle state this field exists to make
+   *  reachable. The label comes from the same function the select's options
+   *  do -- a plain one taking `t`, not a hook, because this sits below an
+   *  early return -- so the picker and the read-back cannot come to disagree
+   *  about a word. */
+  const sshHostKeyPolicyDisplay = (): ReactNode => (
+    <span data-testid="ws-ssh-host-key-policy-display">
+      {sshHostKeyPolicyLabel(t, asSshHostKeyPolicy(settingsValues['ssh-host-key-policy']))}
     </span>
   )
 
@@ -4099,18 +4130,22 @@ function WorkspaceDetailContent() {
                     display={dynamicInventoryDisplay()}
                     control={<DynamicInventorySelect ctx={ansibleCtx} />}
                   />
-                  {/* Whether a configure verifies the host key of the hosts
-                      it targets (#2318). The `toggleDisplay` fallback is TRUE,
-                      unlike every other boolean in this card: on is ansible's
+                  {/* How a configure verifies the host keys of the hosts it
+                      targets (#2318). THREE states since #2592, which is what
+                      makes `accept-new` reachable: a boolean could not say
+                      "keep the pinned hosts strictly verified and leave the
+                      rest reachable", and that is the state a fleet with some
+                      hosts pinned and some not wants. Its own display rather
+                      than `toggleDisplay`, which can only render Enabled or
+                      Disabled, and the read falls back to `strict` -- ansible's
                       own behaviour, so a workspace from an API predating the
-                      attribute is verifying, and `false` here would read it as
-                      accepting any host key. */}
+                      attribute is verifying rather than accepting any key. */}
                   <Field
-                    attr="ansible-host-key-checking"
+                    attr="ssh-host-key-policy"
                     ctx={ansibleCtx}
-                    kind="checkbox"
-                    display={toggleDisplay('ansible-host-key-checking', true)}
-                    control={settingsToggle('ansible-host-key-checking')}
+                    kind="select"
+                    display={sshHostKeyPolicyDisplay()}
+                    control={<SshHostKeyPolicySelect ctx={ansibleCtx} />}
                   />
                 </Group>
 

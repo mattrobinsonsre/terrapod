@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Caniatáu ategion rhestr eiddo a ddatganwyd — ffynhonnell YAML sy''n cario allwedd plugin ar y lefel uchaf — pan fydd y rhedwr yn datrys y rhestr eiddo. Nid yw Terrapod ei hun byth yn rhedeg un, yn y naill gyflwr na''r llall. Pan fydd hwn i ffwrdd, caiff ffynhonnell ategyn ei gwrthod wrth ei henw yn lle datrys i set gwesteiwyr anghyflawn; pan fydd ymlaen, mae''r rhestr eiddo a ddangosir yma yn anghyflawn yn benodol fesul ffynhonnell, a''r set y mae''r rhedwr yn ei datrys sydd â''r gair olaf.",
       "inventoryScriptsEnabled": "Sgriptiau rhestr eiddo",
       "inventoryScriptsEnabledHint": "Caniatáu sgriptiau rhestr eiddo gweithredadwy pan fydd y rhedwr yn datrys y rhestr eiddo. Fe''i cedwir ar wahân i ategion rhestr eiddo ddynamig fel y gellir caniatáu cyfluniadau ategyn a ddatganwyd, sy''n enwi casgliad ac y gellir eu darllen cyn iddynt redeg, heb ganiatáu ffeiliau gweithredadwy mympwyol hefyd.",
-      "ansibleHostKeyChecking": "Gwirio allwedd gwesteiwr SSH",
-      "ansibleHostKeyCheckingHint": "Ymlaen yn ddiofyn, sy'n ymddygiad Ansible ei hun: mae cyflunio yn gwrthod gwesteiwr nad yw'n ymddiried yn ei allwedd eto. Os byddwch yn ei ddiffodd, derbynnir pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad — mae'n well darparu allwedd gyhoeddus y gwesteiwr gyda'r manylion peiriant a gadael y gwiriad ymlaen. Mae newidyn Ansible fesul gwesteiwr yn drech na'r gosodiad hwn y naill ffordd neu'r llall.",
       "oidcAudiencesLead": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob cyfluniad provider, ac yn ei ysgrifennu lle gall y rhediad ei ddarllen.",
       "driftIgnoreRulesLead": "Cyfeiriadau Terraform a llwybrau priodwedd y mae'r dosbarthwr drifft yn eu hatal. Mae cyfeiriad moel heb briodwedd yn distewi pob newid i'r adnodd hwnnw.",
       "dynamicInventoryEnabledLead": "Caniatáu ategion rhestr eiddo a ddatganwyd pan fydd y rhedwr yn datrys y rhestr eiddo. Bryd hynny mae''r rhestr eiddo a ddangosir yma yn dod yn anghyflawn fesul ffynhonnell, a''r set y mae''r rhedwr yn ei datrys sydd â''r gair olaf.",
       "inventoryScriptsEnabledLead": "Caniatáu sgriptiau rhestr eiddo gweithredadwy. Bryd hynny mae ffeil weithredadwy fympwyol o''r storfa yn rhedeg y tu mewn i Job y rhedwr, gyda''i hunaniaeth cwmwl, cyn i''r llyfr chwarae redeg — ac mae''r rhestr eiddo a ddangosir yma yn dod yn anghyflawn.",
-      "ansibleHostKeyCheckingLead": "Ymlaen yn ddiofyn, fel y mae Ansible yn ei wneud ohono'i hun. Mae diffodd hwn yn llacio amddiffyniad: derbynnir pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad.",
       "bindPlanLead": "Pan fydd ymlaen, mae'r diweddariad yn gweithredu'r union gynllun a gadwodd y rhagolwg, felly mae unrhyw beth a newidiodd ers y rhagolwg yn methu'r diweddariad yn hytrach na chael ei weithredu.",
       "configDirectoryLead": "Lle mae ansible.cfg, y llyfrau chwarae, roles/, group_vars/ a host_vars/ yn byw, yn gymharol i wraidd y gadwrfa. Mae gwag yn golygu'r gwraidd ei hun.",
       "ansibleCollectionsLead": "Casgliadau a osodir cyn i ffurfweddiad redeg, un fesul llinell fel namespace.name neu namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Cylchfa amser yr amserlen",
       "scheduledConfigureTimezoneHint": "Y gylchfa IANA y darllenir yr amserlen ynddi, fel bod yr awr yn dilyn amser haf — er enghraifft UTC, Europe/London neu America/New_York. Mae gwag yn golygu UTC.",
       "scheduledConfigureTimezonePlaceholder": "e.e. Europe/London",
-      "scheduledConfigureLastAt": "Rhediad amserlennedig diwethaf"
+      "scheduledConfigureLastAt": "Rhediad amserlennedig diwethaf",
+      "sshHostKeyPolicy": "Polisi allwedd gwesteiwr SSH",
+      "sshHostKeyPolicyStrict": "Gwirio pob gwesteiwr",
+      "sshHostKeyPolicyAcceptNew": "Ymddiried ar y cyswllt cyntaf",
+      "sshHostKeyPolicyOff": "Peidio â gwirio",
+      "sshHostKeyPolicyLead": "Pa un o dri ateb OpenSSH y mae cyflunio yn ei ofyn. Mae ymddiried ar y cyswllt cyntaf yn gwrthod allwedd sydd wedi newid o hyd; mae peidio â gwirio yn derbyn pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad.",
+      "sshHostKeyPolicyHint": "Mae Terrapod yn troi allweddi cymeradwy pob gwesteiwr yn y ffeil known_hosts y mae OpenSSH yn gwirio yn ei herbyn, a'r gosodiad hwn yw'r gwerth StrictHostKeyChecking y mae'r rhediad yn ei ofyn. Rhestr ganiatáu yw'r ffeil honno, ac mae'r gosodiad yn berthnasol i'r broses gyfan: os gwirir pob gwesteiwr, mae cyfeiriad nad yw neb wedi cymeradwyo allwedd ar ei gyfer nid yn unig heb ei wirio ond yn anghyraeddadwy. Ymddiried ar y cyswllt cyntaf yw'r ateb ar gyfer fflyd gymysg: gwirir allweddi cymeradwy yn llwyr o hyd, ond mae gwesteiwr nad yw neb wedi'i binio yn cysylltu unwaith ac yn cael ei wrthod os bydd ei allwedd yn newid wedyn. Ni all dim yn y rhestr eiddo ddiystyru hyn."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

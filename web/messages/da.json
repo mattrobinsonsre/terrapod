@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Tillader deklarerede inventar-plugins — en YAML-kilde med en plugin-nøgle på øverste niveau — når runneren opløser inventaret. Terrapod kører aldrig selv et, i ingen af de to tilstande. Så længe dette er slået fra, afvises en pluginkilde ved navn frem for at blive opløst til et ufuldstændigt værtssæt; så længe det er slået til, er inventaret, der vises her, udtrykkeligt ufuldstændigt pr. kilde, og det sæt, runneren opløser, er det gældende.",
       "inventoryScriptsEnabled": "Inventar-scripts",
       "inventoryScriptsEnabledHint": "Tillader eksekverbare inventar-scripts, når runneren opløser inventaret. Holdt adskilt fra dynamiske inventar-plugins, så deklarerede pluginkonfigurationer, der navngiver en collection og kan læses, før de kører, kan tillades uden også at tillade vilkårlige eksekverbare filer.",
-      "ansibleHostKeyChecking": "Kontrol af SSH-værtsnøgle",
-      "ansibleHostKeyCheckingHint": "Slået til som standard, hvilket er Ansibles egen adfærd: en konfigurationskørsel afviser en vært, hvis nøgle den ikke allerede kender. Slår du den fra, accepteres enhver nøgle, en vært viser frem, så forbindelsen kan aflyttes — det er bedre at angive værtens offentlige nøgle sammen med maskinoplysningerne og lade kontrollen være slået til. En Ansible-variabel pr. vært går under alle omstændigheder forud for denne indstilling.",
       "oidcAudiencesLead": "Terrapod udsteder et kortlivet OpenID Connect-token pr. providerkonfiguration og skriver det et sted, hvor kørslen kan læse det.",
       "driftIgnoreRulesLead": "Terraform-adresser og attributstier, som afdriftsklassificeringen undertrykker. En bar adresse uden attribut dæmper enhver ændring af den ressource.",
       "dynamicInventoryEnabledLead": "Tillader deklarerede inventar-plugins, når runneren opløser inventaret. Inventaret, der vises her, bliver så ufuldstændigt pr. kilde, og det sæt, runneren opløser, er det gældende.",
       "inventoryScriptsEnabledLead": "Tillader eksekverbare inventar-scripts. En vilkårlig eksekverbar fil fra repositoriet kører så inde i runner-Jobbet, med dets cloud-identitet, før playbooken kører — og inventaret, der vises her, bliver ufuldstændigt.",
-      "ansibleHostKeyCheckingLead": "Slået til som standard, som Ansible selv gør. Løsner en beskyttelse, når den er slået fra: enhver nøgle, en vært viser frem, accepteres, så forbindelsen kan aflyttes.",
       "bindPlanLead": "Når den er slået til, anvender opdateringen præcis den plan, forhåndsvisningen gemte, så alt, der har ændret sig siden forhåndsvisningen, får opdateringen til at fejle i stedet for at blive anvendt.",
       "configDirectoryLead": "Hvor ansible.cfg, playbooks, roles/, group_vars/ og host_vars/ ligger, relativt til depotets rod. Tomt betyder roden selv.",
       "ansibleCollectionsLead": "Samlinger der installeres, før en configure kører, én pr. linje som namespace.name eller namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Tidsplanens tidszone",
       "scheduledConfigureTimezoneHint": "IANA-zonen, som tidsplanen læses i, så timen følger sommertid — for eksempel UTC, Europe/London eller America/New_York. Tomt betyder UTC.",
       "scheduledConfigureTimezonePlaceholder": "f.eks. Europe/London",
-      "scheduledConfigureLastAt": "Seneste planlagte kørsel"
+      "scheduledConfigureLastAt": "Seneste planlagte kørsel",
+      "sshHostKeyPolicy": "Politik for SSH-værtsnøgle",
+      "sshHostKeyPolicyStrict": "Kontrollér hver vært",
+      "sshHostKeyPolicyAcceptNew": "Stol på ved første kontakt",
+      "sshHostKeyPolicyOff": "Kontrollér ikke",
+      "sshHostKeyPolicyLead": "Hvilket af OpenSSH's tre svar en konfigurationskørsel beder om. At stole på ved første kontakt afviser stadig en ændret nøgle; ikke at kontrollere accepterer enhver nøgle, en vært viser frem, så forbindelsen kan aflyttes.",
+      "sshHostKeyPolicyHint": "Terrapod laver hver værts godkendte nøgler til den known_hosts-fil, OpenSSH kontrollerer imod, og denne indstilling er den StrictHostKeyChecking-værdi, kørslen beder om. Filen er en tilladelsesliste, og indstillingen gælder hele processen: kontrolleres hver vært, er en adresse, som ingen har godkendt en nøgle for, ikke blot ukontrolleret men uopnåelig. At stole på ved første kontakt er svaret til en blandet flåde: godkendte nøgler kontrolleres stadig strengt, mens en vært, ingen har fastgjort, forbinder én gang og afvises, hvis dens nøgle senere ændrer sig. Intet i opgørelsen kan tilsidesætte det."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

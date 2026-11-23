@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Permite plug-ins de inventário declarados — uma fonte YAML com uma chave plugin de primeiro nível — quando o runner resolve o inventário. O próprio Terrapod nunca executa nenhum, em nenhum dos dois estados. Enquanto isto estiver desativado, uma fonte de plug-in é recusada pelo nome em vez de resolver para um conjunto de anfitriões parcial; enquanto estiver ativado, o inventário aqui mostrado é explicitamente parcial por fonte, e o conjunto que o runner resolve é o que prevalece.",
       "inventoryScriptsEnabled": "Scripts de inventário",
       "inventoryScriptsEnabledHint": "Permite scripts de inventário executáveis quando o runner resolve o inventário. Separado dos plug-ins de inventário dinâmico para que configurações de plug-in declaradas, que nomeiam uma coleção e podem ser lidas antes de executar, possam ser permitidas sem permitir também executáveis arbitrários.",
-      "ansibleHostKeyChecking": "Verificação da chave de host SSH",
-      "ansibleHostKeyCheckingHint": "Ativada por predefinição, que é o que o Ansible faz por si: uma configuração recusa um host cuja chave ainda não conhece. Se a desativar, é aceite qualquer chave que um host apresente, pelo que a ligação pode ser interceptada — é preferível fornecer a chave pública do host com a credencial de máquina e deixar a verificação ativa. Uma variável do Ansible definida por host prevalece de qualquer modo sobre esta opção.",
       "oidcAudiencesLead": "O Terrapod emite um token OpenID Connect de curta duração por cada configuração de provider e escreve-o onde a execução o pode ler.",
       "driftIgnoreRulesLead": "Endereços do Terraform e caminhos de atributo suprimidos pelo classificador de drift. Um endereço simples, sem atributo, silencia qualquer alteração a esse recurso.",
       "dynamicInventoryEnabledLead": "Permite plug-ins de inventário declarados quando o runner resolve o inventário. O inventário aqui mostrado passa então a ser parcial por fonte, e o conjunto que o runner resolve é o que prevalece.",
       "inventoryScriptsEnabledLead": "Permite scripts de inventário executáveis. Um executável arbitrário do repositório é então executado dentro do Job do runner, com a sua identidade na nuvem, antes de o playbook ser executado — e o inventário aqui mostrado passa a ser parcial.",
-      "ansibleHostKeyCheckingLead": "Ativada por predefinição, como o Ansible faz por si. Afrouxa uma proteção quando desativada: é aceite qualquer chave que um anfitrião apresente, pelo que a ligação pode ser interceptada.",
       "bindPlanLead": "Quando ativado, a atualização aplica exatamente o plano que a pré-visualização guardou, pelo que tudo o que tenha mudado desde a pré-visualização faz falhar a atualização em vez de ser aplicado.",
       "configDirectoryLead": "Onde se encontram ansible.cfg, os playbooks, roles/, group_vars/ e host_vars/, relativamente à raiz do repositório. Vazio significa a própria raiz.",
       "ansibleCollectionsLead": "Coleções instaladas antes de um configure ser executado, uma por linha como namespace.name ou namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Fuso horário do agendamento",
       "scheduledConfigureTimezoneHint": "O fuso IANA em que o agendamento é lido, para que a hora acompanhe a hora de verão — por exemplo UTC, Europe/London ou America/New_York. Vazio significa UTC.",
       "scheduledConfigureTimezonePlaceholder": "p. ex. Europe/London",
-      "scheduledConfigureLastAt": "Última execução agendada"
+      "scheduledConfigureLastAt": "Última execução agendada",
+      "sshHostKeyPolicy": "Política de chave de host SSH",
+      "sshHostKeyPolicyStrict": "Verificar cada anfitrião",
+      "sshHostKeyPolicyAcceptNew": "Confiar no primeiro contacto",
+      "sshHostKeyPolicyOff": "Não verificar",
+      "sshHostKeyPolicyLead": "Qual das três respostas do OpenSSH uma configuração pede. Confiar no primeiro contacto continua a recusar uma chave alterada; não verificar aceita qualquer chave que um anfitrião apresente, pelo que a ligação pode ser interceptada.",
+      "sshHostKeyPolicyHint": "O Terrapod reúne as chaves aprovadas de cada host no ficheiro known_hosts contra o qual o OpenSSH verifica, e esta opção é o valor StrictHostKeyChecking que a execução pede. Esse ficheiro é uma lista de permissões e a opção aplica-se a todo o processo: se cada host for verificado, um endereço para o qual ninguém aprovou uma chave não fica apenas sem verificação, fica inacessível. Confiar no primeiro contacto é a resposta para um parque misto: as chaves aprovadas continuam a ser verificadas de forma estrita, enquanto um host que ninguém fixou liga-se uma vez e é recusado se a sua chave mudar depois. Nada no inventário pode prevalecer sobre isto."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

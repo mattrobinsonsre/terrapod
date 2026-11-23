@@ -37,6 +37,12 @@ import { Field, Group, type GroupCtx } from '@/components/workspace-field-groups
 import { HintWithDetail, tieredHint } from '@/components/hint-with-detail'
 import { engineWord } from '@/lib/phase-vocabulary'
 import { DynamicInventorySelect } from '@/components/dynamic-inventory-field'
+import { SshHostKeyPolicySelect } from '@/components/ssh-host-key-policy-field'
+import {
+  DEFAULT_SSH_HOST_KEY_POLICY,
+  asSshHostKeyPolicy,
+  type SshHostKeyPolicy,
+} from '@/lib/ssh-host-keys'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useIsTouch } from '@/lib/use-media-query'
@@ -93,10 +99,11 @@ interface AutodiscoveryRule {
     // would leave an operator editing every materialised workspace by hand.
     'dynamic-inventory-enabled'?: boolean
     'inventory-scripts-enabled'?: boolean
-    // Whether a configure on a materialised workspace verifies the SSH host
-    // key of the hosts it targets (#2318). Templated like the two above, and
-    // the only one of the three whose default is TRUE.
-    'ansible-host-key-checking'?: boolean
+    // How a configure on a materialised workspace verifies the SSH host keys
+    // of the hosts it targets (#2318, three-state since #2592). Templated like
+    // the two above, and the only one of the three whose default is the
+    // protective value rather than the permissive one.
+    'ssh-host-key-policy'?: string
     // An ordinary templated path, '' meaning the configuration version's root.
     // No null state: the declaration is `configure-enabled` above (#1966).
     'config-directory'?: string
@@ -295,7 +302,8 @@ export default function AutodiscoveryPage() {
   const [scheduledConfigureTimezone, setScheduledConfigureTimezone] = useState('UTC')
   const [dynamicInventoryEnabled, setDynamicInventoryEnabled] = useState(false)
   const [inventoryScriptsEnabled, setInventoryScriptsEnabled] = useState(false)
-  const [ansibleHostKeyChecking, setAnsibleHostKeyChecking] = useState(true)
+  const [sshHostKeyPolicy, setSshHostKeyPolicy] =
+    useState<SshHostKeyPolicy>(DEFAULT_SSH_HOST_KEY_POLICY)
   // Where the configure operation runs in each materialised workspace
   // (#1929) — a plain text box, because the path is just a path and '' is the
   // configuration version's root. #1929 had a mode select here because NULL
@@ -510,7 +518,7 @@ export default function AutodiscoveryPage() {
     // (#2318). All three were among the fifteen.
     setDynamicInventoryEnabled(false)
     setInventoryScriptsEnabled(false)
-    setAnsibleHostKeyChecking(true)
+    setSshHostKeyPolicy(DEFAULT_SSH_HOST_KEY_POLICY)
     setResourceCpu('1')
     setResourceMemory('2Gi')
     setEeResourceCpu('')
@@ -584,7 +592,7 @@ export default function AutodiscoveryPage() {
     setScheduledConfigureTimezone(a['scheduled-configure-timezone'] || 'UTC')
     setDynamicInventoryEnabled(a['dynamic-inventory-enabled'] ?? false)
     setInventoryScriptsEnabled(a['inventory-scripts-enabled'] ?? false)
-    setAnsibleHostKeyChecking(a['ansible-host-key-checking'] ?? true)
+    setSshHostKeyPolicy(asSshHostKeyPolicy(a['ssh-host-key-policy']))
     // `?? ''` and nothing to decide: a stored '' is the configuration
     // version's root and seeds an empty box, which is the same box an older
     // API's missing key seeds (#1966).
@@ -681,7 +689,7 @@ export default function AutodiscoveryPage() {
       'scheduled-configure-timezone': scheduledConfigureTimezone.trim(),
       'dynamic-inventory-enabled': dynamicInventoryEnabled,
       'inventory-scripts-enabled': inventoryScriptsEnabled,
-      'ansible-host-key-checking': ansibleHostKeyChecking,
+      'ssh-host-key-policy': sshHostKeyPolicy,
       // Where the configure operation runs (#1929). Sent verbatim and never
       // null — an explicit null is a 422 naming the field (#1966) — with ''
       // meaning the configuration version's root.
@@ -1068,7 +1076,7 @@ export default function AutodiscoveryPage() {
     playbooks,
     'dynamic-inventory-enabled': dynamicInventoryEnabled,
     'inventory-scripts-enabled': inventoryScriptsEnabled,
-    'ansible-host-key-checking': ansibleHostKeyChecking,
+    'ssh-host-key-policy': sshHostKeyPolicy,
     'ansible-version': ansibleVersion,
     'ansible-execution-environment': ansibleEE,
     'ansible-collections': ansibleCollections,
@@ -1145,7 +1153,7 @@ export default function AutodiscoveryPage() {
       case 'playbooks': setPlaybooks(v as string[]); break
       case 'dynamic-inventory-enabled': setDynamicInventoryEnabled(b); break
       case 'inventory-scripts-enabled': setInventoryScriptsEnabled(b); break
-      case 'ansible-host-key-checking': setAnsibleHostKeyChecking(b); break
+      case 'ssh-host-key-policy': setSshHostKeyPolicy(asSshHostKeyPolicy(v)); break
       case 'ansible-version': setAnsibleVersion(s); break
       case 'ansible-execution-environment': setAnsibleEE(s); break
       case 'ansible-collections': setAnsibleCollections(v as string[]); break
@@ -1282,8 +1290,8 @@ export default function AutodiscoveryPage() {
         return hintText(tWs('fields.inventoryPathsHint'))
       case 'dynamic-inventory-enabled':
         return hintText(tWs('fields.dynamicInventoryModeHint'))
-      case 'ansible-host-key-checking':
-        return tieredHint(tWs, 'fields.ansibleHostKeyCheckingHint')
+      case 'ssh-host-key-policy':
+        return tieredHint(tWs, 'fields.sshHostKeyPolicyHint')
       case 'ansible-version':
         return hintText(
           envs.listing === 'complete' && envs.lines.length > 0
@@ -1590,9 +1598,17 @@ export default function AutodiscoveryPage() {
           kind="select"
           control={<DynamicInventorySelect ctx={ruleCtx} />}
         />
-        {/* Defaults to yes, which is both the rule column's default and
-            ansible's own behaviour (#2318). */}
-        <RuleYesNo attr="ansible-host-key-checking" ctx={ruleCtx} />
+        {/* Defaults to `strict`, which is both the rule column's default and
+            ansible's own behaviour (#2318). THREE states since #2592, so no
+            longer a `RuleYesNo`: the middle one keeps the hosts somebody has
+            pinned strictly verified while leaving the rest reachable, which a
+            yes/no pair could not express. */}
+        <Field
+          attr="ssh-host-key-policy"
+          ctx={ruleCtx}
+          kind="select"
+          control={<SshHostKeyPolicySelect ctx={ruleCtx} />}
+        />
         <Field
           attr="ansible-version"
           ctx={ruleCtx}

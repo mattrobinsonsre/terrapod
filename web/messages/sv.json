@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Tillåter deklarerade inventarie-plugins — en YAML-källa med en plugin-nyckel på toppnivå — när runnern löser upp inventariet. Terrapod kör aldrig något själv, i inget av de två lägena. Så länge detta är av avvisas en pluginkälla med namn i stället för att lösas upp till en ofullständig värdlista; så länge det är på är inventariet som visas här uttryckligen ofullständigt per källa, och den uppsättning runnern löser upp är den som gäller.",
       "inventoryScriptsEnabled": "Inventarie-skript",
       "inventoryScriptsEnabledHint": "Tillåter körbara inventarie-skript när runnern löser upp inventariet. Åtskilt från dynamiska inventarie-plugins så att deklarerade pluginkonfigurationer, som namnger en collection och kan läsas innan de körs, kan tillåtas utan att även godta godtyckliga körbara filer.",
-      "ansibleHostKeyChecking": "Kontroll av SSH-värdnyckel",
-      "ansibleHostKeyCheckingHint": "På som standard, vilket är Ansibles eget beteende: en konfigurationskörning avvisar en värd vars nyckel den inte redan litar på. Stänger du av den accepteras vilken nyckel en värd än visar upp, så anslutningen kan avlyssnas — bättre är att ange värdens publika nyckel i maskinuppgifterna och låta kontrollen vara på. En Ansible-variabel per värd går ändå före den här inställningen.",
       "oidcAudiencesLead": "Terrapod utfärdar ett kortlivat OpenID Connect-token per providerkonfiguration och skriver det där körningen kan läsa det.",
       "driftIgnoreRulesLead": "Terraform-adresser och attributsökvägar som driftklassificeraren undertrycker. En ren adress utan attribut tystar alla ändringar av den resursen.",
       "dynamicInventoryEnabledLead": "Tillåter deklarerade inventarie-plugins när runnern löser upp inventariet. Inventariet som visas här blir då ofullständigt per källa, och den uppsättning runnern löser upp är den som gäller.",
       "inventoryScriptsEnabledLead": "Tillåter körbara inventarie-skript. En godtycklig körbar fil från repositoriet körs då inuti runner-jobbet, med dess molnidentitet, innan playbooken körs — och inventariet som visas här blir ofullständigt.",
-      "ansibleHostKeyCheckingLead": "På som standard, vilket Ansible själv gör. Mjukar upp ett skydd när det är av: vilken nyckel en värd än visar upp accepteras, så anslutningen kan avlyssnas.",
       "bindPlanLead": "När det är på tillämpar uppdateringen exakt den plan som förhandsgranskningen sparade, så allt som har ändrats sedan förhandsgranskningen får uppdateringen att misslyckas i stället för att tillämpas.",
       "configDirectoryLead": "Var ansible.cfg, playbooken, roles/, group_vars/ och host_vars/ finns, relativt förrådets rot. Tomt betyder roten själv.",
       "ansibleCollectionsLead": "Samlingar som installeras innan en configure körs, en per rad som namespace.name eller namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Schemats tidszon",
       "scheduledConfigureTimezoneHint": "IANA-zonen som schemat läses i, så att timmen följer sommartid — till exempel UTC, Europe/London eller America/New_York. Tomt betyder UTC.",
       "scheduledConfigureTimezonePlaceholder": "t.ex. Europe/London",
-      "scheduledConfigureLastAt": "Senaste schemalagda körning"
+      "scheduledConfigureLastAt": "Senaste schemalagda körning",
+      "sshHostKeyPolicy": "Policy för SSH-värdnyckel",
+      "sshHostKeyPolicyStrict": "Kontrollera varje värd",
+      "sshHostKeyPolicyAcceptNew": "Lita på vid första kontakt",
+      "sshHostKeyPolicyOff": "Kontrollera inte",
+      "sshHostKeyPolicyLead": "Vilket av OpenSSH:s tre svar en konfigurationskörning begär. Att lita på vid första kontakt avvisar fortfarande en ändrad nyckel; att inte kontrollera accepterar vilken nyckel en värd än visar upp, så anslutningen kan avlyssnas.",
+      "sshHostKeyPolicyHint": "Terrapod bygger varje värds godkända nycklar till den known_hosts-fil OpenSSH kontrollerar mot, och den här inställningen är det StrictHostKeyChecking-värde körningen begär. Filen är en tillåtlista och inställningen gäller hela processen: kontrolleras varje värd blir en adress som ingen har godkänt en nyckel för inte bara okontrollerad utan oåtkomlig. Att lita på vid första kontakt är svaret för en blandad flotta: godkända nycklar kontrolleras fortfarande strikt, medan en värd ingen har fäst ansluter en gång och avvisas om dess nyckel senare ändras. Inget i inventariet kan åsidosätta det."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

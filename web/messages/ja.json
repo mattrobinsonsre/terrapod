@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "ランナーがインベントリを解決するときに、宣言されたインベントリプラグイン（トップレベルの plugin キーを持つ YAML ソース）を許可します。Terrapod 自身はどちらの状態でもプラグインを実行しません。オフのあいだ、プラグインソースは部分的なホスト集合に解決されるのではなく、名前を挙げて拒否されます。オンのあいだ、ここに表示されるインベントリはソースごとに明示的に部分的なものとなり、ランナーが解決した集合が正となります。",
       "inventoryScriptsEnabled": "インベントリスクリプト",
       "inventoryScriptsEnabledHint": "ランナーがインベントリを解決するときに、実行可能なインベントリスクリプトを許可します。動的インベントリプラグインとは別にしてあるため、コレクションを指定でき実行前に内容を読める宣言済みのプラグイン設定だけを許可し、任意の実行ファイルは許可しないという選択ができます。",
-      "ansibleHostKeyChecking": "SSH ホスト鍵の確認",
-      "ansibleHostKeyCheckingHint": "既定で有効であり、これは Ansible 自身の動作です。構成は、まだ信頼していない鍵を提示するホストを拒否します。無効にすると、ホストが提示するどの鍵も受け入れられるため、接続を傍受されるおそれがあります。ホストの公開鍵をマシン資格情報とともに与え、確認を有効のままにしておくほうが安全です。ホストごとの Ansible 変数は、どちらの場合でもこの設定より優先されます。",
       "oidcAudiencesLead": "Terrapod はプロバイダー設定ごとに短命な OpenID Connect トークンを発行し、実行が読み取れる場所に書き出します。",
       "driftIgnoreRulesLead": "ドリフト分類器が抑制する Terraform アドレスと属性パスです。属性のない単なるアドレスは、そのリソースへのあらゆる変更を抑制します。",
       "dynamicInventoryEnabledLead": "ランナーがインベントリを解決するときに、宣言されたインベントリプラグインを許可します。するとここに表示されるインベントリはソースごとに部分的なものとなり、ランナーが解決した集合が正となります。",
       "inventoryScriptsEnabledLead": "実行可能なインベントリスクリプトを許可します。するとリポジトリ内の任意の実行ファイルが、プレイブックより先に、ランナーJob の内部でそのクラウドアイデンティティで実行されます — そしてここに表示されるインベントリは部分的なものとなります。",
-      "ansibleHostKeyCheckingLead": "既定で有効であり、これは Ansible 自身の動作です。無効にすると保護を緩めます: ホストが提示するどの鍵も受け入れられるため、接続を傍受されるおそれがあります。",
       "bindPlanLead": "オンにすると、更新はプレビューが保存したプランをそのまま適用します。プレビュー以降に変化したものがあれば、適用されずに更新が失敗します。",
       "configDirectoryLead": "ansible.cfg、プレイブック、roles/、group_vars/、host_vars/ の場所をリポジトリのルートからの相対パスで指定します。空のままならルート自体を意味します。",
       "ansibleCollectionsLead": "構成の実行前にインストールされるコレクションです。1 行に 1 つ、namespace.name または namespace.name:version の形式で指定します。",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "スケジュールのタイムゾーン",
       "scheduledConfigureTimezoneHint": "スケジュールを解釈する IANA タイムゾーンです。これにより時刻は夏時間に追随します。例: UTC、Europe/London、America/New_York。空の場合は UTC です。",
       "scheduledConfigureTimezonePlaceholder": "例: Europe/London",
-      "scheduledConfigureLastAt": "前回のスケジュール実行"
+      "scheduledConfigureLastAt": "前回のスケジュール実行",
+      "sshHostKeyPolicy": "SSH ホスト鍵ポリシー",
+      "sshHostKeyPolicyStrict": "すべてのホストを確認する",
+      "sshHostKeyPolicyAcceptNew": "初回接続時に信頼する",
+      "sshHostKeyPolicyOff": "確認しない",
+      "sshHostKeyPolicyLead": "構成が OpenSSH の 3 つの応答のどれを求めるかです。初回接続時に信頼しても、変更された鍵はやはり拒否されます。確認しない場合は、ホストが提示するどの鍵も受け入れられるため、接続を傍受されるおそれがあります。",
+      "sshHostKeyPolicyHint": "Terrapod は各ホストの承認済み鍵を、OpenSSH が照合する known_hosts ファイルとして生成し、この設定は実行が求める StrictHostKeyChecking の値です。このファイルは許可リストであり、設定はプロセス全体に及びます。すべてのホストを確認すると、誰も鍵を承認していないアドレスは未確認であるだけでなく到達不能になります。初回接続時に信頼するのは混在した環境向けの答えで、承認済みの鍵は引き続き厳密に確認され、誰も固定していないホストは一度だけ接続でき、その後に鍵が変わると拒否されます。インベントリの何もこれを上書きできません。"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

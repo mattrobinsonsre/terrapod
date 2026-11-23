@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Letz teh runnr uze inventoree pluginz wot r deklaird — a YAML sors wif a top-levul plugin key — when it figgerz out teh inventoree. Terrapod itself NEVR runz wun, no mattr wot. Wen dis iz off, a plugin sors getz refuzed by naym insted ov figgerin out haff teh hostz; wen itz on, teh inventoree shown heer iz offishully inkomplete per sors an teh set teh runnr figgerz out iz teh reel wun. srsly",
       "inventoryScriptsEnabled": "Inventoree Skriptz",
       "inventoryScriptsEnabledHint": "Letz teh runnr uze runnabul inventoree skriptz when it figgerz out teh inventoree. Kept apart from dynamik inventoree pluginz so deklaird plugin konfigz, wot naym a collekshun an can be red b4 dey run, can be allowd wifout allowin enny randum runnabul fingz too.",
-      "ansibleHostKeyChecking": "SSH Host Key Chekin",
-      "ansibleHostKeyCheckingHint": "On by defalt, wich is wot Ansible duz all by itself: a konfigur sez NO to a host wen it dont trust teh key yet. Turn it off an any key teh host showz u getz accepted, so sumwun can lissen in on teh konekshun — betta 2 giv teh hostz publik key wif teh masheen kredenshul an leev teh chekin on. A per-host Ansible varybul still beets dis setting enyway. srsly",
       "oidcAudiencesLead": "Terrapod mintz a short-livd OpenID Connect tokin fer evry providr configurashun an ritez it wher da run can reed it.",
       "driftIgnoreRulesLead": "Terraform addressez an attribyoot pathz wot da drift classifiur squishez. A bare addresz wif no attribyoot shushez evry change ta dat resorce.",
       "dynamicInventoryEnabledLead": "Letz teh runnr uze inventoree pluginz wot r deklaird when it figgerz out teh inventoree. Teh inventoree shown heer den getz inkomplete per sors, an teh set teh runnr figgerz out iz teh reel wun.",
       "inventoryScriptsEnabledLead": "Allowz runnabul inventoree skriptz. Den sum randum runnabul fing frum teh repozitory runz insied teh runnr Job, wif its cloud identitee, b4 teh playbook duz — an teh inventoree shown heer getz inkomplete.",
-      "ansibleHostKeyCheckingLead": "On by defalt, jus liek Ansible duz all by itself. Loosenz a protekshun wen off: any key teh host showz u getz accepted, so sumwun can lissen in on teh konekshun.",
       "bindPlanLead": "On, teh updayt applyz exakly teh plan teh preview savd, so anyfin dat changd sinse teh preview failz teh updayt insted ov gettin applyd.",
       "configDirectoryLead": "Wher ansible.cfg an teh playbookz an roles/ an group_vars/ an host_vars/ livez, relativ ta teh reepo root. Empteh meenz teh root itself.",
       "ansibleCollectionsLead": "Collekshunz wot gets instolled b4 a configyur runz, wun per line liek namespace.name or namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Skedyool timezoan",
       "scheduledConfigureTimezoneHint": "Teh IANA zoan teh skedyool getz red in, so teh hour followz daylite savin — fer exampul UTC, Europe/London or America/New_York. Empteh meenz UTC.",
       "scheduledConfigureTimezonePlaceholder": "e.g. Europe/London",
-      "scheduledConfigureLastAt": "Last skedyoold run"
+      "scheduledConfigureLastAt": "Last skedyoold run",
+      "sshHostKeyPolicy": "SSH Host Key Rulez",
+      "sshHostKeyPolicyStrict": "Chek every host",
+      "sshHostKeyPolicyAcceptNew": "Trust it teh furst time",
+      "sshHostKeyPolicyOff": "Dont chek at all",
+      "sshHostKeyPolicyLead": "Wich of OpenSSHz three anserz a konfigur askz 4. Trustin it teh furst time still sez NO to a key wot changd; not chekin takes any key teh host showz u, so sumwun can lissen in on teh konekshun.",
+      "sshHostKeyPolicyHint": "Terrapod makez all teh approovd keyz of every host into teh known_hosts fiel wot OpenSSH chekz against, an dis setting is teh StrictHostKeyChecking valu teh run askz 4. Dat fiel is a allow-list an teh setting coverz teh hole prosess, so if u chek every host den a adres wot nobuddy approovd a key 4 isnt jus unchekd, it is unreechabul. Trustin it teh furst time is teh anser 4 a mixd fleet: approovd keyz still get chekd reel strikt, but a host nobuddy pinnd connekts wunce an gets refusd if itz key changez l8r. Nuffin in teh inventory can beet it. srsly"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",
