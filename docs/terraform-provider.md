@@ -751,20 +751,25 @@ resource "terrapod_workspace" "fleet" {
   # only in the repository's own requirements.yml. Installed after that file and
   # with --force, so a version here overrides a committed one and every other
   # committed collection stands.
-  ansible_collections = [
-    { name = "community.general", version = "9.2.0" },
-    { name = "acme.internal" },   # omit version for whatever resolves
-  ]
+  ansible_collection {
+    name    = "community.general"
+    version = "9.2.0"
+  }
+  ansible_collection {
+    name = "acme.internal" # omit version for whatever resolves
+  }
 }
 ```
 
-`ansible_collections` is collections only — a **role** is a different mechanism
+`ansible_collection` is collections only — a **role** is a different mechanism
 and is declared in the configuration's own `requirements.yml` under `roles:`,
 where a git source clones using the workspace's `git_http_auth` /
 `git_ssh_auth` credentials. Collections are usually external so they come
 through Terrapod's Galaxy proxy; roles are usually in-house so they come from
-git. Omitting the attribute leaves the stored list untouched; set
-`ansible_collections = []` to clear it.
+git. **Writing no `ansible_collection` block clears the list** — what the
+configuration declares is what the workspace gets. It was a list attribute until
+2.0, where omitting it left a stored value alone; see
+[upgrading to 2.0](upgrading-to-2.0.md).
 
 The refusal is evaluated against the row the write would produce, not against
 what the configuration sends, so turning `plan_apply_enabled` off is accepted on

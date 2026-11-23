@@ -61,6 +61,18 @@ _PROVIDER_WS_MODEL = next(
     )
     if p.exists()
 )
+#: The SCHEMA lives here rather than in model.go, so this is what `_block_names`
+#: reads. Two candidates because `docker/Dockerfile.test` flattens `services/`
+#: into `/app`, leaving the tree one directory shallower in the image than it is
+#: locally -- the same reason every sibling constant above is written this way.
+_PROVIDER_WS_RESOURCE = next(
+    p
+    for p in (
+        _TESTS_DIR.parent.parent / "provider/internal/resources/workspace/resource.go",
+        _TESTS_DIR.parent / "provider/internal/resources/workspace/resource.go",
+    )
+    if p.exists()
+)
 _PROVIDER_WS_DATASOURCE = next(
     p
     for p in (
@@ -292,6 +304,29 @@ def _provider_attrs_as_api(tfsdk_tags: set[str]) -> set[str]:
     return {_provider_to_api(t) for t in tfsdk_tags}
 
 
+def _block_names(source_path: Path) -> set[str]:
+    """The schema keys the resource declares as repeated BLOCKS.
+
+    A repeated block is named in the SINGULAR -- `ansible_collection { }`
+    written one at a time -- while the payload key it carries stays plural
+    (#2681). So the plain `_`->`-` derivation reads the API's
+    `ansible-collections` as missing from a provider that offers it, and the
+    pluralised form has to be accepted as well.
+
+    Keyed on the BLOCK DECLARATION rather than on the tag, deliberately: a bare
+    "also try the plural" would accept a plain attribute whose name merely
+    happens to be the singular, which is a naming inconsistency rather than the
+    block form this exists for.
+    """
+    src = source_path.read_text()
+    return set(re.findall(r'"([a-z][a-z0-9_]+)": schema\.(?:List|Set)NestedBlock\{', src))
+
+
+def _with_block_plurals(as_api: set[str], source_path: Path) -> set[str]:
+    """`as_api`, plus the plural of every name declared as a block."""
+    return as_api | {f"{_provider_to_api(b)}s" for b in _block_names(source_path)}
+
+
 def _go_struct_tags(path: Path, struct: str) -> set[str]:
     """The `json:"..."` tags of one Go struct, `,omitempty` stripped.
 
@@ -440,7 +475,9 @@ class TestWorkspaceContract:
         provider_tfsdk = _extract_provider_workspace_tfsdk_tags(
             _PROVIDER_WS_MODEL, "workspaceModel"
         )
-        provider_api_form = _provider_attrs_as_api(provider_tfsdk)
+        provider_api_form = _with_block_plurals(
+            _provider_attrs_as_api(provider_tfsdk), _PROVIDER_WS_RESOURCE
+        )
         # The provider resource doesn't surface tag-names / health
         # conditions / permissions etc., same allowlist applies.
         # `remote_state_consumers` is a provider-specific concept managed

@@ -162,9 +162,18 @@ func newProtoHarness(t *testing.T, baseURL, typeName string) *protoHarness {
 	if rs.Diagnostics.HasError() {
 		t.Fatalf("%s schema: %v", typeName, rs.Diagnostics)
 	}
+	// Every member of the resource's object type, because `tftypes.NewValue`
+	// rejects an object missing any of them -- so a map built from Attributes
+	// alone panics the moment the resource grows its first BLOCK (#2681), with
+	// a message naming the block rather than this loop.
 	computed := map[string]bool{}
 	for name, a := range rs.Schema.Attributes {
 		computed[name] = a.IsComputed()
+	}
+	for name := range rs.Schema.Blocks {
+		// A block is never Computed: the framework has no such field on one,
+		// which is the whole reason `unmanagedCollections` cannot hold one.
+		computed[name] = false
 	}
 
 	cfg := objectWith(provTyp, map[string]tftypes.Value{

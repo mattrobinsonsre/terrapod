@@ -6436,7 +6436,7 @@
                     "items": {
                         "$ref": "#/types/terrapod:index/WorkspaceAnsibleCollection:WorkspaceAnsibleCollection"
                     },
-                    "description": "Ansible collections installed before a configure runs. Installed AFTER the configuration's own `requirements.yml` and with `--force`, so an entry here overrides the repository's build of that collection and leaves every other one standing. Omitting the attribute leaves the stored value untouched — it does not clear it; set \u003cspan pulumi-lang-nodejs=\"`ansibleCollections \" pulumi-lang-dotnet=\"`AnsibleCollections \" pulumi-lang-go=\"`ansibleCollections \" pulumi-lang-python=\"`ansible_collections \" pulumi-lang-yaml=\"`ansibleCollections \" pulumi-lang-java=\"`ansibleCollections \" pulumi-lang-hcl=\"`ansible_collections \"\u003e`ansibleCollections \u003c/span\u003e= []` to clear."
+                    "description": "Ansible collections installed before a configure runs. Installed AFTER the configuration's own `requirements.yml` and with `--force`, so an entry here overrides the repository's build of that collection and leaves every other one standing. What the configuration declares is what the workspace gets: writing no block CLEARS the list, where the list attribute this replaces left a stored value alone (#2681)."
                 },
                 "ansibleExecutionEnvironment": {
                     "type": "string",
@@ -6783,7 +6783,6 @@
                 "aiSummaryContext",
                 "aiSummaryMode",
                 "allowForkPrPlans",
-                "ansibleCollections",
                 "ansibleVersion",
                 "autoApplyMode",
                 "autoConfigureEnabled",
@@ -6891,7 +6890,7 @@
                     "items": {
                         "$ref": "#/types/terrapod:index/WorkspaceAnsibleCollection:WorkspaceAnsibleCollection"
                     },
-                    "description": "Ansible collections installed before a configure runs. Installed AFTER the configuration's own `requirements.yml` and with `--force`, so an entry here overrides the repository's build of that collection and leaves every other one standing. Omitting the attribute leaves the stored value untouched — it does not clear it; set \u003cspan pulumi-lang-nodejs=\"`ansibleCollections \" pulumi-lang-dotnet=\"`AnsibleCollections \" pulumi-lang-go=\"`ansibleCollections \" pulumi-lang-python=\"`ansible_collections \" pulumi-lang-yaml=\"`ansibleCollections \" pulumi-lang-java=\"`ansibleCollections \" pulumi-lang-hcl=\"`ansible_collections \"\u003e`ansibleCollections \u003c/span\u003e= []` to clear."
+                    "description": "Ansible collections installed before a configure runs. Installed AFTER the configuration's own `requirements.yml` and with `--force`, so an entry here overrides the repository's build of that collection and leaves every other one standing. What the configuration declares is what the workspace gets: writing no block CLEARS the list, where the list attribute this replaces left a stored value alone (#2681)."
                 },
                 "ansibleExecutionEnvironment": {
                     "type": "string",
@@ -7203,7 +7202,7 @@
                         "items": {
                             "$ref": "#/types/terrapod:index/WorkspaceAnsibleCollection:WorkspaceAnsibleCollection"
                         },
-                        "description": "Ansible collections installed before a configure runs. Installed AFTER the configuration's own `requirements.yml` and with `--force`, so an entry here overrides the repository's build of that collection and leaves every other one standing. Omitting the attribute leaves the stored value untouched — it does not clear it; set \u003cspan pulumi-lang-nodejs=\"`ansibleCollections \" pulumi-lang-dotnet=\"`AnsibleCollections \" pulumi-lang-go=\"`ansibleCollections \" pulumi-lang-python=\"`ansible_collections \" pulumi-lang-yaml=\"`ansibleCollections \" pulumi-lang-java=\"`ansibleCollections \" pulumi-lang-hcl=\"`ansible_collections \"\u003e`ansibleCollections \u003c/span\u003e= []` to clear."
+                        "description": "Ansible collections installed before a configure runs. Installed AFTER the configuration's own `requirements.yml` and with `--force`, so an entry here overrides the repository's build of that collection and leaves every other one standing. What the configuration declares is what the workspace gets: writing no block CLEARS the list, where the list attribute this replaces left a stored value alone (#2681)."
                     },
                     "ansibleExecutionEnvironment": {
                         "type": "string",

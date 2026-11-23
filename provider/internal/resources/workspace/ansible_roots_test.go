@@ -649,3 +649,72 @@ func checkOpBoolPtr(t *testing.T, what string, got, want *bool) {
 }
 
 func strPtr(s string) *string { return &s }
+
+// TestTheCollectionBlockSendsWhatTheConfigurationDeclares pins the behaviour
+// change in #2681, which no test covered before it: `ansible_collections` was a
+// three-state list attribute -- omitted meant "leave whatever is stored", `[]`
+// meant "clear", populated meant "set" -- and as a BLOCK there are only two
+// states, so writing no block has to mean clear.
+//
+// It was reachable only through the `unmanagedCollections` table tests, which
+// assert the accessor and the description rather than what goes on the wire, so
+// the request this builds was pinned by nothing at all.
+func TestTheCollectionBlockSendsWhatTheConfigurationDeclares(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("no blocks sends an empty list rather than omitting the key", func(t *testing.T) {
+		var m workspaceModel
+		update, diags := buildUpdateWorkspaceRequest(ctx, &m)
+		if diags.HasError() {
+			t.Fatalf("update: %v", diags)
+		}
+		// NON-NIL is the whole assertion: go-terrapod gates the payload key on
+		// `!= nil`, so nil omits it and the stored value would survive -- which
+		// is the old three-state behaviour this replaces.
+		if update.AnsibleCollections == nil {
+			t.Fatal("no blocks omitted the key; it must send [] so the list is cleared")
+		}
+		if len(update.AnsibleCollections) != 0 {
+			t.Errorf("no blocks sent %d entries, want 0", len(update.AnsibleCollections))
+		}
+	})
+
+	t.Run("declared blocks are sent in order", func(t *testing.T) {
+		var m workspaceModel
+		m.AnsibleCollections = []ansibleCollectionModel{
+			{Name: types.StringValue("community.general"), Version: types.StringValue("9.2.0")},
+			{Name: types.StringValue("acme.internal"), Version: types.StringNull()},
+		}
+		update, diags := buildUpdateWorkspaceRequest(ctx, &m)
+		if diags.HasError() {
+			t.Fatalf("update: %v", diags)
+		}
+		if len(update.AnsibleCollections) != 2 {
+			t.Fatalf("sent %d entries, want 2", len(update.AnsibleCollections))
+		}
+		if got := update.AnsibleCollections[0]; got.Name != "community.general" || got.Version != "9.2.0" {
+			t.Errorf("first entry %+v", got)
+		}
+		// An omitted version must travel as empty, not as the string "null".
+		if got := update.AnsibleCollections[1]; got.Name != "acme.internal" || got.Version != "" {
+			t.Errorf("second entry %+v", got)
+		}
+	})
+
+	t.Run("a server list of none reads back as no blocks", func(t *testing.T) {
+		var m workspaceModel
+		m.AnsibleCollections = []ansibleCollectionModel{
+			{Name: types.StringValue("stale.entry"), Version: types.StringNull()},
+		}
+		ws := &terrapod.Workspace{ID: "ws-a", Name: "a"}
+		if diags := readWorkspaceIntoModel(ctx, ws, &m); diags.HasError() {
+			t.Fatalf("read: %v", diags)
+		}
+		// nil rather than an empty slice: the framework reads both as "no
+		// blocks", and nil is what a configuration writing none produces, so a
+		// round trip cannot plan a diff against itself.
+		if m.AnsibleCollections != nil {
+			t.Errorf("read left %v, want nil", m.AnsibleCollections)
+		}
+	})
+}

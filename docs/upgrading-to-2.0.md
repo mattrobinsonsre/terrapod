@@ -2394,10 +2394,10 @@ explicitly still receives it, and still appears in the rows beside this with
 `AssignmentSource` `"explicit"`. The field comment says so, because the number is
 literally accurate and easy to read as the stronger claim.
 
-### Five provider inputs become blocks, and three of them stop meaning "leave alone"
+### Six provider inputs become blocks, and three of them stop meaning "leave alone"
 
-Five inputs on the Terraform provider change shape. Two were opaque JSON strings
-and three were nested attributes; all five are now blocks, which is the idiomatic
+Six inputs on the Terraform provider change shape. Two were opaque JSON strings
+and four were nested attributes; all six are now blocks, which is the idiomatic
 HCL and what `for_each` and dynamic blocks assume.
 
 | 1.x | 2.0 |
@@ -2407,9 +2407,10 @@ HCL and what `for_each` and dynamic blocks assume.
 | `terrapod_variable_set.assignment_rule = { ... }` | one `assignment_rule { ... }` block |
 | `terrapod_autodiscovery_rule.ansible_collections = [{...}]` | repeated `ansible_collection { ... }` blocks |
 | `terrapod_autodiscovery_rule.run_task_templates = [{...}]` | repeated `run_task_template { ... }` blocks |
+| `terrapod_workspace.ansible_collections = [{...}]` | repeated `ansible_collection { ... }` blocks |
 
-**Read the rest of this entry before upgrading an autodiscovery rule.** Three of
-the five are a change of MEANING and not only of syntax.
+**Read the rest of this entry before upgrading an autodiscovery rule or a
+workspace.** Three of the six are a change of MEANING and not only of syntax.
 
 #### What you gain
 
@@ -2446,10 +2447,11 @@ typed.
 
 #### The behaviour change: omitting a list no longer leaves it alone
 
-**This affects `terrapod_autodiscovery_rule.ansible_collection` and
-`.run_task_template` only — and note both are now SINGULAR**, because a repeated
-block is written one at a time. The server's own wire keys are unchanged, so this
-renames what you write, not what is stored.
+**This affects three inputs: `terrapod_autodiscovery_rule.ansible_collection`,
+`.run_task_template`, and `terrapod_workspace.ansible_collection` — and note all
+three are now SINGULAR**, because a repeated block is written one at a time. The
+server's own wire keys are unchanged, so this renames what you write, not what is
+stored.
 
 As list attributes they had three states, and the provider sent a different
 request for each:
@@ -2463,25 +2465,34 @@ request for each:
 A block list has two states, so the first is gone. **Writing no block now clears
 the value**, where it previously left it untouched.
 
-So before upgrading, for every `terrapod_autodiscovery_rule` in your
-configuration: if it does **not** declare `ansible_collection` or
-`run_task_template` and the rule holds collections or run-task templates set
-elsewhere — through the UI, the API, or a bulk update — write them out as blocks,
-or the next apply removes them. `terraform plan` will show the removal, so a
-reviewed plan catches it; this entry exists so it is not a surprise in the plan.
+So before upgrading, for every `terrapod_autodiscovery_rule` **and every
+`terrapod_workspace`** in your configuration: if it does **not** declare
+`ansible_collection` (or, on a rule, `run_task_template`) and the object holds
+collections or run-task templates set elsewhere — through the UI, the API, or a
+bulk update — write them out as blocks, or the next apply removes them.
+`terraform plan` will show the removal, so a reviewed plan catches it; this entry
+exists so it is not a surprise in the plan.
+
+**The workspace one is the one to check most carefully**, because it is the one
+that was deliberately protected. It was `Optional + Computed` with
+`UseStateForUnknown` and a plan-time *warning* when a configuration stopped
+managing it, precisely so a value set outside Terraform survived an apply by a
+configuration that did not mention it. A block cannot carry any of that, so that
+protection is gone: the warning no longer fires and the value no longer survives.
+Eight sibling workspace attributes — `agent_pool_ids`, `var_files`,
+`trigger_prefixes`, `drift_ignore_rules`, `security_scan_skip_rules`,
+`inventory_paths`, `playbooks`, `oidc_audiences` — keep that behaviour and are
+unaffected.
 
 `terrapod_variable_set.assignment_rule` is **not** affected: a single rule is
 written or not written, with no third state to lose.
 
-#### `terrapod_workspace.ansible_collections` is deliberately NOT a block
+#### `terrapod_workspace` keeps its data source as an attribute
 
-It stays a nested attribute, and the reason is the three-state behaviour above
-rather than an oversight. It is one of nine workspace attributes that are
-Optional + Computed with `UseStateForUnknown`, so that a value set outside
-Terraform survives an apply by a configuration that does not manage it, and a plan
-*warns* when a configuration stops managing one. A block can express none of that.
-Converting it would make that one attribute of the nine silently clobber
-out-of-band values, which is the opposite of what the mechanism is for.
+The `terrapod_workspace` **data source** still exposes `ansible_collections` as a
+list attribute, and that is deliberate rather than an inconsistency: a data source
+is read-only, so there is no configuration to declare blocks in and nothing for
+the block form to buy.
 
 #### Pulumi
 

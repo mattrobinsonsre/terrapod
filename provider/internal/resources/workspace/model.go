@@ -41,7 +41,7 @@
 //	"ansible-version"                   → ansible_version     (string, optional; empty inherits the deployment default)
 //	"config-directory"                  → config_directory    (string, optional; NULL and "" differ — see below)
 //	"inventory-paths"                   → inventory_paths     (list,   optional+computed; ordered)
-//	"ansible-collections"               → ansible_collections (list of {name, version})
+//	"ansible-collections"               → ansible_collection blocks (each {name, version})
 //	"playbooks"                         → playbooks           (list,   optional+computed; the allow-list)
 //	"default-playbook"                  → default_playbook    (string, optional+computed)
 //	"default-limit"                     → default_limit       (string, optional+computed)
@@ -186,47 +186,47 @@ type workspaceModel struct {
 	// attribute as null against a server answer of "" and fail every apply of
 	// every workspace that does not set it with "Provider produced
 	// inconsistent result after apply".
-	ConfigDirectory               types.String `tfsdk:"config_directory"`
-	InventoryPaths                types.List   `tfsdk:"inventory_paths"`
-	AnsibleCollections            types.List   `tfsdk:"ansible_collections"`
-	Playbooks                     types.List   `tfsdk:"playbooks"`
-	DefaultPlaybook               types.String `tfsdk:"default_playbook"`
-	DefaultLimit                  types.String `tfsdk:"default_limit"`
-	HardLimit                     types.String `tfsdk:"hard_limit"`
-	WorkingDirectory              types.String `tfsdk:"working_directory"`
-	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
-	EEResourceCPU                 types.String `tfsdk:"ee_resource_cpu"`
-	EEResourceMemory              types.String `tfsdk:"ee_resource_memory"`
-	Parallelism                   types.Int64  `tfsdk:"parallelism"`
-	ConfigureParallelism          types.Int64  `tfsdk:"configure_parallelism"`
-	ResourceMemory                types.String `tfsdk:"resource_memory"`
-	Labels                        types.Map    `tfsdk:"labels"`
-	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`
-	VCSBranch                     types.String `tfsdk:"vcs_branch"`
-	VCSConnectionID               types.String `tfsdk:"vcs_connection_id"`
-	VCSWorkflow                   types.String `tfsdk:"vcs_workflow"`
-	AutoMerge                     types.Bool   `tfsdk:"auto_merge"`
-	AutoMergeStrategy             types.String `tfsdk:"auto_merge_strategy"`
-	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
-	AgentPoolIDs                  types.List   `tfsdk:"agent_pool_ids"`
-	AgentPoolNames                types.List   `tfsdk:"agent_pool_names"`
-	VarFiles                      types.List   `tfsdk:"var_files"`
-	TriggerPrefixes               types.List   `tfsdk:"trigger_prefixes"`
-	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
-	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
-	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
-	SecurityScanEnforcement       types.String `tfsdk:"security_scan_enforcement"`
-	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
-	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
-	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
-	OIDCAudiences                 types.Map    `tfsdk:"oidc_audiences"`
-	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
-	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
-	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
-	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
-	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
-	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
-	SlackChannel                  types.String `tfsdk:"slack_channel"`
+	ConfigDirectory               types.String             `tfsdk:"config_directory"`
+	InventoryPaths                types.List               `tfsdk:"inventory_paths"`
+	AnsibleCollections            []ansibleCollectionModel `tfsdk:"ansible_collection"`
+	Playbooks                     types.List               `tfsdk:"playbooks"`
+	DefaultPlaybook               types.String             `tfsdk:"default_playbook"`
+	DefaultLimit                  types.String             `tfsdk:"default_limit"`
+	HardLimit                     types.String             `tfsdk:"hard_limit"`
+	WorkingDirectory              types.String             `tfsdk:"working_directory"`
+	ResourceCPU                   types.String             `tfsdk:"resource_cpu"`
+	EEResourceCPU                 types.String             `tfsdk:"ee_resource_cpu"`
+	EEResourceMemory              types.String             `tfsdk:"ee_resource_memory"`
+	Parallelism                   types.Int64              `tfsdk:"parallelism"`
+	ConfigureParallelism          types.Int64              `tfsdk:"configure_parallelism"`
+	ResourceMemory                types.String             `tfsdk:"resource_memory"`
+	Labels                        types.Map                `tfsdk:"labels"`
+	VCSRepoURL                    types.String             `tfsdk:"vcs_repo_url"`
+	VCSBranch                     types.String             `tfsdk:"vcs_branch"`
+	VCSConnectionID               types.String             `tfsdk:"vcs_connection_id"`
+	VCSWorkflow                   types.String             `tfsdk:"vcs_workflow"`
+	AutoMerge                     types.Bool               `tfsdk:"auto_merge"`
+	AutoMergeStrategy             types.String             `tfsdk:"auto_merge_strategy"`
+	AgentPoolID                   types.String             `tfsdk:"agent_pool_id"`
+	AgentPoolIDs                  types.List               `tfsdk:"agent_pool_ids"`
+	AgentPoolNames                types.List               `tfsdk:"agent_pool_names"`
+	VarFiles                      types.List               `tfsdk:"var_files"`
+	TriggerPrefixes               types.List               `tfsdk:"trigger_prefixes"`
+	DriftIgnoreRules              types.List               `tfsdk:"drift_ignore_rules"`
+	DriftDetectionEnabled         types.Bool               `tfsdk:"drift_detection_enabled"`
+	DriftDetectionIntervalSeconds types.Int64              `tfsdk:"drift_detection_interval_seconds"`
+	SecurityScanEnforcement       types.String             `tfsdk:"security_scan_enforcement"`
+	SecurityScanEngine            types.String             `tfsdk:"security_scan_engine"`
+	SecurityScanSeverityThreshold types.String             `tfsdk:"security_scan_severity_threshold"`
+	SecurityScanSkipRules         types.List               `tfsdk:"security_scan_skip_rules"`
+	OIDCAudiences                 types.Map                `tfsdk:"oidc_audiences"`
+	PlanExpirySeconds             types.Int64              `tfsdk:"plan_expiry_seconds"`
+	DebugMode                     types.Bool               `tfsdk:"debug_mode"`
+	AllowForkPRPlans              types.Bool               `tfsdk:"allow_fork_pr_plans"`
+	AISummaryMode                 types.String             `tfsdk:"ai_summary_mode"`
+	AIPolicyMode                  types.String             `tfsdk:"ai_policy_mode"`
+	AISummaryContext              types.String             `tfsdk:"ai_summary_context"`
+	SlackChannel                  types.String             `tfsdk:"slack_channel"`
 
 	// Set of workspace IDs authorized to read this workspace's state
 	// via `terraform_remote_state` (#344). Producer-controlled
