@@ -2405,8 +2405,8 @@ HCL and what `for_each` and dynamic blocks assume.
 | `terrapod_provider_template.parameters_json = jsonencode([...])` | repeated `parameter { ... }` blocks |
 | `terrapod_catalog_item.variable_options_json = jsonencode([...])` | repeated `variable_option { ... }` blocks |
 | `terrapod_variable_set.assignment_rule = { ... }` | one `assignment_rule { ... }` block |
-| `terrapod_autodiscovery_rule.ansible_collections = [{...}]` | repeated `ansible_collections { ... }` blocks |
-| `terrapod_autodiscovery_rule.run_task_templates = [{...}]` | repeated `run_task_templates { ... }` blocks |
+| `terrapod_autodiscovery_rule.ansible_collections = [{...}]` | repeated `ansible_collection { ... }` blocks |
+| `terrapod_autodiscovery_rule.run_task_templates = [{...}]` | repeated `run_task_template { ... }` blocks |
 
 **Read the rest of this entry before upgrading an autodiscovery rule.** Three of
 the five are a change of MEANING and not only of syntax.
@@ -2446,8 +2446,10 @@ typed.
 
 #### The behaviour change: omitting a list no longer leaves it alone
 
-**This affects `terrapod_autodiscovery_rule.ansible_collections` and
-`.run_task_templates` only.**
+**This affects `terrapod_autodiscovery_rule.ansible_collection` and
+`.run_task_template` only — and note both are now SINGULAR**, because a repeated
+block is written one at a time. The server's own wire keys are unchanged, so this
+renames what you write, not what is stored.
 
 As list attributes they had three states, and the provider sent a different
 request for each:
@@ -2462,8 +2464,8 @@ A block list has two states, so the first is gone. **Writing no block now clears
 the value**, where it previously left it untouched.
 
 So before upgrading, for every `terrapod_autodiscovery_rule` in your
-configuration: if it does **not** declare `ansible_collections` or
-`run_task_templates` and the rule holds collections or run-task templates set
+configuration: if it does **not** declare `ansible_collection` or
+`run_task_template` and the rule holds collections or run-task templates set
 elsewhere — through the UI, the API, or a bulk update — write them out as blocks,
 or the next apply removes them. `terraform plan` will show the removal, so a
 reviewed plan catches it; this entry exists so it is not a surprise in the plan.
@@ -2486,3 +2488,7 @@ out-of-band values, which is the opposite of what the mechanism is for.
 The bridge pluralises a block name that is not already plural, so `parameter`
 becomes `parameters` and `variable_option` becomes `variableOptions`. The
 committed schema carries the new shape.
+
+The same rule means the two renamed autodiscovery blocks cost a Pulumi program
+nothing: `ansible_collection` pluralises straight back to `ansibleCollections`,
+so that half of the schema is byte-identical across the rename.

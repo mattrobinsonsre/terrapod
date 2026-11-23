@@ -37,7 +37,7 @@ var mustBeSensitive = map[string]string{
 	"terrapod_gpg_key.ascii_armor":                         "a signing key",
 
 	// Nested, and invisible to this gate until it learned to recurse.
-	"terrapod_autodiscovery_rule.run_task_templates[].hmac_key": "the same key as terrapod_run_task.hmac_key, supplied through a rule",
+	"terrapod_autodiscovery_rule.run_task_template[].hmac_key": "the same key as terrapod_run_task.hmac_key, supplied through a rule",
 }
 
 func TestEverySecretBearingAttributeIsMarkedSensitive(t *testing.T) {

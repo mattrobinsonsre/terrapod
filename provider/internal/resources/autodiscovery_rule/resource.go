@@ -28,7 +28,7 @@
 //	"ansible-version"    -> ansible_version     (string, optional; empty inherits the deployment default)
 //	"ssh-host-key-policy" -> ssh_host_key_policy (string, optional+computed; strict|accept-new|off)
 //	"ansible-execution-environment" -> ansible_execution_environment (string, optional; overrides the line)
-//	"ansible-collections" -> ansible_collections (list of {name, version}, optional)
+//	"ansible-collections" -> ansible_collection blocks (each {name, version})
 //	"plan-apply-enabled" -> plan_apply_enabled  (bool, optional+computed, default true)
 //	"configure-enabled"  -> configure_enabled   (bool, optional+computed, default false)
 //	"config-directory"   -> config_directory    (string, optional+computed; "" is the config version's root)
@@ -45,7 +45,7 @@
 //	"on-directory-delete" -> on_directory_delete (string, optional;
 //	    "flag" (default, safe) or "destroy" (tears down infra then archives))
 //	"var-files"          -> var_files           (list of strings, optional)
-//	"run-task-templates" -> run_task_templates  (list of objects, optional)
+//	"run-task-templates" -> run_task_template blocks
 //	    each: name (string, req), url (string, req), hmac-key (string, opt),
 //	          stage (string, req), enforcement-level (string, opt),
 //	          enabled (bool, opt)
@@ -115,7 +115,7 @@ type autodiscoveryRuleModel struct {
 	TerraformVersion            types.String          `tfsdk:"terraform_version"`
 	AnsibleVersion              types.String          `tfsdk:"ansible_version"`
 	AnsibleExecutionEnvironment types.String          `tfsdk:"ansible_execution_environment"`
-	AnsibleCollections          []ruleCollectionModel `tfsdk:"ansible_collections"`
+	AnsibleCollections          []ruleCollectionModel `tfsdk:"ansible_collection"`
 	// Which operations a materialised workspace has (#1966), and the roots
 	// each one uses (#1929). Templated onto every workspace this rule
 	// creates, exactly like the settings further down -- the rule carries the
@@ -174,7 +174,7 @@ type autodiscoveryRuleModel struct {
 	ScheduledConfigureTimezone types.String `tfsdk:"scheduled_configure_timezone"`
 
 	VarFiles               types.List             `tfsdk:"var_files"`
-	RunTaskTemplates       []runTaskTemplateModel `tfsdk:"run_task_templates"`
+	RunTaskTemplates       []runTaskTemplateModel `tfsdk:"run_task_template"`
 	NotificationTemplates  types.List             `tfsdk:"notification_templates"`
 	ExecutionHookTemplates types.List             `tfsdk:"execution_hook_templates"`
 
@@ -945,7 +945,7 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 			// and `for_each` assume, and `docs/upgrading-to-2.0.md` carries it,
 			// because a configuration that omits these today stops meaning
 			// "leave alone".
-			"ansible_collections": schema.ListNestedBlock{
+			"ansible_collection": schema.ListNestedBlock{
 				Description: "The Ansible collections a workspace created by this rule " +
 					"declares. Installed after the configuration's own `requirements.yml` " +
 					"and with `--force`, so an entry here overrides the repository's build " +
@@ -964,7 +964,7 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 					},
 				},
 			},
-			"run_task_templates": schema.ListNestedBlock{
+			"run_task_template": schema.ListNestedBlock{
 				Description: "Run task definitions auto-applied to workspaces created by this rule.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
