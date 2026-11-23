@@ -277,6 +277,62 @@ At start-up the API also checks that it can reach every named location (`default
 
 A workspace's location never changes once it has been created, and Terrapod refuses any write that would change it. Each node therefore works out a workspace's location from its own copy of the workspace row. For high availability, both nodes must configure the same locations. See [High availability](high-availability.md#storage-locations-on-a-follower).
 
+##### Federated credentials for a storage location
+
+By default a location authenticates with the API pod's own workload identity — IRSA, Azure Workload Identity, GKE Workload Identity — which reaches one account, in one partition, on one cloud. That is enough for a second bucket in the same account and not enough for the requirement named above: a workspace whose state has to live in a different partition, or on a different cloud.
+
+Setting `credentials.type: federated` removes both limits, and with the same mechanism rather than a second one. The target account registers **this Terrapod** as an OIDC identity provider; the API presents a short-lived token it minted for that location; the cloud exchanges it for its own credentials. Crossing a partition is then registering the issuer in the target partition's account, and reaching another cloud is the same shape with a different exchange.
+
+| Value | Default | Description |
+|---|---|---|
+| `credentials.type` | `default` | `default` (the pod's own identity) or `federated` |
+| `credentials.audience` | `""` | The `aud` this location's token carries. Required, and unique — see below |
+| `credentials.session_duration_seconds` | `3600` | How long the exchanged credentials last. Only AWS takes this from us |
+| `credentials.aws_role_arn` | `""` | The role to assume. Required for a federated `s3` location |
+| `credentials.aws_role_session_name` | `terrapod-storage` | The STS session name, which is what CloudTrail shows |
+| `credentials.azure_tenant_id` | `""` | Required for a federated `azure` location |
+| `credentials.azure_client_id` | `""` | The app registration holding the federated identity credential. Required for `azure` |
+| `credentials.gcp_token_url` | `https://sts.googleapis.com/v1/token` | Google's STS endpoint; change only for a non-default universe domain |
+
+A federated `gcs` location must also set `gcs.service_account_email`: the exchange impersonates that service account, and signing a URL has to be done as a service account rather than as the federated identity.
+
+```yaml
+api:
+  config:
+    auth:
+      oidc_issuer:
+        enabled: true
+        public_url: https://terrapod.example.com
+    storage:
+      backend: s3
+      s3:
+        bucket: terrapod-storage
+      locations:
+        gov:
+          backend: s3
+          s3:
+            bucket: terrapod-state-gov
+            region: us-gov-west-1
+            presigned_url_expiry_seconds: 900
+          credentials:
+            type: federated
+            audience: terrapod-storage-gov
+            session_duration_seconds: 1800
+            aws_role_arn: arn:aws-us-gov:iam::222222222222:role/terrapod-state
+```
+
+**This is the one storage mode with an inbound dependency, and it is not a soft one.** The cloud fetches `/.well-known/openid-configuration` and `/.well-known/jwks.json` from this deployment itself, anonymously, so the two paths must be on a publicly reachable Ingress — a private or tailnet-only hostname will not do. Per-workspace cloud identity makes the same trade and the cost there is that a run falls back to its agent pool's credentials; here the cost is that **a workspace's state cannot be read or written at all**. An air-gapped deployment cannot use this. For the issuer itself — enabling it, the Ingress paths, key rotation — see [Cloud identity](cloud-identity.md).
+
+**Key rotation becomes a storage dependency.** `auth.oidc_issuer.key_propagation_seconds` exists so a rotated-in key is published before it signs; with storage federating through the same issuer, a window set too short stops object access rather than stopping new runs from authenticating. Raise it if your cloud caches the JWKS for longer.
+
+**The audience is what keeps a run's identity out of your buckets.** A run identity token and a storage token come from the same issuer and are signed by the same key — deliberately, because a second key would double the propagation window storage now depends on — so `aud` is the discriminator. Startup therefore refuses a configuration in which a location's audience is also a value in `auth.oidc_issuer.audiences`, or in which two locations share one. Their subjects differ as well (`storage:<location>` against `workspace:<name>@<id>`), which is worth having because on AWS and Azure the subject is the only other thing a trust policy can bind.
+
+**On AWS, condition the trust policy on `oaud`, not `aud`.** The IAM condition key spelled `…:aud` maps to the `azp` claim when one is present and falls back to `aud` only when it is absent; the real audience is exposed as `…:oaud`. Terrapod sets no `azp` today, so `aud` happens to work and would stop working the moment anything set one. [Cloud identity](cloud-identity.md) records the same point for run identity.
+
+**An S3 presigned URL is signed with the session credentials**, so `s3.presigned_url_expiry_seconds` must fit inside `credentials.session_duration_seconds` — otherwise a download link stops working partway through, which is not diagnosable from the symptom. Startup refuses that combination and names both numbers. Azure and GCS have no such bound: Azure signs a SAS with a user delegation key the session merely obtains, and GCS signs through IAM, so on those two a presigned URL legitimately outlives the hour-long session.
+
+**A federated location that cannot authenticate does not take the pod down.** The exchange happens inside the cloud's SDK on the first operation, so a failure — an issuer the cloud cannot reach, a trust policy that refuses, a role that no longer exists — surfaces through the same per-location reachability probe described above: the location is logged as unreachable with the reason, `terrapod_storage_location_reachable{location}` drops to `0`, `/ready` shows it as detail, and every other location goes on serving. What *is* refused at startup is a configuration that cannot work at all: a federated location with no audience or no role, a federated location while `auth.oidc_issuer.enabled` is false, or the audience collisions above.
+
 ### Auth
 
 | Value | Default | Description |

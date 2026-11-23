@@ -1770,8 +1770,31 @@
                       "type": {
                         "type": "string",
                         "enum": [
-                          "default"
+                          "default",
+                          "federated"
                         ]
+                      },
+                      "audience": {
+                        "type": "string"
+                      },
+                      "session_duration_seconds": {
+                        "type": "integer",
+                        "minimum": 900
+                      },
+                      "aws_role_arn": {
+                        "type": "string"
+                      },
+                      "aws_role_session_name": {
+                        "type": "string"
+                      },
+                      "azure_tenant_id": {
+                        "type": "string"
+                      },
+                      "azure_client_id": {
+                        "type": "string"
+                      },
+                      "gcp_token_url": {
+                        "type": "string"
                       }
                     }
                   }
@@ -1820,7 +1843,65 @@
                             ]
                           }
                         ]
-                      }
+                      },
+                      "allOf": [
+                        {
+                          "if": {
+                            "required": [
+                              "credentials"
+                            ],
+                            "properties": {
+                              "credentials": {
+                                "required": [
+                                  "type"
+                                ],
+                                "properties": {
+                                  "type": {
+                                    "const": "federated"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "then": {
+                            "properties": {
+                              "credentials": {
+                                "required": [
+                                  "audience",
+                                  "aws_role_arn"
+                                ],
+                                "properties": {
+                                  "audience": {
+                                    "minLength": 1
+                                  },
+                                  "aws_role_arn": {
+                                    "minLength": 1
+                                  }
+                                },
+                                "not": {
+                                  "anyOf": [
+                                    {
+                                      "required": [
+                                        "azure_client_id"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "azure_tenant_id"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "gcp_token_url"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
                     }
                   },
                   {
@@ -1867,7 +1948,72 @@
                             ]
                           }
                         ]
-                      }
+                      },
+                      "allOf": [
+                        {
+                          "if": {
+                            "required": [
+                              "credentials"
+                            ],
+                            "properties": {
+                              "credentials": {
+                                "required": [
+                                  "type"
+                                ],
+                                "properties": {
+                                  "type": {
+                                    "const": "federated"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "then": {
+                            "properties": {
+                              "credentials": {
+                                "required": [
+                                  "audience",
+                                  "azure_tenant_id",
+                                  "azure_client_id"
+                                ],
+                                "properties": {
+                                  "audience": {
+                                    "minLength": 1
+                                  },
+                                  "azure_tenant_id": {
+                                    "minLength": 1
+                                  },
+                                  "azure_client_id": {
+                                    "minLength": 1
+                                  },
+                                  "session_duration_seconds": {
+                                    "maximum": 3600
+                                  }
+                                },
+                                "not": {
+                                  "anyOf": [
+                                    {
+                                      "required": [
+                                        "aws_role_arn"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "aws_role_session_name"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "gcp_token_url"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
                     }
                   },
                   {
@@ -1910,6 +2056,142 @@
                             ]
                           }
                         ]
+                      },
+                      "allOf": [
+                        {
+                          "if": {
+                            "required": [
+                              "credentials"
+                            ],
+                            "properties": {
+                              "credentials": {
+                                "required": [
+                                  "type"
+                                ],
+                                "properties": {
+                                  "type": {
+                                    "const": "federated"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "then": {
+                            "required": [
+                              "gcs"
+                            ],
+                            "properties": {
+                              "credentials": {
+                                "required": [
+                                  "audience"
+                                ],
+                                "properties": {
+                                  "audience": {
+                                    "minLength": 1
+                                  },
+                                  "session_duration_seconds": {
+                                    "maximum": 3600
+                                  }
+                                },
+                                "not": {
+                                  "anyOf": [
+                                    {
+                                      "required": [
+                                        "aws_role_arn"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "aws_role_session_name"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "azure_client_id"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "azure_tenant_id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "gcs": {
+                                "required": [
+                                  "service_account_email"
+                                ],
+                                "properties": {
+                                  "service_account_email": {
+                                    "minLength": 1
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "credentials"
+                      ],
+                      "properties": {
+                        "credentials": {
+                          "not": {
+                            "required": [
+                              "type"
+                            ],
+                            "properties": {
+                              "type": {
+                                "const": "federated"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "credentials": {
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "audience"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "aws_role_arn"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "aws_role_session_name"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "azure_tenant_id"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "azure_client_id"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "gcp_token_url"
+                                ]
+                              }
+                            ]
+                          }
+                        }
                       }
                     }
                   }

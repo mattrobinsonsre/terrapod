@@ -31,6 +31,23 @@ answer the same question as the [`phase`
 claim](#the-phase-claim-and-why-write-permissions-belong-behind-it), and both are
 off until an operator asks for them. Neither needs a publicly reachable path.
 
+> ### The issuer serves storage locations too
+>
+> Everything on this page is about a **run's** identity. The same issuer, the
+> same signing key and the same two `/.well-known` paths also authenticate a
+> **storage location** configured `credentials.type: federated`, which is what
+> lets a workspace's state live in another partition or on another cloud. See
+> [Federated credentials for a storage
+> location](deployment.md#federated-credentials-for-a-storage-location).
+>
+> Two consequences worth knowing here rather than there. A storage token's
+> audience is refused if it is also one of `auth.oidc_issuer.audiences` — that
+> audience is the only thing stopping a run's token being presented for a
+> bucket, so the collision is a configuration error rather than a warning. And
+> `key_propagation_seconds` stops being only about new runs authenticating: set
+> it too short and object access stops, because the API's own reads and writes
+> now go through this issuer.
+
 ---
 
 ## The problem this solves

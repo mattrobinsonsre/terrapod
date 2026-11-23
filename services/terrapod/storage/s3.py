@@ -48,14 +48,26 @@ class S3Store:
         prefix: str = "",
         endpoint_url: str = "",
         presigned_url_expiry_seconds: int = 3600,
+        federated: Any = None,
     ) -> None:
         self._bucket = bucket
         self._region = region
         self._prefix = prefix.strip("/")
         self._endpoint_url = endpoint_url or None
         self._default_expiry = presigned_url_expiry_seconds
+        #: A `storage.credentials.FederatedLocation` when this location federates to
+        #: AWS rather than using the pod's own identity (#2590); None otherwise, which
+        #: is every default-credential location and the deployment-wide backend.
+        #: Untyped to keep this module importable without the config tree, as the rest
+        #: of it is.
+        self._federated = federated
 
-        if self._default_expiry > 3600:
+        if self._default_expiry > 3600 and federated is None:
+            # Not warned for a federated location: `config.py` already refuses an
+            # expiry longer than that location's own session, which is the real
+            # bound, and it says which two numbers disagreed. Repeating a guess
+            # about IRSA here would be noise on a configuration that has been
+            # checked against the actual horizon.
             logger.warning(
                 "Presigned URL expiry exceeds 1 hour — may fail with IRSA credentials",
                 expiry_seconds=self._default_expiry,
@@ -82,6 +94,13 @@ class S3Store:
 
     async def _get_client(self) -> Any:
         if self._client is None:
+            if self._federated is not None:
+                # Before the first client, and once: the provider goes on the
+                # session's resolver chain, and the client resolves credentials
+                # through it on construction.
+                from terrapod.storage.credentials import install_aws_credentials
+
+                install_aws_credentials(self._session, self._federated)
             self._client = await self._session.create_client(
                 "s3",
                 region_name=self._region,

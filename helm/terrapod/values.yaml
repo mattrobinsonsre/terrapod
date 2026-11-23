@@ -309,7 +309,43 @@ api:
       # oci/, policies/, uploads/, vcs_archives/ and module_overrides/ are read from the default store alone,
       # as are state/deleted/ and state/index.yaml. So a wrong bucket breaks the first set and nothing else.
       locations: {}
-      # A location's `credentials.type` is a placeholder: only `default` exists, nothing reads it.
+      #
+      # A location's `credentials.type` is `default` -- the API pod's own workload identity, which
+      # reaches one account in one partition on one cloud -- or `federated` (#2590): the location
+      # presents a token minted by THIS deployment's OIDC issuer and the target cloud exchanges it
+      # for its own short-lived credentials. That is what reaches another partition, or another
+      # cloud entirely, and it needs auth.oidc_issuer.enabled plus an Ingress the cloud can fetch
+      # the two /.well-known paths from. It is the only storage mode with an inbound dependency,
+      # and an unreachable issuer makes that location's objects unreadable rather than degrading a
+      # feature -- so an air-gapped deployment cannot use it. See docs/deployment.md (Storage locations).
+      #
+      #   locations:
+      #     eu:
+      #       backend: s3
+      #       s3:
+      #         bucket: terrapod-state-eu
+      #         region: eu-west-1
+      #         # An S3 presigned URL is signed WITH the session credentials, so this must fit
+      #         # inside session_duration_seconds below. Azure and GCS have no such bound.
+      #         presigned_url_expiry_seconds: 900
+      #       credentials:
+      #         type: federated
+      #         # Unique per location, and never also a value in auth.oidc_issuer.audiences:
+      #         # the audience is the only thing stopping a run's identity token being presented
+      #         # here. Startup refuses a configuration that reuses one.
+      #         audience: terrapod-storage-eu
+      #         session_duration_seconds: 1800
+      #         aws_role_arn: arn:aws:iam::222222222222:role/terrapod-state-eu
+      #     az:
+      #       backend: azure
+      #       azure:
+      #         account_name: terrapodstate
+      #         container_name: state
+      #       credentials:
+      #         type: federated
+      #         audience: api://terrapod-storage-az
+      #         azure_tenant_id: 11111111-1111-1111-1111-111111111111
+      #         azure_client_id: 22222222-2222-2222-2222-222222222222
 
     # Authentication
     auth:

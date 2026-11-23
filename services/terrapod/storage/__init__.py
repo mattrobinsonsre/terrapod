@@ -27,10 +27,34 @@ def _instrumented(store: ObjectStore) -> ObjectStore:
     return InstrumentedStore(store) if settings.metrics.enabled else store  # type: ignore[return-value]
 
 
+def _federated(cfg: StorageConfig | StorageLocationConfig, name: str | None) -> object | None:
+    """This location's federated identity, or None.
+
+    `None` for the deployment-wide backend whatever it is configured as: a
+    `StorageConfig` has no `credentials` block at all, because the pod's own
+    identity is the only thing it could federate AS. Federation is a per-location
+    property by design -- the whole point is reaching an account the pod's identity
+    cannot (#2590).
+    """
+    if name is None or not isinstance(cfg, StorageLocationConfig):
+        return None
+    from terrapod.storage.credentials import federated_location
+
+    return federated_location(name, cfg)
+
+
 def _build_cloud_store(
-    cfg: StorageConfig | StorageLocationConfig, **log_fields: str
+    cfg: StorageConfig | StorageLocationConfig, name: str | None = None
 ) -> ObjectStore:
-    """Build an s3, azure or gcs store from a backend definition."""
+    """Build an s3, azure or gcs store from a backend definition.
+
+    `name` is the storage location's name, or None for the deployment-wide backend.
+    It was a `**log_fields` bag until federation needed it as a value: a token is
+    minted FOR a location, so the name is part of the credential rather than
+    decoration on a log line.
+    """
+    log_fields = {} if name is None else {"location": name}
+    federated = _federated(cfg, name)
     match cfg.backend:
         case StorageBackend.S3:
             from terrapod.storage.s3 import S3Store
@@ -41,6 +65,7 @@ def _build_cloud_store(
                 prefix=cfg.s3.prefix,
                 endpoint_url=cfg.s3.endpoint_url,
                 presigned_url_expiry_seconds=cfg.s3.presigned_url_expiry_seconds,
+                federated=federated,
             )
             logger.info("Storage initialized", backend="s3", bucket=cfg.s3.bucket, **log_fields)
             return store
@@ -53,6 +78,7 @@ def _build_cloud_store(
                 container_name=cfg.azure.container_name,
                 prefix=cfg.azure.prefix,
                 presigned_url_expiry_seconds=cfg.azure.presigned_url_expiry_seconds,
+                federated=federated,
             )
             logger.info(
                 "Storage initialized", backend="azure", account=cfg.azure.account_name, **log_fields
@@ -68,6 +94,7 @@ def _build_cloud_store(
                 project_id=cfg.gcs.project_id,
                 service_account_email=cfg.gcs.service_account_email,
                 presigned_url_expiry_seconds=cfg.gcs.presigned_url_expiry_seconds,
+                federated=federated,
             )
             logger.info("Storage initialized", backend="gcs", bucket=cfg.gcs.bucket, **log_fields)
             return store
@@ -111,7 +138,7 @@ async def init_storage(resolver: LocationResolver | None = None) -> None:
 
         resolver = DbLocationResolver()
     locations = {
-        name: _instrumented(_build_cloud_store(location, location=name))
+        name: _instrumented(_build_cloud_store(location, name=name))
         for name, location in cfg.locations.items()
     }
     _store = RoutingStore(default, locations, resolver)

@@ -37,11 +37,15 @@ class AzureStore:
         container_name: str,
         prefix: str = "",
         presigned_url_expiry_seconds: int = 3600,
+        federated: Any = None,
     ) -> None:
         self._account_name = account_name
         self._container_name = container_name
         self._prefix = prefix.strip("/")
         self._default_expiry = presigned_url_expiry_seconds
+        #: A `storage.credentials.FederatedLocation` when this location federates to
+        #: Azure rather than using DefaultAzureCredential (#2590).
+        self._federated = federated
 
         self._container_client: Any = None
         self._credential: Any = None
@@ -59,12 +63,34 @@ class AzureStore:
             return full_key[len(self._prefix) + 1 :]
         return full_key
 
+    def _get_credential(self) -> Any:
+        """This store's Azure credential, built once.
+
+        One producer, because there are TWO consumers and only one of them used to
+        build it: `_get_container_client` assigned `self._credential` and
+        `_get_delegation_key` read it. A presigned URL requested before any
+        container operation -- a state download on a freshly started replica, which
+        is an ordinary first request -- therefore reached
+        `BlobServiceClient(credential=None)`, and the SAS could not be signed. The
+        two paths share no ordering, so the credential cannot belong to either of
+        them.
+        """
+        if self._credential is None:
+            if self._federated is not None:
+                from terrapod.storage.credentials import azure_credential
+
+                self._credential = azure_credential(self._federated)
+            else:
+                from azure.identity.aio import DefaultAzureCredential
+
+                self._credential = DefaultAzureCredential()
+        return self._credential
+
     async def _get_container_client(self) -> Any:
         if self._container_client is None:
-            from azure.identity.aio import DefaultAzureCredential
             from azure.storage.blob.aio import ContainerClient
 
-            self._credential = DefaultAzureCredential()
+            self._get_credential()
             account_url = f"https://{self._account_name}.blob.core.windows.net"
             self._container_client = ContainerClient(
                 account_url=account_url,
@@ -106,7 +132,7 @@ class AzureStore:
 
             account_url = f"https://{self._account_name}.blob.core.windows.net"
             async with BlobServiceClient(
-                account_url=account_url, credential=self._credential
+                account_url=account_url, credential=self._get_credential()
             ) as service_client:
                 key_start = now
                 key_expiry = now + timedelta(hours=23)

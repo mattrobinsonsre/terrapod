@@ -169,6 +169,37 @@ data:
           {{- with $loc.credentials }}
           credentials:
             type: {{ .type | default "default" | quote }}
+            {{- /* Federated identity for this location (#2590). Every field is
+                   emitted only when set rather than with `| default`, so the
+                   config model's own default is the single place each one lives;
+                   `session_duration_seconds` additionally cannot take `| default`
+                   because a Go template reads a configured 0 as empty, and while
+                   the schema's `minimum: 900` already refuses 0, the next field
+                   added here may not have a floor. None of these is a secret --
+                   a role ARN, a tenant and client id and an audience are all
+                   identifiers the cloud publishes in its own console -- so unlike
+                   the issuer's signing key they belong in the ConfigMap. */}}
+            {{- if .audience }}
+            audience: {{ .audience | quote }}
+            {{- end }}
+            {{- if .session_duration_seconds }}
+            session_duration_seconds: {{ .session_duration_seconds | int64 }}
+            {{- end }}
+            {{- if .aws_role_arn }}
+            aws_role_arn: {{ .aws_role_arn | quote }}
+            {{- end }}
+            {{- if .aws_role_session_name }}
+            aws_role_session_name: {{ .aws_role_session_name | quote }}
+            {{- end }}
+            {{- if .azure_tenant_id }}
+            azure_tenant_id: {{ .azure_tenant_id | quote }}
+            {{- end }}
+            {{- if .azure_client_id }}
+            azure_client_id: {{ .azure_client_id | quote }}
+            {{- end }}
+            {{- if .gcp_token_url }}
+            gcp_token_url: {{ .gcp_token_url | quote }}
+            {{- end }}
           {{- end }}
         {{- end }}
       {{- end }}

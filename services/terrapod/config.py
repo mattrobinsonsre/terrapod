@@ -618,15 +618,140 @@ DEFAULT_STORAGE_LOCATION = "default"
 _LOCATION_NAME_RE = re.compile(r"[a-z0-9-]{1,32}")
 
 
+#: The ceiling a cloud puts on a federated session, by backend, in seconds.
+#:
+#: AWS is the only one that takes a duration from us at all: `DurationSeconds` on
+#: `AssumeRoleWithWebIdentity`, capped at 12h and additionally at the role's own
+#: `MaxSessionDuration`, which we cannot see from here. Azure AD access tokens and
+#: Google STS access tokens are both fixed at an hour and ignore anything we ask
+#: for, so accepting a larger number for those two would be accepting a horizon we
+#: then validate presigned-URL expiry against and never actually get.
+_FEDERATED_SESSION_CEILING: dict[StorageBackend, int] = {
+    StorageBackend.S3: 43200,
+    StorageBackend.AZURE: 3600,
+    StorageBackend.GCS: 3600,
+}
+
+#: Which credential fields belong to which backend, so a location setting another
+#: cloud's can be refused by name. Same shape and the same reason as
+#: `_LOCATION_REQUIRED_FIELDS`: a block that is complete for one backend and
+#: carries a second cloud's identifiers is a configuration somebody half-migrated,
+#: and taking the backend's own fields while ignoring the rest is how it stays
+#: half-migrated for a year.
+_FEDERATED_FIELDS: dict[StorageBackend, tuple[str, ...]] = {
+    StorageBackend.S3: ("aws_role_arn", "aws_role_session_name"),
+    StorageBackend.AZURE: ("azure_tenant_id", "azure_client_id"),
+    StorageBackend.GCS: ("gcp_token_url",),
+}
+
+#: The credential fields each backend cannot work without under `federated`.
+#: `aws_role_session_name` and `gcp_token_url` have usable defaults and are absent
+#: here deliberately.
+_FEDERATED_REQUIRED: dict[StorageBackend, tuple[str, ...]] = {
+    StorageBackend.S3: ("aws_role_arn",),
+    StorageBackend.AZURE: ("azure_tenant_id", "azure_client_id"),
+    StorageBackend.GCS: (),
+}
+
+
 class StorageLocationCredentials(BaseModel):
-    """How a location authenticates. Only the ambient default exists today."""
+    """How a location authenticates: the pod's ambient identity, or federation (#2590).
+
+    `default` is the pod's own workload identity -- IRSA, Azure Workload Identity,
+    GKE Workload Identity -- which reaches whatever that identity can reach. That
+    is one account, in one partition, on one cloud.
+
+    `federated` removes all three limits with no second mechanism: the target
+    account registers THIS Terrapod as an OIDC identity provider, the API presents
+    a token it minted for this location, and the cloud exchanges it for its own
+    short-lived credentials. Crossing a partition is then registering the issuer in
+    the target partition's account rather than a different code path, and reaching
+    another cloud is the same shape with a different exchange.
+
+    **Role assumption is deliberately not offered.** It cannot cross a partition
+    and cannot reach another cloud, which is the requirement this exists for, so it
+    would be a second credential surface -- a config block, a schema leg, a render
+    line, a start-up check and documentation -- that does not meet it. A
+    same-partition deployment is served by `federated` too: registering the issuer
+    in an account you already own is no harder than writing a role trust policy,
+    and it is the same trust policy either way.
+
+    **The one storage mode with an INBOUND dependency.** The cloud fetches the
+    issuer's two `/.well-known` paths itself, so a federated location is
+    unreachable from a deployment the cloud cannot reach -- and unlike run
+    identity, where the cost is that a run falls back to the pool's credentials,
+    the cost here is that a workspace's state cannot be read or written at all. An
+    air-gapped deployment cannot use this.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["default"] = Field(
+    type: Literal["default", "federated"] = Field(
         default="default",
-        description="Placeholder, not read by anything yet. `default` is the only value: "
-        "the API pod's ambient identity",
+        description=(
+            "`default` is the API pod's ambient workload identity. `federated` "
+            "mints a token from this deployment's own OIDC issuer and exchanges it "
+            "for the target cloud's credentials, which is what reaches another "
+            "partition or another cloud. Requires auth.oidc_issuer.enabled, and "
+            "requires the cloud to be able to fetch this deployment's "
+            "/.well-known paths."
+        ),
+    )
+    audience: str = Field(
+        default="",
+        description=(
+            "The `aud` this location's token carries, and the only thing that "
+            "distinguishes it from every other token this issuer mints. Required "
+            "for `federated`, and must be unique: it must not be an audience in "
+            "auth.oidc_issuer.audiences (a run's token would then satisfy this "
+            "location's trust policy) and no two locations may share one. On AWS "
+            "condition the trust policy on `oaud`, not `aud` -- see "
+            "docs/cloud-identity.md. On GCP this is the workload identity pool "
+            "PROVIDER resource name, which is what Google's STS requires as the "
+            "audience."
+        ),
+    )
+    session_duration_seconds: int = Field(
+        default=3600,
+        ge=900,
+        description=(
+            "How long the exchanged cloud credentials last, and the horizon a "
+            "presigned URL from this location must fit inside. Only AWS takes this "
+            "from us (`DurationSeconds`, capped at 12h and at the role's own "
+            "MaxSessionDuration, which cannot be seen from here); Azure and Google "
+            "both fix it at an hour and a larger value is refused rather than "
+            "accepted and not obtained."
+        ),
+    )
+    aws_role_arn: str = Field(
+        default="",
+        description="The role to assume with the minted token. Required for a federated s3 location.",
+    )
+    aws_role_session_name: str = Field(
+        default="terrapod-storage",
+        description=(
+            "The STS session name, which is what the target account's CloudTrail "
+            "shows beside every object operation."
+        ),
+    )
+    azure_tenant_id: str = Field(
+        default="",
+        description="The directory holding the app registration. Required for a federated azure location.",
+    )
+    azure_client_id: str = Field(
+        default="",
+        description=(
+            "The application (client) id whose federated identity credential names "
+            "this issuer, subject and audience. Required for a federated azure location."
+        ),
+    )
+    gcp_token_url: str = Field(
+        default="https://sts.googleapis.com/v1/token",
+        description=(
+            "Google's STS token-exchange endpoint. Configurable only so a "
+            "non-default universe domain can be reached; the default is right "
+            "everywhere else."
+        ),
     )
 
 
@@ -674,7 +799,129 @@ class StorageLocationConfig(BaseModel):
         ]
         if missing:
             raise ValueError(f"a {backend} location must set {', '.join(missing)}")
+        self._check_credentials()
         return self
+
+    def _check_credentials(self) -> None:
+        """A federated credential block must be complete, and for THIS backend (#2590).
+
+        Called from `_complete_backend_block` rather than being its own validator so
+        the backend block is known to be complete first: "a federated gcs location
+        must set gcs.service_account_email" is a confusing thing to say to someone
+        who has not set `gcs.bucket` either.
+
+        Every refusal here is a configuration that cannot work at all, which is the
+        bar for raising from a config model: `settings = Settings()` runs at import,
+        so a raise is not a feature declining but a pod that will not start. A
+        federated location with no audience mints a token no cloud will match; one
+        with no role ARN has nothing to exchange it for; one whose presigned URLs
+        outlive its own credentials hands out links that fail mid-download, which
+        the operator cannot diagnose from the symptom. The things that CAN work and
+        merely might not -- the cloud unable to fetch the issuer, STS refusing the
+        exchange -- are left to the per-location reachability probe, which records
+        them against the location and leaves the pod ready (#2621).
+        """
+        creds = self.credentials
+        if creds.type != "federated":
+            # Every federated field left at its default is the only coherent
+            # `default` block. A role ARN sitting on an unfederated location is
+            # something half-configured: the operator set it, nothing reads it, and
+            # the location goes on using the pod's ambient identity in silence.
+            strays = sorted(
+                f
+                for fields in _FEDERATED_FIELDS.values()
+                for f in fields
+                if f in creds.model_fields_set
+            )
+            if creds.audience:
+                strays.insert(0, "audience")
+            if strays:
+                raise ValueError(
+                    f"a location whose credentials.type is {creds.type!r} must not set "
+                    f"{', '.join(strays)}; set credentials.type to 'federated' to use them"
+                )
+            return
+
+        if not creds.audience.strip():
+            raise ValueError(
+                "a federated location must set credentials.audience: it is the only "
+                "thing distinguishing this location's token from every other token "
+                "this issuer mints"
+            )
+
+        backend = self.backend
+        wrong = sorted(
+            f
+            for other, fields in _FEDERATED_FIELDS.items()
+            if other != backend
+            for f in fields
+            if f in creds.model_fields_set
+        )
+        if wrong:
+            raise ValueError(
+                f"a federated {backend.value} location must not set {', '.join(wrong)}"
+            )
+
+        absent = [f for f in _FEDERATED_REQUIRED[backend] if not getattr(creds, f).strip()]
+        if absent:
+            raise ValueError(
+                f"a federated {backend.value} location must set "
+                f"{', '.join('credentials.' + f for f in absent)}"
+            )
+
+        if backend == StorageBackend.GCS and not self.gcs.service_account_email.strip():
+            # Signing a URL is `iam.serviceAccounts.signBlob` as some principal, and
+            # a federated identity is not one -- so the same service account the
+            # exchange impersonates is the account that signs, which is why this is
+            # one field rather than two that could disagree.
+            raise ValueError(
+                "a federated gcs location must set gcs.service_account_email: the "
+                "exchange impersonates that service account, and signing a URL has "
+                "to be done as a service account rather than as the federated "
+                "identity itself"
+            )
+
+        ceiling = _FEDERATED_SESSION_CEILING[backend]
+        if creds.session_duration_seconds > ceiling:
+            raise ValueError(
+                f"credentials.session_duration_seconds is "
+                f"{creds.session_duration_seconds} but a federated {backend.value} "
+                f"session cannot exceed {ceiling}s"
+                + (
+                    ""
+                    if backend == StorageBackend.S3
+                    else " -- that cloud fixes the lifetime and ignores what we ask for"
+                )
+            )
+
+        # Presigned expiry against the session horizon, **on s3 only** -- measured,
+        # not assumed, and the asymmetry is the whole of it.
+        #
+        # An S3 presigned URL is signed WITH the session credentials, so it stops
+        # working the moment they expire however long its own expiry says: that is
+        # a link that fails partway through a download, which the operator cannot
+        # diagnose from the symptom.
+        #
+        # The other two sign with something the session merely OBTAINS. Azure
+        # requests a user delegation key (cached for ~23h in `storage/azure.py`)
+        # and signs the SAS with that, and the SAS is redeemed against the key
+        # rather than against the AAD token. Google signs through IAM `signBlob`
+        # and the resulting V4 URL is valid for its stated expiry regardless of
+        # the access token that signed it. So on those two a presigned URL
+        # outliving the hour-long session is ordinary and correct -- and refusing
+        # it here would be a pod that will not start on a working configuration,
+        # which is the one thing a config validator must not do.
+        if backend == StorageBackend.S3:
+            expiry = self.s3.presigned_url_expiry_seconds
+            if expiry > creds.session_duration_seconds:
+                raise ValueError(
+                    f"s3.presigned_url_expiry_seconds is {expiry} but this location's "
+                    f"credentials last {creds.session_duration_seconds}s. An S3 "
+                    f"presigned URL is signed with the session credentials, so it stops "
+                    f"working when they expire and the download fails partway through. "
+                    f"Lower the expiry, or raise credentials.session_duration_seconds "
+                    f"(and the role's own MaxSessionDuration with it)."
+                )
 
 
 def _store_identity(cfg: "StorageConfig | StorageLocationConfig") -> tuple[str, ...] | None:
@@ -4562,6 +4809,72 @@ class Settings(BaseSettings):
         # exists -- nothing here can log, since `terrapod.config` imports
         # nothing from Terrapod (#1151).
 
+        return self
+
+    @model_validator(mode="after")
+    def _federated_locations_are_coherent(self) -> "Settings":
+        """A federated storage location needs the issuer, and an audience nothing else has (#2590).
+
+        Both halves are cross-block, which is why they are here and not on
+        `StorageLocationConfig`: one reads the issuer's `enabled`, the other reads
+        the deployment's whole audience catalogue and every other location.
+
+        **The audience IS the discriminator.** A run identity token and a storage
+        token come from the same issuer and are signed by the same key -- that is
+        deliberate (a second key would double the propagation window that storage
+        now depends on) -- so what stops one being presented where the other
+        belongs is `aud`. Their subjects differ too (`workspace:...` against
+        `storage:...`), but a cloud trust policy conditioning on audience alone is
+        both legal and common, so audience disjointness is the half that has to be
+        guaranteed rather than documented. Two locations sharing an audience is the
+        same defect between locations: the point of a per-location audience is that
+        a trust policy can be scoped to one location, and a shared one scopes it to
+        two.
+        """
+        federated = {
+            name: loc
+            for name, loc in self.storage.locations.items()
+            if loc.credentials.type == "federated"
+        }
+        if not federated:
+            return self
+
+        if not self.auth.oidc_issuer.enabled:
+            raise ValueError(
+                f"storage location(s) {', '.join(sorted(federated))} use "
+                f"credentials.type 'federated', which exchanges a token minted by "
+                f"this deployment's own OIDC issuer -- but auth.oidc_issuer.enabled "
+                f"is false, so there is no issuer to mint it, no discovery document "
+                f"and no JWKS for the cloud to verify against. Enable the issuer, or "
+                f"set those locations back to credentials.type 'default'."
+            )
+
+        run_audiences = {
+            aud
+            for auds in self.auth.oidc_issuer.audiences.values()
+            for aud in auds
+            if isinstance(aud, str)
+        }
+        seen: dict[str, str] = {}
+        for name in sorted(federated):
+            audience = federated[name].credentials.audience.strip()
+            if audience in run_audiences:
+                raise ValueError(
+                    f"storage location {name!r} has credentials.audience {audience!r}, "
+                    f"which is also an audience in auth.oidc_issuer.audiences. A run's "
+                    f"identity token would then carry an audience this location's trust "
+                    f"policy accepts, so any workspace able to mint that run identity "
+                    f"could read and write this location's objects. Give the location an "
+                    f"audience of its own."
+                )
+            if audience in seen:
+                raise ValueError(
+                    f"storage locations {seen[audience]!r} and {name!r} share "
+                    f"credentials.audience {audience!r}, so either one's token is "
+                    f"accepted for the other and scoping a trust policy to one location "
+                    f"is not possible. Give each location its own audience."
+                )
+            seen[audience] = name
         return self
 
 

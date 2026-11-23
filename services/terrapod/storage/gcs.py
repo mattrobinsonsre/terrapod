@@ -38,12 +38,16 @@ class GCSStore:
         project_id: str = "",
         service_account_email: str = "",
         presigned_url_expiry_seconds: int = 3600,
+        federated: Any = None,
     ) -> None:
         self._bucket_name = bucket
         self._prefix = prefix.strip("/")
         self._project_id = project_id or None
         self._service_account_email = service_account_email or None
         self._default_expiry = presigned_url_expiry_seconds
+        #: A `storage.credentials.FederatedLocation` when this location federates to
+        #: Google rather than using Application Default Credentials (#2590).
+        self._federated = federated
 
         # Async client (gcloud-aio-storage)
         self._aio_storage: Any = None
@@ -64,16 +68,43 @@ class GCSStore:
         if self._aio_storage is None:
             from gcloud.aio.storage import Storage
 
-            self._aio_storage = Storage()
-            logger.info("GCS async client initialized", bucket=self._bucket_name)
+            if self._federated is not None:
+                from terrapod.storage.credentials import gcs_aio_token
+
+                self._aio_storage = Storage(token=gcs_aio_token(self._federated))
+            else:
+                self._aio_storage = Storage()
+            logger.info(
+                "GCS async client initialized",
+                bucket=self._bucket_name,
+                federated=self._federated is not None,
+            )
         return self._aio_storage
 
     def _get_sync_client(self) -> Any:
         if self._sync_client is None:
             from google.cloud import storage as gcs_storage
 
-            self._sync_client = gcs_storage.Client(project=self._project_id)
-            logger.info("GCS sync client initialized (for signing)")
+            if self._federated is not None:
+                # A SEPARATE credential from the async token above, on purpose.
+                # Signing a URL goes through IAM `signBlob` as a service account,
+                # which a federated identity is not, so these credentials
+                # impersonate the account named on the location -- the same
+                # account `presigned_get_url` passes as `service_account_email`,
+                # which is why `config.py` requires it on a federated gcs
+                # location.
+                from terrapod.storage.credentials import gcs_sync_credentials
+
+                self._sync_client = gcs_storage.Client(
+                    project=self._project_id,
+                    credentials=gcs_sync_credentials(self._federated),
+                )
+            else:
+                self._sync_client = gcs_storage.Client(project=self._project_id)
+            logger.info(
+                "GCS sync client initialized (for signing)",
+                federated=self._federated is not None,
+            )
         return self._sync_client
 
     async def put(
