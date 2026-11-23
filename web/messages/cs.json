@@ -4334,9 +4334,6 @@
     "password": "Heslo",
     "becomePassword": "Heslo pro zvýšení oprávnění",
     "replaceHint": "Uložení nahradí celé přihlašovací údaje, vyplňte proto každé potřebné pole, ne jen to, které měníte. Když necháte všechna prázdná, uložené údaje zůstanou beze změny.",
-    "knownHosts": "Známí hostitelé",
-    "knownHostsHint": "Veřejné klíče hostitelů strojů, na které toto přihlašovací údaje dosáhne, jeden na řádek ve formátu known_hosts. Nasměruj proměnnou inventáře na tuto cestu, abys se připojil bez oslabení ověření klíče hostitele. Není skrytý: veřejný klíč hostitele je veřejný a je to právě to, co porovnáváš, když klíč nesouhlasí.",
-    "knownHostsLead": "Veřejné klíče hostitelů strojů, na které tyto přihlašovací údaje dosáhnou, jeden na řádek ve formátu known_hosts.",
     "machineLead": "Jak se Ansible připojuje k hostitelům, kteří odkazují na tyto přihlašovací údaje. Zadejte privátní klíč nebo heslo, případně obojí."
   },
   "supplyChain": {

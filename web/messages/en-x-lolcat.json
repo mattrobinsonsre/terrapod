@@ -4334,9 +4334,6 @@
     "password": "Passwurd",
     "becomePassword": "Eskalayshun passwurd",
     "replaceHint": "Saving swapz out da hole kredenshul, so fil in evry feeld it needz — not just da wun u iz changin. Leeving dem all emptee keepz da kept kredenshul liek it iz.",
-    "knownHosts": "Noed hostz",
-    "knownHostsHint": "Da publik host keyz ov da masheenz dis credenshul reechez, wan per line in known_hosts formatz. Point an inventry variabul at itz path to connekt wifout relaxin host-key verifikashun. Not hidd: a host publik key iz publik, an itz wot u compare when a key no match. srsly.",
-    "knownHostsLead": "Da publik host keyz ov da masheenz dis credenshul reechez, wan per line in known_hosts formatz.",
     "machineLead": "How Ansible talkz to da hostz dat poynt at dis kredenshul. Giv a privat key or a passwurd, or both."
   },
   "supplyChain": {

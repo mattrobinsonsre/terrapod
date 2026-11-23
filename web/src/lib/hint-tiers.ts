@@ -110,7 +110,6 @@ export const HINT_LEADS: Record<string, string> = {
   // workspaces (the create form)
   'form.namePatternPulumi': 'form.namePatternPulumiLead',
   // ansibleCredentials
-  knownHostsHint: 'knownHostsLead',
   machineHint: 'machineLead',
   // adminBinaryCache — the cache-warm panel (#2486). 349 characters of
   // always-visible prose above the form until now. The lead says what the

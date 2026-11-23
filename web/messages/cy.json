@@ -4334,9 +4334,6 @@
     "password": "Cyfrinair",
     "becomePassword": "Cyfrinair dyrchafu",
     "replaceHint": "Mae cadw yn disodli'r tystlythyr cyfan, felly llwythwch bob maes sydd ei angen — nid dim ond yr un sy'n cael ei newid. Mae gadael pob un yn wag yn cadw'r tystlythyr a storiwyd fel y mae.",
-    "knownHosts": "Gwesteiwyr hysbys",
-    "knownHostsHint": "Allweddi gwesteiwr cyhoeddus y peiriannau y mae''r cymhwyster hwn yn eu cyrraedd, un fesul llinell yn fformat known_hosts. Cyfeiria newidyn rhestr eiddo at ei lwybr i gysylltu heb lacio dilysu allwedd y gwesteiwr. Nid yw''n cael ei guddio: mae allwedd gyhoeddus gwesteiwr yn gyhoeddus, a dyna''n union yr hyn a gymharir pan nad yw allwedd yn cyfateb.",
-    "knownHostsLead": "Allweddi gwesteiwr cyhoeddus y peiriannau y mae'r cymhwyster hwn yn eu cyrraedd, un fesul llinell yn fformat known_hosts.",
     "machineLead": "Sut mae Ansible yn cysylltu â'r gwesteiwyr sy'n cyfeirio at y tystlythyr hwn. Darparwch allwedd breifat neu gyfrinair, neu'r ddau."
   },
   "supplyChain": {

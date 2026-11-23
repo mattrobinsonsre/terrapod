@@ -4334,9 +4334,6 @@
     "password": "Palavra-passe",
     "becomePassword": "Palavra-passe de elevação",
     "replaceHint": "Guardar substitui a credencial completa, pelo que deve preencher todos os campos necessários — não apenas o que está a alterar. Se os deixar todos vazios, a credencial guardada permanece como está.",
-    "knownHosts": "Anfitriões conhecidos",
-    "knownHostsHint": "As chaves públicas de anfitrião das máquinas que esta credencial alcança, uma por linha no formato known_hosts. Aponte uma variável de inventário para o caminho dela para ligar sem afrouxar a verificação da chave de anfitrião. Não é oculta: a chave pública de um anfitrião é pública e é precisamente o que compara quando uma chave não corresponde.",
-    "knownHostsLead": "As chaves públicas de anfitrião das máquinas que esta credencial alcança, uma por linha no formato known_hosts.",
     "machineLead": "Como o Ansible se liga aos anfitriões que se referem a esta credencial. Indique uma chave privada ou uma palavra-passe, ou ambas."
   },
   "supplyChain": {

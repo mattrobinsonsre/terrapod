@@ -4334,9 +4334,6 @@
     "password": "Lösenord",
     "becomePassword": "Lösenord för behörighetshöjning",
     "replaceHint": "Att spara ersätter hela uppgiften, så fyll i varje fält som behövs — inte bara det du ändrar. Lämnar du alla tomma behålls de lagrade uppgifterna som de är.",
-    "knownHosts": "Kända värdar",
-    "knownHostsHint": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format. Låt en inventarievariabel peka på dess sökväg för att ansluta utan att mjuka upp verifieringen av värdnyckeln. Döljs inte: en värds publika nyckel är offentlig och är precis det du jämför när en nyckel inte stämmer.",
-    "knownHostsLead": "De publika värdnycklarna för de maskiner som denna autentiseringsuppgift når, en per rad i known_hosts-format.",
     "machineLead": "Hur Ansible ansluter till de värdar som hänvisar till den här autentiseringsuppgiften. Ange en privat nyckel eller ett lösenord, eller båda."
   },
   "supplyChain": {

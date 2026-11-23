@@ -4334,9 +4334,6 @@
     "password": "Parola",
     "becomePassword": "Yükseltme parolası",
     "replaceHint": "Kaydetmek kimlik bilgisinin tamamını değiştirir; bu yüzden yalnızca değiştirdiğiniz alanı değil, gereken her alanı doldurun. Hepsini boş bırakırsanız kayıtlı kimlik bilgisi olduğu gibi kalır.",
-    "knownHosts": "Bilinen ana makineler",
-    "knownHostsHint": "Bu kimlik bilgisinin ulaştığı makinelerin genel ana makine anahtarları, known_hosts biçiminde satır başına bir tane. Ana makine anahtarı doğrulamasını gevşetmeden bağlanmak için bir envanter değişkenini bu yola yönlendirin. Gizlenmez: bir ana makinenin genel anahtarı geneldir ve bir anahtar uyuşmadığında karşılaştırdığınız şey tam olarak budur.",
-    "knownHostsLead": "Bu kimlik bilgisinin ulaştığı makinelerin genel ana makine anahtarları, known_hosts biçiminde satır başına bir tane.",
     "machineLead": "Ansible''ın bu kimlik bilgisine atıfta bulunan ana makinelere nasıl bağlandığı. Bir özel anahtar ya da parola girin; ikisini birlikte de verebilirsiniz."
   },
   "supplyChain": {

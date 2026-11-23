@@ -4334,9 +4334,6 @@
     "password": "密码",
     "becomePassword": "提升密码",
     "replaceHint": "保存会替换整条凭据，因此请填写它需要的每个字段，而不只是正在修改的那个。全部留空则保留已存储的凭据不变。",
-    "knownHosts": "已知主机",
-    "knownHostsHint": "此凭据所连接的机器的公开主机密钥，按 known_hosts 格式每行一个。将清单变量指向其路径，即可在不放松主机密钥校验的情况下建立连接。不会隐藏：主机的公钥本就是公开的，密钥不匹配时比对的正是它。",
-    "knownHostsLead": "此凭据所连接的机器的公开主机密钥，按 known_hosts 格式每行一个。",
     "machineLead": "Ansible 连接引用此凭据的主机的方式。请提供私钥或密码，也可以同时提供两者。"
   },
   "supplyChain": {
