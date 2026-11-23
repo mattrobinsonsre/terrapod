@@ -332,7 +332,7 @@ class AgentPoolToken(Base):
 #: workspace's playbooks run in, which is a per-workspace concern because the
 #: line decides which target Pythons are supported; the API's own ansible is a
 #: property of the API image and is not configurable at all.
-DEFAULT_ANSIBLE_LINE = "2.21"
+DEFAULT_ANSIBLE_LINE = "2.22"
 
 
 #: How a configure VERIFIES a host key, and the values are OpenSSH's three
