@@ -474,33 +474,41 @@ class TestTheConflictingVariable:
         env = materialise(cfg, inventory=inventory_at(tmp_path, document), client=client)
         assert "UserKnownHostsFile" in env["ANSIBLE_SSH_ARGS"]
 
-    def test_the_platform_relaxation_is_refused_and_named(self, cfg, tmp_path):
-        """The sharpest case, and Terrapod's own.
+    def test_the_legacy_platform_relaxation_is_refused_and_redirected(self, cfg, tmp_path):
+        """The sharpest case, and it used to be Terrapod's own.
 
-        `ansible_host_key_checking = False` on the workspace reaches the runner
-        as `ansible_ssh_common_args` on the `all` group (#2318), which collapses
-        into every host's effective variables. Overriding it silently would
-        leave the workspace page saying verification is relaxed while every run
-        enforced it -- a lie in the product's own interface, which is worse than
-        a failed run. So the message points at the setting, not only at the
-        variable, because the operator never wrote that variable.
+        Until #2592 a relaxed workspace reached the runner as this exact
+        `ansible_ssh_common_args` on the `all` group (#2318), which collapses into
+        every host's effective variables -- so the operator never wrote it and
+        cannot find it in their inventory. **Nothing writes it now**: the policy
+        rides the run's ssh anchor instead, which is why the literals are inlined
+        here rather than imported from a producer that no longer exists.
+
+        It is still the case worth pinning, for two reasons. The variable survives
+        in an inventory an operator carried across the rename, or wrote themselves;
+        and overriding it silently would leave something that says verification is
+        off beside runs that enforce it. So the message has to say what REPLACES
+        it, not merely which line to delete -- a refusal naming the retired
+        attribute would send the operator looking for a setting that is gone.
         """
-        from terrapod.services.inventory_resolve import (
-            _HOST_KEY_VAR,
-            _RELAXED_HOST_KEY_ARGS,
-        )
-
+        legacy = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
         document = {
-            "hosts": {"web1": {_HOST_KEY_VAR: _RELAXED_HOST_KEY_ARGS}},
+            "hosts": {"web1": {"ansible_ssh_common_args": legacy}},
             "groups": {},
             "children": {},
         }
         client = client_for(body=keys_body({"web1": [key()]}))
         with pytest.raises(HostKeyAnchorUnavailable) as caught:
             materialise(cfg, inventory=inventory_at(tmp_path, document), client=client)
-        assert "ansible_host_key_checking" in str(caught.value), (
-            "the refusal must name the workspace SETTING, because that is where the "
-            "variable came from and the operator cannot find it in their inventory"
+        message = str(caught.value)
+        assert "ssh-host-key-policy" in message, (
+            "the refusal must name the setting that REPLACES the relaxation, because "
+            "the operator never wrote this variable and the attribute it came from "
+            "no longer exists"
+        )
+        assert "ansible_host_key_checking" not in message, (
+            "and it must NOT name the retired attribute: an operator told to turn "
+            "that back on goes looking for a setting that is gone"
         )
 
     def test_the_two_anchored_options_are_the_ones_openssh_decides(self):
@@ -514,7 +522,7 @@ class TestTheConflictingVariable:
             "StrictHostKeyChecking",
         )
         # And both appear in the anchor, which is why they are the anchored ones.
-        anchor = configure_known_hosts.ssh_args(__import__("pathlib").Path("/x"))
+        anchor = configure_known_hosts.ssh_args(__import__("pathlib").Path("/x"), policy="strict")
         assert all(option in anchor for option in configure_known_hosts.ANCHORED_SSH_OPTIONS)
 
 

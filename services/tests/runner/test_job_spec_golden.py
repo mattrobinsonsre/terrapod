@@ -198,6 +198,16 @@ SCENARIOS: dict[str, dict] = {
         "playbook": "site.yml",
         "ansible_limit": "webservers:!db",
     },
+    # The host-key policy (#2592), on `accept-new` -- the state the three-state
+    # setting exists to add and the one ansible's boolean could not express.
+    #
+    # A scenario of its own rather than folded into `configure-only`, because
+    # what it pins is that the instruction reaches a NON-configure Job too: the
+    # env is emitted unconditionally on every phase, so a plan Job carries it
+    # harmlessly and the runner's `strict` fallback can never be reached by an
+    # API that simply stopped sending it. Folding it into a configure scenario
+    # would leave the unconditional half unpinned.
+    "ssh-host-key-policy": {"phase": "plan", "ssh_host_key_policy": "accept-new"},
     # The composite shape: one run that applies and then configures, so it
     # carries the configure instructions while its phase is still `apply`.
     # Pins that the two coexist -- the apply ServiceAccount AND the four

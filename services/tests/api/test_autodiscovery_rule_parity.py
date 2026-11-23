@@ -238,7 +238,7 @@ _UNTYPED_SURFACES: dict[str, str] = {
 #: is a stale excuse, which `test_no_debt_entry_is_stale` refuses.
 _SURFACE_DEBT: dict[str, dict[str, str]] = {
     "Terraform provider": {
-        "ansible-host-key-checking": (
+        "ssh-host-key-policy": (
             "#2621: not ported. The rule templates it onto the workspaces it creates, "
             "and terrapod_workspace does not carry it either, so porting it here first "
             "would let a rule set something no workspace resource can then manage."

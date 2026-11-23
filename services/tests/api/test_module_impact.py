@@ -155,6 +155,12 @@ def _mock_run(
     run.resource_cpu = "1"
     run.parallelism = 10
     run.configure_parallelism = 10
+    # The host-key policy this run enforces (#2592), snapshotted from the
+    # workspace at creation. Explicit because `_run_json` SERIALISES it, so an
+    # unset MagicMock attribute reaches `json.dumps` and the route 500s with
+    # "Object of type MagicMock is not JSON serializable" -- naming neither the
+    # attribute nor this fixture. `strict` is the real default.
+    run.ssh_host_key_policy = "strict"
     run.resource_memory = "2Gi"
     run.ee_image = ""
     run.ee_resource_cpu = ""
