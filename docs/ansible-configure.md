@@ -1262,6 +1262,44 @@ operator writes no inventory variable and no placeholder — the platform owns t
 trust anchor, which is the whole reason this is a first-class part of the inventory
 rather than a credential field.
 
+**From the first approved key the file is the ALLOW-LIST for every host that
+configure targets**, and `StrictHostKeyChecking=yes` is set. So a host whose
+presented key is in the file connects, a host presenting anything else is refused
+— which is the point — and **a host the workspace has not pinned is refused too,
+not merely unverified.** Pin every host a configure reaches, or it cannot reach
+them. The run log names the unpinned hosts for exactly this reason.
+
+**The file is keyed on the address `ssh` is given**, which is `ansible_host` when
+the host sets one, plus its inventory name and the `[host]:port` form when
+`ansible_port` is not 22. One gap is worth knowing: a port set where Terrapod
+cannot see it — `remote_port` in your own `ansible.cfg`, or a `-o Port=` inside
+your own ssh arguments — makes `ssh` look up `[host]:port` against a line carrying
+only `host`, and the host is refused. Set the port as `ansible_port` and it is
+handled.
+
+**Your inventory must not also state a host-key policy.** Once there are approved
+keys, a run whose inventory sets `ansible_ssh_args`, names `UserKnownHostsFile` or
+`StrictHostKeyChecking` in `ansible_ssh_common_args`/`ansible_ssh_extra_args`, or
+sets `ansible_host_key_checking: false`, is **refused** — naming the host and the
+variable. The two statements contradict, and a setting that silently does nothing
+is worse than one that refuses. That includes the workspace-level relaxation
+below: if you have it off, turn it back on, because approved keys are what it was
+a substitute for. Anything in those variables that is *not* about host keys — a
+`ProxyCommand`, an `IdentityFile`, a `ServerAliveInterval` — keeps working and is
+not what this refuses.
+
+> **One limit, stated because it is the only place the anchor can be displaced
+> without anything noticing.** A workspace that resolves dynamic inventory
+> sources on the runner hands its repository's own inventory files to ansible
+> inside the execution environment, so Terrapod never reads them — which makes a
+> host that exists only in one of those files invisible here twice over. Its
+> `ansible_host` cannot be pinned (so it is refused, which is the safe
+> direction), and an `ansible_ssh_args` set in one of those files escapes the
+> refusal above and replaces the anchor for that host (which is not). Terrapod
+> cannot see those files before the run, so nothing closes this: if you declare
+> approved keys for a workspace with dynamic sources, keep `ansible_ssh_args` out
+> of the repository's inventory.
+
 > **Ansible is deliberately not the model here.** It has no inventory-level notion
 > of an approved host key: `host_key_checking` is a binary toggle, its
 > `ansible_ssh_host_key_*` facts describe what a host *reported* rather than what
@@ -1284,6 +1322,10 @@ Where approving keys is not practical — ephemeral hosts whose keys are generat
 at boot, say — the workspace can turn verification off for its configure runs.
 Prefer the mechanism above where it fits: this one withdraws the question rather
 than answering it, so a host presenting the wrong key is accepted too.
+
+**It is incompatible with approved host keys**, and a workspace that has both
+refuses its configure runs rather than letting one of the two silently lose — see
+[Approve the key](#approve-the-key-host-keys-on-the-inventory).
 
 | | |
 |---|---|
@@ -1321,6 +1363,12 @@ permit would be unreachable.
 
 ### What beats what
 
+**If the workspace has any approved host key, none of what follows applies** —
+verification is the platform's, nothing in the inventory outranks it, and a
+contradicting statement refuses the run rather than losing quietly. The three
+levels below are how a workspace with *no* approved keys behaves, which is every
+workspace until one is declared.
+
 Three levels, outermost last:
 
 1. **An inventory host variable wins.** A host that sets
@@ -1338,13 +1386,18 @@ Three levels, outermost last:
 That is the whole reason level 1 works at all, and it has a consequence that
 surprises people: a host-level override must restate the *entire* argument
 string, not just the part it wants to change. A host that needs a `ProxyJump`
-*and* the group's known-hosts file writes both:
+*and* the group's relaxation writes both:
 
 ```yaml
 hosts:
   bastioned.example.com:
-    ansible_ssh_common_args: "-o UserKnownHostsFile=${terrapod:web-key.known_hosts} -o ProxyJump=bastion"
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o ProxyJump=bastion"
 ```
+
+This example used to reach the machine credential's `known_hosts` field with a
+`${terrapod:…}` placeholder. That field is
+[retired](#approve-the-key-host-keys-on-the-inventory): the placeholder no longer
+resolves, so anything written from it would fail as an unreachable host.
 
 ## A play that targets the execution environment itself
 

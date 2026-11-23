@@ -51,6 +51,7 @@ from terrapod.runner.phases import (
     cloud_identity,
     configure,
     configure_inventory,
+    configure_known_hosts,
     cost,
     discovery,
     execution_hooks,
@@ -1176,6 +1177,20 @@ def _run_configure_phase(cfg: RunnerConfig, *, binary: str, work_dir: Path) -> i
     inventory = configure_inventory.materialise(
         cfg, work_dir=work_dir, resolved=credential_refs, policy_input=_CONFIGURE_POLICY_INPUT
     )
+    # The host-key anchor (#2592), straight after the inventory and before the
+    # policy gate. After, because it reads each host's connect address out of
+    # the rendered inventory -- that file is what ansible will read, so it is
+    # the faithful source for the names OpenSSH will be asked to match. Before
+    # the gate and the collection install, because it is one API request and a
+    # local write: a configure whose declared trust anchor cannot be raised is
+    # not going to run whatever those produce, and refusing before the install
+    # reaches Galaxy is the cheaper order to fail in.
+    #
+    # Its `HostKeyAnchorUnavailable` is a refusal rather than an exit code, like
+    # `InventoryUnavailable` and `AnsibleAuthUnavailable` above: every caller
+    # over this reads a returned integer as ansible's verdict, and a configure
+    # that never ran must not produce one.
+    ssh_anchor = configure_known_hosts.materialise(cfg, inventory=inventory)
 
     # The policy gate, BEFORE anything runs (#2435). A configure is a single
     # Job -- it IS the action -- so there is no between-Jobs moment for the API
@@ -1225,6 +1240,10 @@ def _run_configure_phase(cfg: RunnerConfig, *, binary: str, work_dir: Path) -> i
             inventory=inventory,
             log_file=str(_CONFIGURE_LOG),
             extra_env={**credential_env, **identity_env, **capture_env},
+            # NOT merged into `extra_env`: the anchor is forced rather than
+            # contributed, so it has to outrank everything in that dict. See
+            # `configure._forced_env`.
+            ssh_args=ssh_anchor.get("ANSIBLE_SSH_ARGS"),
         )
     finally:
         # In a `finally` deliberately: the per-host results of a configure that

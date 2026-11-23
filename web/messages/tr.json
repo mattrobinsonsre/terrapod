@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "Onaylı ana makine anahtarları",
         "body": "Bu ana makinenin sunması onaylanan anahtarlar. Bir ana makine her algoritma için bir anahtar sunar ve hepsi buraya aittir. İşaretler OpenSSH'ın kendi işaretleridir, çünkü bu küme tam olarak bir known_hosts dosyası içindir.",
-        "notWiredNote": "Terrapod bu anahtarları kaydeder. Bir bağlantıyı doğrulamak için onları henüz kullanmaz; dolayısıyla bir yapılandırma, ana makine anahtarlarını hâlâ çalışma alanı ayarının ve makine kimlik bilgisinin söylediği biçimde denetler.",
         "empty": "Onaylı anahtar yok. Bu ana makinenin hangi anahtarları sunmasına izin verildiği burada henüz kayıtlı değil.",
         "markerNone": "Onaylı",
         "markerRevoked": "İptal edildi",

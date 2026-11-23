@@ -3483,8 +3483,7 @@
         "overviewEmpty": "이 인벤토리의 어떤 호스트에도 승인된 키가 선언되어 있지 않습니다.",
         "overviewHosts": "호스트",
         "overviewKeys": "키",
-        "overviewOpenHost": "호스트 열기",
-        "notWiredNote": "Terrapod는 이 키들을 기록합니다. 다만 아직 연결을 검증하는 데 쓰지는 않으므로, 구성은 여전히 워크스페이스 설정과 머신 자격 증명이 지시하는 방식으로 호스트 키를 확인합니다."
+        "overviewOpenHost": "호스트 열기"
       }
     },
     "sharing": {

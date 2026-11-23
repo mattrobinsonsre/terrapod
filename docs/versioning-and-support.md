@@ -206,6 +206,16 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
     workspace has a configure operation, so plan and apply are unaffected — and either
     way it fails closed at pod startup rather than part way through a playbook.
     **Upgrade the two together.**
+  - **[Approved SSH host keys](ansible-configure.md#approve-the-key-host-keys-on-the-inventory)**,
+    from v2.0.0. The directory the runner writes the `known_hosts` file into is
+    created by the *listener*, on the volume the execution environment shares — so a
+    newer runner under an older listener finds no such directory and the configure
+    fails closed with the anchor unraised rather than running unverified. The other
+    direction is the one to watch, because nothing can detect it: an **older runner**
+    under a newer listener has no host-key phase at all, so a workspace's approved
+    keys are declared and enforced by nothing, and every run looks exactly like a
+    verified one. **Upgrade runners before declaring approved host keys**, and
+    upgrade the two images together.
 - **runner ↔ execution environment:** **no window, because there is no protocol
   to skew.** An execution environment carries no Terrapod code at all — the agent
   that drives it is copied in from the runner image at pod startup — so the agent

@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Nenhum host neste inventário tem uma chave aprovada declarada.",
         "overviewHosts": "Hosts",
         "overviewKeys": "Chaves",
-        "overviewOpenHost": "Abrir host",
-        "notWiredNote": "O Terrapod regista estas chaves. Ainda não as utiliza para verificar uma ligação, pelo que um configurar continua a verificar as chaves de host conforme a opção da área de trabalho e a credencial de máquina determinam."
+        "overviewOpenHost": "Abrir host"
       }
     },
     "sharing": {

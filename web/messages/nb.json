@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Ingen vert i dette inventaret har en godkjent nøkkel erklært.",
         "overviewHosts": "Verter",
         "overviewKeys": "Nøkler",
-        "overviewOpenHost": "Åpne vert",
-        "notWiredNote": "Terrapod registrerer disse nøklene. Den bruker dem ennå ikke til å verifisere en forbindelse, så en konfigurasjonskjøring kontrollerer vertsnøkler fortsatt slik arbeidsområdets innstilling og maskinlegitimasjonen angir."
+        "overviewOpenHost": "Åpne vert"
       }
     },
     "sharing": {

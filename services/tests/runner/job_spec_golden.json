@@ -561,6 +561,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -637,7 +641,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -990,6 +994,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -1107,7 +1115,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -1456,6 +1464,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -1532,7 +1544,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -2485,6 +2497,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -2561,7 +2577,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -3189,6 +3205,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -3265,7 +3285,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -3805,6 +3825,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -3881,7 +3905,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -4426,6 +4450,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -4502,7 +4530,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",
@@ -5078,6 +5106,10 @@
                   "value": "/tp/oidc"
                 },
                 {
+                  "name": "TP_EE_KNOWN_HOSTS_DIR",
+                  "value": "/tp/known-hosts"
+                },
+                {
                   "name": "TP_EE_GIT_DIR",
                   "value": "/tp/git"
                 },
@@ -5154,7 +5186,7 @@
               "command": [
                 "/bin/sh",
                 "-c",
-                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
+                "mkdir -p /tp/tmp /tp/collections /tp/roles /tp/home /tp/inventory /tp/credentials /tp/callback /tp/oidc /tp/git /tp/known-hosts && touch /tp/git/gitconfig && cp /usr/local/bin/terrapod-ee-agent /tp/terrapod-ee-agent"
               ],
               "image": "ghcr.io/test/runner:latest",
               "imagePullPolicy": "IfNotPresent",

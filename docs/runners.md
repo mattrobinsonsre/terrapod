@@ -527,7 +527,7 @@ ansible's own warning to say so, and `library`, `roles_path`, `become`,
 `library` fails at parse time; the rest fail silently, and a play can then run as
 the wrong user or without privilege escalation.
 
-Five settings are forced through the **environment**, which beats the file:
+Six settings are forced through the **environment**, which beats the file:
 
 | variable | why |
 |---|---|
@@ -536,6 +536,7 @@ Five settings are forced through the **environment**, which beats the file:
 | `ANSIBLE_FORCE_COLOR=1` | the log viewer renders ANSI and offers a colour toggle, so a configure reads like every other phase. This said `=0` with the reason "nothing reads this log in a terminal", which was backwards: redaction operates on the whole stream, so colour never threatened it (#2413 F18) |
 | `ANSIBLE_RETRY_FILES_ENABLED=False` | a retry file would be written into the fetched tree, and nothing reads it back |
 | `ANSIBLE_FORKS` | the workspace's own `configure_parallelism`, so the platform's per-workspace setting governs rather than the file's `forks`. Falls back to `parallelism` when the workspace pins no configure value. Set only when the workspace declares one |
+| `ANSIBLE_SSH_ARGS` | **only when the workspace declares [approved host keys](ansible-configure.md#approve-the-key-host-keys-on-the-inventory)**, and then it carries `-o UserKnownHostsFile=` for the file Terrapod built from them, `-o StrictHostKeyChecking=yes`, and ansible's own default (`-C -o ControlMaster=auto -o ControlPersist=60s`) after them. `ssh_args` is the one channel ansible emits FIRST, and OpenSSH takes the first value for each parameter — so an anchor placed there outranks a later `UserKnownHostsFile` from anywhere else. A workspace with no approved keys has this unset, and its `[ssh_connection] ssh_args` is read normally |
 
 Three more are **forwarded** rather than decided: `TMPDIR`,
 `ANSIBLE_LOCAL_TEMP` and `ANSIBLE_REMOTE_TEMP` are passed through from the Job's
@@ -559,10 +560,24 @@ a parse-time setting, and the reason this page used to give for it ("an
 unattended run has no one to answer a host-key prompt") was a connection-time
 one. An unattended run does not hang on a prompt, because there is no terminal
 to prompt at: first contact with an unseen host fails closed as
-`Host key verification failed`. Relaxing it, or supplying the key instead, is
+`Host key verification failed`. Relaxing it, or supplying the key through a
+credential, is
 [a workspace setting and a credential field](ansible-configure.md#host-key-verification-and-how-to-satisfy-it)
 rather than anything in this table — deliberately, because a forced environment
 variable would sit above a per-host override and make the exception unreachable.
+
+**`ANSIBLE_HOST_KEY_CHECKING` is still never set, and the paragraph above still
+holds — but a workspace with [approved host keys](ansible-configure.md#approve-the-key-host-keys-on-the-inventory)
+does force the policy, through `ANSIBLE_SSH_ARGS` in the table.** The reasoning
+is not in tension with it: the objection to forcing was that it would sit above
+a per-host override and make a per-host *exception* unreachable, which is right
+for a workspace-wide toggle and is exactly what an approved-keys anchor is
+instead of. The anchor is **per host** — a line per host per key — so it needs no
+exception to be reachable through, and the hosts it pins are the ones an operator
+named. It is also why the two cannot both be set: a run whose inventory states a
+host-key policy of its own while the workspace has approved keys is refused
+rather than quietly losing, which is the one case where this table and that page
+would otherwise disagree about what is enforced.
 
 **Collections install first, in the same environment.** `requires_ansible` is
 not enforced at install time, so installing with one ansible-core and running

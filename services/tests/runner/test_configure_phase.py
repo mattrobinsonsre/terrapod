@@ -182,6 +182,90 @@ class TestTheForcedEnvironment:
         assert ee.calls[0]["env"]["ANSIBLE_FORKS"] == "10"
 
 
+class TestTheHostKeyAnchor:
+    """#2592. The approved host keys reach `ssh` as a FORCED setting.
+
+    Forced rather than contributed, which is the whole of why it is a separate
+    argument from `extra_env`: `_forced_env` is merged last, so an anchor in
+    `extra_env` could be displaced by anything else in that dict, and the point
+    of a trust anchor is that nothing displaces it.
+
+    Every channel ansible offers for ssh arguments can be set by an inventory
+    VARIABLE, which outranks the environment -- so what makes the anchor
+    authoritative is not the channel but OpenSSH, which takes the FIRST value
+    for each parameter. `ANSIBLE_SSH_ARGS` is the one ansible emits first.
+    """
+
+    ANCHOR = (
+        "-o UserKnownHostsFile=/tp/known-hosts/terrapod-known-hosts "
+        "-o StrictHostKeyChecking=yes -C -o ControlMaster=auto -o ControlPersist=60s"
+    )
+
+    def test_the_anchor_reaches_the_execution_environment(self, cfg, tree, ee):
+        configure.run(cfg, work_dir=tree, inventory=_INV, ssh_args=self.ANCHOR)
+        assert ee.calls[0]["env"]["ANSIBLE_SSH_ARGS"] == self.ANCHOR
+
+    def test_a_workspace_with_no_approved_keys_sets_nothing(self, cfg, tree, ee):
+        """The load-bearing negative. Setting `ANSIBLE_SSH_ARGS` unconditionally
+        would override an operator's own `[ssh_connection] ssh_args` on every
+        configure in every workspace, including the ones that pin nothing --
+        and forcing `StrictHostKeyChecking=yes` there would refuse a fleet whose
+        operator had deliberately turned checking off."""
+        configure.run(cfg, work_dir=tree, inventory=_INV)
+        assert "ANSIBLE_SSH_ARGS" not in ee.calls[0]["env"]
+
+    def test_an_EXPORTED_ssh_args_is_stripped_which_is_why_it_is_an_argument(
+        self, cfg, tree, ee, monkeypatch
+    ):
+        """The same reason the vault list is an argument: `_forced_env` strips
+        every inherited `ANSIBLE_*`, so an exported anchor would be stripped on
+        the way out and the configure would run unverified, silently."""
+        monkeypatch.setenv("ANSIBLE_SSH_ARGS", "-o UserKnownHostsFile=/exported")
+        configure.run(cfg, work_dir=tree, inventory=_INV)
+        assert "ANSIBLE_SSH_ARGS" not in ee.calls[0]["env"]
+
+    def test_the_anchor_outranks_extra_env(self, cfg, tree, ee):
+        """It is forced, not contributed. A phase that returned ssh arguments of
+        its own -- a credential wanting an `IdentityFile`, say -- must not be
+        able to move where OpenSSH looks up what a host may present."""
+        configure.run(
+            cfg,
+            work_dir=tree,
+            inventory=_INV,
+            extra_env={"ANSIBLE_SSH_ARGS": "-o UserKnownHostsFile=/dev/null"},
+            ssh_args=self.ANCHOR,
+        )
+        assert ee.calls[0]["env"]["ANSIBLE_SSH_ARGS"] == self.ANCHOR
+
+    def test_the_other_forced_settings_still_apply(self, cfg, tree, ee):
+        """The anchor is added to the forced set rather than replacing it."""
+        configure.run(cfg, work_dir=tree, inventory=_INV, ssh_args=self.ANCHOR)
+        env = ee.calls[0]["env"]
+        assert env["ANSIBLE_INVENTORY_ENABLED"] == "yaml,ini"
+        assert env["ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED"] == "True"
+
+    def test_the_log_says_whether_host_keys_were_enforced(self, cfg, tree, ee, caplog):
+        """Because the two cases are otherwise indistinguishable from the run
+        log, and they are the difference between a verified fleet and an
+        unverified one."""
+        import structlog
+
+        structlog.configure(
+            processors=[structlog.processors.KeyValueRenderer()],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+        )
+        try:
+            with caplog.at_level("INFO"):
+                configure.run(cfg, work_dir=tree, inventory=_INV, ssh_args=self.ANCHOR)
+            assert "host_keys_enforced=True" in caplog.text
+            caplog.clear()
+            with caplog.at_level("INFO"):
+                configure.run(cfg, work_dir=tree, inventory=_INV)
+            assert "host_keys_enforced=False" in caplog.text
+        finally:
+            structlog.reset_defaults()
+
+
 class TestTheCredentialEnvironment:
     """#1933. The vault identity list reaches ansible as an ARGUMENT.
 
@@ -501,6 +585,119 @@ class TestTheConfigureFlowIsWired:
         assert not (isinstance(inv, ast.Name) and inv.id == gate_input.id), (
             "the policy input and the playbook's inventory are the same object; "
             "the rendered inventory carries resolved secrets"
+        )
+
+    def test_the_host_key_anchor_phase_is_called_at_all(self):
+        """#2592. Every test in `TestTheHostKeyAnchor` drives `configure.run`
+        directly, so deleting this call would leave all of them green while the
+        approved host keys an operator declared were enforced by nothing -- the
+        workspace would say its fleet is pinned and the configure would connect
+        to whatever answered.
+
+        A CALL, not a mention: `"configure_known_hosts" in ast.dump(fn)` is
+        satisfied by this function's own comment explaining the phase, so that
+        form survives deleting the call outright.
+        """
+        fn = self._function()
+        calls = [
+            n
+            for n in ast.walk(fn)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "materialise"
+            and isinstance(n.func.value, ast.Name)
+            and n.func.value.id == "configure_known_hosts"
+        ]
+        assert len(calls) == 1, (
+            "nothing raises this configure's host-key anchor, so a workspace's "
+            "approved host keys are declared and enforced by nothing"
+        )
+
+    def test_the_anchor_is_PASSED_to_the_configure_as_ssh_args(self):
+        """And as `ssh_args`, not folded into `extra_env`.
+
+        `_forced_env` is merged last, so an anchor arriving through `extra_env`
+        would be displaced by anything else in that dict -- and a trust anchor
+        that something else can move is not one. Asserting only that the phase
+        is called would pass on a return value nobody reads, which is the
+        declaration-with-no-reader defect in its mirror form.
+        """
+        fn = self._function()
+        anchor = self._call(fn=fn, module="configure_known_hosts", func_attr="materialise")
+        bound = {
+            t.id
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Assign) and node.value is anchor
+            for t in node.targets
+            if isinstance(t, ast.Name)
+        }
+        assert bound, "configure_known_hosts.materialise()'s return is not bound to anything"
+
+        play = self._call(fn=fn, module="configure", func_attr="run")
+        passed = {k.arg: k.value for k in play.keywords}
+        assert "ssh_args" in passed, (
+            "configure.run is called without ssh_args, so the anchor is raised and "
+            "never handed to ansible"
+        )
+        mentioned = {n.id for n in ast.walk(passed["ssh_args"]) if isinstance(n, ast.Name)}
+        assert mentioned & bound, (
+            f"ssh_args mentions {sorted(mentioned)}, none of which is bound from "
+            f"configure_known_hosts.materialise() (that binds {sorted(bound)})"
+        )
+        # And NOT through extra_env, where the forced set would outrank it.
+        in_extra = {n.id for n in ast.walk(passed["extra_env"]) if isinstance(n, ast.Name)}
+        assert not (in_extra & bound), (
+            "the anchor is folded into extra_env, which _forced_env outranks -- so it "
+            "would be silently discarded"
+        )
+
+    def test_the_anchor_is_raised_AFTER_the_inventory_and_BEFORE_the_gate(self):
+        """After, because it reads each host's connect address out of the
+        rendered inventory: ansible hands ssh `ansible_host`, so an anchor keyed
+        on inventory names matches nothing and refuses the fleet. Before the
+        gate and the install, because it is one request and a local write, and
+        a configure whose declared anchor cannot be raised is not going to run
+        whatever those produce.
+        """
+        fn = self._function()
+        anchor = self._call(fn=fn, module="configure_known_hosts", func_attr="materialise")
+        inventory = self._call(fn=fn, module="configure_inventory", func_attr="materialise")
+        gate = self._call(fn=fn, module="opa", func_attr="evaluate_policies")
+        install = self._call(fn=fn, module="ansible_collections", func_attr="install")
+
+        assert inventory.lineno < anchor.lineno, (
+            "the anchor is raised before the inventory exists, so it has no host "
+            "connect addresses to key itself on"
+        )
+        assert anchor.lineno < gate.lineno
+        assert anchor.lineno < install.lineno
+
+    def test_the_anchor_is_given_the_SAME_inventory_the_playbook_gets(self):
+        """Not a re-fetch and not a different list. It reads the file ansible
+        will read, which is what makes the names it pins the names OpenSSH will
+        be asked for -- and one download of the resolved inventory per run.
+        """
+        fn = self._function()
+        inventory = self._call(fn=fn, module="configure_inventory", func_attr="materialise")
+        bound = {
+            t.id
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Assign) and node.value is inventory
+            for t in node.targets
+            if isinstance(t, ast.Name)
+        }
+        assert bound, "configure_inventory.materialise()'s return is not bound to anything"
+
+        anchor = self._call(fn=fn, module="configure_known_hosts", func_attr="materialise")
+        passed = {k.arg: k.value for k in anchor.keywords}
+        assert "inventory" in passed, "the anchor phase is not given the inventory"
+        assert {n.id for n in ast.walk(passed["inventory"]) if isinstance(n, ast.Name)} & bound
+
+        play = self._call(fn=fn, module="configure", func_attr="run")
+        played = {k.arg: k.value for k in play.keywords}
+        assert {n.id for n in ast.walk(played["inventory"]) if isinstance(n, ast.Name)} & bound, (
+            "the anchor and the playbook are pointed at different inventories, so the "
+            "names pinned are not the names ssh will be asked for"
         )
 
 

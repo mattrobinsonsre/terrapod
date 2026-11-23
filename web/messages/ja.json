@@ -3483,8 +3483,7 @@
         "overviewEmpty": "このインベントリのどのホストにも、承認済みの鍵は宣言されていません。",
         "overviewHosts": "ホスト",
         "overviewKeys": "鍵",
-        "overviewOpenHost": "ホストを開く",
-        "notWiredNote": "Terrapod はこれらの鍵を記録します。ただし、接続の検証にはまだ使っていません。そのため構成は、ワークスペースの設定とマシン資格情報が指示するとおりにホスト鍵を確認します。"
+        "overviewOpenHost": "ホストを開く"
       }
     },
     "sharing": {

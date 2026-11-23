@@ -3483,8 +3483,7 @@
         "overviewEmpty": "Ingen vært i dette inventar har en godkendt nøgle erklæret.",
         "overviewHosts": "Værter",
         "overviewKeys": "Nøgler",
-        "overviewOpenHost": "Åbn vært",
-        "notWiredNote": "Terrapod registrerer disse nøgler. Den bruger dem endnu ikke til at verificere en forbindelse, så en konfigurationskørsel kontrollerer værtsnøgler fortsat, som arbejdsområdets indstilling og maskinoplysningerne angiver."
+        "overviewOpenHost": "Åbn vært"
       }
     },
     "sharing": {

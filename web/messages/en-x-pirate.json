@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "Approved keys o'' th'' hand",
         "body": "Th'' keys this hand be approved to fly. A hand runs up one per cipher an'' every last one belongs here. Th'' marks be OpenSSH''s own, for a known_hosts file be what this locker is for.",
-        "notWiredNote": "Terrapod sets these keys down in th'' log. It don''t yet use ''em to vouch for a line, so a configure still checks hand keys th'' way th'' work-deck settin'' an'' th'' machine credential say it does.",
         "empty": "No approved keys. Naught here sets down yet which keys this hand be allowed to fly.",
         "markerNone": "Vouched for",
         "markerRevoked": "Struck off",

@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "Schválené klíče hostitele",
         "body": "Klíče, které má tento hostitel schválené k předložení. Hostitel vystavuje jeden na algoritmus a všechny patří sem. Značky jsou vlastní značky OpenSSH, protože tato sada existuje právě kvůli souboru known_hosts.",
-        "notWiredNote": "Terrapod tyto klíče zaznamenává. K ověření připojení je zatím nepoužívá, takže konfigurace stále kontroluje klíče hostitelů tak, jak to určuje nastavení pracovního prostoru a přihlašovací údaje stroje.",
         "empty": "Žádné schválené klíče. Zatím tu není zaznamenáno, které klíče smí tento hostitel předložit.",
         "markerNone": "Schválen",
         "markerRevoked": "Odvolán",

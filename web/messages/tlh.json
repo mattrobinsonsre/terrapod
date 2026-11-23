@@ -3454,7 +3454,6 @@
       "hostKeys": {
         "heading": "chaw''lu''bogh host ngaQHa''wI''mey",
         "body": "host vam ''angmeH chaw''lu''bogh ngaQHa''wI''mey. wa'' Segh, wa'' ngaQHa''wI'' ''ang host; vaj naDev Hoch lanlu''nIS. OpenSSH permey chaH permeyvam — known_hosts ghItlh chenmoHmeH ghomvam ''oH.",
-        "notWiredNote": "ngaQHa''wI''meyvam qon Terrapod. DaH rar tobmeH chaH lo''be''; vaj Qumwo'' DuH ''ej jan chaw'' chenmoHbogh mIw lo''taH Qum, host ngaQHa''wI'' tobDI''.",
         "empty": "pagh ngaQHa''wI'' chaw''lu''. ''angmeH chaw''lu''bogh ngaQHa''wI''mey, host vam, naDev qonlu''be''taH.",
         "markerNone": "chaw''lu''",
         "markerRevoked": "naghmoHlu''pu''",

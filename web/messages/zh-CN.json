@@ -3483,8 +3483,7 @@
         "overviewEmpty": "此清单中没有任何主机声明了已批准的密钥。",
         "overviewHosts": "主机",
         "overviewKeys": "密钥",
-        "overviewOpenHost": "打开主机",
-        "notWiredNote": "Terrapod 会记录这些密钥，但还没有用它们来验证连接，因此配置仍按工作区设置和机器凭据所规定的方式检查主机密钥。"
+        "overviewOpenHost": "打开主机"
       }
     },
     "sharing": {
