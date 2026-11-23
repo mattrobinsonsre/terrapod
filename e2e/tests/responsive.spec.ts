@@ -2626,6 +2626,65 @@ test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
     await expect(page.getByTestId('inv-host-key')).toHaveCount(1, { timeout: 15_000 })
     await expectNoHorizontalPageScroll(page)
   })
+
+  test('the host-key policy select is operable, and gated, at phone width (#2592)', async ({
+    page,
+  }) => {
+    // The control that replaced a checkbox, so this is the first time three
+    // option labels have to fit here. A `<select>` takes its intrinsic width
+    // from its WIDEST option -- `min-inline-size: min-content` -- which is the
+    // same mechanism that put 122px of overflow on the one `<fieldset>` in
+    // this application (#2406). Hence the measurement below rather than only
+    // the page-level check.
+    //
+    // The tap-target floor is NOT asserted on the select itself, and that is
+    // deliberate rather than an omission: it carries the shared input class
+    // every other select on this form carries, so a bar met here and nowhere
+    // else would be a gate whose only finding is correct work. The floor that
+    // does apply to a select lives on its OPTIONS -- `select option` is given
+    // `min-height: 2.75rem` in `globals.css` once the picker is page content
+    // -- and `web/tests/select-picker-styling.test.ts` already pins it.
+    await page.goto('/workspaces')
+    await page.click('button:has-text("New Workspace")')
+
+    const select = page.getByTestId('ws-ssh-host-key-policy')
+    await expect(select).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // BOTH halves of the gate (#2413 F20). It renders disabled-but-visible
+    // until the workspace declares a configure operation, so asserting only
+    // that it is present would pass on a control nobody can operate, and
+    // asserting only that it works would pass on one that is never gated.
+    await expect(select).toBeDisabled()
+    await page.getByTestId('ws-configure-enabled').check()
+    await expect(select).toBeEnabled()
+
+    // `strict` -- the column default and ansible's own behaviour -- so a
+    // workspace nobody has touched is verifying rather than reading as off,
+    // which is what the seed in `createDefaults` is for. A blank select here
+    // would submit nothing and misreport what the workspace will do.
+    await expect(select).toHaveValue('strict')
+
+    // The middle state is the whole reason this is not a checkbox, so it has
+    // to be REACHABLE with a thumb rather than merely present in the DOM.
+    await select.selectOption('accept-new')
+    await expect(select).toHaveValue('accept-new')
+    await expectNoHorizontalPageScroll(page)
+
+    // Inside the viewport at its widest option, which is what the intrinsic
+    // minimum above would break.
+    const box = await select.boundingBox()
+    expect(box).not.toBeNull()
+    const vw = page.viewportSize()!.width
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(vw)
+
+    // The consequence of relaxing it is on SCREEN rather than behind the ⓘ
+    // (#2413 F15): a reader must not have to open anything to learn that not
+    // verifying accepts any key a host presents.
+    await expect(page.getByText(/so the connection can be intercepted/)).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
 })
 
 test.describe('Phase-slot variables (#2189, #2190)', () => {

@@ -1,9 +1,10 @@
 /**
  * The browser's copy of the SSH host-key vocabulary equals the server's (#2592).
  *
- * `SSH_HOST_KEY_TYPES` and `SSH_HOST_KEY_MARKERS` are closed sets the API
- * validates against, and there is no endpoint to ask — so the picker on the
- * inventory tab restates them. A restated closed set is the drift this
+ * `SSH_HOST_KEY_TYPES`, `SSH_HOST_KEY_MARKERS` and `SSH_HOST_KEY_POLICIES` are
+ * closed sets the API validates against, and there is no endpoint to ask — so
+ * the picker on the inventory tab and the policy select on four workspace
+ * surfaces restate them. A restated closed set is the drift this
  * repository keeps recording, and the direction of the drift here is the
  * expensive one: a type the server accepts and the picker does not offer is
  * simply unreachable from the UI, while a type the picker offers and the server
@@ -12,7 +13,10 @@
  * DERIVED from `db/models.py` rather than listed twice, so an eighth algorithm
  * fails here. The ORDER is deliberately not asserted: the module puts ed25519
  * first and `ssh-rsa` last on purpose, and the server's frozenset has no order
- * to disagree with.
+ * to disagree with. The policy set has an order on BOTH sides and it happens to
+ * agree, which is still not something to assert: the orders are chosen
+ * independently — ours is "dangerous end last", for a picker — so pinning them
+ * equal would fail on a correct change to either.
  *
  * The splitter is pinned here too, with literal fixtures, because it is what
  * decides whether a pasted line is reinterpreted — and the one input that must
@@ -23,12 +27,15 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 import {
+  DEFAULT_SSH_HOST_KEY_POLICY,
   SSH_HOST_KEY_MARKERS,
+  SSH_HOST_KEY_POLICIES,
   SSH_HOST_KEY_TYPES,
+  asSshHostKeyPolicy,
   splitKnownHostsEntry,
 } from '../src/lib/ssh-host-keys.ts'
 
@@ -63,6 +70,27 @@ function serverSet(name: string): string[] {
   return members
 }
 
+/** The string members of a `tuple[str, ...] = (...)` assigned to `name`. */
+function serverTuple(name: string): string[] {
+  const at = MODELS.indexOf(`${name}: tuple[str, ...] = (`)
+  assert.ok(at >= 0, `could not find ${name} in models.py — has it been renamed?`)
+  const open = MODELS.indexOf('(', at + name.length)
+  const end = MODELS.indexOf(')', open)
+  assert.ok(end > open, `unbalanced parentheses reading ${name}`)
+  const members = [...MODELS.slice(open, end).matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  assert.ok(members.length > 0, `${name} parsed to no members — the matcher has stopped matching`)
+  return members
+}
+
+/** The `value=` of every `<option>` in a named `<select>` of a page source. */
+function optionValues(source: string, id: string): string[] {
+  const at = source.indexOf(`id="${id}"`)
+  assert.ok(at >= 0, `no <select id="${id}"> in that source — has it been renamed?`)
+  const end = source.indexOf('</select>', at)
+  assert.ok(end > at, `the <select id="${id}"> never closes`)
+  return [...source.slice(at, end).matchAll(/<option value="([^"]*)"/g)].map((m) => m[1])
+}
+
 describe('the host-key vocabulary matches the server', () => {
   it('the algorithms are exactly the server s SSH_HOST_KEY_TYPES', () => {
     assert.deepEqual(
@@ -87,6 +115,110 @@ describe('the host-key vocabulary matches the server', () => {
     for (const marker of SSH_HOST_KEY_MARKERS) {
       assert.ok(!marker.startsWith('@'), `${marker} carries a leading @`)
     }
+  })
+})
+
+describe('the host-key POLICY vocabulary matches the server', () => {
+  // The third closed set, and the one that is not a `known_hosts` field: it is
+  // OpenSSH's `StrictHostKeyChecking`, which decides whether the rendered file
+  // is consulted at all. It replaced a boolean, so the drift to watch for is a
+  // UI that offers two of the three — which would leave `accept-new`
+  // unreachable, and `accept-new` is the whole reason the boolean went.
+  it('the policies are exactly the server s SSH_HOST_KEY_POLICIES', () => {
+    assert.deepEqual(
+      [...SSH_HOST_KEY_POLICIES].sort(),
+      serverTuple('SSH_HOST_KEY_POLICIES').sort(),
+      'the policy select and the API disagree about which policies exist',
+    )
+  })
+
+  it('the default is the server s DEFAULT_SSH_HOST_KEY_POLICY', () => {
+    // Read as a named constant rather than as the first member of the tuple:
+    // the server declares it separately, and the two could legitimately differ.
+    const m = MODELS.match(/DEFAULT_SSH_HOST_KEY_POLICY = "([^"]+)"/)
+    assert.ok(m, 'could not find DEFAULT_SSH_HOST_KEY_POLICY in models.py')
+    assert.equal(
+      DEFAULT_SSH_HOST_KEY_POLICY,
+      m[1],
+      'the forms would seed a policy the column does not default to',
+    )
+  })
+
+  it('bulk update offers the three, plus its own leave-unchanged', () => {
+    // The ONE surface that restates the three by hand, because its values
+    // carry a fourth state the shared select has no room for. A hand-restated
+    // closed set beside a derived one is exactly the drift this file exists
+    // for, so it is derived too — from the page's own markup.
+    const bulk = readFileSync(
+      join(import.meta.dirname, '..', 'src', 'app', 'admin', 'bulk-update', 'page.tsx'),
+      'utf8',
+    )
+    const offered = optionValues(bulk, 'bu-ssh-host-key-policy')
+    assert.deepEqual(
+      offered.filter((v) => v !== '').sort(),
+      [...SSH_HOST_KEY_POLICIES].sort(),
+      'the fleet form offers a different policy set from the per-workspace one',
+    )
+    assert.ok(
+      offered.includes(''),
+      "bulk update has lost its leave-unchanged option, so a fleet write would set this on every matched workspace",
+    )
+  })
+
+  it('every policy has a label, and no two share one', () => {
+    // The labels are what an operator picks between, so two policies reading
+    // the same is a select with a state nobody can choose deliberately.
+    const labels = [
+      EN.workspaceDetail.fields.sshHostKeyPolicyStrict,
+      EN.workspaceDetail.fields.sshHostKeyPolicyAcceptNew,
+      EN.workspaceDetail.fields.sshHostKeyPolicyOff,
+    ]
+    assert.equal(labels.length, SSH_HOST_KEY_POLICIES.length, 'a policy has no label of its own')
+    for (const l of labels) assert.equal(typeof l, 'string', 'a policy label is missing from en.json')
+    assert.equal(new Set(labels).size, labels.length, `two policies share a label: ${labels}`)
+  })
+
+  it('a value the server could send lands on a real option', () => {
+    // Total by construction, which is what stops the select rendering blank
+    // and losing the setting on the next save. `false` is the boolean this
+    // replaced, and it has to read as `off` rather than fall through to the
+    // default — the fallthrough would tell an operator their fleet is
+    // verifying while the server says it is not.
+    for (const p of SSH_HOST_KEY_POLICIES) assert.equal(asSshHostKeyPolicy(p), p)
+    assert.equal(asSshHostKeyPolicy(false), 'off')
+    assert.equal(asSshHostKeyPolicy(true), DEFAULT_SSH_HOST_KEY_POLICY)
+    assert.equal(asSshHostKeyPolicy(undefined), DEFAULT_SSH_HOST_KEY_POLICY)
+    assert.equal(asSshHostKeyPolicy('banana'), DEFAULT_SSH_HOST_KEY_POLICY)
+  })
+
+  it('no catalogue carries a policy WIRE value as a string', () => {
+    // The three are what the API stores and what a `terrapod_workspace`
+    // resource declares, so they are identifiers rather than copy. Left in the
+    // catalogues, `en-x-leet` would substitute `strict` into `57r1c7` and the
+    // form would send that to a server which refuses it.
+    const dir = join(import.meta.dirname, '..', 'messages')
+    const files = readdirSync(dir).filter((f) => f.endsWith('.json'))
+    assert.ok(files.length >= 25, `only ${files.length} catalogues found`)
+    const offenders: string[] = []
+    for (const f of files) {
+      const flat = (o: Record<string, unknown>, p = '', out: Record<string, string> = {}) => {
+        for (const [k, v] of Object.entries(o)) {
+          const kk = p ? `${p}.${k}` : k
+          if (v && typeof v === 'object') flat(v as Record<string, unknown>, kk, out)
+          else if (typeof v === 'string') out[kk] = v
+        }
+        return out
+      }
+      for (const [key, value] of Object.entries(
+        flat(JSON.parse(readFileSync(join(dir, f), 'utf8'))),
+      )) {
+        if (!key.includes('sshHostKeyPolicy')) continue
+        if ((SSH_HOST_KEY_POLICIES as readonly string[]).includes(value.trim().toLowerCase())) {
+          offenders.push(`${f}:${key} = ${value}`)
+        }
+      }
+    }
+    assert.deepEqual(offenders, [], `a catalogue carries a wire value:\n  ${offenders.join('\n  ')}`)
   })
 })
 
