@@ -208,7 +208,9 @@ resource terrapod_autodiscovery_rule.ai_policy_mode required=false optional=true
 resource terrapod_autodiscovery_rule.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
-resource terrapod_autodiscovery_rule.ansible_collections required=false optional=true computed=false sensitive=false type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
+resource terrapod_autodiscovery_rule.ansible_collections block type=types.ListType[types.ObjectType["name":basetypes.StringType, "version":basetypes.StringType]]
+resource terrapod_autodiscovery_rule.ansible_collections.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.ansible_collections.version required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ansible_execution_environment required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -254,7 +256,13 @@ resource terrapod_autodiscovery_rule.propagate required=false optional=true comp
 resource terrapod_autodiscovery_rule.repo_url required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.resource_memory required=false optional=true computed=true sensitive=false type=basetypes.StringType
-resource terrapod_autodiscovery_rule.run_task_templates required=false optional=true computed=false sensitive=false type=types.ListType[types.ObjectType["enabled":basetypes.BoolType, "enforcement_level":basetypes.StringType, "hmac_key":basetypes.StringType, "name":basetypes.StringType, "stage":basetypes.StringType, "url":basetypes.StringType]]
+resource terrapod_autodiscovery_rule.run_task_templates block type=types.ListType[types.ObjectType["enabled":basetypes.BoolType, "enforcement_level":basetypes.StringType, "hmac_key":basetypes.StringType, "name":basetypes.StringType, "stage":basetypes.StringType, "url":basetypes.StringType]]
+resource terrapod_autodiscovery_rule.run_task_templates.enabled required=false optional=true computed=false sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.run_task_templates.enforcement_level required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.run_task_templates.hmac_key required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_autodiscovery_rule.run_task_templates.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.run_task_templates.stage required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.run_task_templates.url required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.scheduled_configure_cron required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.scheduled_configure_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.scheduled_configure_timezone required=false optional=true computed=true sensitive=false type=basetypes.StringType
