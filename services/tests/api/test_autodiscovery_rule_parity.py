@@ -148,7 +148,25 @@ def _aliases() -> dict[str, frozenset[str]]:
 
 
 def _tfsdk(attr: str) -> tuple[str, ...]:
-    return (f'tfsdk:"{attr.replace("-", "_")}"',)
+    """The forms the provider can offer an attribute in.
+
+    The second is for a repeated BLOCK, whose name is idiomatically the SINGULAR
+    of its wire key -- `ansible_collection { }` written one at a time against an
+    `ansible-collections` payload key (#2681). The naive derivation read those as
+    missing from the provider the moment they stopped being list attributes.
+
+    It is deliberately NOT a bare `tfsdk:"<singular>"`: that would accept a plain
+    attribute whose name merely happens to be the singular, which is a naming
+    inconsistency rather than the block form this exists for. Requiring the block
+    declaration proves both at once, and the framework refuses a schema whose
+    block key no model tag binds, so the key is evidence the field is reachable.
+    """
+    snake = attr.replace("-", "_")
+    forms = [f'tfsdk:"{snake}"']
+    if snake.endswith("s"):
+        singular = re.escape(snake[:-1])
+        forms.append(rf'(?m)"{singular}": schema\.(?:List|Set)NestedBlock\{{')
+    return tuple(forms)
 
 
 def _camel(attr: str) -> str:
