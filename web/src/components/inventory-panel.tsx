@@ -59,7 +59,14 @@ import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { useConfirm } from '@/lib/use-confirm'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { EmptyState } from '@/components/empty-state'
+import { CopyButton } from '@/components/copy-button'
 import { MobileCard, MobileCardList } from '@/components/mobile-card-list'
+import {
+  SAMPLE_HOST_KEY_BLOB,
+  SSH_HOST_KEY_MARKERS,
+  SSH_HOST_KEY_TYPES,
+  splitKnownHostsEntry,
+} from '@/lib/ssh-host-keys'
 import {
   buildTree,
   varYamlLine,
@@ -792,6 +799,623 @@ function VariableTable({
   )
 }
 
+/* ── Approved SSH host keys (#2592) ─────────────────────────────────────────-
+
+   Which keys a host is APPROVED to present. A platform structure that hands
+   off to OpenSSH — a `known_hosts` file is what the set is for, and OpenSSH
+   owns the crypto, the markers and the refusal — and deliberately NOT modelled
+   on ansible, which has no inventory-level notion of an approved key at all.
+
+   ## NOTHING ENFORCES THIS YET, and the copy says so
+
+   #2592's own outstanding list names "the known_hosts renderer and the ssh
+   handoff", and the tree agrees: `grep -rln InventoryHostKey
+   services/terrapod` reaches the model, the API router, the inventory service
+   and the replication registry, and nothing in the runner. So these rows are a
+   declaration with no consumer today.
+
+   That governs every string on this surface. The first draft of the copy was
+   written from the API's own docstrings, which describe the DESIGN — "OpenSSH
+   does the enforcing" — and it read design intent as present behaviour: "a host
+   presenting it is rejected outright". For a security surface that is the
+   expensive direction, because an operator told their fleet is protected stops
+   looking. The copy now describes what is recorded and never what happens to a
+   connection, and `notWiredNote` states the gap outright on both sections.
+
+   ## A HOST HAS MANY KEYS, and the list is the surface
+
+   A host exposes one key per algorithm family, and all of them belong in its
+   trust set: an operator declares the ed25519 key and the RSA one and, through
+   a rotation, two of the same algorithm at once. So this is a list of keys, not
+   a field on the host, and the empty state is "none declared" rather than
+   "unset".
+
+   ## NOT a table, and that is about the VALUE rather than the viewport
+
+   Every other list on this tab is a desktop `<table>` plus a `md:hidden` card
+   twin. This one is a block per key at every width, because the thing it has to
+   render is a base64 blob — 68 characters for ed25519 and about 716 for an
+   RSA-4096 key — and the brief for it is that the FULL key is readable and
+   copyable. There is nothing to mask: a host's public key is public, and it is
+   the value an operator compares when a host presents something unexpected, so
+   truncating it would hide the one thing the feature exists to show.
+
+   A 716-character unbroken run does not belong in a table cell at any width,
+   and it cannot go in an inner scroller either — the touch model forbids one
+   nested in a scrolling page. Full width, wrapped, is the only honest
+   rendering, and once the value owns a row of its own the table has nothing
+   left to align. The same reasoning `LinkList` already gives: a shape that
+   reflows at every width needs no second render.
+
+   ## The type and the blob are the row's IDENTITY — there is no edit
+
+   They are two thirds of the server's unique constraint, so changing either
+   means a different key, which is a delete and a declare. The API refuses a
+   PATCH that names them, and this surface offers no field for them: the only
+   mutable thing is the marker, so the actions are mark/clear and delete. An
+   Edit button here would promise a rewrite of what a host is trusted to
+   present while keeping the row's id, and that id is the audit trail.
+*/
+
+interface HostKeyAttrs {
+  'key-type': string
+  /** The base64 blob ALONE, never masked. A public key is public. */
+  'public-key': string
+  /** `cert-authority`, `revoked`, or null for an ordinary trusted entry. */
+  marker: string | null
+  'created-at': string
+  'updated-at': string
+}
+
+interface InventoryHostKey {
+  id: string
+  attributes: HostKeyAttrs
+}
+
+/** The workspace-wide read, keyed on the host NAME. It carries no key ids, so
+ *  it is a read: the per-host list is where a key is marked or deleted. */
+interface HostKeysByHost {
+  id: string
+  attributes: { keys: HostKeyAttrs[] }
+}
+
+/**
+ * A key's marker, as a badge — and the reason it is a WORD and not a colour.
+ *
+ * `revoked` is the case the whole feature exists to catch: a retired key that
+ * stays declared and is recorded as not to be trusted, so it stays
+ * distinguishable from a key nobody ever declared. A reader who skims past it
+ * has lost the one distinction that matters here, so it cannot be carried by a
+ * tint alone — the tint is on the block too, and the word is what survives
+ * greyscale, a colour-vision deficiency and a screen reader.
+ *
+ * `markerNone` reads "Approved", not "Trusted", for the reason in this
+ * section's header: the badge names the state of the DECLARATION, and nothing
+ * yet turns that into a refusal.
+ */
+function HostKeyMarkerBadge({ marker }: { marker: string | null }) {
+  const t = useTranslations('workspaceDetail.inventory')
+  const pill = 'shrink-0 rounded px-2 py-0.5 text-xs font-medium'
+  if (marker === 'revoked') {
+    return (
+      <span className={`${pill} bg-red-900/50 text-red-300`}>{t('hostKeys.markerRevoked')}</span>
+    )
+  }
+  if (marker === 'cert-authority') {
+    return (
+      <span className={`${pill} bg-amber-900/50 text-amber-300`}>
+        {t('hostKeys.markerCertAuthority')}
+      </span>
+    )
+  }
+  return <span className={`${pill} bg-slate-700 text-slate-300`}>{t('hostKeys.markerNone')}</span>
+}
+
+/**
+ * One key as a block: its algorithm, its marker, the whole blob, and whatever
+ * actions the caller gives it.
+ *
+ * Shared by the per-host list and the workspace-wide read so the two cannot
+ * come to render a revoked key differently — which is exactly the drift that
+ * would matter, since the overview is where a reader scans for one.
+ *
+ * `actions` is optional, and its absence is what makes the overview read-only
+ * rather than a second editing surface: that document carries no key ids, so
+ * there is nothing for a mark or a delete to address.
+ */
+function HostKeyBlock({ attrs, actions }: { attrs: HostKeyAttrs; actions?: React.ReactNode }) {
+  const t = useTranslations('workspaceDetail.inventory')
+  const marker = attrs.marker
+  const revoked = marker === 'revoked'
+  const keyType = attrs['key-type']
+  const value = attrs['public-key']
+
+  return (
+    <li
+      data-testid={revoked ? 'inv-host-key-revoked' : 'inv-host-key'}
+      className={
+        'min-w-0 rounded-lg border p-3 ' +
+        (revoked
+          ? 'border-red-800/60 bg-red-950/30'
+          : marker === 'cert-authority'
+            ? 'border-amber-800/50 bg-slate-900/40'
+            : 'border-slate-700/50 bg-slate-900/40')
+      }
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="min-w-0 font-mono text-xs break-all text-slate-200" dir="ltr">
+          {keyType}
+        </span>
+        <HostKeyMarkerBadge marker={marker} />
+      </div>
+
+      {/* The marker's CONSEQUENCE, not just its name. "Revoked" alone reads as
+          a state; what an operator needs to know is that the key stays declared
+          and is refused, which is the whole mechanism. */}
+      {revoked && <p className="mt-2 text-xs text-red-300">{t('hostKeys.revokedNote')}</p>}
+      {marker === 'cert-authority' && (
+        <p className="mt-2 text-xs text-amber-300">{t('hostKeys.certAuthorityNote')}</p>
+      )}
+
+      {/* `break-all` rather than `break-words`: base64 offers no break
+          opportunities at all, so a word-boundary rule leaves one
+          716-character line and the page scrolls sideways. */}
+      <p
+        className="mt-2 min-w-0 font-mono text-xs leading-relaxed break-all text-slate-300"
+        dir="ltr"
+        data-testid="inv-host-key-value"
+      >
+        {value}
+      </p>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <CopyButton
+          value={value}
+          size="compact"
+          label={t('hostKeys.copy')}
+          ariaLabel={t('hostKeys.copyAria', { type: keyType })}
+        />
+        {actions}
+      </div>
+    </li>
+  )
+}
+
+/**
+ * One host's approved keys, with the declare form.
+ *
+ * Rendered on the host detail view beside its variables, because that is where
+ * the rest of what a single host carries already lives.
+ */
+function HostKeysTable({ hostId, onChanged }: { hostId: string; onChanged?: () => void }) {
+  const t = useTranslations('workspaceDetail.inventory')
+  const { confirmDelete, confirmTouchMutation } = useConfirm()
+
+  const [keys, setKeys] = useState<InventoryHostKey[] | null>(null)
+  const [error, setError] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [draft, setDraft] = useState<{ keyType: string; publicKey: string; marker: string }>({
+    keyType: SSH_HOST_KEY_TYPES[0],
+    publicKey: '',
+    marker: '',
+  })
+  // Set when a pasted whole line was split into the fields, so the change is
+  // reported rather than merely happening. An operator who pasted a
+  // `known_hosts` entry needs to see that the host and the comment were dropped
+  // on purpose.
+  const [splitNote, setSplitNote] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setKeys(await fetchAllPages<InventoryHostKey>(`/api/v1/inventory-hosts/${hostId}/keys`))
+      setError('')
+    } catch (err) {
+      setKeys([])
+      setError(err instanceof Error ? err.message : t('errors.load'))
+    }
+  }, [hostId, t])
+
+  useEffect(() => {
+    // Fetching from the API on mount is what an effect is for.
+    load()
+  }, [load])
+
+  function cancel() {
+    setAdding(false)
+    setSplitNote('')
+    setError('')
+    setDraft({ keyType: SSH_HOST_KEY_TYPES[0], publicKey: '', marker: '' })
+  }
+
+  /** The key field, which accepts either a bare blob or a whole pasted line. */
+  function onKeyFieldChange(raw: string) {
+    const split = splitKnownHostsEntry(raw)
+    if (!split) {
+      setSplitNote('')
+      setDraft((d) => ({ ...d, publicKey: raw }))
+      return
+    }
+    setDraft((d) => ({
+      ...d,
+      keyType: split.keyType,
+      publicKey: split.publicKey,
+      // A line that carried no marker must not clear one the operator chose
+      // from the picker a moment ago: the paste says nothing about it.
+      marker: split.marker ?? d.marker,
+    }))
+    setSplitNote(t('hostKeys.splitNote', { type: split.keyType }))
+  }
+
+  async function declare(e: React.FormEvent) {
+    e.preventDefault()
+    if (!draft.publicKey.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      const attributes: Record<string, unknown> = {
+        'key-type': draft.keyType,
+        'public-key': draft.publicKey.trim(),
+      }
+      // Absent rather than null when none is chosen, matching the create
+      // route's optional attribute.
+      if (draft.marker) attributes.marker = draft.marker
+      const res = await apiFetch(`/api/v1/inventory-hosts/${hostId}/keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { type: 'inventory-host-keys', attributes } }),
+      })
+      if (!res.ok) {
+        // Shown as it arrived: the refusals name the mistake — a whole pasted
+        // line, a blob whose embedded algorithm disagrees with the declared
+        // type — and each is more useful than "failed to save".
+        setError(await parseApiError(res, t('errors.save')))
+        return
+      }
+      cancel()
+      await load()
+      onChanged?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.save'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Set or clear the marker — the only mutable thing about a key. */
+  async function mark(row: InventoryHostKey, marker: string | null) {
+    const type = row.attributes['key-type']
+    // Reversible: the marker can be set straight back, and the key itself is
+    // untouched either way. So this is the touch-only tier, not the
+    // unconditional one a delete gets.
+    const message =
+      marker === 'revoked'
+        ? t('hostKeys.confirmRevoke', { type })
+        : marker === 'cert-authority'
+          ? t('hostKeys.confirmCertAuthority', { type })
+          : t('hostKeys.confirmClear', { type })
+    if (!confirmTouchMutation(message)) return
+    setError('')
+    try {
+      const res = await apiFetch(`/api/v1/inventory-host-keys/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        // `marker: null` CLEARS it; the attribute being absent would leave it
+        // alone, which is the opposite of what Clear means.
+        body: JSON.stringify({ data: { attributes: { marker } } }),
+      })
+      if (!res.ok) {
+        setError(await parseApiError(res, t('errors.save')))
+        return
+      }
+      await load()
+      onChanged?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.save'))
+    }
+  }
+
+  async function remove(row: InventoryHostKey) {
+    // Irreversible, and the blob cannot be recovered from this surface once it
+    // is gone — so both pointer modes prompt. Revoking is the safer move
+    // through a rotation, and the message says so.
+    if (!confirmDelete(t('hostKeys.confirmDelete', { type: row.attributes['key-type'] }))) return
+    setError('')
+    try {
+      const res = await apiFetch(`/api/v1/inventory-host-keys/${row.id}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 404) {
+        setError(await parseApiError(res, t('errors.delete')))
+        return
+      }
+      await load()
+      onChanged?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.delete'))
+    }
+  }
+
+  const form = (
+    <form onSubmit={declare} className="mt-3 space-y-3 rounded-lg border border-slate-700/50 p-3">
+      <div className="min-w-0">
+        <label htmlFor="inventory-host-key-type" className="block text-xs text-slate-500">
+          {t('hostKeys.typeLabel')}
+        </label>
+        <select
+          id="inventory-host-key-type"
+          value={draft.keyType}
+          onChange={(e) => setDraft({ ...draft, keyType: e.target.value })}
+          className={`mt-1 ${INPUT} font-mono`}
+        >
+          {SSH_HOST_KEY_TYPES.map((ty) => (
+            <option key={ty} value={ty}>
+              {ty}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="min-w-0">
+        <label htmlFor="inventory-host-key-value" className="block text-xs text-slate-500">
+          {t('hostKeys.keyLabel')}
+        </label>
+        {/* A textarea, not an input: the value is hundreds of characters for an
+            RSA key, and a single-line field shows about forty of them — so a
+            mistyped paste cannot be read back in the field it was typed into. */}
+        <textarea
+          id="inventory-host-key-value"
+          rows={4}
+          value={draft.publicKey}
+          onChange={(e) => onKeyFieldChange(e.target.value)}
+          placeholder={SAMPLE_HOST_KEY_BLOB}
+          dir="ltr"
+          className={`mt-1 ${INPUT} font-mono break-all`}
+        />
+        <p className="mt-1 text-xs text-slate-500">{t('hostKeys.keyHelp')}</p>
+        {splitNote && <p className="mt-1 text-xs text-brand-300">{splitNote}</p>}
+      </div>
+
+      <div className="min-w-0">
+        <label htmlFor="inventory-host-key-marker" className="block text-xs text-slate-500">
+          {t('hostKeys.markerLabel')}
+        </label>
+        <select
+          id="inventory-host-key-marker"
+          value={draft.marker}
+          onChange={(e) => setDraft({ ...draft, marker: e.target.value })}
+          className={`mt-1 ${INPUT}`}
+        >
+          <option value="">{t('hostKeys.markerNone')}</option>
+          {SSH_HOST_KEY_MARKERS.map((m) => (
+            <option key={m} value={m}>
+              {m === 'revoked' ? t('hostKeys.markerRevoked') : t('hostKeys.markerCertAuthority')}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-slate-500">{t('hostKeys.markerHelp')}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={busy || !draft.publicKey.trim()} className={BTN_PRIMARY}>
+          {busy ? t('actions.saving') : t('hostKeys.declare')}
+        </button>
+        <button type="button" onClick={cancel} className={`${BTN} py-2.5`}>
+          {t('actions.cancel')}
+        </button>
+      </div>
+    </form>
+  )
+
+  return (
+    <Section heading={t('hostKeys.heading')} body={t('hostKeys.body')}>
+      {/* DELETE THIS WHEN THE RENDERER LANDS, and the string with it.
+          #2592's own outstanding list names "the known_hosts renderer and the
+          ssh handoff", and `grep -rln InventoryHostKey services/terrapod`
+          agrees: these rows are read by the model, this API, the inventory
+          service and the replication registry, and by nothing in the runner.
+          So today they are a declaration with no consumer, and a surface
+          called "Approved host keys" reads as the control an operator uses to
+          decide host-key trust. Someone who declares a key and is not told
+          this stops looking — which is the one failure a security surface
+          cannot have. It points at the two mechanisms that DO enforce
+          something today rather than leaving a reader with nowhere to go. */}
+      <p className="mt-2 rounded-lg border border-amber-800/50 bg-amber-900/20 p-3 text-sm text-amber-200">
+        {t('hostKeys.notWiredNote')}
+      </p>
+
+      <ErrorText message={error} />
+
+      {keys === null && <LoadingSpinner />}
+
+      {keys !== null && keys.length === 0 && !adding && (
+        <div className="mt-3">
+          <EmptyState message={t('hostKeys.empty')} />
+        </div>
+      )}
+
+      {keys !== null && keys.length > 0 && (
+        <>
+          <ul className="mt-3 min-w-0 space-y-2">
+            {keys.map((row) => {
+              const marker = row.attributes.marker
+              return (
+                <HostKeyBlock
+                  key={row.id}
+                  attrs={row.attributes}
+                  actions={
+                    <>
+                      {/* Only the markers this key is not already wearing are
+                          offered, so no action here does nothing. */}
+                      {marker !== 'revoked' && (
+                        <button type="button" onClick={() => mark(row, 'revoked')} className={BTN}>
+                          {t('hostKeys.markRevoked')}
+                        </button>
+                      )}
+                      {marker !== 'cert-authority' && (
+                        <button
+                          type="button"
+                          onClick={() => mark(row, 'cert-authority')}
+                          className={BTN}
+                        >
+                          {t('hostKeys.markCertAuthority')}
+                        </button>
+                      )}
+                      {marker !== null && (
+                        <button type="button" onClick={() => mark(row, null)} className={BTN}>
+                          {t('hostKeys.clearMarker')}
+                        </button>
+                      )}
+                      <button type="button" onClick={() => remove(row)} className={BTN_DANGER}>
+                        {t('actions.delete')}
+                      </button>
+                    </>
+                  }
+                />
+              )
+            })}
+          </ul>
+          {/* Said once, under the list rather than per row: there is no Edit
+              here, and its absence is a design decision rather than a gap. */}
+          <p className="mt-3 text-xs text-slate-500">{t('hostKeys.identityNote')}</p>
+        </>
+      )}
+
+      {adding ? (
+        form
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className={`mt-3 ${BTN} py-2.5`}>
+          {t('hostKeys.add')}
+        </button>
+      )}
+    </Section>
+  )
+}
+
+/**
+ * Every approved key in the workspace, keyed by host name.
+ *
+ * Rendered BESIDE the resolution rather than inside it, which is the shape the
+ * API serves: that document is ansible's answer to "what does this inventory
+ * resolve to", and this is Terrapod's answer to "which keys is each of those
+ * hosts approved to present". Read together they answer the question an
+ * operator actually has before a configure runs; folded together, a consumer
+ * could no longer tell which half it was reading.
+ *
+ * It carries its OWN load and error state, deliberately. The resolution can
+ * refuse — a source that will not parse, ansible not yet installed from the
+ * cache — and this is a plain row read that cannot. Sharing a state would hide
+ * the trust anchors behind an unrelated failure, at the moment they are most
+ * worth reading.
+ */
+function HostKeysOverview({
+  workspaceId,
+  reloadKey,
+  hosts,
+  onOpenHost,
+}: {
+  workspaceId: string
+  reloadKey: number
+  hosts: InventoryHost[]
+  onOpenHost: (id: string) => void
+}) {
+  const t = useTranslations('workspaceDetail.inventory')
+  const [rows, setRows] = useState<HostKeysByHost[] | null>(null)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setRows(
+        await fetchAllPages<HostKeysByHost>(
+          `/api/v1/workspaces/${workspaceId}/inventory/host-keys`,
+        ),
+      )
+      setError('')
+    } catch (err) {
+      setRows([])
+      setError(err instanceof Error ? err.message : t('errors.load'))
+    }
+  }, [workspaceId, t])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch, not derived state
+    load()
+  }, [load, reloadKey])
+
+  // The host id for a name, so a reader who spots a revoked key here can go
+  // straight to the host that owns it — this document carries no ids, and the
+  // per-host list is the only place a key can be marked or deleted.
+  const idForName = useMemo(() => new Map(hosts.map((h) => [h.attributes.name, h.id])), [hosts])
+
+  const total = (rows ?? []).reduce((n, r) => n + r.attributes.keys.length, 0)
+  const revoked = (rows ?? []).reduce(
+    (n, r) => n + r.attributes.keys.filter((k) => k.marker === 'revoked').length,
+    0,
+  )
+
+  return (
+    <Section heading={t('hostKeys.overviewHeading')} body={t('hostKeys.overviewBody')}>
+      {/* The same note, for the same reason, and deleted at the same time. It
+          is on BOTH surfaces deliberately: this one is the fleet-wide read,
+          which is where a reader is most likely to conclude the fleet is
+          covered. */}
+      <p className="mt-2 rounded-lg border border-amber-800/50 bg-amber-900/20 p-3 text-sm text-amber-200">
+        {t('hostKeys.notWiredNote')}
+      </p>
+      <ErrorText message={error} />
+      {rows === null && <LoadingSpinner />}
+
+      {rows !== null && (
+        <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <StatChip label={t('hostKeys.overviewHosts')} value={rows.length} />
+            <StatChip label={t('hostKeys.overviewKeys')} value={total} />
+            {/* Shown always, not only when non-zero: a zero is an answer, and a
+                chip that appears only on a bad day teaches a reader to read its
+                absence as "not checked". */}
+            <StatChip
+              label={t('hostKeys.markerRevoked')}
+              value={revoked}
+              valueClassName={revoked > 0 ? 'text-red-300' : undefined}
+            />
+          </div>
+
+          {rows.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500">{t('hostKeys.overviewEmpty')}</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {rows.map((host) => {
+                const hostId = idForName.get(host.id)
+                return (
+                  <div key={host.id} className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h5 className="min-w-0 font-mono text-sm break-all text-slate-200" dir="ltr">
+                        {host.id}
+                      </h5>
+                      {/* Absent for a host the keys document names and the host
+                          list does not — which cannot happen today, since a key
+                          hangs off a declared host row, and is left as a
+                          condition rather than an assumption. */}
+                      {hostId && (
+                        <button type="button" onClick={() => onOpenHost(hostId)} className={BTN}>
+                          {t('hostKeys.overviewOpenHost')}
+                        </button>
+                      )}
+                    </div>
+                    <ul className="mt-2 min-w-0 space-y-2">
+                      {host.attributes.keys.map((k) => (
+                        <HostKeyBlock key={`${k['key-type']}:${k['public-key']}`} attrs={k} />
+                      ))}
+                    </ul>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </Section>
+  )
+}
+
 /* ── Views ──────────────────────────────────────────────────────────────────- */
 
 function HostsView({
@@ -1212,6 +1836,12 @@ function HostDetailView({
         onChanged={onReload}
       />
 
+      {/* Above the memberships, below the variables: both of those are things
+          the host carries for ansible, and so is this — but a trust anchor is
+          read more often than a group link and should not be the last thing on
+          the page (#2592). */}
+      <HostKeysTable hostId={host.id} onChanged={onReload} />
+
       {links === null ? (
         <LoadingSpinner />
       ) : (
@@ -1485,7 +2115,20 @@ function GroupDetailView({
 }
 
 
-function ResolvedView({ workspaceId, reloadKey }: { workspaceId: string; reloadKey: number }) {
+function ResolvedView({
+  workspaceId,
+  reloadKey,
+  hosts,
+  onOpenHost,
+}: {
+  workspaceId: string
+  reloadKey: number
+  /** Only so the host-keys extension can turn a host NAME into its id — that
+   *  document is keyed on the name, which is what lets the two be read side by
+   *  side, and the id is what the per-host editing surface needs. */
+  hosts: InventoryHost[]
+  onOpenHost: (id: string) => void
+}) {
   const t = useTranslations('workspaceDetail.inventory')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1644,6 +2287,19 @@ function ResolvedView({ workspaceId, reloadKey }: { workspaceId: string; reloadK
           </>
         )}
       </Section>
+
+      {/* BESIDE the resolution, never inside it (#2592). The two read as one
+          question — what would a configure target, and which keys is each of
+          those hosts approved to present — and the API keeps them as two
+          documents for the reason the runner needs: it renders the resolved
+          document back into a YAML inventory, where a Terrapod-only section
+          has no meaning. */}
+      <HostKeysOverview
+        workspaceId={workspaceId}
+        reloadKey={reloadKey}
+        hosts={hosts}
+        onOpenHost={onOpenHost}
+      />
     </div>
   )
 }
@@ -1999,7 +2655,12 @@ export function InventoryPanel({ workspaceId }: { workspaceId: string }) {
       )}
 
       {!hostId && !groupId && view === 'resolved' && (
-        <ResolvedView workspaceId={workspaceId} reloadKey={generation} />
+        <ResolvedView
+          workspaceId={workspaceId}
+          reloadKey={generation}
+          hosts={hosts}
+          onOpenHost={go}
+        />
       )}
     </div>
   )
