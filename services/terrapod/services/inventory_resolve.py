@@ -1063,49 +1063,25 @@ def make_tempdir() -> str:
 #: is exactly what makes a host able to override this (measured: a host variable
 #: REPLACES a group `all` variable), and also means a host that overrides it
 #: restates the whole argument string rather than adding to it.
+# `ansible_ssh_common_args` -- NOT written by Terrapod any more, and the name is
+# kept only so the refusal in `runner/phases/configure_known_hosts.py` can name it.
+#
+# The relaxation that used to live here is gone with the boolean it served (#2592).
+# It emitted this variable on `all` when `ansible_host_key_checking` was false,
+# DELIBERATELY as a variable rather than as an environment variable, so that a host
+# variable could beat it -- a host re-enabling verification over a workspace-level
+# relaxation was the only per-host exception available when the choice was
+# all-or-nothing.
+#
+# `ssh_host_key_policy` replaces both halves of that. The policy is delivered
+# through the run's own ssh anchor, which nothing in the inventory can beat, and
+# `accept-new` is what makes the per-host override unnecessary: the mixed case is
+# now expressible at the workspace -- pinned hosts verified strictly, unpinned ones
+# reachable on first contact -- instead of needing an escape from a blunt setting.
+#
+# The anchor has to be unbeatable for the same reason the keys exist at all: a
+# trust anchor a host variable can override is not an anchor.
 _HOST_KEY_VAR = "ansible_ssh_common_args"
-
-#: `UserKnownHostsFile=/dev/null` as well as `StrictHostKeyChecking=no`, because
-#: without it ssh writes the accepted key into a known_hosts under the EE's HOME
-#: -- a per-run `emptyDir`, so it is discarded anyway -- and warns on every
-#: connection, which puts a line in the operator's log for something they asked
-#: for.
-_RELAXED_HOST_KEY_ARGS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-
-
-def _relax_host_key_checking(ws, declared: dict[str, Any]) -> None:
-    """Express the workspace's host-key relaxation as a variable on `all` (#2318).
-
-    A VARIABLE and not an environment variable, which is the whole of why a host
-    can still beat it. `ANSIBLE_HOST_KEY_CHECKING` is per-process: forcing it
-    would override the operator's own `ansible.cfg` -- which this project
-    reserves for non-negotiables -- and would sit ABOVE a per-host override
-    rather than below it, so the per-host exception the setting exists to permit
-    would be unreachable.
-
-    Mutates `declared` in place so BOTH consumers get it from one producer: the
-    platform source rendered for the API's own `ansible-inventory` run, and the
-    document handed to the runner. Injecting at either call site alone would have
-    left the other path quietly unrelaxed.
-
-    An absent workspace means verification stays on, which is the safe direction
-    for a row we could not read.
-    """
-    if ws is None or getattr(ws, "ansible_host_key_checking", True):
-        return
-    global_vars = declared.setdefault("global_vars", {})
-    if _HOST_KEY_VAR in global_vars:
-        # Their own statement is more specific than a workspace toggle, so it
-        # wins -- and it is logged, because a setting that silently does nothing
-        # is worse than one that refuses.
-        logger.info(
-            "host-key verification is relaxed on this workspace, but its inventory "
-            "already declares this variable on `all`; theirs is used unchanged",
-            variable=_HOST_KEY_VAR,
-            declared_value=global_vars[_HOST_KEY_VAR],
-        )
-        return
-    global_vars[_HOST_KEY_VAR] = _RELAXED_HOST_KEY_ARGS
 
 
 async def _declared_document(db, workspace_id: uuid.UUID) -> dict[str, Any]:
@@ -1543,7 +1519,6 @@ async def _resolve_uncached(
         # defined empty result from the same path as everything else rather than
         # from a special case.
         declared = await _declared_document(db, workspace_id)
-        _relax_host_key_checking(ws, declared)
         platform_file = workdir / _PLATFORM_SOURCE_NAME
         await asyncio.to_thread(platform_file.write_text, render_inventory_yaml(**declared))
         sources.append(platform_file)

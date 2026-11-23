@@ -424,6 +424,7 @@ def _run_json(
                 # otherwise, and a default drifting between API and runner
                 # across a version skew would be invisible.
                 "configure-parallelism": run.configure_parallelism,
+                "ssh-host-key-policy": run.ssh_host_key_policy,
                 "resource-memory": run.resource_memory,
                 # The Ansible execution environment this run uses, and how big
                 # its sidecar is (#2154). Already RESOLVED on the run, so the

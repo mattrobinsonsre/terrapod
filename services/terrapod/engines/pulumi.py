@@ -69,6 +69,9 @@ class PulumiRunOptions:
     #: The configure phase's own `forks` (#2499). `0` means "say nothing", the
     #: same convention `parallelism` uses here.
     configure_parallelism: int = 0
+    #: How a configure verifies host keys (#2592). Same snapshot as the
+    #: Terraform engine's; a Pulumi workspace's configure runs the same phase.
+    ssh_host_key_policy: str = "strict"
     env_vars: list[dict[str, Any]] = field(default_factory=list)
     #: Save the preview's plan and bind the update to it (#1553). Off by default.
     bind_plan: bool = False
@@ -227,6 +230,15 @@ class PulumiStrategy:
             env.append({"name": "TP_REPLACE_URNS", "value": json.dumps(options.replace_urns)})
         if options.parallelism:
             env.append({"name": "TP_PARALLELISM", "value": str(options.parallelism)})
+        # Unconditional, unlike `configure_parallelism` above: the runner's own
+        # fallback is `strict`, so an API that stopped sending this would tighten
+        # every run silently rather than leaving a visible default in place.
+        env.append(
+            {
+                "name": "TP_SSH_HOST_KEY_POLICY",
+                "value": str(options.ssh_host_key_policy),
+            }
+        )
         if options.configure_parallelism:
             env.append(
                 {
@@ -280,6 +292,7 @@ class PulumiStrategy:
             resource_memory=attrs.get("resource-memory", ""),
             parallelism=attrs.get("parallelism", 0),
             # The configure phase's own, inherit stated once (#2499).
+            ssh_host_key_policy=attrs.get("ssh-host-key-policy") or "strict",
             configure_parallelism=(
                 attrs.get("configure-parallelism") or attrs.get("parallelism", 0)
             ),

@@ -79,6 +79,39 @@ class TestTheDuplicatedConstants:
     def test_the_key_types_match_the_model(self):
         assert KEY_TYPES == SSH_HOST_KEY_TYPES
 
+    def test_the_policy_map_matches_the_model(self):
+        """The third duplicate, and its drift is the worst of the three.
+
+        The renderer's copy decides what `StrictHostKeyChecking` the run's anchor
+        carries. A copy that disagreed with the model would make the UI, the API
+        and the provider all report one policy while the run enforced another --
+        and the direction that matters is `accept-new` drifting to `yes`, which
+        turns every unpinned host unreachable under a setting that says it should
+        not.
+        """
+        from terrapod.db.models import SSH_HOST_KEY_POLICY_TO_OPENSSH as MODEL_MAP
+        from terrapod.services.known_hosts_render import SSH_HOST_KEY_POLICY_TO_OPENSSH
+
+        assert SSH_HOST_KEY_POLICY_TO_OPENSSH == MODEL_MAP
+
+    def test_the_policy_default_matches_the_model(self):
+        from terrapod.db.models import DEFAULT_SSH_HOST_KEY_POLICY as MODEL_DEFAULT
+        from terrapod.services.known_hosts_render import DEFAULT_SSH_HOST_KEY_POLICY
+
+        assert DEFAULT_SSH_HOST_KEY_POLICY == MODEL_DEFAULT
+
+    def test_the_map_covers_every_policy_the_model_offers(self):
+        """A floor the equality above cannot give on its own: if both copies lost
+        the same entry they would still be equal, and a policy with no OpenSSH
+        value raises `KeyError` inside the anchor builder at run time."""
+        from terrapod.db.models import SSH_HOST_KEY_POLICIES
+        from terrapod.services.known_hosts_render import SSH_HOST_KEY_POLICY_TO_OPENSSH
+
+        assert set(SSH_HOST_KEY_POLICY_TO_OPENSSH) == set(SSH_HOST_KEY_POLICIES)
+        assert len(SSH_HOST_KEY_POLICIES) == 3, (
+            "three OpenSSH behaviours is the whole reason this is not a boolean"
+        )
+
 
 class TestThePurityBar:
     def test_it_imports_nothing_that_the_runner_image_lacks(self):

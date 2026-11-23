@@ -110,7 +110,11 @@ import structlog
 from terrapod.runner.phases import configure_inventory
 from terrapod.runner.runner_config import RunnerConfig
 from terrapod.services.ansible_auth import CREDENTIAL_FILE_MODE
-from terrapod.services.known_hosts_render import known_hosts_patterns, render_known_hosts
+from terrapod.services.known_hosts_render import (
+    SSH_HOST_KEY_POLICY_TO_OPENSSH,
+    known_hosts_patterns,
+    render_known_hosts,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -161,7 +165,7 @@ def known_hosts_dir() -> Path:
     return Path(os.environ.get("TP_EE_KNOWN_HOSTS_DIR") or _DEFAULT_KNOWN_HOSTS_DIR)
 
 
-def ssh_args(path: Path) -> str:
+def ssh_args(path: Path, *, policy: str) -> str:
     """The `ssh_args` value that makes `path` this run's trust anchor.
 
     Ours FIRST and ansible's own default after, which is the whole mechanism:
@@ -169,13 +173,32 @@ def ssh_args(path: Path) -> str:
     `UserKnownHostsFile` or `StrictHostKeyChecking=no` -- wherever it arrives
     from -- is read and discarded. See the module docstring for the measurements.
 
-    `StrictHostKeyChecking=yes` is set rather than left to OpenSSH's own `ask`.
-    Non-interactively `ask` refuses too, so the file would be enforced either
-    way -- but only by accident of there being no tty, and `ask` loses to an
-    `ansible_host_key_checking: false` that `yes` beats on position. Stating the
-    policy is also what makes the run log say what was enforced.
+    `policy` is REQUIRED and has no default, deliberately. A default here would
+    make one of the three the bypass every caller takes by omission, and the
+    caller that matters is the entrypoint threading the run's snapshot through.
+
+    The value is stated rather than left to OpenSSH's own `ask`. Non-interactively
+    `ask` refuses too, so `strict` would be enforced either way -- but only by
+    accident of there being no tty, and `ask` loses on position to an
+    `ansible_host_key_checking: false` that `yes` beats. Stating it is also what
+    makes the run log say what was enforced.
+
+    `off` points at `/dev/null` rather than at our file, which is not merely
+    cosmetic: with verification off, ssh would otherwise write every accepted key
+    into a per-run volume that is discarded anyway, and warn on each connection --
+    a line in the operator's log for something they asked for.
+
+    `accept-new` keeps our file, which is the point of the state existing: a host
+    the file pins is verified strictly against it, and one nobody has pinned is
+    accepted on first contact rather than refused. That is what makes a mixed
+    fleet workable without weakening the hosts that are pinned.
     """
-    return f"-o UserKnownHostsFile={path} -o StrictHostKeyChecking=yes {ANSIBLE_DEFAULT_SSH_ARGS}"
+    strict = SSH_HOST_KEY_POLICY_TO_OPENSSH[policy]
+    anchor = "/dev/null" if policy == "off" else path
+    return (
+        f"-o UserKnownHostsFile={anchor} -o StrictHostKeyChecking={strict} "
+        f"{ANSIBLE_DEFAULT_SSH_ARGS}"
+    )
 
 
 def hosts_in(inventory: Sequence[Path]) -> dict[str, dict[str, Any]]:
@@ -496,4 +519,4 @@ def materialise(
         # and it is the thing an operator needs to read.
         unpinned_hosts=unpinned,
     )
-    return {"ANSIBLE_SSH_ARGS": ssh_args(path)}
+    return {"ANSIBLE_SSH_ARGS": ssh_args(path, policy=cfg.ssh_host_key_policy)}

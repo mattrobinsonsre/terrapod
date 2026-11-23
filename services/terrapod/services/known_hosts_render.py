@@ -34,6 +34,29 @@ where the decision is made. The two that shape the whole module:
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+#: The three host-key policies, in the order the refusal message names them.
+#:
+#: The THIRD duplicate in this module, for the same measured reason as the other
+#: two: the runner carries this file and its image has no SQLAlchemy. Pinned equal
+#: to the model's in `tests/services/test_known_hosts_render.py`.
+SSH_HOST_KEY_POLICIES: tuple[str, ...] = ("strict", "accept-new", "off")
+
+#: Policy -> the `StrictHostKeyChecking` value OpenSSH takes (#2592).
+#:
+#: DUPLICATED from `db.models`, for the reason the module docstring gives: the
+#: runner carries this file and `requirements-runner.txt` has no SQLAlchemy, so
+#: importing the model would make `job_entrypoint` unimportable and fail every run
+#: of every kind at startup. `tests/services/test_known_hosts_render.py` pins these
+#: equal to the model's, so they cannot drift.
+SSH_HOST_KEY_POLICY_TO_OPENSSH: dict[str, str] = {
+    "strict": "yes",
+    "accept-new": "accept-new",
+    "off": "no",
+}
+
+#: The default, and what the boolean this replaced meant by `true`.
+DEFAULT_SSH_HOST_KEY_POLICY = "strict"
+
 #: The markers OpenSSH recognises, without the `@`.
 #:
 #: Duplicated from `db.models.SSH_HOST_KEY_MARKERS` because this module must
