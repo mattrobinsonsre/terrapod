@@ -26,6 +26,7 @@
 //	"engine-version"     -> engine_version      (string, optional+computed; `terraform_version` is its deprecated alias)
 //	"terraform-version"  -> terraform_version   (string, optional+computed, deprecated)
 //	"ansible-version"    -> ansible_version     (string, optional; empty inherits the deployment default)
+//	"ssh-host-key-policy" -> ssh_host_key_policy (string, optional+computed; strict|accept-new|off)
 //	"ansible-execution-environment" -> ansible_execution_environment (string, optional; overrides the line)
 //	"ansible-collections" -> ansible_collections (list of {name, version}, optional)
 //	"plan-apply-enabled" -> plan_apply_enabled  (bool, optional+computed, default true)
@@ -81,11 +82,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/ids"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/validators"
 )
 
 var (
@@ -134,6 +137,7 @@ type autodiscoveryRuleModel struct {
 	EEResourceMemory     types.String `tfsdk:"ee_resource_memory"`
 	Parallelism          types.Int64  `tfsdk:"parallelism"`
 	ConfigureParallelism types.Int64  `tfsdk:"configure_parallelism"`
+	SSHHostKeyPolicy     types.String `tfsdk:"ssh_host_key_policy"`
 	ResourceMemory       types.String `tfsdk:"resource_memory"`
 	AutoApplyMode        types.String `tfsdk:"auto_apply_mode"`
 	Labels               types.Map    `tfsdk:"labels"`
@@ -570,6 +574,26 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Computed: true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
+				},
+			},
+			"ssh_host_key_policy": schema.StringAttribute{
+				Description: "How a configure verifies the SSH host keys of the hosts it " +
+					"targets, templated onto the workspaces this rule creates: `strict`, " +
+					"`accept-new` or `off`. Defaults to `strict`, so a rule that says " +
+					"nothing creates workspaces that verify. These are OpenSSH's " +
+					"StrictHostKeyChecking behaviours; `accept-new` trusts a host on first " +
+					"contact and refuses it once its key CHANGES, which is what keeps an " +
+					"unpinned host reachable on a fleet that has begun declaring approved " +
+					"keys. Optional + Computed, so a rule that does not set it never drifts.",
+				Optional: true,
+				Computed: true,
+				// Plan-time, so a value OpenSSH does not define is refused before
+				// anything is applied. Shared with terrapod_workspace rather than
+				// restated: two copies of a value set is how two surfaces come to
+				// disagree about what they accept.
+				Validators: []validator.String{validators.SSHHostKeyPolicy{}},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"configure_parallelism": schema.Int64Attribute{
@@ -1206,6 +1230,13 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
 		attrs["ansible-version"] = m.AnsibleVersion.ValueString()
 	}
+	// The host-key policy (#2592). Guarded against the empty string as well as
+	// null, like auto-apply-mode: the server refuses "", so sending it would
+	// fail the apply rather than mean "take the default".
+	if !m.SSHHostKeyPolicy.IsNull() && !m.SSHHostKeyPolicy.IsUnknown() &&
+		m.SSHHostKeyPolicy.ValueString() != "" {
+		attrs["ssh-host-key-policy"] = m.SSHHostKeyPolicy.ValueString()
+	}
 	if !m.AnsibleExecutionEnvironment.IsNull() && !m.AnsibleExecutionEnvironment.IsUnknown() {
 		attrs["ansible-execution-environment"] = m.AnsibleExecutionEnvironment.ValueString()
 	}
@@ -1571,6 +1602,17 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.EEResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "ee-resource-memory"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
 	m.AutoApplyMode = types.StringValue(terrapod.GetStringAttr(res, "auto-apply-mode"))
+	// The host-key policy (#2592). Falls back to the server's own default rather
+	// than projecting "": the column is NOT NULL with a default of "strict", so an
+	// empty read means a server that predates the attribute -- and reading that as
+	// "" would make an Optional+Computed attribute null against a configured value
+	// and fail the apply. Falling back to the STRICTEST value is also the safe
+	// direction: it never reports a rule as templating less verification than it does.
+	policy := terrapod.GetStringAttr(res, "ssh-host-key-policy")
+	if policy == "" {
+		policy = "strict"
+	}
+	m.SSHHostKeyPolicy = types.StringValue(policy)
 
 	labels := terrapod.GetMapAttr(res, "labels")
 	if labels == nil {

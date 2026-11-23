@@ -152,7 +152,7 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_inventory_detail",
 		Description: "Read one host or one group with its variables and its links — a host's groups, or a group's member hosts, child groups and parent groups. " +
 			"Pass a host id or a group id; the typed prefix says which, so there is no kind argument to get wrong. " +
-			"For a HOST it also returns `keys`: the SSH host keys that host is approved to present, WITH their ids — which is where the id for terrapod_inventory_host_key_mark or terrapod_inventory_remove comes from, because the workspace-wide terrapod_inventory_host_keys view is keyed on host name and carries none. An empty `keys` on a workspace with host-key checking on means a configure cannot reach that host on first contact. " +
+			"For a HOST it also returns `keys`: the SSH host keys that host is approved to present, WITH their ids — which is where the id for terrapod_inventory_host_key_mark or terrapod_inventory_remove comes from, because the workspace-wide terrapod_inventory_host_keys view is keyed on host name and carries none. What an empty `keys` means depends on the workspace's ssh_host_key_policy: under strict the host is unreachable, under accept-new it is reachable on first contact and refused if its key later changes, under off nothing is verified. " +
 			"A variable's value is returned as `***` when `sensitive` is true: the server masks it in every response and never returns the stored value. Do not write that mask back as a value.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in detailIn) (*mcp.CallToolResult, detailOut, error) {
@@ -473,7 +473,7 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_inventory_remove",
 		Description: "Remove one ansible inventory row. The typed id prefix says what it is, so there is no kind to pass and no way to delete a different kind than intended. " +
 			"CASCADES, and this is the part to show a user before confirming: removing a HOST removes its variables, its group memberships AND its approved SSH host keys; removing a GROUP removes its variables, its memberships and its nestings in both directions, though the hosts themselves remain. Removing a membership or a nesting removes only that link. " +
-			"Removing an APPROVED HOST KEY (invhkey-) withdraws trust in that key. To retire a key, prefer marking it `revoked` with terrapod_inventory_host_key_mark: the entry stays declared and the key is REFUSED, where removing it leaves the key merely unknown. And removing the key a host actually presents makes it an unknown host to the next configure, which on a workspace with host-key checking on means the configure cannot reach it. " +
+			"Removing an APPROVED HOST KEY (invhkey-) withdraws trust in that key. To retire a key, prefer marking it `revoked` with terrapod_inventory_host_key_mark: the entry stays declared and the key is REFUSED, where removing it leaves the key merely unknown. And removing the key a host actually presents makes it an unknown host to the next configure: unreachable under ssh_host_key_policy strict, and under accept-new trusted afresh on the next contact — which is why revoking beats removing when the worry is a key you no longer trust. " +
 			"Call terrapod_inventory_resolved first if the blast radius matters: a host removed here leaves every configure that targeted it.",
 		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in removeIn) (*mcp.CallToolResult, removeOut, error) {

@@ -73,7 +73,7 @@ func registerInventoryHostKeys(s *mcp.Server, c *terrapod.Client) {
 			"A host legitimately appears with SEVERAL keys, and with two of ONE algorithm while it is being rotated. Do not read a second key of the same algorithm as a duplicate; a client picks by its own preference, so declaring all of them is the point. " +
 			"`public_key` is NOT masked, deliberately: a host's public key is public, and hiding it would hide the one value needed when a host presents something else. " +
 			"A host appearing in a VCS-sourced inventory file only is ABSENT here and can hold no approved key — it has no Terrapod row to hang one on, exactly as it can hold no Terrapod-declared variable. " +
-			"A host present with an empty list holds no approved key, which on a workspace with host-key checking on means a configure cannot reach it on first contact. " +
+			"A host present with an empty list holds no approved key. Under ssh_host_key_policy strict that means a configure cannot reach it at all; under accept-new it is reachable on FIRST contact and refused once its key changes, which is the point of that policy. " +
 			"LIVE, and it writes nothing: a function of the rows, so there is no freshness to reason about and no timestamp here to mislead anyone. " +
 			"The ids needed to change or remove a key are not on this view — list one host's keys with terrapod_inventory_detail, which carries them.",
 		Annotations: readOnly,
