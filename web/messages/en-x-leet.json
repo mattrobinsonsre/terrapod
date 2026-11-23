@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "P3rm17 d3cl4r3d 1nv3n70ry plug1n5 — 4 Y4ML 50urc3 c4rry1ng 4 70p-l3v3l plug1n k3y — wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 73rr4p0d 1753lf n3v3r run5 0n3, 1n 317h3r 57473. Wh1l3 7h15 15 0ff, 4 plug1n 50urc3 15 r3fu53d by n4m3 r47h3r 7h4n r350lv1ng 70 4 p4r714l h057 537; wh1l3 17 15 0n, 7h3 1nv3n70ry 5h0wn h3r3 15 3xpl1c17ly p4r714l p3r 50urc3 4nd 7h3 537 7h3 runn3r r350lv35 15 7h3 4u7h0r17471v3 0n3.",
       "inventoryScriptsEnabled": "1nv3n70ry 5cr1p75",
       "inventoryScriptsEnabledHint": "P3rm17 3x3cu74bl3 1nv3n70ry 5cr1p75 wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 53p4r473 fr0m dyn4m1c 1nv3n70ry plug1n5 50 7h47 d3cl4r3d plug1n c0nf1g5, wh1ch n4m3 4 c0ll3c710n 4nd c4n b3 r34d b3f0r3 7h3y run, c4n b3 4ll0w3d w17h0u7 4l50 4ll0w1ng 4rb17r4ry 3x3cu74bl35.",
-      "ansibleHostKeyChecking": "55H h057 k3y ch3ck1ng",
-      "ansibleHostKeyCheckingHint": "0n by d3f4ul7, wh1ch 15 wh47 4n51bl3 d035 0n 175 0wn: 4 c0nf1gur3 r3fu535 4 h057 wh053 k3y 17 d035 n07 4lr34dy 7ru57. 7urn 17 0ff 4nd 4ny k3y 4 h057 pr353n75 15 4cc3p73d, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d — 5upply1ng 7h3 h057'5 publ1c k3y w17h 7h3 m4ch1n3 cr3d3n714l k33p5 v3r1f1c4710n 0n 1n5734d. 4 p3r-h057 4n51bl3 v4r14bl3 571ll 0v3rr1d35 7h15 53771ng 317h3r w4y.",
       "oidcAudiencesLead": "73rr4p0d m1n75 4 5h0r7-l1v3d 0p3n1D C0nn3c7 70k3n p3r pr0v1d3r c0nf1gur4710n 4nd wr1735 17 wh3r3 7h3 run c4n r34d 17.",
       "driftIgnoreRulesLead": "73rr4f0rm 4ddr35535 4nd 477r1bu73 p47h5 7h3 dr1f7 cl4551f13r 5uppr35535. 4 b4r3 4ddr355 w17h n0 477r1bu73 51l3nc35 3v3ry ch4ng3 70 7h47 r350urc3.",
       "dynamicInventoryEnabledLead": "P3rm17 d3cl4r3d 1nv3n70ry plug1n5 wh3n 7h3 runn3r r350lv35 7h3 1nv3n70ry. 7h3 1nv3n70ry 5h0wn h3r3 7h3n b3c0m35 p4r714l p3r 50urc3, 4nd 7h3 537 7h3 runn3r r350lv35 15 7h3 4u7h0r17471v3 0n3.",
       "inventoryScriptsEnabledLead": "P3rm17 3x3cu74bl3 1nv3n70ry 5cr1p75. 4n 4rb17r4ry 3x3cu74bl3 fr0m 7h3 r3p05170ry 7h3n run5 1n51d3 7h3 runn3r J0b, w17h 175 cl0ud 1d3n717y, b3f0r3 7h3 pl4yb00k d035 — 4nd 7h3 1nv3n70ry 5h0wn h3r3 b3c0m35 p4r714l.",
-      "ansibleHostKeyCheckingLead": "0n by d3f4ul7, 45 4n51bl3 d035 0n 175 0wn. R3l4x35 4 pr073c710n wh3n 0ff: 4ny k3y 4 h057 pr353n75 15 4cc3p73d, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d.",
       "bindPlanLead": "0n, 7h3 upd473 4ppl135 3x4c7ly 7h3 pl4n 7h3 pr3v13w 54v3d, 50 4ny7h1ng 7h47 ch4ng3d 51nc3 7h3 pr3v13w f41l5 7h3 upd473 1n5734d 0f b31ng 4ppl13d.",
       "configDirectoryLead": "Wh3r3 4n51bl3.cfg, 7h3 pl4yb00k5, r0l35/, gr0up_v4r5/ 4nd h057_v4r5/ l1v3, r3l471v3 70 7h3 r3p05170ry r007. 3mp7y m34n5 7h3 r007 1753lf.",
       "ansibleCollectionsLead": "C0ll3c710n5 1n574ll3d b3f0r3 4 c0nf1gur3 run5, 0n3 p3r l1n3 45 n4m35p4c3.n4m3 0r n4m35p4c3.n4m3:v3r510n.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "5ch3dul3 71m3 z0n3",
       "scheduledConfigureTimezoneHint": "7h3 14N4 z0n3 7h3 5ch3dul3 15 r34d 1n, 50 7h3 h0ur f0ll0w5 d4yl1gh7 54v1ng — f0r 3x4mpl3 U7C, 3ur0p3/L0nd0n 0r 4m3r1c4/N3w_Y0rk. 3mp7y m34n5 U7C.",
       "scheduledConfigureTimezonePlaceholder": "3.g. 3ur0p3/L0nd0n",
-      "scheduledConfigureLastAt": "L457 5ch3dul3d run"
+      "scheduledConfigureLastAt": "L457 5ch3dul3d run",
+      "sshHostKeyPolicy": "55H h057 k3y p0l1cy",
+      "sshHostKeyPolicyStrict": "V3r1fy 3v3ry h057",
+      "sshHostKeyPolicyAcceptNew": "7ru57 0n f1r57 c0n74c7",
+      "sshHostKeyPolicyOff": "D0 n07 v3r1fy",
+      "sshHostKeyPolicyLead": "Wh1ch 0f 0p3n55H'5 7hr33 4n5w3r5 4 c0nf1gur3 45k5 f0r. 7ru571ng 0n f1r57 c0n74c7 571ll r3fu535 4 ch4ng3d k3y; n07 v3r1fy1ng 4cc3p75 4ny k3y 4 h057 pr353n75, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d.",
+      "sshHostKeyPolicyHint": "73rr4p0d r3nd3r5 34ch h057'5 4ppr0v3d k3y5 45 7h3 kn0wn_h0575 f1l3 0p3n55H ch3ck5 4g41n57, 4nd 7h15 53771ng 15 7h3 57r1c7H057K3yCh3ck1ng v4lu3 7h3 run 45k5 f0r. 7h47 f1l3 15 4n 4ll0w-l157 4nd 7h3 53771ng 15 pr0c355-w1d3, 50 v3r1fy1ng 3v3ry h057 m4k35 4n 4ddr355 n0b0dy h45 4ppr0v3d 4 k3y f0r unr34ch4bl3 r47h3r 7h4n m3r3ly unv3r1f13d. 7ru571ng 0n f1r57 c0n74c7 15 7h3 m1x3d-fl337 4n5w3r: 4ppr0v3d k3y5 4r3 571ll v3r1f13d 57r1c7ly, wh1l3 4n unp1nn3d h057 c0nn3c75 0nc3 4nd 15 r3fu53d 1f 175 k3y l473r ch4ng35. N07h1ng 1n 7h3 1nv3n70ry c4n 0v3rr1d3 17."
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

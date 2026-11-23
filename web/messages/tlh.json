@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', ngu''lu''bogh ghom tetlh chenmoHwI''mey chaw'': YAML mung, plugin per tIn ghajbogh. cha'' Dotlhmey-vaD, Terrapod ''e'' vumbe'' net Sov. chu''be''chugh, chenmoHwI'' mung pong lajbe''lu'', ''ej hostmey puSqu'' ngu''be''lu''. chu''chugh, naDev ghom tetlh ''oH Hoch mung-vaD puSqu'' ''e'' maqlu'', ''ej qalIHwI'' ngu''bogh ghom ''oH DevwI''.",
       "inventoryScriptsEnabled": "ghom tetlh ghItlhmey",
       "inventoryScriptsEnabledHint": "ghom tetlh ngu''taHvIS qalIHwI'', vumlaHbogh ghom tetlh ghItlhmey chaw''. ghom tetlh chenmoHwI''mey-vo'' pIm: ngu''lu''bogh chenmoHwI'' De'' ghomHom pong ''ej vumpa'' laDlaH, vaj bIH chaw''laH ''ej Hoch vumlaHbogh De'' chaw''be''.",
-      "ansibleHostKeyChecking": "SSH host ngaQHa'moHwI' tob",
-      "ansibleHostKeyCheckingHint": "motlh 'oH chu'lu'; Ansible Dotlh je 'oH. ngaQHa'moHwI' voqbe'bogh host lajQo' Qum. chu'Ha'lu'chugh, host ngaQHa'moHwI' nobbogh Hoch lajlu', vaj rar HIvlaH — QaQ law' jan chaw' tlhej host ngaQHa'moHwI' teH yInob 'ej tob yIchu'taH. host choHlaH Ansible reH Dochvam DIvI'.",
       "oidcAudiencesLead": "Hoch provider chenmoHghachvaD, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh DaqDaq lan.",
       "driftIgnoreRulesLead": "tlhotlh chevwI'' So''bogh Terraform Summey je Sep Hemmey. Sep Hutlhbogh Sum neH Dochvetlh choHmey Hoch tuHHa''.",
       "dynamicInventoryEnabledLead": "ghom tetlh ngu''taHvIS qalIHwI'', ngu''lu''bogh ghom tetlh chenmoHwI''mey chaw''. vaj naDev ghom tetlh ''oH Hoch mung-vaD puSqu'', ''ej qalIHwI'' ngu''bogh ghom ''oH DevwI''.",
       "inventoryScriptsEnabledLead": "vumlaHbogh ghom tetlh ghItlhmey chaw''. vaj qawHaq-vo'' Hoch vumlaHbogh De'' vum, qalIHwI'' Qu''Daq, ''eng pongDaj lo''taHvIS, Qu'' paq vumpa'' — ''ej naDev ghom tetlh ''oH puSqu''.",
-      "ansibleHostKeyCheckingLead": "motlh chu''lu'', Ansible Dotlh je. chu''Ha''lu''DI'' ''avwI'' tunmoH: host nobbogh ngaQHa''moHwI'' Hoch lajlu'', vaj rar HIvlaH.",
       "bindPlanLead": "chu''lu''DI'', chovnatlh polbogh nab ''e'' ta''qu''lu''. vaj chovnatlh ret choHlu''bogh Hoch lajbe''lu'', ''ej ta'' luj.",
       "configDirectoryLead": "ansible.cfg, Qu'' paqmey, roles/, group_vars/ je host_vars/ Daq, qawHaq mung-vo''. chImchugh, mung ''e'' ''oS.",
       "ansibleCollectionsLead": "configure qaSpa'' lan ta''lu''bogh ghomHommey, wa'' per Dagh namespace.name ghap namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "poH tetlh poH Daq",
       "scheduledConfigureTimezoneHint": "poH tetlh laDlu''bogh IANA poH Daq; vaj jajlo'' poH tlha'' rep. Da UTC, Europe/London, America/New_York. chImchugh, UTC ''oH.",
       "scheduledConfigureTimezonePlaceholder": "Da Europe/London",
-      "scheduledConfigureLastAt": "poH tetlh Qu'' Qav"
+      "scheduledConfigureLastAt": "poH tetlh Qu'' Qav",
+      "sshHostKeyPolicy": "SSH host ngaQHa'moHwI' chut",
+      "sshHostKeyPolicyStrict": "Hoch host yItob",
+      "sshHostKeyPolicyAcceptNew": "wa'DIch rarDI' yIvoq",
+      "sshHostKeyPolicyOff": "yItobQo'",
+      "sshHostKeyPolicyLead": "OpenSSH wej jangmeH mIw'a' Qum poQbogh. wa'DIch rarDI' voq 'ach ngaQHa'moHwI' choHlu'bogh lajQo'taH; tobbe'chugh, host nobbogh ngaQHa'moHwI' Hoch lajlu', vaj rar HIvlaH.",
+      "sshHostKeyPolicyHint": "Hoch host ngaQHa'moHwI'mey chaw'lu'bogh known_hosts ghItlh moj, 'ej OpenSSH ghItlhvetlh lo'taHvIS tob; Dochvam 'oH StrictHostKeyChecking poQbogh Qum'e'. ghItlhvetlh chaw'lu'bogh tetlh 'oH, 'ej Hoch mIw Dochvam Sang: Hoch host tobchugh, ngaQHa'moHwI' chaw'be'lu'bogh Daq tobbe'lu' neH qar'a'? ghobe' -- SIchlaHbe'lu'. wa'DIch rarDI' voq, mIn'a' ngaDHa' jang: ngaQHa'moHwI' chaw'lu'bogh tobtaH 'ej host chaw'be'lu'bogh wa'logh rar 'ach ngaQHa'moHwI'Daj choHDI' lajQo'lu'. tetlh pagh Dochvam DIvI'laHbe'."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

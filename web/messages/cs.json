@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Povolí deklarované pluginy inventáře — zdroj YAML s klíčem plugin na nejvyšší úrovni — když runner vyhodnocuje inventář. Terrapod sám nikdy žádný nespouští, ani v jednom z obou stavů. Dokud je toto vypnuté, je zdroj pluginu odmítnut jmenovitě, místo aby se vyhodnotil na neúplnou množinu hostů; když je zapnuté, je zde zobrazený inventář výslovně částečný pro každý zdroj a množina, kterou vyhodnotí runner, je rozhodující.",
       "inventoryScriptsEnabled": "Skripty inventáře",
       "inventoryScriptsEnabledHint": "Povolí spustitelné skripty inventáře, když runner vyhodnocuje inventář. Odděleno od dynamických pluginů inventáře, aby bylo možné povolit deklarované konfigurace pluginů, které pojmenovávají kolekci a lze je přečíst před spuštěním, bez povolení libovolných spustitelných souborů.",
-      "ansibleHostKeyChecking": "Kontrola klíče hostitele SSH",
-      "ansibleHostKeyCheckingHint": "Ve výchozím stavu zapnuto, což je vlastní chování Ansible: konfigurace odmítne hostitele, jehož klíč dosud nezná. Když to vypnete, přijme se jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout — lépe je zadat veřejný klíč hostitele spolu s přihlašovacími údaji ke stroji a kontrolu nechat zapnutou. Proměnná Ansible nastavená pro jednotlivého hostitele má nad tímto nastavením tak či tak přednost.",
       "oidcAudiencesLead": "Terrapod vydává krátkodobý token OpenID Connect pro každou konfiguraci provideru a zapisuje ho tam, kde si ho běh může přečíst.",
       "driftIgnoreRulesLead": "Terraform adresy a cesty atributů, které klasifikátor odchýlení potlačuje. Holá adresa bez atributu umlčí jakoukoli změnu tohoto prostředku.",
       "dynamicInventoryEnabledLead": "Povolí deklarované pluginy inventáře, když runner vyhodnocuje inventář. Zde zobrazený inventář se pak stává částečným pro každý zdroj a množina, kterou vyhodnotí runner, je rozhodující.",
       "inventoryScriptsEnabledLead": "Povolí spustitelné skripty inventáře. Libovolný spustitelný soubor z repozitáře se pak spustí uvnitř runner Jobu, s jeho cloudovou identitou, dříve než playbook — a zde zobrazený inventář se stává částečným.",
-      "ansibleHostKeyCheckingLead": "Ve výchozím stavu zapnuto, což je vlastní chování Ansible. Když to vypnete, oslabuje to ochranu: přijme se jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout.",
       "bindPlanLead": "Když je zapnuto, aktualizace použije přesně plán uložený náhledem, takže cokoli, co se od náhledu změnilo, aktualizaci zastaví, místo aby se to použilo.",
       "configDirectoryLead": "Kde leží ansible.cfg, playbooky, roles/, group_vars/ a host_vars/, relativně ke kořeni repozitáře. Prázdná hodnota znamená samotný kořen.",
       "ansibleCollectionsLead": "Kolekce instalované před spuštěním configure, jedna na řádek ve tvaru namespace.name nebo namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Časové pásmo plánu",
       "scheduledConfigureTimezoneHint": "Pásmo IANA, ve kterém se plán čte, aby hodina sledovala letní čas — například UTC, Europe/London nebo America/New_York. Prázdné znamená UTC.",
       "scheduledConfigureTimezonePlaceholder": "např. Europe/London",
-      "scheduledConfigureLastAt": "Poslední naplánovaný běh"
+      "scheduledConfigureLastAt": "Poslední naplánovaný běh",
+      "sshHostKeyPolicy": "Zásada klíče hostitele SSH",
+      "sshHostKeyPolicyStrict": "Kontrolovat každého hostitele",
+      "sshHostKeyPolicyAcceptNew": "Věřit při prvním kontaktu",
+      "sshHostKeyPolicyOff": "Nekontrolovat",
+      "sshHostKeyPolicyLead": "Kterou ze tří odpovědí OpenSSH konfigurace žádá. Důvěra při prvním kontaktu stále odmítne změněný klíč; bez kontroly se přijme jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout.",
+      "sshHostKeyPolicyHint": "Terrapod skládá schválené klíče každého hostitele do souboru known_hosts, podle kterého OpenSSH kontroluje, a toto nastavení je hodnota StrictHostKeyChecking, kterou spuštění žádá. Ten soubor je seznam povolených a nastavení platí pro celý proces: kontroluje-li se každý hostitel, pak adresa, pro kterou nikdo klíč neschválil, není jen nezkontrolovaná, ale nedosažitelná. Důvěra při prvním kontaktu je odpověď pro smíšený park: schválené klíče se nadále kontrolují striktně, zatímco hostitel, kterého nikdo nepřipnul, se připojí jednou a je odmítnut, pokud se jeho klíč později změní. Nic v inventáři to nemůže přebít."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

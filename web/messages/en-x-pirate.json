@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Let th'' deckhand use manifest contraptions ye have declared — a YAML source bearin'' a plugin key at th'' top — when it reckons th'' manifest. Terrapod itself never runs one, in neither state. While this be struck, a contraption source be refused by name rather than reckoned into half a crew; while it be hoisted, th'' manifest shown here be plainly part-reckoned source by source, an'' th'' crew th'' deckhand reckons be th'' word o'' law.",
       "inventoryScriptsEnabled": "Manifest scripts",
       "inventoryScriptsEnabledHint": "Let th'' deckhand use runnable manifest scripts when it reckons th'' manifest. Kept apart from dynamic manifest contraptions, so declared contraption orders — which name a hoard an'' can be read afore they run — may be allowed without lettin'' any old runnable thing aboard.",
-      "ansibleHostKeyChecking": "Checkin'' o'' the SSH host key",
-      "ansibleHostKeyCheckingHint": "On by default, which be Ansible''s own way o'' things: a riggin'' turns away a host whose key it don''t trust yet. Switch it off an'' any key a host waves at ye be taken, so the line can be listened in on — better t'' hand over the host''s public key wi'' the machine credential an'' leave the checkin'' on. An Ansible variable set fer one host still beats this setting either way, arr.",
       "oidcAudiencesLead": "Terrapod strikes a short-lived OpenID Connect token fer every provider riggin'' an'' scrawls it where th'' voyage can read it.",
       "driftIgnoreRulesLead": "Terraform addresses an'' attribute paths th'' drift classifier hushes. A bare address wi'' no attribute gags every change t'' that resource.",
       "dynamicInventoryEnabledLead": "Let th'' deckhand use manifest contraptions ye have declared when it reckons th'' manifest. Th'' manifest shown here then turns part-reckoned source by source, an'' th'' crew th'' deckhand reckons be th'' word o'' law.",
       "inventoryScriptsEnabledLead": "Let runnable manifest scripts aboard. Any old runnable thing from th'' repository then runs inside th'' deckhand''s Job, wearin'' its cloud colours, afore th'' playbook does — an'' th'' manifest shown here turns part-reckoned.",
-      "ansibleHostKeyCheckingLead": "On by default, as Ansible does on its own. Slackens a guard when struck: any key a host waves at ye be taken, so th'' line can be listened in on.",
       "bindPlanLead": "Hoisted, th'' update applies exactly th'' plan th'' preview stowed away, so anythin'' that shifted since th'' preview scuttles th'' update instead o'' bein'' applied.",
       "configDirectoryLead": "Where ansible.cfg, th'' playbooks, roles/, group_vars/ an'' host_vars/ be stowed, reckoned from th'' cargo hold root. Empty means th'' root itself.",
       "ansibleCollectionsLead": "Hoards hauled aboard afore a configure sets sail, one per line as namespace.name or namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Watch time zone",
       "scheduledConfigureTimezoneHint": "Th'' IANA zone th'' schedule be read in, so th'' hour follows daylight savin'' — fer example UTC, Europe/London or America/New_York. Empty means UTC.",
       "scheduledConfigureTimezonePlaceholder": "e.g. Europe/London",
-      "scheduledConfigureLastAt": "Last watch run"
+      "scheduledConfigureLastAt": "Last watch run",
+      "sshHostKeyPolicy": "Rule o' the SSH host key",
+      "sshHostKeyPolicyStrict": "Check every host",
+      "sshHostKeyPolicyAcceptNew": "Trust her on first meetin'",
+      "sshHostKeyPolicyOff": "Check none o' them",
+      "sshHostKeyPolicyLead": "Which o' OpenSSH's three answers a riggin' calls for. Trustin' her on first meetin' still turns away a key wot's changed; checkin' none takes any key a host waves at ye, so th' line can be listened in on.",
+      "sshHostKeyPolicyHint": "Terrapod musters every host's approved keys into the known_hosts file OpenSSH checks against, an' this setting be the StrictHostKeyChecking value the run calls for. That file be a list o' them as are let through, an' the setting holds fer the whole crew o' the process: check every host an' an address nobody has approved a key fer ain't merely unchecked, it be out o' reach. Trustin' her on first meetin' be the answer fer a mixed fleet: approved keys be checked strict as ever, while a host nobody has pinned comes alongside the once an' be turned away if its key shifts later. Naught in the manifest can overrule it, arr."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

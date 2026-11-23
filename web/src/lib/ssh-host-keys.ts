@@ -57,6 +57,69 @@ export type SshHostKeyMarker = (typeof SSH_HOST_KEY_MARKERS)[number]
  */
 export const SAMPLE_HOST_KEY_BLOB = 'AAAAC3NzaC1lZDI1NTE5AAAAI...'
 
+/**
+ * How a configure verifies the host keys of the hosts it targets (#2592).
+ *
+ * The third closed set the server restates here, and the one that is NOT a
+ * `known_hosts` field: it is OpenSSH's own `StrictHostKeyChecking`, which is
+ * what decides whether the file above is consulted as an allow-list or
+ * ignored. It replaced a boolean named after ansible's `HOST_KEY_CHECKING`
+ * flag, because a boolean cannot say `accept-new` -- trust a host on first
+ * contact, refuse it once its key changes -- and ansible cannot express that
+ * state at all.
+ *
+ * `accept-new` is the one worth understanding, because it is what makes a
+ * growing fleet workable: the rendered file is an ALLOW-LIST and `ssh_args` is
+ * process-wide, so under `strict` declaring one approved key makes every
+ * address in that inventory nobody has pinned unreachable. Under `accept-new`
+ * the pinned hosts are still verified strictly against their approved keys and
+ * the unpinned ones stay reachable.
+ *
+ * Ordered by what it permits, dangerous end last, as
+ * `DYNAMIC_INVENTORY_MODES` is. The ORDER is this module's; the SET is the
+ * server's `SSH_HOST_KEY_POLICIES`, and `tests/ssh-host-key-sets.test.ts`
+ * derives it out of `db/models.py` and holds the two equal -- so a fourth
+ * state fails there rather than leaving a picker that cannot offer it.
+ *
+ * **These are WIRE VALUES and are never translated.** The labels beside them
+ * are prose and are; `strict` is what the API stores and what a
+ * `terrapod_workspace` resource declares, so an `en-x-leet` substitution of it
+ * would send `57r1c7` to a server that refuses it.
+ */
+export const SSH_HOST_KEY_POLICIES = ['strict', 'accept-new', 'off'] as const
+
+export type SshHostKeyPolicy = (typeof SSH_HOST_KEY_POLICIES)[number]
+
+/**
+ * The column default, and the behaviour that already existed rather than a new
+ * restriction: ansible's own `HOST_KEY_CHECKING` defaults to on, so first
+ * contact with an unseen host already failed closed.
+ *
+ * Both forms seed it rather than letting an absent value read as `off`, which
+ * would misreport a workspace nobody has touched as accepting any host key.
+ */
+export const DEFAULT_SSH_HOST_KEY_POLICY: SshHostKeyPolicy = 'strict'
+
+/**
+ * The policy a stored value reads as.
+ *
+ * Total by construction, which is the property that matters: a value this
+ * could not name would render the select blank and lose the operator's setting
+ * on the next save. An older API that predates the attribute sends nothing,
+ * and a 1.x one could send the boolean this replaced -- `true` was `strict`
+ * and `false` was `off`, which is the conversion the migration applied -- so
+ * both are read rather than falling through to the default, because reading
+ * `false` as `strict` would tell an operator their fleet is verifying when the
+ * server says it is not.
+ */
+export function asSshHostKeyPolicy(raw: unknown): SshHostKeyPolicy {
+  if (typeof raw === 'string' && (SSH_HOST_KEY_POLICIES as readonly string[]).includes(raw)) {
+    return raw as SshHostKeyPolicy
+  }
+  if (raw === false) return 'off'
+  return DEFAULT_SSH_HOST_KEY_POLICY
+}
+
 export interface SplitKnownHostsEntry {
   keyType: SshHostKeyType
   publicKey: string

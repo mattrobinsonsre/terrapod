@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Declared inventory plugins — a YAML source carrying a top-level plugin key — permit, when the runner resolves the inventory. One, Terrapod itself never runs, in either state. While off this is, refused by name a plugin source is, rather than resolved to a partial host set; while on it is, explicitly partial per source the inventory shown here is, and the authoritative one is the set the runner resolves.",
       "inventoryScriptsEnabled": "scripts, Inventory",
       "inventoryScriptsEnabledHint": "Executable inventory scripts, permit, when the runner resolves the inventory. From dynamic inventory plugins, separate it is, so that declared plugin configs — which name a collection and can be read before they run — allowed can be, without arbitrary executables also being allowed.",
-      "ansibleHostKeyChecking": "Checking, SSH host key",
-      "ansibleHostKeyCheckingHint": "On by default, it is — Ansible's own way, this is. A host whose key it does not already trust, a configure refuses. Off turn it, and any key a host presents, accepted it is; intercepted, the connection can be. The host's public key with the machine credential, supply, and on the verification stays instead. Over this setting, a per-host Ansible variable still wins, either way, hmm.",
       "oidcAudiencesLead": "A short-lived OpenID Connect token per provider configuration, Terrapod mints, and where the run can read it, it writes.",
       "driftIgnoreRulesLead": "Terraform addresses and attribute paths, the drift classifier suppresses. A bare address with no attribute, every change to that resource it silences.",
       "dynamicInventoryEnabledLead": "Declared inventory plugins, permit, when the runner resolves the inventory. Partial per source, the inventory shown here then becomes, and the authoritative one is the set the runner resolves.",
       "inventoryScriptsEnabledLead": "Executable inventory scripts, permit. Inside the runner Job, with its cloud identity, before the playbook does, an arbitrary executable from the repository then runs — and partial the inventory shown here becomes.",
-      "ansibleHostKeyCheckingLead": "On by default, it is — Ansible's own way, this is. A protection it relaxes when off: any key a host presents, accepted it is, so intercepted the connection can be.",
       "bindPlanLead": "On, exactly the plan the preview saved, the update applies — so fail the update, anything changed since the preview does, instead of applied being.",
       "configDirectoryLead": "Relative to the repository root, where ansible.cfg, the playbooks, roles/, group_vars/ and host_vars/ live, this is. The root itself, empty means.",
       "ansibleCollectionsLead": "Before a configure runs, installed the collections are, one per line as namespace.name or namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Time zone, schedule",
       "scheduledConfigureTimezoneHint": "In the IANA zone the schedule is read, so daylight saving the hour follows — UTC, Europe/London or America/New_York, for example. UTC, empty means.",
       "scheduledConfigureTimezonePlaceholder": "e.g. Europe/London",
-      "scheduledConfigureLastAt": "Run, last scheduled"
+      "scheduledConfigureLastAt": "Run, last scheduled",
+      "sshHostKeyPolicy": "Policy, the SSH host key",
+      "sshHostKeyPolicyStrict": "Every host, verify",
+      "sshHostKeyPolicyAcceptNew": "On first contact, trust",
+      "sshHostKeyPolicyOff": "Verify, do not",
+      "sshHostKeyPolicyLead": "Which of OpenSSH's three answers a configure asks for, this is. Trusting on first contact, a changed key it still refuses; not verifying, any key a host presents it accepts, so intercepted the connection can be.",
+      "sshHostKeyPolicyHint": "Each host's approved keys as the known_hosts file OpenSSH checks against, Terrapod renders, and the StrictHostKeyChecking value the run asks for, this setting is. An allow-list that file is, and process-wide the setting is, so verifying every host, an address nobody has approved a key for it makes unreachable rather than merely unverified. The mixed-fleet answer, trusting on first contact is: strictly verified the approved keys still are, while an unpinned host connects once and refused it is, if its key later changes. Override it, nothing in the inventory can, hmm."
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

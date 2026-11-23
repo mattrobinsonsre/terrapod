@@ -176,7 +176,7 @@ export default function BulkUpdatePage() {
   // dynamic inventory does it across the workspaces that should have it.
   const [uDynamicInventoryEnabled, setUDynamicInventoryEnabled] = useState('')
   const [uInventoryScriptsEnabled, setUInventoryScriptsEnabled] = useState('')
-  const [uAnsibleHostKeyChecking, setUAnsibleHostKeyChecking] = useState('')
+  const [uSshHostKeyPolicy, setUSshHostKeyPolicy] = useState('')
   // BOTH explicitly false is the only combination that can never succeed for
   // any matched workspace, so it is the only one blocked here. Turning just
   // plan/apply off is legitimate for a set that has configure on, and the
@@ -357,8 +357,11 @@ export default function BulkUpdatePage() {
       u['dynamic-inventory-enabled'] = uDynamicInventoryEnabled === 'true'
     if (uInventoryScriptsEnabled)
       u['inventory-scripts-enabled'] = uInventoryScriptsEnabled === 'true'
-    if (uAnsibleHostKeyChecking)
-      u['ansible-host-key-checking'] = uAnsibleHostKeyChecking === 'true'
+    // Sent as the string the server validates against, not coerced: the
+    // endpoint refuses a boolean on this attribute BY NAME since #2592, saying
+    // which of the three values `true` used to mean, so a coercion here would
+    // turn an actionable 422 into a fleet write of the wrong policy.
+    if (uSshHostKeyPolicy) u['ssh-host-key-policy'] = uSshHostKeyPolicy
     // Not `if (uConfigDirectory.trim())` — see the state comment: '' is a
     // value here (the configuration version's root), so the checkbox is what
     // says whether to write this at all. Never `null`: an explicit null on
@@ -554,6 +557,11 @@ export default function BulkUpdatePage() {
    * here the moment it is declared, which is the point of the registry holding
    * the gate at all. Every tri-state boolean on this surface is listed, not
    * only the ones that happen to gate something today.
+   *
+   * `ssh-host-key-policy` is absent BECAUSE IT IS NOT ONE (#2592) -- it has
+   * three real values plus this form's "unchanged", so there is no 'false' for
+   * `gateOff` to find, and nothing gates on it anyway. Listed here it would be
+   * a string this map claims is a boolean.
    */
   const booleanValues: Record<string, string> = {
     'plan-apply-enabled': uPlanApplyEnabled,
@@ -564,7 +572,6 @@ export default function BulkUpdatePage() {
     'scheduled-configure-enabled': uScheduledConfigureEnabled,
     'dynamic-inventory-enabled': uDynamicInventoryEnabled,
     'inventory-scripts-enabled': uInventoryScriptsEnabled,
-    'ansible-host-key-checking': uAnsibleHostKeyChecking,
     'terragrunt-enabled': uTerragruntEnabled,
     'auto-merge': uAutoMerge,
     'drift-detection-enabled': uDriftEnabled,
@@ -1179,27 +1186,35 @@ export default function BulkUpdatePage() {
           </select>
           {tieredHint(tWs, 'fields.inventoryScriptsEnabledHint')}
         </div>
-        {/* Whether a configure verifies the host key of the hosts it
-            targets (#2318). Tri-state like every select on this surface:
-            the column defaults TRUE, but "unchanged" is a real value
-            here, so a fleet write says nothing about a workspace the
-            operator left alone. */}
+        {/* How a configure verifies the host keys of the hosts it targets
+            (#2318). FOUR options since #2592, not three: the attribute itself
+            has three states, and "unchanged" is a real value on this surface
+            on top of them, so a fleet write says nothing about a workspace the
+            operator left alone. That extra state is why this keeps its own
+            control rather than sharing `SshHostKeyPolicySelect` with the three
+            surfaces that set a concrete value -- the same reasoning that keeps
+            the two dynamic-inventory grants separate here. */}
         <div className="min-w-0">
-          <label className={labelCls} htmlFor="bu-ansible-host-key-checking">
-            {tWs('fields.ansibleHostKeyChecking')}
+          <label className={labelCls} htmlFor="bu-ssh-host-key-policy">
+            {tWs('fields.sshHostKeyPolicy')}
           </label>
           <select
-            id="bu-ansible-host-key-checking"
-            value={uAnsibleHostKeyChecking}
-            onChange={(e) => setUAnsibleHostKeyChecking(e.target.value)}
-            disabled={gateOff('ansible-host-key-checking')}
+            id="bu-ssh-host-key-policy"
+            value={uSshHostKeyPolicy}
+            onChange={(e) => setUSshHostKeyPolicy(e.target.value)}
+            disabled={gateOff('ssh-host-key-policy')}
             className={inputCls}
           >
             <option value="">{t('unchangedOption')}</option>
-            <option value="true">{tCommon('yes')}</option>
-            <option value="false">{tCommon('no')}</option>
+            {/* Each label spelled LITERALLY, as the shared select spells its
+                three: a computed `t(KEY[p])` is invisible to `i18n:check`, so a
+                missing translation would reach the browser as a raw key rather
+                than failing the build. */}
+            <option value="strict">{tWs('fields.sshHostKeyPolicyStrict')}</option>
+            <option value="accept-new">{tWs('fields.sshHostKeyPolicyAcceptNew')}</option>
+            <option value="off">{tWs('fields.sshHostKeyPolicyOff')}</option>
           </select>
-          {tieredHint(tWs, 'fields.ansibleHostKeyCheckingHint')}
+          {tieredHint(tWs, 'fields.sshHostKeyPolicyHint')}
         </div>
         <div className="min-w-0">
           <label className={labelCls} title={tWs('fields.ansibleVersionTitle')}>

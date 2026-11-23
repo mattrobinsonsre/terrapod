@@ -59,7 +59,13 @@ export const HINT_LEADS: Record<string, string> = {
   'fields.driftIgnoreRulesHint': 'fields.driftIgnoreRulesLead',
   'fields.dynamicInventoryEnabledHint': 'fields.dynamicInventoryEnabledLead',
   'fields.inventoryScriptsEnabledHint': 'fields.inventoryScriptsEnabledLead',
-  'fields.ansibleHostKeyCheckingHint': 'fields.ansibleHostKeyCheckingLead',
+  // Three-state since #2592, and the lead carries the half an operator must
+  // not have to open anything for: that not verifying accepts any key a host
+  // presents, and that trusting on first contact still refuses a changed one.
+  // The mechanism -- the rendered file being an allow-list, and the setting
+  // being process-wide, which together are why the middle state exists at all
+  // -- goes behind the icon.
+  'fields.sshHostKeyPolicyHint': 'fields.sshHostKeyPolicyLead',
   'fields.bindPlanHelp': 'fields.bindPlanLead',
   // A hover `title` until now, which `AGENTS.md` forbids for explanation: it is
   // unreachable on touch and invisible to a keyboard. 257 characters of it.

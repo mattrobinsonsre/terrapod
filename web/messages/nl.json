@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Staat gedeclareerde inventaris-plug-ins toe — een YAML-bron met een plugin-sleutel op het hoogste niveau — wanneer de runner de inventaris oplost. Terrapod voert er zelf nooit een uit, in geen van beide standen. Zolang dit uit staat, wordt een plug-inbron bij naam geweigerd in plaats van tot een onvolledige hostlijst op te lossen; zolang het aan staat, is de hier weergegeven inventaris per bron uitdrukkelijk onvolledig, en is de door de runner opgeloste verzameling bepalend.",
       "inventoryScriptsEnabled": "Inventaris-scripts",
       "inventoryScriptsEnabledHint": "Staat uitvoerbare inventaris-scripts toe wanneer de runner de inventaris oplost. Gescheiden van dynamische inventaris-plug-ins, zodat gedeclareerde plug-inconfiguraties, die een collection benoemen en vóór uitvoering gelezen kunnen worden, toegestaan kunnen worden zonder ook willekeurige uitvoerbare bestanden toe te staan.",
-      "ansibleHostKeyChecking": "SSH-hostsleutelcontrole",
-      "ansibleHostKeyCheckingHint": "Staat standaard aan, en dat is het eigen gedrag van Ansible: een configure-run weigert een host waarvan hij de sleutel nog niet vertrouwt. Zet je het uit, dan wordt elke sleutel die een host aanbiedt geaccepteerd, zodat de verbinding kan worden afgeluisterd — beter is het de publieke sleutel van de host bij de machinereferentie aan te leveren en de controle aan te laten. Een Ansible-variabele per host gaat in beide gevallen voor op deze instelling.",
       "oidcAudiencesLead": "Terrapod geeft per providerconfiguratie een kortlevend OpenID Connect-token uit en schrijft het daar waar de uitvoering het kan lezen.",
       "driftIgnoreRulesLead": "Terraform-adressen en attribuutpaden die de drift-classificator onderdrukt. Een kaal adres zonder attribuut dempt elke wijziging aan die resource.",
       "dynamicInventoryEnabledLead": "Staat gedeclareerde inventaris-plug-ins toe wanneer de runner de inventaris oplost. De hier weergegeven inventaris wordt dan per bron onvolledig, en de door de runner opgeloste verzameling is bepalend.",
       "inventoryScriptsEnabledLead": "Staat uitvoerbare inventaris-scripts toe. Een willekeurig uitvoerbaar bestand uit de repository wordt dan binnen de runner-Job uitgevoerd, met de cloudidentiteit daarvan, nog vóór het playbook draait — en de hier weergegeven inventaris wordt onvolledig.",
-      "ansibleHostKeyCheckingLead": "Staat standaard aan, zoals Ansible zelf doet. Versoepelt een beveiliging als dit uit staat: elke sleutel die een host aanbiedt wordt geaccepteerd, zodat de verbinding kan worden afgeluisterd.",
       "bindPlanLead": "Als dit aan staat, past de update precies het plan toe dat de preview heeft opgeslagen, zodat alles wat sinds de preview is veranderd de update laat mislukken in plaats van te worden toegepast.",
       "configDirectoryLead": "Waar ansible.cfg, de playbooks, roles/, group_vars/ en host_vars/ staan, relatief ten opzichte van de repositorywortel. Leeg betekent de wortel zelf.",
       "ansibleCollectionsLead": "Collections die worden geïnstalleerd voordat een configure draait, één per regel als namespace.name of namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Tijdzone van het schema",
       "scheduledConfigureTimezoneHint": "De IANA-zone waarin het schema wordt gelezen, zodat het uur de zomertijd volgt — bijvoorbeeld UTC, Europe/London of America/New_York. Leeg betekent UTC.",
       "scheduledConfigureTimezonePlaceholder": "bijv. Europe/London",
-      "scheduledConfigureLastAt": "Laatste geplande uitvoering"
+      "scheduledConfigureLastAt": "Laatste geplande uitvoering",
+      "sshHostKeyPolicy": "SSH-hostsleutelbeleid",
+      "sshHostKeyPolicyStrict": "Elke host controleren",
+      "sshHostKeyPolicyAcceptNew": "Vertrouwen bij eerste contact",
+      "sshHostKeyPolicyOff": "Niet controleren",
+      "sshHostKeyPolicyLead": "Welk van de drie antwoorden van OpenSSH een configure-run vraagt. Vertrouwen bij eerste contact weigert een gewijzigde sleutel nog steeds; niet controleren accepteert elke sleutel die een host aanbiedt, zodat de verbinding kan worden afgeluisterd.",
+      "sshHostKeyPolicyHint": "Terrapod maakt van de goedgekeurde sleutels van elke host het known_hosts-bestand waartegen OpenSSH controleert, en deze instelling is de StrictHostKeyChecking-waarde die de run vraagt. Dat bestand is een witte lijst en de instelling geldt voor het hele proces: controleer je elke host, dan is een adres waarvoor niemand een sleutel heeft goedgekeurd niet alleen ongecontroleerd maar onbereikbaar. Vertrouwen bij eerste contact is het antwoord voor een gemengd park: goedgekeurde sleutels blijven streng gecontroleerd, en een host die niemand heeft vastgelegd verbindt één keer en wordt geweigerd als zijn sleutel later verandert. Niets in de inventaris kan dit overrulen."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

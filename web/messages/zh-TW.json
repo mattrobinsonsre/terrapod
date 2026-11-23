@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "允許 runner 解析清單時使用已宣告的清單外掛，也就是帶有頂層 plugin 鍵的 YAML 來源。Terrapod 本身在兩種狀態下都不會執行外掛。關閉時，外掛來源會被指名拒絕，而不是解析成不完整的主機集合；開啟時，此處顯示的清單會按來源明確標示為不完整，由 runner 解析出的集合才是權威結果。",
       "inventoryScriptsEnabled": "清單指令碼",
       "inventoryScriptsEnabledHint": "允許 runner 解析清單時使用可執行的清單指令碼。與動態清單外掛分開設定，這樣便可只允許已宣告的外掛設定——它們指明了一個集合，且在執行前可以讀取——而不必同時允許任意可執行檔。",
-      "ansibleHostKeyChecking": "SSH 主機金鑰檢查",
-      "ansibleHostKeyCheckingHint": "預設開啟，這也是 Ansible 自身的行為：設定會拒絕其金鑰尚未受信任的主機。關閉後，主機出示的任何金鑰都會被接受，連線因而可能被攔截——較好的做法是隨機器憑證一併提供主機的公開金鑰，並維持檢查開啟。無論哪種情況，針對單一主機的 Ansible 變數都優先於此設定。",
       "oidcAudiencesLead": "Terrapod 為每個 provider 設定簽發一個短期的 OpenID Connect 權杖，並寫入執行可讀取的位置。",
       "driftIgnoreRulesLead": "漂移分類器所抑制的 Terraform 地址與屬性路徑。沒有屬性的裸地址會靜默該資源的所有更改。",
       "dynamicInventoryEnabledLead": "允許 runner 解析清單時使用已宣告的清單外掛。此後此處顯示的清單會按來源變得不完整，由 runner 解析出的集合才是權威結果。",
       "inventoryScriptsEnabledLead": "允許使用可執行的清單指令碼。此後儲存庫中的任意可執行檔會在 playbook 之前，在 runner Job 內以其雲端身分執行 — 而此處顯示的清單也會變得不完整。",
-      "ansibleHostKeyCheckingLead": "預設開啟，這也是 Ansible 自身的行為。關閉會放寬一項保護：主機出示的任何金鑰都會被接受，連線因而可能被攔截。",
       "bindPlanLead": "開啟後，更新會嚴格套用預覽儲存的計畫，因此自預覽以來的任何變化都會使更新失敗，而不會被套用。",
       "configDirectoryLead": "ansible.cfg、playbook、roles/、group_vars/ 與 host_vars/ 所在的位置，相對於儲存庫根目錄。留空即表示根目錄本身。",
       "ansibleCollectionsLead": "在設定執行前安裝的集合，每行一個，格式為 namespace.name 或 namespace.name:version。",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "排程時區",
       "scheduledConfigureTimezoneHint": "解讀排程所用的 IANA 時區，因此小時會跟隨日光節約時間 —— 例如 UTC、Europe/London 或 America/New_York。留空表示 UTC。",
       "scheduledConfigureTimezonePlaceholder": "例如 Europe/London",
-      "scheduledConfigureLastAt": "上次排程執行"
+      "scheduledConfigureLastAt": "上次排程執行",
+      "sshHostKeyPolicy": "SSH 主機金鑰原則",
+      "sshHostKeyPolicyStrict": "檢查每一台主機",
+      "sshHostKeyPolicyAcceptNew": "首次連線時信任",
+      "sshHostKeyPolicyOff": "不檢查",
+      "sshHostKeyPolicyLead": "設定向 OpenSSH 要求三種回答中的哪一種。首次連線時信任仍會拒絕已變更的金鑰；不檢查則主機出示的任何金鑰都會被接受，連線因而可能被攔截。",
+      "sshHostKeyPolicyHint": "Terrapod 會把每一台主機已核准的金鑰產生為 OpenSSH 用來比對的 known_hosts 檔案，而此設定就是執行所要求的 StrictHostKeyChecking 值。該檔案是一份允許清單，且該設定作用於整個行程：若檢查每一台主機，無人核准過金鑰的位址不只是未經檢查，而是無法連通。首次連線時信任是混合環境下的答案：已核准的金鑰仍以嚴格方式檢查，而無人釘選過的主機可以連線一次，之後其金鑰若有變動便會被拒絕。清單中的任何內容都無法覆寫它。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

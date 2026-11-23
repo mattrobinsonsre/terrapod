@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Tillater deklarerte inventar-plugins — en YAML-kilde med en plugin-nøkkel på øverste nivå — når runneren løser opp inventaret. Terrapod kjører aldri et selv, i ingen av de to tilstandene. Så lenge dette er av, avvises en pluginkilde ved navn i stedet for å løses opp til et ufullstendig vertssett; så lenge det er på, er inventaret som vises her uttrykkelig ufullstendig per kilde, og settet runneren løser opp er det som gjelder.",
       "inventoryScriptsEnabled": "Inventar-skript",
       "inventoryScriptsEnabledHint": "Tillater kjørbare inventar-skript når runneren løser opp inventaret. Holdt atskilt fra dynamiske inventar-plugins, slik at deklarerte pluginkonfigurasjoner, som navngir en collection og kan leses før de kjører, kan tillates uten også å tillate vilkårlige kjørbare filer.",
-      "ansibleHostKeyChecking": "Kontroll av SSH-vertsnøkkel",
-      "ansibleHostKeyCheckingHint": "Slått på som standard, som er Ansibles egen oppførsel: en konfigurasjonskjøring avviser en vert hvis nøkkel den ikke allerede stoler på. Slår du den av, godtas enhver nøkkel en vert viser fram, slik at forbindelsen kan avlyttes — det er bedre å oppgi vertens offentlige nøkkel sammen med maskinlegitimasjonen og la kontrollen stå på. En Ansible-variabel per vert går uansett foran denne innstillingen.",
       "oidcAudiencesLead": "Terrapod utsteder et kortlevd OpenID Connect-token per providerkonfigurasjon og skriver det der kjøringen kan lese det.",
       "driftIgnoreRulesLead": "Terraform-adresser og attributtstier som avdriftsklassifisereren undertrykker. En bar adresse uten attributt demper enhver endring på den ressursen.",
       "dynamicInventoryEnabledLead": "Tillater deklarerte inventar-plugins når runneren løser opp inventaret. Inventaret som vises her blir da ufullstendig per kilde, og settet runneren løser opp er det som gjelder.",
       "inventoryScriptsEnabledLead": "Tillater kjørbare inventar-skript. En vilkårlig kjørbar fil fra repositoriet kjører da inne i runner-Jobben, med dens skyidentitet, før playbooken kjører — og inventaret som vises her blir ufullstendig.",
-      "ansibleHostKeyCheckingLead": "Slått på som standard, slik Ansible selv gjør. Svekker en beskyttelse når den er av: enhver nøkkel en vert viser fram godtas, slik at forbindelsen kan avlyttes.",
       "bindPlanLead": "Når dette er på, bruker oppdateringen nøyaktig planen forhåndsvisningen lagret, så alt som har endret seg siden forhåndsvisningen får oppdateringen til å feile i stedet for å bli tatt i bruk.",
       "configDirectoryLead": "Hvor ansible.cfg, playbookene, roles/, group_vars/ og host_vars/ ligger, relativt til depotroten. Tomt betyr roten selv.",
       "ansibleCollectionsLead": "Samlinger som installeres før en configure kjører, én per linje som namespace.name eller namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Tidsplanens tidssone",
       "scheduledConfigureTimezoneHint": "IANA-sonen tidsplanen leses i, slik at timen følger sommertid — for eksempel UTC, Europe/London eller America/New_York. Tomt betyr UTC.",
       "scheduledConfigureTimezonePlaceholder": "f.eks. Europe/London",
-      "scheduledConfigureLastAt": "Siste planlagte kjøring"
+      "scheduledConfigureLastAt": "Siste planlagte kjøring",
+      "sshHostKeyPolicy": "Policy for SSH-vertsnøkkel",
+      "sshHostKeyPolicyStrict": "Kontrollér hver vert",
+      "sshHostKeyPolicyAcceptNew": "Stol på ved første kontakt",
+      "sshHostKeyPolicyOff": "Ikke kontrollér",
+      "sshHostKeyPolicyLead": "Hvilket av OpenSSHs tre svar en konfigurasjonskjøring ber om. Å stole på ved første kontakt avviser fortsatt en endret nøkkel; å ikke kontrollere godtar enhver nøkkel en vert viser fram, slik at forbindelsen kan avlyttes.",
+      "sshHostKeyPolicyHint": "Terrapod bygger hver verts godkjente nøkler til den known_hosts-filen OpenSSH kontrollerer mot, og denne innstillingen er den StrictHostKeyChecking-verdien kjøringen ber om. Filen er en tillatelsesliste, og innstillingen gjelder hele prosessen: kontrolleres hver vert, er en adresse ingen har godkjent en nøkkel for ikke bare ukontrollert, men uoppnåelig. Å stole på ved første kontakt er svaret for en blandet flåte: godkjente nøkler kontrolleres fortsatt strengt, mens en vert ingen har festet kobler seg til én gang og avvises hvis nøkkelen senere endres. Ingenting i inventaret kan overstyre det."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

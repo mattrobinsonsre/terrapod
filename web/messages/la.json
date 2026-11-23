@@ -2957,13 +2957,10 @@
       "dynamicInventoryEnabledHint": "Interpolamenta inventarii declarata permittit — fontem YAML clavem plugin in summo gradu ferentem — cum cursor inventarium resolvit. Terrapod ipse nullum umquam exsequitur, in neutro statu. Dum hoc exstinctum est, fons interpolamenti nominatim recusatur potius quam in partem hospitum resolvitur; dum accensum est, inventarium hic ostensum per singulos fontes aperte partiale est, et copia quam cursor resolvit auctoritatem habet.",
       "inventoryScriptsEnabled": "Scripta inventarii",
       "inventoryScriptsEnabledHint": "Scripta inventarii exsecutabilia permittit cum cursor inventarium resolvit. Ab interpolamentis inventarii dynamici separatum est, ut configurationes interpolamenti declaratae, quae collectionem nominant et ante exsecutionem legi possunt, permitti queant sine licentia quorumlibet exsecutabilium.",
-      "ansibleHostKeyChecking": "Inspectio clavis hospitis SSH",
-      "ansibleHostKeyCheckingHint": "Praedefinite accensa, quod est mos ipsius Ansible: configuratio hospitem respuit cuius clavi nondum confidit. Si eam exstinxeris, quaelibet clavis quam hospes praebet accipitur, itaque conexio intercipi potest — melius est clavem publicam hospitis cum credentiali machinae praebere et inspectionem accensam relinquere. Variabilis Ansible pro singulis hospitibus huic optioni utroque modo praevalet.",
       "oidcAudiencesLead": "Terrapod pro singulis configurationibus provider tesseram OpenID Connect brevis aevi emittit eamque ibi scribit ubi exsecutio eam legere potest.",
       "driftIgnoreRulesLead": "Inscriptiones Terraform et semitae attributorum quas classificator aberrationis supprimit. Inscriptio nuda, sine attributo, quamvis mutationem illius facultatis silet.",
       "dynamicInventoryEnabledLead": "Interpolamenta inventarii declarata permittit cum cursor inventarium resolvit. Inventarium hic ostensum tunc per singulos fontes partiale fit, et copia quam cursor resolvit auctoritatem habet.",
       "inventoryScriptsEnabledLead": "Scripta inventarii exsecutabilia permittit. Exsecutabile quodlibet ex repositorio tunc intra Job cursoris currit, cum identitate nubis eius, priusquam libellus ludendi currat — et inventarium hic ostensum partiale fit.",
-      "ansibleHostKeyCheckingLead": "Praedefinite accensa, sicut ipse Ansible facit. Praesidium relaxat cum exstincta est: quaelibet clavis quam hospes praebet accipitur, itaque conexio intercipi potest.",
       "bindPlanLead": "Cum activatum est, renovatio ipsum consilium quod praevisio servavit adhibet, ita ut quidquid post praevisionem mutatum est renovationem deficere faciat potius quam adhibeatur.",
       "configDirectoryLead": "Ubi ansible.cfg, libelli ludendi, roles/, group_vars/ et host_vars/ habitant, relative ad radicem repositorii. Vacuum ipsam radicem significat.",
       "ansibleCollectionsLead": "Collectiones ante configure exsecutum institutae, una per lineam ut namespace.name vel namespace.name:version.",
@@ -2996,7 +2993,13 @@
       "scheduledConfigureTimezone": "Zona temporis horarii",
       "scheduledConfigureTimezoneHint": "Zona IANA in qua horarium legitur, ut hora tempus aestivum sequatur: exempli gratia UTC, Europe/London vel America/New_York. Vacuum UTC significat.",
       "scheduledConfigureTimezonePlaceholder": "ex. gr. Europe/London",
-      "scheduledConfigureLastAt": "Ultima executio praedestinata"
+      "scheduledConfigureLastAt": "Ultima executio praedestinata",
+      "sshHostKeyPolicy": "Ratio clavis hospitis SSH",
+      "sshHostKeyPolicyStrict": "Omnem hospitem inspicere",
+      "sshHostKeyPolicyAcceptNew": "Primo congressu confidere",
+      "sshHostKeyPolicyOff": "Non inspicere",
+      "sshHostKeyPolicyLead": "Quam ex tribus responsis OpenSSH configuratio poscat. Primo congressu confidere clavem mutatam adhuc respuit; non inspicere quamlibet clavem quam hospes praebet accipit, itaque conexio intercipi potest.",
+      "sshHostKeyPolicyHint": "Terrapod claves cuiusque hospitis probatas in tabellam known_hosts componit, ad quam OpenSSH inspicit, et haec optio est valor StrictHostKeyChecking quem cursus poscit. Illa tabella index permissorum est et optio per totum processum valet: si omnis hospes inspicitur, locus cui nemo clavem probavit non modo non inspectus sed inaccessus est. Primo congressu confidere responsum est gregi mixto: claves probatae adhuc severe inspiciuntur, hospes autem quem nemo fixit semel conectitur et respuitur si clavis eius postea mutatur. Nihil in inventario hoc vincere potest."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
