@@ -215,7 +215,7 @@ class RunnerConfig:
             # `strict` when absent, which is the safe direction for a runner
             # claiming a run from an API that predates the policy: it enforces
             # rather than relaxing.
-            ssh_host_key_policy=os.environ.get("TP_SSH_HOST_KEY_POLICY") or "strict",
+            ssh_host_key_policy=e.get("TP_SSH_HOST_KEY_POLICY") or "strict",
             refresh_only=_bool("TP_REFRESH_ONLY"),
             allow_empty_apply=_bool("TP_ALLOW_EMPTY_APPLY"),
             destroy=_bool("TP_DESTROY"),

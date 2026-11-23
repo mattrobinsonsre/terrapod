@@ -159,12 +159,12 @@ class TestTheNativeSurfaceServesEveryEngine:
         "inventory-scripts-enabled": (
             "an Ansible concept; the TFE surface serves Terraform alone (#2033)"
         ),
-        # Whether a configure verifies the SSH host key of each host it targets
-        # (#2318). Native-only for the same two reasons as its neighbours: it
-        # governs an Ansible connection, and no `terraform`/`tofu`/`tfci`
-        # invocation makes one.
-        "ansible-host-key-checking": (
-            "an Ansible connection setting; the TFE surface serves Terraform alone (#2318)"
+        # HOW a configure verifies the SSH host keys of the hosts it targets --
+        # `strict`, `accept-new` or `off` (#2592, replacing #2318's boolean).
+        # Native-only for the same two reasons as its neighbours: it governs an
+        # Ansible connection, and no `terraform`/`tofu`/`tfci` invocation makes one.
+        "ssh-host-key-policy": (
+            "an Ansible connection setting; the TFE surface serves Terraform alone (#2592)"
         ),
         "storage-location": (
             "a Terrapod deployment concept; no `terraform`/`tofu`/`tfci` invocation reads it"
@@ -319,6 +319,233 @@ class TestStorageLocationAgainstRealPostgres:
             )
             assert r.status_code == 422, r.text
             assert expected in r.json()["detail"], r.text
+
+
+class TestTheSshHostKeyPolicyAgainstRealPostgres:
+    """The three-state policy through the real native routes (#2592).
+
+    Three things only a real row can answer: that each of the three stores and
+    reads back BYTE-EXACTLY -- the Terraform provider writes the server's answer
+    into state, so a normalised value is "Provider produced inconsistent result
+    after apply" on every apply -- that an invalid one is refused rather than
+    coerced, and the SNAPSHOT ASYMMETRY at the bottom, which is a contrast
+    between two live rows and the one thing a mocked test cannot see.
+    """
+
+    POLICIES = ("strict", "accept-new", "off")
+
+    async def _make(self, client, name: str, **attrs) -> tuple[str, dict]:
+        r = await client.post(
+            NATIVE,
+            json={"data": {"attributes": {"name": name, **attrs}}},
+            headers=AUTH,
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["data"]["id"], r.json()["data"]["attributes"]
+
+    async def _read(self, client, wid: str) -> dict:
+        r = await client.get(f"{NATIVE}/{wid}", headers=AUTH)
+        assert r.status_code == 200, r.text
+        return r.json()["data"]["attributes"]
+
+    @pytest.mark.parametrize("policy", POLICIES)
+    async def test_each_policy_round_trips_on_create(self, app, client, policy):
+        set_auth(app, admin_user())
+        wid, created = await self._make(
+            client, f"hk-create-{policy}", **{"ssh-host-key-policy": policy}
+        )
+        assert created["ssh-host-key-policy"] == policy
+        assert (await self._read(client, wid))["ssh-host-key-policy"] == policy
+
+    async def test_absent_is_strict_rather_than_null(self, app, client):
+        """The column is `NOT NULL` with a `strict` default, and `strict` is the
+        behaviour that already existed: ansible's own `HOST_KEY_CHECKING`
+        defaults true, so first contact with an unseen host already failed
+        closed."""
+        set_auth(app, admin_user())
+        _, created = await self._make(client, "hk-absent")
+        assert created["ssh-host-key-policy"] == "strict"
+
+    @pytest.mark.parametrize("policy", POLICIES)
+    async def test_patch_reaches_every_policy_from_every_other(self, app, client, policy):
+        """Including `strict` -> `strict`, which is the no-op a client sending the
+        whole document on every write performs constantly."""
+        set_auth(app, admin_user())
+        wid, _ = await self._make(client, f"hk-patch-{policy}")
+        for target in (policy, *self.POLICIES):
+            r = await client.patch(
+                f"{NATIVE}/{wid}",
+                json={"data": {"attributes": {"ssh-host-key-policy": target}}},
+                headers=AUTH,
+            )
+            assert r.status_code == 200, r.text
+            assert r.json()["data"]["attributes"]["ssh-host-key-policy"] == target
+            assert (await self._read(client, wid))["ssh-host-key-policy"] == target
+
+    @pytest.mark.parametrize(
+        ("bad", "expected"),
+        [
+            ("yes", "ssh-host-key-policy"),
+            ("no", "ssh-host-key-policy"),
+            ("STRICT", "ssh-host-key-policy"),
+            ("", "ssh-host-key-policy"),
+            (True, "ansible-host-key-checking"),
+            (7, "ssh-host-key-policy"),
+        ],
+    )
+    async def test_an_invalid_policy_is_refused_on_create_and_on_patch(
+        self, app, client, bad, expected
+    ):
+        """A 422 naming the field, not a 500 from the column's length.
+
+        `True` expects the RETIRED attribute in the message instead, because that
+        is what a caller sending a boolean is using -- a message listing three
+        strings with no hint that the spelling is gone leaves them guessing.
+        """
+        set_auth(app, admin_user())
+        created = await client.post(
+            NATIVE,
+            json={"data": {"attributes": {"name": f"hk-bad-{bad}", "ssh-host-key-policy": bad}}},
+            headers=AUTH,
+        )
+        assert created.status_code == 422, created.text
+        assert expected in created.json()["detail"], created.text
+
+        wid, _ = await self._make(client, f"hk-badpatch-{bad}")
+        patched = await client.patch(
+            f"{NATIVE}/{wid}",
+            json={"data": {"attributes": {"ssh-host-key-policy": bad}}},
+            headers=AUTH,
+        )
+        assert patched.status_code == 422, patched.text
+        assert expected in patched.json()["detail"], patched.text
+        # And the refused write changed nothing.
+        assert (await self._read(client, wid))["ssh-host-key-policy"] == "strict"
+
+    @pytest.mark.parametrize("policy", ["accept-new", "off"])
+    async def test_the_fleet_surface_sets_it_too(self, app, client, policy):
+        """Bulk update, which is the surface an operator with a fleet uses.
+
+        A fleet reached through a bastion that rewrites host keys is exactly the
+        case the setting exists for, and editing it one workspace at a time is
+        what this surface exists to avoid.
+        """
+        import uuid as _uuid
+
+        set_auth(app, admin_user())
+        tag = _uuid.uuid4().hex[:8]
+        ids = [
+            (await self._make(client, f"hk-bulk-{tag}-{i}", labels={"grp": tag}))[0]
+            for i in range(2)
+        ]
+
+        resp = await client.post(
+            "/api/terrapod/v1/workspaces/actions/bulk-update",
+            json={
+                "dry_run": False,
+                "filter": {"labels": {"grp": tag}},
+                "update": {"ssh-host-key-policy": policy},
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 200, resp.text
+
+        for wid in ids:
+            assert (await self._read(client, wid))["ssh-host-key-policy"] == policy
+
+    async def test_the_fleet_surface_refuses_an_invalid_policy(self, app, client):
+        """One rule, shared with the single-workspace write rather than restated
+        -- a second copy is how the two surfaces come to disagree about what is
+        valid."""
+        import uuid as _uuid
+
+        set_auth(app, admin_user())
+        tag = _uuid.uuid4().hex[:8]
+        wid, _ = await self._make(client, f"hk-bulkbad-{tag}", labels={"grp": tag})
+
+        resp = await client.post(
+            "/api/terrapod/v1/workspaces/actions/bulk-update",
+            json={
+                "dry_run": False,
+                "filter": {"labels": {"grp": tag}},
+                "update": {"ssh-host-key-policy": "yes"},
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+        assert (await self._read(client, wid))["ssh-host-key-policy"] == "strict"
+
+    async def test_a_run_pins_the_policy_and_a_later_workspace_edit_does_not_move_it(
+        self, app, client
+    ):
+        """The asymmetry, which is the point of snapshotting it at all.
+
+        A test of the snapshot alone cannot see this: it would pass identically
+        if the run document read the policy LIVE off the workspace, because at
+        creation the two agree. The property is a CONTRAST, so both states have
+        to exist at once -- the run on `off`, the workspace on `strict`, at the
+        same moment.
+
+        Why this direction is the safe one: the policy is a security posture, so
+        a relaxation must not be able to weaken a configure already in flight,
+        and a tightening must not strand a queued run whose fleet nobody has
+        pinned yet. The approved KEYS are read the opposite way, live, so a key
+        marked `revoked` while a run sits queued IS refused by that run.
+        """
+        set_auth(app, admin_user())
+        wid, _ = await self._make(client, "hk-snapshot", **{"ssh-host-key-policy": "off"})
+
+        # A non-VCS workspace needs an uploaded configuration version before a
+        # run can be queued (#358).
+        cv = await client.post(
+            f"/api/v2/workspaces/{wid}/configuration-versions",
+            json={
+                "data": {
+                    "type": "configuration-versions",
+                    "attributes": {"auto-queue-runs": False},
+                }
+            },
+            headers=AUTH,
+        )
+        assert cv.status_code == 201, cv.text
+        upload = await client.put(
+            cv.json()["data"]["attributes"]["upload-url"],
+            content=b"placeholder-tarball-for-tests",
+            headers={"Content-Type": "application/x-tar"},
+        )
+        assert upload.status_code in (200, 204), upload.text
+
+        made = await client.post(
+            "/api/v1/runs",
+            json={
+                "data": {
+                    "type": "runs",
+                    "attributes": {"plan-only": True},
+                    "relationships": {"workspace": {"data": {"type": "workspaces", "id": wid}}},
+                }
+            },
+            headers=AUTH,
+        )
+        assert made.status_code == 201, made.text
+        run_id = made.json()["data"]["id"]
+        assert made.json()["data"]["attributes"]["ssh-host-key-policy"] == "off", (
+            "the run must carry the workspace's policy at creation"
+        )
+
+        tightened = await client.patch(
+            f"{NATIVE}/{wid}",
+            json={"data": {"attributes": {"ssh-host-key-policy": "strict"}}},
+            headers=AUTH,
+        )
+        assert tightened.status_code == 200, tightened.text
+        assert (await self._read(client, wid))["ssh-host-key-policy"] == "strict"
+
+        after = await client.get(f"/api/v1/runs/{run_id}", headers=AUTH)
+        assert after.status_code == 200, after.text
+        assert after.json()["data"]["attributes"]["ssh-host-key-policy"] == "off", (
+            "the run's policy is SNAPSHOTTED: editing the workspace after creation "
+            "must not change what an already-queued run enforces"
+        )
 
 
 class TestTheTfeSurfaceStaysTerraformOnly:

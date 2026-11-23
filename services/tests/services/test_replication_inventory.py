@@ -679,7 +679,7 @@ class TestApprovedHostKeysReplicate:
     """The eighth inventory class (#2592), and the failure it guards is the sharpest.
 
     A host whose approved keys are lost at promotion has NO approved key -- and
-    `ansible_host_key_checking` defaults true and fails closed on first contact, so
+    `ssh_host_key_policy` defaults `strict`, which fails closed on first contact, so
     a configure against that host does not degrade, it refuses the host outright.
     The symptom on the promoted node is every host unreachable with nothing in the
     inventory looking wrong, which is why these rows are not optional.

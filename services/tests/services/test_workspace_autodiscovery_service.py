@@ -626,12 +626,12 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         # half only maintains an inventory wants Configure as its everyday
         # action on every one of its workspaces, not on each one by hand.
         "default_run_kind",
-        # Whether a configure verifies its targets' SSH host keys (#2318).
-        # Templated for the same reason as the version above: a fleet reached
-        # through a bastion that rewrites host keys should not be edited one
-        # workspace at a time. It defaults TRUE, so a rule that says nothing
-        # creates workspaces that verify.
-        "ansible_host_key_checking",
+        # HOW a configure verifies its targets' SSH host keys -- `strict`,
+        # `accept-new` or `off` (#2592). Templated for the same reason as the
+        # version above: a fleet reached through a bastion that rewrites host keys
+        # should not be edited one workspace at a time. It defaults `strict`, so a
+        # rule that says nothing creates workspaces that verify.
+        "ssh_host_key_policy",
         # The collections a configure installs (#1931). Templated for the same
         # reason as the version above: a fleet standardising on an internal
         # collection should not have to be edited one workspace at a time.

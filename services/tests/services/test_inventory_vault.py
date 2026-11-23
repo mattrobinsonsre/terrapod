@@ -378,7 +378,10 @@ def _resolve_with_levels(root: pathlib.Path, monkeypatch) -> dict:
         inventory_paths = ["inv"]
         ansible_version = ""
         hard_limit = ""
-        ansible_host_key_checking = True
+        # No host-key setting here, deliberately: the resolver stopped reading one
+        # when #2592 retired the inventory-variable relaxation, and the policy now
+        # rides the run's own ssh anchor. A stub attribute would say this path
+        # consults a setting it cannot see.
         # Both off, which is the default, and set explicitly: these reach a
         # `bool(...)`, so an auto-attribute would read as TRUE and quietly put
         # the test on the dynamic path.
