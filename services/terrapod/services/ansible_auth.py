@@ -125,15 +125,30 @@ CREDENTIAL_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 #: Envelope field -> nothing; the field names are the placeholder's second half.
 #: `MACHINE_FILE_FIELDS` is the one place that says a field's value is delivered
 #: as a FILE, so a placeholder naming it substitutes that file's path.
-#: `known_hosts` is here and deliberately NOT in `MACHINE_SECRET_FIELDS`: a
-#: host's PUBLIC key is public, so registering it with the log redactor would
-#: corrupt the run's log -- replacing a value an operator needs to read when a
-#: host key does not match -- in exchange for hiding nothing. It is a file
-#: because that is what `-o UserKnownHostsFile=` takes, which is the whole
-#: reason the field exists: without it, the only route past an unknown host is
-#: to disable verification, and a correct default nobody can satisfy becomes a
-#: default everybody turns off (#2318).
-MACHINE_FILE_FIELDS: frozenset[str] = frozenset({"private_key", "known_hosts"})
+#:
+#: **`known_hosts` was here and is retired (#2592).** It was added by #2318 for a
+#: real problem -- without any way to approve a host's key, the only route past an
+#: unknown host was to disable verification, and a correct default nobody can
+#: satisfy becomes a default everybody turns off. The field solved that and the
+#: shape was wrong in three ways that only became visible once the problem was
+#: modelled properly:
+#:
+#: * it is a CREDENTIAL that holds nothing secret, which is why it had to be
+#:   excluded from `MACHINE_SECRET_FIELDS` by hand -- a host's public key is
+#:   public, and registering it with the log redactor would have corrupted the run
+#:   log by replacing the one value an operator reads when a key does not match;
+#: * it is one opaque blob per credential, so it cannot say which host a key
+#:   belongs to, cannot carry a marker, and cannot be reasoned about per host;
+#: * it made the operator assemble the file and paste a placeholder into an
+#:   inventory variable, so the platform's trust anchor was only as good as that
+#:   one line of someone else's YAML.
+#:
+#: `inventory_host_keys` replaces it: one row per host per key type per key, with
+#: `cert-authority`/`revoked` markers, and the platform renders the `known_hosts`
+#: file and points ssh at it. That is the same mechanism done per host instead of
+#: per credential -- so this is a narrowing of the credential surface, not a loss
+#: of the capability.
+MACHINE_FILE_FIELDS: frozenset[str] = frozenset({"private_key"})
 
 #: The fields whose value a placeholder substitutes verbatim.
 #:
@@ -187,7 +202,7 @@ VAULT_FIELDS = frozenset({"password"})
 #: something stops validating. Tolerating on read needs no key and no downtime,
 #: and the form repairs a row the next time anyone edits it.
 RETIRED_MACHINE_FIELDS: frozenset[str] = frozenset(
-    {"user", "become", "become_method", "become_user"}
+    {"user", "become", "become_method", "become_user", "known_hosts"}
 )
 
 #: The fields whose value is secret, so the runner can register them with the

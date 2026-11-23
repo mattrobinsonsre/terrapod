@@ -219,84 +219,111 @@ class TestOneProducerReachesBothConsumers:
         )
 
 
-class TestTheCredentialFieldIsNotTreatedAsASecret:
-    """A host's PUBLIC key is public, and redacting it destroys a log.
+class TestTheCredentialFieldIsRetired:
+    """`known_hosts` on a machine credential is retired (#2592).
 
-    The runner's file loop registered every `MACHINE_FILE_FIELDS` value with the
-    log redactor, which was correct while `private_key` was the only file field.
-    Adding `known_hosts` made it wrong: the redactor would replace, in the run's
-    own log, the one value an operator needs to read when a host key does not
-    match -- in exchange for hiding nothing.
+    It was added by #2318 for a real problem and the shape was wrong: a CREDENTIAL
+    holding nothing secret, one opaque blob per credential with no way to say which
+    host a key belongs to and nowhere to put a marker, and an operator pasting a
+    placeholder into an inventory variable so the platform's trust anchor was only
+    as good as that one line of someone else's YAML. `inventory_host_keys` replaces
+    it per host, per key type, and the platform renders the file itself.
+
+    The class that was here guarded the field's one awkward property -- a file
+    field that is NOT a secret, which the runner had to stop registering with the
+    log redactor. Most of that is now vacuous, so what survives is the retirement's
+    own asymmetry plus the structural invariant, which is latent rather than
+    pointless (see the last test).
     """
 
-    def test_known_hosts_is_a_file_field(self):
-        from terrapod.services.ansible_auth import MACHINE_FILE_FIELDS
+    def test_known_hosts_is_no_longer_a_field(self):
+        from terrapod.services.ansible_auth import MACHINE_FIELDS
 
-        assert "known_hosts" in MACHINE_FILE_FIELDS
+        assert "known_hosts" not in MACHINE_FIELDS
 
-    def test_known_hosts_is_not_a_secret_field(self):
-        from terrapod.services.ansible_auth import MACHINE_SECRET_FIELDS
+    def test_it_is_retired_rather_than_merely_absent(self):
+        """The distinction that matters, and the whole lesson of #2425 §0.3.
 
-        assert "known_hosts" not in MACHINE_SECRET_FIELDS, (
-            "a host's public key must not be registered with the log redactor"
+        An absent field is REFUSED as unknown on read, and `delivery_entries`
+        catches that refusal and skips the credential -- so a credential still
+        carrying `known_hosts` would silently stop delivering its PRIVATE KEY too,
+        and the operator's only signal would be a wholly unreachable fleet naming
+        neither the credential nor the field. Listing it as retired is what makes
+        the read tolerate it.
+        """
+        from terrapod.services.ansible_auth import RETIRED_MACHINE_FIELDS
+
+        assert "known_hosts" in RETIRED_MACHINE_FIELDS
+
+    def test_a_legacy_envelope_still_delivers_its_private_key(self):
+        """The half the test above cannot prove: tolerated on READ.
+
+        This is the actual failure mode, driven rather than asserted about a set.
+        """
+        import json
+
+        from terrapod.services import ansible_auth as aa
+
+        legacy = json.dumps({"private_key": "KEY", "known_hosts": "h.example.com ssh-rsa AAA"})
+        parsed = aa.validate_envelope(aa.MACHINE_CATEGORY, "web-key", legacy, tolerate_retired=True)
+
+        assert parsed == {"private_key": "KEY"}, (
+            "the retired field must be dropped and the private key must survive"
         )
 
+    def test_it_is_refused_on_a_write(self):
+        """The other half of the asymmetry. A test of either half alone passes
+        whichever way the code is written, which is why both are here."""
+        import json
+
+        import pytest
+
+        from terrapod.services import ansible_auth as aa
+
+        with pytest.raises(aa.AnsibleAuthError) as exc:
+            aa.validate_envelope(
+                aa.MACHINE_CATEGORY,
+                "web-key",
+                json.dumps({"private_key": "KEY", "known_hosts": "h.example.com ssh-rsa AAA"}),
+            )
+        assert "known_hosts" in str(exc.value)
+
     def test_the_private_key_is_still_a_secret(self):
-        """The control. Without it, satisfying the assertion above by emptying the
-        secret set entirely would pass."""
-        from terrapod.services.ansible_auth import MACHINE_SECRET_FIELDS
+        """The control. Without it, the assertions above would be satisfied by a
+        machine credential set that had been emptied entirely."""
+        from terrapod.services.ansible_auth import MACHINE_FILE_FIELDS, MACHINE_SECRET_FIELDS
 
         assert "private_key" in MACHINE_SECRET_FIELDS
+        assert "private_key" in MACHINE_FILE_FIELDS
 
     def test_the_runner_registers_only_the_secret_file_fields(self):
-        """Source-introspected because the alternative is asserting on a redactor
-        side effect, and the defect is a missing CONDITION rather than a wrong
-        value -- the unconditional call produced correct behaviour for every
-        input that existed before `known_hosts` did.
+        """LATENT, and kept deliberately rather than deleted.
+
+        With `known_hosts` gone, every member of `MACHINE_FILE_FIELDS` is also a
+        secret, so the runner's condition is true for every input that exists and
+        no current field exercises it. That makes this unexercised, NOT wrong: the
+        invariant is "a file field is registered with the redactor only if it is
+        secret", and the next non-secret file field would need it on the day it is
+        added -- which is precisely when nobody would think to write it.
+
+        Source-introspected because the defect it guards is a missing CONDITION
+        rather than a wrong value, and an unconditional call produced correct
+        behaviour for every input that existed before `known_hosts` did.
         """
+        import ast
+        import inspect
+
         from terrapod.runner.phases import ansible_auth as phase
 
         src = inspect.getsource(phase._apply_machine)
         tree = ast.parse(src.lstrip())
-
-        # Scoped to the FILE-field loop, which is the whole point. There is a
-        # second `if field in MACHINE_SECRET_FIELDS:` in the VALUE-field loop
-        # below it, also guarding a `register_secret` -- so an unscoped search
-        # finds that one and passes while the file-field call is unguarded.
-        # Caught by mutation: unguarding the file-field call left this green.
-        file_loops = [
-            n
+        names = {
+            n.attr if isinstance(n, ast.Attribute) else n.id
             for n in ast.walk(tree)
-            if isinstance(n, ast.For) and "MACHINE_FILE_FIELDS" in ast.dump(n.iter)
-        ]
-        assert len(file_loops) == 1, (
-            f"expected exactly one loop over MACHINE_FILE_FIELDS, found {len(file_loops)} -- "
-            "this test can no longer tell which call it is scoped to"
-        )
-        loop = file_loops[0]
-
-        registers = [
-            c
-            for c in ast.walk(loop)
-            if isinstance(c, ast.Call) and getattr(c.func, "attr", None) == "register_secret"
-        ]
-        assert registers, (
-            "the file-field loop no longer registers anything with the redactor; a "
-            "private key reaching the log unredacted is the defect in the other direction"
-        )
-
-        guarded = [
-            n
-            for n in ast.walk(loop)
-            if isinstance(n, ast.If)
-            and "MACHINE_SECRET_FIELDS" in ast.dump(n.test)
-            and any(
-                isinstance(c, ast.Call) and getattr(c.func, "attr", None) == "register_secret"
-                for c in ast.walk(n)
-            )
-        ]
-        assert len(guarded) == len(registers), (
-            f"{len(registers)} register_secret call(s) in the file-field loop but "
-            f"{len(guarded)} guarded on MACHINE_SECRET_FIELDS -- an unguarded one "
-            "redacts a host's public key out of the operator's own log"
+            if isinstance(n, ast.Attribute | ast.Name)
+        }
+        assert "MACHINE_SECRET_FIELDS" in names, (
+            "the file loop must consult the secret set before registering a value "
+            "with the log redactor; without it, a non-secret file field added later "
+            "is redacted out of the operator's own run log"
         )

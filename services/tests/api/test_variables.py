@@ -2066,8 +2066,12 @@ class TestAnsibleCredentialCategoryWrites(_WritePaths):
         assert resp.status_code in (200, 201), resp.text
 
     async def test_a_valid_machine_credential_is_stored(self):
-        # `known_hosts` rather than `user`, which #2413 F9 withdrew -- and it
-        # keeps the read-back assertion on a value that is not a secret.
+        # `private_key` rather than `known_hosts`, which #2592 retired -- which in
+        # turn had replaced `user`, withdrawn by #2413 F9. Three fixtures for one
+        # test, and the reason is worth stating: this test needs a field that is
+        # VALID, and the valid set has narrowed twice. With `known_hosts` gone
+        # every machine field is a secret, so there is no non-secret value left to
+        # read back and the assertion moves onto the key itself.
         #
         # Compared WHOLE rather than by prefix, and not only because CodeQL
         # flags a `startswith` against something host-shaped as
@@ -2079,16 +2083,10 @@ class TestAnsibleCredentialCategoryWrites(_WritePaths):
         # exactly the class of transform the Ansible credential rules forbid --
         # an altered credential is worse than a refused one, and a provider
         # writing this value back would meet "inconsistent result after apply".
-        host_keys = "h.example.com ssh-ed25519 AAA"
-        resp, created = await self._create_ws(
-            self._cred(
-                "web",
-                self.MACHINE,
-                {"private_key": "k", "known_hosts": host_keys},
-            )
-        )
+        key = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaA\n-----END-----\n"
+        resp, created = await self._create_ws(self._cred("web", self.MACHINE, {"private_key": key}))
         assert resp.status_code == 201, resp.text
-        assert json.loads(created["value"])["known_hosts"] == host_keys
+        assert json.loads(created["value"])["private_key"] == key
 
     # ── the envelope, on every write path ──────────────────────────────
 
@@ -2151,13 +2149,17 @@ class TestAnsibleCredentialCategoryWrites(_WritePaths):
         assert resp.status_code == 201, resp.text
 
     async def test_a_machine_credential_with_no_way_to_authenticate_is_422(self):
-        # `known_hosts` is a VALID field that authenticates nothing, which is
-        # what this test is about. It was `{"user": "deploy"}`, and since #2413
-        # F9 withdrew that field the envelope would be refused as unknown
-        # instead -- so the test would have gone on passing for a reason that
-        # has nothing to do with its name.
+        # The fixture needs a field that is VALID and authenticates NOTHING, and
+        # that field has changed twice: `{"user": "deploy"}` until #2413 F9
+        # withdrew it, then `known_hosts` until #2592 retired it. Either would now
+        # be refused as UNKNOWN -- so the test would go on passing for a reason
+        # that has nothing to do with its name, which is the thing to watch for
+        # whenever a fixture's field is withdrawn under it.
+        #
+        # `become_password` is the remaining one: privilege escalation happens
+        # AFTER a connection, so it cannot establish one.
         resp, _ = await self._create_ws(
-            self._cred("all", self.MACHINE, {"known_hosts": "h.example.com ssh-ed25519 AAA"})
+            self._cred("all", self.MACHINE, {"become_password": "s3cret"})
         )
         assert resp.status_code == 422
         assert "private_key" in resp.text
