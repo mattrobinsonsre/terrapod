@@ -206,7 +206,7 @@ orjson = "^3.10"
 # workspace's inventory. The two sides are decoupled by design, so a workspace
 # can select a 2.22 execution environment regardless of what the API parses with.
 # Move the line when something needs it, and say what.
-ansible-core = "~2.21"
+ansible-core = "~2.22"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"

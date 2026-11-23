@@ -475,6 +475,14 @@ than the backstop:
   a vault password — is additionally **registered with the redactor before the
   file exists**, so there is no window in which ansible could print one
   unredacted.
+- **Ansible masks vault-decrypted values in its own output too, from
+  ansible-core 2.22.** A task that displays one renders `$REDACTED$`, which is
+  ansible's marker and not Terrapod's — the redactor above writes `[redacted]`.
+  The two are independent and neither relies on the other: Terrapod's covers
+  every secret it delivers and every stream it owns, and ansible's covers a value
+  that came out of a vault whatever delivered the password. A value is still
+  fully usable where it is used rather than displayed, so a task that writes one
+  to a file writes the real bytes; only the display is masked.
 - **The secret fields, not every field.** `MACHINE_SECRET_FIELDS` is what the
   runner registers with the log redactor, and it is narrower than
   `MACHINE_FILE_FIELDS` on purpose — a file is not automatically a secret. Today
