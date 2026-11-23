@@ -40,14 +40,14 @@ func TestEveryTerraformAttributeReachesTheCommittedSchema(t *testing.T) {
 			"against nothing", len(resources))
 	}
 
-	tf := terraformResourceAttributes(ctx, t)
+	tf := terraformResourceFields(ctx, t)
 	if len(tf) < 20 {
 		t.Fatalf("only %d resources read from the Terraform provider; the accessors have "+
 			"probably changed rather than the provider having shrunk", len(tf))
 	}
 
-	var checked int
-	for tfName, attrs := range tf {
+	var checked, checkedBlocks int
+	for tfName, fields := range tf {
 		// The schema's token for `terrapod_workspace` is
 		// `terrapod:index/workspace:Workspace`; find it by its tail rather than
 		// by rebuilding the token, which is the token strategy's business.
@@ -61,12 +61,26 @@ func TestEveryTerraformAttributeReachesTheCommittedSchema(t *testing.T) {
 		props, _ := entry["inputProperties"].(map[string]any)
 
 		var missing []string
-		for _, a := range attrs {
-			if _, ok := props[pulumiName(a)]; !ok {
-				missing = append(missing, a+" ("+pulumiName(a)+")")
+		for _, f := range fields {
+			if _, ok := props[pulumiName(f.name)]; ok {
+				continue
+			}
+			// A collection whose name is not already plural is PLURALISED by
+			// the bridge -- a `key` block arrives as `keys` -- so accept an
+			// extension of the name for one, exactly as the data-source half
+			// does. Not for a scalar, where an extension would be a different
+			// property.
+			if f.collection && hasPropExtending(props, pulumiName(f.name)) {
+				continue
+			}
+			missing = append(missing, f.name+" ("+pulumiName(f.name)+")")
+		}
+		checked += len(fields)
+		for _, f := range fields {
+			if f.block {
+				checkedBlocks++
 			}
 		}
-		checked += len(attrs)
 		if len(missing) > 0 {
 			sort.Strings(missing)
 			t.Errorf("%s is missing %d attribute(s) from the committed Pulumi schema: %s.\n"+
@@ -84,14 +98,52 @@ func TestEveryTerraformAttributeReachesTheCommittedSchema(t *testing.T) {
 		t.Fatalf("only %d attributes compared; the derivation is not finding the "+
 			"provider's schemas", checked)
 	}
-	t.Logf("compared %d attributes across %d resources", checked, len(tf))
+	// And a separate floor on the BLOCKS, because the one above cannot see them
+	// disappear: there are hundreds of attributes and one block, so a derivation
+	// that stopped reading `Block.BlockTypes` entirely would leave `checked` far
+	// above 200 and this gate green while the surface it was extended to cover
+	// went unchecked. One resource uses a block today (#2592).
+	if checkedBlocks < 1 {
+		t.Fatal("no block was compared; the derivation is not reading " +
+			"Block.BlockTypes, so a block reaching the committed schema is unchecked")
+	}
+	t.Logf("compared %d fields (%d of them blocks) across %d resources",
+		checked, checkedBlocks, len(tf))
 }
 
-// terraformResourceAttributes reads each resource's top-level attribute names
-// straight off the Terraform provider, through the protocol server -- the same
-// path `terraform` itself uses, so there is no second opinion about what the
-// provider declares.
-func terraformResourceAttributes(ctx context.Context, t *testing.T) map[string][]string {
+// resourceField is one top-level thing a practitioner can set on a resource:
+// an attribute, or a BLOCK.
+//
+// `collection` decides whether a pluralised name in the committed schema counts
+// as the same field, because the bridge pluralises a list- or set-typed
+// property whose name is not already plural.
+type resourceField struct {
+	name       string
+	collection bool
+	// block says this field is a nested block rather than an attribute, so the
+	// gate can floor on them separately -- hundreds of attributes would hide
+	// the loss of the one block otherwise.
+	block bool
+}
+
+// terraformResourceFields reads each resource's top-level attribute AND BLOCK
+// names straight off the Terraform provider, through the protocol server -- the
+// same path `terraform` itself uses, so there is no second opinion about what
+// the provider declares.
+//
+// **Blocks are included, and that is the point.** This gate read
+// `Block.Attributes` alone until #2592, which made `terrapod_inventory_host_keys`
+// the first resource to use a block -- so its `key` block, and everything
+// inside it, would have reached the committed schema or not with every gate
+// green. That is the same shape as the defect this file's header describes, one
+// level down: a derived gate's derivation decides its blind spot, and a block is
+// as much a public surface as an attribute.
+//
+// The block's own nested attributes are the sibling gate's subject
+// (TestEveryTerraformBlockAttributeReachesTheCommittedSchema) -- they live in a
+// generated TYPE rather than in `inputProperties`, so comparing them needs a
+// `$ref` to follow and a separate message to report.
+func terraformResourceFields(ctx context.Context, t *testing.T) map[string][]resourceField {
 	t.Helper()
 
 	server := providerserver.NewProtocol6(tfprovider.New("0.0.0-test")())()
@@ -100,23 +152,169 @@ func terraformResourceAttributes(ctx context.Context, t *testing.T) map[string][
 		t.Fatalf("GetProviderSchema: %v", err)
 	}
 
-	out := make(map[string][]string, len(resp.ResourceSchemas))
+	out := make(map[string][]resourceField, len(resp.ResourceSchemas))
 	for name, s := range resp.ResourceSchemas {
 		if s == nil || s.Block == nil {
 			continue
 		}
-		attrs := make([]string, 0, len(s.Block.Attributes))
+		fields := make([]resourceField, 0, len(s.Block.Attributes)+len(s.Block.BlockTypes))
 		for _, a := range s.Block.Attributes {
 			// `id` is Pulumi's own resource identity and is not an input
 			// property, so it is not drift when it is absent.
 			if a.Name == "id" || a.Computed && !a.Optional && !a.Required {
 				continue
 			}
-			attrs = append(attrs, a.Name)
+			fields = append(fields, resourceField{name: a.Name, collection: isCollection(a)})
 		}
-		out[name] = attrs
+		for _, b := range s.Block.BlockTypes {
+			fields = append(fields, resourceField{
+				name: b.TypeName, collection: isCollectionBlock(b), block: true,
+			})
+		}
+		out[name] = fields
 	}
 	return out
+}
+
+// isCollectionBlock reports whether a nested block is repeated, and so arrives
+// in Pulumi as an array under a possibly-pluralised name.
+func isCollectionBlock(b *tfprotov6.SchemaNestedBlock) bool {
+	if b == nil {
+		return false
+	}
+	return b.Nesting == tfprotov6.SchemaNestedBlockNestingModeList ||
+		b.Nesting == tfprotov6.SchemaNestedBlockNestingModeSet
+}
+
+// TestEveryTerraformBlockAttributeReachesTheCommittedSchema is the other half of
+// the gate above: a block's own ATTRIBUTES.
+//
+// The sibling gate asks whether the block itself reached `inputProperties`. That
+// can be true while everything inside it is missing, because a block's contents
+// land in a generated TYPE that `inputProperties` only references -- so a
+// practitioner could declare `keys` and set nothing in it, which is the same
+// unusable surface the header describes for a whole resource.
+//
+// Derived from the provider, with a floor, and it follows the schema's own
+// `$ref` rather than rebuilding the type token -- which is the token strategy's
+// business, exactly as `tokenFor` is careful not to rebuild a resource's.
+func TestEveryTerraformBlockAttributeReachesTheCommittedSchema(t *testing.T) {
+	ctx := context.Background()
+	committed := theSchema(t)
+	resources, _ := committed["resources"].(map[string]any)
+	schemaTypes, _ := committed["types"].(map[string]any)
+
+	server := providerserver.NewProtocol6(tfprovider.New("0.0.0-test")())()
+	resp, err := server.GetProviderSchema(ctx, &tfprotov6.GetProviderSchemaRequest{})
+	if err != nil {
+		t.Fatalf("GetProviderSchema: %v", err)
+	}
+
+	var checkedBlocks, checkedAttrs int
+	for tfName, s := range resp.ResourceSchemas {
+		if s == nil || s.Block == nil || len(s.Block.BlockTypes) == 0 {
+			continue
+		}
+		token := tokenFor(resources, tfName)
+		if token == "" {
+			continue
+		}
+		entry, _ := resources[token].(map[string]any)
+		props, _ := entry["inputProperties"].(map[string]any)
+
+		for _, b := range s.Block.BlockTypes {
+			if b == nil || b.Block == nil {
+				continue
+			}
+			typeProps := blockTypeProperties(props, schemaTypes, pulumiName(b.TypeName))
+			if typeProps == nil {
+				// The block reached no type at all. The sibling gate reports
+				// the block being absent, so say something different: this is
+				// a block that is present and empty.
+				t.Errorf("%s: block %q carries no generated type in the committed schema, so a "+
+					"Pulumi practitioner can name it and set nothing in it. Regenerate it with "+
+					"`go run ./cmd/pulumi-tfgen-terrapod schema --out cmd/pulumi-resource-terrapod`.",
+					tfName, b.TypeName)
+				continue
+			}
+			checkedBlocks++
+
+			var missing []string
+			for _, a := range b.Block.Attributes {
+				if a.Computed && !a.Optional && !a.Required {
+					continue
+				}
+				checkedAttrs++
+				if _, ok := typeProps[pulumiName(a.Name)]; ok {
+					continue
+				}
+				if isCollection(a) && hasPropExtending(typeProps, pulumiName(a.Name)) {
+					continue
+				}
+				missing = append(missing, a.Name+" ("+pulumiName(a.Name)+")")
+			}
+			if len(missing) > 0 {
+				sort.Strings(missing)
+				t.Errorf("%s: block %q is missing %d attribute(s) from its generated Pulumi "+
+					"type: %s. Regenerate it with `go run ./cmd/pulumi-tfgen-terrapod schema "+
+					"--out cmd/pulumi-resource-terrapod`.",
+					tfName, b.TypeName, len(missing), strings.Join(missing, ", "))
+			}
+		}
+	}
+
+	// Floors on BOTH, because the loop skips a resource whose token it cannot
+	// find and a block whose type it cannot resolve -- so either could reduce
+	// this gate to checking nothing while reporting success. One resource uses
+	// blocks today (#2592) and its one block carries three attributes.
+	if checkedBlocks < 1 {
+		t.Fatal("no block was compared; the derivation is not finding the provider's blocks")
+	}
+	if checkedAttrs < 3 {
+		t.Fatalf("only %d block attributes compared; the derivation is not reading into the "+
+			"blocks it found", checkedAttrs)
+	}
+	t.Logf("compared %d attributes across %d block(s)", checkedAttrs, checkedBlocks)
+}
+
+// blockTypeProperties resolves a block's generated type and returns its
+// properties, or nil when the block reaches no type.
+//
+// The property name is looked up exactly and then as an extension, because the
+// bridge pluralises a repeated block -- `key` becomes `keys`.
+func blockTypeProperties(props, schemaTypes map[string]any, want string) map[string]any {
+	candidates := []string{want}
+	for p := range props {
+		if len(p) > len(want) && strings.HasPrefix(p, want) {
+			candidates = append(candidates, p)
+		}
+	}
+	for _, name := range candidates {
+		prop, ok := props[name].(map[string]any)
+		if !ok {
+			continue
+		}
+		// An array of objects references its type through `items`; a single
+		// nested block references it directly.
+		ref, _ := prop["$ref"].(string)
+		if items, ok := prop["items"].(map[string]any); ok {
+			if r, ok := items["$ref"].(string); ok {
+				ref = r
+			}
+		}
+		token := strings.TrimPrefix(ref, "#/types/")
+		if token == "" || token == ref && !strings.HasPrefix(ref, "#/types/") {
+			continue
+		}
+		entry, ok := schemaTypes[token].(map[string]any)
+		if !ok {
+			continue
+		}
+		if typeProps, ok := entry["properties"].(map[string]any); ok {
+			return typeProps
+		}
+	}
+	return nil
 }
 
 // tokenFor finds the schema token whose type name matches a Terraform resource
@@ -174,15 +372,15 @@ func TestTheNameMappingAgreesWithTheGeneratedSchema(t *testing.T) {
 	entry, _ := resources[token].(map[string]any)
 	props, _ := entry["inputProperties"].(map[string]any)
 
-	tf := terraformResourceAttributes(ctx, t)
-	attrs := tf["terrapod_workspace"]
-	if len(attrs) < 40 {
-		t.Fatalf("only %d attributes on terrapod_workspace; the derivation is wrong", len(attrs))
+	tf := terraformResourceFields(ctx, t)
+	fields := tf["terrapod_workspace"]
+	if len(fields) < 40 {
+		t.Fatalf("only %d fields on terrapod_workspace; the derivation is wrong", len(fields))
 	}
 
-	mapped := make(map[string]string, len(attrs))
-	for _, a := range attrs {
-		mapped[pulumiName(a)] = a
+	mapped := make(map[string]string, len(fields))
+	for _, f := range fields {
+		mapped[pulumiName(f.name)] = f.name
 	}
 
 	var unmappable []string

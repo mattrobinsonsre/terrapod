@@ -159,6 +159,27 @@
                 "url"
             ]
         },
+        "terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey": {
+            "properties": {
+                "keyType": {
+                    "type": "string",
+                    "description": "The algorithm, spelled as OpenSSH spells it in the second field of a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line: `ssh-ed25519`, `ecdsa-sha2-nistp256`, `ecdsa-sha2-nistp384`, `ecdsa-sha2-nistp521`, `ssh-rsa`, `rsa-sha2-256` or `rsa-sha2-512`. The server validates it against that closed set, and the reason is the direction a typo fails in: an unrecognised algorithm in a trust anchor silently never matches, and the symptom reads as the host having rotated its key rather than as a configuration error.\n"
+                },
+                "marker": {
+                    "type": "string",
+                    "description": "The optional first field of a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line, WITHOUT its `@`: `cert-authority` or \u003cspan pulumi-lang-nodejs=\"`revoked`\" pulumi-lang-dotnet=\"`Revoked`\" pulumi-lang-go=\"`revoked`\" pulumi-lang-python=\"`revoked`\" pulumi-lang-yaml=\"`revoked`\" pulumi-lang-java=\"`revoked`\" pulumi-lang-hcl=\"`revoked`\"\u003e`revoked`\u003c/span\u003e. Omit it for an ordinary entry.\n\nPer key rather than per algorithm, which is what makes \u003cspan pulumi-lang-nodejs=\"`revoked`\" pulumi-lang-dotnet=\"`Revoked`\" pulumi-lang-go=\"`revoked`\" pulumi-lang-python=\"`revoked`\" pulumi-lang-yaml=\"`revoked`\" pulumi-lang-java=\"`revoked`\" pulumi-lang-hcl=\"`revoked`\"\u003e`revoked`\u003c/span\u003e useful: the outgoing key of a rotation stays declared and is refused, so a replay of it is rejected rather than silently treated as an unknown host. Changing only the marker is applied in place, so a rotation never leaves the host momentarily untrusted.\n"
+                },
+                "publicKey": {
+                    "type": "string",
+                    "description": "The base64 blob ALONE — the third field of a \u003cspan pulumi-lang-nodejs=\"`knownHosts`\" pulumi-lang-dotnet=\"`KnownHosts`\" pulumi-lang-go=\"`knownHosts`\" pulumi-lang-python=\"`known_hosts`\" pulumi-lang-yaml=\"`knownHosts`\" pulumi-lang-java=\"`knownHosts`\" pulumi-lang-hcl=\"`known_hosts`\"\u003e`knownHosts`\u003c/span\u003e line, with no algorithm prefix and no host. The server refuses a whole line, because stored as the blob it would render with the host and algorithm doubled and nothing would match it; it also checks the blob's own embedded algorithm name against \u003cspan pulumi-lang-nodejs=\"`keyType`\" pulumi-lang-dotnet=\"`KeyType`\" pulumi-lang-go=\"`keyType`\" pulumi-lang-python=\"`key_type`\" pulumi-lang-yaml=\"`keyType`\" pulumi-lang-java=\"`keyType`\" pulumi-lang-hcl=\"`key_type`\"\u003e`keyType`\u003c/span\u003e. Not marked sensitive: a host's public key is public, and hiding it would hide the one value an operator needs to read when a host presents something else.\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "keyType",
+                "publicKey"
+            ]
+        },
         "terrapod:index/VariableSetAssignmentRule:VariableSetAssignmentRule": {
             "properties": {
                 "agentPoolId": {
@@ -3303,6 +3324,57 @@
                     "hostId": {
                         "type": "string",
                         "description": "The host joining the group (e.g. \"invhost-abc123\")."
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "terrapod:index/inventoryHostKeys:InventoryHostKeys": {
+            "properties": {
+                "hostId": {
+                    "type": "string",
+                    "description": "The host whose keys these are (e.g. \"invhost-abc123\"). A trust set belongs to one host, so moving it is a destroy and create. Not defaulted from the provider's \u003cspan pulumi-lang-nodejs=\"`workspace`\" pulumi-lang-dotnet=\"`Workspace`\" pulumi-lang-go=\"`workspace`\" pulumi-lang-python=\"`workspace`\" pulumi-lang-yaml=\"`workspace`\" pulumi-lang-java=\"`workspace`\" pulumi-lang-hcl=\"`workspace`\"\u003e`workspace`\u003c/span\u003e attribute: this is a HOST id, not a workspace id, so there is nothing for TERRAPOD_WORKSPACE to supply — declare the host and reference it."
+                },
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey"
+                    },
+                    "description": "One approved host key. Repeat the block per key; a SET, because a trust set has no order and a list would plan a diff whenever two blocks were swapped. Declaring no \u003cspan pulumi-lang-nodejs=\"`key`\" pulumi-lang-dotnet=\"`Key`\" pulumi-lang-go=\"`key`\" pulumi-lang-python=\"`key`\" pulumi-lang-yaml=\"`key`\" pulumi-lang-java=\"`key`\" pulumi-lang-hcl=\"`key`\"\u003e`key`\u003c/span\u003e blocks at all is a valid statement that this host is approved to present nothing, and it removes any keys the host already has."
+                }
+            },
+            "required": [
+                "hostId"
+            ],
+            "inputProperties": {
+                "hostId": {
+                    "type": "string",
+                    "description": "The host whose keys these are (e.g. \"invhost-abc123\"). A trust set belongs to one host, so moving it is a destroy and create. Not defaulted from the provider's \u003cspan pulumi-lang-nodejs=\"`workspace`\" pulumi-lang-dotnet=\"`Workspace`\" pulumi-lang-go=\"`workspace`\" pulumi-lang-python=\"`workspace`\" pulumi-lang-yaml=\"`workspace`\" pulumi-lang-java=\"`workspace`\" pulumi-lang-hcl=\"`workspace`\"\u003e`workspace`\u003c/span\u003e attribute: this is a HOST id, not a workspace id, so there is nothing for TERRAPOD_WORKSPACE to supply — declare the host and reference it."
+                },
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey"
+                    },
+                    "description": "One approved host key. Repeat the block per key; a SET, because a trust set has no order and a list would plan a diff whenever two blocks were swapped. Declaring no \u003cspan pulumi-lang-nodejs=\"`key`\" pulumi-lang-dotnet=\"`Key`\" pulumi-lang-go=\"`key`\" pulumi-lang-python=\"`key`\" pulumi-lang-yaml=\"`key`\" pulumi-lang-java=\"`key`\" pulumi-lang-hcl=\"`key`\"\u003e`key`\u003c/span\u003e blocks at all is a valid statement that this host is approved to present nothing, and it removes any keys the host already has."
+                }
+            },
+            "requiredInputs": [
+                "hostId"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering InventoryHostKeys resources.\n",
+                "properties": {
+                    "hostId": {
+                        "type": "string",
+                        "description": "The host whose keys these are (e.g. \"invhost-abc123\"). A trust set belongs to one host, so moving it is a destroy and create. Not defaulted from the provider's \u003cspan pulumi-lang-nodejs=\"`workspace`\" pulumi-lang-dotnet=\"`Workspace`\" pulumi-lang-go=\"`workspace`\" pulumi-lang-python=\"`workspace`\" pulumi-lang-yaml=\"`workspace`\" pulumi-lang-java=\"`workspace`\" pulumi-lang-hcl=\"`workspace`\"\u003e`workspace`\u003c/span\u003e attribute: this is a HOST id, not a workspace id, so there is nothing for TERRAPOD_WORKSPACE to supply — declare the host and reference it."
+                    },
+                    "keys": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/terrapod:index/InventoryHostKeysKey:InventoryHostKeysKey"
+                        },
+                        "description": "One approved host key. Repeat the block per key; a SET, because a trust set has no order and a list would plan a diff whenever two blocks were swapped. Declaring no \u003cspan pulumi-lang-nodejs=\"`key`\" pulumi-lang-dotnet=\"`Key`\" pulumi-lang-go=\"`key`\" pulumi-lang-python=\"`key`\" pulumi-lang-yaml=\"`key`\" pulumi-lang-java=\"`key`\" pulumi-lang-hcl=\"`key`\"\u003e`key`\u003c/span\u003e blocks at all is a valid statement that this host is approved to present nothing, and it removes any keys the host already has."
                     }
                 },
                 "type": "object"

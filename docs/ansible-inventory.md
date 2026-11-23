@@ -858,7 +858,7 @@ Request and response shapes for every route are in
 
 ## Managing it as code
 
-Seven resources and one data source, in
+Eight resources and two data sources, in
 [the Terrapod provider](terraform-provider.md). The roots and defaults are
 attributes on `terrapod_workspace` itself:
 
@@ -871,11 +871,41 @@ attributes on `terrapod_workspace` itself:
 | `terrapod_inventory_host_var` | One `host_vars` entry |
 | `terrapod_inventory_group_var` | One `group_vars` entry |
 | `terrapod_inventory_global_var` | One `group_vars/all` entry |
+| `terrapod_inventory_host_keys` | The SSH host keys one host is approved to present — one resource per host, with a `key` block per key |
 
 The data source **`terrapod_inventory_resolved`** is the merged view. It is a
 data source rather than an attribute on a resource because a data source has no
 round-trip requirement, so a derived value belongs there — the same reasoning
 that keeps a workspace's effective cloud-identity audiences off its resource.
+
+**`terrapod_ssh_host_keys`** is the second data source: the keys a set of hosts
+actually present, read by connecting to each one. Feed it into
+`terrapod_inventory_host_keys` through a `dynamic "key"` block — a direct
+assignment cannot type-check, because the scan cannot supply a `marker`:
+
+```hcl
+resource "terrapod_inventory_host_keys" "web1" {
+  host_id = terrapod_inventory_host.web1.id
+
+  dynamic "key" {
+    for_each = data.terrapod_ssh_host_keys.fleet.entries["web-01.example.com"]
+    content {
+      key_type   = key.value.key_type
+      public_key = key.value.public_key
+    }
+  }
+}
+```
+
+`terrapod_inventory_host_keys` owns a host's WHOLE trust set, so a key that
+appears out of band is drift the next apply removes — which is the point, because
+the alternative is a key nobody approved quietly becoming trusted. Declare one
+per host. Declare every key the host offers rather than one per algorithm family:
+a client picks by its own `HostKeyAlgorithms` preference, so a trust set holding
+one key per family refuses the host whenever the two disagree. Two keys of one
+algorithm are allowed, which is what makes a rotation safe — declare the incoming
+key and mark the outgoing one `revoked`, so a replay of it is refused rather than
+merely unknown.
 
 ---
 

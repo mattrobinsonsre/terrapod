@@ -356,6 +356,12 @@ resource terrapod_inventory_host_group.created_at required=false optional=false 
 resource terrapod_inventory_host_group.group_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_group.host_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_group.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.host_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.key block type=types.SetType[types.ObjectType["key_type":basetypes.StringType, "marker":basetypes.StringType, "public_key":basetypes.StringType]]
+resource terrapod_inventory_host_keys.key.key_type required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.key.marker required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_host_keys.key.public_key required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_var.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_var.host_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_inventory_host_var.id required=false optional=false computed=true sensitive=false type=basetypes.StringType

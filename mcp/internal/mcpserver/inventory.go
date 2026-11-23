@@ -10,7 +10,13 @@ import (
 )
 
 // registerInventory adds the ansible inventory tools: the eight structures a
-// workspace declares (#1968) and the resolution they feed (#1967).
+// workspace declares (#1968, #2592) and the resolution they feed (#1967).
+//
+// The eight are a host, a group, a host's membership of a group, a group's
+// nesting inside another, a variable on a host / a group / `all`, and the SSH
+// host keys a host is approved to present. The last is registered from
+// inventory_host_keys.go; this header claimed eight and named none until the
+// eighth arrived.
 //
 // # Why the resolved read is the tool that earns its place
 //
@@ -56,6 +62,10 @@ import (
 func registerInventory(s *mcp.Server, c *terrapod.Client) {
 	registerInventoryReads(s, c)
 	registerInventoryWrites(s, c)
+	// The eighth structure (#2592), in its own file because the trust set is a
+	// subject of its own rather than another row shape: what a host is
+	// approved to PRESENT, handed off to OpenSSH.
+	registerInventoryHostKeys(s, c)
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -128,6 +138,11 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 		Vars   []terrapod.InventoryVar       `json:"vars"`
 		Groups []terrapod.InventoryHostGroup `json:"groups,omitempty"`
 		Hosts  []terrapod.InventoryHostGroup `json:"hosts,omitempty"`
+		// Keys is a HOST's approved SSH host keys (#2592), with their ids --
+		// which the workspace-wide terrapod_inventory_host_keys view does not
+		// carry, so this is where a marker or a removal gets the id it needs.
+		// Absent for a group: a key is approved for a host.
+		Keys []terrapod.InventoryHostKey `json:"keys,omitempty"`
 		// Children and Parents are only meaningful for a group. A group may
 		// have several parents, so Parents is a list rather than a field.
 		Children []terrapod.InventoryGroupChild `json:"children,omitempty"`
@@ -137,6 +152,7 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_inventory_detail",
 		Description: "Read one host or one group with its variables and its links — a host's groups, or a group's member hosts, child groups and parent groups. " +
 			"Pass a host id or a group id; the typed prefix says which, so there is no kind argument to get wrong. " +
+			"For a HOST it also returns `keys`: the SSH host keys that host is approved to present, WITH their ids — which is where the id for terrapod_inventory_host_key_mark or terrapod_inventory_remove comes from, because the workspace-wide terrapod_inventory_host_keys view is keyed on host name and carries none. An empty `keys` on a workspace with host-key checking on means a configure cannot reach that host on first contact. " +
 			"A variable's value is returned as `***` when `sensitive` is true: the server masks it in every response and never returns the stored value. Do not write that mask back as a value.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in detailIn) (*mcp.CallToolResult, detailOut, error) {
@@ -156,8 +172,13 @@ func registerInventoryReads(s *mcp.Server, c *terrapod.Client) {
 			if err != nil {
 				return errResult(err), detailOut{}, nil
 			}
+			keys, err := c.ListInventoryHostKeys(ctx, in.ID)
+			if err != nil {
+				return errResult(err), detailOut{}, nil
+			}
 			return nil, detailOut{
 				Host: host, Vars: orEmptyVars(vars), Groups: orEmptyMemberships(links),
+				Keys: orEmptyHostKeys(keys),
 			}, nil
 		case strings.HasPrefix(in.ID, "invgroup-"):
 			group, err := c.GetInventoryGroup(ctx, in.ID)
@@ -442,7 +463,7 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 
 	// ── terrapod_inventory_remove ────────────────────────────────────
 	type removeIn struct {
-		ID string `json:"id" jsonschema:"the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable. A workspace id (ws-) is NOT accepted: the inventory roots are workspace settings, changed with terrapod_workspace_update"`
+		ID string `json:"id" jsonschema:"the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable, invhkey- an approved host key. A workspace id (ws-) is NOT accepted: the inventory roots are workspace settings, changed with terrapod_workspace_update"`
 	}
 	type removeOut struct {
 		Removed string `json:"removed"`
@@ -451,25 +472,12 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_inventory_remove",
 		Description: "Remove one ansible inventory row. The typed id prefix says what it is, so there is no kind to pass and no way to delete a different kind than intended. " +
-			"CASCADES, and this is the part to show a user before confirming: removing a HOST removes its variables and its group memberships; removing a GROUP removes its variables, its memberships and its nestings in both directions, though the hosts themselves remain. Removing a membership or a nesting removes only that link. " +
+			"CASCADES, and this is the part to show a user before confirming: removing a HOST removes its variables, its group memberships AND its approved SSH host keys; removing a GROUP removes its variables, its memberships and its nestings in both directions, though the hosts themselves remain. Removing a membership or a nesting removes only that link. " +
+			"Removing an APPROVED HOST KEY (invhkey-) withdraws trust in that key. To retire a key, prefer marking it `revoked` with terrapod_inventory_host_key_mark: the entry stays declared and the key is REFUSED, where removing it leaves the key merely unknown. And removing the key a host actually presents makes it an unknown host to the next configure, which on a workspace with host-key checking on means the configure cannot reach it. " +
 			"Call terrapod_inventory_resolved first if the blast radius matters: a host removed here leaves every configure that targeted it.",
 		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in removeIn) (*mcp.CallToolResult, removeOut, error) {
-		kinds := []struct {
-			prefix, label string
-			del           func(context.Context, string) error
-		}{
-			// `invgvar-` before `invg…` would be ambiguous the other way
-			// round, so the longer prefixes are listed first and matched in
-			// order rather than by a map.
-			{"invhost-", "host", c.DeleteInventoryHost},
-			{"invgroup-", "group", c.DeleteInventoryGroup},
-			{"invhvar-", "host variable", c.DeleteInventoryHostVar},
-			{"invgvar-", "group variable", c.DeleteInventoryGroupVar},
-			{"invvar-", "variable under all", c.DeleteInventoryGlobalVar},
-			{"invhg-", "group membership", c.DeleteInventoryHostGroup},
-			{"invgc-", "group nesting", c.DeleteInventoryGroupChild},
-		}
+		kinds := inventoryRemoveKinds(c)
 		if in.ID == "" {
 			return errText("id is required"), removeOut{}, nil
 		}
@@ -483,7 +491,7 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 			return nil, removeOut{Removed: k.label, ID: in.ID}, nil
 		}
 		return errText("id is not an inventory row: expected one of invhost-, invgroup-, " +
-			"invhvar-, invgvar-, invvar-, invhg- or invgc-, got " + in.ID +
+			"invhvar-, invgvar-, invvar-, invhg-, invgc- or invhkey-, got " + in.ID +
 			". A workspace id is not an inventory row: the inventory roots " +
 			"(config_directory, inventory_paths and the run defaults) are workspace " +
 			"settings, changed with terrapod_workspace_update"), removeOut{}, nil
@@ -491,6 +499,39 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
+
+// inventoryRemoveKind is one kind terrapod_inventory_remove can delete: the
+// typed id prefix that identifies it, the label an agent relays to a user, and
+// the call that removes it.
+type inventoryRemoveKind struct {
+	prefix, label string
+	del           func(context.Context, string) error
+}
+
+// inventoryRemoveKinds is the whole table, in MATCH order.
+//
+// Hoisted out of the handler so the test that claims to drive every prefix can
+// derive its subject from it. It was a hand-written list in both places, which
+// is a ledger with nothing keeping the two in step -- and the eighth kind
+// (#2592) is what showed it: a prefix added here and not there left a test
+// called "EveryPrefix" covering seven of eight, with nothing saying so.
+//
+// Order matters and is not alphabetical. `invgvar-`, `invgroup-` and `invgc-`
+// all begin `invg`, so the prefixes are matched in sequence rather than by a
+// map or a shortest match; a shorter prefix placed above a longer one that
+// extends it would shadow it.
+func inventoryRemoveKinds(c *terrapod.Client) []inventoryRemoveKind {
+	return []inventoryRemoveKind{
+		{"invhost-", "host", c.DeleteInventoryHost},
+		{"invgroup-", "group", c.DeleteInventoryGroup},
+		{"invhvar-", "host variable", c.DeleteInventoryHostVar},
+		{"invgvar-", "group variable", c.DeleteInventoryGroupVar},
+		{"invvar-", "variable under all", c.DeleteInventoryGlobalVar},
+		{"invhg-", "group membership", c.DeleteInventoryHostGroup},
+		{"invgc-", "group nesting", c.DeleteInventoryGroupChild},
+		{"invhkey-", "approved host key", c.DeleteInventoryHostKey},
+	}
+}
 
 // isConflict says the write failed because the row already exists, which is
 // the one error "set" recovers from by patching instead.
