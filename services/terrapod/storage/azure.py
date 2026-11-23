@@ -59,12 +59,32 @@ class AzureStore:
             return full_key[len(self._prefix) + 1 :]
         return full_key
 
-    async def _get_container_client(self) -> Any:
-        if self._container_client is None:
+    def _get_credential(self) -> Any:
+        """This store's Azure credential, built once.
+
+        One producer, because there are TWO consumers and only one of them used to
+        build it: `_get_container_client` assigned `self._credential` and
+        `_get_delegation_key` read it. The two paths share no ordering, so a
+        presigned URL requested before any container operation -- a state download
+        on a freshly started replica, which is an ordinary first request, and
+        `presigned_get_url` calls `_get_delegation_key` and nothing else -- reached
+        `BlobServiceClient(credential=None)`, could not obtain a user delegation key,
+        and so could not sign the SAS (#2677).
+
+        The credential therefore cannot belong to whichever path happens to run
+        first, which is what calling a producer from both of them fixes.
+        """
+        if self._credential is None:
             from azure.identity.aio import DefaultAzureCredential
-            from azure.storage.blob.aio import ContainerClient
 
             self._credential = DefaultAzureCredential()
+        return self._credential
+
+    async def _get_container_client(self) -> Any:
+        if self._container_client is None:
+            from azure.storage.blob.aio import ContainerClient
+
+            self._get_credential()
             account_url = f"https://{self._account_name}.blob.core.windows.net"
             self._container_client = ContainerClient(
                 account_url=account_url,
@@ -106,7 +126,7 @@ class AzureStore:
 
             account_url = f"https://{self._account_name}.blob.core.windows.net"
             async with BlobServiceClient(
-                account_url=account_url, credential=self._credential
+                account_url=account_url, credential=self._get_credential()
             ) as service_client:
                 key_start = now
                 key_expiry = now + timedelta(hours=23)
