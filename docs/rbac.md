@@ -19,7 +19,7 @@ Workspace permissions are strictly hierarchical -- each level includes all permi
 | **read** | View workspace, view runs and plan output, view state metadata, view non-sensitive variables |
 | **plan** | read + queue plan-only runs, lock/unlock (own locks), download raw state |
 | **write** | plan + confirm/discard applies, create apply runs, CRUD variables, upload state/config, rollback state versions |
-| **admin** | write + update/delete workspace, change VCS/execution settings, change labels, delete state versions. Cannot change owner (platform admin only) |
+| **admin** | write + update/delete workspace, change VCS/execution settings, change labels, delete state versions, override a held policy/scan/AI-policy gate (`run:override`). Cannot change owner (platform admin only) |
 
 "CRUD variables" at the **write** level includes a variable's
 [`apply-only`](api-reference.md#apply-only-variables-api) flag, which decides

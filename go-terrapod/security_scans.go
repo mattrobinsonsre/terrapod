@@ -122,7 +122,7 @@ func (c *Client) GetRunSecurityScanStatus(
 }
 
 // OverrideRunSecurityScan overrides a blocking security scan for a run (requires
-// workspace admin). A run still held in planning by the scan gate is re-driven
+// the `run:override` capability). A run still held in planning by the scan gate is re-driven
 // immediately. Returns the (now overridden) scan, or (nil, nil) if none was
 // recorded.
 func (c *Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error) {

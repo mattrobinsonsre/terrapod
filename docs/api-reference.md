@@ -1177,7 +1177,7 @@ Workspaces support the following drift detection attributes (settable on create 
 | `drift-detection-interval-seconds` | integer | `86400` | How often to run drift detection checks (minimum: 3600 seconds / 1 hour) |
 | `plan-expiry-seconds` | integer / null | `null` | Per-workspace plan-expiry TTL (#646). When set, an apply-capable run that has sat in `planned` longer than this (from plan completion) is auto-discarded and must be re-planned. `null` / `0` = disabled (default) |
 | `drift-ignore-rules` | list[string] | `[]` | Glob-aware patterns silenced by the drift-result classifier (#482). Each rule is a Terraform address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` chars (spans `[N]` indices), `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Max 50 entries, ≤ 500 chars each. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`. Affects drift-detection runs only — regular plan/apply is untouched. See [drift-ignore-rules.md](drift-ignore-rules.md) for the full grammar and recipes |
-| `security-scan-enforcement` | string | `advisory` | IaC security-scan (Checkov/Trivy) enforcement (#1036): `off` (skip the stage), `advisory` (scan and record findings, never block apply — the default), or `enforced` (a failed/errored scan holds the run in `planning` until the finding is fixed or a workspace admin overrides it) |
+| `security-scan-enforcement` | string | `advisory` | IaC security-scan (Checkov/Trivy) enforcement (#1036): `off` (skip the stage), `advisory` (scan and record findings, never block apply — the default), or `enforced` (a failed/errored scan holds the run in `planning` until the finding is fixed or a holder of `run:override` overrides it) |
 | `security-scan-engine` | string | `checkov` | Which scanner(s) run: `checkov`, `trivy`, or `both` (union of findings, deduped) |
 | `security-scan-severity-threshold` | string | `high` | Lowest finding severity that counts as a scan failure: `critical`, `high`, `medium`, or `low` |
 | `security-scan-skip-rules` | list[string] | `[]` | Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Max 200 entries, ≤ 100 chars each |
@@ -2225,12 +2225,12 @@ The deterministic Checkov/Trivy IaC security-scan result for a run — the struc
 
 ```
 GET  /api/v1/runs/{run_id}/security-scan                     # read the result (workspace read)
-POST /api/v1/runs/{run_id}/actions/override-security-scan    # override a blocking scan (workspace admin)
+POST /api/v1/runs/{run_id}/actions/override-security-scan    # override a blocking scan (run:override)
 ```
 
 **GET** returns `{"data": <resource>|null, "meta": {"summary": {...}}}`. `data` is `null` when the workspace has scanning off or the run wasn't scanned; for a run whose engine is never scanned (Pulumi, until #1569), `meta.not-evaluated-reason` says why. The resource `attributes` are: `engine`, `enforcement-level`, `severity-threshold`, `outcome` (`passed`/`failed`/`errored`), `findings` (list of `{engine, rule_id, severity, title, resource, file, line, guideline}`), `summary` (`{total, blocking, by_severity, …}`), `error`, `overridden-by`, `overridden-at`, `created-at`. `meta.summary` carries a compact `{status, outcome, engine, total, blocking}` for the badge (`status` = `blocked` | `advisory-failed` | `passed`). Requires `read` on the workspace.
 
-**POST override** marks a failed/errored result overridden and, when the run is still held in `planning` by an enforced scan, re-drives it immediately (mirrors the policy override). Requires **admin** on the workspace; audit-logged. Prefer fixing the finding or adding a skip rule.
+**POST override** marks a failed/errored result overridden and, when the run is still held in `planning` by an enforced scan, re-drives it immediately (mirrors the policy override). Requires the **`run:override`** capability on the workspace; audit-logged. Prefer fixing the finding or adding a skip rule.
 
 The runner protocol (runner-token, run_id-scoped) — `GET .../security-scan-config` and `POST .../security-scan-results` — is internal to the runner and mirrors the OPA `policy-bundle`/`policy-results` pair; the enforcement level and severity threshold are re-resolved **server-side from the workspace** on results POST, never trusted from the runner body.
 
@@ -2240,7 +2240,7 @@ The AI plan summary's optional post-plan gate — the third structural sibling o
 
 ```
 GET  /api/v1/runs/{run_id}/ai-policy                     # read the verdict (workspace read)
-POST /api/v1/runs/{run_id}/actions/override-ai-policy    # release a held run (workspace admin)
+POST /api/v1/runs/{run_id}/actions/override-ai-policy    # release a held run (run:override)
 ```
 
 **GET** returns `{"data": <resource>|null, "meta": {...}}`. The resource `attributes` are: `enforcement-level` (`advisory`/`mandatory`), `risk-threshold`, `outcome` (`passed`/`failed`/`errored`), `verdict` (`{decision: "allow"|"deny", reasons: [{criterion, detail}]}`), `risk-level`, `error`, `overridden-by`, `overridden-at`, `created-at`. `meta` carries the resolved `enforcement-level` and `blocking`, plus `not-evaluated-reason` when no verdict is recorded.
@@ -2249,7 +2249,7 @@ POST /api/v1/runs/{run_id}/actions/override-ai-policy    # release a held run (w
 
 **`outcome: errored` BLOCKS under a mandatory gate rather than passing.** The gate fails closed: a verdict that could not be reached is not approval, so an empty `verdict` never reads as a clean pass. `error` distinguishes a spent daily token budget from a model fault, because the two call for different responses.
 
-**POST override** marks the verdict overridden and, when the run is still held in `planning`, re-drives `complete_plan` immediately (mirrors the policy and scan overrides). Requires **admin** on the workspace; audit-logged. It also releases a run held with **no verdict recorded** — the summariser never ran, or failed before ruling — writing an explicit no-verdict override (`outcome: overridden`, `verdict: null`, an `error` saying the gate never ruled) rather than a forged pass, so an auditor can tell the two apart.
+**POST override** marks the verdict overridden and, when the run is still held in `planning`, re-drives `complete_plan` immediately (mirrors the policy and scan overrides). Requires the **`run:override`** capability on the workspace; audit-logged. It also releases a run held with **no verdict recorded** — the summariser never ran, or failed before ruling — writing an explicit no-verdict override (`outcome: overridden`, `verdict: null`, an `error` saying the gate never ruled) rather than a forged pass, so an auditor can tell the two apart.
 
 Unlike the other two gates there is **no runner protocol**: the verdict is produced in the API by the summariser, which is why a mandatory gate holds the run until it arrives instead of failing it. A Pulumi run is reported as not evaluated and never held — its preview digest is capped, and a gate ruling over a truncated resource list could allow a plan whose offending resource fell off the end.
 
@@ -6553,7 +6553,7 @@ Returns the policy evaluations recorded for a run, plus a `meta.summary` (`statu
 POST /api/v1/runs/{run_id}/actions/override-policy
 ```
 
-Overrides every failed/errored policy evaluation of a run and immediately re-drives a run held at the post-plan policy gate. **Required permission:** `admin` on the run's workspace.
+Overrides every failed/errored policy evaluation of a run and immediately re-drives a run held at the post-plan policy gate. **Required permission:** the `run:override` capability on the run's workspace.
 
 ### Policy checks
 
@@ -6587,7 +6587,7 @@ The run's post-plan gates in the Terraform Enterprise `policy-checks` shape that
 
 `status` is `soft_failed` while a mandatory policy set's (or an enforced scan's) failure is not overridden, `overridden` once it is, and `passed` otherwise — an advisory failure passes, counted in `advisory-failed`. `/output` returns `text/plain`: each policy set with its denies and warnings, or the scan's findings, worst first. The override overrides everything the check covers (every failed policy set, or the scan) and moves a held run on at once; it answers **409** for a check that is not `soft_failed`. The run advertises these checks in its `policy-checks` relationship only in the Terraform Enterprise vocabulary, but the endpoints are always served.
 
-**Required permission:** `read` on the run's workspace to list or read (a caller without it gets **404**); `admin` to override, which is also what `permissions.can-override` reports.
+**Required permission:** `read` on the run's workspace to list or read (a caller without it gets **404**); the `run:override` capability to override, which is also what `permissions.can-override` reports. `workspace:settings` alone is not enough; the built-in `admin` level includes `run:override`.
 
 ### Runner protocol — Policy Bundle
 

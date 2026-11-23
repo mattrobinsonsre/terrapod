@@ -95,9 +95,9 @@ func (c *Client) GetPolicyCheckOutput(ctx context.Context, checkID string) (stri
 	return string(data), nil
 }
 
-// OverridePolicyCheck overrides a soft-failed check, which requires admin on
-// the workspace, and moves a run it was holding on at once. A check that is not
-// soft_failed returns a *ConflictError.
+// OverridePolicyCheck overrides a soft-failed check, which requires the
+// `run:override` capability on the workspace, and moves a run it was holding
+// on at once. A check that is not soft_failed returns a *ConflictError.
 func (c *Client) OverridePolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error) {
 	id, err := policyCheckIDPath(checkID)
 	if err != nil {

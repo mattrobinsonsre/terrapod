@@ -141,13 +141,25 @@ capabilities).
 
 | Capability | Gates |
 |---|---|
-| `workspace:settings` | PATCH workspace (settings, VCS, labels, execution mode, pool — pool reassign additionally needs `pool:assign` on the target pool) |
+| `workspace:settings` | PATCH workspace (settings, VCS, labels, execution mode, pool — pool reassign additionally needs `pool:assign` on the target pool). It no longer covers overriding a gate: that is `run:override` |
 | `workspace:force-unlock` | POST workspaces/{id}/actions/unlock when the lock is held by another user |
+| `run:override` | POST runs/{id}/actions/override-policy, override-security-scan and override-ai-policy; POST policy-checks/{id}/actions/override; and `permissions.can-override` on a policy check. One predicate (`can_override`) decides all four. Overriding a **run task** stage is a different gate — `run-task:manage` below |
 | `workspace:delete` | DELETE workspace |
 | `state:delete` | DELETE state-versions/{id}/manage (delete a non-current state version) |
 | `notification:manage` | POST/PATCH/DELETE notification-configurations; POST .../actions/verify |
-| `run-task:manage` | POST/PATCH/DELETE run-tasks; POST task-stages/{id}/actions/override |
+| `run-task:manage` | POST/PATCH/DELETE run-tasks; POST task-stages/{id}/actions/override (unchanged: it is not `run:override`) |
 | `run-trigger:manage` | POST workspaces/{id}/run-triggers; DELETE run-triggers/{id} |
+
+> **Changed in the next release.** Overriding a failed policy, scan or AI-policy
+> gate used to need `workspace:settings`; it now needs its own `run:override`,
+> which sits in the `admin` preset. Nobody loses it on upgrade: built-in `admin`
+> and workspace owners get it through the tier, and a migration adds it to every
+> stored role that already holds `workspace:settings`. It is a deliberate
+> tightening for roles created **after** the upgrade: `workspace:settings` alone
+> no longer overrides, and `run:override` can be granted without it. A role
+> managed as code with an explicit `capabilities` list must add `run:override`
+> to it, or the first apply after upgrading removes the token the migration
+> added (see [deprecations](deprecations.md#overriding-a-gate-needs-runoverride-not-workspacesettings)).
 
 > **Correction vs. first draft:** variable-**set** management is *not* here — varset
 > CRUD is `require_admin` (platform), so it is a `platform:varset-admin`
