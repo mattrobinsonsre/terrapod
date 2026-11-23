@@ -380,7 +380,17 @@ func TestTheNameMappingAgreesWithTheGeneratedSchema(t *testing.T) {
 
 	mapped := make(map[string]string, len(fields))
 	for _, f := range fields {
-		mapped[pulumiName(f.name)] = f.name
+		n := pulumiName(f.name)
+		mapped[n] = f.name
+		// tfbridge pluralises a REPEATED BLOCK whose name is not already
+		// plural, because it arrives in Pulumi as an array -- so the singular
+		// `ansible_collection` is emitted as `ansibleCollections` (#2681).
+		// Keyed on the two flags `resourceField` already carries rather than on
+		// the name alone, so a plain attribute ending in a consonant does not
+		// quietly acquire a second spelling it never has.
+		if f.block && f.collection && !strings.HasSuffix(n, "s") {
+			mapped[n+"s"] = f.name
+		}
 	}
 
 	var unmappable []string

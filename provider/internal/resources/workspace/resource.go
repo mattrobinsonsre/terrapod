@@ -238,19 +238,7 @@ var unmanagedCollections = []struct {
 	{"inventory_paths", "[]", func(m *workspaceModel) attr.Value { return m.InventoryPaths }},
 	{"playbooks", "[]", func(m *workspaceModel) attr.Value { return m.Playbooks }},
 	{"oidc_audiences", "{}", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
-	{"ansible_collections", "[]", func(m *workspaceModel) attr.Value { return m.AnsibleCollections }},
 }
-
-// ansibleCollectionAttrTypes is the object shape of one `ansible_collections`
-// entry (#1931) -- ansible's own requirements entry, minus the fields Terrapod
-// does not accept (`source`, `type`), so a practitioner writes what they
-// already know.
-var ansibleCollectionAttrTypes = map[string]attr.Type{
-	"name":    types.StringType,
-	"version": types.StringType,
-}
-
-var ansibleCollectionObjType = types.ObjectType{AttrTypes: ansibleCollectionAttrTypes}
 
 // ansibleCollectionModel carries the tfsdk tags ListValueFrom reflects over.
 // The SDK's own terrapod.AnsibleCollection has json tags only, and reflection
@@ -266,20 +254,16 @@ type ansibleCollectionModel struct {
 // A nil return and an empty slice mean different things on the wire: nil omits
 // the key and leaves the stored list alone, `[]` clears it. That is the same
 // rule inventory_paths follows.
-func ansibleCollectionsForRequest(l types.List) []terrapod.AnsibleCollection {
-	if l.IsNull() || l.IsUnknown() {
-		return nil
-	}
-	out := make([]terrapod.AnsibleCollection, 0, len(l.Elements()))
-	for _, e := range l.Elements() {
-		obj, ok := e.(types.Object)
-		if !ok {
-			continue
-		}
-		a := obj.Attributes()
-		entry := terrapod.AnsibleCollection{Name: objStrOf(a, "name")}
-		if v := objStrOf(a, "version"); v != "" {
-			entry.Version = v
+func ansibleCollectionsForRequest(blocks []ansibleCollectionModel) []terrapod.AnsibleCollection {
+	// NON-NIL even when empty, deliberately. go-terrapod gates the payload key
+	// on `req.AnsibleCollections != nil`, so a nil slice omits the key and an
+	// empty one sends `[]` -- and sending `[]` is what "no blocks written" has
+	// to mean now the three-state list is gone (#2681).
+	out := make([]terrapod.AnsibleCollection, 0, len(blocks))
+	for _, b := range blocks {
+		entry := terrapod.AnsibleCollection{Name: b.Name.ValueString()}
+		if !b.Version.IsNull() && !b.Version.IsUnknown() && b.Version.ValueString() != "" {
+			entry.Version = b.Version.ValueString()
 		}
 		out = append(out, entry)
 	}
@@ -311,9 +295,13 @@ func playbooksForRequest(l types.List) []string {
 // An absent version becomes NULL rather than "": the practitioner wrote no
 // version, and storing an empty string would show a diff on every plan against
 // a configuration that still writes none.
-func ansibleCollectionsToState(
-	ctx context.Context, entries []terrapod.AnsibleCollection,
-) (types.List, diag.Diagnostics) {
+func ansibleCollectionsToState(entries []terrapod.AnsibleCollection) []ansibleCollectionModel {
+	if len(entries) == 0 {
+		// nil, not an empty slice: the framework reads both as "no blocks", and
+		// nil is what a configuration writing none produces, so a round trip is
+		// byte-identical either way round.
+		return nil
+	}
 	models := make([]ansibleCollectionModel, 0, len(entries))
 	for _, e := range entries {
 		m := ansibleCollectionModel{Name: types.StringValue(e.Name), Version: types.StringNull()}
@@ -322,15 +310,7 @@ func ansibleCollectionsToState(
 		}
 		models = append(models, m)
 	}
-	return types.ListValueFrom(ctx, ansibleCollectionObjType, models)
-}
-
-// objStrOf reads a string out of an object's attributes, empty when absent.
-func objStrOf(a map[string]attr.Value, key string) string {
-	if s, ok := a[key].(types.String); ok && !s.IsNull() && !s.IsUnknown() {
-		return s.ValueString()
-	}
-	return ""
+	return models
 }
 
 // agentPoolIDsForRequest returns the pool set to put on the wire, or nil when it
@@ -980,30 +960,6 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"ansible_collections": schema.ListNestedAttribute{
-				Description: "Ansible collections installed before a configure runs. " +
-					"Installed AFTER the configuration's own `requirements.yml` and with " +
-					"`--force`, so an entry here overrides the repository's build of that " +
-					"collection and leaves every other one standing. Omitting the attribute " +
-					"leaves the stored value untouched — it does not clear it; set " +
-					"`ansible_collections = []` to clear.",
-				Optional: true,
-				Computed: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
-							Description: "Galaxy coordinate, `namespace.name`.",
-							Required:    true,
-						},
-						"version": schema.StringAttribute{
-							Description: "Version or range, as in ansible's own requirements " +
-								"file. Omit for whatever resolves.",
-							Optional: true,
-						},
-					},
-				},
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
-			},
 			"inventory_paths": schema.ListAttribute{
 				ElementType: types.StringType,
 				Description: "Inventory sources, each a file or a directory relative to the " +
@@ -1510,6 +1466,29 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"ansible_collection": schema.ListNestedBlock{
+				Description: "Ansible collections installed before a configure runs. " +
+					"Installed AFTER the configuration's own `requirements.yml` and with " +
+					"`--force`, so an entry here overrides the repository's build of that " +
+					"collection and leaves every other one standing. What the configuration " +
+					"declares is what the workspace gets: writing no block CLEARS the list, " +
+					"where the list attribute this replaces left a stored value alone (#2681).",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Galaxy coordinate, `namespace.name`.",
+							Required:    true,
+						},
+						"version": schema.StringAttribute{
+							Description: "Version or range, as in ansible's own requirements " +
+								"file. Omit for whatever resolves.",
+							Optional: true,
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -1807,9 +1786,7 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		}
 		req.InventoryPaths = paths
 	}
-	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
-		req.AnsibleCollections = c
-	}
+	req.AnsibleCollections = ansibleCollectionsForRequest(m.AnsibleCollections)
 	if pb := playbooksForRequest(m.Playbooks); pb != nil {
 		req.Playbooks = pb
 	}
@@ -2099,9 +2076,7 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		}
 		req.InventoryPaths = paths
 	}
-	if c := ansibleCollectionsForRequest(m.AnsibleCollections); c != nil {
-		req.AnsibleCollections = c
-	}
+	req.AnsibleCollections = ansibleCollectionsForRequest(m.AnsibleCollections)
 	if pb := playbooksForRequest(m.Playbooks); pb != nil {
 		req.Playbooks = pb
 	}
@@ -2617,13 +2592,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		diags.Append(pbDiag...)
 		m.Playbooks = pbVal
 	}
-	if m.AnsibleCollections.IsNull() && len(ws.AnsibleCollections) == 0 {
-		m.AnsibleCollections = types.ListNull(ansibleCollectionObjType)
-	} else {
-		acVal, acDiag := ansibleCollectionsToState(ctx, ws.AnsibleCollections)
-		diags.Append(acDiag...)
-		m.AnsibleCollections = acVal
-	}
+	m.AnsibleCollections = ansibleCollectionsToState(ws.AnsibleCollections)
 
 	// OIDC audiences (#1901) — a SELECTIVE read, unlike every other collection
 	// here, because this is the one attribute whose read is wider than its
