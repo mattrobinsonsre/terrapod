@@ -4,9 +4,8 @@ import asyncio
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 
-from terrapod.db.models import Workspace
 from tests.integration.test_migrated_schema_matches_models import (
     _alembic,
     _drop_database,
@@ -38,11 +37,20 @@ async def test_the_downgrade_refuses_while_a_workspace_names_a_location(app, mon
         )
         assert index and "WHERE (storage_location IS NOT NULL)" in index
 
-        async with async_sessionmaker(engine)() as db:
-            db.add_all(
-                [Workspace(name="named", storage_location="eu-west"), Workspace(name="plain")]
+        # RAW SQL, not the ORM. The database is pinned at `_REVISION` while
+        # `Workspace` is the CURRENT model, so every column a later migration adds
+        # breaks this insert -- `ssh_host_key_policy` (#2592) did exactly that, with
+        # an `UndefinedColumnError` naming a column this test has no opinion about.
+        # At this revision `id` and `name` are the only NOT NULL columns without a
+        # default, so naming three columns is immune to whatever arrives later.
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO workspaces (id, name, storage_location) VALUES "
+                    "(gen_random_uuid(), 'named', 'eu-west'), "
+                    "(gen_random_uuid(), 'plain', NULL)"
+                )
             )
-            await db.commit()
         with pytest.raises(Exception, match="1 workspace"):
             await asyncio.to_thread(command.downgrade, cfg, _BEFORE)
         assert await _scalar(engine, "SELECT version_num FROM alembic_version") == _REVISION

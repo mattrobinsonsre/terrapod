@@ -557,7 +557,7 @@ test.describe('Approved host keys', () => {
     // Declare one, through the form rather than the API, because the form is
     // what is under test.
     await page.getByRole('button', { name: 'Declare a key', exact: true }).click()
-    await page.getByLabel('Public key').fill(SSH_HOST_KEY_BLOBS['ssh-ed25519'])
+    await page.locator('#inventory-host-key-value').fill(SSH_HOST_KEY_BLOBS['ssh-ed25519'])
     await page.getByRole('button', { name: 'Declare key', exact: true }).click()
 
     const block = page.getByTestId('inv-host-key')
@@ -582,7 +582,7 @@ test.describe('Approved host keys', () => {
     // A host has MANY keys: a second algorithm is an addition, not a
     // replacement.
     await page.getByRole('button', { name: 'Declare a key', exact: true }).click()
-    await page.getByLabel('Public key').fill(SSH_HOST_KEY_BLOBS['ssh-rsa'])
+    await page.locator('#inventory-host-key-value').fill(SSH_HOST_KEY_BLOBS['ssh-rsa'])
     await page.getByRole('button', { name: 'Declare key', exact: true }).click()
     await expect(page.getByTestId('inv-host-key')).toHaveCount(2, { timeout: 15_000 })
 
@@ -651,7 +651,7 @@ test.describe('Approved host keys', () => {
     // accepted happily by anything that does not look, and then never matches
     // the host.
     await page.getByLabel('Algorithm').selectOption('ssh-rsa')
-    await page.getByLabel('Public key').fill(SSH_HOST_KEY_BLOBS['ssh-ed25519'])
+    await page.locator('#inventory-host-key-value').fill(SSH_HOST_KEY_BLOBS['ssh-ed25519'])
     await page.getByRole('button', { name: 'Declare key', exact: true }).click()
     await expect(page.getByText(/declared as/)).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('inv-host-key')).toHaveCount(0)

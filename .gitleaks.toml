@@ -33,4 +33,15 @@ title = "Terrapod gitleaks config"
   regexes = [
     '''4dabf18193072939515e22adb298388d''',
     '''1b47061264138c4ac30d75fd1eb44270''',
+
+    # An SSH host PUBLIC key is not a secret -- it is the half every server hands
+    # to every client that connects -- but its base64 body carries the entropy
+    # `generic-api-key` looks for, so a test fixture holding one fails the scan.
+    # Matched on the algorithm identifier rather than on the three current fixture
+    # values: that prefix is the base64 of the key's own length-prefixed algorithm
+    # name, so it cannot match an arbitrary high-entropy string, and a fixture that
+    # changes later does not reopen the same non-finding. Still by VALUE rather
+    # than by path, so the files carrying them stay scanned for everything else --
+    # a PRIVATE key is a different shape entirely and keeps its own rule.
+    '''AAAA(C3NzaC1lZDI1NTE5|E2VjZHNhLXNoYTIt|B3NzaC1yc2E)[A-Za-z0-9+/=]+''',
   ]

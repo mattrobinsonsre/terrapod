@@ -478,16 +478,16 @@ func TestUpdateCreatesBeforeItDeletes(t *testing.T) {
 	ctx := context.Background()
 	var calls []string
 	r := &inventoryHostKeysResource{tc: fakeClient(t, func(w http.ResponseWriter, req *http.Request) {
-		switch {
-		case req.Method == http.MethodGet:
+		switch req.Method {
+		case http.MethodGet:
 			writeKeyList(w, row("invhkey-old", "ssh-ed25519", edKey, ""))
-		case req.Method == http.MethodPost:
+		case http.MethodPost:
 			calls = append(calls, "create")
 			w.Header().Set("Content-Type", "application/vnd.api+json")
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"invhkey-new","type":"inventory-host-keys",
 			  "attributes":{"key-type":"ssh-ed25519","public-key":"x","marker":null}}}`))
-		case req.Method == http.MethodDelete:
+		case http.MethodDelete:
 			calls = append(calls, "delete")
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -500,7 +500,7 @@ func TestUpdateCreatesBeforeItDeletes(t *testing.T) {
 	// withdraw.
 	plan := stateWith(t, block("ssh-ed25519", edKeyNew, ""))
 	resp := resource.UpdateResponse{State: nullState(t)}
-	r.Update(ctx, resource.UpdateRequest{Plan: tfsdk.Plan{Schema: plan.Schema, Raw: plan.Raw}}, &resp)
+	r.Update(ctx, resource.UpdateRequest{Plan: tfsdk.Plan(plan)}, &resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("update: %v", resp.Diagnostics)
 	}
@@ -574,7 +574,7 @@ func TestCreateDeclaresEveryBlock(t *testing.T) {
 		block("ssh-ed25519", edKey, ""),
 		block("ecdsa-sha2-nistp256", ecKey, "revoked"))
 	resp := resource.CreateResponse{State: nullState(t)}
-	r.Create(ctx, resource.CreateRequest{Plan: tfsdk.Plan{Schema: plan.Schema, Raw: plan.Raw}}, &resp)
+	r.Create(ctx, resource.CreateRequest{Plan: tfsdk.Plan(plan)}, &resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("create: %v", resp.Diagnostics)
 	}
@@ -613,7 +613,7 @@ func TestCreateReportsAFailureAndNamesTheKey(t *testing.T) {
 
 	plan := stateWith(t, block("ssh-ed25519", edKey, ""))
 	resp := resource.CreateResponse{State: nullState(t)}
-	r.Create(ctx, resource.CreateRequest{Plan: tfsdk.Plan{Schema: plan.Schema, Raw: plan.Raw}}, &resp)
+	r.Create(ctx, resource.CreateRequest{Plan: tfsdk.Plan(plan)}, &resp)
 
 	if !resp.Diagnostics.HasError() {
 		t.Fatal("a refused key must be reported")

@@ -18,6 +18,8 @@ from __future__ import annotations
 import json
 import os
 import stat
+import tempfile
+from pathlib import Path
 
 import httpx
 import pytest
@@ -231,7 +233,27 @@ class TestWhereTheFileGoes:
         written = shared / RENDERED_NAME
         assert written.exists()
         assert str(written) in env["ANSIBLE_SSH_ARGS"]
-        assert "/tmp/" not in env["ANSIBLE_SSH_ARGS"]
+
+    def test_the_default_when_the_job_sets_nothing_is_the_shared_volume(self, monkeypatch):
+        """The negative half, asserted against the PRODUCTION default rather than
+        against a path string.
+
+        This used to read `assert "/tmp/" not in env["ANSIBLE_SSH_ARGS"]` above,
+        which passed on macOS and could not pass on Linux: `tmp_path` is
+        `/tmp/pytest-of-root/...` there, so the very path the line above asserts IS
+        present contains `/tmp/`. The two assertions contradicted each other and
+        the one that failed was measuring pytest's choice of temp directory, not
+        the product.
+
+        The property is about where the file goes when the Job says nothing, and
+        `/tp` is the shared volume while `/tmp` is an emptyDir mounted into the
+        ORCHESTRATOR alone -- so a file there is unreachable by the ssh that must
+        read it.
+        """
+        monkeypatch.delenv("TP_EE_KNOWN_HOSTS_DIR", raising=False)
+        resolved = configure_known_hosts.known_hosts_dir()
+        assert resolved == Path("/tp/known-hosts")
+        assert not str(resolved).startswith(tempfile.gettempdir())
 
     def test_it_is_owner_only(self, cfg, tmp_path):
         """`0600`, which is correct because the EE's `runAsUser` is pinned to the

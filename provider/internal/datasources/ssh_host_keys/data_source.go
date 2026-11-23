@@ -358,9 +358,9 @@ func readIntoModel(targets []aHost, results map[string]scanResult, m *sshHostKey
 // single diagnostic listing three hundred hosts is a wall.
 func unreachableDetail(t aHost, res scanResult) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Dialled %s and got no host key. This does not fail the plan — %q is in "+
+	fmt.Fprintf(&b, "Dialled %s and got no host key. This does not fail the plan — %q is in "+
 		"`unreachable_hosts` and absent from `entries`, so a consumer can keep whatever it already "+
-		"holds for it.\n\n", t.address, t.key))
+		"holds for it.\n\n", t.address, t.key)
 	if len(res.errs) == 0 {
 		// Reachable in principle: no algorithm was asked for. parseKeyTypes
 		// cannot produce an empty list, so this is a guard against a future
