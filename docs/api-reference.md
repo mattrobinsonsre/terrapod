@@ -4416,7 +4416,7 @@ Refused with `422`:
 
 - `exclude` with no positive dimension and no `"all": true` — it is never a selector on its own.
 - an entry that sets no selector: it is empty, or only a blank `name_prefix`/`name_glob` (`exclude[N] sets no selector`). `{"owner_email": ""}` is a valid selector (unowned workspaces).
-- an entry that sets `all` or nests `exclude` (`exclude[N]: 'all' and 'exclude' are not allowed in an exclude entry`).
+- an entry that sets `"all": true` or nests `exclude` (`exclude[N] cannot set 'all': true or nest 'exclude'`). `"all": false` is accepted: it says "not all", which is already the default.
 - an `exclude` with more than 20 entries.
 - an `exclude` that is not a list, or an entry that is not an object. `[]` and `null` both mean "no exclusion".
 
