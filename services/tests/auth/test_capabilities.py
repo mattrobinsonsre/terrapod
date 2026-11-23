@@ -74,6 +74,7 @@ def test_workspace_write_tier_membership():
         cap.INVENTORY_WRITE,
     } <= write
     assert cap.WORKSPACE_SETTINGS not in write and cap.WORKSPACE_DELETE not in write
+    assert cap.RUN_OVERRIDE not in write
     assert cap.INVENTORY_WRITE not in _ws("plan"), (
         "a plan-tier grant must not be able to rewrite the target set a configure uses"
     )
@@ -91,6 +92,7 @@ def test_workspace_admin_tier_membership():
         cap.NOTIFICATION_MANAGE,
         cap.RUN_TASK_MANAGE,
         cap.RUN_TRIGGER_MANAGE,
+        cap.RUN_OVERRIDE,
     } <= admin
     # Variable SETS are platform-admin gated, not workspace-admin — they must NOT
     # leak into the workspace preset (this was a draft bug the gate survey caught).
@@ -292,3 +294,23 @@ def test_capabilities_for_builtin_unknown_is_empty():
 def test_has_capability_empty_set_grants_nothing():
     assert cap.has_capability(frozenset(), cap.RUN_READ) is False
     assert cap.has_capability(frozenset(), cap.WORKSPACE_READ) is False
+
+
+def test_run_override_is_a_grantable_admin_tier_capability():
+    assert cap.RUN_OVERRIDE == "run:override"
+    assert cap.RUN_OVERRIDE in cap.GRANTABLE_CAPABILITIES
+    assert cap.RUN_OVERRIDE in cap.capabilities_for_builtin("admin")
+    assert cap.RUN_OVERRIDE not in _ws("write")
+
+
+def test_can_override_is_run_override_alone():
+    assert cap.can_override({cap.RUN_OVERRIDE})
+    assert cap.can_override(frozenset({cap.RUN_READ, cap.RUN_OVERRIDE}))
+    # Settings no longer implies override; neither does the task-stage gate.
+    assert not cap.can_override({cap.WORKSPACE_SETTINGS})
+    assert not cap.can_override({cap.RUN_TASK_MANAGE})
+    assert not cap.can_override(set())
+
+
+def test_a_preset_admin_role_still_summarises_as_admin():
+    assert cap.summarize_capabilities(_ws("admin"))["workspace_permission"] == "admin"

@@ -12,7 +12,7 @@ attribute names / status codes here MUST be matched by that page.
 Endpoints (all under /api/terrapod/v1):
     Run lifecycle (workspace read/admin):
         GET  /runs/{run_id}/security-scan                     read the run's scan result
-        POST /runs/{run_id}/actions/override-security-scan    admin override (workspace admin)
+        POST /runs/{run_id}/actions/override-security-scan    override (run:override)
     Runner protocol (runner token, run_id-scoped):
         GET  /runs/{run_id}/security-scan-config              engine/enforcement/threshold/skip
         POST /runs/{run_id}/security-scan-results             record the scan outcome
@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     get_current_user,
+    require_override,
     require_runner_for_run,
 )
 from terrapod.auth import capabilities as cap
@@ -125,7 +126,7 @@ async def override_run_security_scan(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Override a run's blocking security scan. Requires workspace admin.
+    """Override a run's blocking security scan. Requires the `run:override` capability.
 
     After overriding, a run still held in ``planning`` by the scan gate is
     re-driven immediately (mirrors the policy override), rather than waiting for
@@ -138,8 +139,7 @@ async def override_run_security_scan(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     caps = await resolve_workspace_capabilities_for(db, user, ws)
-    if not has_capability(caps, cap.WORKSPACE_SETTINGS):
-        raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
+    require_override(caps)
 
     count = await security_scan_service.override_run_scan(db, run.id, user.email)
     await db.commit()

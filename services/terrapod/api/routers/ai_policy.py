@@ -14,7 +14,7 @@ attribute names / status codes here MUST be matched by that page.
 
 Endpoints (all under the native prefix):
     GET  /runs/{run_id}/ai-policy                    read the run's verdict
-    POST /runs/{run_id}/actions/override-ai-policy   admin override (workspace admin)
+    POST /runs/{run_id}/actions/override-ai-policy   override (run:override)
 """
 
 import uuid
@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_override
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Run, Workspace
@@ -138,7 +138,7 @@ async def override_run_ai_policy(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Override a run's blocking AI policy verdict. Requires workspace admin.
+    """Override a run's blocking AI policy verdict. Requires the `run:override` capability.
 
     After overriding, a run still held in `planning` is re-driven immediately
     rather than waiting for the next reconciler tick — the same contract as the
@@ -151,8 +151,7 @@ async def override_run_ai_policy(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     caps = await resolve_workspace_capabilities_for(db, user, ws)
-    if not has_capability(caps, cap.WORKSPACE_SETTINGS):
-        raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
+    require_override(caps)
 
     # Releases the hold even when no verdict was ever recorded. That used to be
     # a 409 on the grounds that there was nothing to override -- but a run held

@@ -24,7 +24,7 @@ Endpoints (all under /api/terrapod/v1):
         DELETE /policies/{id}                       delete a policy
     Run lifecycle (workspace read/admin):
         GET    /runs/{run_id}/policy-evaluations    list a run's evaluations
-        POST   /runs/{run_id}/actions/override-policy   admin override (workspace admin)
+        POST   /runs/{run_id}/actions/override-policy   override (run:override)
     Runner protocol (runner token, run_id-scoped):
         GET    /runs/{run_id}/policy-bundle         applicable sets + context
         POST   /runs/{run_id}/policy-results        record evaluation outcomes
@@ -45,6 +45,7 @@ from terrapod.api.dependencies import (
     AuthenticatedUser,
     get_current_user,
     require_admin,
+    require_override,
     require_runner_for_run,
 )
 from terrapod.api.pagination import paginate
@@ -662,7 +663,7 @@ async def override_run_policy(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Override a run's failed policy evaluations. Requires workspace admin.
+    """Override a run's failed policy evaluations. Requires the `run:override` capability.
 
     After overriding, the run (if held in `planning` by the gate) is
     re-driven immediately rather than waiting for the next reconciler
@@ -679,8 +680,7 @@ async def override_run_policy(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     caps = await resolve_workspace_capabilities_for(db, user, ws)
-    if not has_capability(caps, cap.WORKSPACE_SETTINGS):
-        raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
+    require_override(caps)
 
     count = await policy_set_service.override_run_policies(db, run.id, user.email)
     await db.commit()

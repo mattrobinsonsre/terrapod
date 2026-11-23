@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_override
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.api.prefixes import is_tfe_path
@@ -138,8 +138,7 @@ async def _check_for(
 
 
 def _can_override(caps: set) -> bool:
-    # The same capability the Policy Checks and Security panels' overrides need.
-    return has_capability(caps, cap.WORKSPACE_SETTINGS)
+    return cap.can_override(caps)
 
 
 @router.get("/runs/{run_id}/policy-checks")
@@ -196,8 +195,7 @@ async def override_policy_check(
     confirmable by then.
     """
     run, caps, check = await _check_for(db, user, check_id, request=request)
-    if not _can_override(caps):
-        raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
+    require_override(caps)
     if not check.is_overridable:
         raise HTTPException(
             status_code=409,
