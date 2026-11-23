@@ -8,11 +8,16 @@
 // reason rather than a precedent. It is this: the thing being read does not
 // exist anywhere else. A host key is held by the host, Terrapod has never seen
 // it, and no API can be asked for it — so either the provider reads it from the
-// host or an operator obtains it by hand, per host, which is the cost that
-// makes a correct default (#2318's `known_hosts`, and ansible's own
-// `HOST_KEY_CHECKING`) into one everybody turns off. The realistic alternative
-// to this data source is not out-of-band key distribution; it is
+// host or an operator obtains it by hand, per host, which is the cost that makes
+// a correct default into one everybody turns off -- ansible's own
+// `HOST_KEY_CHECKING` being the example everyone has met. The realistic
+// alternative to this data source is not out-of-band key distribution; it is
 // `ssh_host_key_policy = "off"`.
+//
+// (This cited `#2318`'s `known_hosts` credential field as a second example until
+// #2592 retired it -- tolerated on read, refused on write. The claim was true
+// when written and became exactly the kind of stale reason that reads as
+// considered: a reader would have gone looking for a field the API now rejects.)
 //
 // Two consequences of that departure, both deliberate:
 //
