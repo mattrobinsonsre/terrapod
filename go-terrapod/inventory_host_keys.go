@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-// Approved SSH host keys: the ninth inventory structure (#2592).
+// Approved SSH host keys: the eighth inventory structure (#2592).
 //
 // # Why Terrapod models this at all
 //

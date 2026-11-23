@@ -42,7 +42,7 @@ not written separately. Two consequences, and the second is a real trade:
 
 - **The surface is the same and stays the same.** A resource added to the
   Terraform provider appears here with no separate work, so the two cannot drift
-  apart. All 35 resources and 15 data sources are available, not just the
+  apart. All 36 resources and 15 data sources are available, not just the
   inventory ones.
 - **The ergonomics are Terraform-shaped.** Naming, types and the general feel
   follow the Terraform schema rather than idiomatic Pulumi. That is a deliberate
