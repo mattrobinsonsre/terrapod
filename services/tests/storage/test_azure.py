@@ -216,3 +216,66 @@ class TestAzureStoreUnit:
             url = await store.presigned_put_url("test.txt", content_type="text/plain")
             assert url.headers["x-ms-blob-type"] == "BlockBlob"
             assert "sas=token" in url.url
+
+
+class TestTheCredentialHasOneProducer:
+    """A presigned URL before any container operation must still have a credential (#2677).
+
+    `_get_delegation_key` used to READ `self._credential`, which only
+    `_get_container_client` assigned. The two paths share no ordering, so this
+    sequence -- which is an ordinary first request, because a state download on a
+    freshly started replica is served by `presigned_get_url` and that calls
+    `_get_delegation_key` and nothing else -- reached
+    `BlobServiceClient(credential=None)` and could not obtain a user delegation key.
+
+    Every pre-existing presigned test pre-seeds `store._delegation_key`, so none of
+    them enters `_get_delegation_key` at all. That is why this never fired in CI:
+    the ordering that breaks it is the one no test took.
+    """
+
+    def _store(self) -> AzureStore:
+        return AzureStore(account_name="testaccount", container_name="testcontainer")
+
+    async def test_a_delegation_key_is_fetched_with_a_real_credential(self) -> None:
+        store = self._store()
+        seen: dict[str, object] = {}
+
+        class _ServiceClient:
+            def __init__(self, *, account_url: str, credential: object) -> None:
+                seen["credential"] = credential
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+            async def get_user_delegation_key(self, **_kw):
+                return MagicMock()
+
+        with (
+            patch("azure.identity.aio.DefaultAzureCredential") as mock_cred,
+            patch("azure.storage.blob.aio.BlobServiceClient", _ServiceClient),
+        ):
+            # No container operation first: this is the whole point.
+            assert store._container_client is None
+            await store._get_delegation_key()
+
+        assert seen["credential"] is mock_cred.return_value
+        assert seen["credential"] is not None
+
+    async def test_the_container_client_and_the_delegation_key_share_one_credential(self) -> None:
+        """Built once, not once per consumer -- two credentials would mean two token
+        acquisitions and two sets of refresh timers for one store."""
+        store = self._store()
+
+        with (
+            patch("azure.identity.aio.DefaultAzureCredential") as mock_cred,
+            patch("azure.storage.blob.aio.ContainerClient"),
+        ):
+            await store._get_container_client()
+            first = store._credential
+            second = store._get_credential()
+
+        assert first is second is mock_cred.return_value
+        assert mock_cred.call_count == 1
