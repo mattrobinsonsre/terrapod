@@ -1058,20 +1058,22 @@ def make_tempdir() -> str:
 # ── The orchestrator ─────────────────────────────────────────────────────────
 
 
-#: The variable a host-key relaxation is expressed as. ONE string, because
-#: `ansible_ssh_common_args` is one string and ansible does not merge it -- which
-#: is exactly what makes a host able to override this (measured: a host variable
-#: REPLACES a group `all` variable), and also means a host that overrides it
-#: restates the whole argument string rather than adding to it.
-# `ansible_ssh_common_args` -- NOT written by Terrapod any more, and the name is
-# kept only so the refusal in `runner/phases/configure_known_hosts.py` can name it.
+# NOTHING HERE WRITES A HOST-KEY VARIABLE ANY MORE (#2592), and the comment is
+# what is left rather than a constant: `_HOST_KEY_VAR` held
+# `"ansible_ssh_common_args"` and was deleted with the last thing that read it.
+# `runner/phases/configure_known_hosts._statements_about_host_keys` names that
+# variable itself, from its own literal tuple, so keeping a copy here would have
+# been a constant nothing reads carrying a reason that was not true.
 #
 # The relaxation that used to live here is gone with the boolean it served (#2592).
-# It emitted this variable on `all` when `ansible_host_key_checking` was false,
-# DELIBERATELY as a variable rather than as an environment variable, so that a host
-# variable could beat it -- a host re-enabling verification over a workspace-level
-# relaxation was the only per-host exception available when the choice was
-# all-or-nothing.
+# It emitted that variable on `all` when `ansible_host_key_checking` was false, as
+# ONE string -- ansible does not merge `ansible_ssh_common_args`, which is exactly
+# what let a host override it (measured: a host variable REPLACES a group `all`
+# variable, so a host that overrode it restated the whole argument string rather
+# than adding to it). A variable rather than an environment variable was
+# DELIBERATE, and that override was the point: a host re-enabling verification over
+# a workspace-level relaxation was the only per-host exception available when the
+# choice was all-or-nothing.
 #
 # `ssh_host_key_policy` replaces both halves of that. The policy is delivered
 # through the run's own ssh anchor, which nothing in the inventory can beat, and
@@ -1081,7 +1083,6 @@ def make_tempdir() -> str:
 #
 # The anchor has to be unbeatable for the same reason the keys exist at all: a
 # trust anchor a host variable can override is not an anchor.
-_HOST_KEY_VAR = "ansible_ssh_common_args"
 
 
 async def _declared_document(db, workspace_id: uuid.UUID) -> dict[str, Any]:

@@ -61,13 +61,15 @@ enforced and is not.
 `refuse_conflicting_variables` refuses it, and refuses the other three shapes
 too even though the anchor beats them -- because the question there is not
 whether the run is secure but whether a setting an operator can SEE is quietly
-doing nothing. The sharpest case is Terrapod's own: a workspace whose
-`ansible_host_key_checking` is relaxed reaches the runner as
-`ansible_ssh_common_args` on `all` (#2318), so overriding it silently would
-leave the workspace page saying verification is relaxed while every run enforced
-it. `inventory_resolve._relax_host_key_checking` already states the principle,
-about this same setting: *a setting that silently does nothing is worse than one
-that refuses.*
+doing nothing. The sharpest case was Terrapod's own: until #2592 a workspace
+whose `ansible_host_key_checking` was relaxed reached the runner as
+`ansible_ssh_common_args` on `all` (#2318), so overriding it silently would have
+left the workspace page saying verification is relaxed while every run enforced
+it. Nothing writes that variable now -- the policy rides this anchor instead --
+but an inventory carried across the rename still can. The retired relaxation in
+`inventory_resolve` stated the principle about this same setting, and it outlived
+the mechanism: *a setting that silently does nothing is worse than one that
+refuses.*
 
 The refusal is narrow in the way that matters: it fires only when the workspace
 has approved keys -- a surface that ships with #2592 -- so no existing workspace
@@ -237,8 +239,8 @@ def _statements_about_host_keys(variables: Mapping[str, Any]) -> list[str]:
 
     Three shapes, and the rule is one rule: once a workspace declares approved
     keys, host-key verification is the platform's, so any of these is a setting
-    that cannot take effect -- and `inventory_resolve._relax_host_key_checking`
-    says it best, in its own comment about the same situation: *a setting that
+    that cannot take effect -- and the retired relaxation in `inventory_resolve`
+    said it best, in its own comment about the same situation: *a setting that
     silently does nothing is worse than one that refuses*.
 
     * **`ansible_ssh_args`, whatever it contains.** It sets the same ansible
@@ -300,11 +302,13 @@ def refuse_conflicting_variables(hosts: Mapping[str, Mapping[str, Any]]) -> None
     Uniform across the shapes `_statements_about_host_keys` finds, even though
     the anchor beats most of them: the question is not whether the run would be
     secure -- it would -- but whether a setting an operator can see is quietly
-    doing nothing. The sharpest instance is Terrapod's own: a workspace with
-    `ansible_host_key_checking` relaxed reaches the runner as
-    `ansible_ssh_common_args` on `all` (#2318), so without this the workspace
-    page would say verification is relaxed while every run enforced it. That is
-    a lie in the product's own interface, which is worse than a failed run.
+    doing nothing. The sharpest instance was Terrapod's own: until #2592 a
+    workspace with `ansible_host_key_checking` relaxed reached the runner as
+    `ansible_ssh_common_args` on `all` (#2318), so without this the workspace page
+    would have said verification is relaxed while every run enforced it -- a lie in
+    the product's own interface, which is worse than a failed run. Nothing writes
+    that variable now, and the refusal still fires on an inventory that carries one
+    for its own reasons.
 
     **Nothing existing can meet this.** It fires only when the workspace has
     approved keys, which is a surface that ships with #2592 -- so the only
@@ -330,9 +334,10 @@ def refuse_conflicting_variables(hosts: Mapping[str, Mapping[str, Any]]) -> None
         f"on: {named}. Those two contradict, and rather than leave the losing one "
         f"silently doing nothing the configure is refused here.\n"
         f"To fix it, remove {' / '.join(variables_seen)} from those hosts and groups. "
-        f"If a value arrived there from this workspace's `ansible_host_key_checking` "
-        f"setting rather than from your own inventory, turn that setting back on: "
-        f"approved host keys are what it was a substitute for.\n"
+        f"If a value arrived there from Terrapod's own pre-#2592 relaxation rather than "
+        f"from your own inventory, the setting that replaces it is this workspace's "
+        f"`ssh-host-key-policy`: set it to `accept-new` or `off` instead, or leave it "
+        f"`strict` now that approved host keys are what the relaxation stood in for.\n"
         f"Anything in ansible_ssh_common_args or ansible_ssh_extra_args that is NOT "
         f"about host keys -- a ProxyCommand, an IdentityFile, a ServerAliveInterval -- "
         f"keeps working and is not what this refuses."

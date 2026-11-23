@@ -1318,7 +1318,13 @@ def _workspace_json(
             "configure-enabled",
             "auto-configure-enabled",
             "configure-all-hosts",
-            "ansible-host-key-checking",
+            # Renamed with the column it serves (#2592). The pop is
+            # `pop(key, None)`, so a stale entry here is a SILENT no-op -- which
+            # is how the renamed attribute came to leak onto this wire until
+            # `test_a_terraform_workspace_reads_the_same_on_both_surfaces`
+            # caught it. The contract snapshot cannot: it AST-reads the literal
+            # above and has no view of this list.
+            "ssh-host-key-policy",
             "dynamic-inventory-enabled",
             "inventory-scripts-enabled",
             "configure-after-apply",

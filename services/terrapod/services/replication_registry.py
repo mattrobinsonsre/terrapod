@@ -572,7 +572,7 @@ INVENTORY_GLOBAL_VARS = register(
 
 # Approved SSH host keys (#2592). Registered for the same reason the link classes
 # above are, and the failure mode is the sharper one: a host whose keys are lost at
-# promotion has NO approved key, and `ansible_host_key_checking` defaults true and
+# promotion has NO approved key, and `ssh_host_key_policy` defaults `strict`, which
 # fails closed on first contact -- so a configure against it does not degrade, it
 # refuses the host outright. The symptom on the promoted node is every host
 # unreachable, with nothing in the inventory looking wrong.
