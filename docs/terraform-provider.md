@@ -68,7 +68,10 @@ with its merged variables, each group's **direct** membership, and the nesting
 carried separately, with an optional `limit` that ansible itself expands through
 that nesting; a data source rather than an attribute on a resource for the same
 reason as `oidc_audiences` below, since a data source has no round-trip
-requirement and a derived value belongs there), and
+requirement and a derived value belongs there), `terrapod_ssh_host_keys` (the
+SSH host keys a set of hosts present, read by connecting to each one — the
+provider's only data source that talks to something other than the Terrapod
+API; see below), and
 `terrapod_ansible_execution_environments` (which Ansible
 [execution environments](runners.md#choosing-an-execution-environment) this
 deployment can run — the built-in image per ansible-core line and any the
@@ -412,6 +415,119 @@ Two things to know before reaching for them:
   row. Full semantics: [Cloud Identity → Apply-only
   variables](cloud-identity.md#apply-only-variables) and [Configure-only
   variables](cloud-identity.md#configure-only-variables).
+
+## `terrapod_ssh_host_keys`
+
+The SSH host keys a set of hosts present, read by **connecting to each one** and
+taking the key it offers during the key exchange — the same thing `ssh-keyscan`
+does. It is the provider's only data source that opens a socket to something
+other than the Terrapod API, and the reason is that the thing being read exists
+nowhere else: a host key is held by the host, Terrapod has never seen it, and no
+API can be asked for it.
+
+```hcl
+data "terrapod_ssh_host_keys" "fleet" {
+  hosts = ["web1.example.com", "web2.example.com:2222", "[2001:db8::1]:22"]
+}
+```
+
+| attribute | kind | |
+|---|---|---|
+| `hosts` | required, set of string | A hostname or address, optionally `:port`, which overrides `port` for that entry alone. An IPv6 literal with a port needs the bracket form. An entry keys `entries` and appears in `unreachable_hosts` **exactly as written**. |
+| `port` | optional, default 22 | The port for entries that do not name one. |
+| `key_types` | optional | Defaults to `["ssh-ed25519", "ecdsa-sha2-nistp256", "rsa-sha2-512"]`. |
+| `scan_timeout_seconds` | optional, default 5 | Bounds **one** connection attempt, not the whole read. |
+| `entries` | computed | Per host, a list of `{ key_type, public_key }`. |
+| `unreachable_hosts` | computed | Every entry this read got no key out of. |
+
+A data source attribute has no schema default in the plugin framework, so the
+three optional inputs are applied on read and written back — `port` reads as
+`22` rather than as null.
+
+**Why it exists.** Verifying host keys is on by default and fails closed on
+first contact, and the machine credential's `known_hosts` field is what makes
+that default satisfiable. Satisfying it by hand means obtaining and pasting a
+key per host, and an operator with a fleet reaches for
+`ansible_host_key_checking = false` instead. So the baseline this is measured
+against is not out-of-band key distribution; it is verification switched off,
+which checks nothing, ever.
+
+**It is trust-on-first-use.** What arrives is a key the responder demonstrably
+holds the private half of — the signature over the exchange hash is verified
+before the key is accepted — and that is all it is. It says nothing about
+whether the responder is the host you meant. The value is in what happens next:
+a key anchored through `terrapod_inventory_host_keys` is compared on every later
+connection.
+
+**Nothing is authenticated and no username is sent.** The handshake is version
+exchange, key exchange, then authentication; this abandons the connection in the
+host-key callback, which fires during the key exchange. The target's log records
+a connection from `SSH-2.0-terrapod_hostkeyscan` and no attempted login.
+
+**One connection per algorithm**, which is necessary rather than wasteful:
+`HostKeyAlgorithms` is the set the *client* accepts and the server picks one, so
+a single connection offering three returns one key of the server's choosing.
+Two consequences worth knowing:
+
+- `key_type` is the key's own **format**, not the algorithm asked for.
+  `rsa-sha2-512` and `rsa-sha2-256` are signature algorithms over one `ssh-rsa`
+  key, so either returns a `key_type` of `ssh-rsa`, and asking for both yields
+  one entry.
+- `ssh-rsa` is deliberately not in the default. It is RSA signed with SHA-1,
+  which OpenSSH has disabled server-side since 8.8, so it would fail on most of
+  a modern fleet while `rsa-sha2-512` reaches the same key.
+
+### Where the scan runs
+
+In **agent** mode the provider executes on the runner, which is the same network
+position an Ansible configure will connect from — the right vantage point. In
+**local** mode it runs wherever you ran `plan`, which may not reach the hosts at
+all. The same configuration can therefore read a whole fleet from one place and
+nothing from the other, and the symptom is a pile of warnings rather than an
+error.
+
+### An unreachable host warns; it does not fail the plan
+
+A host this read got no key out of goes in `unreachable_hosts` and raises a
+**warning** carrying the error per algorithm attempted. That tolerance is
+load-bearing even when the host list has been narrowed to the instances a cloud
+provider says are running, because "running" is not "reachable from here" — a
+security group, an sshd that has not started, an instance still in cloud-init.
+If it failed, one booting fleet member would block every other host's keys from
+being read. Gate on `unreachable_hosts` yourself if a missing key should stop
+something.
+
+The warning's text is what distinguishes the two cases the attribute covers
+together: a connection error means the host is unreachable from wherever the
+provider ran, while an error naming a host-key algorithm means the host answered
+and holds none of the types `key_types` asked for.
+
+A host that answered with nothing is **absent from `entries`**, not present with
+an empty list — deliberately unlike `terrapod_inventory_resolved`, which is
+exhaustive. Absence is the signal: a consumer that looks a host up and gets null
+can keep whatever it already had, where an empty list would tell it to store
+none.
+
+A value this data source cannot **interpret** is a different matter and fails
+the plan: an unrecognised `key_types` entry, a port that is not a number or is
+out of range, or two entries of `hosts` naming the same host and port — which a
+Terraform set holds as two distinct members, so nothing upstream catches it.
+
+### What to do with `entries`
+
+This data source keeps nothing between reads: it scans and returns. Feed
+`entries` into `terrapod_inventory_host_keys`, which owns state and is where a
+host's keys persist — including across a read in which the host was briefly
+unreachable. Scanning is a read, so it is a data source; keeping is a write, so
+it is a resource. The algorithm and the key are carried separately rather than
+as a rendered `known_hosts` line because that is the identity an
+`inventory_host_keys` row has, and because a host legitimately holds two keys of
+one type mid-rotation.
+
+Draw `hosts` from the authoritative host list — `terrapod_inventory_resolved` —
+narrowed by your own cloud provider's data source to the instances actually
+running, since scanning one the cloud says is stopped can only ever produce a
+warning.
 
 ## Reserved-name note
 

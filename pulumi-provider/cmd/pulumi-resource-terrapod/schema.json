@@ -717,6 +717,26 @@
                 }
             }
         },
+        "terrapod:index/getSshHostKeysEntries:getSshHostKeysEntries": {
+            "properties": {
+                "keyType": {
+                    "type": "string"
+                },
+                "publicKey": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "keyType",
+                "publicKey"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredInputs": []
+                }
+            }
+        },
         "terrapod:index/getWorkspaceAnsibleCollection:getWorkspaceAnsibleCollection": {
             "properties": {
                 "name": {
@@ -7889,6 +7909,82 @@
                     "registryPermission",
                     "updatedAt",
                     "workspacePermission"
+                ],
+                "type": "object"
+            }
+        },
+        "terrapod:index/getSshHostKeys:getSshHostKeys": {
+            "inputs": {
+                "description": "A collection of arguments for invoking getSshHostKeys.\n",
+                "properties": {
+                    "hosts": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "keyTypes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "port": {
+                        "type": "integer"
+                    },
+                    "scanTimeoutSeconds": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "hosts"
+                ]
+            },
+            "outputs": {
+                "description": "A collection of values returned by getSshHostKeys.\n",
+                "properties": {
+                    "entries": {
+                        "additionalProperties": {
+                            "items": {
+                                "$ref": "#/types/terrapod:index/getSshHostKeysEntries:getSshHostKeysEntries"
+                            },
+                            "type": "array"
+                        },
+                        "type": "object"
+                    },
+                    "hosts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "keyTypes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "port": {
+                        "type": "integer"
+                    },
+                    "scanTimeoutSeconds": {
+                        "type": "integer"
+                    },
+                    "unreachableHosts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "entries",
+                    "hosts",
+                    "keyTypes",
+                    "port",
+                    "scanTimeoutSeconds",
+                    "unreachableHosts"
                 ],
                 "type": "object"
             }

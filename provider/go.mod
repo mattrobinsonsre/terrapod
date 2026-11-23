@@ -6,6 +6,7 @@ require (
 	github.com/hashicorp/terraform-plugin-framework v1.13.0
 	github.com/hashicorp/terraform-plugin-go v0.25.0
 	github.com/mattrobinsonsre/terrapod/go-terrapod v0.0.0-00010101000000-000000000000
+	golang.org/x/crypto v0.58.0
 )
 
 require (

@@ -59,6 +59,12 @@ data terrapod_role.pool_permission required=false optional=false computed=true s
 data terrapod_role.registry_permission required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_role.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_role.workspace_permission required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_ssh_host_keys.entries required=false optional=false computed=true sensitive=false type=types.MapType[types.ListType[types.ObjectType["key_type":basetypes.StringType, "public_key":basetypes.StringType]]]
+data terrapod_ssh_host_keys.hosts required=true optional=false computed=false sensitive=false type=types.SetType[basetypes.StringType]
+data terrapod_ssh_host_keys.key_types required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
+data terrapod_ssh_host_keys.port required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_ssh_host_keys.scan_timeout_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_ssh_host_keys.unreachable_hosts required=false optional=false computed=true sensitive=false type=types.SetType[basetypes.StringType]
 data terrapod_user.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.display_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.email required=true optional=false computed=false sensitive=false type=basetypes.StringType
