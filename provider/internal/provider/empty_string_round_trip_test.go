@@ -68,15 +68,6 @@ var legitimatelyNullable = map[string]string{
 	"terrapod_autodiscovery_rule.on_directory_delete": "an enum, so \"\" is not a storable value -- " +
 		"the API answers 422 for anything outside its set, which means a configuration cannot ask " +
 		"for the empty string in the first place and there is no round trip to break",
-
-	"terrapod_catalog_item.variable_options_json": "the attribute carries a JSON document, " +
-		"marshalled from the server's own structure. \"\" is not valid JSON, so the state the " +
-		"practitioner can express is \"a document\" or \"no document\", and null is how the second " +
-		"one is spelled",
-
-	"terrapod_provider_template.parameters_json": "the same shape as " +
-		"terrapod_catalog_item.variable_options_json: a marshalled JSON document, where \"\" is not " +
-		"a value the attribute can hold",
 }
 
 // anAttribute is one row of the derived subject.

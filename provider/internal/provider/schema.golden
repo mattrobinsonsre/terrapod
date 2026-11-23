@@ -301,7 +301,12 @@ resource terrapod_catalog_item.name required=true optional=false computed=false 
 resource terrapod_catalog_item.provider_template_ids required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_catalog_item.self_contained required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_catalog_item.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
-resource terrapod_catalog_item.variable_options_json required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_catalog_item.variable_option block type=types.ListType[types.ObjectType["default_json":basetypes.StringType, "hidden":basetypes.BoolType, "name":basetypes.StringType, "options_json":basetypes.StringType, "sensitive":basetypes.BoolType]]
+resource terrapod_catalog_item.variable_option.default_json required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_catalog_item.variable_option.hidden required=false optional=true computed=false sensitive=false type=basetypes.BoolType
+resource terrapod_catalog_item.variable_option.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.variable_option.options_json required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_catalog_item.variable_option.sensitive required=false optional=true computed=false sensitive=false type=basetypes.BoolType
 resource terrapod_execution_hook.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_execution_hook.description required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_execution_hook.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -445,7 +450,14 @@ resource terrapod_provider_template.created_at required=false optional=false com
 resource terrapod_provider_template.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_provider_template.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_provider_template.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
-resource terrapod_provider_template.parameters_json required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_provider_template.parameter block type=types.ListType[types.ObjectType["default_json":basetypes.StringType, "description":basetypes.StringType, "name":basetypes.StringType, "options_json":basetypes.StringType, "required":basetypes.BoolType, "sensitive":basetypes.BoolType, "type":basetypes.StringType]]
+resource terrapod_provider_template.parameter.default_json required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_provider_template.parameter.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_provider_template.parameter.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_provider_template.parameter.options_json required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_provider_template.parameter.required required=false optional=true computed=false sensitive=false type=basetypes.BoolType
+resource terrapod_provider_template.parameter.sensitive required=false optional=true computed=false sensitive=false type=basetypes.BoolType
+resource terrapod_provider_template.parameter.type required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_provider_template.provider_type required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_provider_template.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_registry_module.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
