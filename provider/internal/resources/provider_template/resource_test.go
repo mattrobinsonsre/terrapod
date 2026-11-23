@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
@@ -55,8 +56,20 @@ func TestReadProviderTemplateUsesAuthoringValuesInsteadOfRedactedState(t *testin
 	if diags := resp.State.Get(ctx, &got); diags.HasError() {
 		t.Fatal(diags)
 	}
-	if got.Body.ValueString() != "private" || got.ParametersJSON.ValueString() != `[{"default":"private","name":"token","sensitive":true}]` {
-		t.Fatalf("refresh lost sensitive authoring values: body=%s parameters=%s", got.Body.ValueString(), got.ParametersJSON.ValueString())
+	// The same property as before #2681, read off the typed block rather than a
+	// JSON string: a refresh must bring the sensitive default back, or a later
+	// write would send a template whose secret had been quietly dropped.
+	if got.Body.ValueString() != "private" || len(got.Parameters) != 1 {
+		t.Fatalf("refresh lost sensitive authoring values: body=%s parameters=%+v",
+			got.Body.ValueString(), got.Parameters)
+	}
+	first := got.Parameters[0]
+	// A JSON document, so the string default is quoted.
+	if first.DefaultJSON.ValueString() != `"private"` {
+		t.Fatalf("refresh lost the sensitive default: %s", first.DefaultJSON.ValueString())
+	}
+	if first.Name.ValueString() != "token" || !first.Sensitive.ValueBool() {
+		t.Fatalf("refresh lost the parameter's own fields: %+v", first)
 	}
 	plan := tfsdk.Plan{Schema: sch.Schema, Raw: resp.State.Raw}
 	created := resource.CreateResponse{State: state}
@@ -74,8 +87,15 @@ func TestReadProviderTemplateUsesAuthoringValuesInsteadOfRedactedState(t *testin
 	}
 	for _, result := range []tfsdk.State{created.State, updated.State} {
 		var value providerTemplateModel
-		if diags := result.Get(ctx, &value); diags.HasError() || value.Body.ValueString() != "private" || value.ParametersJSON.ValueString() != got.ParametersJSON.ValueString() {
+		if diags := result.Get(ctx, &value); diags.HasError() || value.Body.ValueString() != "private" {
 			t.Fatalf("write must retain authoring values in state: %v %+v", diags, value)
+		}
+		if len(value.Parameters) != len(got.Parameters) {
+			t.Fatalf("write changed the parameter count: %d != %d", len(value.Parameters), len(got.Parameters))
+		}
+		if value.Parameters[0].DefaultJSON.ValueString() != first.DefaultJSON.ValueString() {
+			t.Fatalf("write did not retain the sensitive default: %s",
+				value.Parameters[0].DefaultJSON.ValueString())
 		}
 	}
 }

@@ -28,7 +28,7 @@
 //	"ansible-version"    -> ansible_version     (string, optional; empty inherits the deployment default)
 //	"ssh-host-key-policy" -> ssh_host_key_policy (string, optional+computed; strict|accept-new|off)
 //	"ansible-execution-environment" -> ansible_execution_environment (string, optional; overrides the line)
-//	"ansible-collections" -> ansible_collections (list of {name, version}, optional)
+//	"ansible-collections" -> ansible_collection blocks (each {name, version})
 //	"plan-apply-enabled" -> plan_apply_enabled  (bool, optional+computed, default true)
 //	"configure-enabled"  -> configure_enabled   (bool, optional+computed, default false)
 //	"config-directory"   -> config_directory    (string, optional+computed; "" is the config version's root)
@@ -45,7 +45,7 @@
 //	"on-directory-delete" -> on_directory_delete (string, optional;
 //	    "flag" (default, safe) or "destroy" (tears down infra then archives))
 //	"var-files"          -> var_files           (list of strings, optional)
-//	"run-task-templates" -> run_task_templates  (list of objects, optional)
+//	"run-task-templates" -> run_task_template blocks
 //	    each: name (string, req), url (string, req), hmac-key (string, opt),
 //	          stage (string, req), enforcement-level (string, opt),
 //	          enabled (bool, opt)
@@ -100,22 +100,22 @@ var (
 type autodiscoveryRuleModel struct {
 	ID types.String `tfsdk:"id"`
 
-	Name                        types.String `tfsdk:"name"`
-	NameTemplate                types.String `tfsdk:"name_template"`
-	VCSConnectionID             types.String `tfsdk:"vcs_connection_id"`
-	RepoURL                     types.String `tfsdk:"repo_url"`
-	Branch                      types.String `tfsdk:"branch"`
-	Pattern                     types.String `tfsdk:"pattern"`
-	IgnorePatterns              types.List   `tfsdk:"ignore_patterns"`
-	Enabled                     types.Bool   `tfsdk:"enabled"`
-	ExecutionMode               types.String `tfsdk:"execution_mode"`
-	ExecutionBackend            types.String `tfsdk:"execution_backend"`
-	AgentPoolID                 types.String `tfsdk:"agent_pool_id"`
-	EngineVersion               types.String `tfsdk:"engine_version"`
-	TerraformVersion            types.String `tfsdk:"terraform_version"`
-	AnsibleVersion              types.String `tfsdk:"ansible_version"`
-	AnsibleExecutionEnvironment types.String `tfsdk:"ansible_execution_environment"`
-	AnsibleCollections          types.List   `tfsdk:"ansible_collections"`
+	Name                        types.String          `tfsdk:"name"`
+	NameTemplate                types.String          `tfsdk:"name_template"`
+	VCSConnectionID             types.String          `tfsdk:"vcs_connection_id"`
+	RepoURL                     types.String          `tfsdk:"repo_url"`
+	Branch                      types.String          `tfsdk:"branch"`
+	Pattern                     types.String          `tfsdk:"pattern"`
+	IgnorePatterns              types.List            `tfsdk:"ignore_patterns"`
+	Enabled                     types.Bool            `tfsdk:"enabled"`
+	ExecutionMode               types.String          `tfsdk:"execution_mode"`
+	ExecutionBackend            types.String          `tfsdk:"execution_backend"`
+	AgentPoolID                 types.String          `tfsdk:"agent_pool_id"`
+	EngineVersion               types.String          `tfsdk:"engine_version"`
+	TerraformVersion            types.String          `tfsdk:"terraform_version"`
+	AnsibleVersion              types.String          `tfsdk:"ansible_version"`
+	AnsibleExecutionEnvironment types.String          `tfsdk:"ansible_execution_environment"`
+	AnsibleCollections          []ruleCollectionModel `tfsdk:"ansible_collection"`
 	// Which operations a materialised workspace has (#1966), and the roots
 	// each one uses (#1929). Templated onto every workspace this rule
 	// creates, exactly like the settings further down -- the rule carries the
@@ -173,10 +173,10 @@ type autodiscoveryRuleModel struct {
 	ScheduledConfigureCron     types.String `tfsdk:"scheduled_configure_cron"`
 	ScheduledConfigureTimezone types.String `tfsdk:"scheduled_configure_timezone"`
 
-	VarFiles               types.List `tfsdk:"var_files"`
-	RunTaskTemplates       types.List `tfsdk:"run_task_templates"`
-	NotificationTemplates  types.List `tfsdk:"notification_templates"`
-	ExecutionHookTemplates types.List `tfsdk:"execution_hook_templates"`
+	VarFiles               types.List             `tfsdk:"var_files"`
+	RunTaskTemplates       []runTaskTemplateModel `tfsdk:"run_task_template"`
+	NotificationTemplates  types.List             `tfsdk:"notification_templates"`
+	ExecutionHookTemplates types.List             `tfsdk:"execution_hook_templates"`
 
 	// Propagate is a request OPTION rather than a stored field: it is sent on
 	// update and never read back, so it has no `Computed` counterpart and never
@@ -185,24 +185,6 @@ type autodiscoveryRuleModel struct {
 
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
-}
-
-// runTaskTemplateAttrTypes is the object attribute type map for a single
-// element of run_task_templates. Used for nested list (un)marshalling.
-// ruleCollectionAttrTypes is the object shape of one `ansible_collections`
-// entry on a rule (#1931), mirroring the workspace resource's own.
-var ruleCollectionAttrTypes = map[string]attr.Type{
-	"name":    types.StringType,
-	"version": types.StringType,
-}
-
-var runTaskTemplateAttrTypes = map[string]attr.Type{
-	"name":              types.StringType,
-	"url":               types.StringType,
-	"hmac_key":          types.StringType,
-	"stage":             types.StringType,
-	"enforcement_level": types.StringType,
-	"enabled":           types.BoolType,
 }
 
 // notificationTemplateAttrTypes is the object attribute type map for a
@@ -215,6 +197,22 @@ var notificationTemplateAttrTypes = map[string]attr.Type{
 	"triggers":         types.ListType{ElemType: types.StringType},
 	"email_addresses":  types.ListType{ElemType: types.StringType},
 	"enabled":          types.BoolType,
+}
+
+// ruleCollectionModel is one `ansible_collections` block.
+type ruleCollectionModel struct {
+	Name    types.String `tfsdk:"name"`
+	Version types.String `tfsdk:"version"`
+}
+
+// runTaskTemplateModel is one `run_task_templates` block.
+type runTaskTemplateModel struct {
+	Name             types.String `tfsdk:"name"`
+	URL              types.String `tfsdk:"url"`
+	HMACKey          types.String `tfsdk:"hmac_key"`
+	Stage            types.String `tfsdk:"stage"`
+	EnforcementLevel types.String `tfsdk:"enforcement_level"`
+	Enabled          types.Bool   `tfsdk:"enabled"`
 }
 
 type autodiscoveryRuleResource struct {
@@ -376,26 +374,6 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				// contradicting the server, since the rule resource shipped (#1559).
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"ansible_collections": schema.ListNestedAttribute{
-				Description: "The Ansible collections a workspace created by this rule " +
-					"declares. Installed after the configuration's own `requirements.yml` " +
-					"and with `--force`, so an entry here overrides the repository's build " +
-					"of that collection. A fleet standardising on an internal collection " +
-					"is the case this exists for.",
-				Optional: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
-							Description: "Galaxy coordinate, `namespace.name`.",
-							Required:    true,
-						},
-						"version": schema.StringAttribute{
-							Description: "Version or range; omit for whatever resolves.",
-							Optional:    true,
-						},
-					},
 				},
 			},
 			"ansible_version": schema.StringAttribute{
@@ -885,39 +863,6 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"run_task_templates": schema.ListNestedAttribute{
-				Description: "Run task definitions auto-applied to workspaces created by this rule.",
-				Optional:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
-							Description: "Run task name.",
-							Required:    true,
-						},
-						"url": schema.StringAttribute{
-							Description: "Run task webhook URL.",
-							Required:    true,
-						},
-						"hmac_key": schema.StringAttribute{
-							Description: "Optional HMAC signing key for the run task webhook.",
-							Optional:    true,
-							Sensitive:   true,
-						},
-						"stage": schema.StringAttribute{
-							Description: "Run stage the task runs at (e.g. pre_plan, post_plan, pre_apply).",
-							Required:    true,
-						},
-						"enforcement_level": schema.StringAttribute{
-							Description: "Enforcement level: mandatory or advisory. Defaults to mandatory.",
-							Optional:    true,
-						},
-						"enabled": schema.BoolAttribute{
-							Description: "Whether the run task is enabled. Defaults to true.",
-							Optional:    true,
-						},
-					},
-				},
-			},
 			"notification_templates": schema.ListNestedAttribute{
 				Description: "Notification configurations auto-applied to workspaces created by this rule.",
 				Optional:    true,
@@ -989,6 +934,67 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 			"updated_at": schema.StringAttribute{
 				Description: "Last update timestamp.",
 				Computed:    true,
+			},
+		},
+		Blocks: map[string]schema.Block{
+			// BLOCKS (#2681). Both were repeated nested ATTRIBUTES, and this is a
+			// deliberate change of meaning as well as of shape: a list attribute
+			// distinguished null ("leave the stored value alone") from `[]`
+			// ("clear it"), and a block list cannot -- what the configuration
+			// writes is what the rule gets. That is the declarative model blocks
+			// and `for_each` assume, and `docs/upgrading-to-2.0.md` carries it,
+			// because a configuration that omits these today stops meaning
+			// "leave alone".
+			"ansible_collection": schema.ListNestedBlock{
+				Description: "The Ansible collections a workspace created by this rule " +
+					"declares. Installed after the configuration's own `requirements.yml` " +
+					"and with `--force`, so an entry here overrides the repository's build " +
+					"of that collection. A fleet standardising on an internal collection " +
+					"is the case this exists for.",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Galaxy coordinate, `namespace.name`.",
+							Required:    true,
+						},
+						"version": schema.StringAttribute{
+							Description: "Version or range; omit for whatever resolves.",
+							Optional:    true,
+						},
+					},
+				},
+			},
+			"run_task_template": schema.ListNestedBlock{
+				Description: "Run task definitions auto-applied to workspaces created by this rule.",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Run task name.",
+							Required:    true,
+						},
+						"url": schema.StringAttribute{
+							Description: "Run task webhook URL.",
+							Required:    true,
+						},
+						"hmac_key": schema.StringAttribute{
+							Description: "Optional HMAC signing key for the run task webhook.",
+							Optional:    true,
+							Sensitive:   true,
+						},
+						"stage": schema.StringAttribute{
+							Description: "Run stage the task runs at (e.g. pre_plan, post_plan, pre_apply).",
+							Required:    true,
+						},
+						"enforcement_level": schema.StringAttribute{
+							Description: "Enforcement level: mandatory or advisory. Defaults to mandatory.",
+							Optional:    true,
+						},
+						"enabled": schema.BoolAttribute{
+							Description: "Whether the run task is enabled. Defaults to true.",
+							Optional:    true,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -1240,22 +1246,18 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.AnsibleExecutionEnvironment.IsNull() && !m.AnsibleExecutionEnvironment.IsUnknown() {
 		attrs["ansible-execution-environment"] = m.AnsibleExecutionEnvironment.ValueString()
 	}
-	if !m.AnsibleCollections.IsNull() && !m.AnsibleCollections.IsUnknown() {
-		cols := make([]map[string]any, 0, len(m.AnsibleCollections.Elements()))
-		for _, e := range m.AnsibleCollections.Elements() {
-			obj, ok := e.(types.Object)
-			if !ok {
-				continue
-			}
-			a := obj.Attributes()
-			col := map[string]any{"name": objStr(a, "name")}
-			if v := objStr(a, "version"); v != "" {
-				col["version"] = v
-			}
-			cols = append(cols, col)
+	// ALWAYS SENT, empty included: a block list is declarative, so writing no
+	// block means the rule declares no collections. The attribute this replaces
+	// omitted the key when null, which meant "leave whatever is stored".
+	cols := make([]map[string]any, 0, len(m.AnsibleCollections))
+	for _, c := range m.AnsibleCollections {
+		col := map[string]any{"name": c.Name.ValueString()}
+		if v := c.Version.ValueString(); v != "" {
+			col["version"] = v
 		}
-		attrs["ansible-collections"] = cols
+		cols = append(cols, col)
 	}
+	attrs["ansible-collections"] = cols
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		attrs["parallelism"] = m.Parallelism.ValueInt64()
 	}
@@ -1438,30 +1440,27 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		attrs["execution-hook-templates"] = hooks
 	}
 
-	if !m.RunTaskTemplates.IsNull() && !m.RunTaskTemplates.IsUnknown() {
-		tasks := make([]map[string]any, 0, len(m.RunTaskTemplates.Elements()))
-		for _, e := range m.RunTaskTemplates.Elements() {
-			obj := e.(types.Object)
-			a := obj.Attributes()
-			task := map[string]any{
-				"name":  objStr(a, "name"),
-				"url":   objStr(a, "url"),
-				"stage": objStr(a, "stage"),
-			}
-			// Server validators read the hyphenated input keys.
-			if s, ok := a["hmac_key"].(types.String); ok && !s.IsNull() && !s.IsUnknown() {
-				task["hmac-key"] = s.ValueString()
-			}
-			if s, ok := a["enforcement_level"].(types.String); ok && !s.IsNull() && !s.IsUnknown() && s.ValueString() != "" {
-				task["enforcement-level"] = s.ValueString()
-			}
-			if b, ok := a["enabled"].(types.Bool); ok && !b.IsNull() && !b.IsUnknown() {
-				task["enabled"] = b.ValueBool()
-			}
-			tasks = append(tasks, task)
+	// Always sent, empty included -- see the note on `ansible-collections`.
+	tasks := make([]map[string]any, 0, len(m.RunTaskTemplates))
+	for _, t := range m.RunTaskTemplates {
+		task := map[string]any{
+			"name":  t.Name.ValueString(),
+			"url":   t.URL.ValueString(),
+			"stage": t.Stage.ValueString(),
 		}
-		attrs["run-task-templates"] = tasks
+		// Server validators read the hyphenated input keys.
+		if !t.HMACKey.IsNull() && !t.HMACKey.IsUnknown() {
+			task["hmac-key"] = t.HMACKey.ValueString()
+		}
+		if !t.EnforcementLevel.IsNull() && !t.EnforcementLevel.IsUnknown() && t.EnforcementLevel.ValueString() != "" {
+			task["enforcement-level"] = t.EnforcementLevel.ValueString()
+		}
+		if !t.Enabled.IsNull() && !t.Enabled.IsUnknown() {
+			task["enabled"] = t.Enabled.ValueBool()
+		}
+		tasks = append(tasks, task)
 	}
+	attrs["run-task-templates"] = tasks
 
 	if !m.NotificationTemplates.IsNull() && !m.NotificationTemplates.IsUnknown() {
 		notifs := make([]map[string]any, 0, len(m.NotificationTemplates.Elements()))
@@ -1574,22 +1573,12 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.AnsibleExecutionEnvironment = optionalStringKeepingExplicitEmpty(
 		m.AnsibleExecutionEnvironment,
 		terrapod.GetStringAttr(res, "ansible-execution-environment"))
-	acObjType := types.ObjectType{AttrTypes: ruleCollectionAttrTypes}
-	if rawCols := parseRawObjectList(res, "ansible-collections"); len(rawCols) > 0 {
-		elems := make([]attr.Value, 0, len(rawCols))
-		for _, c := range rawCols {
-			ov, d := types.ObjectValue(ruleCollectionAttrTypes, map[string]attr.Value{
-				"name":    rawStr(c, "name"),
-				"version": rawStr(c, "version"),
-			})
-			diags.Append(d...)
-			elems = append(elems, ov)
-		}
-		lv, d := types.ListValue(acObjType, elems)
-		diags.Append(d...)
-		m.AnsibleCollections = lv
-	} else {
-		m.AnsibleCollections = types.ListNull(acObjType)
+	m.AnsibleCollections = nil
+	for _, c := range parseRawObjectList(res, "ansible-collections") {
+		m.AnsibleCollections = append(m.AnsibleCollections, ruleCollectionModel{
+			Name:    rawStr(c, "name"),
+			Version: rawStr(c, "version"),
+		})
 	}
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	if v := terrapod.GetIntAttr(res, "configure-parallelism"); v != 0 {
@@ -1802,26 +1791,16 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.ExecutionHookTemplates = types.ListNull(types.StringType)
 	}
 
-	rtObjType := types.ObjectType{AttrTypes: runTaskTemplateAttrTypes}
-	if rawTasks := parseRawObjectList(res, "run-task-templates"); len(rawTasks) > 0 {
-		elems := make([]attr.Value, 0, len(rawTasks))
-		for _, t := range rawTasks {
-			ov, d := types.ObjectValue(runTaskTemplateAttrTypes, map[string]attr.Value{
-				"name":              rawStr(t, "name"),
-				"url":               rawStr(t, "url"),
-				"hmac_key":          rawStr(t, "hmac_key", "hmac-key"),
-				"stage":             rawStr(t, "stage"),
-				"enforcement_level": rawStr(t, "enforcement_level", "enforcement-level"),
-				"enabled":           rawBool(t, "enabled"),
-			})
-			diags.Append(d...)
-			elems = append(elems, ov)
-		}
-		lv, d := types.ListValue(rtObjType, elems)
-		diags.Append(d...)
-		m.RunTaskTemplates = lv
-	} else {
-		m.RunTaskTemplates = types.ListNull(rtObjType)
+	m.RunTaskTemplates = nil
+	for _, t := range parseRawObjectList(res, "run-task-templates") {
+		m.RunTaskTemplates = append(m.RunTaskTemplates, runTaskTemplateModel{
+			Name:             rawStr(t, "name"),
+			URL:              rawStr(t, "url"),
+			HMACKey:          rawStr(t, "hmac_key", "hmac-key"),
+			Stage:            rawStr(t, "stage"),
+			EnforcementLevel: rawStr(t, "enforcement_level", "enforcement-level"),
+			Enabled:          rawBool(t, "enabled"),
+		})
 	}
 
 	ntObjType := types.ObjectType{AttrTypes: notificationTemplateAttrTypes}

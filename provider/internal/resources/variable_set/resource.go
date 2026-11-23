@@ -85,13 +85,24 @@ func (r *variableSetResource) Schema(_ context.Context, _ resource.SchemaRequest
 	resp.Schema = schema.Schema{
 		Description: "Manages a variable set in Terrapod.",
 		Attributes: map[string]schema.Attribute{
-			"id":          schema.StringAttribute{Computed: true, Description: "Variable set ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"name":        schema.StringAttribute{Required: true, Description: "The variable set name."},
-			"description": schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Description: "Description of the variable set."},
-			"global":      schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Apply this variable set to all workspaces."},
-			"priority":    schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Priority variable sets override workspace variables."},
-			"assignment_rule": schema.SingleNestedAttribute{
-				Optional: true,
+			"id":              schema.StringAttribute{Computed: true, Description: "Variable set ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"name":            schema.StringAttribute{Required: true, Description: "The variable set name."},
+			"description":     schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Description: "Description of the variable set."},
+			"global":          schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Apply this variable set to all workspaces."},
+			"priority":        schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Priority variable sets override workspace variables."},
+			"var_count":       schema.Int64Attribute{Computed: true, Description: "Number of variables in this set."},
+			"workspace_count": schema.Int64Attribute{Computed: true, Description: "Number of workspaces explicitly assigned to this set. Does not include workspaces matched by `assignment_rule`, or every workspace when `global` is set."},
+			"created_at":      schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":      schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+		},
+		Blocks: map[string]schema.Block{
+			// A BLOCK (#2681). Blocks and `for_each` are the idiomatic HCL and a
+			// major release is when the shape can change. Safe here in a way the
+			// repeated lists are not: this rule is BINARY -- written or not -- so
+			// a block expresses it exactly, where a list attribute's three states
+			// (null meaning "leave alone", `[]` meaning "clear", populated) have
+			// no block equivalent.
+			"assignment_rule": schema.SingleNestedBlock{
 				Description: "Select workspaces by their attributes instead of assigning them one by one. " +
 					"All dimensions given are AND-combined, and membership is re-evaluated on every run, " +
 					"so a workspace that later matches picks the set up without being touched. " +
@@ -115,10 +126,6 @@ func (r *variableSetResource) Schema(_ context.Context, _ resource.SchemaRequest
 					"has_vcs":           schema.BoolAttribute{Optional: true, Description: "Match workspaces by whether they are VCS-connected."},
 				},
 			},
-			"var_count":       schema.Int64Attribute{Computed: true, Description: "Number of variables in this set."},
-			"workspace_count": schema.Int64Attribute{Computed: true, Description: "Number of workspaces explicitly assigned to this set. Does not include workspaces matched by `assignment_rule`, or every workspace when `global` is set."},
-			"created_at":      schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"updated_at":      schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }

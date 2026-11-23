@@ -25,7 +25,7 @@ func TestTheShippedThreeStringsRoundTripAnExplicitEmptyString(t *testing.T) {
 		DefaultVersionPin: types.StringValue(""),
 	}
 
-	attrs, d := buildCatalogItemAttrs(&m, false)
+	attrs, d := buildCatalogItemAttrs(context.Background(), &m, false)
 	if d.HasError() {
 		t.Fatalf("buildCatalogItemAttrs: %v", d)
 	}

@@ -23,21 +23,21 @@ import (
 // golden was written — and `schema.golden` duly recorded these as
 // `sensitive=false` for two releases without anything objecting.
 var mustBeSensitive = map[string]string{
-	"terrapod_variable.value":                     "the variable's value; the whole point of the resource",
-	"terrapod_variable_set_variable.value":        "same, on a variable set",
-	"terrapod_provider_template.body":             "HCL rendered into a provider block — the canonical home of cloud credentials",
-	"terrapod_provider_template.parameters_json":  "a parameter declared sensitive WITH a default puts that default here",
-	"terrapod_catalog_item.variable_options_json": "same JSON-string shape; may carry a sensitive default",
-	"terrapod_catalog_instance.input_values":      "the server omits sensitive inputs, so the provider is their sole durable holder",
-	"terrapod_execution_hook.script":              "a shell body round-tripped into state; the description asks for no secrets, which is not enforcement",
-	"terrapod_user.password":                      "a password",
-	"terrapod_run_task.hmac_key":                  "forging a task result bypasses a mandatory run task's apply gate",
-	"terrapod_notification_configuration.token":   "a delivery credential",
-	"terrapod_agent_pool_token.token":             "a pool join token",
-	"terrapod_gpg_key.ascii_armor":                "a signing key",
+	"terrapod_variable.value":                              "the variable's value; the whole point of the resource",
+	"terrapod_variable_set_variable.value":                 "same, on a variable set",
+	"terrapod_provider_template.body":                      "HCL rendered into a provider block — the canonical home of cloud credentials",
+	"terrapod_provider_template.parameter[].default_json":  "a parameter declared sensitive WITH a default puts that default here",
+	"terrapod_catalog_item.variable_option[].default_json": "same shape; may carry a sensitive default",
+	"terrapod_catalog_instance.input_values":               "the server omits sensitive inputs, so the provider is their sole durable holder",
+	"terrapod_execution_hook.script":                       "a shell body round-tripped into state; the description asks for no secrets, which is not enforcement",
+	"terrapod_user.password":                               "a password",
+	"terrapod_run_task.hmac_key":                           "forging a task result bypasses a mandatory run task's apply gate",
+	"terrapod_notification_configuration.token":            "a delivery credential",
+	"terrapod_agent_pool_token.token":                      "a pool join token",
+	"terrapod_gpg_key.ascii_armor":                         "a signing key",
 
 	// Nested, and invisible to this gate until it learned to recurse.
-	"terrapod_autodiscovery_rule.run_task_templates[].hmac_key": "the same key as terrapod_run_task.hmac_key, supplied through a rule",
+	"terrapod_autodiscovery_rule.run_task_template[].hmac_key": "the same key as terrapod_run_task.hmac_key, supplied through a rule",
 }
 
 func TestEverySecretBearingAttributeIsMarkedSensitive(t *testing.T) {
@@ -58,6 +58,16 @@ func TestEverySecretBearingAttributeIsMarkedSensitive(t *testing.T) {
 			// a nested attribute's TYPE but not its sensitive flag — so a
 			// nested `Sensitive: true` could be deleted with nothing failing.
 			collectNested(actual, md.TypeName+"."+name, a)
+		}
+		// BLOCKS TOO. Walking only `Attributes` left every secret inside a block
+		// invisible to this gate -- which became load-bearing when #2681 moved
+		// the provider-template parameter and catalog-item variable-option
+		// shapes out of opaque JSON strings and into typed blocks, carrying
+		// their sensitive default with them. Without this the policy entries
+		// would have had to be DELETED to make the gate pass, which is how a
+		// security gate silently stops covering the thing it names.
+		for name, b := range sr.Schema.Blocks {
+			collectBlock(actual, md.TypeName+"."+name, b)
 		}
 	}
 	for _, factory := range p.DataSources(ctx) {
@@ -121,6 +131,31 @@ func TestTheProviderTokenIsSensitive(t *testing.T) {
 // NestedAttribute interface is internal, so this type-switches on the concrete
 // public schema types instead — verbose, but it needs no unexported access and
 // fails loudly if a new nested kind appears.
+// collectBlock is collectNested's counterpart for a block. A block holds both
+// attributes and further blocks, and either can carry a secret.
+func collectBlock(out map[string]bool, prefix string, b rschema.Block) {
+	var attrs map[string]rschema.Attribute
+	var blocks map[string]rschema.Block
+	switch n := b.(type) {
+	case rschema.ListNestedBlock:
+		attrs, blocks = n.NestedObject.Attributes, n.NestedObject.Blocks
+	case rschema.SetNestedBlock:
+		attrs, blocks = n.NestedObject.Attributes, n.NestedObject.Blocks
+	case rschema.SingleNestedBlock:
+		attrs, blocks = n.Attributes, n.Blocks
+	default:
+		return
+	}
+	for name, child := range attrs {
+		key := prefix + "[]." + name
+		out[key] = child.IsSensitive()
+		collectNested(out, key, child)
+	}
+	for name, child := range blocks {
+		collectBlock(out, prefix+"[]."+name, child)
+	}
+}
+
 func collectNested(out map[string]bool, prefix string, a rschema.Attribute) {
 	var attrs map[string]rschema.Attribute
 	switch n := a.(type) {

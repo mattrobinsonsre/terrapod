@@ -68,18 +68,18 @@ var (
 type catalogItemModel struct {
 	ID types.String `tfsdk:"id"`
 
-	Name                        types.String `tfsdk:"name"`
-	ModuleID                    types.String `tfsdk:"module_id"`
-	DisplayName                 types.String `tfsdk:"display_name"`
-	Description                 types.String `tfsdk:"description"`
-	Enabled                     types.Bool   `tfsdk:"enabled"`
-	SelfContained               types.Bool   `tfsdk:"self_contained"`
-	ExecutionBackendConstraints types.Map    `tfsdk:"execution_backend_constraints"`
-	DefaultVersionPin           types.String `tfsdk:"default_version_pin"`
-	ProviderTemplateIDs         types.List   `tfsdk:"provider_template_ids"`
-	AllowedAgentPoolIDs         types.List   `tfsdk:"allowed_agent_pool_ids"`
-	VariableOptionsJSON         types.String `tfsdk:"variable_options_json"`
-	Labels                      types.Map    `tfsdk:"labels"`
+	Name                        types.String          `tfsdk:"name"`
+	ModuleID                    types.String          `tfsdk:"module_id"`
+	DisplayName                 types.String          `tfsdk:"display_name"`
+	Description                 types.String          `tfsdk:"description"`
+	Enabled                     types.Bool            `tfsdk:"enabled"`
+	SelfContained               types.Bool            `tfsdk:"self_contained"`
+	ExecutionBackendConstraints types.Map             `tfsdk:"execution_backend_constraints"`
+	DefaultVersionPin           types.String          `tfsdk:"default_version_pin"`
+	ProviderTemplateIDs         types.List            `tfsdk:"provider_template_ids"`
+	AllowedAgentPoolIDs         types.List            `tfsdk:"allowed_agent_pool_ids"`
+	VariableOptions             []variableOptionModel `tfsdk:"variable_option"`
+	Labels                      types.Map             `tfsdk:"labels"`
 
 	// The Ansible half this item provisions (#2019): a workspace that is
 	// primarily Ansible, carrying only as much Terraform as it takes to declare
@@ -93,6 +93,15 @@ type catalogItemModel struct {
 
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
+}
+
+// variableOptionModel is one `variable_option` block.
+type variableOptionModel struct {
+	Name        types.String `tfsdk:"name"`
+	Hidden      types.Bool   `tfsdk:"hidden"`
+	Sensitive   types.Bool   `tfsdk:"sensitive"`
+	DefaultJSON types.String `tfsdk:"default_json"`
+	OptionsJSON types.String `tfsdk:"options_json"`
 }
 
 type catalogItemResource struct {
@@ -226,17 +235,6 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Optional:    true,
 				ElementType: types.StringType,
 			},
-			"variable_options_json": schema.StringAttribute{
-				Description: "Optional JSON array of variable-option objects controlling how the " +
-					"provision form is rendered. Supplied as a JSON string to track the " +
-					"open-ended server contract.",
-				Optional: true,
-				// Same shape as provider_template.parameters_json: an opaque JSON
-				// string whose objects may carry a sensitive default, and a schema
-				// cannot mark sub-fields of one.
-				Sensitive: true,
-			},
-
 			// The Ansible half this item provisions (#2019). `configure_enabled`
 			// says whether and `ansible_directory` says where.
 			//
@@ -309,6 +307,55 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:    true,
 			},
 		},
+		Blocks: map[string]schema.Block{
+			// A BLOCK, not a JSON string (#2681) -- the same conversion as
+			// `terrapod_provider_template.parameter`, for the same three reasons:
+			// one blunt `Sensitive` over the whole list, a misspelled field nobody
+			// validated, and one diff for the entire blob.
+			"variable_option": schema.ListNestedBlock{
+				Description: "How this item presents one of the module's inputs on the " +
+					"provision form. An entry naming an input the module does not have is " +
+					"accepted and simply never matches.",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "The module input this entry overrides, exactly as the module declares it.",
+							Required:    true,
+						},
+						"hidden": schema.BoolAttribute{
+							Description: "Remove the input from the form and wire this entry's default " +
+								"instead. A hidden entry MUST carry a default -- it can neither be " +
+								"supplied nor wired without one -- and that is how an item fixes a " +
+								"value a provisioner must not choose.",
+							Optional: true,
+						},
+						"sensitive": schema.BoolAttribute{
+							Description: "Mask the input on the form and do not read the stored value " +
+								"back. Independent of hidden: a sensitive input is still SUPPLIED by " +
+								"the provisioner, where a hidden one is not.",
+							Optional: true,
+						},
+						"default_json": schema.StringAttribute{
+							Description: "The value to pre-fill, or -- with hidden -- to wire " +
+								"unconditionally, as a JSON document: `jsonencode(\"eu-west-1\")`. " +
+								"See `terrapod_provider_template.parameter.default_json` for why " +
+								"this one leaf is encoded.",
+							Optional: true,
+							// See the note on `terrapod_provider_template.parameter.default_json`:
+							// narrower than the whole-attribute flag it replaces, and still
+							// blunt, because a sibling field cannot decide it.
+							Sensitive: true,
+						},
+						"options_json": schema.StringAttribute{
+							Description: "Restrict the input to a closed list of permitted values, " +
+								"rendered as a picker, as a JSON array: `jsonencode([\"a\", \"b\"])`. " +
+								"Omit for a free-text field.",
+							Optional: true,
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -338,7 +385,7 @@ func (r *catalogItemResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	attrs, diags := buildCatalogItemAttrs(&plan, false)
+	attrs, diags := buildCatalogItemAttrs(ctx, &plan, false)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -393,7 +440,7 @@ func (r *catalogItemResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	attrs, diags := buildCatalogItemAttrs(&plan, true)
+	attrs, diags := buildCatalogItemAttrs(ctx, &plan, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -454,7 +501,7 @@ func (r *catalogItemResource) readAuthoring(ctx context.Context, id string) (*te
 
 // buildCatalogItemAttrs converts the Terraform model into JSON:API
 // attributes for create/update. Computed-only attributes are omitted.
-func buildCatalogItemAttrs(m *catalogItemModel, onUpdate bool) (map[string]any, diag.Diagnostics) {
+func buildCatalogItemAttrs(ctx context.Context, m *catalogItemModel, onUpdate bool) (map[string]any, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	attrs := map[string]any{
@@ -514,11 +561,37 @@ func buildCatalogItemAttrs(m *catalogItemModel, onUpdate bool) (map[string]any, 
 		attrs["allowed-agent-pool-ids"] = listToStrings(m.AllowedAgentPoolIDs)
 	}
 
-	if !m.VariableOptionsJSON.IsNull() && !m.VariableOptionsJSON.IsUnknown() && m.VariableOptionsJSON.ValueString() != "" {
-		var opts []any
-		if err := json.Unmarshal([]byte(m.VariableOptionsJSON.ValueString()), &opts); err != nil {
-			diags.AddError("Invalid variable_options_json", fmt.Sprintf("variable_options_json must be a JSON array of objects: %s", err))
-			return nil, diags
+	if len(m.VariableOptions) > 0 {
+		opts := make([]any, 0, len(m.VariableOptions))
+		for _, o := range m.VariableOptions {
+			one := map[string]any{"name": o.Name.ValueString()}
+			// Each flag only when written, so the server's default stands and
+			// "I did not say" stays distinct from "false".
+			if !o.Hidden.IsNull() && !o.Hidden.IsUnknown() {
+				one["hidden"] = o.Hidden.ValueBool()
+			}
+			if !o.Sensitive.IsNull() && !o.Sensitive.IsUnknown() {
+				one["sensitive"] = o.Sensitive.ValueBool()
+			}
+			if v, ok := decodeJSON(&diags, o.DefaultJSON, "variable_option", o.Name.ValueString(), "default_json"); !ok {
+				return nil, diags
+			} else if v != nil {
+				one["default"] = *v
+			}
+			if v, ok := decodeJSON(&diags, o.OptionsJSON, "variable_option", o.Name.ValueString(), "options_json"); !ok {
+				return nil, diags
+			} else if v != nil {
+				if _, isList := (*v).([]any); !isList {
+					diags.AddError(
+						"Invalid variable_option options_json",
+						fmt.Sprintf("variable_option %q: options_json must be a JSON array, got %T",
+							o.Name.ValueString(), *v),
+					)
+					return nil, diags
+				}
+				one["options"] = *v
+			}
+			opts = append(opts, one)
 		}
 		attrs["variable-options"] = opts
 	}
@@ -621,19 +694,27 @@ func readCatalogItemIntoModel(ctx context.Context, ci *terrapod.CatalogItem, m *
 		m.AllowedAgentPoolIDs = types.ListNull(types.StringType)
 	}
 
+	m.VariableOptions = nil
 	if raw, ok := ci.Attributes["variable-options"]; ok && raw != nil {
-		if arr, ok := raw.([]any); ok && len(arr) > 0 {
-			b, err := json.Marshal(arr)
-			if err != nil {
-				diags.AddError("Failed to encode variable-options", err.Error())
+		arr, _ := raw.([]any)
+		for i, entry := range arr {
+			obj, ok := entry.(map[string]any)
+			if !ok {
+				diags.AddError(
+					"Unexpected variable option",
+					fmt.Sprintf("variable-option %d is %T rather than an object", i, entry),
+				)
 				return diags
 			}
-			m.VariableOptionsJSON = types.StringValue(string(b))
-		} else {
-			m.VariableOptionsJSON = types.StringNull()
+			one := variableOptionModel{
+				Name:      optItemString(obj, "name"),
+				Hidden:    optItemBool(obj, "hidden"),
+				Sensitive: optItemBool(obj, "sensitive"),
+			}
+			one.DefaultJSON = jsonOrNull(obj["default"])
+			one.OptionsJSON = jsonOrNull(obj["options"])
+			m.VariableOptions = append(m.VariableOptions, one)
 		}
-	} else {
-		m.VariableOptionsJSON = types.StringNull()
 	}
 
 	// The Ansible half (#2019), read back unchanged. The bool follows `enabled`
@@ -732,4 +813,57 @@ func attrStringMap(attrs map[string]any, key string) map[string]string {
 		}
 	}
 	return out
+}
+
+// optItemString / optItemBool leave a field NULL when the server omitted it,
+// so an absent description does not read as an explicit empty string and an
+// absent flag does not read as an explicit false.
+func optItemString(obj map[string]any, key string) types.String {
+	if v, ok := obj[key]; ok && v != nil {
+		if s, ok := v.(string); ok && s != "" {
+			return types.StringValue(s)
+		}
+	}
+	return types.StringNull()
+}
+
+func optItemBool(obj map[string]any, key string) types.Bool {
+	if v, ok := obj[key]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			return types.BoolValue(b)
+		}
+	}
+	return types.BoolNull()
+}
+
+// decodeJSON reads one of the two JSON-encoded leaves. (nil, true) means the
+// attribute is unset, so the key is omitted from the request -- the server reads
+// an absent key as "not supplied" and a present null as "set it to null".
+func decodeJSON(diags *diag.Diagnostics, raw types.String, kind, name, attr string) (*any, bool) {
+	if raw.IsNull() || raw.IsUnknown() || raw.ValueString() == "" {
+		return nil, true
+	}
+	var v any
+	if err := json.Unmarshal([]byte(raw.ValueString()), &v); err != nil {
+		diags.AddError(
+			fmt.Sprintf("Invalid %s %s", kind, attr),
+			fmt.Sprintf("%s %q: %s must be a JSON document: %s", kind, name, attr, err),
+		)
+		return nil, false
+	}
+	return &v, true
+}
+
+// jsonOrNull re-encodes what the server returned, leaving the attribute NULL
+// when there was none, so an absent default does not read back as the
+// four-character string "null".
+func jsonOrNull(v any) types.String {
+	if v == nil {
+		return types.StringNull()
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return types.StringNull()
+	}
+	return types.StringValue(string(b))
 }

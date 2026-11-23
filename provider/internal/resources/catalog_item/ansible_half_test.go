@@ -114,7 +114,7 @@ func TestTheAnsibleHalfReachesTheWireVerbatim(t *testing.T) {
 		{"mixed case is not folded", "Ansible/SiteConfig"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			attrs, diags := buildCatalogItemAttrs(&catalogItemModel{
+			attrs, diags := buildCatalogItemAttrs(context.Background(), &catalogItemModel{
 				AnsibleDirectory: types.StringValue(tc.value),
 				DefaultPlaybook:  types.StringValue(tc.value),
 				DefaultLimit:     types.StringValue(tc.value),
@@ -134,7 +134,7 @@ func TestTheAnsibleHalfReachesTheWireVerbatim(t *testing.T) {
 		// `--limit` has a grammar of its own -- patterns, intersection,
 		// exclusion -- and none of it is the provider's business.
 		const limit = "web:&staging:!web03.example.com"
-		attrs, _ := buildCatalogItemAttrs(&catalogItemModel{
+		attrs, _ := buildCatalogItemAttrs(context.Background(), &catalogItemModel{
 			DefaultLimit: types.StringValue(limit),
 		}, false)
 		if got := attrs["default-limit"]; got != limit {
@@ -159,7 +159,7 @@ func TestTheBooleanTravelsIncludingAnExplicitFalse(t *testing.T) {
 		{"unknown is not a declaration", types.BoolUnknown(), nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			attrs, _ := buildCatalogItemAttrs(&catalogItemModel{ConfigureEnabled: tc.in}, false)
+			attrs, _ := buildCatalogItemAttrs(context.Background(), &catalogItemModel{ConfigureEnabled: tc.in}, false)
 			got, present := attrs["configure-enabled"]
 			if tc.want == nil {
 				if present {
@@ -183,7 +183,7 @@ func TestAnOmittedStringLeavesTheStoredValueAlone(t *testing.T) {
 	// alone, so an attribute this configuration does not manage must not appear
 	// in the PATCH at all. Sending "" instead would clear a stored value nobody
 	// asked to clear.
-	attrs, _ := buildCatalogItemAttrs(&catalogItemModel{
+	attrs, _ := buildCatalogItemAttrs(context.Background(), &catalogItemModel{
 		AnsibleDirectory: types.StringNull(),
 		DefaultPlaybook:  types.StringUnknown(),
 		DefaultLimit:     types.StringNull(),
@@ -207,7 +207,7 @@ func TestTheAnsibleHalfRoundTripsUnchanged(t *testing.T) {
 		"web:&staging:!web03.example.com",
 	} {
 		t.Run(value, func(t *testing.T) {
-			attrs, diags := buildCatalogItemAttrs(&catalogItemModel{
+			attrs, diags := buildCatalogItemAttrs(context.Background(), &catalogItemModel{
 				AnsibleDirectory: types.StringValue(value),
 				DefaultPlaybook:  types.StringValue(value),
 				DefaultLimit:     types.StringValue(value),
@@ -302,7 +302,7 @@ func TestTheThreeStringsRoundTripAnExplicitEmptyString(t *testing.T) {
 		DefaultPlaybook:  types.StringValue(""),
 		DefaultLimit:     types.StringValue(""),
 	}
-	attrs, d := buildCatalogItemAttrs(&m, false)
+	attrs, d := buildCatalogItemAttrs(context.Background(), &m, false)
 	if d.HasError() {
 		t.Fatalf("buildCatalogItemAttrs: %v", d)
 	}

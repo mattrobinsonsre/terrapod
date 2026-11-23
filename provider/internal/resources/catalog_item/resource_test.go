@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -28,7 +29,7 @@ func TestCatalogItemSelfContainedCreateUpdateAndRead(t *testing.T) {
 		SelfContained: types.BoolValue(true), ExecutionBackendConstraints: value,
 	}
 	for _, update := range []bool{false, true} {
-		attrs, diags := buildCatalogItemAttrs(plan, update)
+		attrs, diags := buildCatalogItemAttrs(context.Background(), plan, update)
 		if diags.HasError() {
 			t.Fatal(diags)
 		}
@@ -47,7 +48,7 @@ func TestCatalogItemSelfContainedCreateUpdateAndRead(t *testing.T) {
 		if imported.ID.ValueString() != "item-id" || imported.SelfContained.IsNull() || !imported.SelfContained.ValueBool() {
 			t.Fatalf("imported self-contained item: %+v", imported)
 		}
-		got, diags := buildCatalogItemAttrs(imported, update)
+		got, diags := buildCatalogItemAttrs(context.Background(), imported, update)
 		if diags.HasError() || !reflect.DeepEqual(got["execution-backend-constraints"], constraints) {
 			t.Fatalf("roundtrip update=%t: attrs=%v diags=%v", update, got, diags)
 		}
@@ -60,7 +61,7 @@ func TestCatalogItemWrapperAndExplicitClearing(t *testing.T) {
 		Name: types.StringValue("example"), ModuleID: types.StringValue("module-id"),
 		SelfContained: types.BoolNull(), ExecutionBackendConstraints: types.MapNull(types.StringType),
 	}
-	created, diags := buildCatalogItemAttrs(plan, false)
+	created, diags := buildCatalogItemAttrs(context.Background(), plan, false)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -71,7 +72,7 @@ func TestCatalogItemWrapperAndExplicitClearing(t *testing.T) {
 		t.Fatalf("wrapper create should omit constraints: %v", created)
 	}
 	plan.SelfContained = types.BoolValue(false)
-	updated, diags := buildCatalogItemAttrs(plan, true)
+	updated, diags := buildCatalogItemAttrs(context.Background(), plan, true)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -118,14 +119,14 @@ func TestCatalogItemRejectsInvalidConstraints(t *testing.T) {
 			t.Fatal(diags)
 		}
 		plan := &catalogItemModel{ExecutionBackendConstraints: value}
-		if _, diags := buildCatalogItemAttrs(plan, false); !diags.HasError() {
+		if _, diags := buildCatalogItemAttrs(context.Background(), plan, false); !diags.HasError() {
 			t.Fatalf("expected validation error for %v", input)
 		}
 	}
 	plan := &catalogItemModel{
 		SelfContained: types.BoolValue(true), ExecutionBackendConstraints: types.MapNull(types.StringType),
 	}
-	if _, diags := buildCatalogItemAttrs(plan, false); !diags.HasError() {
+	if _, diags := buildCatalogItemAttrs(context.Background(), plan, false); !diags.HasError() {
 		t.Fatal("self-contained items must require constraints")
 	}
 }
@@ -176,8 +177,18 @@ func TestReadCatalogItemUsesAuthoringValuesInsteadOfRedactedState(t *testing.T) 
 	if diags := resp.State.Get(ctx, &got); diags.HasError() {
 		t.Fatal(diags)
 	}
-	if !containsValue(got.VariableOptionsJSON.ValueString(), secret) {
-		t.Fatalf("refresh lost secret from Terraform state: %s", got.VariableOptionsJSON.ValueString())
+	// Same property as before #2681, read off the typed block: a refresh must
+	// bring the sensitive default back, or a later write sends an item whose
+	// secret has been silently dropped.
+	if len(got.VariableOptions) == 0 {
+		t.Fatalf("refresh lost the variable options entirely: %+v", got)
+	}
+	// The attribute now holds just this option's default as a JSON document, so a
+	// string secret is the quoted form. `containsValue` decoded the OLD shape -- an
+	// array of objects, read at [0]["default"] -- and has no subject left.
+	if got.VariableOptions[0].DefaultJSON.ValueString() != strconv.Quote(secret) {
+		t.Fatalf("refresh lost secret from Terraform state: %s",
+			got.VariableOptions[0].DefaultJSON.ValueString())
 	}
 	plan := tfsdk.Plan{Schema: sch.Schema, Raw: resp.State.Raw}
 	created := resource.CreateResponse{State: state}
@@ -195,13 +206,12 @@ func TestReadCatalogItemUsesAuthoringValuesInsteadOfRedactedState(t *testing.T) 
 	}
 	for _, result := range []tfsdk.State{created.State, updated.State} {
 		var value catalogItemModel
-		if diags := result.Get(ctx, &value); diags.HasError() || !containsValue(value.VariableOptionsJSON.ValueString(), secret) {
+		if diags := result.Get(ctx, &value); diags.HasError() || len(value.VariableOptions) == 0 {
 			t.Fatalf("write must retain authoring value in state: %v %+v", diags, value)
 		}
+		if value.VariableOptions[0].DefaultJSON.ValueString() != strconv.Quote(secret) {
+			t.Fatalf("write did not retain the sensitive default: %s",
+				value.VariableOptions[0].DefaultJSON.ValueString())
+		}
 	}
-}
-
-func containsValue(raw, value string) bool {
-	var decoded []map[string]any
-	return json.Unmarshal([]byte(raw), &decoded) == nil && len(decoded) == 1 && decoded[0]["default"] == value
 }
