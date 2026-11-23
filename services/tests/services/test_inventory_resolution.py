@@ -181,9 +181,42 @@ class TestTerrapodImplementsNoMergeOfItsOwn:
 
     def test_it_declares_only_the_validators_and_their_constants(self):
         """A floor, so a renamed module cannot pass by exporting nothing, and a
-        ceiling, so the merge cannot creep back under a new name."""
+        ceiling, so the merge cannot creep back under a new name.
+
+        The set is EXHAUSTIVE on purpose and is not relaxed into a pattern: any new
+        public function here fails until someone adds it deliberately, which is the
+        whole of the ceiling. A `validate_*` pattern would have let the three host-key
+        validators (#2592) in silently, and would let a merge in under any name that
+        happened to start the same way.
+        """
         source = self._source()
         functions = set(re.findall(r"^def (\w+)\(", source, re.M))
-        assert functions == {"validate_group_name", "validate_host_name", "validate_var_key"}, (
-            f"unexpected public surface: {sorted(functions)}"
+        assert functions == {
+            "validate_group_name",
+            "validate_host_name",
+            "validate_var_key",
+            # Approved SSH host keys (#2592). Validators, not merge: each refuses a
+            # malformed declaration and returns it unchanged.
+            "validate_host_key_type",
+            "validate_host_public_key",
+            "validate_host_key_marker",
+        }, f"unexpected public surface: {sorted(functions)}"
+
+    def test_every_name_in_that_ledger_is_a_validator(self):
+        """The half the exhaustive set above cannot check on its own.
+
+        The set is a ledger, so it is only as good as the care taken adding to it --
+        and `merge_hosts` added by someone in a hurry would pass it. Requiring every
+        entry to be named `validate_*` keeps the conscious acknowledgement and makes
+        the one thing the ceiling exists to stop fail even when it is ledgered.
+        """
+        source = self._source()
+        functions = sorted(re.findall(r"^def (\w+)\(", source, re.M))
+        not_validators = [f for f in functions if not f.startswith("validate_")]
+
+        assert not not_validators, (
+            f"{not_validators} are public in the pure half and are not validators. "
+            f"Ansible performs the merge, the precedence, the group DAG and the "
+            f"--limit expansion; anything else here is a second answer to one of those."
         )
+        assert len(functions) >= 3, "the matcher found almost nothing; it has stopped matching"

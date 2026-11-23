@@ -27,6 +27,7 @@ from terrapod.db.models import (
     InventoryGroupVar,
     InventoryHost,
     InventoryHostGroup,
+    InventoryHostKey,
     InventoryHostVar,
     ModuleAutodiscoveryRepository,
     ModuleAutodiscoveryRule,
@@ -568,6 +569,19 @@ INVENTORY_GROUP_VARS = register(
 INVENTORY_GLOBAL_VARS = register(
     ReplicatedClass(name="inventory_global_vars", model=InventoryGlobalVar)
 )
+
+# Approved SSH host keys (#2592). Registered for the same reason the link classes
+# above are, and the failure mode is the sharper one: a host whose keys are lost at
+# promotion has NO approved key, and `ansible_host_key_checking` defaults true and
+# fails closed on first contact -- so a configure against it does not degrade, it
+# refuses the host outright. The symptom on the promoted node is every host
+# unreachable, with nothing in the inventory looking wrong.
+#
+# Unlike the three variable classes above this carries NO encrypted column, so the
+# matrix derives no `encrypted-columns` row for it -- a host's public key is public,
+# which is the same reasoning that keeps it out of `MACHINE_SECRET_FIELDS` and out of
+# `ENCRYPTED_COLUMNS`. Nothing secret crosses the peer link here.
+INVENTORY_HOST_KEYS = register(ReplicatedClass(name="inventory_host_keys", model=InventoryHostKey))
 
 
 # ---------------------------------------------------------------------------

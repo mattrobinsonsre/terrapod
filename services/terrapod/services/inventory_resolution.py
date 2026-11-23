@@ -123,3 +123,127 @@ def validate_var_key(key: Any) -> str:
             f"certainly a mistake and is invisible in every surface that displays it."
         )
     return key
+
+
+#: The key types whose BLOB carries a different algorithm name than the type does.
+#:
+#: `rsa-sha2-256` and `rsa-sha2-512` are SIGNATURE algorithms; the key they sign
+#: with is an RSA key whose own embedded name is `ssh-rsa`. Measured against
+#: `x/crypto/ssh`: asking a server for either yields a key whose `.Type()` is
+#: `ssh-rsa`. So a validator comparing the blob's embedded name to the declared type
+#: has to know that, or it would refuse every correct RSA entry.
+_BLOB_NAME_ALIASES: dict[str, str] = {
+    "rsa-sha2-256": "ssh-rsa",
+    "rsa-sha2-512": "ssh-rsa",
+}
+
+
+def validate_host_key_type(value: Any) -> str:
+    """Return `value` if it names an SSH host-key algorithm, else raise.
+
+    Validated against a closed set rather than accepted as free text, and the
+    reason is the direction the failure takes: a typo'd algorithm in a declared
+    TRUST ANCHOR silently never matches anything, and the symptom -- a host whose
+    key is refused -- reads as "the host rotated its key" rather than as a
+    configuration error.
+    """
+    from terrapod.db.models import SSH_HOST_KEY_TYPES
+
+    if not isinstance(value, str) or not value:
+        raise InventoryValidationError(f"a host key type must be a non-empty string; got {value!r}")
+    if value not in SSH_HOST_KEY_TYPES:
+        raise InventoryValidationError(
+            f"host key type {value!r} is not one Terrapod recognises. Expected one of "
+            f"{', '.join(sorted(SSH_HOST_KEY_TYPES))}, spelled as OpenSSH spells it in "
+            f"the second field of a known_hosts line."
+        )
+    return value
+
+
+def validate_host_public_key(value: Any, *, key_type: str) -> str:
+    """Return `value` if it is the base64 blob of a `key_type` public key, else raise.
+
+    Three refusals, each for a mistake an operator actually makes.
+
+    **A whole known_hosts line.** The commonest paste is
+    `host ssh-ed25519 AAAA...`, all three fields. Stored as the blob it would
+    render into a line with the host and algorithm doubled, which no client
+    matches -- and the symptom is an unknown host, not a parse error.
+
+    **A blob that is not base64.** Caught here rather than at render time, where it
+    would reach a file ansible reads and fail inside the configure.
+
+    **A blob whose embedded algorithm disagrees with `key_type`.** An SSH public key
+    is a length-prefixed algorithm name followed by its parameters, so the blob says
+    what it is. Declaring an ed25519 key as `ssh-rsa` is otherwise accepted and then
+    never matches anything.
+    """
+    import base64
+    import struct
+
+    if not isinstance(value, str) or not value:
+        raise InventoryValidationError(
+            f"a host public key must be a non-empty string; got {value!r}"
+        )
+    if value.strip() != value:
+        raise InventoryValidationError(
+            "a host public key has leading or trailing whitespace, which is invisible "
+            "in every surface that displays it."
+        )
+    if " " in value:
+        raise InventoryValidationError(
+            "a host public key must be the base64 blob ALONE -- the third field of a "
+            "known_hosts line. This value contains a space, so it looks like a whole "
+            "line (`<host> <type> <blob>`); supply the host through the inventory and "
+            "the type through `key_type`, and give only the blob here."
+        )
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except Exception as exc:
+        raise InventoryValidationError(
+            f"a host public key must be base64; this value is not ({exc})."
+        ) from exc
+    # The wire format: a 4-byte big-endian length, then that many bytes of
+    # algorithm name. Anything shorter is not a key at all.
+    if len(raw) < 4:
+        raise InventoryValidationError(
+            "a host public key decoded to fewer than four bytes, so it carries no "
+            "algorithm name and is not an SSH public key."
+        )
+    (name_len,) = struct.unpack(">I", raw[:4])
+    if name_len <= 0 or len(raw) < 4 + name_len:
+        raise InventoryValidationError(
+            "a host public key's leading length field does not match its contents, so "
+            "it is not an SSH public key."
+        )
+    embedded = raw[4 : 4 + name_len].decode("ascii", errors="replace")
+    expected = _BLOB_NAME_ALIASES.get(key_type, key_type)
+    if embedded != expected:
+        raise InventoryValidationError(
+            f"this public key is a {embedded!r} key but it is declared as "
+            f"{key_type!r}. The blob itself names its algorithm, so one of the two is "
+            f"wrong -- a key declared under the wrong type is stored happily and then "
+            f"never matches the host."
+        )
+    return value
+
+
+def validate_host_key_marker(value: Any) -> str | None:
+    """Return `value` if it is a known_hosts marker or None, else raise.
+
+    `None` and `""` both mean "an ordinary entry" and both normalise to None, so a
+    caller clearing the field does not have to know which one the surface uses.
+    """
+    from terrapod.db.models import SSH_HOST_KEY_MARKERS
+
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise InventoryValidationError(f"a host key marker must be a string or null; got {value!r}")
+    if value not in SSH_HOST_KEY_MARKERS:
+        raise InventoryValidationError(
+            f"host key marker {value!r} is not one OpenSSH defines. Expected one of "
+            f"{', '.join(sorted(SSH_HOST_KEY_MARKERS))}, without the leading '@' -- "
+            f"Terrapod adds that when it renders the line."
+        )
+    return value

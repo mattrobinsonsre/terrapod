@@ -49,12 +49,16 @@ from terrapod.db.models import (
     InventoryGroupVar,
     InventoryHost,
     InventoryHostGroup,
+    InventoryHostKey,
     InventoryHostVar,
 )
 from terrapod.services.inventory_resolution import (
     InventoryValidationError,
     validate_group_name,
+    validate_host_key_marker,
+    validate_host_key_type,
     validate_host_name,
+    validate_host_public_key,
     validate_var_key,
 )
 
@@ -73,6 +77,12 @@ MAX_GLOBAL_VARS_PER_WORKSPACE = 500
 #: rather than a per-group one.
 MAX_MEMBERSHIPS_PER_WORKSPACE = 20000
 MAX_GROUP_CHILDREN_PER_WORKSPACE = 2000
+#: Approved host keys per host. Deliberately small: a host offers one key per
+#: algorithm, so the realistic ceiling is the number of algorithms plus whatever a
+#: rotation leaves behind -- and the honest reason for a bound at all is that a
+#: runaway `for_each` should fail naming the limit rather than fill the table one
+#: call at a time.
+MAX_KEYS_PER_HOST = 32
 
 
 class InventoryLimitExceeded(Exception):
@@ -618,6 +628,163 @@ async def _check_var_ceiling(
         raise InventoryLimitExceeded(f"Maximum of {MAX_VARS_PER_PARENT} variables per {what}")
 
 
+# ── Approved SSH host keys ───────────────────────────────────────────────────
+#
+# One row per `known_hosts` LINE: host, algorithm, key, and an optional marker.
+# Not a variable, and not a map keyed by algorithm -- a marker belongs to a key
+# rather than to an algorithm, and a host legitimately holds two keys of one type
+# while it is being rotated (#2592).
+
+
+async def list_host_keys(db: AsyncSession, host_id: uuid.UUID) -> list[InventoryHostKey]:
+    """A host's approved keys, ordered so a rendered file is byte-stable.
+
+    Ordered by `(key_type, public_key)` rather than by `created_at`: the rendered
+    `known_hosts` file is compared by consumers, so a listing whose order depends on
+    insertion time would make an unchanged key set look changed after a re-create.
+    """
+    result = await db.execute(
+        select(InventoryHostKey)
+        .where(InventoryHostKey.host_id == host_id)
+        .order_by(InventoryHostKey.key_type, InventoryHostKey.public_key)
+    )
+    return list(result.scalars().all())
+
+
+async def list_host_keys_for_workspace(
+    db: AsyncSession, workspace_id: uuid.UUID
+) -> list[InventoryHostKey]:
+    """Every approved key in a workspace, for the renderer.
+
+    One query rather than one per host, because the renderer needs the whole set to
+    build a single file and a per-host loop over a few hundred hosts is a few
+    hundred round trips.
+    """
+    result = await db.execute(
+        select(InventoryHostKey)
+        .where(InventoryHostKey.workspace_id == workspace_id)
+        .order_by(InventoryHostKey.host_id, InventoryHostKey.key_type, InventoryHostKey.public_key)
+    )
+    return list(result.scalars().all())
+
+
+async def get_host_key(db: AsyncSession, key_id: uuid.UUID) -> InventoryHostKey | None:
+    result = await db.execute(select(InventoryHostKey).where(InventoryHostKey.id == key_id))
+    return result.scalar_one_or_none()
+
+
+async def create_host_key(
+    db: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    host_id: uuid.UUID,
+    key_type: str,
+    public_key: str,
+    marker: str | None = None,
+) -> InventoryHostKey:
+    """Declare one approved key for a host.
+
+    `key_type` is validated before `public_key`, deliberately: the public-key
+    validator compares the blob's own embedded algorithm against the declared type,
+    so an unrecognised type would otherwise produce a confusing mismatch message
+    about a comparison that could never have succeeded.
+    """
+    key_type = validate_host_key_type(key_type)
+    public_key = validate_host_public_key(public_key, key_type=key_type)
+    marker = validate_host_key_marker(marker)
+    await _check_key_ceiling(db, host_id)
+    row = InventoryHostKey(
+        workspace_id=workspace_id,
+        host_id=host_id,
+        key_type=key_type,
+        public_key=public_key,
+        marker=marker,
+    )
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def update_host_key(
+    db: AsyncSession,
+    row: InventoryHostKey,
+    *,
+    marker: str | None = None,
+    marker_supplied: bool = False,
+) -> InventoryHostKey:
+    """Change a key's marker, which is the only mutable thing about it.
+
+    The algorithm and the blob are the row's IDENTITY -- they are two thirds of the
+    unique constraint -- so changing either is a different key and means deleting
+    this row and declaring that one. Offering them as editable would let a caller
+    rewrite what a host is trusted to present while keeping the row's id, which is
+    exactly the audit trail a trust anchor should not have.
+
+    `marker_supplied` distinguishes "set it to null" from "do not touch it", because
+    `None` is a meaningful value here and a PATCH that omits the field must not clear
+    it (#316's shape: validate and apply only what the caller sent).
+    """
+    if marker_supplied:
+        row.marker = validate_host_key_marker(marker)
+    await db.flush()
+    return row
+
+
+async def delete_host_key(db: AsyncSession, row: InventoryHostKey) -> None:
+    await db.delete(row)
+    await db.flush()
+
+
+async def host_keys_by_host_name(
+    db: AsyncSession, workspace_id: uuid.UUID
+) -> dict[str, list[InventoryHostKey]]:
+    """Every approved key in a workspace, grouped by the host's NAME.
+
+    By name rather than by id because the only consumer is the resolved-inventory
+    overlay, and a resolved document is keyed on the inventory hostname -- ansible's
+    key, not ours. Joining here keeps the id-to-name translation in one place
+    instead of making the overlay combinator take two arguments that have to agree.
+
+    Ordered within each host so a rendered file is byte-stable, the same reason
+    `list_host_keys` is.
+    """
+    result = await db.execute(
+        select(InventoryHost.name, InventoryHostKey)
+        .join(InventoryHostKey, InventoryHostKey.host_id == InventoryHost.id)
+        .where(InventoryHostKey.workspace_id == workspace_id)
+        .order_by(InventoryHost.name, InventoryHostKey.key_type, InventoryHostKey.public_key)
+    )
+    out: dict[str, list[InventoryHostKey]] = {}
+    for name, row in result.all():
+        out.setdefault(name, []).append(row)
+    return out
+
+
+async def host_key_counts(db: AsyncSession, workspace_id: uuid.UUID) -> dict[uuid.UUID, int]:
+    """Keys per host, for a listing that wants a count without the rows."""
+    result = await db.execute(
+        select(InventoryHostKey.host_id, func.count())
+        .where(InventoryHostKey.workspace_id == workspace_id)
+        .group_by(InventoryHostKey.host_id)
+    )
+    return dict(result.all())
+
+
+async def _check_key_ceiling(db: AsyncSession, host_id: uuid.UUID) -> None:
+    existing = await db.scalar(
+        select(func.count())
+        .select_from(InventoryHostKey)
+        .where(InventoryHostKey.host_id == host_id)
+    )
+    if (existing or 0) >= MAX_KEYS_PER_HOST:
+        raise InventoryLimitExceeded(
+            f"this host already has {existing} approved host keys, which is the "
+            f"limit of {MAX_KEYS_PER_HOST}. A host offers one key per algorithm, so "
+            f"reaching this means stale keys are accumulating -- delete the ones a "
+            f"rotation has retired."
+        )
+
+
 __all__ = [
     "MAX_GLOBAL_VARS_PER_WORKSPACE",
     "MAX_GROUPS_PER_WORKSPACE",
@@ -654,15 +821,23 @@ __all__ = [
     "group_var_counts",
     "has_anything",
     "host_group_counts",
+    "create_host_key",
+    "delete_host_key",
+    "get_host_key",
+    "host_key_counts",
+    "host_keys_by_host_name",
     "host_var_counts",
     "list_global_vars",
     "list_group_children",
     "list_group_vars",
     "list_groups",
     "list_host_groups",
+    "list_host_keys",
+    "list_host_keys_for_workspace",
     "list_host_vars",
     "list_hosts",
     "rename_group",
     "rename_host",
+    "update_host_key",
     "update_var",
 ]
