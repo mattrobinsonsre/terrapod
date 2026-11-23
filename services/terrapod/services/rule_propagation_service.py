@@ -44,7 +44,7 @@ PROPAGATED_FIELDS: dict[str, str] = {
     "auto-configure-enabled": "auto-configure-enabled",
     "configure-all-hosts": "configure-all-hosts",
     "configure-after-apply": "configure-after-apply",
-    "ansible-host-key-checking": "ansible-host-key-checking",
+    "ssh-host-key-policy": "ssh-host-key-policy",
     "dynamic-inventory-enabled": "dynamic-inventory-enabled",
     "inventory-scripts-enabled": "inventory-scripts-enabled",
     "config-directory": "config-directory",

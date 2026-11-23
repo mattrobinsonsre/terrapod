@@ -138,7 +138,16 @@ type Run struct {
 	ResourceCPU          string `json:"resource-cpu,omitempty"`
 	Parallelism          int64  `json:"parallelism,omitempty"`
 	ConfigureParallelism int64  `json:"configure-parallelism,omitempty"`
-	ResourceMemory       string `json:"resource-memory,omitempty"`
+	// SSHHostKeyPolicy is the host-key policy this run's configure uses:
+	// "strict", "accept-new" or "off" (#2592). SNAPSHOTTED at run creation like
+	// ConfigureParallelism above, so relaxing the workspace cannot weaken a run
+	// already in flight.
+	//
+	// Note the deliberate asymmetry with the approved KEYS, which are read live:
+	// a revocation takes effect on a queued run while a relaxation does not.
+	// Both are the safe direction.
+	SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
+	ResourceMemory   string `json:"resource-memory,omitempty"`
 	// The Ansible execution environment this run used, and how big its sidecar
 	// was (#2154). Recorded on the run because the built-in EE tags MOVE -- a
 	// line's image is rebuilt when upstream patches it -- so without the image
@@ -686,6 +695,7 @@ func runFromResource(res *Resource) *Run {
 		ResourceCPU:          GetStringAttr(res, "resource-cpu"),
 		Parallelism:          GetIntAttr(res, "parallelism"),
 		ConfigureParallelism: GetIntAttr(res, "configure-parallelism"),
+		SSHHostKeyPolicy:     GetStringAttr(res, "ssh-host-key-policy"),
 		ResourceMemory:       GetStringAttr(res, "resource-memory"),
 		EEImage:              GetStringAttr(res, "ee-image"),
 		EEResourceCPU:        GetStringAttr(res, "ee-resource-cpu"),

@@ -188,16 +188,23 @@ type Workspace struct {
 	// appears in neither write request below.
 	ScheduledConfigureLastAt string `json:"scheduled-configure-last-at,omitempty"`
 
-	// AnsibleHostKeyChecking is whether a configure verifies the SSH host key
-	// of the hosts it targets (#2318). True is verification ON, and that is the
-	// existing behaviour rather than a new restriction: ansible's own default
-	// is on and the configure phase forces nothing, so first contact with an
-	// unseen host already fails closed.
+	// SSHHostKeyPolicy is how a configure verifies the SSH host keys of the
+	// hosts it targets (#2592): "strict", "accept-new" or "off". Never empty --
+	// the server stores one of the three and defaults to "strict", which is the
+	// behaviour that already existed rather than a new restriction, since
+	// ansible's own HOST_KEY_CHECKING defaults on.
 	//
-	// Relaxing it emits `ansible_ssh_common_args` as a variable on `all`, never
-	// an environment variable, so an inventory HOST variable still beats it --
-	// measured, a host variable REPLACES a group variable rather than merging.
-	AnsibleHostKeyChecking bool `json:"ansible-host-key-checking"`
+	// It is OpenSSH's StrictHostKeyChecking rather than ansible's boolean flag,
+	// and the middle state is the point: "accept-new" trusts a host on FIRST
+	// contact and refuses it if its key later changes, which ansible cannot
+	// express at all. Without it, declaring one approved host key makes every
+	// unpinned ADDRESS in that inventory unreachable, because ssh_args is
+	// process-wide.
+	//
+	// It REPLACED AnsibleHostKeyChecking, a bool on `ansible-host-key-checking`
+	// (#2318), which appeared on no release line. Sending a boolean is refused
+	// by a 422 that names the three values.
+	SSHHostKeyPolicy string `json:"ssh-host-key-policy"`
 	// DynamicInventoryEnabled permits ansible's `auto` inventory plugin -- a
 	// declared plugin config, a YAML file with a top-level `plugin:` key -- ON
 	// THE RUNNER (#2033). The API never runs one in either state.
@@ -506,10 +513,14 @@ type CreateWorkspaceRequest struct {
 	ScheduledConfigureEnabled  *bool  `json:"scheduled-configure-enabled,omitempty"`
 	ScheduledConfigureCron     string `json:"scheduled-configure-cron,omitempty"`
 	ScheduledConfigureTimezone string `json:"scheduled-configure-timezone,omitempty"`
-	// AnsibleHostKeyChecking sets host-key verification on the new workspace
-	// (#2318). A POINTER for the reason the pair above gives; the server-side
-	// default is TRUE, which verifies.
-	AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
+	// SSHHostKeyPolicy sets how the new workspace's configures verify host keys
+	// (#2592): "strict", "accept-new" or "off". See Workspace.SSHHostKeyPolicy.
+	//
+	// A PLAIN string, unlike the pair above, because "" is not a value the
+	// server accepts -- it refuses anything outside the three -- so an empty
+	// field can only mean "say nothing", which takes the server default of
+	// "strict". The same shape AISummaryMode has here, and for the same reason.
+	SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 	// DynamicInventoryEnabled permits ansible's `auto` inventory plugin on the
 	// runner for the new workspace (#2033). A POINTER for the reason the pair
 	// above gives; the server-side default is FALSE, which refuses.
@@ -702,9 +713,15 @@ type UpdateWorkspaceRequest struct {
 	ScheduledConfigureEnabled  *bool   `json:"scheduled-configure-enabled,omitempty"`
 	ScheduledConfigureCron     *string `json:"scheduled-configure-cron,omitempty"`
 	ScheduledConfigureTimezone *string `json:"scheduled-configure-timezone,omitempty"`
-	// AnsibleHostKeyChecking turns host-key verification off or back on
-	// (#2318). A POINTER so nil leaves the stored value alone.
-	AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
+	// SSHHostKeyPolicy moves this workspace's host-key policy (#2592):
+	// "strict", "accept-new" or "off". See Workspace.SSHHostKeyPolicy.
+	//
+	// A PLAIN string rather than a pointer, which is the right shape here and
+	// not merely the simpler one: the column is NOT NULL with a default, so
+	// there is no "clear it" to express, and the server refuses "" outright --
+	// so empty cannot be confused with a value a caller meant to send. Empty
+	// therefore leaves the stored policy alone, like AISummaryMode.
+	SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 	// DynamicInventoryEnabled turns the `auto` inventory plugin on or off for
 	// this workspace's runs (#2033). A POINTER so nil leaves it alone.
 	DynamicInventoryEnabled *bool `json:"dynamic-inventory-enabled,omitempty"`
@@ -1077,8 +1094,8 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.ScheduledConfigureTimezone != "" {
 		attrs["scheduled-configure-timezone"] = req.ScheduledConfigureTimezone
 	}
-	if req.AnsibleHostKeyChecking != nil {
-		attrs["ansible-host-key-checking"] = *req.AnsibleHostKeyChecking
+	if req.SSHHostKeyPolicy != "" {
+		attrs["ssh-host-key-policy"] = req.SSHHostKeyPolicy
 	}
 	if req.DynamicInventoryEnabled != nil {
 		attrs["dynamic-inventory-enabled"] = *req.DynamicInventoryEnabled
@@ -1296,8 +1313,8 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.ScheduledConfigureTimezone != nil {
 		attrs["scheduled-configure-timezone"] = *req.ScheduledConfigureTimezone
 	}
-	if req.AnsibleHostKeyChecking != nil {
-		attrs["ansible-host-key-checking"] = *req.AnsibleHostKeyChecking
+	if req.SSHHostKeyPolicy != "" {
+		attrs["ssh-host-key-policy"] = req.SSHHostKeyPolicy
 	}
 	if req.DynamicInventoryEnabled != nil {
 		attrs["dynamic-inventory-enabled"] = *req.DynamicInventoryEnabled
@@ -1538,7 +1555,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ScheduledConfigureCron:        GetStringAttr(res, "scheduled-configure-cron"),
 		ScheduledConfigureTimezone:    GetStringAttr(res, "scheduled-configure-timezone"),
 		ScheduledConfigureLastAt:      GetStringAttr(res, "scheduled-configure-last-at"),
-		AnsibleHostKeyChecking:        GetBoolAttr(res, "ansible-host-key-checking"),
+		SSHHostKeyPolicy:              GetStringAttr(res, "ssh-host-key-policy"),
 		DynamicInventoryEnabled:       GetBoolAttr(res, "dynamic-inventory-enabled"),
 		InventoryScriptsEnabled:       GetBoolAttr(res, "inventory-scripts-enabled"),
 		ConfigDirectory:               GetStringAttr(res, "config-directory"),

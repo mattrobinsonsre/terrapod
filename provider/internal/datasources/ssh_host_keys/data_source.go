@@ -12,7 +12,7 @@
 // makes a correct default (#2318's `known_hosts`, and ansible's own
 // `HOST_KEY_CHECKING`) into one everybody turns off. The realistic alternative
 // to this data source is not out-of-band key distribution; it is
-// `ansible_host_key_checking = false`.
+// `ssh_host_key_policy = "off"`.
 //
 // Two consequences of that departure, both deliberate:
 //
@@ -120,7 +120,7 @@ func (d *sshHostKeysDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 			"the key it offers during the key exchange — the same thing `ssh-keyscan` does, and it " +
 			"authenticates nothing: the connection is abandoned before a username is sent. Exists so that " +
 			"verifying host keys is cheap enough to leave on; the realistic alternative is " +
-			"`ansible_host_key_checking = false`, which verifies nothing for ever. Feed `entries` into " +
+			"`ssh_host_key_policy = \"off\"`, which verifies nothing for ever. Feed `entries` into " +
 			"`terrapod_inventory_host_keys` to anchor a host's keys, which is where they persist — this " +
 			"data source keeps nothing between reads.\n\n" +
 			"**Where it runs matters.** In agent mode the provider executes on the runner, the same place " +

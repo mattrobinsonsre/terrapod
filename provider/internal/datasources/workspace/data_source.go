@@ -49,7 +49,7 @@ type workspaceDataSourceModel struct {
 	ScheduledConfigureCron        types.String `tfsdk:"scheduled_configure_cron"`
 	ScheduledConfigureTimezone    types.String `tfsdk:"scheduled_configure_timezone"`
 	ScheduledConfigureLastAt      types.String `tfsdk:"scheduled_configure_last_at"`
-	AnsibleHostKeyChecking        types.Bool   `tfsdk:"ansible_host_key_checking"`
+	SSHHostKeyPolicy              types.String `tfsdk:"ssh_host_key_policy"`
 	DynamicInventoryEnabled       types.Bool   `tfsdk:"dynamic_inventory_enabled"`
 	InventoryScriptsEnabled       types.Bool   `tfsdk:"inventory_scripts_enabled"`
 	ConfigDirectory               types.String `tfsdk:"config_directory"`
@@ -150,7 +150,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"scheduled_configure_cron":      computedString("The five-field cron expression the schedule fires on, for example `0 2 * * 2`. Empty means no schedule whatever `scheduled_configure_enabled` holds. Stored exactly as written — the server validates it and normalises nothing."),
 			"scheduled_configure_timezone":  computedString("The IANA time zone `scheduled_configure_cron` is read in. Defaults to `UTC`. A real zone rather than an offset is what keeps an overnight schedule overnight across a daylight-saving change."),
 			"scheduled_configure_last_at":   computedString("When the schedule last fired, or null if it never has. It is what the next occurrence is measured from."),
-			"ansible_host_key_checking":     computedBool("Whether a configure verifies the SSH host key of the hosts it targets. Defaults to true, which is ansible's own default and the behaviour that already existed — first contact with an unseen host fails closed. Relaxing it makes the inventory resolver emit `ansible_ssh_common_args` as a variable on the `all` group rather than forcing an environment variable, so an inventory host variable still beats it and a single host may re-enable verification over a workspace-level relaxation."),
+			"ssh_host_key_policy":           computedString("How a configure verifies the SSH host keys of the hosts it targets: `strict`, `accept-new` or `off`. Defaults to `strict`, which is the behaviour that already existed — ansible's own default is on, so first contact with an unseen host fails closed. `accept-new` trusts a host on first contact and refuses it if its key later changes, which is what keeps an unpinned host reachable once approved keys exist; ansible cannot express it at all. The policy rides the run's own ssh anchor, so nothing in the inventory overrides it."),
 			"dynamic_inventory_enabled":     computedBool("Whether ansible's `auto` inventory plugin — a declared plugin config, a YAML file with a top-level `plugin:` key — may run on the runner. Defaults to false. The API never executes a plugin in either state: off, a plugin source is refused by name rather than resolving partially; on, the API skips it and the runner re-resolves the inventory and is authoritative."),
 			"inventory_scripts_enabled":     computedBool("Whether ansible's `script` inventory plugin — an executable inventory script — may run on the runner. Defaults to false, and the API never executes one in either state. Separate from dynamic_inventory_enabled so declared plugin configs can be permitted without also permitting arbitrary executables: a declared config names a collection that can be pinned and installed, a script names nothing."),
 			"config_directory":              computedString("Repository-root-relative directory the ansible configure operation runs in. The empty string means the configuration version's root, exactly as it does for `working_directory`. It does not say whether the workspace has a configure operation; `configure_enabled` does."),
@@ -385,15 +385,17 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	if v := terrapod.GetBoolPtrAttr(res, "scheduled-configure-enabled"); v != nil {
 		m.ScheduledConfigureEnabled = types.BoolValue(*v)
 	}
-	// Host-key verification (#2318). Falls back to its own server-side default --
-	// TRUE -- for exactly the reason `plan-apply-enabled` does above: a server
-	// predating #2318 sends the attribute not at all and a workspace read
-	// through /api/tfe/v2 drops it, and reading absent as `false` would be wrong
-	// in the dangerous direction. It would report a workspace as NOT verifying
-	// host keys when it does.
-	m.AnsibleHostKeyChecking = types.BoolValue(true)
-	if v := terrapod.GetBoolPtrAttr(res, "ansible-host-key-checking"); v != nil {
-		m.AnsibleHostKeyChecking = types.BoolValue(*v)
+	// The host-key policy (#2592). Falls back to its own server-side default --
+	// "strict" -- for exactly the reason `plan-apply-enabled` does above: a
+	// server predating it sends the attribute not at all, and an absent value
+	// read as "off" would be wrong in the dangerous direction. It would report a
+	// workspace as verifying NOTHING when it verifies everything.
+	//
+	// An empty string is the only absent form to handle, because the server
+	// stores one of three non-empty values and refuses "" on write.
+	m.SSHHostKeyPolicy = types.StringValue("strict")
+	if v := terrapod.GetStringAttr(res, "ssh-host-key-policy"); v != "" {
+		m.SSHHostKeyPolicy = types.StringValue(v)
 	}
 	// #2033's pair. Both default FALSE, so a plain GetBoolAttr would answer
 	// correctly for an absent key; the pointer form is here to state that

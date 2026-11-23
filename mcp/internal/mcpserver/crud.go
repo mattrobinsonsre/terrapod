@@ -110,20 +110,22 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ScheduledConfigureEnabled  *bool  `json:"scheduled_configure_enabled,omitempty" jsonschema:"run a configure on a CRON SCHEDULE. DEFAULTS TO FALSE. Distinct from auto_configure_enabled, which fires on a push to config_directory: this one is the calendar. Needs scheduled_configure_cron set to do anything, and needs configure_enabled, without which it is inert. Creating a workspace with it already true stamps the schedule clock at creation, so the first configure is the next OCCURRENCE rather than one fired the moment the workspace exists"`
 		ScheduledConfigureCron     string `json:"scheduled_configure_cron,omitempty" jsonschema:"when the scheduled configure runs, as a FIVE-FIELD cron expression read in scheduled_configure_timezone -- for example 0 2 * * 2 for 02:00 every Tuesday. Refused (422) if it does not parse, if it has six fields (a seconds-resolution schedule cannot be honoured), or if it fires more often than every 300 seconds. Stored exactly as you write it, never reformatted. Empty or omitted means NO SCHEDULE, which is the server default"`
 		ScheduledConfigureTimezone string `json:"scheduled_configure_timezone,omitempty" jsonschema:"the IANA zone the cron expression is read in, e.g. Europe/London; UTC by default. This is what makes it a schedule rather than an interval -- 0 2 * * * in Europe/London is 02:00 there in January AND in July, which are different instants in UTC. Empty or omitted takes the default"`
-		// Whether a configure verifies the SSH host key of the hosts it
-		// targets (#2318). A pointer like the declarations above, so omitting
-		// it takes the server's TRUE rather than asserting a false nobody
-		// asked for -- and TRUE is the EXISTING behaviour rather than a new
-		// restriction: ansible's own HOST_KEY_CHECKING defaults on, the
-		// configure phase forces nothing about it, and no known_hosts ships,
-		// so first contact with an unseen host already fails closed. What was
-		// missing was any way to express an exception.
+		// How a configure verifies the SSH host keys of the hosts it targets
+		// (#2592): `strict`, `accept-new` or `off`. A plain string rather than
+		// the `*bool` this replaced (#2318), and it loses nothing -- `omitempty`
+		// drops an empty field, the server reads an absent attribute as "take
+		// the default", and "" is a value the server REFUSES, so there is no
+		// third state a pointer would be needed to express.
 		//
-		// The setting is NOT the mechanism, which is what keeps the per-host
-		// override reachable: relaxing it emits `ansible_ssh_common_args` as a
-		// variable on the `all` group, and an inventory HOST variable replaces
-		// a group variable rather than merging with it.
-		AnsibleHostKeyChecking *bool `json:"ansible_host_key_checking,omitempty" jsonschema:"whether a configure on this workspace VERIFIES the SSH host key of each host it targets. DEFAULTS TO TRUE, which is ansible's own default and the behaviour every workspace already had: with no known_hosts shipped, first contact with an unseen host fails closed with Host key verification failed. Pass false only for an exception you mean -- it makes the server emit ansible_ssh_common_args as a variable on the all group, NOT an environment variable, so an inventory HOST variable still overrides it and one host may keep verification on over a relaxed workspace. Prefer the other route: an ansible_machine_auth credential carries a known_hosts field, referenced from an inventory variable as ${terrapod:<credential-name>.known_hosts}, which gets a run past an unknown host with verification left ON"`
+		// A tri-state because OpenSSH has three behaviours and ansible's flag
+		// could only say two. `accept-new` is the one the boolean could not
+		// reach, and it is what a growing fleet needs: `ssh_args` is
+		// process-wide, so declaring one approved key under `strict` makes
+		// every unpinned ADDRESS in that inventory unreachable.
+		//
+		// Unlike the boolean, the policy rides the run's own ssh anchor, which
+		// nothing in the inventory can override.
+		SSHHostKeyPolicy string `json:"ssh_host_key_policy,omitempty" jsonschema:"how a configure on this workspace VERIFIES the SSH host key of each host it targets. One of strict, accept-new or off; DEFAULTS TO strict, which is ansible's own behaviour and what every workspace already had -- with no approved keys declared, first contact with an unseen host fails closed with Host key verification failed. These are OpenSSH's StrictHostKeyChecking behaviours rather than a boolean, and accept-new is the one worth knowing about: it trusts a host on FIRST CONTACT and refuses it once its key CHANGES. Reach for accept-new rather than off on a fleet that has begun declaring approved host keys with terrapod_inventory_host_declare -- Terrapod renders those into a known_hosts ALLOW-LIST and points ssh at it -- because ssh_args is process-wide -- declaring one approved key under strict makes every address nobody has pinned yet unreachable, and off would then be the only alternative, which verifies nothing for ever. The policy rides the run's own ssh anchor, so unlike the ansible_host_key_checking boolean it replaced, nothing in the inventory can override it"`
 		// Which ansible inventory PLUGINS this workspace permits on the
 		// runner (#2033). Two independent booleans rather than one switch or a
 		// delimited value, for #1966's reasoning: a value that has to be parsed
@@ -219,9 +221,10 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			Playbooks:    in.Playbooks,
 			DefaultLimit: in.DefaultLimit,
 			HardLimit:    in.HardLimit,
-			// #2318's one. A pointer straight through, so a create that leaves
-			// it out sends nothing and takes the server's TRUE, which verifies.
-			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,
+			// #2592's one. Straight through: the SDK takes a plain string and
+			// omits it when empty, so a create that leaves it out sends nothing
+			// and takes the server's "strict", which verifies.
+			SSHHostKeyPolicy: in.SSHHostKeyPolicy,
 			// #2033's two. Pointers straight through, so a create that mentions
 			// neither sends neither and takes the server's own default, which is
 			// OFF for both -- the safe direction, and the behaviour a workspace
@@ -278,12 +281,14 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Playbooks       []string `json:"playbooks,omitempty" jsonschema:"the playbooks a configure on this workspace may name -- an ALLOW-LIST over the playbook run option, each entry relative to config_directory. An EMPTY OR OMITTED list means NO RESTRICTION, which is what every workspace has today, so this is opt-in and setting it is what narrows the workspace. With a list set the API refuses a configure naming anything outside it (422, listing what is allowed), and default_playbook MUST be one of the entries -- a bare configure runs the default, so a default outside the list would leave the workspace unable to run its own button. Entries are stored exactly as written: nothing is trimmed or de-duplicated, and a duplicate is refused. At most 50. Omitting the field leaves the stored list alone; pass an empty list to clear it, which removes the restriction"`
 		HardLimit       *string  `json:"hard_limit,omitempty" jsonschema:"a --limit NO RUN MAY ESCAPE; empty means no ceiling. Unlike default_limit, which a run replaces when it supplies its own, this is INTERSECTED with the run's limit -- narrowing is allowed, widening is not. Pass an empty string to REMOVE the ceiling, which widens every run on this workspace"`
 		DefaultLimit    *string  `json:"default_limit,omitempty" jsonschema:"the default --limit for a configure run, overridable per run. Empty means the whole inventory, which is ansible's own default. This narrows which HOSTS a run touches and is the configure operation's equivalent of -target on a plan. Pass an empty string to widen a run back to the whole inventory"`
-		// Host-key verification, settable here for the reason the block below
+		// The host-key policy, settable here for the reason the block below
 		// gives at length: this server is not an authorization boundary, so an
 		// attribute a workspace read reports and this tool cannot set is an
-		// asymmetry rather than a control (#2318). A pointer so nil leaves the
-		// stored value alone.
-		AnsibleHostKeyChecking *bool `json:"ansible_host_key_checking,omitempty" jsonschema:"turn SSH HOST-KEY VERIFICATION for this workspace's configure runs off or back on: true verifies the host key of each host a configure targets, false relaxes it by emitting ansible_ssh_common_args as a variable on the all group -- which an inventory HOST variable still overrides, so relaxing the workspace does not stop a single host re-enabling it. Omitting the field leaves the stored value alone. TRUE is the default and the pre-existing behaviour, so before reaching for false consider the known_hosts field on an ansible_machine_auth credential, referenced as ${terrapod:<credential-name>.known_hosts}, which supplies the host key and keeps verification ON"`
+		// asymmetry rather than a control (#2592). A plain string, where the
+		// boolean it replaced needed a pointer: omitting it leaves the stored
+		// value alone, and so does an explicit "" -- which costs nothing,
+		// because "" is not a policy the server would have stored either way.
+		SSHHostKeyPolicy string `json:"ssh_host_key_policy,omitempty" jsonschema:"move how this workspace's configure runs verify SSH host keys: strict, accept-new or off. Omitting the field leaves the stored value alone; an empty string is REFUSED rather than read as the default. strict verifies every host and refuses an unknown one, accept-new trusts a host on first contact and refuses it once its key CHANGES, off verifies nothing. strict is the default and the pre-existing behaviour, so before reaching for off consider accept-new first: it is what keeps an unpinned host reachable on a workspace that has begun declaring approved keys with terrapod_inventory_host_declare, where strict would otherwise make every unpinned address unreachable. A RUN SNAPSHOTS the policy at creation, so changing this cannot weaken a run already in flight -- while the approved keys themselves are read live, so a revocation does reach a queued run"`
 		// Which ansible inventory PLUGINS this workspace permits on the runner
 		// (#2033). Settable here for the reason the block below gives at
 		// length: this server is not an authorization boundary, so an
@@ -443,9 +448,13 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			Playbooks:    in.Playbooks,
 			DefaultLimit: in.DefaultLimit,
 			HardLimit:    in.HardLimit,
-			// #2318's one. A pointer straight through, so a PATCH that does not
-			// mention it cannot disturb the stored setting.
-			AnsibleHostKeyChecking: in.AnsibleHostKeyChecking,
+			// #2592's one. A plain string here where the boolean it replaced
+			// needed a pointer, and HardLimit beside it still does: a pointer
+			// exists to tell "leave it alone" from "set it to the empty value",
+			// and this setting has no empty value -- the column is NOT NULL with
+			// a default and the server refuses "". So empty and omitted are the
+			// same request, which is the whole of what the pointer bought.
+			SSHHostKeyPolicy: in.SSHHostKeyPolicy,
 			// #2033's two. Pointers straight through, so a PATCH that mentions
 			// neither sends neither and cannot disturb a stored switch.
 			DynamicInventoryEnabled: in.DynamicInventoryEnabled,

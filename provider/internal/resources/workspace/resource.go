@@ -28,6 +28,7 @@ import (
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/validators"
 )
 
 var (
@@ -916,12 +917,17 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"ansible_host_key_checking": schema.BoolAttribute{
-				MarkdownDescription: "Whether a configure **verifies the SSH host key** of the hosts it targets. **Defaults to true**, and that default is the behaviour that already existed rather than a new restriction: ansible's own `HOST_KEY_CHECKING` defaults to on and the configure phase forces nothing about it, so first contact with an unseen host already fails closed with `Host key verification failed`. What was missing was any way to express an exception.\n\nThe setting is **not** the mechanism, and that is what keeps a per-host override reachable. Relaxing it makes the inventory resolver emit `ansible_ssh_common_args` as a variable on the `all` group — never an environment variable, which would override the operator's own `ansible.cfg` and would sit *above* a per-host override rather than below it. So an inventory **host** variable still beats the workspace, and may re-enable verification over a relaxation.\n\nPrefer the narrower mechanism where it fits: `known_hosts` on a machine credential substitutes a file path, so `-o UserKnownHostsFile=${terrapod:web-key.known_hosts}` reaches an unknown host without standing verification down for every host the workspace configures.",
+			"ssh_host_key_policy": schema.StringAttribute{
+				MarkdownDescription: "How a configure **verifies the SSH host keys** of the hosts it targets: `strict`, `accept-new` or `off`. **Defaults to `strict`**, and that default is the behaviour that already existed rather than a new restriction — ansible's own `HOST_KEY_CHECKING` defaults on, so first contact with an unseen host already failed closed with `Host key verification failed`.\n\nThese are OpenSSH's `StrictHostKeyChecking` behaviours rather than ansible's boolean flag, and the middle one is the point:\n\n- `strict` — a host must already be approved. Verifies every host, refuses an unknown one.\n- `accept-new` — trust a host on **first contact**, refuse it if its key later **changes**. **Ansible cannot express this at all**, and it is what a growing fleet wants: approved keys are verified strictly while a host nobody has pinned yet is still reachable. Without it, declaring one approved key with `terrapod_inventory_host_keys` makes every unpinned **address** in that inventory unreachable, because `ssh_args` is process-wide.\n- `off` — verify nothing.\n\nThe policy rides the run's own SSH anchor, which **nothing in the inventory can override**. That is a deliberate change from the `ansible_host_key_checking` boolean this replaced, which was emitted as a group variable precisely so a host variable could beat it — the only per-host exception available when the choice was all-or-nothing. `accept-new` is what makes that override unnecessary, so losing it is a trade rather than a regression: the mixed case is now expressible on the workspace.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
+				// Plan-time, so a value OpenSSH does not define is refused
+				// before anything is applied rather than by the server's 422
+				// mid-apply. The set cannot move underneath us, which is what
+				// makes checking it here safe -- see the validator.
+				Validators: []validator.String{validators.SSHHostKeyPolicy{}},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"dynamic_inventory_enabled": schema.BoolAttribute{
@@ -1769,15 +1775,15 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ScheduledConfigureTimezone.IsNull() && !m.ScheduledConfigureTimezone.IsUnknown() {
 		req.ScheduledConfigureTimezone = m.ScheduledConfigureTimezone.ValueString()
 	}
-	// Host-key verification (#2318). A pointer for the reason the booleans above
-	// give, and here that reason bites hardest, because the server default is
-	// TRUE: "I did not say" and "stop verifying" have to be different requests.
-	// A plain bool would send `false` for an attribute the configuration never
-	// mentions -- standing verification down on every workspace it creates, and
-	// silently relaxing an existing one on every apply.
-	if !m.AnsibleHostKeyChecking.IsNull() && !m.AnsibleHostKeyChecking.IsUnknown() {
-		v := m.AnsibleHostKeyChecking.ValueBool()
-		req.AnsibleHostKeyChecking = &v
+	// The host-key policy (#2592). A plain string needs no pointer and loses
+	// nothing, unlike the boolean it replaced: the SDK omits an empty field and
+	// the server reads an absent attribute as "leave it alone", while "" is a
+	// value the server refuses outright -- so there is no third state to
+	// distinguish. The guard is still explicit rather than relying on
+	// ValueString() answering "" for null, because an UNKNOWN value must not be
+	// sent either.
+	if !m.SSHHostKeyPolicy.IsNull() && !m.SSHHostKeyPolicy.IsUnknown() {
+		req.SSHHostKeyPolicy = m.SSHHostKeyPolicy.ValueString()
 	}
 	// #2033's pair. Pointers for the same reason as the booleans above: a
 	// plain bool would make "I did not say" and "refuse these sources" the
@@ -2061,15 +2067,15 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.ScheduledConfigureTimezone.ValueString()
 		req.ScheduledConfigureTimezone = &v
 	}
-	// Host-key verification (#2318). A pointer for the reason the booleans above
-	// give, and here that reason bites hardest, because the server default is
-	// TRUE: "I did not say" and "stop verifying" have to be different requests.
-	// A plain bool would send `false` for an attribute the configuration never
-	// mentions -- standing verification down on every workspace it creates, and
-	// silently relaxing an existing one on every apply.
-	if !m.AnsibleHostKeyChecking.IsNull() && !m.AnsibleHostKeyChecking.IsUnknown() {
-		v := m.AnsibleHostKeyChecking.ValueBool()
-		req.AnsibleHostKeyChecking = &v
+	// The host-key policy (#2592). A plain string needs no pointer and loses
+	// nothing, unlike the boolean it replaced: the SDK omits an empty field and
+	// the server reads an absent attribute as "leave it alone", while "" is a
+	// value the server refuses outright -- so there is no third state to
+	// distinguish. The guard is still explicit rather than relying on
+	// ValueString() answering "" for null, because an UNKNOWN value must not be
+	// sent either.
+	if !m.SSHHostKeyPolicy.IsNull() && !m.SSHHostKeyPolicy.IsUnknown() {
+		req.SSHHostKeyPolicy = m.SSHHostKeyPolicy.ValueString()
 	}
 	// #2033's pair. Pointers for the same reason as the booleans above: a
 	// plain bool would make "I did not say" and "refuse these sources" the
@@ -2341,7 +2347,12 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	// dropped the false the server would answer `true` and the apply would FAIL,
 	// where on a false-defaulting sibling the same bug agrees with itself and
 	// goes unnoticed.
-	m.AnsibleHostKeyChecking = types.BoolValue(ws.AnsibleHostKeyChecking)
+	// The host-key policy (#2592). Unconditional for the reason the lines above
+	// give, and taken verbatim: the column is NOT NULL with a default and the
+	// server stores what it was sent, so a configured value round-trips byte for
+	// byte and there is no normalisation to make a configured policy differ from
+	// the answer. That is what makes UseStateForUnknown safe here.
+	m.SSHHostKeyPolicy = types.StringValue(ws.SSHHostKeyPolicy)
 	// Scheduled configure (#2538), read side. Unconditional projections for
 	// the reason the lines above give: all three are Optional+Computed over
 	// non-nullable columns, so a null read-back is the inconsistent-result

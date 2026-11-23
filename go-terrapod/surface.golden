@@ -484,7 +484,6 @@ field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitemp
 field CreateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field CreateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field CreateWorkspaceRequest.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
-field CreateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
@@ -523,6 +522,7 @@ field CreateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field CreateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field CreateWorkspaceRequest.SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 field CreateWorkspaceRequest.ScheduledConfigureCron string `json:"scheduled-configure-cron,omitempty"`
 field CreateWorkspaceRequest.ScheduledConfigureEnabled *bool `json:"scheduled-configure-enabled,omitempty"`
 field CreateWorkspaceRequest.ScheduledConfigureTimezone string `json:"scheduled-configure-timezone,omitempty"`
@@ -1181,6 +1181,7 @@ field Run.RunVariableKeys []string `json:"run-variable-keys,omitempty"`
 field Run.RunnerExitCode *int64 `json:"runner-exit-code,omitempty"`
 field Run.RunnerExitReason string `json:"runner-exit-reason,omitempty"`
 field Run.RunnerExitStatus string `json:"runner-exit-status,omitempty"`
+field Run.SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 field Run.SavePlan bool `json:"save-plan,omitempty"`
 field Run.Source string `json:"source,omitempty"`
 field Run.StateDiverged bool `json:"state-diverged"`
@@ -1447,7 +1448,6 @@ field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitemp
 field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field UpdateWorkspaceRequest.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field UpdateWorkspaceRequest.AnsibleExecutionEnvironment *string `json:"ansible-execution-environment,omitempty"`
-field UpdateWorkspaceRequest.AnsibleHostKeyChecking *bool `json:"ansible-host-key-checking,omitempty"`
 field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoConfigureEnabled *bool `json:"auto-configure-enabled,omitempty"`
@@ -1484,6 +1484,7 @@ field UpdateWorkspaceRequest.Playbooks []string `json:"playbooks,omitempty"`
 field UpdateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field UpdateWorkspaceRequest.SSHHostKeyPolicy string `json:"ssh-host-key-policy,omitempty"`
 field UpdateWorkspaceRequest.ScheduledConfigureCron *string `json:"scheduled-configure-cron,omitempty"`
 field UpdateWorkspaceRequest.ScheduledConfigureEnabled *bool `json:"scheduled-configure-enabled,omitempty"`
 field UpdateWorkspaceRequest.ScheduledConfigureTimezone *string `json:"scheduled-configure-timezone,omitempty"`
@@ -1706,7 +1707,6 @@ field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
 field Workspace.AnsibleCollections []AnsibleCollection `json:"ansible-collections,omitempty"`
 field Workspace.AnsibleExecutionEnvironment string `json:"ansible-execution-environment,omitempty"`
-field Workspace.AnsibleHostKeyChecking bool `json:"ansible-host-key-checking"`
 field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoConfigureEnabled bool `json:"auto-configure-enabled"`
@@ -1756,6 +1756,7 @@ field Workspace.Playbooks []string `json:"playbooks,omitempty"`
 field Workspace.PulumiBindPlan bool `json:"pulumi-bind-plan"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`
+field Workspace.SSHHostKeyPolicy string `json:"ssh-host-key-policy"`
 field Workspace.ScheduledConfigureCron string `json:"scheduled-configure-cron,omitempty"`
 field Workspace.ScheduledConfigureEnabled bool `json:"scheduled-configure-enabled"`
 field Workspace.ScheduledConfigureLastAt string `json:"scheduled-configure-last-at,omitempty"`

@@ -351,6 +351,20 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
+    # The host-key policy (#2592). Its own rule rather than a row in the boolean
+    # loop below, which is where the rename left it: `validate_bool` refuses
+    # every one of the three values with a message about booleans, so the
+    # attribute was unsettable, and the one shape it DID accept wrote a Python
+    # bool into a String(16) column. The workspace surfaces both reach for
+    # `validate_ssh_host_key_policy`, and so does this one -- a second opinion
+    # about what the three values are is how two surfaces come to disagree.
+    if "ssh-host-key-policy" in attrs:
+        try:
+            out["ssh_host_key_policy"] = workspace_settings.validate_ssh_host_key_policy(
+                attrs["ssh-host-key-policy"]
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
     if "ansible-collections" in attrs:
         try:
             out["ansible_collections"] = validate_ansible_collections(attrs["ansible-collections"])
@@ -368,7 +382,6 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         # declaring the two in either order.
         ("auto-configure-enabled", "auto_configure_enabled"),
         ("configure-all-hosts", "configure_all_hosts"),
-        ("ssh-host-key-policy", "ssh_host_key_policy"),
         ("dynamic-inventory-enabled", "dynamic_inventory_enabled"),
         ("inventory-scripts-enabled", "inventory_scripts_enabled"),
         ("configure-after-apply", "configure_after_apply"),

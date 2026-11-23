@@ -147,16 +147,20 @@ type workspaceModel struct {
 	ScheduledConfigureTimezone types.String `tfsdk:"scheduled_configure_timezone"`
 	// Whether a configure verifies the SSH host key of the hosts it targets
 	// (#2318). The server defaults it TRUE -- ansible's own default, and the
-	// behaviour that already existed -- which is why both requests carry it as a
-	// POINTER: a plain bool would make an omitted attribute indistinguishable
-	// from a deliberate relaxation. Optional+Computed like its neighbours, so a
-	// configuration that never mentions it plans UNKNOWN and takes the server's
-	// value rather than planning NULL against an answer of `true`.
+	// behaviour that already existed rather than a new restriction. A STRING
+	// rather than the pointer-to-bool this replaced (#2318), because the value
+	// set is OpenSSH's three `StrictHostKeyChecking` behaviours and a boolean
+	// could not say `accept-new` -- trust on first contact, refuse on change.
 	//
-	// The setting is not the mechanism: relaxing it emits
-	// `ansible_ssh_common_args` on the `all` group, so an inventory host
-	// variable still overrides it.
-	AnsibleHostKeyChecking types.Bool `tfsdk:"ansible_host_key_checking"`
+	// Optional+Computed, and the empty string needs no special handling here
+	// because the server REFUSES it: a configuration that never mentions the
+	// attribute plans UNKNOWN and takes the server's `strict`, and one that does
+	// mention it is validated at plan time against the three.
+	//
+	// Unlike the boolean, the policy rides the run's own ssh anchor, which
+	// nothing in the inventory can override. `accept-new` is what makes that
+	// override unnecessary.
+	SSHHostKeyPolicy types.String `tfsdk:"ssh_host_key_policy"`
 	// Whether ansible's inventory PLUGINS may run, and they run ON THE
 	// RUNNER only (#2033). Both default false on the server, and the API
 	// never executes a plugin or a script in either state -- so neither
