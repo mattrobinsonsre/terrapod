@@ -586,6 +586,13 @@
     "updated-at",
     "variable-count"
   ],
+  "inventory._host_key_json": [
+    "created-at",
+    "key-type",
+    "marker",
+    "public-key",
+    "updated-at"
+  ],
   "inventory._var_json": [
     "created-at",
     "key",
@@ -593,6 +600,9 @@
     "structured",
     "updated-at",
     "value"
+  ],
+  "inventory.show_inventory_host_keys": [
+    "keys"
   ],
   "inventory.show_resolved_inventory": [
     "group-children",

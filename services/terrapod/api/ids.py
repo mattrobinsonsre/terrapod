@@ -58,6 +58,7 @@ ID_PREFIXES: dict[str, str] = {
     "inventory-group-vars": "invgvar-",
     "inventory-groups": "invgroup-",
     "inventory-host-groups": "invhg-",
+    "inventory-host-keys": "invhkey-",
     "inventory-host-vars": "invhvar-",
     "inventory-hosts": "invhost-",
     "listeners": "listener-",
