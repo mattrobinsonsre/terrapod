@@ -477,6 +477,16 @@ jobs:
       - name: (docs-audit) The committed-snapshot registry is derived and complete
         run: python3 scripts/docs-audit/check_snapshot_registry.py
 
+      # The first application of "a defect class that recurs after being written
+      # down earns a gate". Bounded retry has been a hard requirement in
+      # AGENTS.md for a long time and was broken seven times in six weeks -- every
+      # time in code whose neighbours already complied, which is the tell: a new
+      # call site copies the shape of the work, not the shape of the policy. The
+      # existing unrouted population is baselined and grandfathered; what this
+      # blocks is growth. Stdlib only.
+      - name: (docs-audit) Outbound calls are retried, or say why not
+        run: python3 scripts/docs-audit/check_outbound_retry.py
+
       # Needs only PyYAML, installed above: the parser's regex is extracted from
       # `pulumi_plugins.py` by `ast` rather than imported, because importing it
       # drags in `settings` and so SQLAlchemy and the rest of the API closure --
