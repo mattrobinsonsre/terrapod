@@ -1274,6 +1274,10 @@
     "overridden",
     "run-status"
   ],
+  "storage.list_storage_locations": [
+    "backend",
+    "name"
+  ],
   "tfe_v2._output_json": [
     "detailed-type",
     "name",

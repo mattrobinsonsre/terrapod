@@ -1536,6 +1536,12 @@ def create_application() -> FastAPI:
 
     include_terrapod(ansible_router)
 
+    # `include_terrapod`, never the prefix directly: the alias mount is what a
+    # lagging consumer still reaches, and mounting one prefix silently drops it.
+    from terrapod.api.routers.storage import router as storage_router
+
+    include_terrapod(storage_router)
+
     # Caching routes (provider mirror, binary cache)
     from terrapod.api.routers.provider_mirror import router as provider_mirror_router
 
