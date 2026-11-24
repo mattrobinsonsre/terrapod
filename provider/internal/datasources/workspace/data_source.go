@@ -34,6 +34,7 @@ type workspaceDataSourceModel struct {
 	Engine                        types.String `tfsdk:"engine"`
 	PulumiBindPlan                types.Bool   `tfsdk:"pulumi_bind_plan"`
 	EngineVersion                 types.String `tfsdk:"engine_version"`
+	StorageLocation               types.String `tfsdk:"storage_location"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
@@ -135,6 +136,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 					"binary within the Terraform engine."),
 			"pulumi_bind_plan":              computedBool("Pulumi only: whether the update is bound to the approved preview."),
 			"engine_version":                computedString("Version of the engine this workspace runs (OpenTofu/Terraform, or Pulumi)."),
+			"storage_location":              computedString("The named object store holding this workspace's own objects — state, plans, logs, configuration versions and inventory. Null for the deployment's default store, which is every workspace unless an operator has configured named locations. Set when the workspace is created and not changeable afterwards."),
 			"terraform_version":             computedString("The same version under its original name; `engine_version` is the current one."),
 			"terragrunt_enabled":            computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
 			"terragrunt_version":            computedString("Terragrunt CLI version (when terragrunt_enabled)."),
@@ -329,6 +331,10 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		engineVersion = terrapod.GetStringAttr(res, "terraform-version")
 	}
 	setOptionalString(&m.EngineVersion, engineVersion)
+	// `setOptionalString`, so an unset location is null rather than "" -- the
+	// same null-for-empty rule the resource applies, and what lets a caller
+	// test `storage_location == null` for "the default store".
+	setOptionalString(&m.StorageLocation, terrapod.GetStringAttr(res, "storage-location"))
 	setOptionalString(&m.TerraformVersion, engineVersion)
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))

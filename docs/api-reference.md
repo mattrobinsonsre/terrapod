@@ -922,6 +922,33 @@ Partial versions are supported and resolve to the newest matching release —
 `"1.12"` means `1.12.*`. Do not use HCL constraint operators (`~>`, `>=`); those
 belong in a `required_version` block inside your configuration.
 
+### `storage-location`
+
+The named object store holding **this workspace's own** objects — its state,
+plans, logs, configuration versions and inventory. Omit it, or send `null`, for
+the deployment's default store; that is every workspace unless an operator has
+configured named locations under `storage.locations`.
+
+Read the valid names from
+[`GET /api/v1/storage/locations`](#get-apiv1storagelocations). Three
+things about the value are easy to get wrong:
+
+| | |
+|---|---|
+| **It is create-only** | Settable on `POST /workspaces`. A later `PATCH` sending a *different* value is refused with a 422; sending the value it already holds is accepted, so a client that round-trips the whole document does not have to strip the field. Nothing moves a workspace's existing objects between buckets, so changing it would leave the workspace pointing at a store its data is not in. Moving one is a future explicit copy-and-verify operation rather than an edit. |
+| **`"default"` is refused** | It names the *absence* of a location rather than a location. A client offering a choice supplies its own "use the deployment's store" option mapping to `null`. The literal string is refused so that a client which reads the server's answer back cannot write it into state and then fail every subsequent write. |
+| **The empty string is refused too** | `""` is neither absent nor a configured name. Omit the key instead. This matters for a typed client with a default: a static `""` default would 422 every create. |
+
+An autodiscovery rule carries the same attribute, and there it is a **template
+for workspaces discovered afterwards** rather than a setting of the rule itself —
+so it is mutable there, and it is in the rule's **not propagated** set: changing
+a rule's location never moves or re-points a workspace it already created.
+
+In the Terraform provider the workspace attribute is `storage_location`,
+`Optional` and not `Computed`, and a change to it is refused **at plan time**
+rather than at apply. It is deliberately not `RequiresReplace`, which would
+offer to destroy a workspace holding live state.
+
 ### Agent pool set
 
 A workspace routes its runs to a **set** of agent pools. The set is **flat**:
@@ -7454,45 +7481,6 @@ Statuses worth knowing, because the three say different things:
 Which images this deployment can run a configure operation in (#2154). See
 [Choosing an execution environment](runners.md#choosing-an-execution-environment).
 
-### `GET /api/v1/storage/locations`
-
-Any authenticated user, matching the execution-environment listing above, which
-is the same shape: an operator-configured set a workspace selects from. Anyone
-who may set the attribute needs the valid values, and the name of every location
-already **in use** is readable from the workspaces themselves — so gating this
-would withhold only the names of locations configured and not yet used, while
-costing the picker for every non-admin who may legitimately set it.
-
-```json
-{"data": [
-   {"type": "storage-locations", "id": "archive",
-    "attributes": {"name": "archive", "backend": "s3"}},
-   {"type": "storage-locations", "id": "eu-restricted",
-    "attributes": {"name": "eu-restricted", "backend": "azure"}}
- ],
- "meta": {"pagination": {"current-page": 1, "page-size": 2,
-                         "total-count": 2, "total-pages": 1}}}
-```
-
-Three things about the answer, each of which otherwise costs a 422:
-
-| | |
-|---|---|
-| **`default` is absent** | It is the *absence* of a location, not a location, and the write path refuses the literal string — so a client offering a choice supplies its own "use the deployment's store" option mapping to a **null** `storage-location`. Sending `"default"` is refused |
-| **An empty list is ordinary** | It means a single object store, which is the default configuration. Offer no control rather than an empty select; it is not a failure and not a missing feature |
-| **The attribute is create-only** | `storage-location` is set when a workspace is created and a later `PATCH` sending a different value is refused with a 422. A client should offer the choice on a create form and render it read-only on an existing workspace |
-
-Names and backends only. A location's configuration also carries its bucket,
-region, endpoint and a credentials block holding `role_arn` and `external_id`;
-none of it is served here. Nothing a picker does needs it, and those fields sit
-directly beside the credentials in the configuration model — the adjacency that
-makes "while we are here, add the bucket" cheap to write and wrong to ship.
-
-What a location governs is where that workspace's **own** objects live: its
-state, plans, logs, configuration versions and inventory. Registry artifacts,
-caches and backups stay on the default store regardless, being keyed by
-repository or digest rather than by workspace.
-
 ### `GET /api/v1/ansible/execution-environments`
 
 Any authenticated user. The answer is which images this deployment can pull,
@@ -7537,6 +7525,52 @@ authoritative in both states: they come from configuration, not from a registry.
 A string rather than a boolean because the next state this may need is
 `partial` — a listing trusted for one source and not another — and a boolean
 would have to be deprecated to say it.
+
+## Storage locations
+
+Which named object stores this deployment has configured, for the
+workspace and autodiscovery-rule [`storage-location`](#storage-location)
+attribute to select from (#2547). A deployment that configures none has
+exactly one store and this list is empty.
+
+### `GET /api/v1/storage/locations`
+
+Any authenticated user, matching the execution-environment listing above, which
+is the same shape: an operator-configured set a workspace selects from. Anyone
+who may set the attribute needs the valid values, and the name of every location
+already **in use** is readable from the workspaces themselves — so gating this
+would withhold only the names of locations configured and not yet used, while
+costing the picker for every non-admin who may legitimately set it.
+
+```json
+{"data": [
+   {"type": "storage-locations", "id": "archive",
+    "attributes": {"name": "archive", "backend": "s3"}},
+   {"type": "storage-locations", "id": "eu-restricted",
+    "attributes": {"name": "eu-restricted", "backend": "azure"}}
+ ],
+ "meta": {"pagination": {"current-page": 1, "page-size": 2,
+                         "total-count": 2, "total-pages": 1}}}
+```
+
+Three things about the answer, each of which otherwise costs a 422:
+
+| | |
+|---|---|
+| **`default` is absent** | It is the *absence* of a location, not a location, and the write path refuses the literal string — so a client offering a choice supplies its own "use the deployment's store" option mapping to a **null** `storage-location`. Sending `"default"` is refused |
+| **An empty list is ordinary** | It means a single object store, which is the default configuration. Offer no control rather than an empty select; it is not a failure and not a missing feature |
+| **The attribute is create-only** | `storage-location` is set when a workspace is created and a later `PATCH` sending a different value is refused with a 422. A client should offer the choice on a create form and render it read-only on an existing workspace |
+
+Names and backends only. A location's configuration also carries its bucket,
+region, endpoint and a credentials block holding `role_arn` and `external_id`;
+none of it is served here. Nothing a picker does needs it, and those fields sit
+directly beside the credentials in the configuration model — the adjacency that
+makes "while we are here, add the bucket" cheap to write and wrong to ship.
+
+What a location governs is where that workspace's **own** objects live: its
+state, plans, logs, configuration versions and inventory. Registry artifacts,
+caches and backups stay on the default store regardless, being keyed by
+repository or digest rather than by workspace.
 
 ## High Availability
 

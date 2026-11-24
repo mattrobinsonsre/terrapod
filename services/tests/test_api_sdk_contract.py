@@ -117,7 +117,6 @@ WORKSPACE_API_ONLY: frozenset[str] = frozenset(
         # is the whole thing #2503 removed.
         "auto-apply",
         # Not in the SDK or provider yet: those consumers follow in the consumers slice.
-        "storage-location",
     }
 )
 

@@ -109,6 +109,7 @@ type workspaceModel struct {
 	Engine                      types.String `tfsdk:"engine"`
 	PulumiBindPlan              types.Bool   `tfsdk:"pulumi_bind_plan"`
 	EngineVersion               types.String `tfsdk:"engine_version"`
+	StorageLocation             types.String `tfsdk:"storage_location"`
 	TerraformVersion            types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled           types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion           types.String `tfsdk:"terragrunt_version"`
