@@ -499,6 +499,38 @@ func (r *workspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// `storage_location` is create-only: the API refuses an update that changes
+	// it, because nothing moves a workspace's existing objects between buckets.
+	//
+	// Refused HERE rather than left to the apply, and rather than modelled as
+	// RequiresReplace. The apply-time 422 arrives after a plan the operator has
+	// already approved and says nothing about which attribute; RequiresReplace
+	// would instead show a plan that DESTROYS a workspace holding live state,
+	// for someone whose intent was to move data. #2547's own position is that
+	// moving is "a later, explicit copy-and-verify operation", so neither
+	// outcome is what they asked for and the honest answer is to say so at plan
+	// time.
+	//
+	// Compared only when the configuration declares it, so removing the
+	// attribute is not read as "change it to null" -- that would refuse a plan
+	// for a workspace whose location is simply no longer managed here, which is
+	// the shape the `agent_pool_id` warning below exists for.
+	if !cfg.StorageLocation.IsNull() && !state.StorageLocation.IsNull() &&
+		cfg.StorageLocation.ValueString() != state.StorageLocation.ValueString() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("storage_location"),
+			"storage_location cannot be changed after the workspace is created",
+			"The workspace's objects -- its state, plans, logs, configuration versions "+
+				"and inventory -- are held in `"+state.StorageLocation.ValueString()+
+				"`, and this configuration sets `"+cfg.StorageLocation.ValueString()+
+				"`. Nothing moves them between locations, so the API refuses the change.\n\n"+
+				"To hold a workspace's data elsewhere, create a new workspace in that "+
+				"location. Restore `storage_location = \""+state.StorageLocation.ValueString()+
+				"\"` to plan this one again.",
+		)
+		return
+	}
 	for _, a := range unmanagedCollections {
 		// `agent_pool_ids` reads back the set that `agent_pool_id` assigns, so a
 		// config using the singular IS managing it — as long as the set is
@@ -664,6 +696,36 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.RequiresReplaceIfConfigured(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"storage_location": schema.StringAttribute{
+				Description: "The named object store holding THIS workspace's own objects " +
+					"— its state, plans, logs, configuration versions and inventory. " +
+					"Omit it for the deployment's default store, which is every workspace " +
+					"unless an operator has configured `storage.locations`. Read the valid " +
+					"names from the `terrapod_storage_locations` data source; never set " +
+					"`\"default\"`, which is the absence of a location rather than a " +
+					"location and is refused. **Cannot be changed after the workspace is " +
+					"created** — nothing moves existing objects between buckets, so a change " +
+					"is refused at plan time rather than proposing to destroy the workspace.",
+				Optional: true,
+				// Optional ONLY, deliberately. The server never supplies a value
+				// the operator did not set, so there is no unknown to resolve and
+				// nothing for `UseStateForUnknown` to do -- and that modifier
+				// belongs only on Computed-only attributes whose value cannot
+				// change as a side effect of the apply (see the v0.35.5 note
+				// further down). Computed here would also make an omitted
+				// attribute read its value from state, which is how a plain
+				// RequiresReplace comes to propose destroying live infrastructure
+				// for a field nobody set.
+				//
+				// No RequiresReplace either, which IS what `engine` uses for the
+				// same "cannot change in place" reason. Changing an engine means a
+				// different KIND of workspace, so replacement is honest there;
+				// changing a storage location means "move my data", and #2547 says
+				// plainly that moving is "a later, explicit copy-and-verify
+				// operation". A plan proposing to destroy a workspace holding live
+				// state would be a destructive misreading of that intent, so
+				// ModifyPlan refuses instead.
 			},
 			"engine_version": schema.StringAttribute{
 				Description: "The version of the engine this workspace runs — OpenTofu or " +
@@ -1691,6 +1753,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	// `engine_version` wins when set; `terraform_version` is the same version
 	// under its old name and keeps working for a config written before the
 	// rename (#1559).
+	if !m.StorageLocation.IsNull() && !m.StorageLocation.IsUnknown() {
+		// Create only. There is no equivalent in the update builder, and the
+		// SDK's UpdateWorkspaceRequest does not carry the field at all, so
+		// neither this provider nor any other go-terrapod caller can attempt
+		// the change the API refuses.
+		req.StorageLocation = m.StorageLocation.ValueString()
+	}
 	if !m.EngineVersion.IsNull() && !m.EngineVersion.IsUnknown() {
 		req.EngineVersion = m.EngineVersion.ValueString()
 	} else if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
@@ -2247,6 +2316,15 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.Engine = types.StringValue(ws.Engine)
 	m.PulumiBindPlan = types.BoolValue(ws.PulumiBindPlan)
 	m.WorkingDirectory = types.StringValue(ws.WorkingDirectory)
+	// Null rather than "" when the server reports nothing. The attribute is
+	// Optional and not Computed, so a config that omits it plans null; writing
+	// StringValue("") into state is the "provider produced inconsistent result
+	// after apply" shape ConfigureParallelism carries a note about below.
+	if ws.StorageLocation != "" {
+		m.StorageLocation = types.StringValue(ws.StorageLocation)
+	} else {
+		m.StorageLocation = types.StringNull()
+	}
 	m.ResourceCPU = types.StringValue(ws.ResourceCPU)
 	m.EEResourceCPU = types.StringValue(ws.EEResourceCPU)
 	m.EEResourceMemory = types.StringValue(ws.EEResourceMemory)

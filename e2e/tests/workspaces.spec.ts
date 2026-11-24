@@ -63,6 +63,26 @@ test.describe("Workspaces", () => {
     });
   });
 
+  // A deployment that configures no named storage locations has exactly one
+  // store, and the create form offers NO control rather than a select whose
+  // only option is "deployment default" -- offering a choice of one is worse
+  // than offering none (#2547). This stack configures none, so the absence IS
+  // the behaviour under test rather than a gap in the fixture.
+  test("no storage location control when the deployment configures none", async ({
+    page,
+  }) => {
+    await page.goto("/workspaces");
+    await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
+    await page.click('button:has-text("New Workspace")');
+
+    // The form is open: a control that IS always present, so a missing form
+    // cannot be mistaken for a missing storage-location control.
+    await expect(page.locator('input[placeholder*="workspace"]')).toBeVisible();
+    await expect(
+      page.getByTestId("ws-storage-location-select"),
+    ).toHaveCount(0);
+  });
+
   test("workspace detail shows tabs", async ({ page }) => {
     // Create a workspace first
     const wsName = `e2e-detail-${Date.now()}`;

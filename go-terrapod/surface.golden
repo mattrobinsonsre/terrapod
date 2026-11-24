@@ -531,6 +531,7 @@ field CreateWorkspaceRequest.SecurityScanEngine string `json:"security-scan-engi
 field CreateWorkspaceRequest.SecurityScanSeverityThreshold string `json:"security-scan-severity-threshold,omitempty"`
 field CreateWorkspaceRequest.SecurityScanSkipRules []string `json:"security-scan-skip-rules,omitempty"`
 field CreateWorkspaceRequest.SlackChannel string `json:"slack-channel,omitempty"`
+field CreateWorkspaceRequest.StorageLocation string `json:"storage-location,omitempty"`
 field CreateWorkspaceRequest.TerraformVersion string `json:"terraform-version,omitempty"`
 field CreateWorkspaceRequest.TerragruntEnabled *bool `json:"terragrunt-enabled,omitempty"`
 field CreateWorkspaceRequest.TerragruntVersion string `json:"terragrunt-version,omitempty"`
@@ -1769,6 +1770,7 @@ field Workspace.SecurityScanSeverityThreshold string `json:"security-scan-severi
 field Workspace.SecurityScanSkipRules []string `json:"security-scan-skip-rules,omitempty"`
 field Workspace.SlackChannel string `json:"slack-channel,omitempty"`
 field Workspace.StateDiverged bool `json:"state-diverged"`
+field Workspace.StorageLocation string `json:"storage-location,omitempty"`
 field Workspace.TerraformVersion string `json:"terraform-version,omitempty"`
 field Workspace.TerragruntEnabled bool `json:"terragrunt-enabled"`
 field Workspace.TerragruntVersion string `json:"terragrunt-version,omitempty"`

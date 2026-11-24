@@ -90,7 +90,8 @@
       "namePatternPulumi": "由 '::' 分隔的两部分 — project::stack。仅限字母、数字、连字符和下划线；每部分必须以字母或数字开头。",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "使用 <code>pulumi stack select default/project/stack</code> 让 CLI 指向它。",
-      "namePatternPulumiLead": "由 '::' 分隔的两部分 — project::stack。"
+      "namePatternPulumiLead": "由 '::' 分隔的两部分 — project::stack。",
+      "storageLocationDefault": "部署默认值"
     },
     "stats": {
       "total": "总计",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "首次连接时信任",
       "sshHostKeyPolicyOff": "不检查",
       "sshHostKeyPolicyLead": "配置向 OpenSSH 请求三种回答中的哪一种。首次连接时信任仍会拒绝已更改的密钥；不检查则主机出示的任何密钥都会被接受，连接因而可能被截取。",
-      "sshHostKeyPolicyHint": "Terrapod 会把每台主机已批准的密钥生成为 OpenSSH 据以核对的 known_hosts 文件，而此设置就是运行所请求的 StrictHostKeyChecking 取值。该文件是一份允许清单，且该设置作用于整个进程：若检查每台主机，无人批准过密钥的地址不只是未经检查，而是无法连通。首次连接时信任是混合环境下的答案：已批准的密钥仍按严格方式检查，而无人固定过的主机可以连接一次，此后其密钥若有变化即被拒绝。清单中的任何内容都无法覆盖它。"
+      "sshHostKeyPolicyHint": "Terrapod 会把每台主机已批准的密钥生成为 OpenSSH 据以核对的 known_hosts 文件，而此设置就是运行所请求的 StrictHostKeyChecking 取值。该文件是一份允许清单，且该设置作用于整个进程：若检查每台主机，无人批准过密钥的地址不只是未经检查，而是无法连通。首次连接时信任是混合环境下的答案：已批准的密钥仍按严格方式检查，而无人固定过的主机可以连接一次，此后其密钥若有变化即被拒绝。清单中的任何内容都无法覆盖它。",
+      "storageLocation": "存储位置"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

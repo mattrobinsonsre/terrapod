@@ -167,7 +167,7 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
     // fifteen times against an empty input and could only report that the
     // element was missing. Asserting the value before each click makes a lost
     // fill fail saying so.
-    const prefixInput = adminPage.getByPlaceholder('prod-');
+    const prefixInput = adminPage.getByPlaceholder('prod-', { exact: true });
     const matched = adminPage.getByText(/Matched/);
     await expect(async () => {
       if (!(await matched.isVisible())) {
@@ -250,7 +250,7 @@ test.describe('Bulk update — exclusions (#2548)', () => {
     // fill is lost if it lands before the controlled input mounts, and the page
     // then renders an ErrorBanner rather than a wrong count. Asserting the
     // value before each click makes a lost fill fail saying so.
-    const prefixInput = adminPage.getByPlaceholder('prod-');
+    const prefixInput = adminPage.getByPlaceholder('prod-', { exact: true });
     const matched = adminPage.getByText(/Matched/);
     await expect(async () => {
       if (!(await matched.isVisible())) {

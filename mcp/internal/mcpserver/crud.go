@@ -48,6 +48,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_workspace_create ────────────────────────────────────
 	type workspaceCreateIn struct {
 		Name                        string                   `json:"name" jsonschema:"the workspace name (unique within the org)"`
+		StorageLocation             string                   `json:"storage_location,omitempty" jsonschema:"the named object store to hold THIS workspace's own objects -- its state, plans, logs, configuration versions and inventory. Omit for the deployment's default store, which is every workspace unless an operator has configured named locations. SET IT HERE OR NEVER: this is create-only and the update tool does not accept it, because nothing moves a workspace's existing objects between buckets. Read terrapod_storage_locations for the valid names and NEVER send \"default\", which is the absence of a location rather than a location and is refused"`
 		Engine                      string                   `json:"engine,omitempty" jsonschema:"the execution engine family: terraform (default) or another engine this deployment enables, such as pulumi. NOT execution_backend, which picks tofu vs terraform within the Terraform engine. Workspaces are created here, in the UI or with the Terraform provider — never by an engine's own CLI"`
 		ExecutionMode               string                   `json:"execution_mode,omitempty" jsonschema:"local or agent (default: server default)"`
 		ExecutionBackend            string                   `json:"execution_backend,omitempty" jsonschema:"which binary runs a Terraform-engine workspace: tofu or terraform. A choice WITHIN the Terraform engine — Pulumi has one binary, so this has no meaning on a pulumi workspace (default: server default)"`
@@ -160,6 +161,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ws, err := c.CreateWorkspace(ctx, terrapod.CreateWorkspaceRequest{
 			Name:                        in.Name,
 			Engine:                      in.Engine,
+			StorageLocation:             in.StorageLocation,
 			ExecutionMode:               in.ExecutionMode,
 			ExecutionBackend:            in.ExecutionBackend,
 			EngineVersion:               version,

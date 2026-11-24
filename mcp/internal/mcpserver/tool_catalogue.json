@@ -2729,6 +2729,10 @@
           "description": "how a configure on this workspace VERIFIES the SSH host key of each host it targets. One of strict, accept-new or off; DEFAULTS TO strict, which is ansible's own behaviour and what every workspace already had -- with no approved keys declared, first contact with an unseen host fails closed with Host key verification failed. These are OpenSSH's StrictHostKeyChecking behaviours rather than a boolean, and accept-new is the one worth knowing about: it trusts a host on FIRST CONTACT and refuses it once its key CHANGES. Reach for accept-new rather than off on a fleet that has begun declaring approved host keys with terrapod_inventory_host_declare -- Terrapod renders those into a known_hosts ALLOW-LIST and points ssh at it -- because ssh_args is process-wide -- declaring one approved key under strict makes every address nobody has pinned yet unreachable, and off would then be the only alternative, which verifies nothing for ever. The policy rides the run's own ssh anchor, so unlike the ansible_host_key_checking boolean it replaced, nothing in the inventory can override it",
           "type": "string"
         },
+        "storage_location": {
+          "description": "the named object store to hold THIS workspace's own objects -- its state, plans, logs, configuration versions and inventory. Omit for the deployment's default store, which is every workspace unless an operator has configured named locations. SET IT HERE OR NEVER: this is create-only and the update tool does not accept it, because nothing moves a workspace's existing objects between buckets. Read terrapod_storage_locations for the valid names and NEVER send \"default\", which is the absence of a location rather than a location and is refused",
+          "type": "string"
+        },
         "terraform_version": {
           "description": "the same version under its original name; prefer engine_version. Setting both to different values is rejected",
           "type": "string"

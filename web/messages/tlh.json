@@ -90,7 +90,8 @@
       "namePatternPulumi": "cha' 'ay' '::' Sepbogh — project::stack. ghItlh mI' je neH; ghItlh mI' joq taghnIS 'ay' Hoch.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> yIlo''.",
-      "namePatternPulumiLead": "cha' 'ay' '::' Sepbogh — project::stack."
+      "namePatternPulumiLead": "cha' 'ay' '::' Sepbogh — project::stack.",
+      "storageLocationDefault": "nISwI'' motlh"
     },
     "stats": {
       "total": "naQ",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "wa'DIch rarDI' yIvoq",
       "sshHostKeyPolicyOff": "yItobQo'",
       "sshHostKeyPolicyLead": "OpenSSH wej jangmeH mIw'a' Qum poQbogh. wa'DIch rarDI' voq 'ach ngaQHa'moHwI' choHlu'bogh lajQo'taH; tobbe'chugh, host nobbogh ngaQHa'moHwI' Hoch lajlu', vaj rar HIvlaH.",
-      "sshHostKeyPolicyHint": "Hoch host ngaQHa'moHwI'mey chaw'lu'bogh known_hosts ghItlh moj, 'ej OpenSSH ghItlhvetlh lo'taHvIS tob; Dochvam 'oH StrictHostKeyChecking poQbogh Qum'e'. ghItlhvetlh chaw'lu'bogh tetlh 'oH, 'ej Hoch mIw Dochvam Sang: Hoch host tobchugh, ngaQHa'moHwI' chaw'be'lu'bogh Daq tobbe'lu' neH qar'a'? ghobe' -- SIchlaHbe'lu'. wa'DIch rarDI' voq, mIn'a' ngaDHa' jang: ngaQHa'moHwI' chaw'lu'bogh tobtaH 'ej host chaw'be'lu'bogh wa'logh rar 'ach ngaQHa'moHwI'Daj choHDI' lajQo'lu'. tetlh pagh Dochvam DIvI'laHbe'."
+      "sshHostKeyPolicyHint": "Hoch host ngaQHa'moHwI'mey chaw'lu'bogh known_hosts ghItlh moj, 'ej OpenSSH ghItlhvetlh lo'taHvIS tob; Dochvam 'oH StrictHostKeyChecking poQbogh Qum'e'. ghItlhvetlh chaw'lu'bogh tetlh 'oH, 'ej Hoch mIw Dochvam Sang: Hoch host tobchugh, ngaQHa'moHwI' chaw'be'lu'bogh Daq tobbe'lu' neH qar'a'? ghobe' -- SIchlaHbe'lu'. wa'DIch rarDI' voq, mIn'a' ngaDHa' jang: ngaQHa'moHwI' chaw'lu'bogh tobtaH 'ej host chaw'be'lu'bogh wa'logh rar 'ach ngaQHa'moHwI'Daj choHDI' lajQo'lu'. tetlh pagh Dochvam DIvI'laHbe'.",
+      "storageLocation": "qawHaq Daq"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

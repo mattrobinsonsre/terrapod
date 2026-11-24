@@ -68,6 +68,22 @@ var legitimatelyNullable = map[string]string{
 	"terrapod_autodiscovery_rule.on_directory_delete": "an enum, so \"\" is not a storable value -- " +
 		"the API answers 422 for anything outside its set, which means a configuration cannot ask " +
 		"for the empty string in the first place and there is no round trip to break",
+
+	// Same shape as the enum above, by a different mechanism: the API's
+	// `validate_storage_location` refuses "" because it is neither absent (which
+	// is null, and means the deployment's default store) nor one of the
+	// configured location names. So a configuration cannot ask for "" and get it
+	// stored, and there is no round trip to break.
+	//
+	// No plan-time validator to go with it, deliberately. The provider cannot
+	// know which locations a deployment has configured without asking the API,
+	// so the server's own 422 is strictly more useful than anything we could
+	// say here -- it names the value AND lists the valid ones.
+	"terrapod_workspace.storage_location": "the API refuses \"\": it is neither absent " +
+		"(null, meaning the deployment's default store) nor a configured location name, so a " +
+		"configuration cannot ask for the empty string and there is no round trip to break",
+	"terrapod_autodiscovery_rule.storage_location": "same as the workspace attribute -- the " +
+		"API refuses \"\", so it is not a value a configuration can ask for",
 }
 
 // anAttribute is one row of the derived subject.

@@ -90,7 +90,8 @@
       "namePatternPulumi": "Dvě části oddělené '::' — project::stack. Pouze písmena, číslice, pomlčky a podtržítka; každá část musí začínat písmenem nebo číslicí.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Nasměrujte na něj CLI příkazem <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Dvě části oddělené '::' — project::stack."
+      "namePatternPulumiLead": "Dvě části oddělené '::' — project::stack.",
+      "storageLocationDefault": "Výchozí nastavení nasazení"
     },
     "stats": {
       "total": "Celkem",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Věřit při prvním kontaktu",
       "sshHostKeyPolicyOff": "Nekontrolovat",
       "sshHostKeyPolicyLead": "Kterou ze tří odpovědí OpenSSH konfigurace žádá. Důvěra při prvním kontaktu stále odmítne změněný klíč; bez kontroly se přijme jakýkoli klíč, který hostitel předloží, takže spojení lze odposlechnout.",
-      "sshHostKeyPolicyHint": "Terrapod skládá schválené klíče každého hostitele do souboru known_hosts, podle kterého OpenSSH kontroluje, a toto nastavení je hodnota StrictHostKeyChecking, kterou spuštění žádá. Ten soubor je seznam povolených a nastavení platí pro celý proces: kontroluje-li se každý hostitel, pak adresa, pro kterou nikdo klíč neschválil, není jen nezkontrolovaná, ale nedosažitelná. Důvěra při prvním kontaktu je odpověď pro smíšený park: schválené klíče se nadále kontrolují striktně, zatímco hostitel, kterého nikdo nepřipnul, se připojí jednou a je odmítnut, pokud se jeho klíč později změní. Nic v inventáři to nemůže přebít."
+      "sshHostKeyPolicyHint": "Terrapod skládá schválené klíče každého hostitele do souboru known_hosts, podle kterého OpenSSH kontroluje, a toto nastavení je hodnota StrictHostKeyChecking, kterou spuštění žádá. Ten soubor je seznam povolených a nastavení platí pro celý proces: kontroluje-li se každý hostitel, pak adresa, pro kterou nikdo klíč neschválil, není jen nezkontrolovaná, ale nedosažitelná. Důvěra při prvním kontaktu je odpověď pro smíšený park: schválené klíče se nadále kontrolují striktně, zatímco hostitel, kterého nikdo nepřipnul, se připojí jednou a je odmítnut, pokud se jeho klíč později změní. Nic v inventáři to nemůže přebít.",
+      "storageLocation": "Umístění úložiště"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

@@ -90,7 +90,8 @@
       "namePatternPulumi": "Two partz separatd by '::' — projekt::stak. Letterz, numberz, hyfenz an underskorez only; each part gotta start wif a letter or number. KTHX",
       "namePlaceholderPulumi": "mah-projekt::dev",
       "pulumiNameHint": "Point teh CLI at it wif <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Two partz separatd by '::' — projekt::stak. KTHX"
+      "namePatternPulumiLead": "Two partz separatd by '::' — projekt::stak. KTHX",
+      "storageLocationDefault": "Deployment defawlt"
     },
     "stats": {
       "total": "Total",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Trust it teh furst time",
       "sshHostKeyPolicyOff": "Dont chek at all",
       "sshHostKeyPolicyLead": "Wich of OpenSSHz three anserz a konfigur askz 4. Trustin it teh furst time still sez NO to a key wot changd; not chekin takes any key teh host showz u, so sumwun can lissen in on teh konekshun.",
-      "sshHostKeyPolicyHint": "Terrapod makez all teh approovd keyz of every host into teh known_hosts fiel wot OpenSSH chekz against, an dis setting is teh StrictHostKeyChecking valu teh run askz 4. Dat fiel is a allow-list an teh setting coverz teh hole prosess, so if u chek every host den a adres wot nobuddy approovd a key 4 isnt jus unchekd, it is unreechabul. Trustin it teh furst time is teh anser 4 a mixd fleet: approovd keyz still get chekd reel strikt, but a host nobuddy pinnd connekts wunce an gets refusd if itz key changez l8r. Nuffin in teh inventory can beet it. srsly"
+      "sshHostKeyPolicyHint": "Terrapod makez all teh approovd keyz of every host into teh known_hosts fiel wot OpenSSH chekz against, an dis setting is teh StrictHostKeyChecking valu teh run askz 4. Dat fiel is a allow-list an teh setting coverz teh hole prosess, so if u chek every host den a adres wot nobuddy approovd a key 4 isnt jus unchekd, it is unreechabul. Trustin it teh furst time is teh anser 4 a mixd fleet: approovd keyz still get chekd reel strikt, but a host nobuddy pinnd connekts wunce an gets refusd if itz key changez l8r. Nuffin in teh inventory can beet it. srsly",
+      "storageLocation": "Storaj locashun"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

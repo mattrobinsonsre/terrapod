@@ -90,7 +90,8 @@
       "namePatternPulumi": "Kaksi osaa erotettuna merkeillä '::' — project::stack. Vain kirjaimia, numeroita, väliviivoja ja alaviivoja; kummankin osan on alettava kirjaimella tai numerolla.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Osoita CLI siihen komennolla <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Kaksi osaa erotettuna merkeillä '::' — project::stack."
+      "namePatternPulumiLead": "Kaksi osaa erotettuna merkeillä '::' — project::stack.",
+      "storageLocationDefault": "Käyttöönoton oletus"
     },
     "stats": {
       "total": "Yhteensä",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Luota ensimmäisellä yhteydellä",
       "sshHostKeyPolicyOff": "Älä tarkista",
       "sshHostKeyPolicyLead": "Minkä OpenSSH:n kolmesta vastauksesta määritys pyytää. Ensimmäisellä yhteydellä luottaminen hylkää silti muuttuneen avaimen; tarkistamatta jättäminen hyväksyy minkä tahansa isännän esittämän avaimen, jolloin yhteyttä voidaan salakuunnella.",
-      "sshHostKeyPolicyHint": "Terrapod kokoaa jokaisen isännän hyväksytyt avaimet known_hosts-tiedostoksi, jota vasten OpenSSH tarkistaa, ja tämä asetus on se StrictHostKeyChecking-arvo, jota ajo pyytää. Tiedosto on sallittujen luettelo ja asetus koskee koko prosessia: jos jokainen isäntä tarkistetaan, osoite, jolle kukaan ei ole hyväksynyt avainta, ei ole pelkästään tarkistamaton vaan tavoittamaton. Ensimmäisellä yhteydellä luottaminen on vastaus sekalaiselle laitekannalle: hyväksytyt avaimet tarkistetaan edelleen tiukasti, kun taas isäntä, jota kukaan ei ole kiinnittänyt, yhdistää kerran ja hylätään, jos sen avain myöhemmin muuttuu. Mikään luettelossa ei voi ohittaa tätä."
+      "sshHostKeyPolicyHint": "Terrapod kokoaa jokaisen isännän hyväksytyt avaimet known_hosts-tiedostoksi, jota vasten OpenSSH tarkistaa, ja tämä asetus on se StrictHostKeyChecking-arvo, jota ajo pyytää. Tiedosto on sallittujen luettelo ja asetus koskee koko prosessia: jos jokainen isäntä tarkistetaan, osoite, jolle kukaan ei ole hyväksynyt avainta, ei ole pelkästään tarkistamaton vaan tavoittamaton. Ensimmäisellä yhteydellä luottaminen on vastaus sekalaiselle laitekannalle: hyväksytyt avaimet tarkistetaan edelleen tiukasti, kun taas isäntä, jota kukaan ei ole kiinnittänyt, yhdistää kerran ja hylätään, jos sen avain myöhemmin muuttuu. Mikään luettelossa ei voi ohittaa tätä.",
+      "storageLocation": "Tallennussijainti"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

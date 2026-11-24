@@ -112,6 +112,7 @@ type autodiscoveryRuleModel struct {
 	ExecutionBackend            types.String          `tfsdk:"execution_backend"`
 	AgentPoolID                 types.String          `tfsdk:"agent_pool_id"`
 	EngineVersion               types.String          `tfsdk:"engine_version"`
+	StorageLocation             types.String          `tfsdk:"storage_location"`
 	TerraformVersion            types.String          `tfsdk:"terraform_version"`
 	AnsibleVersion              types.String          `tfsdk:"ansible_version"`
 	AnsibleExecutionEnvironment types.String          `tfsdk:"ansible_execution_environment"`
@@ -375,6 +376,24 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"storage_location": schema.StringAttribute{
+				Description: "The named object store that workspaces this rule creates " +
+					"hold their objects in — state, plans, logs, configuration versions " +
+					"and inventory. Omit it for the deployment's default store. Read the " +
+					"valid names from the `terrapod_storage_locations` data source.\n\n" +
+					"Changing it is allowed and affects only workspaces discovered " +
+					"AFTERWARDS: a workspace's own location is fixed when it is created, " +
+					"because nothing moves existing objects between buckets. So this is a " +
+					"template for future workspaces rather than a setting propagated to " +
+					"the ones that already exist.",
+				Optional: true,
+				// Optional ONLY -- deliberately NOT the Optional+Computed+
+				// `Default: stringdefault.StaticString("")` shape that `branch` and
+				// several siblings here use. The server refuses "" for this
+				// attribute: it is neither None, nor the reserved "default", nor a
+				// configured location name, so `validate_storage_location` raises
+				// and a static "" default would 422 every rule create.
 			},
 			"ansible_version": schema.StringAttribute{
 				Description: "The ansible-core LINE whose execution environment this " +
@@ -1198,6 +1217,11 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.Branch.IsNull() && !m.Branch.IsUnknown() {
 		attrs["branch"] = m.Branch.ValueString()
 	}
+	if !m.StorageLocation.IsNull() && !m.StorageLocation.IsUnknown() {
+		// Omitted rather than sent as "" when unset -- the server refuses the
+		// empty string, and omitting the key is how it stores None.
+		attrs["storage-location"] = m.StorageLocation.ValueString()
+	}
 
 	if !m.IgnorePatterns.IsNull() && !m.IgnorePatterns.IsUnknown() {
 		patterns := make([]string, 0, len(m.IgnorePatterns.Elements()))
@@ -1558,6 +1582,13 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.AnsibleVersion = types.StringValue(v)
 	} else {
 		m.AnsibleVersion = types.StringNull()
+	}
+	// Optional-only for the same reason, and because the server refuses "":
+	// an unset rule stays null and produces no spurious diff.
+	if v := terrapod.GetStringAttr(res, "storage-location"); v != "" {
+		m.StorageLocation = types.StringValue(v)
+	} else {
+		m.StorageLocation = types.StringNull()
 	}
 	// Still null for an unset label, so a rule that templates none produces no
 	// diff -- but now by consulting what the configuration asked for rather than

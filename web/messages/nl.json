@@ -90,7 +90,8 @@
       "namePatternPulumi": "Twee delen gescheiden door '::' — project::stack. Alleen letters, cijfers, koppeltekens en underscores; elk deel moet met een letter of cijfer beginnen.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Richt de CLI erop met <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Twee delen gescheiden door '::' — project::stack."
+      "namePatternPulumiLead": "Twee delen gescheiden door '::' — project::stack.",
+      "storageLocationDefault": "Standaard van deployment"
     },
     "stats": {
       "total": "Totaal",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Vertrouwen bij eerste contact",
       "sshHostKeyPolicyOff": "Niet controleren",
       "sshHostKeyPolicyLead": "Welk van de drie antwoorden van OpenSSH een configure-run vraagt. Vertrouwen bij eerste contact weigert een gewijzigde sleutel nog steeds; niet controleren accepteert elke sleutel die een host aanbiedt, zodat de verbinding kan worden afgeluisterd.",
-      "sshHostKeyPolicyHint": "Terrapod maakt van de goedgekeurde sleutels van elke host het known_hosts-bestand waartegen OpenSSH controleert, en deze instelling is de StrictHostKeyChecking-waarde die de run vraagt. Dat bestand is een witte lijst en de instelling geldt voor het hele proces: controleer je elke host, dan is een adres waarvoor niemand een sleutel heeft goedgekeurd niet alleen ongecontroleerd maar onbereikbaar. Vertrouwen bij eerste contact is het antwoord voor een gemengd park: goedgekeurde sleutels blijven streng gecontroleerd, en een host die niemand heeft vastgelegd verbindt één keer en wordt geweigerd als zijn sleutel later verandert. Niets in de inventaris kan dit overrulen."
+      "sshHostKeyPolicyHint": "Terrapod maakt van de goedgekeurde sleutels van elke host het known_hosts-bestand waartegen OpenSSH controleert, en deze instelling is de StrictHostKeyChecking-waarde die de run vraagt. Dat bestand is een witte lijst en de instelling geldt voor het hele proces: controleer je elke host, dan is een adres waarvoor niemand een sleutel heeft goedgekeurd niet alleen ongecontroleerd maar onbereikbaar. Vertrouwen bij eerste contact is het antwoord voor een gemengd park: goedgekeurde sleutels blijven streng gecontroleerd, en een host die niemand heeft vastgelegd verbindt één keer en wordt geweigerd als zijn sleutel later verandert. Niets in de inventaris kan dit overrulen.",
+      "storageLocation": "Opslaglocatie"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

@@ -155,6 +155,7 @@ data terrapod_workspace.security_scan_skip_rules required=false optional=false c
 data terrapod_workspace.slack_channel required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ssh_host_key_policy required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.state_diverged required=false optional=false computed=true sensitive=false type=basetypes.BoolType
+data terrapod_workspace.storage_location required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.terraform_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.terragrunt_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.terragrunt_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -272,6 +273,7 @@ resource terrapod_autodiscovery_rule.security_scan_severity_threshold required=f
 resource terrapod_autodiscovery_rule.security_scan_skip_rules required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.slack_channel required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ssh_host_key_policy required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.storage_location required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.terraform_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.terragrunt_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.terragrunt_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -692,6 +694,7 @@ resource terrapod_workspace.security_scan_skip_rules required=false optional=tru
 resource terrapod_workspace.slack_channel required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ssh_host_key_policy required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.state_diverged required=false optional=false computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_workspace.storage_location required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_workspace.terraform_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.terragrunt_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.terragrunt_version required=false optional=true computed=true sensitive=false type=basetypes.StringType

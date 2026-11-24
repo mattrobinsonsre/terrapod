@@ -381,6 +381,21 @@ type Workspace struct {
 	LatestRun *WorkspaceLatestRun `json:"latest-run,omitempty"`
 	CreatedAt string              `json:"created-at,omitempty"`
 	UpdatedAt string              `json:"updated-at,omitempty"`
+	// StorageLocation names the object store holding THIS workspace's own
+	// objects -- its state, plans, logs, configuration versions and inventory
+	// (#2547). Empty means the deployment's default store, which is every
+	// workspace unless an operator has configured `storage.locations`.
+	//
+	// CREATE-ONLY. The API refuses an update that changes it, because nothing
+	// moves a workspace's existing objects between buckets; moving one is a
+	// future explicit operation rather than a field you may edit. Hence its
+	// absence from UpdateWorkspaceRequest.
+	//
+	// Never send "default": that is the ABSENCE of a location rather than a
+	// location, and the API refuses the literal string so that a provider
+	// reading the answer back cannot write it into state and fail every apply.
+	// Leave this empty instead. `ListStorageLocations` returns the valid names.
+	StorageLocation string `json:"storage-location,omitempty"`
 }
 
 // WorkspaceLatestRun is the `latest-run` block on a workspace. Actions is the
@@ -617,6 +632,11 @@ type CreateWorkspaceRequest struct {
 	// SlackChannel opts this workspace into Slack run notifications (#556)
 	// on the given channel. Empty means silent.
 	SlackChannel string `json:"slack-channel,omitempty"`
+	// StorageLocation is settable ONLY here, and only to a name
+	// `ListStorageLocations` returned. It joins Engine and OwnerEmail as a
+	// field the UPDATE request deliberately does not carry, so this SDK cannot
+	// attempt a change the API refuses.
+	StorageLocation string `json:"storage-location,omitempty"`
 }
 
 // UpdateWorkspaceRequest is the input shape for Client.UpdateWorkspace.
@@ -1044,6 +1064,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 		attrs["engine-version"] = req.EngineVersion
 	} else if req.TerraformVersion != "" {
 		attrs["engine-version"] = req.TerraformVersion
+	}
+	if req.StorageLocation != "" {
+		// Omitted rather than sent as "" -- the server refuses the empty string
+		// (neither absent nor a configured name), and omitting the key is how a
+		// workspace ends up in the deployment's default store.
+		attrs["storage-location"] = req.StorageLocation
 	}
 	if req.TerragruntEnabled != nil {
 		attrs["terragrunt-enabled"] = *req.TerragruntEnabled
@@ -1528,6 +1554,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		// Both fields carry the resolved value, so a caller reading either one
 		// gets the right answer whichever name the server used (#1559).
 		EngineVersion:               version,
+		StorageLocation:             GetStringAttr(res, "storage-location"),
 		TerraformVersion:            version,
 		TerragruntEnabled:           GetBoolAttr(res, "terragrunt-enabled"),
 		TerragruntVersion:           GetStringAttr(res, "terragrunt-version"),

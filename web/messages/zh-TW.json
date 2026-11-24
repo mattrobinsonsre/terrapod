@@ -90,7 +90,8 @@
       "namePatternPulumi": "由 '::' 分隔的兩部分 — project::stack。僅限字母、數字、連字號與底線；每部分必須以字母或數字開頭。",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "使用 <code>pulumi stack select default/project/stack</code> 讓 CLI 指向它。",
-      "namePatternPulumiLead": "由 '::' 分隔的兩部分 — project::stack。"
+      "namePatternPulumiLead": "由 '::' 分隔的兩部分 — project::stack。",
+      "storageLocationDefault": "部署預設值"
     },
     "stats": {
       "total": "總計",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "首次連線時信任",
       "sshHostKeyPolicyOff": "不檢查",
       "sshHostKeyPolicyLead": "設定向 OpenSSH 要求三種回答中的哪一種。首次連線時信任仍會拒絕已變更的金鑰；不檢查則主機出示的任何金鑰都會被接受，連線因而可能被攔截。",
-      "sshHostKeyPolicyHint": "Terrapod 會把每一台主機已核准的金鑰產生為 OpenSSH 用來比對的 known_hosts 檔案，而此設定就是執行所要求的 StrictHostKeyChecking 值。該檔案是一份允許清單，且該設定作用於整個行程：若檢查每一台主機，無人核准過金鑰的位址不只是未經檢查，而是無法連通。首次連線時信任是混合環境下的答案：已核准的金鑰仍以嚴格方式檢查，而無人釘選過的主機可以連線一次，之後其金鑰若有變動便會被拒絕。清單中的任何內容都無法覆寫它。"
+      "sshHostKeyPolicyHint": "Terrapod 會把每一台主機已核准的金鑰產生為 OpenSSH 用來比對的 known_hosts 檔案，而此設定就是執行所要求的 StrictHostKeyChecking 值。該檔案是一份允許清單，且該設定作用於整個行程：若檢查每一台主機，無人核准過金鑰的位址不只是未經檢查，而是無法連通。首次連線時信任是混合環境下的答案：已核准的金鑰仍以嚴格方式檢查，而無人釘選過的主機可以連線一次，之後其金鑰若有變動便會被拒絕。清單中的任何內容都無法覆寫它。",
+      "storageLocation": "儲存位置"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

@@ -90,7 +90,8 @@
       "namePatternPulumi": "Deux parties séparées par '::' — project::stack. Uniquement lettres, chiffres, tirets et traits de soulignement ; chaque partie doit commencer par une lettre ou un chiffre.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Pointez la CLI dessus avec <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Deux parties séparées par '::' — project::stack."
+      "namePatternPulumiLead": "Deux parties séparées par '::' — project::stack.",
+      "storageLocationDefault": "Valeur par défaut du déploiement"
     },
     "stats": {
       "total": "Total",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Faire confiance au premier contact",
       "sshHostKeyPolicyOff": "Ne pas vérifier",
       "sshHostKeyPolicyLead": "Laquelle des trois réponses d'OpenSSH une configuration demande. Faire confiance au premier contact refuse toujours une clé modifiée ; ne pas vérifier accepte n'importe quelle clé présentée par un hôte, de sorte que la connexion peut être interceptée.",
-      "sshHostKeyPolicyHint": "Terrapod assemble les clés approuvées de chaque hôte dans le fichier known_hosts qu'OpenSSH vérifie, et ce réglage est la valeur StrictHostKeyChecking que demande l'exécution. Ce fichier est une liste d'autorisation et le réglage s'applique à tout le processus : si chaque hôte est vérifié, une adresse pour laquelle personne n'a approuvé de clé n'est pas seulement non vérifiée, elle est inaccessible. Faire confiance au premier contact est la réponse pour un parc mixte : les clés approuvées restent vérifiées strictement, tandis qu'un hôte que personne n'a épinglé se connecte une fois et est refusé si sa clé change ensuite. Rien dans l'inventaire ne peut le remplacer."
+      "sshHostKeyPolicyHint": "Terrapod assemble les clés approuvées de chaque hôte dans le fichier known_hosts qu'OpenSSH vérifie, et ce réglage est la valeur StrictHostKeyChecking que demande l'exécution. Ce fichier est une liste d'autorisation et le réglage s'applique à tout le processus : si chaque hôte est vérifié, une adresse pour laquelle personne n'a approuvé de clé n'est pas seulement non vérifiée, elle est inaccessible. Faire confiance au premier contact est la réponse pour un parc mixte : les clés approuvées restent vérifiées strictement, tandis qu'un hôte que personne n'a épinglé se connecte une fois et est refusé si sa clé change ensuite. Rien dans l'inventaire ne peut le remplacer.",
+      "storageLocation": "Emplacement de stockage"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

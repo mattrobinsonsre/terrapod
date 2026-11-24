@@ -90,7 +90,8 @@
       "namePatternPulumi": "Duas partes separadas por '::' — project::stack. Apenas letras, números, hífenes e sublinhados; cada parte deve começar por uma letra ou número.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Aponte a CLI para ele com <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Duas partes separadas por '::' — project::stack."
+      "namePatternPulumiLead": "Duas partes separadas por '::' — project::stack.",
+      "storageLocationDefault": "Predefinição da implementação"
     },
     "stats": {
       "total": "Total",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Confiar no primeiro contacto",
       "sshHostKeyPolicyOff": "Não verificar",
       "sshHostKeyPolicyLead": "Qual das três respostas do OpenSSH uma configuração pede. Confiar no primeiro contacto continua a recusar uma chave alterada; não verificar aceita qualquer chave que um anfitrião apresente, pelo que a ligação pode ser interceptada.",
-      "sshHostKeyPolicyHint": "O Terrapod reúne as chaves aprovadas de cada host no ficheiro known_hosts contra o qual o OpenSSH verifica, e esta opção é o valor StrictHostKeyChecking que a execução pede. Esse ficheiro é uma lista de permissões e a opção aplica-se a todo o processo: se cada host for verificado, um endereço para o qual ninguém aprovou uma chave não fica apenas sem verificação, fica inacessível. Confiar no primeiro contacto é a resposta para um parque misto: as chaves aprovadas continuam a ser verificadas de forma estrita, enquanto um host que ninguém fixou liga-se uma vez e é recusado se a sua chave mudar depois. Nada no inventário pode prevalecer sobre isto."
+      "sshHostKeyPolicyHint": "O Terrapod reúne as chaves aprovadas de cada host no ficheiro known_hosts contra o qual o OpenSSH verifica, e esta opção é o valor StrictHostKeyChecking que a execução pede. Esse ficheiro é uma lista de permissões e a opção aplica-se a todo o processo: se cada host for verificado, um endereço para o qual ninguém aprovou uma chave não fica apenas sem verificação, fica inacessível. Confiar no primeiro contacto é a resposta para um parque misto: as chaves aprovadas continuam a ser verificadas de forma estrita, enquanto um host que ninguém fixou liga-se uma vez e é recusado se a sua chave mudar depois. Nada no inventário pode prevalecer sobre isto.",
+      "storageLocation": "Localização de armazenamento"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

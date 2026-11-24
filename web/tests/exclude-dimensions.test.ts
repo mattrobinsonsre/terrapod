@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   BULK_EXCLUDE_DIMENSIONS,
+  spellDimension,
   MAX_EXCLUDE_ENTRIES,
   RULE_EXCLUDE_DIMENSIONS,
   entryIsEmpty,
@@ -69,6 +70,56 @@ describe('the exclusion editor tracks the server', () => {
     // positive bulk filter offers neither — so a narrower set here would make
     // the feature unable to express the thing it was asked for.
     assert.deepEqual([...BULK_EXCLUDE_DIMENSIONS].sort(), [...serverDimensions()].sort())
+  })
+
+  // #2696: the POSITIVE filter drifted from the exclusion editor -- the server
+  // accepted fourteen dimensions, the exclusion rows offered all fourteen, and
+  // `buildFilter` could send only six. So an operator could exclude by a
+  // dimension they could not select by.
+  //
+  // Derived from `buildFilter`'s own source rather than from the markup,
+  // because the page holds each dimension in a state variable and a scan of the
+  // fieldset under-reports. The wire name is what the function emits, so this
+  // reads the kebab-case key out of the assignments and compares the set to the
+  // server's, which is itself read from the Python.
+  it('buildFilter can send every dimension the server accepts', () => {
+    const page = read('web/src/app/admin/bulk-update/page.tsx')
+    const start = page.indexOf('function buildFilter()')
+    assert.ok(start > 0, 'buildFilter not found -- has it been renamed?')
+    // to the next top-level `function` at the same indentation
+    const end = page.indexOf('\n  function ', start + 10)
+    assert.ok(end > start, 'could not bound buildFilter')
+    const body = page.slice(start, end)
+
+    // Both forms the function uses: f['name-prefix'] and f.locked. A dimension
+    // whose name needs no quoting is written the second way, so a matcher that
+    // reads only the bracket form silently misses it -- which is how a gate
+    // comes to pass over the attribute it was written for.
+    const sent = new Set<string>()
+    for (const m of body.matchAll(/\bf\['([a-z-]+)'\]\s*=/g)) sent.add(m[1])
+    for (const m of body.matchAll(/\bf\.([a-zA-Z]+)\s*=/g)) sent.add(m[1])
+
+    const wanted = serverDimensions().map((d) => spellDimension(d, 'kebab'))
+    const missing = wanted.filter((w) => !sent.has(w))
+    assert.deepEqual(
+      missing,
+      [],
+      `buildFilter cannot send ${missing.length} dimension(s) the server accepts: ` +
+        `${missing.join(', ')}. Add a line to buildFilter and a control to the ` +
+        `filter fieldset, or the form can exclude by a dimension it cannot ` +
+        `select by (#2696).`,
+    )
+
+    // The floor binds the matcher rather than the page: if the regexes stop
+    // matching, `sent` empties and every dimension reads as missing -- but a
+    // matcher that silently narrowed to a handful would still pass the check
+    // above once the page shrank with it.
+    assert.ok(
+      sent.size >= wanted.length,
+      `only matched ${sent.size} assignments in buildFilter, below the ` +
+        `${wanted.length} dimensions the server accepts -- the matcher has ` +
+        `stopped reading the function`,
+    )
   })
 
   it('the assignment rule omits exactly what the server refuses, and nothing else', () => {

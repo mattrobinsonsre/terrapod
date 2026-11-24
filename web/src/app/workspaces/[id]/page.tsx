@@ -105,6 +105,11 @@ interface WorkspaceAttrs {
   name: string
   // Which engine runs this workspace (#1407). Absent from an older API: Terraform.
   engine?: string
+  // The named object store holding this workspace's objects (#2547). Absent
+  // means the deployment's default store, which is every workspace unless an
+  // operator has configured named locations. Create-only: the API refuses an
+  // update that changes it.
+  'storage-location'?: string
   // Pulumi only (#1553): bind the update to the approved preview.
   'pulumi-bind-plan'?: boolean
   'execution-mode': string
@@ -3532,6 +3537,28 @@ function WorkspaceDetailContent() {
                       display={
                         <span data-testid="ws-engine">
                           {isPulumi ? t('fields.enginePulumi') : attrs.engine}
+                        </span>
+                      }
+                    />
+                  )}
+                  {/* Identity for the same reason, and immutable for a harder
+                      one: this workspace's objects -- state, plans, logs,
+                      configuration versions, inventory -- are IN that store,
+                      and nothing moves them between buckets, so the API refuses
+                      an update that changes it. Read-only even mid-edit.
+
+                      Absent when the workspace uses the deployment's default
+                      store, which is every workspace unless an operator has
+                      configured named locations -- naming it would be noise,
+                      exactly as for a Terraform engine above. */}
+                  {attrs['storage-location'] && (
+                    <Field
+                      attr="storage-location"
+                      ctx={settingsViewCtx}
+                      kind="text"
+                      display={
+                        <span data-testid="ws-storage-location">
+                          {String(attrs['storage-location'])}
                         </span>
                       }
                     />

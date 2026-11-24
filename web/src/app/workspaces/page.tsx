@@ -410,6 +410,10 @@ function createDefaults(engine: string): Record<string, unknown> {
     // identity
     name: '',
     engine,
+    // '' is "the deployment's default store" -- the ABSENCE of a location. It
+    // is never sent: the create path's `include` drops it, because the API
+    // refuses the empty string as well as the literal "default".
+    'storage-location': '',
     // execution
     'execution-mode': 'local',
     'execution-backend': 'tofu',
@@ -779,6 +783,11 @@ function WorkspacesPageInner() {
 
   // Agent pools
   const [agentPools, setAgentPools] = useState<{ id: string; attributes: { name: string } }[]>([])
+  // The deployment's named object stores (#2547). An empty list is the ordinary
+  // answer -- it means one store -- and renders NO control rather than a select
+  // with a single option, which is why this is a list rather than a flag.
+  const [storageLocations, setStorageLocations] = useState<{ id: string }[]>([])
+  const [storageLocationsLoaded, setStorageLocationsLoaded] = useState(false)
   const [agentPoolsLoaded, setAgentPoolsLoaded] = useState(false)
 
   // Engines this build can run (#1555). The picker appears only when there is a
@@ -1182,7 +1191,15 @@ function WorkspacesPageInner() {
         .then(pools => { setAgentPools(pools); setAgentPoolsLoaded(true) })
         .catch(() => {})
     }
-  }, [showCreate, vcsConnectionsLoaded, agentPoolsLoaded])
+    if (!storageLocationsLoaded) {
+      fetchAllPages<{ id: string }>('/api/v1/storage/locations')
+        .then(locs => { setStorageLocations(locs); setStorageLocationsLoaded(true) })
+        // Swallowed like its siblings: a deployment that cannot answer should
+        // not block the create form, and no control is the same outcome as no
+        // configured locations.
+        .catch(() => { setStorageLocationsLoaded(true) })
+    }
+  }, [showCreate, vcsConnectionsLoaded, agentPoolsLoaded, storageLocationsLoaded])
 
   // Fetch version suggestions when the tool the version pins changes and the
   // form is open. A Pulumi workspace pins the Pulumi CLI; every other engine
@@ -1262,6 +1279,11 @@ function WorkspacesPageInner() {
           const spec = FIELD_BY_ATTR[attr]
           if (!spec) return true
           if (spec.engines && !spec.engines.includes(engine)) return false
+          // '' means the deployment's default store, which is the ABSENCE of a
+          // location rather than a location -- and the API refuses both "" and
+          // the literal "default", so it must be omitted rather than sent.
+          if (attr === 'storage-location' && !String(values[attr] ?? '').trim())
+            return false
           return dependencyMet(spec, values)
         },
       })
@@ -1593,6 +1615,27 @@ function WorkspacesPageInner() {
             on/off switch is gone (#1986) — so a Terraform-only deployment sees
             no picker and creates Terraform workspaces, which is what the seeded
             value already says. */}
+        {storageLocations.length > 0 && (
+          <Field
+            attr="storage-location"
+            ctx={createCtx}
+            kind="select"
+            control={
+              <select
+                id="ws-storage-location"
+                data-testid="ws-storage-location-select"
+                value={String(values['storage-location'] ?? '')}
+                onChange={(e) => setValue('storage-location', e.target.value)}
+                className={CREATE_INPUT}
+              >
+                <option value="">{t('form.storageLocationDefault')}</option>
+                {storageLocations.map((l) => (
+                  <option key={l.id} value={l.id}>{l.id}</option>
+                ))}
+              </select>
+            }
+          />
+        )}
         {engines.length > 1 && (
           <Field
             attr="engine"
