@@ -362,9 +362,18 @@ SSH_HOST_KEY_POLICIES: tuple[str, ...] = ("strict", "accept-new", "off")
 #: contact with an unseen host already failed closed.
 DEFAULT_SSH_HOST_KEY_POLICY = "strict"
 
-#: Policy -> the `StrictHostKeyChecking` value OpenSSH takes. One producer, because
-#: the orchestrator and the inventory resolver both need the mapping and a second
-#: copy is how they come to disagree about what `accept-new` means.
+#: Policy -> the `StrictHostKeyChecking` value OpenSSH takes.
+#:
+#: TWO copies, not one, and deliberately: `known_hosts_render` carries its own
+#: because the runner image installs no SQLAlchemy, so it cannot import this
+#: module. `test_known_hosts_render` holds them equal, which is what stops them
+#: disagreeing about what `accept-new` means -- the thing a single producer
+#: would have given for free and cannot here.
+#:
+#: This comment used to claim one producer, and named the inventory resolver as
+#: the second consumer. Neither half survived: the resolver's host-key
+#: relaxation was deleted with the boolean (#2592), so it no longer reads the
+#: mapping at all.
 SSH_HOST_KEY_POLICY_TO_OPENSSH: dict[str, str] = {
     "strict": "yes",
     "accept-new": "accept-new",
