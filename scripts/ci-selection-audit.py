@@ -36,17 +36,62 @@ import json
 import re
 import subprocess
 import sys
+import time
 
 # The families a job belongs to, read from the workflow rather than listed, so
 # a newly gated job is audited without touching this file.
 GATE_RE = re.compile(r"needs\.prepare\.outputs\.run_([a-z_]+)")
 
 
+#: Transient shapes in `gh`'s own stderr, matched as POSITIVE evidence. An
+#: unrecognised failure is final: retrying by default would make a 404 or an
+#: auth error wait out the whole backoff before reporting, and a deny-list of
+#: definitive shapes cannot stay complete against someone else's CLI.
+#:
+#: `gh: Server Error (HTTP 502)` is the one that fired: this audit makes one API
+#: read per replayed push, so with `--runs 30` a single upstream 502 failed the
+#: whole scheduled run -- and a red `CI Selection Audit` reads as "the CI
+#: selection gate is unsound" rather than as a registry hiccup, which is the
+#: expensive part.
+_GH_TRANSIENT = re.compile(
+    r"HTTP (?:429|5\d\d)"
+    r"|connection reset|connection refused|no such host"
+    r"|i/o timeout|TLS handshake timeout|unexpected EOF|EOF$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+#: Mirrors `terrapod.http_retry`'s policy (3 retries, 1s base, 8s ceiling)
+#: rather than importing it: this script runs from a bare checkout where
+#: `terrapod` is not installed, so it stays stdlib-only like every other script
+#: in here.
+_GH_RETRIES = 3
+_GH_BASE_DELAY = 1.0
+_GH_MAX_DELAY = 8.0
+
+
 def _gh(*args: str) -> str:
-    out = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
-    if out.returncode != 0:
-        raise SystemExit(f"gh {' '.join(args)} failed: {out.stderr.strip()[:200]}")
-    return out.stdout
+    """One `gh` call, retried on a transient failure (#2689's sibling).
+
+    Bounded, and the LAST attempt reports whatever the reason -- there is
+    nothing left to try, so classifying it again would only change the message.
+    """
+    for attempt in range(_GH_RETRIES + 1):
+        out = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+        if out.returncode == 0:
+            return out.stdout
+        stderr = out.stderr.strip()
+        last = attempt == _GH_RETRIES
+        if last or not _GH_TRANSIENT.search(stderr):
+            tried = f" after {attempt + 1} attempts" if attempt else ""
+            raise SystemExit(f"gh {' '.join(args)} failed{tried}: {stderr[:200]}")
+        delay = min(_GH_MAX_DELAY, _GH_BASE_DELAY * (2**attempt))
+        print(
+            f"  gh {args[0] if args else ''} failed transiently, retrying in {delay:.0f}s "
+            f"(attempt {attempt + 1}/{_GH_RETRIES + 1}): {stderr[:120]}",
+            file=sys.stderr,
+        )
+        time.sleep(delay)
+    raise SystemExit("unreachable")  # pragma: no cover - the loop always returns or raises
 
 
 def _load_affected():

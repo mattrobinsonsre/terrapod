@@ -183,6 +183,13 @@ class EEResult:
     #: (`ansible-config dump`), and an unbounded buffer here would be a way for
     #: a long-running child to exhaust the orchestrator's memory.
     output: bytes = b""
+    #: The LAST bytes of the output, present only when `run(tail_bytes=N)`
+    #: and never more than that many. Unlike `output` this costs the stream
+    #: NOTHING: the bytes are still delivered to the log file and the tee, and
+    #: this is a ring kept beside them. For a caller that must CLASSIFY a
+    #: failure it has already streamed -- a tool whose own diagnostic is its
+    #: last line -- where `capture` would mean not streaming it at all.
+    tail: bytes = b""
 
 
 def configured() -> bool:
@@ -263,6 +270,7 @@ def run(
     log_file: str | None = None,
     tee_to_stdout: bool = True,
     capture: bool = False,
+    tail_bytes: int = 0,
     highlight: Callable[[bytes], bytes] | None = None,
 ) -> EEResult:
     """Run an allowlisted ansible entry point in the EE and stream its output.
@@ -289,6 +297,12 @@ def run(
             configuration dump is ours to read, not the operator's run log, and
             teeing it would put their whole effective config in the log of a
             configure that never asked for it.
+        tail_bytes: keep the last N bytes of the output on the result's `tail`,
+            in ADDITION to streaming them. For classifying a failure after the
+            fact: `ansible-galaxy` reports why it failed on its last line, and
+            whether that reason is transient decides whether retrying it is
+            honest or just slow (#2689). Bounded by construction -- the ring is
+            trimmed on every write -- so it cannot grow with a long run.
         highlight: given one line's bytes WITHOUT its terminator, returns the
             bytes to emit in its place; the terminator is re-added here. For a
             tool whose own output carries no colour -- `ansible-galaxy` prints
@@ -314,6 +328,9 @@ def run(
         # A captured call answers us; nothing about it belongs in the run log.
         log_file, tee_to_stdout = None, False
     collected = bytearray()
+    #: The last `tail_bytes` of output, trimmed on every write so a long run
+    #: cannot grow it. Empty unless a caller asked.
+    recent = bytearray()
 
     redactor = StreamRedactor()
     # Append rather than truncate: a configure may be the second thing writing
@@ -325,6 +342,10 @@ def run(
     def emit(chunk: bytes) -> None:
         if capture and len(collected) < _CAPTURE_LIMIT:
             collected.extend(chunk[: _CAPTURE_LIMIT - len(collected)])
+        if tail_bytes > 0:
+            recent.extend(chunk)
+            if len(recent) > tail_bytes:
+                del recent[: len(recent) - tail_bytes]
         if handle is not None:
             handle.write(chunk)
             handle.flush()
@@ -419,6 +440,7 @@ def run(
             rc=int(body["rc"]),
             error=str(body.get("error", "")),
             output=bytes(collected),
+            tail=bytes(recent),
         )
     except (ValueError, KeyError, TypeError) as exc:
         raise ExecutionEnvironmentUnavailable(

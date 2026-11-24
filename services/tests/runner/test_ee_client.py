@@ -799,3 +799,48 @@ class TestTheChildIsForcedUnbuffered:
             argv, capture_output=True, env={**path, **child_env(None)}, check=False
         )
         assert b"STREAMED-WITHOUT-FLUSHING" in forced.stdout
+
+
+class TestABoundedTailForClassifyingAFailure:
+    """`tail_bytes` keeps the END of the output on the result (#2689).
+
+    For a caller that has to decide WHY a child failed after it has already
+    streamed: `ansible-galaxy` reports its reason on its last line, and whether
+    that reason is transient is what decides whether retrying it is honest or
+    merely slow.
+
+    `capture` cannot serve this. It returns the output INSTEAD of streaming it
+    and implies no log file, so classifying a galaxy failure that way would take
+    the install's progress out of the operator's run log to do it.
+    """
+
+    def test_it_keeps_the_last_bytes_AND_still_streams_them(self, agent, tmp_path):
+        """Both halves, because the second is the whole difference from `capture`."""
+        agent(chunks=(b"early line\n", b"ERROR! the last word\n"))
+        logf = tmp_path / "configure.log"
+        result = run(
+            "ansible-galaxy",
+            ["collection", "install"],
+            cwd="/w",
+            log_file=str(logf),
+            tee_to_stdout=False,
+            tail_bytes=4096,
+        )
+        assert b"ERROR! the last word" in result.tail
+        body = logf.read_text()
+        assert "early line" in body
+        assert "ERROR! the last word" in body
+
+    def test_the_tail_is_bounded_and_keeps_the_END_not_the_start(self, agent, tmp_path):
+        """A long install must not be able to grow it, and the reason is last."""
+        agent(chunks=(b"X" * 5000, b"THE-REASON\n"))
+        result = run("ansible-galaxy", [], cwd="/w", tee_to_stdout=False, tail_bytes=64)
+        assert len(result.tail) <= 64
+        assert result.tail.endswith(b"THE-REASON\n")
+        assert b"XXXX" in result.tail or len(result.tail) == 11
+
+    def test_nothing_is_kept_unless_a_caller_asks(self, agent, tmp_path):
+        """Opt-in, so no existing caller's memory profile changes."""
+        agent(chunks=(b"anything at all\n",))
+        result = run("ansible-playbook", [], cwd="/w", tee_to_stdout=False)
+        assert result.tail == b""
