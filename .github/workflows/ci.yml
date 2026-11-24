@@ -459,6 +459,24 @@ jobs:
       - name: (docs-audit) Every Go module declares the same toolchain
         run: python3 scripts/docs-audit/check_go_directives.py
 
+      # The largest defect class measured over a six-week window -- 24 of 230 fix
+      # items -- was a gate that could not fail, or measured something other than
+      # its name claimed, and every instance was a set growing while the gate's
+      # subject did not. A `>=` floor is blind to that by construction. This
+      # inventories every floor and ratchets against a committed baseline, so the
+      # existing population is grandfathered but cannot grow unjustified. It
+      # flagged an unjustified floor in its own sibling script on the first run.
+      # Stdlib only.
+      - name: (docs-audit) Gate floors are inventoried and cannot grow unjustified
+        run: python3 scripts/docs-audit/check_gate_floors.py
+
+      # The snapshot set must not be something anyone greps for by one convention:
+      # three gates regenerate by a documented COMMAND with no environment flag at
+      # all, so a flag search cannot see them -- which is exactly how the Pulumi
+      # committed schema came to be missed before a push. Stdlib only.
+      - name: (docs-audit) The committed-snapshot registry is derived and complete
+        run: python3 scripts/docs-audit/check_snapshot_registry.py
+
       # Needs only PyYAML, installed above: the parser's regex is extracted from
       # `pulumi_plugins.py` by `ast` rather than imported, because importing it
       # drags in `settings` and so SQLAlchemy and the rest of the API closure --
