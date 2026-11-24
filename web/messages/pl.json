@@ -4379,5 +4379,38 @@
       "verification": "Weryfikacja",
       "supplyChain": "Zawartość"
     }
+  },
+  "exclude": {
+    "title": "Wykluczenia",
+    "selectorLead": "Usuń obszary robocze z zaznaczenia. Każde wykluczenie jest samo w sobie selektorem, a obszar roboczy pasujący do któregokolwiek z nich zostaje pominięty — tak właśnie mówisz „wszystko tego rodzaju, z wyjątkiem tych”.",
+    "selectorHint": "Wykluczenia są łączone operatorem OR: obszar roboczy pasujący do któregokolwiek z nich zostaje pominięty, natomiast wymiary w obrębie jednego wykluczenia są łączone operatorem AND. Wykluczenie nie może zawierać kolejnego, a dozwolonych jest co najwyżej {max}. Wykluczenie, które do niczego nie pasuje, niczego nie chroni, dlatego jest tu oznaczane i odrzucane przy zastosowaniu.",
+    "none": "Brak wykluczeń. Uwzględniony zostanie każdy obszar roboczy pasujący do selektora.",
+    "count": "{n, plural, one {# wykluczenie} few {# wykluczenia} many {# wykluczeń} other {# wykluczenia}}",
+    "entry": "Wykluczenie {n}",
+    "add": "Dodaj wykluczenie",
+    "atCap": "Osiągnięto limit {max} wykluczeń.",
+    "any": "Dowolny",
+    "yes": "Tak",
+    "no": "Nie",
+    "rowNoSelector": "To wykluczenie nic nie ustawia, więc niczego nie chroni. Ustaw wymiar lub je usuń.",
+    "rowMatchesNothing": "To wykluczenie nie pasuje do żadnego obszaru roboczego, więc niczego nie chroni.",
+    "excludedCount": "{n, plural, one {Wykluczono # obszar roboczy} few {Wykluczono # obszary robocze} many {Wykluczono # obszarów roboczych} other {Wykluczono # obszaru roboczego}}.",
+    "blocksApply": "{n, plural, one {Wykluczenie {rows} nie pasuje do żadnego obszaru roboczego, więc niczego nie chroni. Popraw je lub usuń przed zastosowaniem.} few {Wykluczenia {rows} nie pasują do żadnego obszaru roboczego, więc niczego nie chronią. Popraw je lub usuń przed zastosowaniem.} many {Wykluczenia {rows} nie pasują do żadnego obszaru roboczego, więc niczego nie chronią. Popraw je lub usuń przed zastosowaniem.} other {Wykluczenia {rows} nie pasują do żadnego obszaru roboczego, więc niczego nie chronią. Popraw je lub usuń przed zastosowaniem.}}",
+    "dim": {
+      "labels": "Etykiety",
+      "workspace_ids": "Identyfikatory obszarów roboczych",
+      "name_prefix": "Prefiks nazwy",
+      "name_glob": "Wzorzec nazwy",
+      "execution_backend": "Silnik wykonawczy",
+      "execution_mode": "Tryb wykonania",
+      "engine_version": "Wersja silnika",
+      "agent_pool_id": "Pula agentów",
+      "vcs_connection_id": "Połączenie VCS",
+      "autodiscovery_rule_id": "Reguła autowykrywania",
+      "owner_email": "E-mail właściciela",
+      "drift_status": "Status dryfu",
+      "locked": "Zablokowany",
+      "has_vcs": "Połączony z VCS"
+    }
   }
 }

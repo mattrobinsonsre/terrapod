@@ -4379,5 +4379,38 @@
       "verification": "驗證",
       "supplyChain": "內容"
     }
+  },
+  "exclude": {
+    "title": "排除",
+    "selectorLead": "從所選範圍中排除工作區。每個排除項目本身就是一個選擇器，比對到其中任一條的工作區都會被排除在外——這就是表達「此類全部，但不包括那些」的方式。",
+    "selectorHint": "各排除項目之間是 OR 關係：比對到其中任一條的工作區都會被排除；而同一個排除項目內的各個條件之間是 AND 關係。排除項目不能再嵌套排除項目，最多允許 {max} 條。未比對到任何工作區的排除項目不會保護任何內容，因此會在此處標記出來，並在應用時被拒絕。",
+    "none": "沒有排除項目。選擇器比對到的每個工作區都會被納入。",
+    "count": "{n, plural, one {# 個排除項目} other {# 個排除項目}}",
+    "entry": "排除項目 {n}",
+    "add": "新增排除項目",
+    "atCap": "已達到 {max} 個排除項目的上限。",
+    "any": "任意",
+    "yes": "是",
+    "no": "否",
+    "rowNoSelector": "此排除項目未設定任何內容，因此不會保護任何內容。請設定一個條件，或將其移除。",
+    "rowMatchesNothing": "此排除項目未比對到任何工作區，因此不會保護任何內容。",
+    "excludedCount": "{n, plural, one {已排除 # 個工作區} other {已排除 # 個工作區}}。",
+    "blocksApply": "{n, plural, one {排除項目 {rows} 未比對到任何工作區，因此不會保護任何內容。請在應用前修正或移除。} other {排除項目 {rows} 未比對到任何工作區，因此不會保護任何內容。請在應用前修正或移除。}}",
+    "dim": {
+      "labels": "標籤",
+      "workspace_ids": "工作區 ID",
+      "name_prefix": "名稱前綴",
+      "name_glob": "名稱比對樣式",
+      "execution_backend": "執行後端",
+      "execution_mode": "執行模式",
+      "engine_version": "引擎版本",
+      "agent_pool_id": "代理池",
+      "vcs_connection_id": "VCS 連線",
+      "autodiscovery_rule_id": "自動發現規則",
+      "owner_email": "所有者電子郵箱",
+      "drift_status": "漂移狀態",
+      "locked": "已鎖定",
+      "has_vcs": "已連線 VCS"
+    }
   }
 }

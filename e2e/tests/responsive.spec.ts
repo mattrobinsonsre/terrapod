@@ -2151,6 +2151,46 @@ test.describe('Per-workspace run identity (#1901)', () => {
     page.off('dialog', spy)
   })
 
+  test('the exclusion rows fit a phone, and their controls are tappable', async ({ page }) => {
+    // #2548. Each exclusion is a `fieldset`, and a fieldset defaults to
+    // `min-inline-size: min-content` -- which is the recorded cause of this
+    // page's 412px overflow, measured at 501px wide in a 412px viewport. So a
+    // list of them is exactly the shape that reintroduces it, and `min-w-0` on
+    // every one is what this asserts rather than assumes.
+    await page.goto('/admin/bulk-update')
+    await expectNoHorizontalPageScroll(page)
+
+    const add = page.getByRole('button', { name: 'Add exclusion' })
+    await expect(add).toBeVisible({ timeout: 15_000 })
+
+    // Retried, and only while no row exists, so a handler that hydrates after
+    // the first click cannot add a second row instead of the first.
+    const row = page.getByTestId('exclude-row-0')
+    await expect(async () => {
+      if ((await row.count()) === 0) await add.click()
+      await expect(row).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
+
+    // One row, with every dimension the server accepts in it, is the widest
+    // this gets -- so the measurement is taken here rather than on an empty list.
+    await expectNoHorizontalPageScroll(page)
+
+    // Remove is a real button with a tap target, not a run of coloured text.
+    // The recorded failure is specific: it was a ~16px-tall run of red text
+    // sat beside a full-height input, which is why the shared button carries
+    // `min-h-11` and why this measures the box rather than trusting the class.
+    const remove = row.getByRole('button', { name: /Remove/i })
+    const box = await remove.boundingBox()
+    expect(box, 'the remove control has no box').not.toBeNull()
+    expect(box!.height, `remove is ${box!.height}px tall`).toBeGreaterThanOrEqual(44)
+
+    // A second row, because the overflow is cumulative and one row proves
+    // nothing about a list.
+    await add.click()
+    await expect(page.getByTestId('exclude-row-1')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('the fleet form gates the list behind a checkbox and fits a phone', async ({ page }) => {
     // The gate is load-bearing, not decoration: an empty list is a real value
     // here (it turns run identity off), so it cannot also mean "leave alone".

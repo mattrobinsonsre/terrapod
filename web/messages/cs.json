@@ -4379,5 +4379,38 @@
       "verification": "Ověření",
       "supplyChain": "Obsah"
     }
+  },
+  "exclude": {
+    "title": "Výjimky",
+    "selectorLead": "Odeberte pracovní prostory z výběru. Každá výjimka je sama selektorem a pracovní prostor, který odpovídá kterékoli z nich, je vynechán — takto tedy řeknete „všechno tohoto druhu, kromě těchto“.",
+    "selectorHint": "Výjimky se spojují operátorem OR: pracovní prostor, který odpovídá kterékoli z nich, je vynechán, zatímco dimenze v rámci jedné výjimky se spojují operátorem AND. Výjimka nemůže obsahovat další a povoleno je nejvýše {max} výjimek. Výjimka, která neodpovídá ničemu, nic nechrání, a proto je zde označena a při aplikování odmítnuta.",
+    "none": "Žádné výjimky. Zahrnut bude každý pracovní prostor, který odpovídá selektoru.",
+    "count": "{n, plural, one {# výjimka} few {# výjimky} many {# výjimky} other {# výjimek}}",
+    "entry": "Výjimka {n}",
+    "add": "Přidat výjimku",
+    "atCap": "Dosažen limit {max} výjimek.",
+    "any": "Libovolné",
+    "yes": "Ano",
+    "no": "Ne",
+    "rowNoSelector": "Tato výjimka nic nenastavuje, takže nic nechrání. Nastavte dimenzi, nebo ji odeberte.",
+    "rowMatchesNothing": "Tato výjimka neodpovídá žádnému pracovnímu prostoru, takže nic nechrání.",
+    "excludedCount": "{n, plural, one {Vyloučen # pracovní prostor} few {Vyloučeny # pracovní prostory} many {Vyloučeno # pracovního prostoru} other {Vyloučeno # pracovních prostorů}}.",
+    "blocksApply": "{n, plural, one {Výjimka {rows} neodpovídá žádnému pracovnímu prostoru, takže nic nechrání. Před aplikováním ji opravte nebo odeberte.} few {Výjimky {rows} neodpovídají žádnému pracovnímu prostoru, takže nic nechrání. Před aplikováním je opravte nebo odeberte.} many {Výjimky {rows} neodpovídají žádnému pracovnímu prostoru, takže nic nechrání. Před aplikováním je opravte nebo odeberte.} other {Výjimky {rows} neodpovídají žádnému pracovnímu prostoru, takže nic nechrání. Před aplikováním je opravte nebo odeberte.}}",
+    "dim": {
+      "labels": "Štítky",
+      "workspace_ids": "ID pracovních prostorů",
+      "name_prefix": "Předpona názvu",
+      "name_glob": "Vzor názvu",
+      "execution_backend": "Spouštěcí backend",
+      "execution_mode": "Režim spuštění",
+      "engine_version": "Verze enginu",
+      "agent_pool_id": "Fond agentů",
+      "vcs_connection_id": "Připojení VCS",
+      "autodiscovery_rule_id": "Pravidlo automatického objevování",
+      "owner_email": "E-mail vlastníka",
+      "drift_status": "Stav odchylky",
+      "locked": "Uzamčeno",
+      "has_vcs": "Připojeno k VCS"
+    }
   }
 }

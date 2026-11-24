@@ -201,10 +201,25 @@ test('every surface blocks the both-false save the server refuses', () => {
   // wanted. Found by mutating a single call site and watching this pass.
   const occurrences = (src: string, re: RegExp) => (src.match(re) ?? []).length
 
+  // Matched by PROPERTY -- a `disabled=` expression that mentions the flag --
+  // rather than by the exact expression. The count is what carries the weight
+  // and is unchanged; what this survives is a control legitimately gaining a
+  // SECOND reason to be disabled, which is what happened when the fleet form's
+  // two apply buttons also started refusing an exclusion that matches nothing
+  // (#2548). An exact-string count failed there while all three guards were
+  // still in place -- a false negative that invites someone to delete the
+  // assertion rather than read it.
+  //
+  // `[^}]*` is sound only while these expressions contain no nested braces,
+  // which they do not; a call with an object argument inside `disabled={...}`
+  // would need brace matching instead.
+  const guarded = (src: string, flag: string) =>
+    occurrences(src, new RegExp(`disabled=\\{[^}]*\\b${flag}\\b[^}]*\\}`, 'g'))
+
   assert.match(page, /editHasNoOperations = !editPlanApplyEnabled && !editConfigureEnabled/)
   // One guarded control: Save. (Cancel must stay reachable — an operator who
   // ticked both off needs a way out that is not a save.)
-  assert.equal(occurrences(page, /disabled=\{saving \|\| editHasNoOperations\}/g), 1)
+  assert.equal(guarded(page, 'editHasNoOperations'), 1)
 
   assert.match(autodiscovery, /ruleHasNoOperations = !planApplyEnabled && !configureEnabled/)
   // THREE guarded controls: the submit, the preview, and save-and-propagate.
@@ -212,7 +227,7 @@ test('every surface blocks the both-false save the server refuses', () => {
   // can create; propagation SAVES the rule before it propagates (#2621 item
   // 50), so a rule the server would refuse cannot be propagated either -- and
   // its dry run would describe a payload that is never going to be stored.
-  assert.equal(occurrences(autodiscovery, /disabled=\{submitting \|\| ruleHasNoOperations\}/g), 3)
+  assert.equal(guarded(autodiscovery, 'ruleHasNoOperations'), 3)
 
   // The fleet form blocks only BOTH explicitly false: turning plan/apply off
   // alone is legitimate across a set that already has configure on, and the
@@ -223,7 +238,7 @@ test('every surface blocks the both-false save the server refuses', () => {
   )
   // THREE guarded controls: the dry-run preview, Apply, and Confirm apply.
   // Leaving any one unguarded is a path straight to the 422.
-  assert.equal(occurrences(bulk, /disabled=\{submitting \|\| uWouldLeaveNoOperations\}/g), 3)
+  assert.equal(guarded(bulk, 'uWouldLeaveNoOperations'), 3)
 })
 
 test('the inventory tab gate keys on configure-enabled, not on the path', () => {

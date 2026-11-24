@@ -4379,5 +4379,38 @@
       "verification": "Verificação",
       "supplyChain": "Conteúdo"
     }
+  },
+  "exclude": {
+    "title": "Exclusões",
+    "selectorLead": "Remove workspaces da seleção. Cada exclusão é ela mesma um seletor, e um workspace que corresponda a qualquer uma delas fica de fora — é assim que se diz “tudo deste tipo, exceto aqueles”.",
+    "selectorHint": "As exclusões são combinadas com OU: um workspace que corresponda a qualquer uma delas fica de fora, enquanto as dimensões dentro da mesma exclusão são combinadas com E. Uma exclusão não pode conter outra, e são permitidas no máximo {max}. Uma exclusão que não corresponde a nada não protege nada, pelo que é sinalizada aqui e recusada ao aplicar.",
+    "none": "Nenhuma exclusão. Serão incluídos todos os workspaces correspondentes ao seletor.",
+    "count": "{n, plural, one {# exclusão} other {# exclusões}}",
+    "entry": "Exclusão {n}",
+    "add": "Adicionar exclusão",
+    "atCap": "No limite de {max} exclusões.",
+    "any": "Qualquer",
+    "yes": "Sim",
+    "no": "Não",
+    "rowNoSelector": "Esta exclusão não define nada, pelo que não protege nada. Defina uma dimensão ou remova-a.",
+    "rowMatchesNothing": "Esta exclusão não corresponde a nenhum workspace, pelo que não protege nada.",
+    "excludedCount": "{n, plural, one {# workspace excluído} other {# workspaces excluídos}}.",
+    "blocksApply": "{n, plural, one {A exclusão {rows} não corresponde a nenhum workspace, pelo que não protege nada. Corrija-a ou remova-a antes de aplicar.} other {As exclusões {rows} não correspondem a nenhum workspace, pelo que não protegem nada. Corrija-as ou remova-as antes de aplicar.}}",
+    "dim": {
+      "labels": "Etiquetas",
+      "workspace_ids": "IDs dos workspaces",
+      "name_prefix": "Prefixo do nome",
+      "name_glob": "Padrão do nome",
+      "execution_backend": "Backend de execução",
+      "execution_mode": "Modo de execução",
+      "engine_version": "Versão do motor",
+      "agent_pool_id": "Conjunto de agentes",
+      "vcs_connection_id": "Ligação VCS",
+      "autodiscovery_rule_id": "Regra de autodescoberta",
+      "owner_email": "E-mail do proprietário",
+      "drift_status": "Estado de desvio",
+      "locked": "Bloqueado",
+      "has_vcs": "VCS ligado"
+    }
   }
 }

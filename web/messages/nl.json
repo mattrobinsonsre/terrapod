@@ -4379,5 +4379,38 @@
       "verification": "Verificatie",
       "supplyChain": "Inhoud"
     }
+  },
+  "exclude": {
+    "title": "Uitsluitingen",
+    "selectorLead": "Haal workspaces uit de selectie. Elke uitsluiting is zelf een selector, en een workspace die met een ervan overeenkomt valt af — zo zegt u “alles van dit soort, behalve deze”.",
+    "selectorHint": "Uitsluitingen worden met OF gecombineerd: een workspace die met één ervan overeenkomt valt af, terwijl de dimensies binnen één uitsluiting met EN worden gecombineerd. Een uitsluiting kan zelf geen andere bevatten, en er zijn er maximaal {max} toegestaan. Een uitsluiting die met niets overeenkomt beschermt niets, en wordt daarom hier gemarkeerd en bij toepassen geweigerd.",
+    "none": "Geen uitsluitingen. Elke workspace waarmee de selector overeenkomt wordt meegenomen.",
+    "count": "{n, plural, one {# uitsluiting} other {# uitsluitingen}}",
+    "entry": "Uitsluiting {n}",
+    "add": "Uitsluiting toevoegen",
+    "atCap": "De grens van {max} uitsluitingen is bereikt.",
+    "any": "Alle",
+    "yes": "Ja",
+    "no": "Nee",
+    "rowNoSelector": "Deze uitsluiting stelt niets in en beschermt dus niets. Stel een dimensie in of verwijder hem.",
+    "rowMatchesNothing": "Deze uitsluiting komt met geen enkele workspace overeen en beschermt dus niets.",
+    "excludedCount": "{n, plural, one {# workspace uitgesloten} other {# workspaces uitgesloten}}.",
+    "blocksApply": "{n, plural, one {Uitsluiting {rows} komt met geen enkele workspace overeen en beschermt dus niets. Herstel of verwijder hem voordat u toepast.} other {Uitsluitingen {rows} komen met geen enkele workspace overeen en beschermen dus niets. Herstel of verwijder ze voordat u toepast.}}",
+    "dim": {
+      "labels": "Labels",
+      "workspace_ids": "Workspace-ID''s",
+      "name_prefix": "Naamprefix",
+      "name_glob": "Naampatroon",
+      "execution_backend": "Uitvoeringsbackend",
+      "execution_mode": "Uitvoeringsmodus",
+      "engine_version": "Engine-versie",
+      "agent_pool_id": "Agentpool",
+      "vcs_connection_id": "VCS-verbinding",
+      "autodiscovery_rule_id": "Autodetectieregel",
+      "owner_email": "E-mail eigenaar",
+      "drift_status": "Driftstatus",
+      "locked": "Vergrendeld",
+      "has_vcs": "Met VCS verbonden"
+    }
   }
 }

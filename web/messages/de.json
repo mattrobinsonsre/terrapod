@@ -4379,5 +4379,38 @@
       "verification": "Verifizierung",
       "supplyChain": "Inhalt"
     }
+  },
+  "exclude": {
+    "title": "Ausschlüsse",
+    "selectorLead": "Entfernt Arbeitsbereiche aus der Auswahl. Jeder Ausschluss ist selbst ein Selektor, und ein Arbeitsbereich, auf den einer von ihnen zutrifft, fällt heraus — so drücken Sie „alles dieser Art, außer diesen“ aus.",
+    "selectorHint": "Ausschlüsse werden mit ODER verknüpft: ein Arbeitsbereich, auf den einer von ihnen zutrifft, fällt heraus, während die Dimensionen innerhalb eines einzelnen Ausschlusses mit UND verknüpft werden. Ein Ausschluss kann keinen weiteren enthalten, und es sind höchstens {max} erlaubt. Ein Ausschluss, der auf nichts zutrifft, schützt nichts, wird deshalb hier markiert und beim Anwenden abgelehnt.",
+    "none": "Keine Ausschlüsse. Jeder Arbeitsbereich, auf den der Selektor zutrifft, wird einbezogen.",
+    "count": "{n, plural, one {# Ausschluss} other {# Ausschlüsse}}",
+    "entry": "Ausschluss {n}",
+    "add": "Ausschluss hinzufügen",
+    "atCap": "Die Grenze von {max} Ausschlüssen ist erreicht.",
+    "any": "Beliebig",
+    "yes": "Ja",
+    "no": "Nein",
+    "rowNoSelector": "Dieser Ausschluss legt nichts fest und schützt damit nichts. Legen Sie eine Dimension fest oder entfernen Sie ihn.",
+    "rowMatchesNothing": "Dieser Ausschluss trifft auf keinen Arbeitsbereich zu und schützt damit nichts.",
+    "excludedCount": "{n, plural, one {# Arbeitsbereich ausgeschlossen} other {# Arbeitsbereiche ausgeschlossen}}.",
+    "blocksApply": "{n, plural, one {Ausschluss {rows} trifft auf keinen Arbeitsbereich zu und schützt damit nichts. Korrigieren oder entfernen Sie ihn vor dem Anwenden.} other {Ausschlüsse {rows} treffen auf keinen Arbeitsbereich zu und schützen damit nichts. Korrigieren oder entfernen Sie sie vor dem Anwenden.}}",
+    "dim": {
+      "labels": "Labels",
+      "workspace_ids": "Arbeitsbereichs-IDs",
+      "name_prefix": "Namenspräfix",
+      "name_glob": "Namensmuster",
+      "execution_backend": "Ausführungs-Backend",
+      "execution_mode": "Ausführungsmodus",
+      "engine_version": "Engine-Version",
+      "agent_pool_id": "Agent-Pool",
+      "vcs_connection_id": "VCS-Verbindung",
+      "autodiscovery_rule_id": "Autoerkennungsregel",
+      "owner_email": "E-Mail des Besitzers",
+      "drift_status": "Drift-Status",
+      "locked": "Gesperrt",
+      "has_vcs": "Mit VCS verbunden"
+    }
   }
 }

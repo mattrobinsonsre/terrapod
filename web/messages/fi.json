@@ -4379,5 +4379,38 @@
       "verification": "Varmennus",
       "supplyChain": "Sisältö"
     }
+  },
+  "exclude": {
+    "title": "Poissulut",
+    "selectorLead": "Poista työtiloja valinnasta. Jokainen poissulku on itsekin valitsin, ja mihin tahansa niistä osuva työtila jätetään pois — näin sanot ”kaikki tämänkaltaiset, paitsi nämä”.",
+    "selectorHint": "Poissulut yhdistetään OR-operaatiolla: mihin tahansa niistä osuva työtila jätetään pois, kun taas yhden poissulun sisällä olevat ulottuvuudet yhdistetään AND-operaatiolla. Poissulku ei voi sisältää toista, ja niitä sallitaan enintään {max}. Poissulku, joka ei osu mihinkään, ei suojaa mitään, joten se merkitään tässä ja hylätään käyttöön otettaessa.",
+    "none": "Ei poissulkuja. Jokainen valitsimen osuma otetaan mukaan.",
+    "count": "{n, plural, one {# poissulku} other {# poissulkua}}",
+    "entry": "Poissulku {n}",
+    "add": "Lisää poissulku",
+    "atCap": "Enintään {max} poissulkua — raja on saavutettu.",
+    "any": "Mikä tahansa",
+    "yes": "Kyllä",
+    "no": "Ei",
+    "rowNoSelector": "Tämä poissulku ei aseta mitään, joten se ei suojaa mitään. Aseta ulottuvuus tai poista se.",
+    "rowMatchesNothing": "Tämä poissulku ei osu yhteenkään työtilaan, joten se ei suojaa mitään.",
+    "excludedCount": "{n, plural, one {# työtila jätetty pois} other {# työtilaa jätetty pois}}.",
+    "blocksApply": "{n, plural, one {Poissulku {rows} ei osu yhteenkään työtilaan, joten se ei suojaa mitään. Korjaa tai poista se ennen käyttöönottoa.} other {Poissulut {rows} eivät osu yhteenkään työtilaan, joten ne eivät suojaa mitään. Korjaa tai poista ne ennen käyttöönottoa.}}",
+    "dim": {
+      "labels": "Tunnisteet",
+      "workspace_ids": "Työtilojen ID:t",
+      "name_prefix": "Nimen etuliite",
+      "name_glob": "Nimen kuvio",
+      "execution_backend": "Suoritustausta",
+      "execution_mode": "Suoritustila",
+      "engine_version": "Moottorin versio",
+      "agent_pool_id": "Agenttivaranto",
+      "vcs_connection_id": "VCS-yhteys",
+      "autodiscovery_rule_id": "Automaattisen löytämisen sääntö",
+      "owner_email": "Omistajan sähköposti",
+      "drift_status": "Poikkeaman tila",
+      "locked": "Lukittu",
+      "has_vcs": "VCS-yhteydessä"
+    }
   }
 }

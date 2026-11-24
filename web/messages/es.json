@@ -4379,5 +4379,38 @@
       "verification": "Verificación",
       "supplyChain": "Contenido"
     }
+  },
+  "exclude": {
+    "title": "Exclusiones",
+    "selectorLead": "Quita espacios de trabajo de la selección. Cada exclusión es a su vez un selector, y un espacio de trabajo que coincida con cualquiera de ellas queda fuera — así es como se dice «todo lo de este tipo, excepto esos».",
+    "selectorHint": "Las exclusiones se combinan con un O lógico: un espacio de trabajo que coincida con cualquiera de ellas queda fuera, mientras que las dimensiones dentro de una misma exclusión se combinan con un Y lógico. Una exclusión no puede contener otra, y se permiten como máximo {max}. Una exclusión que no coincide con nada no protege nada, por lo que se señala aquí y se rechaza al aplicar.",
+    "none": "Sin exclusiones. Se incluirán todos los espacios de trabajo que coincidan con el selector.",
+    "count": "{n, plural, one {# exclusión} other {# exclusiones}}",
+    "entry": "Exclusión {n}",
+    "add": "Añadir exclusión",
+    "atCap": "En el límite de {max} exclusiones.",
+    "any": "Cualquiera",
+    "yes": "Sí",
+    "no": "No",
+    "rowNoSelector": "Esta exclusión no establece nada, por lo que no protege nada. Establezca una dimensión o elimínela.",
+    "rowMatchesNothing": "Esta exclusión no coincide con ningún espacio de trabajo, por lo que no protege nada.",
+    "excludedCount": "{n, plural, one {# espacio de trabajo excluido} other {# espacios de trabajo excluidos}}.",
+    "blocksApply": "{n, plural, one {La exclusión {rows} no coincide con ningún espacio de trabajo, por lo que no protege nada. Corríjala o elimínela antes de aplicar.} other {Las exclusiones {rows} no coinciden con ningún espacio de trabajo, por lo que no protegen nada. Corríjalas o elimínelas antes de aplicar.}}",
+    "dim": {
+      "labels": "Etiquetas",
+      "workspace_ids": "ID de espacios de trabajo",
+      "name_prefix": "Prefijo del nombre",
+      "name_glob": "Patrón del nombre",
+      "execution_backend": "Motor de ejecución",
+      "execution_mode": "Modo de ejecución",
+      "engine_version": "Versión del motor",
+      "agent_pool_id": "Grupo de agentes",
+      "vcs_connection_id": "Conexión VCS",
+      "autodiscovery_rule_id": "Regla de autodescubrimiento",
+      "owner_email": "Correo del propietario",
+      "drift_status": "Estado de desviación",
+      "locked": "Bloqueado",
+      "has_vcs": "VCS conectado"
+    }
   }
 }

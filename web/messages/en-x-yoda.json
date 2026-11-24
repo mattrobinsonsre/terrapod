@@ -4379,5 +4379,38 @@
       "verification": "Verification, the",
       "supplyChain": "Contents, the"
     }
+  },
+  "exclude": {
+    "title": "Exclusions",
+    "selectorLead": "From the selection, workspaces remove. A selector itself, each exclusion is, and left out, a workspace matching any of them is — so “everything of this kind, except those”, this is how you say it.",
+    "selectorHint": "OR-ed, exclusions are: left out, a workspace matching any one of them is, while AND-ed together, the dimensions within a single exclusion are. Another, an exclusion cannot itself contain, and at most {max} allowed are. Nothing, an exclusion that matches nothing protects, so flagged here it is, and refused on apply.",
+    "none": "No exclusions. Included, every workspace the selector matches will be.",
+    "count": "{n, plural, one {# exclusion} other {# exclusions}}",
+    "entry": "Exclusion {n}, this is",
+    "add": "An exclusion, add",
+    "atCap": "Of {max} exclusions, at the limit you are.",
+    "any": "Any",
+    "yes": "Yes",
+    "no": "No",
+    "rowNoSelector": "Nothing this exclusion sets, so nothing it protects. A dimension set, or remove it.",
+    "rowMatchesNothing": "No workspace this exclusion matches, so nothing it protects.",
+    "excludedCount": "{n, plural, one {Excluded, # workspace} other {Excluded, # workspaces}}.",
+    "blocksApply": "{n, plural, one {No workspace, exclusion {rows} matches, so nothing it protects. Before applying, fix or remove it.} other {No workspace, exclusions {rows} match, so nothing they protect. Before applying, fix or remove them.}}",
+    "dim": {
+      "labels": "Labels",
+      "workspace_ids": "IDs, workspace",
+      "name_prefix": "Prefix, name",
+      "name_glob": "Pattern, name",
+      "execution_backend": "Backend, execution",
+      "execution_mode": "Mode, execution",
+      "engine_version": "Version, engine",
+      "agent_pool_id": "Pool, agent",
+      "vcs_connection_id": "Connection, VCS",
+      "autodiscovery_rule_id": "Rule, autodiscovery",
+      "owner_email": "Email, owner",
+      "drift_status": "Status, drift",
+      "locked": "Locked",
+      "has_vcs": "Connected, VCS"
+    }
   }
 }

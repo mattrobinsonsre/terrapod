@@ -225,6 +225,80 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
   });
 });
 
+test.describe('Bulk update — exclusions (#2548)', () => {
+  // The write path had no UI at all: the server has accepted `exclude` since
+  // #2582, and this page had zero occurrences of it, so an exclusion could only
+  // be expressed through the API.
+  //
+  // Two properties are worth driving rather than unit-testing. First that an
+  // exclusion actually removes a workspace from the match, which is a round
+  // trip through the real selector. Second that a row matching NOTHING blocks
+  // Apply here -- the server treats that as a soft field on search and dry-run
+  // and a hard 422 on apply, so without the gate a clean preview is followed by
+  // a refusal.
+  test('an exclusion removes a workspace, and an empty one blocks Apply', async ({
+    adminPage,
+  }) => {
+    const token = getStoredToken();
+    const prefix = uniqueName('e2e-bulkexcl');
+    await createWorkspace(token, `${prefix}-keep`);
+    await createWorkspace(token, `${prefix}-drop`);
+
+    await adminPage.goto('/admin/bulk-update');
+
+    // The same retry shape as the mode spec above, and for the same reason: the
+    // fill is lost if it lands before the controlled input mounts, and the page
+    // then renders an ErrorBanner rather than a wrong count. Asserting the
+    // value before each click makes a lost fill fail saying so.
+    const prefixInput = adminPage.getByPlaceholder('prod-');
+    const matched = adminPage.getByText(/Matched/);
+    await expect(async () => {
+      if (!(await matched.isVisible())) {
+        await prefixInput.fill(prefix);
+        await expect(prefixInput).toHaveValue(prefix, { timeout: 1_000 });
+        await adminPage.getByRole('button', { name: 'Search' }).click();
+      }
+      await expect(matched).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await expect(matched).toContainText('2');
+
+    // 1. Add an exclusion. It is numbered, because every server refusal is
+    //    indexed (`exclude[1] sets no selector`) and nothing on this page
+    //    mapped an index back to a row before.
+    await adminPage.getByRole('button', { name: 'Add exclusion' }).click();
+    const row = adminPage.getByTestId('exclude-row-0');
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Exclusion 1');
+
+    // 2. Empty, it says so and Apply is refused. The reason is beside the
+    //    control as well as in the row -- an operator who has scrolled past the
+    //    exclusions would otherwise meet a dead button with no explanation.
+    await expect(row).toContainText(/protects nothing/);
+    await expect(adminPage.getByRole('button', { name: 'Apply changes' })).toBeDisabled();
+
+    // 3. Fill it so it matches exactly one of the two, and the exclusion takes
+    //    effect through the real selector rather than through anything this
+    //    page computed.
+    const excludePrefix = row.getByLabel('Name prefix');
+    await expect(async () => {
+      await excludePrefix.fill(`${prefix}-drop`);
+      await expect(excludePrefix).toHaveValue(`${prefix}-drop`, { timeout: 1_000 });
+      await adminPage.getByRole('button', { name: 'Search' }).click();
+      await expect(adminPage.getByText(/1 workspace excluded/)).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
+
+    // One left, and it is the one that was NOT excluded.
+    await expect(matched).toContainText('1');
+    await expect(adminPage.getByText(`${prefix}-keep`)).toBeVisible();
+    await expect(adminPage.getByText(`${prefix}-drop`)).toHaveCount(0);
+
+    // 4. With the row no longer empty, Apply is available again. Asserted as
+    //    the pair, because a gate that is always on is indistinguishable from
+    //    one that works until you check it can turn off.
+    await expect(adminPage.getByRole('button', { name: 'Apply changes' })).toBeEnabled();
+  });
+});
+
 test.describe('Caches — the package and VCS archive sections (#2474)', () => {
   // Both caches had no admin surface at all: an operator could warm one and
   // never see what was in it, how big it had grown, or drop one bad artifact

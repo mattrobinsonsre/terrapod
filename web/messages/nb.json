@@ -4379,5 +4379,38 @@
       "verification": "Verifisering",
       "supplyChain": "Innhold"
     }
+  },
+  "exclude": {
+    "title": "Unntak",
+    "selectorLead": "Fjern arbeidsområder fra utvalget. Hvert unntak er selv en selektor, og et arbeidsområde som treffer et av dem, faller ut — det er slik du sier «alt av dette slaget, bortsett fra disse».",
+    "selectorHint": "Unntak kombineres med ELLER: et arbeidsområde som treffer bare ett av dem, faller ut, mens dimensjonene innenfor et enkelt unntak kombineres med OG. Et unntak kan ikke selv inneholde et annet, og det tillates høyst {max}. Et unntak som ikke treffer noe, beskytter ingenting, så det merkes her og avvises ved anvendelse.",
+    "none": "Ingen unntak. Hvert arbeidsområde selektoren treffer, blir tatt med.",
+    "count": "{n, plural, one {# unntak} other {# unntak}}",
+    "entry": "Unntak {n}",
+    "add": "Legg til unntak",
+    "atCap": "Grensen på {max} unntak er nådd.",
+    "any": "Alle",
+    "yes": "Ja",
+    "no": "Nei",
+    "rowNoSelector": "Dette unntaket setter ingenting og beskytter derfor ingenting. Angi en dimensjon, eller fjern det.",
+    "rowMatchesNothing": "Dette unntaket treffer ingen arbeidsområder og beskytter derfor ingenting.",
+    "excludedCount": "{n, plural, one {# arbeidsområde utelatt} other {# arbeidsområder utelatt}}.",
+    "blocksApply": "{n, plural, one {Unntak {rows} treffer ingen arbeidsområder og beskytter derfor ingenting. Rett eller fjern det før du anvender.} other {Unntakene {rows} treffer ingen arbeidsområder og beskytter derfor ingenting. Rett eller fjern dem før du anvender.}}",
+    "dim": {
+      "labels": "Etiketter",
+      "workspace_ids": "Arbeidsområde-ID-er",
+      "name_prefix": "Navneprefiks",
+      "name_glob": "Navnemønster",
+      "execution_backend": "Kjøremotor",
+      "execution_mode": "Kjøremodus",
+      "engine_version": "Motorversjon",
+      "agent_pool_id": "Agentpool",
+      "vcs_connection_id": "VCS-tilkobling",
+      "autodiscovery_rule_id": "Autooppdagingsregel",
+      "owner_email": "Eierens e-post",
+      "drift_status": "Driftstatus",
+      "locked": "Låst",
+      "has_vcs": "Koblet til VCS"
+    }
   }
 }
