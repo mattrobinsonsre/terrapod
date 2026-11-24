@@ -2179,7 +2179,8 @@
       "memory": "内存",
       "requested": "已请求 {value}",
       "limit": "限制 {value}",
-      "phaseConfigure": "配置"
+      "phaseConfigure": "配置",
+      "orchestratorOnly": "这些数值来自编排器容器。playbook 实际在执行环境中运行，而 Terrapod 尚未测量执行环境自身的用量，因此这些数值并不能说明执行环境的规格是否合适。"
     },
     "labelsEditor": {
       "none": "无",
@@ -2493,7 +2494,13 @@
       "agentPool": "代理池",
       "agentPoolCandidates": "{count, plural, other {# 个候选池}}",
       "autoApplyHeld": "已保留",
-      "playbook": "playbook"
+      "playbook": "playbook",
+      "limit": "主机 limit",
+      "limitWholeInventory": "无 limit — 以整个清单为目标",
+      "eeImage": "执行环境",
+      "eeResources": "执行环境资源",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "配置并行度"
     },
     "timeline": {
       "heading": "时间线",

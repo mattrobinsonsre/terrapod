@@ -2179,7 +2179,8 @@
       "memory": "Mémoire",
       "requested": "Demandé {value}",
       "limit": "Limite {value}",
-      "phaseConfigure": "Configuration"
+      "phaseConfigure": "Configuration",
+      "orchestratorOnly": "Ces chiffres sont ceux du conteneur de l''orchestrateur. Le playbook s''exécute dans l''environnement d''exécution, dont Terrapod ne mesure pas encore la consommation propre : cela ne dit donc pas si l''EE est correctement dimensionné."
     },
     "labelsEditor": {
       "none": "Aucun",
@@ -2493,7 +2494,13 @@
       "agentPool": "Pool d''agents",
       "agentPoolCandidates": "{count, plural, one {# pool candidat} other {# pools candidats}}",
       "autoApplyHeld": "en attente",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Limite d''hôtes",
+      "limitWholeInventory": "aucune limite — l''inventaire entier",
+      "eeImage": "Environnement d''exécution",
+      "eeResources": "Ressources de l''environnement d''exécution",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Parallélisme de la configuration"
     },
     "timeline": {
       "heading": "Chronologie",

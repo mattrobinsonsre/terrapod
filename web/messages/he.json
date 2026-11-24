@@ -2179,7 +2179,8 @@
       "memory": "זיכרון",
       "requested": "התבקש {value}",
       "limit": "מגבלה {value}",
-      "phaseConfigure": "תצורה"
+      "phaseConfigure": "תצורה",
+      "orchestratorOnly": "נתונים אלה הם של מכולת המתזמר. ספר ההרצה מורץ בסביבת ההרצה, ש-Terrapod עדיין אינו מודד את השימוש שלה, ולכן אין בכך תשובה לשאלה אם סביבת ההרצה מוגדרת בגודל הנכון."
     },
     "labelsEditor": {
       "none": "ללא",
@@ -2493,7 +2494,13 @@
       "agentPool": "מאגר סוכנים",
       "agentPoolCandidates": "{count, plural, other {# מאגרים מועמדים}}",
       "autoApplyHeld": "מוחזק",
-      "playbook": "ספר הרצה"
+      "playbook": "ספר הרצה",
+      "limit": "מגבלת מארחים",
+      "limitWholeInventory": "אין מגבלה — כל המלאי",
+      "eeImage": "סביבת הרצה",
+      "eeResources": "משאבי סביבת ההרצה",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "מקביליות התצורה"
     },
     "timeline": {
       "heading": "ציר זמן",

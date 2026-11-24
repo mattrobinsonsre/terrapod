@@ -2179,7 +2179,8 @@
       "memory": "Muisti",
       "requested": "Pyydetty {value}",
       "limit": "Raja {value}",
-      "phaseConfigure": "Määritys"
+      "phaseConfigure": "Määritys",
+      "orchestratorOnly": "Nämä luvut koskevat orkestroijan konttia. Playbook suoritetaan suoritusympäristössä, jonka omaa käyttöä Terrapod ei vielä mittaa, joten näistä ei näe, onko suoritusympäristö mitoitettu oikein."
     },
     "labelsEditor": {
       "none": "Ei mitään",
@@ -2493,7 +2494,13 @@
       "agentPool": "Agenttiryhmä",
       "agentPoolCandidates": "{count, plural, one {# ehdokasryhmä} other {# ehdokasryhmää}}",
       "autoApplyHeld": "odottaa",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Isäntärajaus",
+      "limitWholeInventory": "ei rajausta — koko inventaario",
+      "eeImage": "Suoritusympäristö",
+      "eeResources": "Suoritusympäristön resurssit",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Määrityksen rinnakkaisuus"
     },
     "timeline": {
       "heading": "Aikajana",

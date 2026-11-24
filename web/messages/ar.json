@@ -2179,7 +2179,8 @@
       "memory": "الذاكرة",
       "requested": "المطلوب {value}",
       "limit": "الحد {value}",
-      "phaseConfigure": "التهيئة"
+      "phaseConfigure": "التهيئة",
+      "orchestratorOnly": "هذه الأرقام تخص حاوية المنسِّق. يعمل دفتر التشغيل في بيئة التنفيذ، ولا يقيس Terrapod استخدامها الخاص بعد، لذا فهي لا تُبيّن ما إذا كان حجم بيئة التنفيذ مناسبًا."
     },
     "labelsEditor": {
       "none": "لا شيء",
@@ -2493,7 +2494,13 @@
       "agentPool": "مجموعة الوكلاء",
       "agentPoolCandidates": "{count, plural, other {# مجموعة مرشحة}}",
       "autoApplyHeld": "معلّق",
-      "playbook": "دفتر التشغيل"
+      "playbook": "دفتر التشغيل",
+      "limit": "حد المضيفات",
+      "limitWholeInventory": "لا حدّ — المخزون بأكمله",
+      "eeImage": "بيئة التنفيذ",
+      "eeResources": "موارد بيئة التنفيذ",
+      "eeResourcesValue": "{cpu} معالج · {memory}",
+      "configureParallelism": "توازي التهيئة"
     },
     "timeline": {
       "heading": "الجدول الزمني",

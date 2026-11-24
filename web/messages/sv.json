@@ -2179,7 +2179,8 @@
       "memory": "Minne",
       "requested": "Begärt {value}",
       "limit": "Gräns {value}",
-      "phaseConfigure": "Konfiguration"
+      "phaseConfigure": "Konfiguration",
+      "orchestratorOnly": "Dessa siffror gäller orkestrator-containern. Playbooken körs i exekveringsmiljön, vars egen användning Terrapod ännu inte mäter, så siffrorna säger ingenting om huruvida exekveringsmiljön är rätt dimensionerad."
     },
     "labelsEditor": {
       "none": "Ingen",
@@ -2493,7 +2494,13 @@
       "agentPool": "Agentpool",
       "agentPoolCandidates": "{count, plural, one {# kandidatpool} other {# kandidatpooler}}",
       "autoApplyHeld": "pausad",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Värdlimit",
+      "limitWholeInventory": "inget limit — hela inventariet",
+      "eeImage": "Exekveringsmiljö",
+      "eeResources": "Exekveringsmiljöns resurser",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Konfigurationsparallellitet"
     },
     "timeline": {
       "heading": "Tidslinje",

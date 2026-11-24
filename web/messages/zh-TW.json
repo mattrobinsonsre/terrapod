@@ -2179,7 +2179,8 @@
       "memory": "記憶體",
       "requested": "已請求 {value}",
       "limit": "限制 {value}",
-      "phaseConfigure": "設定"
+      "phaseConfigure": "設定",
+      "orchestratorOnly": "這些數值來自編排器容器。playbook 實際在執行環境中執行，而 Terrapod 尚未測量執行環境自身的用量，因此這些數值並不能說明執行環境的規格是否合適。"
     },
     "labelsEditor": {
       "none": "無",
@@ -2493,7 +2494,13 @@
       "agentPool": "代理集區",
       "agentPoolCandidates": "{count, plural, other {# 個候選集區}}",
       "autoApplyHeld": "已保留",
-      "playbook": "playbook"
+      "playbook": "playbook",
+      "limit": "主機 limit",
+      "limitWholeInventory": "無 limit — 以整個清單為目標",
+      "eeImage": "執行環境",
+      "eeResources": "執行環境資源",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "設定平行度"
     },
     "timeline": {
       "heading": "時間線",

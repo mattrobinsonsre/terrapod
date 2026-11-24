@@ -2179,7 +2179,8 @@
       "memory": "Memory",
       "requested": "Requested {value}",
       "limit": "Limit {value}",
-      "phaseConfigure": "Riggin''"
+      "phaseConfigure": "Riggin''",
+      "orchestratorOnly": "These figures be th'' runner''s own hold. Th'' playbook runs in th'' execution quarters, whose own usage Terrapod does not yet take th'' measure of, so they say naught about whether th'' execution quarters be rightly sized."
     },
     "labelsEditor": {
       "none": "None",
@@ -2493,7 +2494,13 @@
       "agentPool": "Agent crew",
       "agentPoolCandidates": "{count, plural, one {# candidate crew} other {# candidate crews}}",
       "autoApplyHeld": "belayed",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Hand limit",
+      "limitWholeInventory": "no limit — th'' whole manifest",
+      "eeImage": "Execution quarters",
+      "eeResources": "Execution quarters stores",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Riggin'' Hands at Once"
     },
     "timeline": {
       "heading": "Timeline",

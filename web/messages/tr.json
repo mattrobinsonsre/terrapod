@@ -2179,7 +2179,8 @@
       "memory": "Bellek",
       "requested": "İstenen {value}",
       "limit": "Sınır {value}",
-      "phaseConfigure": "Yapılandırma"
+      "phaseConfigure": "Yapılandırma",
+      "orchestratorOnly": "Bu değerler orkestratör konteynerine aittir. Playbook, kendi kullanımını Terrapod''un henüz ölçmediği yürütme ortamında çalışır; bu nedenle bu değerler yürütme ortamının doğru boyutlandırılıp boyutlandırılmadığını göstermez."
     },
     "labelsEditor": {
       "none": "Yok",
@@ -2493,7 +2494,13 @@
       "agentPool": "Aracı havuzu",
       "agentPoolCandidates": "{count, plural, other {# aday havuz}}",
       "autoApplyHeld": "beklemede",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Ana makine limiti",
+      "limitWholeInventory": "limit yok — tüm envanter",
+      "eeImage": "Yürütme ortamı",
+      "eeResources": "Yürütme ortamı kaynakları",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Yapılandırma paralelliği"
     },
     "timeline": {
       "heading": "Zaman Çizelgesi",

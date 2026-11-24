@@ -2179,7 +2179,8 @@
       "memory": "Memoria",
       "requested": "Postulatum {value}",
       "limit": "Limes {value}",
-      "phaseConfigure": "Configuratio"
+      "phaseConfigure": "Configuratio",
+      "orchestratorOnly": "Hi numeri continentis moderatoris sunt. Libellus ludendi in ambitu exsecutionis agitur, cuius proprium usum Terrapod nondum metitur, ideo hoc non indicat num EE recte dimensus sit."
     },
     "labelsEditor": {
       "none": "Nulli",
@@ -2493,7 +2494,13 @@
       "agentPool": "Copia agentium",
       "agentPoolCandidates": "{count, plural, one {# copia candidata} other {# copiae candidatae}}",
       "autoApplyHeld": "retentum",
-      "playbook": "Libellus Ludendi"
+      "playbook": "Libellus Ludendi",
+      "limit": "Limes hospitum",
+      "limitWholeInventory": "sine limite — totum inventarium",
+      "eeImage": "Ambitus exsecutionis",
+      "eeResources": "Facultates ambitus exsecutionis",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Parallelismus configurationis"
     },
     "timeline": {
       "heading": "Series Temporum",

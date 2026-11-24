@@ -2179,7 +2179,8 @@
       "memory": "Пам''ять",
       "requested": "Запитано {value}",
       "limit": "Ліміт {value}",
-      "phaseConfigure": "Налаштування"
+      "phaseConfigure": "Налаштування",
+      "orchestratorOnly": "Ці показники стосуються контейнера оркестратора. Плейбук виконується в середовищі виконання, власне споживання якого Terrapod поки не вимірює, тому вони не свідчать про те, чи правильно підібрано розмір середовища виконання."
     },
     "labelsEditor": {
       "none": "Немає",
@@ -2493,7 +2494,13 @@
       "agentPool": "Пул агентів",
       "agentPoolCandidates": "{count, plural, one {# пул-кандидат} few {# пули-кандидати} other {# пулів-кандидатів}}",
       "autoApplyHeld": "відкладено",
-      "playbook": "Плейбук"
+      "playbook": "Плейбук",
+      "limit": "Ліміт хостів",
+      "limitWholeInventory": "без ліміту — увесь інвентар",
+      "eeImage": "Середовище виконання",
+      "eeResources": "Ресурси середовища виконання",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Паралелізм налаштування"
     },
     "timeline": {
       "heading": "Хронологія",

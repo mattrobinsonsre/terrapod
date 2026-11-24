@@ -2179,7 +2179,8 @@
       "memory": "Pamięć",
       "requested": "Żądano {value}",
       "limit": "Limit {value}",
-      "phaseConfigure": "Konfiguracja"
+      "phaseConfigure": "Konfiguracja",
+      "orchestratorOnly": "Te dane dotyczą kontenera orkiestratora. Playbook działa w środowisku wykonawczym, którego własnego wykorzystania Terrapod jeszcze nie mierzy, więc nie wynika z nich, czy środowisko wykonawcze ma właściwy rozmiar."
     },
     "labelsEditor": {
       "none": "Brak",
@@ -2493,7 +2494,13 @@
       "agentPool": "Pula agentów",
       "agentPoolCandidates": "{count, plural, one {# pula kandydatów} few {# pule kandydatów} other {# pul kandydatów}}",
       "autoApplyHeld": "wstrzymano",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Limit hostów",
+      "limitWholeInventory": "bez limitu — cały inwentarz",
+      "eeImage": "Środowisko wykonawcze",
+      "eeResources": "Zasoby środowiska wykonawczego",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Równoległość konfiguracji"
     },
     "timeline": {
       "heading": "Oś czasu",

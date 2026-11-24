@@ -2179,7 +2179,8 @@
       "memory": "Marklar",
       "requested": "Requested {value}",
       "limit": "Marklar {value}",
-      "phaseConfigure": "Marklar"
+      "phaseConfigure": "Marklar",
+      "orchestratorOnly": "These marklars are the marklar marklar''s. The marklar runs in the marklar marklar, whose own marklar Terrapod does not yet measure, so they do not say whether the marklar marklar is sized correctly."
     },
     "labelsEditor": {
       "none": "None",
@@ -2493,7 +2494,13 @@
       "agentPool": "Marklar marklar",
       "agentPoolCandidates": "{count, plural, one {# candidate marklar} other {# candidate marklars}}",
       "autoApplyHeld": "held",
-      "playbook": "Marklar"
+      "playbook": "Marklar",
+      "limit": "Marklar marklar",
+      "limitWholeInventory": "no marklar — the whole marklar",
+      "eeImage": "Marklar marklar",
+      "eeResources": "Marklar marklar marklars",
+      "eeResourcesValue": "{cpu} Marklar · {memory}",
+      "configureParallelism": "Marklar marklar"
     },
     "timeline": {
       "heading": "Marklar",

@@ -2179,7 +2179,8 @@
       "memory": "Geheugen",
       "requested": "Aangevraagd {value}",
       "limit": "Limiet {value}",
-      "phaseConfigure": "Configureren"
+      "phaseConfigure": "Configureren",
+      "orchestratorOnly": "Deze cijfers zijn die van de orchestrator-container. Het playbook draait in de uitvoeringsomgeving, waarvan Terrapod het eigen gebruik nog niet meet; dit zegt dus niet of de uitvoeringsomgeving juist is gedimensioneerd."
     },
     "labelsEditor": {
       "none": "Geen",
@@ -2493,7 +2494,13 @@
       "agentPool": "Agentpool",
       "agentPoolCandidates": "{count, plural, one {# kandidaat-pool} other {# kandidaat-pools}}",
       "autoApplyHeld": "vastgehouden",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Host-limit",
+      "limitWholeInventory": "geen limit — de hele inventaris",
+      "eeImage": "Uitvoeringsomgeving",
+      "eeResources": "Resources van de uitvoeringsomgeving",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Configure-parallellisme"
     },
     "timeline": {
       "heading": "Tijdlijn",

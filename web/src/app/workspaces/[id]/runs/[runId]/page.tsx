@@ -98,6 +98,19 @@ interface RunAttrs {
    *  workspace's `default-playbook`, which is what a git-driven configure
    *  runs -- so the two are shown differently rather than resolved. */
   playbook?: string
+  /** The run's own `--limit` (#2693). THE thing an operator needs from a
+   *  configure's record: without it the page cannot distinguish a run that
+   *  configured three hosts from one that configured the whole estate. Empty
+   *  means the workspace's `default_limit`, which may itself be empty and
+   *  therefore the entire inventory. */
+  limit?: string
+  /** Which execution environment ran the playbook, and what it was sized at.
+   *  The EE is where the work happens on a configure, so its image and request
+   *  belong on the record beside the orchestrator's. */
+  'ee-image'?: string
+  'ee-resource-cpu'?: string
+  'ee-resource-memory'?: string
+  'configure-parallelism'?: number
   /** When a LIVE configure's output last changed (#1977). Absent otherwise. */
   'last-output-at'?: string
   // `tofu plan -out=FILE` (#1903) -- apply-capable, apply deferred.
@@ -2520,7 +2533,15 @@ function RunDetailPageInner() {
             phaseLabels={{
               plan: tPhase(phaseKey(engine, 'words', 'phaseLabelPlan')),
               apply: tPhase(phaseKey(engine, 'words', 'phaseLabelApply')),
+              configure: tPhase('common.resourceUsage.phaseConfigure'),
             }}
+            // #2693. On a configure the playbook runs in the EE sidecar, and
+            // `collect_profile` reads the RUNNER container's own cgroup -- so
+            // this figure is the orchestrator's and the EE's is not collected
+            // at all. Saying so is the fix available here; pairing the
+            // orchestrator's peak with the EE's larger request would read as
+            // reassuring and describe neither container.
+            orchestratorOnly={!!attrs['is-configure']}
           />
         </div>
 
@@ -2587,6 +2608,42 @@ function RunDetailPageInner() {
               <div>
                 <dt className="text-xs text-slate-500">{t('details.playbook')}</dt>
                 <dd className="mt-1 text-sm text-slate-200 font-mono break-all">{attrs.playbook}</dd>
+              </div>
+            )}
+            {/* #2693. The limit is NOT truncated and wraps instead: a real one
+                is a list of hostnames, and an elided one answers the question
+                it exists to answer only by accident. An empty limit is stated
+                rather than omitted -- "the whole inventory" is a fact about the
+                run, where a missing row reads as "not recorded". */}
+            {attrs['is-configure'] && (
+              <div className="col-span-2 min-w-0">
+                <dt className="text-xs text-slate-500">{t('details.limit')}</dt>
+                <dd className="mt-1 text-sm text-slate-200 font-mono break-words">
+                  {attrs.limit?.trim() ? attrs.limit : <span className="font-sans italic text-slate-400">{t('details.limitWholeInventory')}</span>}
+                </dd>
+              </div>
+            )}
+            {attrs['is-configure'] && attrs['ee-image'] && (
+              <div className="col-span-2 min-w-0">
+                <dt className="text-xs text-slate-500">{t('details.eeImage')}</dt>
+                <dd className="mt-1 text-sm text-slate-200 font-mono break-all">{attrs['ee-image']}</dd>
+              </div>
+            )}
+            {attrs['is-configure'] && (attrs['ee-resource-cpu'] || attrs['ee-resource-memory']) && (
+              <div>
+                <dt className="text-xs text-slate-500">{t('details.eeResources')}</dt>
+                <dd className="mt-1 text-sm text-slate-200 font-mono">
+                  {t('details.eeResourcesValue', {
+                    cpu: attrs['ee-resource-cpu'] || '—',
+                    memory: attrs['ee-resource-memory'] || '—',
+                  })}
+                </dd>
+              </div>
+            )}
+            {attrs['is-configure'] && attrs['configure-parallelism'] != null && (
+              <div>
+                <dt className="text-xs text-slate-500">{t('details.configureParallelism')}</dt>
+                <dd className="mt-1 text-sm text-slate-200 font-mono">{attrs['configure-parallelism']}</dd>
               </div>
             )}
             {attrs['created-by'] && (

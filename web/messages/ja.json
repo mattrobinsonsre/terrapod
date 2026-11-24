@@ -2179,7 +2179,8 @@
       "memory": "メモリ",
       "requested": "リクエスト {value}",
       "limit": "上限 {value}",
-      "phaseConfigure": "構成"
+      "phaseConfigure": "構成",
+      "orchestratorOnly": "これらの数値はオーケストレーターコンテナのものです。プレイブックは実行環境で実行され、その使用状況は Terrapod ではまだ計測していないため、この数値では実行環境のサイズが適切かどうかは判断できません。"
     },
     "labelsEditor": {
       "none": "なし",
@@ -2493,7 +2494,13 @@
       "agentPool": "エージェントプール",
       "agentPoolCandidates": "{count, plural, other {候補プール #件}}",
       "autoApplyHeld": "保留",
-      "playbook": "プレイブック"
+      "playbook": "プレイブック",
+      "limit": "ホスト limit",
+      "limitWholeInventory": "limit なし — インベントリ全体が対象",
+      "eeImage": "実行環境",
+      "eeResources": "実行環境のリソース",
+      "eeResourcesValue": "{cpu} CPU・{memory}",
+      "configureParallelism": "構成の並列度"
     },
     "timeline": {
       "heading": "タイムライン",
