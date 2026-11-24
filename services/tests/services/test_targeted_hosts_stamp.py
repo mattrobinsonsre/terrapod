@@ -27,26 +27,49 @@ def _run(limit: str | None):
 WHOLE = {"hosts": {"web1": {}, "web2": {}, "db1": {}}, "groups": {"web": ["web1", "web2"]}}
 
 
-async def _stamp(limit: str | None, *, document=None, narrowed_hosts=("web1",)):
-    """Drive the stamp, returning (result, document, storage)."""
+async def _stamp(
+    limit: str | None,
+    *,
+    document=None,
+    narrowed_hosts=("web1",),
+    default_limit: str = "",
+    hard_limit: str = "",
+):
+    """Drive the stamp, returning (result, document, storage, resolve).
+
+    The workspace is supplied EXPLICITLY, with both limits defaulting to empty,
+    because the stamp reads the run's EFFECTIVE limit -- the run's own, falling
+    back to the workspace's `default_limit`, bounded by `hard_limit`, exactly as
+    the engine builds the Job's. A bare `AsyncMock()` db would hand it a mock
+    whose `default_limit` is truthy, so every one of these tests would take the
+    stamping branch for the wrong reason.
+    """
     doc = dict(WHOLE if document is None else document)
     storage = MagicMock()
     storage.put = AsyncMock()
     narrowed = {"hosts": {h: {} for h in narrowed_hosts}}
+    ws = MagicMock(default_limit=default_limit, hard_limit=hard_limit)
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=ws)
     with (
         patch.object(ir, "resolve_for_run", AsyncMock(return_value=narrowed)) as resolve,
         patch("terrapod.storage.get_storage", return_value=storage),
     ):
-        out = await ir.stamp_targeted_hosts(AsyncMock(), _run(limit), doc, "the/key")
+        out = await ir.stamp_targeted_hosts(db, _run(limit), doc, "the/key")
     return out, doc, storage, resolve
 
 
 class TestNothingIsRecordedWhenThereIsNothingToRecord:
     @pytest.mark.asyncio
-    async def test_a_run_with_no_limit_of_its_own(self) -> None:
-        """The ordinary case. Such a run targets the artifact as stored, and
-        `resolve_for_run` bounds EVERY resolution -- so even an unlimited write
-        is already narrowed to the workspace's `hard_limit`."""
+    async def test_a_run_with_no_limit_and_no_workspace_default(self) -> None:
+        """The ordinary case: NOTHING narrows, so the artifact as stored IS the
+        target set and there is nothing to record.
+
+        This test used to say "a run with no limit of its own", which was the
+        false claim -- a workspace with `default_limit` set narrows such a run
+        at the runner while the run's own column stays empty. Both halves have
+        to be empty, which is what `effective_limit` answers.
+        """
         out, doc, storage, resolve = await _stamp(None)
         assert out is None
         assert ir.TARGETED not in doc
@@ -115,3 +138,64 @@ class TestTheRecord:
         `--limit` a retry derives from it is stable."""
         out, _doc, _s, _r = await _stamp("web", narrowed_hosts=("web2", "db1", "web1"))
         assert out == ["db1", "web1", "web2"]
+
+
+class TestTheWorkspaceDefaultNarrowsToo:
+    """#2690's second class of workspace, which the first fix did not reach.
+
+    `limit_for` returns `""` whenever a derived configure adds no narrowing of
+    its own, and its docstring says `build_job_spec` falls back to
+    `default-limit`. So for a workspace with `default_limit` set, the RUNNER
+    narrows and `run.ansible_limit` is empty -- and a stamp gated on the column
+    alone never fires. The consumer then has neither a stamp nor a run limit and
+    returns the whole inventory, which is verbatim the three consequences #2690
+    exists to fix: a host filter offering hosts that cannot appear in the log,
+    every excluded host reported `not-reached` (a status that ASSERTS the run
+    targeted it), and an outstanding-only retry reaching hosts the operator
+    excluded.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_workspace_default_is_recorded(self) -> None:
+        out, doc, storage, resolve = await _stamp(None, default_limit="web")
+        assert out == ["web1"], "the workspace's default_limit did not reach the stamp"
+        assert doc[ir.TARGETED]["limit"] == "web"
+        assert doc[ir.TARGETED]["hosts"] == ["web1"]
+        storage.put.assert_awaited_once()
+        assert resolve.await_args.kwargs["limit"] == "web"
+
+    @pytest.mark.asyncio
+    async def test_the_runs_own_limit_wins_over_the_default(self) -> None:
+        """Same precedence as the engine's: the run's own choice first."""
+        out, doc, _, resolve = await _stamp("db1", default_limit="web")
+        assert doc[ir.TARGETED]["limit"] == "db1"
+        assert resolve.await_args.kwargs["limit"] == "db1"
+        assert out is not None
+
+    @pytest.mark.asyncio
+    async def test_the_hard_limit_still_bounds_the_default(self) -> None:
+        """`bounded_limit` intersects, so a hard limit narrows the default too."""
+        _, doc, _, resolve = await _stamp(None, default_limit="web", hard_limit="prod")
+        sent = resolve.await_args.kwargs["limit"]
+        assert "prod" in sent and "web" in sent, f"hard limit not intersected: {sent!r}"
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_workspace_fails_wide(self) -> None:
+        """A missing workspace row must not make a run look NARROWER than it was.
+
+        A short target set under-reports what is outstanding, and a retry built
+        from it would miss hosts -- so the degradation is to the run's own limit
+        (here none, so no stamp) rather than to a guess.
+        """
+        doc = dict(WHOLE)
+        storage = MagicMock()
+        storage.put = AsyncMock()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=None)
+        with (
+            patch.object(ir, "resolve_for_run", AsyncMock()) as resolve,
+            patch("terrapod.storage.get_storage", return_value=storage),
+        ):
+            out = await ir.stamp_targeted_hosts(db, _run(None), doc, "the/key")
+        assert out is None
+        resolve.assert_not_awaited()
