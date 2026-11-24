@@ -4379,5 +4379,38 @@
       "verification": "Chekin",
       "supplyChain": "Contentz"
     }
+  },
+  "exclude": {
+    "title": "Exclooshunz",
+    "selectorLead": "Remoov werkspacez frum teh selekshun. Evry exclooshun iz its own lil selekter, an a werkspace dat matchez enny ov em getz left owt — so dis is how u sez “all teh thingz ov dis kynd, cept doze onez”.",
+    "selectorHint": "Exclooshunz is OR-ed: a werkspace dat matchez enny wun ov em getz left owt, while teh dimenshunz insyd wun exclooshun is AND-ed togethr. An exclooshun can not hav anuthr exclooshun insyd it, an at moast {max} is allowd. An exclooshun dat matchez nuffin protekts nuffin, so itz flagd rite heer an refuzd wen u apply.",
+    "none": "No exclooshunz. Evry werkspace teh selekter matchez wil be included.",
+    "count": "{n, plural, one {# exclooshun} other {# exclooshunz}}",
+    "entry": "Exclooshun {n}",
+    "add": "Add a exclooshun",
+    "atCap": "At teh limit ov {max} exclooshunz.",
+    "any": "Enny",
+    "yes": "Yus",
+    "no": "Noes",
+    "rowNoSelector": "Dis exclooshun setz nuffin, so it protekts nuffin. Set a dimenshun or remoov it.",
+    "rowMatchesNothing": "Dis exclooshun matchez no werkspace, so it protekts nuffin.",
+    "excludedCount": "{n, plural, one {# werkspace kikd owt} other {# werkspacez kikd owt}}.",
+    "blocksApply": "{n, plural, one {Exclooshun {rows} matchez no werkspace, so it protekts nuffin. Fix it or remoov it b4 u apply.} other {Exclooshunz {rows} match no werkspace, so dey protekt nuffin. Fix em or remoov em b4 u apply.}}",
+    "dim": {
+      "labels": "Labelz",
+      "workspace_ids": "Werkspace IDz",
+      "name_prefix": "Naym prefix",
+      "name_glob": "Naym patturn",
+      "execution_backend": "Ekzekushun bakend",
+      "execution_mode": "Ekzekushun moad",
+      "engine_version": "Enginz vershun",
+      "agent_pool_id": "Ajent pool",
+      "vcs_connection_id": "VCS konekshun",
+      "autodiscovery_rule_id": "Autodiskovry rool",
+      "owner_email": "Ownr emayl",
+      "drift_status": "Drift statuz",
+      "locked": "Lokd",
+      "has_vcs": "VCS konektd"
+    }
   }
 }

@@ -4379,5 +4379,38 @@
       "verification": "Verificering",
       "supplyChain": "Indhold"
     }
+  },
+  "exclude": {
+    "title": "Undtagelser",
+    "selectorLead": "Fjern arbejdsområder fra udvalget. Hver undtagelse er selv en selektor, og et arbejdsområde, der matcher en af dem, falder ud — det er sådan, du siger „alt af denne slags, bortset fra dem her“.",
+    "selectorHint": "Undtagelser kombineres med ELLER: et arbejdsområde, der matcher blot én af dem, falder ud, mens dimensionerne inden for en enkelt undtagelse kombineres med OG. En undtagelse kan ikke selv indeholde en anden, og der tillades højst {max}. En undtagelse, der ikke matcher noget, beskytter ingenting, så den markeres her og afvises ved anvendelse.",
+    "none": "Ingen undtagelser. Hvert arbejdsområde, selektoren matcher, bliver inkluderet.",
+    "count": "{n, plural, one {# undtagelse} other {# undtagelser}}",
+    "entry": "Undtagelse {n}",
+    "add": "Tilføj undtagelse",
+    "atCap": "Grænsen på {max} undtagelser er nået.",
+    "any": "Enhver",
+    "yes": "Ja",
+    "no": "Nej",
+    "rowNoSelector": "Denne undtagelse sætter ingenting og beskytter derfor ingenting. Angiv en dimension, eller fjern den.",
+    "rowMatchesNothing": "Denne undtagelse matcher ingen arbejdsområder og beskytter derfor ingenting.",
+    "excludedCount": "{n, plural, one {# arbejdsområde udelukket} other {# arbejdsområder udelukket}}.",
+    "blocksApply": "{n, plural, one {Undtagelse {rows} matcher ingen arbejdsområder og beskytter derfor ingenting. Ret eller fjern den, før du anvender.} other {Undtagelserne {rows} matcher ingen arbejdsområder og beskytter derfor ingenting. Ret eller fjern dem, før du anvender.}}",
+    "dim": {
+      "labels": "Labels",
+      "workspace_ids": "Arbejdsområde-ID''er",
+      "name_prefix": "Navnepræfiks",
+      "name_glob": "Navnemønster",
+      "execution_backend": "Eksekveringsmotor",
+      "execution_mode": "Eksekveringstilstand",
+      "engine_version": "Motorversion",
+      "agent_pool_id": "Agentpulje",
+      "vcs_connection_id": "VCS-forbindelse",
+      "autodiscovery_rule_id": "Regel for automatisk registrering",
+      "owner_email": "Ejer-e-mail",
+      "drift_status": "Drift-status",
+      "locked": "Låst",
+      "has_vcs": "Forbundet til VCS"
+    }
   }
 }

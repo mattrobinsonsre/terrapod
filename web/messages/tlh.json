@@ -4379,5 +4379,38 @@
       "verification": "tob",
       "supplyChain": "qoD Dochmey"
     }
+  },
+  "exclude": {
+    "title": "Hutlhmey",
+    "selectorLead": "wIvlu'pu'bogh Qumwo'mey teq. Hutlh Hoch wIvwI' 'oH 'ej vay' Hutlh rurbogh Qumwo' lonlu' — vaj «Hoch Segh vam, 'ach Dochvetlhmey Hutlh» jatlhmeH mIw 'oH.",
+    "selectorHint": "Hutlhmey OR-lu': vay' wa' Hutlh rurbogh Qumwo' lonlu', 'ach wa' Hutlh qoDDaq Seghmey AND-lu'. latlh Hutlh ghajlaHbe' Hutlh, 'ej {max} Hutlhmey neH chaw'lu'. pagh rurbogh Hutlh pagh choq, vaj naDev perlu' 'ej lo'lu'DI' lajbe'lu'.",
+    "none": "pagh Hutlhmey. wIvwI' rurbogh Hoch Qumwo' chellu'.",
+    "count": "{n, plural, one {# Hutlh} other {# Hutlhmey}}",
+    "entry": "Hutlh {n}",
+    "add": "Hutlh chel",
+    "atCap": "{max} Hutlhmey veH chavlu'pu'.",
+    "any": "vay'",
+    "yes": "HISlaH",
+    "no": "ghobe'",
+    "rowNoSelector": "pagh wIv Hutlhvam, vaj pagh choq. Segh yIwIv pagh yIteq.",
+    "rowMatchesNothing": "pagh Qumwo' rur Hutlhvam, vaj pagh choq.",
+    "excludedCount": "{n, plural, one {# Qumwo'' lonlu''} other {# Qumwo''mey lonlu''}}.",
+    "blocksApply": "{n, plural, one {pagh Qumwo'' rur Hutlh {rows}, vaj pagh choq. lo''lu''pa'' yIchoH pagh yIteq.} other {pagh Qumwo'' rur Hutlhmey {rows}, vaj pagh choq. lo''lu''pa'' yIchoH pagh yIteq.}}",
+    "dim": {
+      "labels": "permey",
+      "workspace_ids": "Qumwo' ID",
+      "name_prefix": "pong wa'DIch",
+      "name_glob": "pong Segh",
+      "execution_backend": "Qap patlh",
+      "execution_mode": "Qap mIw",
+      "engine_version": "QuQ mI'",
+      "agent_pool_id": "raSHom",
+      "vcs_connection_id": "VCS rar",
+      "autodiscovery_rule_id": "tlhoS tu' chut",
+      "owner_email": "ghajwI'' QIn De''wI''",
+      "drift_status": "chIch Doch",
+      "locked": "ngaQ",
+      "has_vcs": "VCS rarlu'"
+    }
   }
 }

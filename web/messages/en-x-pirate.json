@@ -4379,5 +4379,38 @@
       "verification": "The vouchin''",
       "supplyChain": "What be inside"
     }
+  },
+  "exclude": {
+    "title": "Exclusions",
+    "selectorLead": "Strike work-decks from th'' selection. Each exclusion be a selector in its own right, an'' a work-deck matchin'' any o'' them be left out — so this be how ye say “all o'' this kind, savin'' those”.",
+    "selectorHint": "Exclusions be OR-ed: a work-deck matchin'' any one o'' them be left out, while th'' dimensions within a single exclusion be AND-ed together. An exclusion cannot hold another within it, an'' nay more than {max} be allowed. An exclusion that matches naught protects naught, so it be flagged here an'' refused on apply.",
+    "none": "No exclusions. Every work-deck th'' selector matches be taken aboard.",
+    "count": "{n, plural, one {# exclusion entry} other {# exclusion entries}}",
+    "entry": "Exclusion entry {n}",
+    "add": "Add an exclusion",
+    "atCap": "At th'' limit o'' {max} exclusions.",
+    "any": "Any",
+    "yes": "Aye",
+    "no": "Nay",
+    "rowNoSelector": "This exclusion sets naught, so it protects naught. Set a dimension or strike it.",
+    "rowMatchesNothing": "This exclusion matches naught a work-deck, so it protects naught.",
+    "excludedCount": "{n, plural, one {# work-deck kept out} other {# work-decks kept out}}.",
+    "blocksApply": "{n, plural, one {Exclusion {rows} matches naught a work-deck, so it protects naught. Mend it or strike it afore ye apply.} other {Exclusions {rows} match naught a work-deck, so they protect naught. Mend ''em or strike ''em afore ye apply.}}",
+    "dim": {
+      "labels": "Markings",
+      "workspace_ids": "Work-deck IDs",
+      "name_prefix": "Name prefix",
+      "name_glob": "Name pattern",
+      "execution_backend": "Execution engine",
+      "execution_mode": "Execution mode",
+      "engine_version": "Engine''s mark",
+      "agent_pool_id": "Crew pool",
+      "vcs_connection_id": "VCS mooring",
+      "autodiscovery_rule_id": "Huntin'' rule",
+      "owner_email": "Cap''n''s email",
+      "drift_status": "Drift status",
+      "locked": "Battened down",
+      "has_vcs": "VCS-moored"
+    }
   }
 }

@@ -4379,5 +4379,38 @@
       "verification": "Doğrulama",
       "supplyChain": "İçerik"
     }
+  },
+  "exclude": {
+    "title": "Hariç tutmalar",
+    "selectorLead": "Çalışma alanlarını seçimden çıkarın. Her hariç tutma kendisi de bir seçicidir ve bunlardan herhangi biriyle eşleşen bir çalışma alanı dışarıda bırakılır — yani “bu türden her şey, bunlar hariç” demenin yolu budur.",
+    "selectorHint": "Hariç tutmalar OR ile birleştirilir: bunlardan herhangi biriyle eşleşen bir çalışma alanı dışarıda bırakılır; tek bir hariç tutma içindeki boyutlar ise AND ile birleştirilir. Bir hariç tutma başka birini içeremez ve en fazla {max} tanesine izin verilir. Hiçbir şeyle eşleşmeyen bir hariç tutma hiçbir şeyi korumaz; bu nedenle burada işaretlenir ve uygulama sırasında reddedilir.",
+    "none": "Hariç tutma yok. Seçicinin eşleştirdiği her çalışma alanı dahil edilecek.",
+    "count": "{n, plural, one {# hariç tutma} other {# hariç tutma}}",
+    "entry": "Hariç tutma {n}",
+    "add": "Hariç tutma ekle",
+    "atCap": "{max} hariç tutma sınırına ulaşıldı.",
+    "any": "Herhangi",
+    "yes": "Evet",
+    "no": "Hayır",
+    "rowNoSelector": "Bu hariç tutma hiçbir şey ayarlamıyor, dolayısıyla hiçbir şeyi korumuyor. Bir boyut ayarlayın veya onu kaldırın.",
+    "rowMatchesNothing": "Bu hariç tutma hiçbir çalışma alanıyla eşleşmiyor, dolayısıyla hiçbir şeyi korumuyor.",
+    "excludedCount": "{n, plural, one {# çalışma alanı hariç tutuldu} other {# çalışma alanı hariç tutuldu}}.",
+    "blocksApply": "{n, plural, one {{rows} numaralı hariç tutma hiçbir çalışma alanıyla eşleşmiyor, dolayısıyla hiçbir şeyi korumuyor. Uygulamadan önce bunu düzeltin veya kaldırın.} other {{rows} numaralı hariç tutmalar hiçbir çalışma alanıyla eşleşmiyor, dolayısıyla hiçbir şeyi korumuyor. Uygulamadan önce bunları düzeltin veya kaldırın.}}",
+    "dim": {
+      "labels": "Etiketler",
+      "workspace_ids": "Çalışma alanı ID''leri",
+      "name_prefix": "Ad öneki",
+      "name_glob": "Ad deseni",
+      "execution_backend": "Yürütme motoru",
+      "execution_mode": "Yürütme modu",
+      "engine_version": "Motor sürümü",
+      "agent_pool_id": "Aracı havuzu",
+      "vcs_connection_id": "VCS bağlantısı",
+      "autodiscovery_rule_id": "Otomatik keşif kuralı",
+      "owner_email": "Sahip e-postası",
+      "drift_status": "Sapma durumu",
+      "locked": "Kilitli",
+      "has_vcs": "VCS bağlı"
+    }
   }
 }

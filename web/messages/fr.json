@@ -4379,5 +4379,38 @@
       "verification": "Vérification",
       "supplyChain": "Contenu"
     }
+  },
+  "exclude": {
+    "title": "Exclusions",
+    "selectorLead": "Retirez des espaces de travail de la sélection. Chaque exclusion est elle-même un sélecteur, et un espace de travail qui correspond à l''une d''elles est écarté — c''est ainsi que l''on dit « tout ce qui est de ce type, sauf ceux-là ».",
+    "selectorHint": "Les exclusions sont combinées par OU : un espace de travail qui correspond à l''une quelconque d''elles est écarté, tandis que les dimensions au sein d''une même exclusion sont combinées par ET. Une exclusion ne peut pas en contenir une autre, et {max} au maximum sont autorisées. Une exclusion qui ne correspond à rien ne protège rien : elle est donc signalée ici et refusée à l''application.",
+    "none": "Aucune exclusion. Tous les espaces de travail correspondant au sélecteur seront inclus.",
+    "count": "{n, plural, one {# exclusion} other {# exclusions}}",
+    "entry": "Exclusion {n}",
+    "add": "Ajouter une exclusion",
+    "atCap": "Limite de {max} exclusions atteinte.",
+    "any": "Indifférent",
+    "yes": "Oui",
+    "no": "Non",
+    "rowNoSelector": "Cette exclusion ne définit rien, elle ne protège donc rien. Définissez une dimension ou supprimez-la.",
+    "rowMatchesNothing": "Cette exclusion ne correspond à aucun espace de travail, elle ne protège donc rien.",
+    "excludedCount": "{n, plural, one {# espace de travail exclu} other {# espaces de travail exclus}}.",
+    "blocksApply": "{n, plural, one {L''exclusion {rows} ne correspond à aucun espace de travail, elle ne protège donc rien. Corrigez-la ou supprimez-la avant d''appliquer.} other {Les exclusions {rows} ne correspondent à aucun espace de travail, elles ne protègent donc rien. Corrigez-les ou supprimez-les avant d''appliquer.}}",
+    "dim": {
+      "labels": "Labels",
+      "workspace_ids": "ID des espaces de travail",
+      "name_prefix": "Préfixe du nom",
+      "name_glob": "Motif du nom",
+      "execution_backend": "Moteur d''exécution",
+      "execution_mode": "Mode d''exécution",
+      "engine_version": "Version du moteur",
+      "agent_pool_id": "Pool d''agents",
+      "vcs_connection_id": "Connexion VCS",
+      "autodiscovery_rule_id": "Règle de découverte automatique",
+      "owner_email": "E-mail du propriétaire",
+      "drift_status": "État de dérive",
+      "locked": "Verrouillé",
+      "has_vcs": "VCS connecté"
+    }
   }
 }

@@ -4379,5 +4379,38 @@
       "verification": "Verifiering",
       "supplyChain": "Innehåll"
     }
+  },
+  "exclude": {
+    "title": "Undantag",
+    "selectorLead": "Ta bort arbetsytor från urvalet. Varje undantag är självt en selektor, och en arbetsyta som matchar något av dem faller bort — så säger du ”allt av det här slaget, utom dessa”.",
+    "selectorHint": "Undantag kombineras med ELLER: en arbetsyta som matchar bara ett av dem faller bort, medan dimensionerna inom ett enskilt undantag kombineras med OCH. Ett undantag kan inte självt innehålla ett annat, och högst {max} tillåts. Ett undantag som inte matchar något skyddar ingenting, så det flaggas här och avvisas vid tillämpning.",
+    "none": "Inga undantag. Varje arbetsyta som selektorn matchar tas med.",
+    "count": "{n, plural, one {# undantag} other {# undantag}}",
+    "entry": "Undantag {n}",
+    "add": "Lägg till undantag",
+    "atCap": "Gränsen på {max} undantag är nådd.",
+    "any": "Alla",
+    "yes": "Ja",
+    "no": "Nej",
+    "rowNoSelector": "Det här undantaget anger ingenting och skyddar därför ingenting. Ange en dimension eller ta bort det.",
+    "rowMatchesNothing": "Det här undantaget matchar ingen arbetsyta och skyddar därför ingenting.",
+    "excludedCount": "{n, plural, one {# arbetsyta utesluten} other {# arbetsytor uteslutna}}.",
+    "blocksApply": "{n, plural, one {Undantag {rows} matchar ingen arbetsyta och skyddar därför ingenting. Åtgärda eller ta bort det innan du tillämpar.} other {Undantagen {rows} matchar ingen arbetsyta och skyddar därför ingenting. Åtgärda eller ta bort dem innan du tillämpar.}}",
+    "dim": {
+      "labels": "Etiketter",
+      "workspace_ids": "Arbetsyte-ID:n",
+      "name_prefix": "Namnprefix",
+      "name_glob": "Namnmönster",
+      "execution_backend": "Exekveringsmotor",
+      "execution_mode": "Exekveringsläge",
+      "engine_version": "Motorversion",
+      "agent_pool_id": "Agentpool",
+      "vcs_connection_id": "VCS-anslutning",
+      "autodiscovery_rule_id": "Autoupptäcktsregel",
+      "owner_email": "Ägarens e-post",
+      "drift_status": "Driftstatus",
+      "locked": "Låst",
+      "has_vcs": "Ansluten till VCS"
+    }
   }
 }

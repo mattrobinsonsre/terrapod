@@ -4379,5 +4379,38 @@
       "verification": "Marklar",
       "supplyChain": "Marklars"
     }
+  },
+  "exclude": {
+    "title": "Marklars",
+    "selectorLead": "Remove marklars from the marklar. Each marklar is itself a marklar, and a marklar matching any of them is left out — so this is how you say “everything of this marklar, except those”.",
+    "selectorHint": "Marklars are OR-ed: a marklar matching any one of them is left out, while the marklars within a single marklar are AND-ed together. A marklar cannot itself contain another, and at most {max} are allowed. A marklar that matches nothing protects nothing, so it is flagged here and refused on apply.",
+    "none": "No marklars. Every marklar the marklar matches will be included.",
+    "count": "{n, plural, one {# marklar} other {# marklars}}",
+    "entry": "Marklar {n}",
+    "add": "Add marklar",
+    "atCap": "At the marklar of {max} marklars.",
+    "any": "Any",
+    "yes": "Yes",
+    "no": "No",
+    "rowNoSelector": "This marklar sets nothing, so it protects nothing. Set a marklar or remove it.",
+    "rowMatchesNothing": "This marklar matches no marklar, so it protects nothing.",
+    "excludedCount": "{n, plural, one {# marklar excluded} other {# marklars excluded}}.",
+    "blocksApply": "{n, plural, one {Marklar {rows} matches no marklar, so it protects nothing. Fix or remove it before applying.} other {Marklars {rows} match no marklar, so they protect nothing. Fix or remove them before applying.}}",
+    "dim": {
+      "labels": "Marklars",
+      "workspace_ids": "Marklar marklars",
+      "name_prefix": "Marklar marklar",
+      "name_glob": "Marklar marklar",
+      "execution_backend": "Marklar marklar",
+      "execution_mode": "Marklar marklar",
+      "engine_version": "Marklar marklar",
+      "agent_pool_id": "Marklar marklar",
+      "vcs_connection_id": "VCS marklar",
+      "autodiscovery_rule_id": "Marklar marklar",
+      "owner_email": "Marklar marklar",
+      "drift_status": "Marklar marklar",
+      "locked": "Locked",
+      "has_vcs": "VCS connected"
+    }
   }
 }

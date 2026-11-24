@@ -4379,5 +4379,38 @@
       "verification": "Dilysu",
       "supplyChain": "Cynnwys"
     }
+  },
+  "exclude": {
+    "title": "Eithriadau",
+    "selectorLead": "Tynnu gweithfannau o''r dewisiad. Mae pob eithriad yn ddewisydd ynddo''i hun, ac mae gweithfan sy''n cydweddu ag unrhyw un ohonynt yn cael ei hepgor — felly dyma''r ffordd o ddweud “popeth o''r math hwn, ac eithrio''r rhain”.",
+    "selectorHint": "Mae eithriadau''n cael eu cyfuno â OR: mae gweithfan sy''n cydweddu ag unrhyw un ohonynt yn cael ei hepgor, ond mae''r dimensiynau o fewn un eithriad yn cael eu cyfuno â AND. Ni all eithriad gynnwys un arall, a {max} ar y mwyaf a ganiateir. Nid yw eithriad nad yw''n cydweddu â dim yn gwarchod dim, felly caiff ei nodi yma a''i wrthod wrth weithredu.",
+    "none": "Dim eithriadau. Caiff pob gweithfan y mae''r dewisydd yn cydweddu â hi ei chynnwys.",
+    "count": "{n, plural, zero {# eithriad} one {# eithriad} two {# eithriad} few {# eithriad} many {# eithriad} other {# eithriad}}",
+    "entry": "Eithriad {n}",
+    "add": "Ychwanegu eithriad",
+    "atCap": "Ar y terfyn o {max} eithriad.",
+    "any": "Unrhyw",
+    "yes": "Ydy",
+    "no": "Nac ydy",
+    "rowNoSelector": "Nid yw''r eithriad hwn yn gosod dim, felly nid yw''n gwarchod dim. Gosodwch ddimensiwn neu tynnwch ef.",
+    "rowMatchesNothing": "Nid yw''r eithriad hwn yn cydweddu ag unrhyw weithfan, felly nid yw''n gwarchod dim.",
+    "excludedCount": "{n, plural, zero {Eithriwyd # gweithfan} one {Eithriwyd # weithfan} two {Eithriwyd # weithfan} few {Eithriwyd # gweithfan} many {Eithriwyd # gweithfan} other {Eithriwyd # gweithfan}}.",
+    "blocksApply": "{n, plural, zero {Nid yw eithriadau {rows} yn cydweddu ag unrhyw weithfan, felly nid ydynt yn gwarchod dim. Trwsiwch neu tynnwch hwy cyn gweithredu.} one {Nid yw eithriad {rows} yn cydweddu ag unrhyw weithfan, felly nid yw''n gwarchod dim. Trwsiwch neu tynnwch ef cyn gweithredu.} two {Nid yw eithriadau {rows} yn cydweddu ag unrhyw weithfan, felly nid ydynt yn gwarchod dim. Trwsiwch neu tynnwch hwy cyn gweithredu.} few {Nid yw eithriadau {rows} yn cydweddu ag unrhyw weithfan, felly nid ydynt yn gwarchod dim. Trwsiwch neu tynnwch hwy cyn gweithredu.} many {Nid yw eithriadau {rows} yn cydweddu ag unrhyw weithfan, felly nid ydynt yn gwarchod dim. Trwsiwch neu tynnwch hwy cyn gweithredu.} other {Nid yw eithriadau {rows} yn cydweddu ag unrhyw weithfan, felly nid ydynt yn gwarchod dim. Trwsiwch neu tynnwch hwy cyn gweithredu.}}",
+    "dim": {
+      "labels": "Labeli",
+      "workspace_ids": "IDau gweithfan",
+      "name_prefix": "Rhagddodiad enw",
+      "name_glob": "Patrwm enw",
+      "execution_backend": "Peiriant gweithredu",
+      "execution_mode": "Modd gweithredu",
+      "engine_version": "Fersiwn peiriant",
+      "agent_pool_id": "Pwll asiantau",
+      "vcs_connection_id": "Cysylltiad VCS",
+      "autodiscovery_rule_id": "Rheol awtoddarganfod",
+      "owner_email": "E-bost y perchennog",
+      "drift_status": "Statws drifft",
+      "locked": "Wedi''i gloi",
+      "has_vcs": "Cysylltiedig â VCS"
+    }
   }
 }

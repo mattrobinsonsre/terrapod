@@ -4379,5 +4379,38 @@
       "verification": "Verifica",
       "supplyChain": "Contenuto"
     }
+  },
+  "exclude": {
+    "title": "Esclusioni",
+    "selectorLead": "Rimuove workspace dalla selezione. Ogni esclusione è essa stessa un selettore e un workspace che corrisponde a una qualsiasi di esse viene escluso — è così che si dice «tutto quello di questo tipo, tranne quelli».",
+    "selectorHint": "Le esclusioni sono combinate in OR: un workspace che corrisponde a una qualsiasi di esse viene escluso, mentre le dimensioni all''interno di una singola esclusione sono combinate in AND. Un''esclusione non può contenerne un''altra e ne sono consentite al massimo {max}. Un''esclusione che non corrisponde a nulla non protegge nulla, quindi viene segnalata qui e rifiutata in fase di applicazione.",
+    "none": "Nessuna esclusione. Verranno inclusi tutti i workspace che corrispondono al selettore.",
+    "count": "{n, plural, one {# esclusione} other {# esclusioni}}",
+    "entry": "Esclusione {n}",
+    "add": "Aggiungi esclusione",
+    "atCap": "Raggiunto il limite di {max} esclusioni.",
+    "any": "Qualsiasi",
+    "yes": "Sì",
+    "no": "No",
+    "rowNoSelector": "Questa esclusione non imposta nulla, quindi non protegge nulla. Imposta una dimensione oppure rimuovila.",
+    "rowMatchesNothing": "Questa esclusione non corrisponde ad alcun workspace, quindi non protegge nulla.",
+    "excludedCount": "{n, plural, one {# workspace escluso} other {# workspace esclusi}}.",
+    "blocksApply": "{n, plural, one {L''esclusione {rows} non corrisponde ad alcun workspace, quindi non protegge nulla. Correggila o rimuovila prima di applicare.} other {Le esclusioni {rows} non corrispondono ad alcun workspace, quindi non proteggono nulla. Correggile o rimuovile prima di applicare.}}",
+    "dim": {
+      "labels": "Etichette",
+      "workspace_ids": "ID workspace",
+      "name_prefix": "Prefisso del nome",
+      "name_glob": "Modello del nome",
+      "execution_backend": "Backend di esecuzione",
+      "execution_mode": "Modalità di esecuzione",
+      "engine_version": "Versione del motore",
+      "agent_pool_id": "Pool di agenti",
+      "vcs_connection_id": "Connessione VCS",
+      "autodiscovery_rule_id": "Regola di autodiscovery",
+      "owner_email": "Email del proprietario",
+      "drift_status": "Stato di deriva",
+      "locked": "Bloccato",
+      "has_vcs": "VCS connesso"
+    }
   }
 }

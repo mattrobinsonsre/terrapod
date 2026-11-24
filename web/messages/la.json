@@ -4379,5 +4379,38 @@
       "verification": "Verificatio",
       "supplyChain": "Contenta"
     }
+  },
+  "exclude": {
+    "title": "Exclusiones",
+    "selectorLead": "Loca operis ex selectione remove. Quaeque exclusio ipsa selector est, et locus operis cuilibet earum congruens excluditur — ita dicis «omnia huius generis, praeter illa».",
+    "selectorHint": "Exclusiones per VEL coniunguntur: locus operis cuilibet earum congruens excluditur, dimensiones autem intra unam eandemque exclusionem per ET coniunguntur. Exclusio aliam in se continere non potest, et ad summum {max} permittuntur. Exclusio quae nulli congruit nihil tuetur, ideo hic notatur et in applicando respuitur.",
+    "none": "Nullae exclusiones. Omnia loca operis quibus selector congruit includentur.",
+    "count": "{n, plural, one {# exclusio} other {# exclusiones}}",
+    "entry": "Exclusio {n}",
+    "add": "Exclusionem addere",
+    "atCap": "Ad limitem {max} exclusionum perventum est.",
+    "any": "Quilibet",
+    "yes": "Ita",
+    "no": "Non",
+    "rowNoSelector": "Haec exclusio nihil statuit, ideo nihil tuetur. Dimensionem statue aut eam remove.",
+    "rowMatchesNothing": "Haec exclusio nulli loco operis congruit, ideo nihil tuetur.",
+    "excludedCount": "{n, plural, one {# locus operis exclusus} other {# loca operis exclusa}}.",
+    "blocksApply": "{n, plural, one {Exclusio {rows} nulli loco operis congruit, ideo nihil tuetur. Eam corrige aut remove priusquam applices.} other {Exclusiones {rows} nullis locis operis congruunt, ideo nihil tuentur. Eas corrige aut remove priusquam applices.}}",
+    "dim": {
+      "labels": "Tituli",
+      "workspace_ids": "ID locorum operis",
+      "name_prefix": "Praefixum nominis",
+      "name_glob": "Forma nominis",
+      "execution_backend": "Machina exsecutionis",
+      "execution_mode": "Modus exsecutionis",
+      "engine_version": "Versio machinae",
+      "agent_pool_id": "Congeries agentium",
+      "vcs_connection_id": "Nexus VCS",
+      "autodiscovery_rule_id": "Regula autoinventionis",
+      "owner_email": "Inscriptio domini",
+      "drift_status": "Status aberrationis",
+      "locked": "Clausum",
+      "has_vcs": "VCS connexum"
+    }
   }
 }
