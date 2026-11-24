@@ -252,10 +252,6 @@
                     "type": "string",
                     "description": "Match workspaces using this agent pool.\n"
                 },
-                "driftStatus": {
-                    "type": "string",
-                    "description": "Match the current drift status.\n"
-                },
                 "engineVersion": {
                     "type": "string",
                     "description": "Match the configured engine version.\n"
@@ -278,10 +274,6 @@
                         "type": "string"
                     },
                     "description": "Match workspaces carrying all of these labels.\n"
-                },
-                "locked": {
-                    "type": "boolean",
-                    "description": "Match workspaces by lock state.\n"
                 },
                 "nameGlob": {
                     "type": "string",

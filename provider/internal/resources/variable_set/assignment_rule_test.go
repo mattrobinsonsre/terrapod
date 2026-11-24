@@ -50,8 +50,6 @@ func TestAssignmentRuleRoundTrips(t *testing.T) {
 		AgentPoolID:      types.StringValue("apool-1"),
 		VCSConnectionID:  types.StringValue("vcs-1"),
 		OwnerEmail:       types.StringValue("owner@example.com"),
-		DriftStatus:      types.StringValue("drifted"),
-		Locked:           types.BoolValue(true),
 		HasVCS:           types.BoolValue(false),
 	}
 
@@ -80,8 +78,6 @@ func TestEveryRuleDimensionSurvivesTheRoundTrip(t *testing.T) {
 		AgentPoolID:      types.StringValue("apool-1"),
 		VCSConnectionID:  types.StringValue("vcs-1"),
 		OwnerEmail:       types.StringValue("o@e.com"),
-		DriftStatus:      types.StringValue("drifted"),
-		Locked:           types.BoolValue(true),
 		HasVCS:           types.BoolValue(true),
 	}
 	v := reflect.ValueOf(*original)

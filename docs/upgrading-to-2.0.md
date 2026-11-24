@@ -499,6 +499,43 @@ Set either back to `false` if you need the old behaviour while you adjust, but t
 temporary — the refusals exist because the permissive shapes are the ones a trust policy
 silently accepts.
 
+### `drift_status` and `locked` are removed from a variable-set assignment rule
+
+**Affects:** a `terrapod_variable_set` (or the Pulumi equivalent) whose
+`assignment_rule` block sets either attribute. If your rules match on labels,
+names, pools, VCS connections, owner or `has_vcs`, nothing changes.
+
+**They never worked.** The server refuses both — `RULE_DIMENSIONS_REFUSED` — in a
+positive term as firmly as inside an `exclude` entry, with a 422 naming the
+dimension. So a configuration setting one got an apply-time refusal against a
+schema description that asserted it worked, and an operator filling the matching
+selector in the UI got a failed save. Removing them turns an apply-time 422 into
+a plan-time "Unsupported argument", which names the attribute and the line.
+
+The reason the server refuses them is worth knowing, because it is not an
+oversight to be lifted later: both are **momentary** properties of a workspace
+rather than the stable facts a rule is evaluated against. Drift status is written
+by the drift checker and cleared by `dismiss-drift` or by disabling drift
+detection; lock state moves through the lock, unlock and force-unlock endpoints,
+which need only `workspace:lock`. A workspace's own owner can move either, so a
+rule naming one would both match a different set on every evaluation and let that
+owner opt their workspace into or out of a variable set.
+
+**To migrate:** delete the attribute from the block. There is no replacement,
+because there was never any behaviour to replace — a rule carrying one matched
+nothing.
+
+```hcl
+assignment_rule {
+  labels = { env = "prod" }
+  # drift_status = "drifted"   <- delete
+  # locked       = false       <- delete
+}
+```
+
+`autodiscovery_rule_id` is refused for the same reason and was never offered on
+this block.
+
 ### `ansible-host-key-checking` is replaced by `ssh-host-key-policy`
 
 **Affects:** anything that SETS the attribute by name — a `terrapod_workspace` or
