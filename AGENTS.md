@@ -123,6 +123,14 @@ make dev           # local Kubernetes dev stack (Tilt)
 make dev-down      # stop the dev stack
 ```
 
+**Do not run Prettier on this repository.** There is no Prettier config and no
+`format` script; the TypeScript and React sources were not written with it and
+nothing in CI applies it. Running it reformats whole files and buries the change
+— one ~30-line edit came back as 771 insertions and 624 deletions. Python is
+formatted by `ruff format` (run from `services/`, and from the repo root for
+`scripts/`, which has its own config — both halves of the pair are in CI, so
+`ruff check` passing says nothing about `ruff format`).
+
 Per-surface verification before you push (lint alone is **not** enough):
 
 - **Python** changes → `make test`
@@ -278,6 +286,16 @@ that surfaces the changed thing has been carried along with it.
     property of the SETTING ("this one is consequential") applies equally to every
     other client and is therefore an argument about the feature, not about MCP.
 
+    **And know which half of a tool is frozen.** A **field** description lives
+    inside `input_schema`, so it IS pinned by `tool_catalogue.json` and editing
+    one fails the golden until it is regenerated. The **tool-level**
+    `Description` is pinned by nothing — it can go false with every gate green,
+    and it is the half an agent reads first. So when behaviour changes, re-read
+    the tool description as deliberately as the code: an agent cannot
+    sanity-check a confident false statement the way a person can, and a wrong
+    description is worse than a missing tool because it is confidently
+    actionable.
+
 The workflow when extending the API:
 
 1. Add the endpoint to the appropriate router (`/api/tfe/v2/` only if it's on the
@@ -297,6 +315,54 @@ references it, the migration tool if it touches that field, and any MCP tool
 that returns it. go-terrapod is the single source of truth for the Go-side
 view; the provider, migration tools, and MCP do not carry their own JSON:API
 marshaling — they read the changed shape off go-terrapod.
+
+## Writing provider attributes (hard requirements)
+
+The Terraform provider is the surface where a small mistake becomes
+`Provider produced inconsistent result after apply` — an error that names the
+provider and not the cause, and that an operator cannot work around. Five
+separate fixes in one six-week window came from the rules below, so they are
+stated rather than left to precedent.
+
+- **Validate, never transform, a value the provider sends.** Refuse what is
+  unacceptable with a 422 and store the rest byte for byte. A server that
+  lower-cases, trims or truncates an attribute makes the plan disagree with the
+  result, and every apply fails. Where tolerance is wanted, put it on the
+  **read** side, where it costs nothing — and note that truncating a value
+  stores something the caller did not ask for, which for anything
+  security-relevant is worse than refusing it. Write-only attributes are exempt:
+  the provider never reads them back, so no inconsistency is possible. The test
+  is whether the value is returned, not whether it is sensitive.
+- **An explicit empty string must round-trip.** `""` is a value, not an absence:
+  for most attributes it means "clear this", and the only thing that means
+  "inherit" is the key being absent from the request. So a write path keys on
+  presence (`"x" in attrs`), never on truthiness — `if attrs.get("x")` silently
+  turns an explicit clear into an inherit, and there is then no way to express
+  either. The read side must not substitute a default for a stored empty value,
+  or a client writing a read straight back pins every inheriting object to
+  whatever the default was at read time. A test using an object with a *concrete*
+  value cannot see this; the fixture has to store `""`.
+- **`UseStateForUnknown` belongs only on a Computed-only attribute** whose value
+  cannot change as a side effect of the apply. On an `Optional + Computed`
+  attribute whose stored value the server *normalises*, reading the server's
+  answer back over a configured value is the inconsistency above. Check what the
+  precedent you are copying **depends on**, not what it looks like: two
+  attributes can be deliberately asymmetrical because one is stored verbatim and
+  the other is resolved, and that asymmetry is the design.
+- **A repeated block is named in the singular** — `ansible_collection`, not
+  `ansible_collections` — because a block is written one at a time and is named
+  for what one of them is. The plural is the list-attribute spelling these
+  inputs had before they became blocks, so it names something no practitioner
+  can write.
+- **Attribute → block is type-preserving and needs no state upgrader.** A single
+  nested attribute and a single nested block are both `object(...)`, and a list
+  of either is `list(object(...))`, so a prior state reads under the new schema.
+  Confirm it from the schema golden, which records each attribute's resulting
+  type, rather than reasoning about it.
+- **Relaxing `Required` deletes a diagnostic, so replace it.** Making an
+  attribute Optional silently removes the framework's own plan-time "argument is
+  required" error; on a long-shipped resource that is a regression, and no test
+  notices because no test asserts an error the framework used to raise for you.
 
 ## The Code ↔ Tests contract (hard)
 
@@ -329,6 +395,21 @@ Routing rules of thumb:
   page must actually render in the E2E stack. It must **also** carry a
   responsive guard (see *Responsive / mobile-first UI* below) — a page that
   only works on desktop is an incomplete change, not a done one.
+- **Extended an enumerable set** — a resource, a data source, a column, a
+  consumer surface, a credential category, an engine, a module, a file location →
+  **find every existing test whose subject is that set, and extend it too.** This
+  is its own routing rule because the tiers above route a *new* test and say
+  nothing about the *existing* ones a change widens, which is how a new column
+  gets a new test while four registries keyed on columns keep passing. The
+  mechanical form: grep for the set's name, and for the ledger constants that
+  enumerate it. Three paths each have registries a change must reach, and each
+  has shipped incomplete — **database** (the model, the migration, and every
+  registry keyed on a column: encryption, replication, the restore path, the
+  retention sweep — a column in no migration is invisible until a fresh install);
+  **API** (the consumer contract above in full, including the snapshot that
+  freezes each surface); **engine** (the per-engine vocabulary, the
+  engine-specific run options, the phase names, and whatever refuses an option on
+  an engine that has no such thing).
 - A **new hard invariant** ("X must never happen") → a source-introspection
   test that reads the implementation and asserts the absence of the forbidden
   pattern, so the invariant fails CI loudly if a future change violates it.
@@ -370,11 +451,131 @@ Routing rules of thumb:
   node to a running install has no deltas at all, so a class that only handles
   deltas produces an empty peer on day one.
 
+Two traps that are properties of this repository's test harness rather than of
+anyone's machine, and both have reached CI green-locally:
+
+- **The test image flattens `services/` into `/app`**, so the test tree sits one
+  directory shallower there than it does in a checkout. A test that resolves a
+  path *outside* `services/` — a provider file, a web page, the Dockerfile, the
+  chart — therefore cannot use `Path(__file__).parents[N]`: the N that is right
+  in one layout is wrong in the other. Use the helper that tries both and
+  **refuses** rather than skipping. And the image copies named files, not trees,
+  so a new file a test reads needs its own `COPY` line or the module is four
+  collection errors in a shard that otherwise passes.
+- **A `@pytest.mark.parametrize` list is built at collection time, so a random
+  value in one breaks `pytest-xdist`.** Each worker builds a different test id,
+  and the shard dies before running anything with
+  `Different tests were collected between gw0 and gw3` — which reads as a broken
+  shard rather than as a defect in one file. It is invisible to a serial run, so
+  a new parametrized file gets one `-n 4` run before it is pushed. Note pytest
+  only puts an argvalue into the id when it is a `str`/`int`/`bool`/`None`, so a
+  bare `uuid.UUID` object is ided by position and is safe; settle it by
+  collecting twice and diffing the ids, not by reading the rule.
+
 E2E isolation invariants (higher worker/shard counts make violations flaky,
 not deterministic): every test creates its own uniquely-named resources and
 tears them down; never assert global counts or absolute list positions; never
 depend on another spec having run; no fixed `setTimeout` waits — use
 Playwright's auto-waiting.
+
+## When you extend a set, extend the gate whose subject is that set (hard requirement)
+
+**This is the single most common way a defect reaches `main` here**, and it is
+worth stating as its own rule because the ordinary review reflex misses it: the
+change is correct, the tests are green, and a gate that exists specifically to
+catch the class keeps passing — because the gate's subject is the *old* set.
+
+The shape is always the same. Something enumerable grows — a resource, a data
+source, a column, a consumer surface, a credential category, an engine, a Go
+module, a file location — and the test whose subject is that enumeration does not
+grow with it. Real instances, each of which shipped:
+
+| the set grew | the gate's subject did not |
+|---|---|
+| the provider gained data sources | the committed-schema gate walked `resources` only, leaving every data source and its attributes unchecked |
+| two Go modules were added | the coverage floor stayed at 7, so two modules were audited by nothing |
+| theme pairings moved into `*.ts` | the contrast gate globbed `*.tsx`, so it read half the app and the dark theme had no gate at all |
+| MCP became a consumer of workspace settings | the parity gate read four surfaces and not that one — 21 of 46 attributes were unreachable from an agent for as long as the gate had existed |
+| a second Kubernetes accessor appeared | the test fixture refused the first one by name, so the second was wide open |
+
+Note what every row has in common: **nobody wrote a bug.** Each gate was correct
+when written, and correct about everything it was looking at.
+
+### Derive the subject; never enumerate it
+
+A gate's subject must be **computed from the thing it guards** — walk the schema,
+read the model's columns, glob the tree, parse the registry — so a new member is
+in scope the day it lands. A hand-kept list is a second place to remember, and it
+is the place that gets forgotten.
+
+Where the subject genuinely cannot be derived, the enumeration is a **ledger**,
+and a ledger needs the checkable half checked: every entry must still resolve to
+something real, so a stale entry fails rather than silently narrowing the gate.
+Prefer a ledger that **expires** — an entry naming the thing that justifies it,
+so removing that thing fails the gate.
+
+### A `>=` floor cannot see a set grow
+
+A floor exists so a matcher that stops matching fails instead of passing on
+nothing, and for that it is exactly right. It is also **structurally blind to the
+case above**: `len(x) >= 7` is as true at nine as at seven.
+
+So where a gate carries a count at all, prefer an **equality against a count
+derived from the tree** over a lower bound. Where a lower bound is genuinely what
+you mean, say so in a comment, and say what the other direction is protected by —
+otherwise the next reader takes the floor for the whole of the gate's reach.
+
+### A fan-out is a set, so the same rule governs the consumer contract
+
+The API ↔ Consumer contract above lists the consumer classes. That list is itself
+an enumeration that grows, so a gate asserting "every consumer carries this"
+must derive its surfaces from the tree rather than naming them. The failure is
+not hypothetical and not symmetrical: a feature that reaches the API, the SDK,
+MCP and the UI but not the provider looks finished from every angle except the
+one nobody checked — and when the *prose* has already been written as though the
+fan-out completed, a reader is told to use a surface that does not exist.
+
+Three propagation paths are worth calling out because each has registries a
+change must reach, and each has shipped incomplete:
+
+- **a database change** — the model, the migration, and every registry keyed on a
+  column: encryption, replication, the restore path, the retention sweep. A
+  column in no migration is invisible until a fresh install.
+- **an API change** — the contract above, in full, including the snapshot that
+  freezes each surface.
+- **an engine change** — the per-engine vocabulary, the engine-specific run
+  options, the phase names, and whatever refuses an option on an engine that has
+  no such thing.
+
+### A defect class that recurs after being written down earns a gate
+
+When the same class of mistake appears again *after* this guide already covers
+it, the words have been tested and have failed. Do not restate them more
+firmly — build the gate. Bounded retry is the worked example: it is a hard
+requirement several sections up, it was broken repeatedly, and every instance
+was written next to code that already complied. That is the tell, and it is why
+this repository has so many derived checks. **Compliance by neighbour is not
+compliance**, because a new call site copies the shape of the work, not the
+shape of the policy.
+
+### A new gate ships with its mutation proof
+
+A gate nobody has seen fail is a gate nobody knows binds. So when you add or
+widen one, break the thing it guards, watch it fail **by the name of the test
+that catches it**, and restore — then say in the PR which mutation you ran.
+
+Two directions, because each catches what the other cannot:
+
+- **remove the behaviour** — the gate must fail. If it does not, the gate is
+  asserting something weaker than its name claims.
+- **narrow the gate's own subject** — drop a surface from its list, lower its
+  floor, restrict its glob. The gate must *also* fail, or it cannot defend
+  against the very drift this section is about.
+
+A mutation that does not fire is not automatically a weak gate: the property may
+have two defenders, or the mutation may not have applied. Isolate before
+concluding, and check the mutation actually landed before reading anything into
+the result.
 
 ## Responsive / mobile-first UI (hard requirement)
 
@@ -894,6 +1095,28 @@ multi-language implementation ships in the same PR**:
   **4xx is final and never retried**. Deliberately best-effort calls (e.g.
   telemetry) may skip retry but MUST say so in a comment. When in doubt, retry.
 
+  **This rule has the worst compliance record of any hard requirement here, and
+  the reason is that it is stated and not gated.** It has been broken by a whole
+  package of pull-through proxies at once, by the one runner→API call out of
+  dozens that lacked it (a single refused connection killed an entire configure
+  run, where every sibling call survived the identical failure), and by nine
+  downloads in one review round. In each case the surrounding code was already
+  compliant — which is the tell: **compliance by neighbour is not compliance**,
+  because a new call site is written by copying the shape of the work, not the
+  shape of the policy. So treat "every sibling call retries" as a reason to check
+  this one, never as evidence that it does.
+
+  Two refinements paid for by the same history:
+
+  - **A retry on a latency-sensitive read path needs its own budget**, not the
+    default policy. A revalidation that sits inline before serving a cached
+    answer must not make a servable read slow — adding the default retry there
+    made every mirrored pull block on a slow upstream. Bound it to what the
+    caller can afford and say what that is.
+  - **An operation retried against a resource it has already partly consumed must
+    release what it holds first.** A retry that re-enters holding handles from the
+    failed attempt is a worse failure than the one it was recovering from.
+
 - **`tfe_v2.py` is the CLI-contract router — don't put anything else in it.**
   `services/terrapod/api/routers/tfe_v2.py` implements *only* the TFE V2 subset
   that the `terraform` / `tofu` CLI actually consumes (catalogued in
@@ -920,6 +1143,18 @@ multi-language implementation ships in the same PR**:
   edited via PATCH. Non-interactive flows that must not abort (e.g. materialising
   a workspace from a legacy rule) use `sanitize_labels` (strip-and-log) instead
   of raising.
+- **A refusal must be distinguishable from success (hard requirement).** When a
+  function can decline to do the thing — a short-circuit, a cooldown, a cache
+  hit, a guard that declines — its return value has to say which happened, and
+  the caller has to act on that rather than on the absence of an exception.
+  Returning `None` for both "did it, nothing to report" and "declined" is how a
+  short-circuit added as a *fix* came to leave a reconnect loop running at
+  network speed, which was strictly worse than the bug being fixed: the thing it
+  removed had been the only thing throttling the loop. The same shape appears as
+  an exception swallowed by a broad `except` that defeats the caller's own guard,
+  and as a refusal reported to a user as the user's own mistake. So: add a
+  short-circuit, and in the same change read every caller to see what it does
+  with the value you now return.
 - **Fix the bug you just found, then carry on (hard requirement).** When you hit
   a bug, error, failing test, or broken endpoint while doing something else —
   **stop and fix it**, then resume. Don't work around it, don't leave a TODO,
@@ -1225,6 +1460,30 @@ git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base imag
   *not* one. When someone asks in six months whether a fix is in a line, the
   recorded origin is the answer — and where there is no origin to record, say
   so, or the absence reads as an oversight.
+- **A carried comment is wrong on arrival if it states the receiving line's
+  reasoning, and a cited line number is wrong by construction.** A comment saying
+  "X does not exist here" was true where it was written and false where it lands,
+  and left alone it reads as a deliberate choice — which is the shape of stale
+  claim that survives review. Cite the **symbol**, never the line: a squash carry
+  shifts every number. Grep a carry for sentences stating a default or a count,
+  not only for code.
+- **Match a carry by CONTENT, never by issue number.** A line that took a whole
+  range as one squash contains none of the individual subjects or numbers it
+  carried, so a number matcher reports everything as missing. `git show
+  "${REF}:path" | grep` for the change's most distinctive identifier — and brace
+  the ref, or the shell reads `:path` as a modifier, `git show` prints nothing,
+  and `grep -c` answers a confident `0`, which reads as "the fix is absent from
+  this line". Print a byte count beside every match count: `bytes=0 hits=0` is
+  the trap, `bytes=19394 hits=3` is an answer.
+- **When a carry is written as a minimal change rather than a cherry-pick, diff
+  the source commit for the lines it CHANGED**, not only the ones it added. An
+  addition-only carry cannot see a sibling revision in the same hunk, which is
+  how two lines shipped a description asserting the opposite of what the change
+  had just delivered.
+- **Treat every doc conflict in a carry as a question about which side is
+  correct**, not as a merge chore. A conflict is precisely where the two lines
+  disagree about one sentence, so one of them is usually wrong — several defects
+  have been found exactly that way.
 - **A patch stays a patch.** A schema migration, a new API route or response
   attribute, a wire-protocol change, or anything that alters what an existing
   configuration does is not patch material — see
