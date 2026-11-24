@@ -90,7 +90,8 @@
       "namePatternPulumi": "'::' 로 구분된 두 부분 — project::stack. 문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 각 부분은 문자 또는 숫자로 시작해야 합니다.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> 명령으로 CLI가 이 워크스페이스를 가리키게 하세요.",
-      "namePatternPulumiLead": "'::' 로 구분된 두 부분 — project::stack."
+      "namePatternPulumiLead": "'::' 로 구분된 두 부분 — project::stack.",
+      "storageLocationDefault": "배포 기본값"
     },
     "stats": {
       "total": "전체",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "첫 접속 시 신뢰",
       "sshHostKeyPolicyOff": "확인하지 않음",
       "sshHostKeyPolicyLead": "구성이 OpenSSH의 세 가지 응답 중 어느 것을 요청하는지입니다. 첫 접속 시 신뢰해도 변경된 키는 여전히 거부됩니다. 확인하지 않으면 호스트가 제시하는 어떤 키든 받아들여지므로 연결이 가로채일 수 있습니다.",
-      "sshHostKeyPolicyHint": "Terrapod는 각 호스트의 승인된 키를 OpenSSH가 대조하는 known_hosts 파일로 만들며, 이 설정은 실행이 요청하는 StrictHostKeyChecking 값입니다. 그 파일은 허용 목록이고 설정은 프로세스 전체에 적용되므로, 모든 호스트를 확인하면 아무도 키를 승인하지 않은 주소는 확인되지 않은 정도가 아니라 도달할 수 없게 됩니다. 첫 접속 시 신뢰는 혼합된 환경을 위한 답입니다. 승인된 키는 계속 엄격하게 확인되고, 아무도 고정하지 않은 호스트는 한 번 연결되며 이후 키가 바뀌면 거부됩니다. 인벤토리의 어떤 것도 이를 덮어쓸 수 없습니다."
+      "sshHostKeyPolicyHint": "Terrapod는 각 호스트의 승인된 키를 OpenSSH가 대조하는 known_hosts 파일로 만들며, 이 설정은 실행이 요청하는 StrictHostKeyChecking 값입니다. 그 파일은 허용 목록이고 설정은 프로세스 전체에 적용되므로, 모든 호스트를 확인하면 아무도 키를 승인하지 않은 주소는 확인되지 않은 정도가 아니라 도달할 수 없게 됩니다. 첫 접속 시 신뢰는 혼합된 환경을 위한 답입니다. 승인된 키는 계속 엄격하게 확인되고, 아무도 고정하지 않은 호스트는 한 번 연결되며 이후 키가 바뀌면 거부됩니다. 인벤토리의 어떤 것도 이를 덮어쓸 수 없습니다.",
+      "storageLocation": "스토리지 위치"
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",

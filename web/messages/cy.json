@@ -90,7 +90,8 @@
       "namePatternPulumi": "Dwy ran wedi'u gwahanu gan '::' — project::stack. Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig; rhaid i bob rhan ddechrau â llythyren neu rif.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Cyfeiriwch y CLI ato gyda <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Dwy ran wedi'u gwahanu gan '::' — project::stack."
+      "namePatternPulumiLead": "Dwy ran wedi'u gwahanu gan '::' — project::stack.",
+      "storageLocationDefault": "Rhagosodiad y defnydd"
     },
     "stats": {
       "total": "Cyfanswm",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Ymddiried ar y cyswllt cyntaf",
       "sshHostKeyPolicyOff": "Peidio â gwirio",
       "sshHostKeyPolicyLead": "Pa un o dri ateb OpenSSH y mae cyflunio yn ei ofyn. Mae ymddiried ar y cyswllt cyntaf yn gwrthod allwedd sydd wedi newid o hyd; mae peidio â gwirio yn derbyn pa allwedd bynnag a gyflwynir gan westeiwr, felly gellir rhyng-gipio'r cysylltiad.",
-      "sshHostKeyPolicyHint": "Mae Terrapod yn troi allweddi cymeradwy pob gwesteiwr yn y ffeil known_hosts y mae OpenSSH yn gwirio yn ei herbyn, a'r gosodiad hwn yw'r gwerth StrictHostKeyChecking y mae'r rhediad yn ei ofyn. Rhestr ganiatáu yw'r ffeil honno, ac mae'r gosodiad yn berthnasol i'r broses gyfan: os gwirir pob gwesteiwr, mae cyfeiriad nad yw neb wedi cymeradwyo allwedd ar ei gyfer nid yn unig heb ei wirio ond yn anghyraeddadwy. Ymddiried ar y cyswllt cyntaf yw'r ateb ar gyfer fflyd gymysg: gwirir allweddi cymeradwy yn llwyr o hyd, ond mae gwesteiwr nad yw neb wedi'i binio yn cysylltu unwaith ac yn cael ei wrthod os bydd ei allwedd yn newid wedyn. Ni all dim yn y rhestr eiddo ddiystyru hyn."
+      "sshHostKeyPolicyHint": "Mae Terrapod yn troi allweddi cymeradwy pob gwesteiwr yn y ffeil known_hosts y mae OpenSSH yn gwirio yn ei herbyn, a'r gosodiad hwn yw'r gwerth StrictHostKeyChecking y mae'r rhediad yn ei ofyn. Rhestr ganiatáu yw'r ffeil honno, ac mae'r gosodiad yn berthnasol i'r broses gyfan: os gwirir pob gwesteiwr, mae cyfeiriad nad yw neb wedi cymeradwyo allwedd ar ei gyfer nid yn unig heb ei wirio ond yn anghyraeddadwy. Ymddiried ar y cyswllt cyntaf yw'r ateb ar gyfer fflyd gymysg: gwirir allweddi cymeradwy yn llwyr o hyd, ond mae gwesteiwr nad yw neb wedi'i binio yn cysylltu unwaith ac yn cael ei wrthod os bydd ei allwedd yn newid wedyn. Ni all dim yn y rhestr eiddo ddiystyru hyn.",
+      "storageLocation": "Lleoliad storio"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

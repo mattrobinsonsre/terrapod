@@ -90,7 +90,8 @@
       "namePatternPulumi": "To deler atskilt av '::' — project::stack. Bare bokstaver, tall, bindestreker og understreker; hver del må begynne med en bokstav eller et tall.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Pek CLI-en mot den med <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "To deler atskilt av '::' — project::stack."
+      "namePatternPulumiLead": "To deler atskilt av '::' — project::stack.",
+      "storageLocationDefault": "Utrullingens standard"
     },
     "stats": {
       "total": "Totalt",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Stol på ved første kontakt",
       "sshHostKeyPolicyOff": "Ikke kontrollér",
       "sshHostKeyPolicyLead": "Hvilket av OpenSSHs tre svar en konfigurasjonskjøring ber om. Å stole på ved første kontakt avviser fortsatt en endret nøkkel; å ikke kontrollere godtar enhver nøkkel en vert viser fram, slik at forbindelsen kan avlyttes.",
-      "sshHostKeyPolicyHint": "Terrapod bygger hver verts godkjente nøkler til den known_hosts-filen OpenSSH kontrollerer mot, og denne innstillingen er den StrictHostKeyChecking-verdien kjøringen ber om. Filen er en tillatelsesliste, og innstillingen gjelder hele prosessen: kontrolleres hver vert, er en adresse ingen har godkjent en nøkkel for ikke bare ukontrollert, men uoppnåelig. Å stole på ved første kontakt er svaret for en blandet flåte: godkjente nøkler kontrolleres fortsatt strengt, mens en vert ingen har festet kobler seg til én gang og avvises hvis nøkkelen senere endres. Ingenting i inventaret kan overstyre det."
+      "sshHostKeyPolicyHint": "Terrapod bygger hver verts godkjente nøkler til den known_hosts-filen OpenSSH kontrollerer mot, og denne innstillingen er den StrictHostKeyChecking-verdien kjøringen ber om. Filen er en tillatelsesliste, og innstillingen gjelder hele prosessen: kontrolleres hver vert, er en adresse ingen har godkjent en nøkkel for ikke bare ukontrollert, men uoppnåelig. Å stole på ved første kontakt er svaret for en blandet flåte: godkjente nøkler kontrolleres fortsatt strengt, mens en vert ingen har festet kobler seg til én gang og avvises hvis nøkkelen senere endres. Ingenting i inventaret kan overstyre det.",
+      "storageLocation": "Lagringssted"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

@@ -124,7 +124,8 @@ export interface FieldSpec {
   /**
    * Settable at create and immutable afterwards.
    *
-   * `engine` is the only one: the native create route reads it off the body
+   * `engine` and `storage-location`. The native create route reads `engine`
+   * off the body
    * (`attrs.get("engine")`, defaulting to Terraform) and nothing on the PATCH
    * path accepts it, because a workspace holds state produced by its own
    * engine. So the create form offers a selector, the edit tab shows it
@@ -166,6 +167,22 @@ export const FIELDS: readonly FieldSpec[] = [
     // and passes it down as a parameter -- and accepted on no PATCH path,
     // because `NEVER_BULK_SETTABLE` rightly calls it identity. So it must be
     // SENT at create and shown read-only afterwards.
+    createOnly: true,
+  },
+  {
+    attr: 'storage-location',
+    id: 'ws-storage-location',
+    group: 'identity',
+    // Identity for the same reason `engine` is: it decides WHERE this
+    // workspace's objects live -- state, plans, logs, configuration versions
+    // and inventory -- and the API refuses an update that changes it, because
+    // nothing moves them between buckets. So the create form offers a
+    // selector, the edit tab shows it read-only, and `toAttributes` emits it
+    // on create only.
+    //
+    // A deployment that configures no named locations has exactly one store,
+    // so the create form renders NO control rather than a select with a single
+    // "default" option -- offering a choice of one is worse than offering none.
     createOnly: true,
   },
 
@@ -599,6 +616,7 @@ export function toAttributes(
 export const LABEL_KEY: Record<string, string> = {
   // identity
   name: 'fields.name',
+  'storage-location': 'fields.storageLocation',
   engine: 'fields.engine',
   // execution
   'execution-mode': 'fields.executionMode',

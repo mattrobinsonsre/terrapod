@@ -769,10 +769,6 @@ _NOT_A_FORM_FIELD: dict[str, str] = {
         "refusal for this one request -- not stored, not a setting, and offering it "
         "as a control would invite an operator to leave it on"
     ),
-    "storage-location": (
-        "a real setting, offered on create only; the form follows with the UI change "
-        "that lists the configured locations, so remove this entry then"
-    ),
 }
 
 #: The functions whose request body IS the workspace write surface.

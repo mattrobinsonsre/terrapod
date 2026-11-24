@@ -90,7 +90,8 @@
       "namePatternPulumi": "Two parts split by '::' — project::stack, matey. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Point yer CLI at it with <code>pulumi stack select default/project/stack</code>, matey.",
-      "namePatternPulumiLead": "Two parts split by '::' — project::stack, matey."
+      "namePatternPulumiLead": "Two parts split by '::' — project::stack, matey.",
+      "storageLocationDefault": "Deployment''s own"
     },
     "stats": {
       "total": "Total",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Trust her on first meetin'",
       "sshHostKeyPolicyOff": "Check none o' them",
       "sshHostKeyPolicyLead": "Which o' OpenSSH's three answers a riggin' calls for. Trustin' her on first meetin' still turns away a key wot's changed; checkin' none takes any key a host waves at ye, so th' line can be listened in on.",
-      "sshHostKeyPolicyHint": "Terrapod musters every host's approved keys into the known_hosts file OpenSSH checks against, an' this setting be the StrictHostKeyChecking value the run calls for. That file be a list o' them as are let through, an' the setting holds fer the whole crew o' the process: check every host an' an address nobody has approved a key fer ain't merely unchecked, it be out o' reach. Trustin' her on first meetin' be the answer fer a mixed fleet: approved keys be checked strict as ever, while a host nobody has pinned comes alongside the once an' be turned away if its key shifts later. Naught in the manifest can overrule it, arr."
+      "sshHostKeyPolicyHint": "Terrapod musters every host's approved keys into the known_hosts file OpenSSH checks against, an' this setting be the StrictHostKeyChecking value the run calls for. That file be a list o' them as are let through, an' the setting holds fer the whole crew o' the process: check every host an' an address nobody has approved a key fer ain't merely unchecked, it be out o' reach. Trustin' her on first meetin' be the answer fer a mixed fleet: approved keys be checked strict as ever, while a host nobody has pinned comes alongside the once an' be turned away if its key shifts later. Naught in the manifest can overrule it, arr.",
+      "storageLocation": "Stowage locker"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

@@ -90,7 +90,8 @@
       "namePatternPulumi": "Dwie części oddzielone '::' — project::stack. Tylko litery, cyfry, myślniki i podkreślenia; każda część musi zaczynać się od litery lub cyfry.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Wskaż go w CLI poleceniem <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Dwie części oddzielone '::' — project::stack."
+      "namePatternPulumiLead": "Dwie części oddzielone '::' — project::stack.",
+      "storageLocationDefault": "Domyślne wdrożenia"
     },
     "stats": {
       "total": "Łącznie",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Zaufaj przy pierwszym kontakcie",
       "sshHostKeyPolicyOff": "Nie sprawdzaj",
       "sshHostKeyPolicyLead": "Której z trzech odpowiedzi OpenSSH żąda konfiguracja. Zaufanie przy pierwszym kontakcie nadal odrzuca zmieniony klucz; brak sprawdzania przyjmuje dowolny klucz, jaki przedstawi host, więc połączenie może zostać przechwycone.",
-      "sshHostKeyPolicyHint": "Terrapod składa zatwierdzone klucze każdego hosta w plik known_hosts, z którym OpenSSH je porównuje, a to ustawienie jest wartością StrictHostKeyChecking, której żąda uruchomienie. Ten plik to lista dozwolonych, a ustawienie obowiązuje w całym procesie: jeśli sprawdzany jest każdy host, to adres, dla którego nikt nie zatwierdził klucza, jest nie tylko niesprawdzony, ale nieosiągalny. Zaufanie przy pierwszym kontakcie to odpowiedź dla mieszanego parku: zatwierdzone klucze są nadal sprawdzane rygorystycznie, a host, którego nikt nie przypiął, łączy się raz i zostaje odrzucony, jeśli jego klucz później się zmieni. Nic w inwentarzu nie może tego nadpisać."
+      "sshHostKeyPolicyHint": "Terrapod składa zatwierdzone klucze każdego hosta w plik known_hosts, z którym OpenSSH je porównuje, a to ustawienie jest wartością StrictHostKeyChecking, której żąda uruchomienie. Ten plik to lista dozwolonych, a ustawienie obowiązuje w całym procesie: jeśli sprawdzany jest każdy host, to adres, dla którego nikt nie zatwierdził klucza, jest nie tylko niesprawdzony, ale nieosiągalny. Zaufanie przy pierwszym kontakcie to odpowiedź dla mieszanego parku: zatwierdzone klucze są nadal sprawdzane rygorystycznie, a host, którego nikt nie przypiął, łączy się raz i zostaje odrzucony, jeśli jego klucz później się zmieni. Nic w inwentarzu nie może tego nadpisać.",
+      "storageLocation": "Lokalizacja magazynu"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

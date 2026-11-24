@@ -90,7 +90,8 @@
       "namePatternPulumi": "Dos partes separadas por '::' — project::stack. Solo letras, números, guiones y guiones bajos; cada parte debe empezar por una letra o un número.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Apunta la CLI a él con <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Dos partes separadas por '::' — project::stack."
+      "namePatternPulumiLead": "Dos partes separadas por '::' — project::stack.",
+      "storageLocationDefault": "Predeterminado del despliegue"
     },
     "stats": {
       "total": "Total",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Confiar en el primer contacto",
       "sshHostKeyPolicyOff": "No comprobar",
       "sshHostKeyPolicyLead": "Cuál de las tres respuestas de OpenSSH pide una configuración. Confiar en el primer contacto sigue rechazando una clave cambiada; no comprobar acepta cualquier clave que presente un host, por lo que la conexión puede ser interceptada.",
-      "sshHostKeyPolicyHint": "Terrapod convierte las claves aprobadas de cada host en el archivo known_hosts contra el que comprueba OpenSSH, y este ajuste es el valor StrictHostKeyChecking que pide la ejecución. Ese archivo es una lista de permitidos y el ajuste se aplica a todo el proceso: si se comprueba cada host, una dirección para la que nadie ha aprobado una clave no solo queda sin comprobar, queda inalcanzable. Confiar en el primer contacto es la respuesta para un parque mixto: las claves aprobadas se siguen comprobando de forma estricta, mientras que un host que nadie ha fijado se conecta una vez y se rechaza si su clave cambia después. Nada en el inventario puede anularlo."
+      "sshHostKeyPolicyHint": "Terrapod convierte las claves aprobadas de cada host en el archivo known_hosts contra el que comprueba OpenSSH, y este ajuste es el valor StrictHostKeyChecking que pide la ejecución. Ese archivo es una lista de permitidos y el ajuste se aplica a todo el proceso: si se comprueba cada host, una dirección para la que nadie ha aprobado una clave no solo queda sin comprobar, queda inalcanzable. Confiar en el primer contacto es la respuesta para un parque mixto: las claves aprobadas se siguen comprobando de forma estricta, mientras que un host que nadie ha fijado se conecta una vez y se rechaza si su clave cambia después. Nada en el inventario puede anularlo.",
+      "storageLocation": "Ubicación de almacenamiento"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",

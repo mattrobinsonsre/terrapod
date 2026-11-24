@@ -90,7 +90,8 @@
       "namePatternPulumi": "Due parti separate da '::' — project::stack. Solo lettere, numeri, trattini e trattini bassi; ogni parte deve iniziare con una lettera o un numero.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Punta la CLI su di esso con <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Due parti separate da '::' — project::stack."
+      "namePatternPulumiLead": "Due parti separate da '::' — project::stack.",
+      "storageLocationDefault": "Predefinito del deployment"
     },
     "stats": {
       "total": "Totale",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Fidati al primo contatto",
       "sshHostKeyPolicyOff": "Non verificare",
       "sshHostKeyPolicyLead": "Quale delle tre risposte di OpenSSH chiede una configurazione. Fidarsi al primo contatto rifiuta comunque una chiave cambiata; non verificare accetta qualsiasi chiave presentata da un host, così la connessione può essere intercettata.",
-      "sshHostKeyPolicyHint": "Terrapod compone le chiavi approvate di ogni host nel file known_hosts contro cui verifica OpenSSH, e questa impostazione è il valore StrictHostKeyChecking che l'esecuzione richiede. Quel file è un elenco di consentiti e l'impostazione vale per tutto il processo: se si verifica ogni host, un indirizzo per cui nessuno ha approvato una chiave non è soltanto non verificato, è irraggiungibile. Fidarsi al primo contatto è la risposta per un parco misto: le chiavi approvate restano verificate in modo rigoroso, mentre un host che nessuno ha fissato si collega una volta e viene rifiutato se la sua chiave cambia in seguito. Nulla nell'inventario può prevalere su questo."
+      "sshHostKeyPolicyHint": "Terrapod compone le chiavi approvate di ogni host nel file known_hosts contro cui verifica OpenSSH, e questa impostazione è il valore StrictHostKeyChecking che l'esecuzione richiede. Quel file è un elenco di consentiti e l'impostazione vale per tutto il processo: se si verifica ogni host, un indirizzo per cui nessuno ha approvato una chiave non è soltanto non verificato, è irraggiungibile. Fidarsi al primo contatto è la risposta per un parco misto: le chiavi approvate restano verificate in modo rigoroso, mentre un host che nessuno ha fissato si collega una volta e viene rifiutato se la sua chiave cambia in seguito. Nulla nell'inventario può prevalere su questo.",
+      "storageLocation": "Posizione di archiviazione"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",

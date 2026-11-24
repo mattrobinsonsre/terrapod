@@ -949,6 +949,13 @@ In the Terraform provider the workspace attribute is `storage_location`,
 rather than at apply. It is deliberately not `RequiresReplace`, which would
 offer to destroy a workspace holding live state.
 
+In the web UI the create form offers a picker, and an existing workspace's
+Configuration tab shows the value read-only beside its engine — the same
+treatment, for the same reason. A deployment that configures no named locations
+gets **no control at all** rather than a select whose only option is the
+default: offering a choice of one is worse than offering none, and that
+deployment genuinely has one store.
+
 ### Agent pool set
 
 A workspace routes its runs to a **set** of agent pools. The set is **flat**:

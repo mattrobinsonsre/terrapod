@@ -90,7 +90,8 @@
       "namePatternPulumi": "Duae partes signo '::' divisae — project::stack. Tantum litterae, numeri, lineolae et lineolae subscriptae; utraque pars littera vel numero incipiat.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Instrumentum CLI eo dirige per <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Duae partes signo '::' divisae — project::stack."
+      "namePatternPulumiLead": "Duae partes signo '::' divisae — project::stack.",
+      "storageLocationDefault": "Praedefinitum instructionis"
     },
     "stats": {
       "total": "Summa",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Primo congressu confidere",
       "sshHostKeyPolicyOff": "Non inspicere",
       "sshHostKeyPolicyLead": "Quam ex tribus responsis OpenSSH configuratio poscat. Primo congressu confidere clavem mutatam adhuc respuit; non inspicere quamlibet clavem quam hospes praebet accipit, itaque conexio intercipi potest.",
-      "sshHostKeyPolicyHint": "Terrapod claves cuiusque hospitis probatas in tabellam known_hosts componit, ad quam OpenSSH inspicit, et haec optio est valor StrictHostKeyChecking quem cursus poscit. Illa tabella index permissorum est et optio per totum processum valet: si omnis hospes inspicitur, locus cui nemo clavem probavit non modo non inspectus sed inaccessus est. Primo congressu confidere responsum est gregi mixto: claves probatae adhuc severe inspiciuntur, hospes autem quem nemo fixit semel conectitur et respuitur si clavis eius postea mutatur. Nihil in inventario hoc vincere potest."
+      "sshHostKeyPolicyHint": "Terrapod claves cuiusque hospitis probatas in tabellam known_hosts componit, ad quam OpenSSH inspicit, et haec optio est valor StrictHostKeyChecking quem cursus poscit. Illa tabella index permissorum est et optio per totum processum valet: si omnis hospes inspicitur, locus cui nemo clavem probavit non modo non inspectus sed inaccessus est. Primo congressu confidere responsum est gregi mixto: claves probatae adhuc severe inspiciuntur, hospes autem quem nemo fixit semel conectitur et respuitur si clavis eius postea mutatur. Nihil in inventario hoc vincere potest.",
+      "storageLocation": "Locus conservationis"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

@@ -90,7 +90,8 @@
       "namePatternPulumi": "Two marklars separated by '::' — marklar::marklar. Marklars, marklars, marklars and marklars only; each marklar must start with a marklar or marklar.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Point the marklar at it with <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Two marklars separated by '::' — marklar::marklar."
+      "namePatternPulumiLead": "Two marklars separated by '::' — marklar::marklar.",
+      "storageLocationDefault": "Marklar marklar"
     },
     "stats": {
       "total": "Total",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Trust on first marklar",
       "sshHostKeyPolicyOff": "Do not verify",
       "sshHostKeyPolicyLead": "Which of OpenSSH's three marklars a marklar asks for. Trusting on first marklar still refuses a changed marklar; not verifying accepts any marklar a marklar presents, so the marklar can be intercepted.",
-      "sshHostKeyPolicyHint": "Terrapod renders each marklar's approved marklars as the known_hosts marklar OpenSSH checks against, and this marklar is the StrictHostKeyChecking marklar the marklar asks for. That marklar is an allow-marklar and the marklar is marklar-wide, so verifying every marklar makes a marklar nobody has approved a marklar for unreachable rather than merely unverified. Trusting on first marklar is the mixed-marklar marklar: approved marklars are still verified strictly, while an unpinned marklar connects once and is refused if its marklar later changes. Nothing in the marklar can override it."
+      "sshHostKeyPolicyHint": "Terrapod renders each marklar's approved marklars as the known_hosts marklar OpenSSH checks against, and this marklar is the StrictHostKeyChecking marklar the marklar asks for. That marklar is an allow-marklar and the marklar is marklar-wide, so verifying every marklar makes a marklar nobody has approved a marklar for unreachable rather than merely unverified. Trusting on first marklar is the mixed-marklar marklar: approved marklars are still verified strictly, while an unpinned marklar connects once and is refused if its marklar later changes. Nothing in the marklar can override it.",
+      "storageLocation": "Marklar marklar"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

@@ -90,7 +90,8 @@
       "namePatternPulumi": "'::' で区切られた 2 つの部分 — project::stack。使用できるのは英数字、ハイフン、アンダースコアのみで、各部分は英字または数字で始まる必要があります。",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> で CLI をこのワークスペースに向けます。",
-      "namePatternPulumiLead": "'::' で区切られた 2 つの部分 — project::stack。"
+      "namePatternPulumiLead": "'::' で区切られた 2 つの部分 — project::stack。",
+      "storageLocationDefault": "デプロイメントの既定値"
     },
     "stats": {
       "total": "合計",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "初回接続時に信頼する",
       "sshHostKeyPolicyOff": "確認しない",
       "sshHostKeyPolicyLead": "構成が OpenSSH の 3 つの応答のどれを求めるかです。初回接続時に信頼しても、変更された鍵はやはり拒否されます。確認しない場合は、ホストが提示するどの鍵も受け入れられるため、接続を傍受されるおそれがあります。",
-      "sshHostKeyPolicyHint": "Terrapod は各ホストの承認済み鍵を、OpenSSH が照合する known_hosts ファイルとして生成し、この設定は実行が求める StrictHostKeyChecking の値です。このファイルは許可リストであり、設定はプロセス全体に及びます。すべてのホストを確認すると、誰も鍵を承認していないアドレスは未確認であるだけでなく到達不能になります。初回接続時に信頼するのは混在した環境向けの答えで、承認済みの鍵は引き続き厳密に確認され、誰も固定していないホストは一度だけ接続でき、その後に鍵が変わると拒否されます。インベントリの何もこれを上書きできません。"
+      "sshHostKeyPolicyHint": "Terrapod は各ホストの承認済み鍵を、OpenSSH が照合する known_hosts ファイルとして生成し、この設定は実行が求める StrictHostKeyChecking の値です。このファイルは許可リストであり、設定はプロセス全体に及びます。すべてのホストを確認すると、誰も鍵を承認していないアドレスは未確認であるだけでなく到達不能になります。初回接続時に信頼するのは混在した環境向けの答えで、承認済みの鍵は引き続き厳密に確認され、誰も固定していないホストは一度だけ接続でき、その後に鍵が変わると拒否されます。インベントリの何もこれを上書きできません。",
+      "storageLocation": "ストレージの場所"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

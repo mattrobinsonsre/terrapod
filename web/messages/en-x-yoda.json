@@ -90,7 +90,8 @@
       "namePatternPulumi": "Separated by '::', two parts there are — project::stack. Only letters, numbers, hyphens and underscores; start with a letter or number, each part must.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "At it, point the CLI with <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Separated by '::', two parts there are — project::stack."
+      "namePatternPulumiLead": "Separated by '::', two parts there are — project::stack.",
+      "storageLocationDefault": "default, Deployment"
     },
     "stats": {
       "total": "Total",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "On first contact, trust",
       "sshHostKeyPolicyOff": "Verify, do not",
       "sshHostKeyPolicyLead": "Which of OpenSSH's three answers a configure asks for, this is. Trusting on first contact, a changed key it still refuses; not verifying, any key a host presents it accepts, so intercepted the connection can be.",
-      "sshHostKeyPolicyHint": "Each host's approved keys as the known_hosts file OpenSSH checks against, Terrapod renders, and the StrictHostKeyChecking value the run asks for, this setting is. An allow-list that file is, and process-wide the setting is, so verifying every host, an address nobody has approved a key for it makes unreachable rather than merely unverified. The mixed-fleet answer, trusting on first contact is: strictly verified the approved keys still are, while an unpinned host connects once and refused it is, if its key later changes. Override it, nothing in the inventory can, hmm."
+      "sshHostKeyPolicyHint": "Each host's approved keys as the known_hosts file OpenSSH checks against, Terrapod renders, and the StrictHostKeyChecking value the run asks for, this setting is. An allow-list that file is, and process-wide the setting is, so verifying every host, an address nobody has approved a key for it makes unreachable rather than merely unverified. The mixed-fleet answer, trusting on first contact is: strictly verified the approved keys still are, while an unpinned host connects once and refused it is, if its key later changes. Override it, nothing in the inventory can, hmm.",
+      "storageLocation": "Location, Storage"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

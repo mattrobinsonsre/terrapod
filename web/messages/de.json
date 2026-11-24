@@ -90,7 +90,8 @@
       "namePatternPulumi": "Zwei durch '::' getrennte Teile — project::stack. Nur Buchstaben, Zahlen, Bindestriche und Unterstriche; jeder Teil muss mit einem Buchstaben oder einer Zahl beginnen.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Richten Sie die CLI mit <code>pulumi stack select default/project/stack</code> darauf aus.",
-      "namePatternPulumiLead": "Zwei durch '::' getrennte Teile — project::stack."
+      "namePatternPulumiLead": "Zwei durch '::' getrennte Teile — project::stack.",
+      "storageLocationDefault": "Standard der Bereitstellung"
     },
     "stats": {
       "total": "Gesamt",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Beim ersten Kontakt vertrauen",
       "sshHostKeyPolicyOff": "Nicht prüfen",
       "sshHostKeyPolicyLead": "Welche der drei Antworten von OpenSSH ein Konfigurationslauf anfordert. Beim ersten Kontakt zu vertrauen weist einen geänderten Schlüssel weiterhin ab; nicht zu prüfen akzeptiert jeden Schlüssel eines Hosts, sodass die Verbindung abgehört werden kann.",
-      "sshHostKeyPolicyHint": "Terrapod erzeugt aus den freigegebenen Schlüsseln jedes Hosts die known_hosts-Datei, gegen die OpenSSH prüft, und diese Einstellung ist der StrictHostKeyChecking-Wert, den der Lauf anfordert. Die Datei ist eine Positivliste und die Einstellung gilt prozessweit: Wird jeder Host geprüft, ist eine Adresse, für die niemand einen Schlüssel freigegeben hat, nicht nur ungeprüft, sondern unerreichbar. Beim ersten Kontakt zu vertrauen ist die Antwort für gemischte Bestände: freigegebene Schlüssel werden weiterhin streng geprüft, ein nicht freigegebener Host verbindet sich einmal und wird abgewiesen, sobald sich sein Schlüssel ändert. Nichts im Inventar kann dies überschreiben."
+      "sshHostKeyPolicyHint": "Terrapod erzeugt aus den freigegebenen Schlüsseln jedes Hosts die known_hosts-Datei, gegen die OpenSSH prüft, und diese Einstellung ist der StrictHostKeyChecking-Wert, den der Lauf anfordert. Die Datei ist eine Positivliste und die Einstellung gilt prozessweit: Wird jeder Host geprüft, ist eine Adresse, für die niemand einen Schlüssel freigegeben hat, nicht nur ungeprüft, sondern unerreichbar. Beim ersten Kontakt zu vertrauen ist die Antwort für gemischte Bestände: freigegebene Schlüssel werden weiterhin streng geprüft, ein nicht freigegebener Host verbindet sich einmal und wird abgewiesen, sobald sich sein Schlüssel ändert. Nichts im Inventar kann dies überschreiben.",
+      "storageLocation": "Speicherort"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

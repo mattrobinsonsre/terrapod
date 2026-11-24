@@ -90,7 +90,8 @@
       "namePatternPulumi": "Två delar åtskilda av '::' — project::stack. Endast bokstäver, siffror, bindestreck och understreck; varje del måste börja med en bokstav eller siffra.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Peka CLI:t mot den med <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "Två delar åtskilda av '::' — project::stack."
+      "namePatternPulumiLead": "Två delar åtskilda av '::' — project::stack.",
+      "storageLocationDefault": "Deploymentets standard"
     },
     "stats": {
       "total": "Totalt",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Lita på vid första kontakt",
       "sshHostKeyPolicyOff": "Kontrollera inte",
       "sshHostKeyPolicyLead": "Vilket av OpenSSH:s tre svar en konfigurationskörning begär. Att lita på vid första kontakt avvisar fortfarande en ändrad nyckel; att inte kontrollera accepterar vilken nyckel en värd än visar upp, så anslutningen kan avlyssnas.",
-      "sshHostKeyPolicyHint": "Terrapod bygger varje värds godkända nycklar till den known_hosts-fil OpenSSH kontrollerar mot, och den här inställningen är det StrictHostKeyChecking-värde körningen begär. Filen är en tillåtlista och inställningen gäller hela processen: kontrolleras varje värd blir en adress som ingen har godkänt en nyckel för inte bara okontrollerad utan oåtkomlig. Att lita på vid första kontakt är svaret för en blandad flotta: godkända nycklar kontrolleras fortfarande strikt, medan en värd ingen har fäst ansluter en gång och avvisas om dess nyckel senare ändras. Inget i inventariet kan åsidosätta det."
+      "sshHostKeyPolicyHint": "Terrapod bygger varje värds godkända nycklar till den known_hosts-fil OpenSSH kontrollerar mot, och den här inställningen är det StrictHostKeyChecking-värde körningen begär. Filen är en tillåtlista och inställningen gäller hela processen: kontrolleras varje värd blir en adress som ingen har godkänt en nyckel för inte bara okontrollerad utan oåtkomlig. Att lita på vid första kontakt är svaret för en blandad flotta: godkända nycklar kontrolleras fortfarande strikt, medan en värd ingen har fäst ansluter en gång och avvisas om dess nyckel senare ändras. Inget i inventariet kan åsidosätta det.",
+      "storageLocation": "Lagringsplats"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

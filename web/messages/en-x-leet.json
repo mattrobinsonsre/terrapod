@@ -90,7 +90,8 @@
       "namePatternPulumi": "7w0 p4r75 53p4r473d by '::' — pr0j3c7::574ck. L3773r5, numb3r5, hyph3n5 4nd und3r5c0r35 0nly; 34ch p4r7 mu57 574r7 w17h 4 l3773r 0r numb3r.",
       "namePlaceholderPulumi": "my-pr0j3c7::d3v",
       "pulumiNameHint": "P01n7 7h3 CL1 47 17 w17h <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "7w0 p4r75 53p4r473d by '::' — pr0j3c7::574ck."
+      "namePatternPulumiLead": "7w0 p4r75 53p4r473d by '::' — pr0j3c7::574ck.",
+      "storageLocationDefault": "D3pl0ym3n7 d3f4ul7"
     },
     "stats": {
       "total": "7074l",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "7ru57 0n f1r57 c0n74c7",
       "sshHostKeyPolicyOff": "D0 n07 v3r1fy",
       "sshHostKeyPolicyLead": "Wh1ch 0f 0p3n55H'5 7hr33 4n5w3r5 4 c0nf1gur3 45k5 f0r. 7ru571ng 0n f1r57 c0n74c7 571ll r3fu535 4 ch4ng3d k3y; n07 v3r1fy1ng 4cc3p75 4ny k3y 4 h057 pr353n75, 50 7h3 c0nn3c710n c4n b3 1n73rc3p73d.",
-      "sshHostKeyPolicyHint": "73rr4p0d r3nd3r5 34ch h057'5 4ppr0v3d k3y5 45 7h3 kn0wn_h0575 f1l3 0p3n55H ch3ck5 4g41n57, 4nd 7h15 53771ng 15 7h3 57r1c7H057K3yCh3ck1ng v4lu3 7h3 run 45k5 f0r. 7h47 f1l3 15 4n 4ll0w-l157 4nd 7h3 53771ng 15 pr0c355-w1d3, 50 v3r1fy1ng 3v3ry h057 m4k35 4n 4ddr355 n0b0dy h45 4ppr0v3d 4 k3y f0r unr34ch4bl3 r47h3r 7h4n m3r3ly unv3r1f13d. 7ru571ng 0n f1r57 c0n74c7 15 7h3 m1x3d-fl337 4n5w3r: 4ppr0v3d k3y5 4r3 571ll v3r1f13d 57r1c7ly, wh1l3 4n unp1nn3d h057 c0nn3c75 0nc3 4nd 15 r3fu53d 1f 175 k3y l473r ch4ng35. N07h1ng 1n 7h3 1nv3n70ry c4n 0v3rr1d3 17."
+      "sshHostKeyPolicyHint": "73rr4p0d r3nd3r5 34ch h057'5 4ppr0v3d k3y5 45 7h3 kn0wn_h0575 f1l3 0p3n55H ch3ck5 4g41n57, 4nd 7h15 53771ng 15 7h3 57r1c7H057K3yCh3ck1ng v4lu3 7h3 run 45k5 f0r. 7h47 f1l3 15 4n 4ll0w-l157 4nd 7h3 53771ng 15 pr0c355-w1d3, 50 v3r1fy1ng 3v3ry h057 m4k35 4n 4ddr355 n0b0dy h45 4ppr0v3d 4 k3y f0r unr34ch4bl3 r47h3r 7h4n m3r3ly unv3r1f13d. 7ru571ng 0n f1r57 c0n74c7 15 7h3 m1x3d-fl337 4n5w3r: 4ppr0v3d k3y5 4r3 571ll v3r1f13d 57r1c7ly, wh1l3 4n unp1nn3d h057 c0nn3c75 0nc3 4nd 15 r3fu53d 1f 175 k3y l473r ch4ng35. N07h1ng 1n 7h3 1nv3n70ry c4n 0v3rr1d3 17.",
+      "storageLocation": "570r4g3 l0c4710n"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

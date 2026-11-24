@@ -90,7 +90,8 @@
       "namePatternPulumi": "To dele adskilt af '::' — project::stack. Kun bogstaver, tal, bindestreger og understregninger; hver del skal begynde med et bogstav eller tal.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "Peg CLI''en på den med <code>pulumi stack select default/project/stack</code>.",
-      "namePatternPulumiLead": "To dele adskilt af '::' — project::stack."
+      "namePatternPulumiLead": "To dele adskilt af '::' — project::stack.",
+      "storageLocationDefault": "Deploymentets standard"
     },
     "stats": {
       "total": "I alt",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "Stol på ved første kontakt",
       "sshHostKeyPolicyOff": "Kontrollér ikke",
       "sshHostKeyPolicyLead": "Hvilket af OpenSSH's tre svar en konfigurationskørsel beder om. At stole på ved første kontakt afviser stadig en ændret nøgle; ikke at kontrollere accepterer enhver nøgle, en vært viser frem, så forbindelsen kan aflyttes.",
-      "sshHostKeyPolicyHint": "Terrapod laver hver værts godkendte nøgler til den known_hosts-fil, OpenSSH kontrollerer imod, og denne indstilling er den StrictHostKeyChecking-værdi, kørslen beder om. Filen er en tilladelsesliste, og indstillingen gælder hele processen: kontrolleres hver vært, er en adresse, som ingen har godkendt en nøgle for, ikke blot ukontrolleret men uopnåelig. At stole på ved første kontakt er svaret til en blandet flåde: godkendte nøgler kontrolleres stadig strengt, mens en vært, ingen har fastgjort, forbinder én gang og afvises, hvis dens nøgle senere ændrer sig. Intet i opgørelsen kan tilsidesætte det."
+      "sshHostKeyPolicyHint": "Terrapod laver hver værts godkendte nøgler til den known_hosts-fil, OpenSSH kontrollerer imod, og denne indstilling er den StrictHostKeyChecking-værdi, kørslen beder om. Filen er en tilladelsesliste, og indstillingen gælder hele processen: kontrolleres hver vært, er en adresse, som ingen har godkendt en nøgle for, ikke blot ukontrolleret men uopnåelig. At stole på ved første kontakt er svaret til en blandet flåde: godkendte nøgler kontrolleres stadig strengt, mens en vært, ingen har fastgjort, forbinder én gang og afvises, hvis dens nøgle senere ændrer sig. Intet i opgørelsen kan tilsidesætte det.",
+      "storageLocation": "Lagringsplacering"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

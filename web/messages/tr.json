@@ -90,7 +90,8 @@
       "namePatternPulumi": "'::' ile ayrılmış iki bölüm — project::stack. Yalnızca harf, rakam, tire ve alt çizgi; her bölüm bir harf veya rakamla başlamalıdır.",
       "namePlaceholderPulumi": "my-project::dev",
       "pulumiNameHint": "CLI''ı <code>pulumi stack select default/project/stack</code> ile ona yönlendirin.",
-      "namePatternPulumiLead": "'::' ile ayrılmış iki bölüm — project::stack."
+      "namePatternPulumiLead": "'::' ile ayrılmış iki bölüm — project::stack.",
+      "storageLocationDefault": "Dağıtım varsayılanı"
     },
     "stats": {
       "total": "Toplam",
@@ -3006,7 +3007,8 @@
       "sshHostKeyPolicyAcceptNew": "İlk temasta güven",
       "sshHostKeyPolicyOff": "Denetleme",
       "sshHostKeyPolicyLead": "Bir yapılandırmanın OpenSSH'ın üç yanıtından hangisini istediği. İlk temasta güvenmek değişmiş bir anahtarı yine de reddeder; denetlememek bir ana makinenin sunduğu her anahtarı kabul eder, dolayısıyla bağlantı araya girilerek dinlenebilir.",
-      "sshHostKeyPolicyHint": "Terrapod her ana makinenin onaylı anahtarlarını OpenSSH'ın karşılaştırdığı known_hosts dosyasına dönüştürür ve bu ayar, çalıştırmanın istediği StrictHostKeyChecking değeridir. O dosya bir izin listesidir ve ayar tüm süreç için geçerlidir: her ana makine denetlenirse, kimsenin anahtar onaylamadığı bir adres yalnızca denetlenmemiş değil, ulaşılamaz olur. İlk temasta güvenmek, karma bir filo için verilen yanıttır: onaylı anahtarlar yine katı biçimde denetlenir, kimsenin sabitlemediği bir ana makine ise bir kez bağlanır ve anahtarı sonradan değişirse reddedilir. Envanterdeki hiçbir şey bunu geçersiz kılamaz."
+      "sshHostKeyPolicyHint": "Terrapod her ana makinenin onaylı anahtarlarını OpenSSH'ın karşılaştırdığı known_hosts dosyasına dönüştürür ve bu ayar, çalıştırmanın istediği StrictHostKeyChecking değeridir. O dosya bir izin listesidir ve ayar tüm süreç için geçerlidir: her ana makine denetlenirse, kimsenin anahtar onaylamadığı bir adres yalnızca denetlenmemiş değil, ulaşılamaz olur. İlk temasta güvenmek, karma bir filo için verilen yanıttır: onaylı anahtarlar yine katı biçimde denetlenir, kimsenin sabitlemediği bir ana makine ise bir kez bağlanır ve anahtarı sonradan değişirse reddedilir. Envanterdeki hiçbir şey bunu geçersiz kılamaz.",
+      "storageLocation": "Depolama konumu"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",
