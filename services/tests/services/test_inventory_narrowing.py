@@ -491,6 +491,11 @@ class TestCreateRunNarrowsADerivedConfigure:
             patch.object(
                 inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", doc))
             ),
+            # The stamp resolves a SECOND time, through ansible, to record what
+            # the narrowed limit selects (#2690). These tests are about the
+            # limit, not about recording it, and their document is faked -- so
+            # there is no configuration version for a real resolve to read.
+            patch.object(inventory_resolve, "stamp_targeted_hosts", AsyncMock(return_value=None)),
             patch.object(narrow, "limit_for", limit),
         ):
             inst = MockRun.return_value
@@ -582,6 +587,11 @@ class TestTheCompositeNarrowsAtTheHandOver:
             patch.object(
                 inventory_resolve, "write_run_artifact", AsyncMock(return_value=("key", doc))
             ),
+            # The stamp resolves a SECOND time, through ansible, to record what
+            # the narrowed limit selects (#2690). These tests are about the
+            # limit, not about recording it, and their document is faked -- so
+            # there is no configuration version for a real resolve to read.
+            patch.object(inventory_resolve, "stamp_targeted_hosts", AsyncMock(return_value=None)),
             patch.object(narrow, "limit_for", limit),
             patch.object(run_service, "transition_run", AsyncMock(side_effect=_transition)),
             patch.object(run_service, "_after_apply_landed", AsyncMock()),
