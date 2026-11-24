@@ -908,9 +908,15 @@ export default function BulkUpdatePage() {
             <option value="configure">{tWs('runs.queueConfigure')}</option>
             <option value="plan">{engineWord(tPhase, null, 'queuePlan')}</option>
           </select>
-          <p className="mt-1 text-xs text-slate-400">
+          {/* A DIV, not a `p`. `tieredHint` returns a `HintWithDetail` for any
+              key with a registered lead, and that roots a `div` -- which inside
+              a `p` is invalid HTML and fails hydration outright, regenerating
+              the whole tree on the client. Pre-existing; found by driving the
+              page rather than by any gate, since the markup type-checks and
+              renders. */}
+          <div className="mt-1 text-xs text-slate-400">
             {tieredHint(tWs, 'fields.defaultRunKindTitle')}
-          </p>
+          </div>
         </div>
         <div className="min-w-0">
           <label className={labelCls} htmlFor="bu-auto-configure-enabled">

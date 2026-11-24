@@ -420,3 +420,54 @@ describe('every long hint is RENDERED two-tier, not merely registered', () => {
     )
   })
 })
+
+describe('a tiered hint is never wrapped in a paragraph', () => {
+  // `tieredHint` returns a `HintWithDetail` for any key with a registered lead,
+  // and that component roots a `<div>`. A `<div>` inside a `<p>` is invalid
+  // HTML: React fails hydration and regenerates the entire tree on the client.
+  //
+  // It type-checks, it renders, and no gate could see it -- it was found by
+  // opening the page and reading the console. One site had it, on `main`, from
+  // the moment that hint was tiered.
+  //
+  // Shape-based rather than a list of files, because the defect is "a `p` whose
+  // body is a tiered hint" wherever someone writes it next.
+  it('no <p> encloses a tieredHint call', () => {
+    const files: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const q = path.join(dir, e.name)
+        if (e.isDirectory()) walk(q)
+        else if (e.name.endsWith('.tsx')) files.push(q)
+      }
+    }
+    walk(path.join(here, '..', 'src'))
+    assert.ok(files.length >= 90, `only walked ${files.length} .tsx files`)
+
+    const offenders: string[] = []
+    for (const f of files) {
+      const text = readFileSync(f, 'utf8')
+      // `[^>]` for the ATTRIBUTES, then only whitespace before the call. A
+      // tag's attributes cannot contain `>`, so this cannot run past the
+      // paragraph's own opening tag.
+      //
+      // A bounded `[\s\S]{0,200}?` here instead -- which looks more permissive
+      // and therefore safer -- spans across SIBLING elements: it paired a plain
+      // `t()` hint's `<p>` with a `tieredHint` seven lines below it and reported
+      // a defect that does not exist. A matcher that fails toward a finding is
+      // the expensive direction, because the reward for believing it is a
+      // change to correct code.
+      const re = /<p\b[^>]{0,300}>\s*\{\s*tieredHint\(/g
+      let m: RegExpExecArray | null
+      while ((m = re.exec(text)) !== null) {
+        offenders.push(`${path.relative(path.join(here, '..'), f)}:${text.slice(0, m.index).split('\n').length}`)
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `a tiered hint roots a <div>, so a <p> around it is invalid HTML and ` +
+        `fails hydration:\n  ${offenders.join('\n  ')}`,
+    )
+  })
+})
