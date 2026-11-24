@@ -1,0 +1,71 @@
+{
+  "services/terrapod/auth/connectors/oidc.py": [
+    "client.get",
+    "client.post"
+  ],
+  "services/terrapod/runner/download.py": [
+    "client.get",
+    "client.stream"
+  ],
+  "services/terrapod/runner/ee_client.py": [
+    "client.get",
+    "client.post",
+    "client.stream"
+  ],
+  "services/terrapod/runner/lock_extender.py": [
+    "client.get"
+  ],
+  "services/terrapod/runner/phases/binary_verify.py": [
+    "client.get"
+  ],
+  "services/terrapod/runner/phases/cloud_identity.py": [
+    "client.request"
+  ],
+  "services/terrapod/runner/phases/configure_known_hosts.py": [
+    "client.get"
+  ],
+  "services/terrapod/runner/phases/log_capture.py": [
+    "client.put"
+  ],
+  "services/terrapod/runner/phases/opa.py": [
+    "client.get",
+    "client.post"
+  ],
+  "services/terrapod/runner/phases/pulumi_exec.py": [
+    "httpx.stream"
+  ],
+  "services/terrapod/runner/phases/resource_profile.py": [
+    "client.post"
+  ],
+  "services/terrapod/runner/phases/security_scan.py": [
+    "client.get",
+    "client.post"
+  ],
+  "services/terrapod/services/cost_pricesheet_service.py": [
+    "client.get",
+    "client.stream"
+  ],
+  "services/terrapod/services/github_service.py": [
+    "client.request",
+    "client.stream"
+  ],
+  "services/terrapod/services/gitlab_service.py": [
+    "client.delete",
+    "client.post",
+    "client.put",
+    "client.request",
+    "client.stream"
+  ],
+  "services/terrapod/services/ha_role.py": [
+    "client.get"
+  ],
+  "services/terrapod/services/onboarding_service.py": [
+    "client.stream"
+  ],
+  "services/terrapod/services/package_cache/publisher_provenance.py": [
+    "client.get"
+  ],
+  "services/terrapod/services/slack_link_service.py": [
+    "client.post"
+  ]
+}

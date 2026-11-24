@@ -1,0 +1,48 @@
+#!/usr/bin/env zsh
+# Report files that are modified but NOT in the commit being made.
+#
+# The file-inventory check, adapted. An audit-trail study of a gated
+# spec-driven agent workflow found this to be the one control that caught a real
+# undeclared change -- and identified the orchestrator judging its own checks as
+# the weak point everywhere else. So this is deliberately mechanical: it does not
+# ask whether the omission was intended, it just makes the omission visible,
+# because the failure mode is not knowing.
+#
+# The failure it catches, from this repository's history: this project stages by
+# explicit path (never `git add -A`, so a scratch file cannot be committed by
+# accident), and the cost of that rule is that a SECOND changed file is silently
+# left behind. A lint fix was lost exactly that way and CI failed on the error
+# already fixed locally.
+#
+# It WARNS rather than refuses, because a partial commit is often deliberate --
+# splitting work into reviewable commits is house practice. `scripts/hooks/pre-push`
+# is the one that refuses, and it only fires when a left-behind file is also in
+# the push, which is when it actually costs something.
+#
+# Install:  ln -sf ../../scripts/hooks/pre-commit-inventory .git/hooks/post-index-change
+# or call it from an existing pre-commit hook.
+
+STAGED=$(git diff --cached --name-only 2>/dev/null)
+[[ -z "$STAGED" ]] && exit 0
+
+# Tracked files changed in the working tree but not staged at all.
+UNSTAGED=$(git diff --name-only 2>/dev/null)
+[[ -z "$UNSTAGED" ]] && exit 0
+
+print -r -- "$STAGED"   | sort -u > /tmp/.pci_s.$$
+print -r -- "$UNSTAGED" | sort -u > /tmp/.pci_u.$$
+LEFT=$(comm -13 /tmp/.pci_s.$$ /tmp/.pci_u.$$)
+rm -f /tmp/.pci_s.$$ /tmp/.pci_u.$$
+
+if [[ -n "$LEFT" ]]; then
+  print -r -- ""
+  print -r -- "note: these files are modified and NOT in this commit:"
+  print -r -- "$LEFT" | sed 's/^/    /'
+  print -r -- ""
+  print -r -- "  Fine if that is deliberate. If one of them is part of the change you"
+  print -r -- "  just verified, it is the failure this exists to surface: every local"
+  print -r -- "  check reads the working tree, so lint and the tests passed on a state"
+  print -r -- "  the commit does not contain."
+  print -r -- ""
+fi
+exit 0

@@ -1,0 +1,378 @@
+{
+  "go-terrapod/wire_completeness_test.go": [
+    "if len(want) < 4 {"
+  ],
+  "mcp/internal/mcpserver/inventory_tools_test.go": [
+    "if len(declared) < 7 {"
+  ],
+  "provider/internal/datasources/ssh_host_keys/scan_test.go": [
+    "if len(fields) < 2 {"
+  ],
+  "provider/internal/planmods/sensitive_test.go": [
+    "if len(credentialCategories) < 4 {"
+  ],
+  "provider/internal/resources/role/capabilities_plan_test.go": [
+    "if len(levels) < 4 {"
+  ],
+  "pulumi-provider/schema_attributes_test.go": [
+    "if len(fields) < 40 {",
+    "if len(functions) < 10 {",
+    "if len(resources) < 20 {",
+    "if len(resp.DataSourceSchemas) < 10 {",
+    "if len(tf) < 20 {"
+  ],
+  "pulumi-provider/schema_test.go": [
+    "if len(reserved) < 10 {"
+  ],
+  "scripts/docs-audit/check_backup_prefix_prose.py": [
+    "MIN_SWEPT = 1"
+  ],
+  "scripts/docs-audit/check_cli_body_claims.py": [
+    "MIN_NOT_CONSUMED = 8"
+  ],
+  "scripts/docs-audit/check_cli_surface_covered.py": [
+    "MIN_CHECKS = 6",
+    "MIN_SECTIONS = 8"
+  ],
+  "scripts/docs-audit/check_cli_surface_served.py": [
+    "MIN_OWN_ROUTES = 12"
+  ],
+  "scripts/docs-audit/check_credential_key_prose.py": [
+    "MIN_SITES = 8"
+  ],
+  "scripts/docs-audit/check_doc_api_attributes.py": [
+    "MIN_ATTRIBUTE_NAMES = 400",
+    "MIN_EXEMPTION_PHRASE = 12",
+    "MIN_REFERENCES = 20"
+  ],
+  "scripts/docs-audit/check_doc_helm_values.py": [
+    "MIN_BLOCKS = 5"
+  ],
+  "scripts/docs-audit/check_docs_audit_wiring.py": [
+    "MIN_SHELL_GATES = 3"
+  ],
+  "scripts/docs-audit/check_ee_contract.py": [
+    "MIN_AGENT_BINARIES = 4",
+    "MIN_READERS = 2"
+  ],
+  "scripts/docs-audit/check_forced_env.py": [
+    "MIN_SITES = 2"
+  ],
+  "scripts/docs-audit/check_gate_floors.py": [
+    "\"assert len(_STORAGE_LOCATION_CONSUMERS) >= 6\",",
+    "\"assert len(pinned) >= 10\",",
+    "'assert len(calls) >= 2, f\"found only {len(calls)}\"',"
+  ],
+  "scripts/docs-audit/check_ghcr_cleanup.py": [
+    "MIN_PACKAGES = 12"
+  ],
+  "scripts/docs-audit/check_health_flag_codes.py": [
+    ""
+  ],
+  "scripts/docs-audit/check_mirror_consumption.py": [
+    "MIN_IMAGES = 10",
+    "MIN_REFERENCES = 20"
+  ],
+  "scripts/docs-audit/check_native_prefix.py": [
+    "MIN_FILES_SCANNED = 400",
+    "MIN_HISTORY_MENTIONS = 2"
+  ],
+  "scripts/docs-audit/check_peer_fairness.py": [
+    "MIN_FILES = 200"
+  ],
+  "scripts/docs-audit/check_provider_defaults.py": [
+    "MIN_ATTRS = 6"
+  ],
+  "scripts/docs-audit/check_provider_state_upgraders.py": [
+    ""
+  ],
+  "scripts/docs-audit/check_run_task_payload_doc.py": [
+    "MIN_KEYS = 10"
+  ],
+  "scripts/docs-audit/check_run_task_spec_fields.py": [
+    "MIN_TABLE_CHARS = 400"
+  ],
+  "scripts/docs-audit/check_screenshot_dimensions.py": [
+    "MIN_DESKTOP = 20",
+    "MIN_PHONE = 2"
+  ],
+  "services/tests/ai_eval/test_offline.py": [
+    "assert len(cases) >= 25, f\"expected a substantial generated corpus, got {len(cases)}\""
+  ],
+  "services/tests/api/test_assignment_rule_labels.py": [
+    "assert len(keys) >= 13, f\"only {len(keys)} label(s) read; the matcher stopped matching\"",
+    "assert len(storable) >= 10, f\"only {len(storable)} storable dimension(s): {sorted(storable)}\""
+  ],
+  "services/tests/api/test_attribute_contract.py": [
+    "assert len(contract) >= 25"
+  ],
+  "services/tests/api/test_autodiscovery_rule_parity.py": [
+    "assert len(pairs) >= 8, (",
+    "assert len(routes) >= 7, (",
+    "if len(reason.strip()) < 20"
+  ],
+  "services/tests/api/test_autodiscovery_rules.py": [
+    "assert len(checked) >= 8, f\"only inspected {checked}; is the gate still reading the source?\""
+  ],
+  "services/tests/api/test_cache_admin.py": [
+    "assert len(live) >= 15, ("
+  ],
+  "services/tests/api/test_docs_html.py": [
+    "assert len(assets) >= 3, ("
+  ],
+  "services/tests/api/test_identity_provider_parity.py": [
+    "assert len(_constructions()) >= 10, len(_constructions())"
+  ],
+  "services/tests/api/test_inventory_phase_binding_gate.py": [
+    "assert len(reads) >= 15, (",
+    "assert len(writes) >= 17, ("
+  ],
+  "services/tests/api/test_oidc_audiences_write_paths.py": [
+    "assert len(mentions_key) >= 3, (",
+    "assert len(mods) > 50, f\"found only {len(mods)} modules under {_PACKAGE} \u2014 wrong path?\""
+  ],
+  "services/tests/api/test_oidc_issuer_is_mounted.py": [
+    "assert len(key[\"n\"]) > 300"
+  ],
+  "services/tests/api/test_operations_pair_enforcement.py": [
+    "MIN_CONSTRUCTIONS = 3"
+  ],
+  "services/tests/api/test_package_cache.py": [
+    "assert len(routers) >= 6, routers"
+  ],
+  "services/tests/api/test_package_cache_run_context.py": [
+    "assert len(builders) >= 4, f\"only {len(builders)} artifact builder call(s) found\"",
+    "assert len(found) >= 6, ("
+  ],
+  "services/tests/api/test_package_cache_uploads.py": [
+    "assert len(live) >= 6, f\"only {len(live)} upload routes read off the routers\""
+  ],
+  "services/tests/api/test_route_contract.py": [
+    "assert len(snapshot) > 100"
+  ],
+  "services/tests/api/test_run_column_writes_notify.py": [
+    "MIN_HANDLERS = 5",
+    "assert len(values) >= 3, f\"found {len(values)} call sites, expected at least 3\""
+  ],
+  "services/tests/api/test_runner_token_phase_binding.py": [
+    "assert len(derived) >= 12, ("
+  ],
+  "services/tests/api/test_tfe_link_prefixes.py": [
+    "MIN_STRINGS = 500"
+  ],
+  "services/tests/api/test_unauthenticated_write_sweep.py": [
+    "assert len(ops) > 300, f\"only {len(ops)} write operations found; did routing change?\"",
+    "assert reason and len(reason) > 10, f\"{path} needs a real reason, got {reason!r}\""
+  ],
+  "services/tests/api/test_varset_native_surface.py": [
+    "assert len(VARSET_ROUTES) >= 3"
+  ],
+  "services/tests/api/test_wire_contract.py": [
+    "assert len(_runs_next_attributes()) >= 15",
+    "assert len(_sse_event_names()) >= 4"
+  ],
+  "services/tests/api/test_workspace_setting_parity.py": [
+    "assert len(_ENGINE_GATED_ATTRS) >= 2, \"the gated-attribute map has emptied\"",
+    "assert len(canonical) >= 40, (",
+    "assert len(found) >= 30, (",
+    "assert len(known) >= 2, \"known_engines() collapsed; this gate needs the real set\""
+  ],
+  "services/tests/auth/test_api_tokens.py": [
+    "assert len(a) > 5 and len(b) > 20"
+  ],
+  "services/tests/auth/test_auth_state.py": [
+    "assert len(c1) > 20",
+    "assert len(s1) > 20"
+  ],
+  "services/tests/auth/test_ca.py": [
+    "assert len(raw) >= 32"
+  ],
+  "services/tests/auth/test_sessions.py": [
+    "assert len(session.token) > 20"
+  ],
+  "services/tests/config/test_config_contract.py": [
+    "assert len(config_key_paths()) > 100"
+  ],
+  "services/tests/config/test_security_scanners_can_fail.py": [
+    "assert len(self._templates()) >= 5, ("
+  ],
+  "services/tests/config/test_startup_settings_paths.py": [
+    "assert len(chains) > 20, f\"suspiciously few settings paths found in app.py: {chains}\""
+  ],
+  "services/tests/db/test_credential_columns_encrypted.py": [
+    "assert len(found) >= 6, found",
+    "assert len(self._encrypted_text_columns()) >= 8"
+  ],
+  "services/tests/db/test_migration_contract.py": [
+    "assert len(_migration_files()) > 40"
+  ],
+  "services/tests/helm/test_api_reads_runner_config.py": [
+    "MIN_FIELDS = 8"
+  ],
+  "services/tests/helm/test_backup_prefix_schema_sync.py": [
+    "assert len(_ACCEPTED) >= 6",
+    "assert len(_REFUSED) >= 56",
+    "assert len(_REFUSED_AS_EMPTY) >= 7",
+    "assert len(spellings) >= 200"
+  ],
+  "services/tests/helm/test_credentials_are_never_literals.py": [
+    "assert len(found) > 10, ("
+  ],
+  "services/tests/helm/test_networkpolicy_rules_restrict.py": [
+    "assert len(_policy_templates()) >= 2"
+  ],
+  "services/tests/helm/test_retention_settings_are_chart_reachable.py": [
+    "MIN_FIELDS = 10"
+  ],
+  "services/tests/helm/test_values_contract.py": [
+    "assert len(values_keys()) > 50"
+  ],
+  "services/tests/integration/test_aggregate_statuses_posted.py": [
+    "assert len(wire.posts) >= 6 # plan and policy for each of the three PRs"
+  ],
+  "services/tests/integration/test_migrated_schema_matches_models.py": [
+    "_MIN_CONSTRAINTS = 25"
+  ],
+  "services/tests/integration/test_run_execution.py": [
+    "assert len(state_versions) >= 1"
+  ],
+  "services/tests/integration/test_varset_self_join.py": [
+    "assert src.count(\"refuse_varset_growth(\") >= 2, ("
+  ],
+  "services/tests/meta/test_no_real_kubernetes_guard.py": [
+    "assert len(accessors) >= 2, ("
+  ],
+  "services/tests/runner/test_cloud_identity_discovery_inputs.py": [
+    "assert len(calls) >= 2, ("
+  ],
+  "services/tests/runner/test_configure_failure_reason.py": [
+    "assert len(found) >= 2, f\"expected at least two phase-log collections, got {found}\""
+  ],
+  "services/tests/runner/test_configure_known_hosts.py": [
+    "assert len(SSH_HOST_KEY_POLICIES) >= 3, \"the set shrank -- is this still the subject?\""
+  ],
+  "services/tests/runner/test_host_stdout_callback.py": [
+    "assert len(blocks) > 5, f\"too few blocks to be measuring anything:\\n{out}\"",
+    "assert len(blocks) > 5, f\"too few blocks:\\n{out}\"",
+    "assert len(found) >= 10, f\"the matcher stopped matching: {sorted(found)}\"",
+    "assert len(theirs) >= 20, f\"only found {len(theirs)} overridden hooks -- wrong class?\""
+  ],
+  "services/tests/runner/test_job_manager_api_refusal.py": [
+    "assert len(golden) >= 10, f\"only {len(golden)} scenarios read; the golden moved\""
+  ],
+  "services/tests/runner/test_phase_logs_are_uploaded.py": [
+    "assert len(consts) >= 4, f\"found only {sorted(consts)}; the matcher has rotted\"",
+    "assert len(rolled) >= 4, f\"found only {sorted(rolled)}; the roll-in loop was not located\""
+  ],
+  "services/tests/runner/test_provider_credentials.py": [
+    "assert len(found) >= 2, f\"only found {found} -- the matcher has stopped matching\""
+  ],
+  "services/tests/runner/test_runner_image_completeness.py": [
+    "assert len(imports) >= 3, (",
+    "assert len(pinned) >= 10, ("
+  ],
+  "services/tests/runner/test_vault_files_introspection.py": [
+    "assert len(calls) > 20, \"bite-check: the extractor must see the listener's log calls\""
+  ],
+  "services/tests/services/test_apply_only_variables.py": [
+    "assert len(yielded) >= 3, ("
+  ],
+  "services/tests/services/test_blob_classes.py": [
+    "assert len(clauses) >= 2, (",
+    "assert len(clauses) >= 6, ("
+  ],
+  "services/tests/services/test_conditional_auto_apply.py": [
+    "assert src.count(\"auto_apply_mode\") >= 2, ("
+  ],
+  "services/tests/services/test_configure_failure_summary.py": [
+    "assert len(out) < 1000"
+  ],
+  "services/tests/services/test_configure_serialisation.py": [
+    "assert len(creators) >= 3, ("
+  ],
+  "services/tests/services/test_every_upload_reaches_the_ledger.py": [
+    "assert len(modules) >= 3, f\"only found {names}\""
+  ],
+  "services/tests/services/test_host_results_ingest.py": [
+    "assert len(opens) >= 2, ("
+  ],
+  "services/tests/services/test_inventory_resolution.py": [
+    "assert len(functions) >= 3, \"the matcher found almost nothing; it has stopped matching\""
+  ],
+  "services/tests/services/test_listener.py": [
+    "assert len(claims) >= 5 # Both paths contributed"
+  ],
+  "services/tests/services/test_orphan_sweep_key_holders.py": [
+    "assert len(reason.strip()) >= 40, ("
+  ],
+  "services/tests/services/test_package_cache_pulumi.py": [
+    "assert len(seen) > 1, \"a 5xx should have been retried before giving up\""
+  ],
+  "services/tests/services/test_plan_resource_list.py": [
+    "assert len(filler) > 12 * 1024",
+    "assert len(forms) > 1 and 10**9 - budget.remaining >= len(forms) - 1",
+    "assert len(prl._literals(['a\"bcdef'])) > 1"
+  ],
+  "services/tests/services/test_platform_tools.py": [
+    "assert version and len(version.split(\".\")) >= 2"
+  ],
+  "services/tests/services/test_pr_close_cancel_scope.py": [
+    "MIN_SWEEPS = 2"
+  ],
+  "services/tests/services/test_pr_session_lookups.py": [
+    "MIN_LOOKUPS = 6"
+  ],
+  "services/tests/services/test_replication_bulk_write_gate.py": [
+    "assert len(workspace) >= 3, ("
+  ],
+  "services/tests/services/test_replication_role_collector.py": [
+    "assert len(OTHER_COMPOSITE.pk_attrs) >= 2, ("
+  ],
+  "services/tests/services/test_repo_match_is_parsed.py": [
+    "_MIN_MODULES = 3"
+  ],
+  "services/tests/services/test_run_artifact_retention_coverage.py": [
+    "assert len(found) >= 8, f\"only found {sorted(found)}; the matcher has drifted\""
+  ],
+  "services/tests/services/test_summariser_fit.py": [
+    "assert len(data) > 200_000 # genuinely over budget",
+    "assert skeletons and len(skeletons) < 40 # genuinely a mixture"
+  ],
+  "services/tests/services/test_vcs_aggregate_post.py": [
+    "assert marker.green and marker.count >= 3"
+  ],
+  "services/tests/services/test_vcs_connection_rbac.py": [
+    "assert src.count(\"may_reference_connection(\") >= 2, \"create and PATCH must both authorize\""
+  ],
+  "services/tests/services/test_vcs_poller_keyword_gate.py": [
+    "MIN_DEFAULTS = 2"
+  ],
+  "services/tests/services/test_vcs_rate_limit.py": [
+    "assert src.count('vcs_source(\"autodiscovery\")') >= 2, ("
+  ],
+  "services/tests/services/test_vcs_reactions.py": [
+    "assert len(names) >= 3, f\"the matcher stopped finding the constants: {names}\""
+  ],
+  "services/tests/storage/test_fanout_prose.py": [
+    "assert len(prefixes) >= 6, prefixes"
+  ],
+  "services/tests/storage/test_keys.py": [
+    "assert len(self.NORMALISED) >= 9"
+  ],
+  "services/tests/storage/test_keys_workspace_scope.py": [
+    "assert len(found) >= 15, f\"only found {sorted(found)}; the matcher has drifted\"",
+    "assert len(shared) >= 15, f\"only found {sorted(shared)}\""
+  ],
+  "services/tests/storage/test_routing.py": [
+    "assert len(names) >= 15",
+    "assert len(prefixes) >= 30"
+  ],
+  "services/tests/test_api_sdk_contract.py": [
+    "assert len(_STORAGE_LOCATION_CONSUMERS) >= 6",
+    "assert len(_dict_keys(_latest_run_literal())) >= 7",
+    "assert len(_go_struct_tags(_SDK_WORKSPACES, \"WorkspaceLatestRun\")) >= 7"
+  ],
+  "services/tests/test_ee_image_resolution.py": [
+    "assert len(_modules()) > 100, ("
+  ]
+}

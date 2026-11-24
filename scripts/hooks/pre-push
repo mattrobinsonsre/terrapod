@@ -1,0 +1,65 @@
+#!/usr/bin/env zsh
+# Refuse a push that leaves behind uncommitted work in the files it is pushing.
+#
+# WHY. The failure this catches, from this repository's own history: a lint error
+# was fixed, the fix was never staged (the commit added files by explicit path,
+# which is the house rule and silently leaves a second changed file behind), the
+# push went out, and CI failed on the exact error already fixed locally. Every
+# local check had passed, because they all read the working tree -- so lint,
+# format and the tests share one blind spot, and a single check closes it for all
+# of them.
+#
+# WHAT IT DOES NOT DO. It does not refuse on a dirty tree. Unrelated
+# work-in-progress in other files is normal and blocking it would make the hook
+# something to disable. It refuses only when a file this push MODIFIES also has
+# uncommitted changes -- which is precisely the case where what CI tests is not
+# what you just verified.
+#
+# Install:  ln -sf ../../scripts/hooks/pre-push .git/hooks/pre-push
+#
+# This is advisory tooling, not a product gate: `--no-verify` bypasses it, and
+# the pre-commit hook's prohibition on that does not extend here. If you bypass
+# it, the thing to check by hand is `git status --short` against the push.
+
+set -e
+
+remote_ref_base() {
+  # What the remote already has for this branch, or the merge base with the
+  # default branch for a brand-new branch.
+  local br="$1"
+  if git rev-parse --verify --quiet "origin/${br}" >/dev/null; then
+    print -r -- "origin/${br}"
+  else
+    git merge-base HEAD origin/main 2>/dev/null || print -r -- "HEAD~1"
+  fi
+}
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+BASE=$(remote_ref_base "$BRANCH")
+
+# Files this push would change.
+PUSHED=$(git diff --name-only "${BASE}...HEAD" 2>/dev/null || true)
+[[ -z "$PUSHED" ]] && exit 0
+
+# Files with uncommitted changes (staged or not). Tracked only -- an untracked
+# file cannot be in a commit, so it cannot be the failure above.
+DIRTY=$(git diff --name-only HEAD 2>/dev/null || true)
+[[ -z "$DIRTY" ]] && exit 0
+
+OVERLAP=$(print -r -- "$PUSHED" | sort -u > /tmp/.pp_pushed.$$ \
+  && print -r -- "$DIRTY" | sort -u > /tmp/.pp_dirty.$$ \
+  && comm -12 /tmp/.pp_pushed.$$ /tmp/.pp_dirty.$$)
+rm -f /tmp/.pp_pushed.$$ /tmp/.pp_dirty.$$
+
+if [[ -n "$OVERLAP" ]]; then
+  print -r -- ""
+  print -r -- "pre-push REFUSED: these files are in the push AND have uncommitted changes:"
+  print -r -- "$OVERLAP" | sed 's/^/    /'
+  print -r -- ""
+  print -r -- "  So what CI will test is not what you verified locally -- every local"
+  print -r -- "  check reads the working tree, which is the blind spot they all share."
+  print -r -- "  Commit or stash the change, then push."
+  print -r -- ""
+  exit 1
+fi
+exit 0
