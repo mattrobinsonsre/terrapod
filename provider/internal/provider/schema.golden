@@ -65,6 +65,8 @@ data terrapod_ssh_host_keys.key_types required=false optional=true computed=true
 data terrapod_ssh_host_keys.port required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_ssh_host_keys.scan_timeout_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_ssh_host_keys.unreachable_hosts required=false optional=false computed=true sensitive=false type=types.SetType[basetypes.StringType]
+data terrapod_storage_locations.locations required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["backend":basetypes.StringType, "name":basetypes.StringType]]
+data terrapod_storage_locations.names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_user.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.display_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.email required=true optional=false computed=false sensitive=false type=basetypes.StringType

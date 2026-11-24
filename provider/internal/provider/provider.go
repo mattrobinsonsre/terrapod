@@ -23,6 +23,7 @@ import (
 	oidcAudienceDefaultsDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/oidc_audience_defaults"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
 	sshHostKeysDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/ssh_host_keys"
+	storageLocationsDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/storage_locations"
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
 	workspaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/workspace"
@@ -259,6 +260,7 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		oidcAudienceDefaultsDS.NewDataSource,
 		inventoryResolvedDS.NewDataSource,
 		ansibleEEDS.NewDataSource,
+		storageLocationsDS.NewDataSource,
 		sshHostKeysDS.NewDataSource,
 	}
 }
