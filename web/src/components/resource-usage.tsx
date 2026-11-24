@@ -24,8 +24,19 @@ interface ResourceUsageProps {
   // defaulted: a plan is a "preview" on Pulumi and an apply an "update", and a
   // default would render a Pulumi run in Terraform's words -- which is exactly
   // what 26 locales did for a whole release (#1915). `configure` needs no
-  // engine, being the Ansible half of either.
-  phaseLabels: { plan: string; apply: string }
+  // engine, being the Ansible half of either -- but it is a REQUIRED key
+  // rather than a fallback (#2693). It used to be the `else` of a two-way
+  // test, so every phase that was neither plan nor apply rendered as
+  // "Configure": a fourth phase would have been mislabelled silently, and the
+  // label would have looked deliberate.
+  phaseLabels: { plan: string; apply: string; configure: string }
+  /** True when the figures describe the ORCHESTRATOR rather than where the work
+   *  ran (#2693). On a configure the playbook executes in the EE sidecar, while
+   *  the profile is read from the runner container's own cgroup -- so the EE's
+   *  usage is not collected at all. Stated rather than silently implied: a
+   *  "within limits" that describes the wrong container is worse than no figure,
+   *  because it answers the question the operator came to ask. */
+  orchestratorOnly?: boolean
 }
 
 
@@ -83,6 +94,7 @@ export function ResourceUsage({
   runnerExitStatus,
   phaseProfiles,
   phaseLabels,
+  orchestratorOnly = false,
 }: ResourceUsageProps) {
   const t = useTranslations('common')
   // Only render when we have anything to show — peak from runner, OR an
@@ -173,11 +185,10 @@ export function ResourceUsage({
             {phases.map(([phase, prof]) => (
               <div key={phase} className="flex items-baseline justify-between text-xs">
                 <dt className="text-slate-400">
-                  {phase === 'plan'
-                    ? phaseLabels.plan
-                    : phase === 'apply'
-                      ? phaseLabels.apply
-                      : t('resourceUsage.phaseConfigure')}
+                  {/* An explicit lookup, so an unrecognised phase shows its
+                      own key rather than borrowing "Configure". A wrong label
+                      that reads as deliberate is the worse failure. */}
+                  {phaseLabels[phase as keyof typeof phaseLabels] ?? phase}
                 </dt>
                 <dd
                   className="font-mono text-slate-300"
@@ -188,6 +199,18 @@ export function ResourceUsage({
               </div>
             ))}
           </dl>
+        )}
+        {/* #2693. Whose figure this is. On a configure the playbook runs in the
+            EE sidecar while the profile comes from the runner container's own
+            cgroup, so what is shown above is the orchestrator's and the EE's is
+            not measured. An operator who sized an EE at 6Gi cannot find out
+            from this panel whether that was right, and saying so is the only
+            honest thing it can do until the sidecar reports its own peak. */}
+        {orchestratorOnly && (
+          <p className="mt-3 border-t border-slate-800 pt-2 text-xs text-slate-500"
+             data-testid="resource-usage-orchestrator-only">
+            {t('resourceUsage.orchestratorOnly')}
+          </p>
         )}
       </div>
     </div>
