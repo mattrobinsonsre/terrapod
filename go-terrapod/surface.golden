@@ -1338,6 +1338,8 @@ field StateVersion.Lineage string `json:"lineage"`
 field StateVersion.MD5 string `json:"md5,omitempty"`
 field StateVersion.Serial int64 `json:"serial"`
 field StateVersion.StateSize int64 `json:"state-size,omitempty"`
+field StorageLocation.Backend string
+field StorageLocation.Name string
 field UnpricedResource.Address string `json:"address"`
 field UnpricedResource.Change string `json:"change"`
 field UnpricedResource.Type string `json:"type"`
@@ -2123,6 +2125,7 @@ method (*Client) ListRunHostResults(ctx context.Context, runID string) ([]*RunHo
 method (*Client) ListRunPolicyChecks(ctx context.Context, runID string) ([]PolicyCheck, error)
 method (*Client) ListRunQueue( ctx context.Context, pageNumber, pageSize int, ) ([]QueuedRun, error)
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
+method (*Client) ListStorageLocations(ctx context.Context) ([]StorageLocation, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
 method (*Client) ListUsers(ctx context.Context) ([]User, error)
 method (*Client) ListVCSArchiveCache(ctx context.Context, opts VCSArchiveListOptions) (*VCSArchiveList, error)
@@ -2440,6 +2443,7 @@ type StateGraphMeta struct
 type StateGraphVersion struct
 type StateNode struct
 type StateVersion struct
+type StorageLocation struct
 type UnpricedResource struct
 type UpdateAgentPoolRequest struct
 type UpdateExecutionHookRequest struct
