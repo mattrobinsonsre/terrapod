@@ -284,27 +284,19 @@ export function AssignmentRuleEditor({
                 onChange={(e) => setField('vcs_connection_id', e.target.value)}
               />
             </div>
-            <div>
-              <label className="text-xs text-slate-500">{t('ruleDriftStatus')}</label>
-              <select
-                className={INPUT}
-                value={(rule?.drift_status as string) ?? ''}
-                onChange={(e) => setField('drift_status', e.target.value)}
-              >
-                <option value="">{t('ruleAny')}</option>
-                <option value="drifted">{/* i18n-ignore: literal API value */}drifted</option>
-                <option value="no_drift">{/* i18n-ignore: literal API value */}no_drift</option>
-                <option value="unknown">{/* i18n-ignore: literal API value */}unknown</option>
-              </select>
-            </div>
-            <BoolFilter
-              label={t('ruleLocked')}
-              value={rule?.locked as boolean | undefined}
-              onChange={(v) => setField('locked', v)}
-              anyLabel={t('ruleAny')}
-              yesLabel={t('yes')}
-              noLabel={t('no')}
-            />
+            {/*
+              `drift_status` and `locked` had controls here until 2.0, and the
+              server refuses both -- `varset_self_join.RULE_DIMENSIONS_REFUSED`,
+              in a POSITIVE term as firmly as inside an `exclude` entry, with a
+              422 naming the dimension. So an operator filled them in and the
+              save failed. The exclusion rows below already withheld them through
+              `RULE_REFUSED`, which is the same list read from the same place;
+              this block offered them anyway.
+
+              They are momentary properties of a workspace rather than the stable
+              facts a rule is evaluated against, so a rule naming one would match
+              a different set every time it ran.
+            */}
             <BoolFilter
               label={t('ruleHasVcs')}
               value={rule?.has_vcs as boolean | undefined}

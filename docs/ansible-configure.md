@@ -1218,6 +1218,17 @@ first is the one to reach for.
 
 ### Approve the key: host keys on the inventory
 
+> **Upgrade your runner images before you declare approved host keys.** An
+> **older runner** under a newer listener has no host-key phase at all, so a
+> workspace's approved keys are declared and enforced by **nothing** — and every
+> run looks exactly like a verified one. Nothing can detect it: there is no error,
+> no warning and no difference in the run record, because the phase that would
+> have raised the anchor is simply not in that image. The other direction fails
+> closed and is therefore safe: a newer runner under an older listener finds no
+> shared directory and refuses with the anchor unraised rather than running
+> unverified. See
+> [version skew](versioning-and-support.md#component-version-skew).
+
 A host in Terrapod's inventory carries the SSH host keys it is **approved** to
 present. One entry per key, each naming the algorithm and the key itself, with an
 optional marker:

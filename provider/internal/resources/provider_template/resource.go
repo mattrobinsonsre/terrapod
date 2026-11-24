@@ -15,10 +15,14 @@
 //	"name"          -> name             (string, required)
 //	"provider-type" -> provider_type    (string, required)
 //	"body"          -> body             (string, required, HCL)
-//	"parameters"    -> parameters_json  (string, optional; JSON array of
-//	    objects like {name,type,description,required,sensitive,default,
-//	    options}). Modeled as a JSON string to keep the schema simple and
-//	    track the open-ended server contract.
+//	"parameters"    -> parameter        (repeated BLOCK, optional; each with
+//	    name, type, description, required, sensitive, default_json and
+//	    options). A typed block since #2681, so a typo is a plan-time error
+//	    rather than a 422 -- it was a `parameters_json` string, justified as
+//	    keeping the schema simple and tracking an open-ended server contract,
+//	    and that is the reason the block form withdrew. `default_json` stays
+//	    encoded because terraform-plugin-framework refuses a dynamic type
+//	    inside a collection, and a repeated block IS one.
 //	"labels"        -> labels           (map[string]string, optional)
 //
 // Read-only:

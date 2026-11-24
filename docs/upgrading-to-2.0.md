@@ -74,6 +74,9 @@ first — most rows do not apply to most deployments.
 | Remove the pre-release-only Helm keys — [`engines:`](#the-engine-onoff-switch-is-removed), [`default_ansible_version`](#apiconfigdefault_ansible_version-is-removed), [`registry.platform_tools.pulumi_version`](#registryplatform_toolspulumi_version-is-removed--the-version-is-per-workspace) | your `values.yaml` was written against a 2.0 pre-release build. **An upgrade from 1.x has nothing to do here** — none of the three ever shipped in a 1.x chart | `values.schema.json` refuses keys it does not declare, so `helm lint` and the `helm upgrade` itself fail rather than ignoring them. Loud, but it fails the upgrade |
 | [Warm the Go checksum database, or set `sumdb_upstream` empty](#go-module-hashes-are-verified-against-the-checksum-database) | `registry.cache_only: true` **and** any workspace runs a Pulumi program written in Go | the runner verifies module hashes against the checksum database from 2.0, and Terrapod mirrors it — but **a sealed node cannot fill a miss**, so until it is warmed every Go dependency install fails rather than degrading. Warming it needs egress, which is what you no longer have once sealed |
 | [Rename `ansible_host_key_checking` to `ssh_host_key_policy`](#ansible-host-key-checking-is-replaced-by-ssh-host-key-policy) and map the value | you set it in Terraform, Pulumi, the API or MCP | your stored value migrates either way, but the next apply sends a retired attribute and 422s |
+| **Upgrade every runner image before declaring approved SSH host keys** — see [version skew](versioning-and-support.md#component-version-skew) | you intend to use approved host keys on an inventory | an older runner has no host-key phase, so the keys are enforced by **nothing** and every run looks verified. Nothing detects it — no error, no warning, no difference in the run record |
+| [Write out the six provider inputs that became blocks](#six-provider-inputs-become-blocks-and-three-of-them-stop-meaning-leave-alone) — for every `terrapod_autodiscovery_rule` **and** every `terrapod_workspace` | you manage either with Terraform or Pulumi | three of them stop meaning “leave alone”, so the next apply REMOVES the value rather than keeping it |
+| [Check and move `backup.prefix`](#backupprefix-is-normalised-and-refuses-a-prefix-terrapod-sweeps) | you set it to a prefix Terrapod itself sweeps, or to a bare root | the chart fails `helm lint` and the job exits 1 — and existing dumps under the old prefix are pruned by the first run after the upgrade, so check what is there first |
 | [Pull the new web image, or unpin it](#the-web-pod-gains-a-storage-rewrite-init-container) | you pin `web.image.tag`, or mirror images into an internal registry | the chart's new init container runs `server-entry.mjs`, which **does not exist in a 1.x web image**. A 2.0 chart with an older web image gives `Init:CrashLoopBackOff` on every web replica — the whole UI, down, with nothing in this guide to search for unless you read this row |
 | [Set `platform_tools.verify: checksum`, or allow egress to `tuf-repo-cdn.sigstore.dev`](#a-platform-tool-is-verified-against-its-publishers-signature-by-default) | you **pin** a platform tool version, or your network allowlists egress by host | the default moved from `checksum` to `signature`. Unreachable signing material degrades to the checksum and keeps working, so this is not an outage — but a signature that genuinely does not verify is a hard refusal, and a pinned version signed from a differently-named workflow is how you meet one |
 | [Unseal, re-warm, re-seal](#if-you-run-a-sealed-deployment-registrycache_only-true-read-this-before-upgrading) | `registry.cache_only: true` | artifacts cached before 2.0 are re-fetched once to verify them, and **a miss cannot be filled while sealed** — so between the upgrade and a re-warm, runs needing a cached package fail. Nothing is deleted, so re-warming later recovers everything, but the window is a real outage for those runs |
@@ -499,12 +502,56 @@ Set either back to `false` if you need the old behaviour while you adjust, but t
 temporary — the refusals exist because the permissive shapes are the ones a trust policy
 silently accepts.
 
+### `drift_status` and `locked` are removed from a variable-set assignment rule
+
+**Affects:** a `terrapod_variable_set` (or the Pulumi equivalent) whose
+`assignment_rule` block sets either attribute. If your rules match on labels,
+names, pools, VCS connections, owner or `has_vcs`, nothing changes.
+
+**They never worked.** The server refuses both — `RULE_DIMENSIONS_REFUSED` — in a
+positive term as firmly as inside an `exclude` entry, with a 422 naming the
+dimension. So a configuration setting one got an apply-time refusal against a
+schema description that asserted it worked, and an operator filling the matching
+selector in the UI got a failed save. Removing them turns an apply-time 422 into
+a plan-time "Unsupported argument", which names the attribute and the line.
+
+The reason the server refuses them is worth knowing, because it is not an
+oversight to be lifted later: both are **momentary** properties of a workspace
+rather than the stable facts a rule is evaluated against. Drift status is written
+by the drift checker and cleared by `dismiss-drift` or by disabling drift
+detection; lock state moves through the lock, unlock and force-unlock endpoints,
+which need only `workspace:lock`. A workspace's own owner can move either, so a
+rule naming one would both match a different set on every evaluation and let that
+owner opt their workspace into or out of a variable set.
+
+**To migrate:** delete the attribute from the block. There is no replacement,
+because there was never any behaviour to replace — a rule carrying one matched
+nothing.
+
+```hcl
+assignment_rule {
+  labels = { env = "prod" }
+  # drift_status = "drifted"   <- delete
+  # locked       = false       <- delete
+}
+```
+
+`autodiscovery_rule_id` is refused for the same reason and was never offered on
+this block.
+
 ### `ansible-host-key-checking` is replaced by `ssh-host-key-policy`
 
-**Affects:** anything that SETS the attribute by name — a `terrapod_workspace` or
-`terrapod_autodiscovery_rule` resource, a direct API call, a go-terrapod caller,
-an MCP tool call. **Your stored values are migrated for you**, so a deployment
-that only ever set it through the UI has nothing to do.
+**An upgrade from 1.x has nothing to do here** — `ansible-host-key-checking`
+never shipped in a 1.x release. It first appeared in `v2.0.0-alpha.1`, so no 1.x
+provider, SDK or API accepted it and no 1.x configuration can be setting it.
+Verified against `release/v1.11`: absent from the provider model, go-terrapod and
+the API attribute contract alike.
+
+**Affects:** a deployment already on a 2.0 pre-release that SETS the attribute by
+name — a `terrapod_workspace` or `terrapod_autodiscovery_rule` resource, a direct
+API call, a go-terrapod caller, an MCP tool call. **Your stored values are
+migrated for you**, so one that only ever set it through the UI has nothing to
+do.
 
 The boolean became a three-state policy, because the two states it could express
 were not the two an operator wants. `strict` refuses a host whose key is not
@@ -2522,8 +2569,17 @@ bulk update — write them out as blocks, or the next apply removes them.
 `terraform plan` will show the removal, so a reviewed plan catches it; this entry
 exists so it is not a surprise in the plan.
 
-**The workspace one is the one to check most carefully**, because it is the one
-that was deliberately protected. It was `Optional + Computed` with
+**On an upgrade FROM 1.x, only `run_task_template` is in scope here.** Measured
+against `release/v1.11`'s provider schema: `run_task_templates`,
+`parameters_json`, `variable_options_json` and `assignment_rule` all shipped in
+1.x, and `ansible_collections` — on the workspace and on the rule alike — did
+not. It first appeared in a 2.0 pre-release, so a 1.x configuration cannot be
+setting it and the paragraph above applies to `run_task_template` only. The
+paragraph below describes a protection a 1.x operator never had.
+
+**The workspace one is the one to check most carefully** *if you are already on a
+2.0 pre-release*, because it is the one that was deliberately protected. It was
+`Optional + Computed` with
 `UseStateForUnknown` and a plan-time *warning* when a configuration stopped
 managing it, precisely so a value set outside Terraform survived an apply by a
 configuration that did not mention it. A block cannot carry any of that, so that

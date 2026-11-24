@@ -456,7 +456,43 @@ def render_inventory_yaml(**kwargs: Any) -> str:
 TARGETED = "targeted"
 
 
-async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str) -> list[str] | None:
+def effective_limit(run, ws) -> str:
+    """The `--limit` the RUNNER will actually carry for this run.
+
+    Mirrors how `engines.terraform` builds the Job's own value --
+    `combine_limits(hard_limit, ansible_limit or default_limit)` -- because the
+    two must agree about what the run targets. They are separate because one
+    composes a Job env from a wire attribute map and this reads the rows; a
+    comment claiming two implementations agree is a ledger with no gate, so the
+    engine's expression is quoted here and `test_effective_limit_matches_the_job`
+    drives both.
+
+    The run's own `ansible_limit` is NOT the answer on its own, and that gap is
+    what #2690 reproduced for a second class of workspace. `limit_for` returns
+    `""` whenever a derived configure adds no narrowing of its own -- its
+    docstring says so, and says `build_job_spec` falls back to `default-limit`
+    -- so for a workspace with `default_limit` set, the run column is empty
+    while the runner narrows. Anything reading the column alone concludes the
+    run targeted everything.
+
+    **The workspace is PASSED, not fetched.** Both callers already hold the row
+    -- `create_run` takes it as a parameter and `complete_apply` reads it for the
+    narrowing a few lines above -- so fetching here would be a second query for
+    a row the caller has, and a chance to read a DIFFERENT row than the one the
+    caller validated. It is a required argument rather than an optional one
+    because an optional parameter makes the fetch the default, and defaults are
+    what tests take.
+    """
+    limit = (getattr(run, "ansible_limit", "") or "").strip()
+    if ws is None:
+        # Fail WIDE: an unreadable workspace row must not make a run look
+        # narrower than it was, because a short target set under-reports what is
+        # outstanding and a retry would then miss hosts.
+        return limit
+    return bounded_limit(ws, limit or (getattr(ws, "default_limit", "") or "")) or ""
+
+
+async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str, ws) -> list[str] | None:
     """Record what the run's own `--limit` selects, on its artifact (#2690).
 
     **The artifact itself stays WHOLE, deliberately.** `--limit` does not
@@ -480,7 +516,8 @@ async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str) -> l
     the whole artifact, which is precisely the widening this fixes. Refusing is
     the direction that cannot silently reintroduce it.
     """
-    if not (getattr(run, "ansible_limit", "") or "").strip():
+    limit = effective_limit(run, ws)
+    if not limit.strip():
         return None
     if not (document.get("hosts") or {}):
         # Nothing to narrow. An empty inventory is a legitimate resolution --
@@ -491,9 +528,9 @@ async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str) -> l
 
     from terrapod.storage import get_storage
 
-    narrowed = await resolve_for_run(db, run, limit=run.ansible_limit)
+    narrowed = await resolve_for_run(db, run, limit=limit)
     hosts = sorted((narrowed.get("hosts") or {}).keys())
-    document[TARGETED] = {"limit": run.ansible_limit, "hosts": hosts}
+    document[TARGETED] = {"limit": limit, "hosts": hosts}
     await get_storage().put(
         key,
         json.dumps(document).encode(),
@@ -503,7 +540,7 @@ async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str) -> l
         "run target set recorded",
         run_id=str(run.id),
         workspace_id=str(run.workspace_id),
-        limit=run.ansible_limit,
+        limit=limit,
         targeted=len(hosts),
         of_inventory=len(document.get("hosts") or {}),
     )

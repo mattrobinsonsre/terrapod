@@ -69,6 +69,7 @@ interface AutodiscoveryRule {
     'pulumi-bind-plan'?: boolean
     'agent-pool-id': string | null
     'terraform-version': string
+    'storage-location'?: string
     'ansible-version'?: string
     'ansible-execution-environment'?: string
     'ansible-collections'?: { name: string; version?: string }[]
@@ -277,6 +278,10 @@ export default function AutodiscoveryPage() {
   // pre-filling would pin every rule the UI creates to whatever the default
   // happened to be the day it was created -- which is the thing that goes
   // stale. An operator who wants a pin types one.
+  // Where workspaces this rule creates hold their objects (#2547). '' means
+  // the deployment's default store, and is NEVER sent -- see the payload below.
+  const [storageLocation, setStorageLocation] = useState('')
+  const [storageLocations, setStorageLocations] = useState<{ id: string }[]>([])
   const [ansibleVersion, setAnsibleVersion] = useState('')
   const [ansibleEE, setAnsibleEE] = useState('')
   const [envs, setEnvs] = useState<AnsibleExecutionEnvironments>(EE_UNKNOWN)
@@ -444,6 +449,12 @@ export default function AutodiscoveryPage() {
       // Non-fatal like the pickers above, and its own call because it needs
       // `meta.listing` -- which `fetchAllPages` discards.
       void fetchAnsibleExecutionEnvironments().then(setEnvs)
+      // Non-fatal like the pickers above: an empty list is the ordinary answer
+      // for a single-store deployment and renders no control, which is the same
+      // outcome as a call that could not be made.
+      void fetchAllPages<{ id: string }>('/api/v1/storage/locations')
+        .then(setStorageLocations)
+        .catch(() => {})
       setConnections(connsList)
       setPools(poolsList)
       setHooks(hooksList)
@@ -493,6 +504,7 @@ export default function AutodiscoveryPage() {
     setParallelism('10')
     setConfigureParallelism('')
     setTerraformVersion('1.13')
+    setStorageLocation('')
     setAnsibleVersion('')
     setAnsibleEE('')
     setAnsibleCollections([])
@@ -572,6 +584,7 @@ export default function AutodiscoveryPage() {
     setAgentPoolId(a['agent-pool-id'] ? `apool-${a['agent-pool-id']}` : '')
     setExecutionBackend((a['execution-backend'] as 'tofu' | 'terraform') || 'tofu')
     setTerraformVersion(a['terraform-version'])
+    setStorageLocation(a['storage-location'] || '')
     setAnsibleVersion(a['ansible-version'] || '')
     setAnsibleEE(a['ansible-execution-environment'] || '')
     setAnsibleCollections(formatCollectionLines(a['ansible-collections']))
@@ -665,6 +678,13 @@ export default function AutodiscoveryPage() {
       'execution-backend': executionBackend,
       'agent-pool-id': agentPoolId || null,
       'engine-version': terraformVersion,
+      // The ONE attribute this form does not always send, and the deviation is
+      // forced rather than stylistic: '' means the deployment's default store --
+      // the ABSENCE of a location -- and the API refuses the empty string as
+      // firmly as it refuses the literal "default". Sending it would 422 every
+      // save on a deployment that configures no named locations, which is the
+      // default configuration. Omitted, the server stores null.
+      ...(storageLocation ? { 'storage-location': storageLocation } : {}),
       'ansible-version': ansibleVersion.trim(),
       'ansible-execution-environment': ansibleEE.trim(),
       'ansible-collections': parseCollectionLines(ansibleCollections),
@@ -1077,6 +1097,7 @@ export default function AutodiscoveryPage() {
     'dynamic-inventory-enabled': dynamicInventoryEnabled,
     'inventory-scripts-enabled': inventoryScriptsEnabled,
     'ssh-host-key-policy': sshHostKeyPolicy,
+    'storage-location': storageLocation,
     'ansible-version': ansibleVersion,
     'ansible-execution-environment': ansibleEE,
     'ansible-collections': ansibleCollections,
@@ -1126,6 +1147,7 @@ export default function AutodiscoveryPage() {
     const b = Boolean(v)
     switch (attr) {
       case 'engine': setEngine(s); break
+      case 'storage-location': setStorageLocation(s); break
       case 'execution-backend': setExecutionBackend(s as 'tofu' | 'terraform'); break
       case 'engine-version': setTerraformVersion(s); break
       case 'auto-apply-mode': setAutoApplyMode(s); break
@@ -1609,6 +1631,34 @@ export default function AutodiscoveryPage() {
           kind="select"
           control={<SshHostKeyPolicySelect ctx={ruleCtx} />}
         />
+        {/* No control at all when the deployment configures no named
+            locations -- a select whose only option is the default offers a
+            choice of one, which is worse than offering none. Same decision as
+            the workspace create form. */}
+        {storageLocations.length > 0 && (
+          <Field
+            attr="storage-location"
+            ctx={ruleCtx}
+            kind="select"
+            control={
+              <select
+                id="rule-storage-location"
+                data-testid="rule-storage-location"
+                value={storageLocation}
+                disabled={submitting}
+                onChange={(e) => setRuleValue('storage-location', e.target.value)}
+                className={CREATE_INPUT}
+              >
+                <option value="">{t('form.none')}</option>
+                {storageLocations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.id}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        )}
         <Field
           attr="ansible-version"
           ctx={ruleCtx}

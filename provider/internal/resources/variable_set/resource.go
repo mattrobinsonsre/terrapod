@@ -60,8 +60,6 @@ type assignmentRuleModel struct {
 	AgentPoolID      types.String `tfsdk:"agent_pool_id"`
 	VCSConnectionID  types.String `tfsdk:"vcs_connection_id"`
 	OwnerEmail       types.String `tfsdk:"owner_email"`
-	DriftStatus      types.String `tfsdk:"drift_status"`
-	Locked           types.Bool   `tfsdk:"locked"`
 	HasVCS           types.Bool   `tfsdk:"has_vcs"`
 }
 
@@ -120,10 +118,19 @@ func (r *variableSetResource) Schema(_ context.Context, _ resource.SchemaRequest
 					"terraform_version": schema.StringAttribute{Optional: true, Description: "Match the configured engine version under its original name; `engine_version` is the current one."},
 					"agent_pool_id":     schema.StringAttribute{Optional: true, Description: "Match workspaces using this agent pool."},
 					"vcs_connection_id": schema.StringAttribute{Optional: true, Description: "Match workspaces using this VCS connection."},
-					"owner_email":       schema.StringAttribute{Optional: true, Description: "Match workspaces with this owner."},
-					"drift_status":      schema.StringAttribute{Optional: true, Description: "Match the current drift status."},
-					"locked":            schema.BoolAttribute{Optional: true, Description: "Match workspaces by lock state."},
-					"has_vcs":           schema.BoolAttribute{Optional: true, Description: "Match workspaces by whether they are VCS-connected."},
+					// `drift_status`, `locked` and `autodiscovery_rule_id` are
+					// DELIBERATELY absent, and the server is where that is decided:
+					// `varset_self_join.RULE_DIMENSIONS_REFUSED` refuses all three in a
+					// positive term and inside an `exclude` entry alike, with a 422
+					// naming the dimension. They were offered here until 2.0, so a
+					// configuration setting one got an APPLY-time 422 against a
+					// description asserting it worked -- a control whose only possible
+					// outcome is a refusal. Drift and lock state are momentary
+					// properties of a workspace rather than the stable facts an
+					// assignment rule is evaluated against, so a rule naming one would
+					// match a different set on every evaluation.
+					"owner_email": schema.StringAttribute{Optional: true, Description: "Match workspaces with this owner."},
+					"has_vcs":     schema.BoolAttribute{Optional: true, Description: "Match workspaces by whether they are VCS-connected."},
 				},
 			},
 		},
@@ -264,8 +271,6 @@ func assignmentRuleToAPI(m *assignmentRuleModel) map[string]any {
 	putStr("agent_pool_id", m.AgentPoolID)
 	putStr("vcs_connection_id", m.VCSConnectionID)
 	putStr("owner_email", m.OwnerEmail)
-	putStr("drift_status", m.DriftStatus)
-	putBool("locked", m.Locked)
 	putBool("has_vcs", m.HasVCS)
 	if len(out) == 0 {
 		return nil
@@ -312,8 +317,6 @@ func assignmentRuleFromAPI(raw map[string]any) *assignmentRuleModel {
 	m.AgentPoolID = getStr("agent_pool_id")
 	m.VCSConnectionID = getStr("vcs_connection_id")
 	m.OwnerEmail = getStr("owner_email")
-	m.DriftStatus = getStr("drift_status")
-	m.Locked = getBool("locked")
 	m.HasVCS = getBool("has_vcs")
 	return m
 }

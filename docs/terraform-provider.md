@@ -80,6 +80,20 @@ Read `listing` before gating on `lines`: `unknown` means the set could not be
 determined and the server will accept **any** line, so a configuration that
 blocks on an empty list would refuse applies the server would have allowed.
 
+`terrapod_storage_locations` is the discovery path for `storage_location` on a
+workspace or an autodiscovery rule (#2547). The set is deployment
+configuration — `api.config.storage.locations` in the chart — and the server
+refuses a name it has not been configured with, so without this a configuration
+has no way to learn the valid values. It returns `locations` (each with a `name`
+and a `backend` of `s3`, `azure` or `gcs`) and `names` for a `contains()` check.
+
+**An empty list is the ordinary answer**, not a failure: it means the deployment
+has exactly one object store, which is the default configuration, and the right
+thing then is to leave `storage_location` unset. The lists are empty rather than
+null precisely so a `contains()` against them answers `false` instead of
+erroring. The deployment's own store is the *absence* of a named location, so
+`default` is reserved, refused as a value, and never listed.
+
 **`terrapod_workspace.oidc_audiences` holds what you set, not the effective
 map**, and that pairing is deliberate. The API returns the merged result, so the
 resource reconciles only the keys your configuration declares and ignores the

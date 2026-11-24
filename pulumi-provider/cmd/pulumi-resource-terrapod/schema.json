@@ -252,10 +252,6 @@
                     "type": "string",
                     "description": "Match workspaces using this agent pool.\n"
                 },
-                "driftStatus": {
-                    "type": "string",
-                    "description": "Match the current drift status.\n"
-                },
                 "engineVersion": {
                     "type": "string",
                     "description": "Match the configured engine version.\n"
@@ -278,10 +274,6 @@
                         "type": "string"
                     },
                     "description": "Match workspaces carrying all of these labels.\n"
-                },
-                "locked": {
-                    "type": "boolean",
-                    "description": "Match workspaces by lock state.\n"
                 },
                 "nameGlob": {
                     "type": "string",
@@ -817,6 +809,28 @@
             "required": [
                 "keyType",
                 "publicKey"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredInputs": []
+                }
+            }
+        },
+        "terrapod:index/getStorageLocationsLocation:getStorageLocationsLocation": {
+            "properties": {
+                "backend": {
+                    "type": "string",
+                    "description": "The store's kind: \u003cspan pulumi-lang-nodejs=\"`s3`\" pulumi-lang-dotnet=\"`S3`\" pulumi-lang-go=\"`s3`\" pulumi-lang-python=\"`s3`\" pulumi-lang-yaml=\"`s3`\" pulumi-lang-java=\"`s3`\" pulumi-lang-hcl=\"`s3`\"\u003e`s3`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`azure`\" pulumi-lang-dotnet=\"`Azure`\" pulumi-lang-go=\"`azure`\" pulumi-lang-python=\"`azure`\" pulumi-lang-yaml=\"`azure`\" pulumi-lang-java=\"`azure`\" pulumi-lang-hcl=\"`azure`\"\u003e`azure`\u003c/span\u003e or \u003cspan pulumi-lang-nodejs=\"`gcs`\" pulumi-lang-dotnet=\"`Gcs`\" pulumi-lang-go=\"`gcs`\" pulumi-lang-python=\"`gcs`\" pulumi-lang-yaml=\"`gcs`\" pulumi-lang-java=\"`gcs`\" pulumi-lang-hcl=\"`gcs`\"\u003e`gcs`\u003c/span\u003e. Never \u003cspan pulumi-lang-nodejs=\"`filesystem`\" pulumi-lang-dotnet=\"`Filesystem`\" pulumi-lang-go=\"`filesystem`\" pulumi-lang-python=\"`filesystem`\" pulumi-lang-yaml=\"`filesystem`\" pulumi-lang-java=\"`filesystem`\" pulumi-lang-hcl=\"`filesystem`\"\u003e`filesystem`\u003c/span\u003e — a named location cannot be one.\n"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "The value \u003cspan pulumi-lang-nodejs=\"`storageLocation`\" pulumi-lang-dotnet=\"`StorageLocation`\" pulumi-lang-go=\"`storageLocation`\" pulumi-lang-python=\"`storage_location`\" pulumi-lang-yaml=\"`storageLocation`\" pulumi-lang-java=\"`storageLocation`\" pulumi-lang-hcl=\"`storage_location`\"\u003e`storageLocation`\u003c/span\u003e would be set to. Never \u003cspan pulumi-lang-nodejs=\"`default`\" pulumi-lang-dotnet=\"`Default`\" pulumi-lang-go=\"`default`\" pulumi-lang-python=\"`default`\" pulumi-lang-yaml=\"`default`\" pulumi-lang-java=\"`default`\" pulumi-lang-hcl=\"`default`\"\u003e`default`\u003c/span\u003e, which names the absence of a location.\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "backend",
+                "name"
             ],
             "language": {
                 "nodejs": {
@@ -1551,7 +1565,7 @@
                 },
                 "storageLocation": {
                     "type": "string",
-                    "description": "The named object store that workspaces this rule creates hold their objects in — state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapodStorageLocations`\" pulumi-lang-dotnet=\"`TerrapodStorageLocations`\" pulumi-lang-go=\"`terrapodStorageLocations`\" pulumi-lang-python=\"`terrapod_storage_locations`\" pulumi-lang-yaml=\"`terrapodStorageLocations`\" pulumi-lang-java=\"`terrapodStorageLocations`\" pulumi-lang-hcl=\"`terrapod_storage_locations`\"\u003e`terrapodStorageLocations`\u003c/span\u003e data source.\n\nChanging it is allowed and affects only workspaces discovered AFTERWARDS: a workspace's own location is fixed when it is created, because nothing moves existing objects between buckets. So this is a template for future workspaces rather than a setting propagated to the ones that already exist."
+                    "description": "The named object store that workspaces this rule creates hold their objects in — state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getStorageLocations`\" pulumi-lang-dotnet=\"`terrapod.getStorageLocations`\" pulumi-lang-go=\"`getStorageLocations`\" pulumi-lang-python=\"`get_storage_locations`\" pulumi-lang-yaml=\"`terrapod.getStorageLocations`\" pulumi-lang-java=\"`terrapod.getStorageLocations`\" pulumi-lang-hcl=\"`data.terrapod_storage_locations`\"\u003e`terrapod.getStorageLocations`\u003c/span\u003e data source.\n\nChanging it is allowed and affects only workspaces discovered AFTERWARDS: a workspace's own location is fixed when it is created, because nothing moves existing objects between buckets. So this is a template for future workspaces rather than a setting propagated to the ones that already exist."
                 },
                 "terraformVersion": {
                     "type": "string",
@@ -1918,7 +1932,7 @@
                 },
                 "storageLocation": {
                     "type": "string",
-                    "description": "The named object store that workspaces this rule creates hold their objects in — state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapodStorageLocations`\" pulumi-lang-dotnet=\"`TerrapodStorageLocations`\" pulumi-lang-go=\"`terrapodStorageLocations`\" pulumi-lang-python=\"`terrapod_storage_locations`\" pulumi-lang-yaml=\"`terrapodStorageLocations`\" pulumi-lang-java=\"`terrapodStorageLocations`\" pulumi-lang-hcl=\"`terrapod_storage_locations`\"\u003e`terrapodStorageLocations`\u003c/span\u003e data source.\n\nChanging it is allowed and affects only workspaces discovered AFTERWARDS: a workspace's own location is fixed when it is created, because nothing moves existing objects between buckets. So this is a template for future workspaces rather than a setting propagated to the ones that already exist."
+                    "description": "The named object store that workspaces this rule creates hold their objects in — state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getStorageLocations`\" pulumi-lang-dotnet=\"`terrapod.getStorageLocations`\" pulumi-lang-go=\"`getStorageLocations`\" pulumi-lang-python=\"`get_storage_locations`\" pulumi-lang-yaml=\"`terrapod.getStorageLocations`\" pulumi-lang-java=\"`terrapod.getStorageLocations`\" pulumi-lang-hcl=\"`data.terrapod_storage_locations`\"\u003e`terrapod.getStorageLocations`\u003c/span\u003e data source.\n\nChanging it is allowed and affects only workspaces discovered AFTERWARDS: a workspace's own location is fixed when it is created, because nothing moves existing objects between buckets. So this is a template for future workspaces rather than a setting propagated to the ones that already exist."
                 },
                 "terraformVersion": {
                     "type": "string",
@@ -2235,7 +2249,7 @@
                     },
                     "storageLocation": {
                         "type": "string",
-                        "description": "The named object store that workspaces this rule creates hold their objects in — state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapodStorageLocations`\" pulumi-lang-dotnet=\"`TerrapodStorageLocations`\" pulumi-lang-go=\"`terrapodStorageLocations`\" pulumi-lang-python=\"`terrapod_storage_locations`\" pulumi-lang-yaml=\"`terrapodStorageLocations`\" pulumi-lang-java=\"`terrapodStorageLocations`\" pulumi-lang-hcl=\"`terrapod_storage_locations`\"\u003e`terrapodStorageLocations`\u003c/span\u003e data source.\n\nChanging it is allowed and affects only workspaces discovered AFTERWARDS: a workspace's own location is fixed when it is created, because nothing moves existing objects between buckets. So this is a template for future workspaces rather than a setting propagated to the ones that already exist."
+                        "description": "The named object store that workspaces this rule creates hold their objects in — state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getStorageLocations`\" pulumi-lang-dotnet=\"`terrapod.getStorageLocations`\" pulumi-lang-go=\"`getStorageLocations`\" pulumi-lang-python=\"`get_storage_locations`\" pulumi-lang-yaml=\"`terrapod.getStorageLocations`\" pulumi-lang-java=\"`terrapod.getStorageLocations`\" pulumi-lang-hcl=\"`data.terrapod_storage_locations`\"\u003e`terrapod.getStorageLocations`\u003c/span\u003e data source.\n\nChanging it is allowed and affects only workspaces discovered AFTERWARDS: a workspace's own location is fixed when it is created, because nothing moves existing objects between buckets. So this is a template for future workspaces rather than a setting propagated to the ones that already exist."
                     },
                     "terraformVersion": {
                         "type": "string",
@@ -6716,7 +6730,7 @@
                 },
                 "storageLocation": {
                     "type": "string",
-                    "description": "The named object store holding THIS workspace's own objects — its state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store, which is every workspace unless an operator has configured `storage.locations`. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapodStorageLocations`\" pulumi-lang-dotnet=\"`TerrapodStorageLocations`\" pulumi-lang-go=\"`terrapodStorageLocations`\" pulumi-lang-python=\"`terrapod_storage_locations`\" pulumi-lang-yaml=\"`terrapodStorageLocations`\" pulumi-lang-java=\"`terrapodStorageLocations`\" pulumi-lang-hcl=\"`terrapod_storage_locations`\"\u003e`terrapodStorageLocations`\u003c/span\u003e data source; never set `\"default\"`, which is the absence of a location rather than a location and is refused. **Cannot be changed after the workspace is created** — nothing moves existing objects between buckets, so a change is refused at plan time rather than proposing to destroy the workspace."
+                    "description": "The named object store holding THIS workspace's own objects — its state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store, which is every workspace unless an operator has configured `storage.locations`. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getStorageLocations`\" pulumi-lang-dotnet=\"`terrapod.getStorageLocations`\" pulumi-lang-go=\"`getStorageLocations`\" pulumi-lang-python=\"`get_storage_locations`\" pulumi-lang-yaml=\"`terrapod.getStorageLocations`\" pulumi-lang-java=\"`terrapod.getStorageLocations`\" pulumi-lang-hcl=\"`data.terrapod_storage_locations`\"\u003e`terrapod.getStorageLocations`\u003c/span\u003e data source; never set `\"default\"`, which is the absence of a location rather than a location and is refused. **Cannot be changed after the workspace is created** — nothing moves existing objects between buckets, so a change is refused at plan time rather than proposing to destroy the workspace."
                 },
                 "terraformVersion": {
                     "type": "string",
@@ -7126,7 +7140,7 @@
                 },
                 "storageLocation": {
                     "type": "string",
-                    "description": "The named object store holding THIS workspace's own objects — its state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store, which is every workspace unless an operator has configured `storage.locations`. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapodStorageLocations`\" pulumi-lang-dotnet=\"`TerrapodStorageLocations`\" pulumi-lang-go=\"`terrapodStorageLocations`\" pulumi-lang-python=\"`terrapod_storage_locations`\" pulumi-lang-yaml=\"`terrapodStorageLocations`\" pulumi-lang-java=\"`terrapodStorageLocations`\" pulumi-lang-hcl=\"`terrapod_storage_locations`\"\u003e`terrapodStorageLocations`\u003c/span\u003e data source; never set `\"default\"`, which is the absence of a location rather than a location and is refused. **Cannot be changed after the workspace is created** — nothing moves existing objects between buckets, so a change is refused at plan time rather than proposing to destroy the workspace."
+                    "description": "The named object store holding THIS workspace's own objects — its state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store, which is every workspace unless an operator has configured `storage.locations`. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getStorageLocations`\" pulumi-lang-dotnet=\"`terrapod.getStorageLocations`\" pulumi-lang-go=\"`getStorageLocations`\" pulumi-lang-python=\"`get_storage_locations`\" pulumi-lang-yaml=\"`terrapod.getStorageLocations`\" pulumi-lang-java=\"`terrapod.getStorageLocations`\" pulumi-lang-hcl=\"`data.terrapod_storage_locations`\"\u003e`terrapod.getStorageLocations`\u003c/span\u003e data source; never set `\"default\"`, which is the absence of a location rather than a location and is refused. **Cannot be changed after the workspace is created** — nothing moves existing objects between buckets, so a change is refused at plan time rather than proposing to destroy the workspace."
                 },
                 "terraformVersion": {
                     "type": "string",
@@ -7490,7 +7504,7 @@
                     },
                     "storageLocation": {
                         "type": "string",
-                        "description": "The named object store holding THIS workspace's own objects — its state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store, which is every workspace unless an operator has configured `storage.locations`. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapodStorageLocations`\" pulumi-lang-dotnet=\"`TerrapodStorageLocations`\" pulumi-lang-go=\"`terrapodStorageLocations`\" pulumi-lang-python=\"`terrapod_storage_locations`\" pulumi-lang-yaml=\"`terrapodStorageLocations`\" pulumi-lang-java=\"`terrapodStorageLocations`\" pulumi-lang-hcl=\"`terrapod_storage_locations`\"\u003e`terrapodStorageLocations`\u003c/span\u003e data source; never set `\"default\"`, which is the absence of a location rather than a location and is refused. **Cannot be changed after the workspace is created** — nothing moves existing objects between buckets, so a change is refused at plan time rather than proposing to destroy the workspace."
+                        "description": "The named object store holding THIS workspace's own objects — its state, plans, logs, configuration versions and inventory. Omit it for the deployment's default store, which is every workspace unless an operator has configured `storage.locations`. Read the valid names from the \u003cspan pulumi-lang-nodejs=\"`terrapod.getStorageLocations`\" pulumi-lang-dotnet=\"`terrapod.getStorageLocations`\" pulumi-lang-go=\"`getStorageLocations`\" pulumi-lang-python=\"`get_storage_locations`\" pulumi-lang-yaml=\"`terrapod.getStorageLocations`\" pulumi-lang-java=\"`terrapod.getStorageLocations`\" pulumi-lang-hcl=\"`data.terrapod_storage_locations`\"\u003e`terrapod.getStorageLocations`\u003c/span\u003e data source; never set `\"default\"`, which is the absence of a location rather than a location and is refused. **Cannot be changed after the workspace is created** — nothing moves existing objects between buckets, so a change is refused at plan time rather than proposing to destroy the workspace."
                     },
                     "terraformVersion": {
                         "type": "string",
@@ -8171,6 +8185,30 @@
                     "port",
                     "scanTimeoutSeconds",
                     "unreachableHosts"
+                ],
+                "type": "object"
+            }
+        },
+        "terrapod:index/getStorageLocations:getStorageLocations": {
+            "outputs": {
+                "description": "A collection of values returned by getStorageLocations.\n",
+                "properties": {
+                    "locations": {
+                        "items": {
+                            "$ref": "#/types/terrapod:index/getStorageLocationsLocation:getStorageLocationsLocation"
+                        },
+                        "type": "array"
+                    },
+                    "names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "locations",
+                    "names"
                 ],
                 "type": "object"
             }

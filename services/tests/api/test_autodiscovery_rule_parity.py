@@ -288,13 +288,6 @@ _SURFACE_DEBT: dict[str, dict[str, str]] = {
             "severity threshold are all offered, so the skip list is the one part of "
             "the scanning block an operator cannot set from the UI."
         ),
-        "storage-location": (
-            "#2547: the rule's attribute is carried by the API, the SDK and the "
-            "Terraform provider, and this form renders no control for it yet. NOT "
-            "'matching the provider', which is what this entry used to say and was "
-            "true until the provider gained it -- a cross-reference to another "
-            "surface's gap is a reason that goes stale the moment that gap closes."
-        ),
     },
 }
 

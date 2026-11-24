@@ -65,6 +65,8 @@ data terrapod_ssh_host_keys.key_types required=false optional=true computed=true
 data terrapod_ssh_host_keys.port required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_ssh_host_keys.scan_timeout_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_ssh_host_keys.unreachable_hosts required=false optional=false computed=true sensitive=false type=types.SetType[basetypes.StringType]
+data terrapod_storage_locations.locations required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["backend":basetypes.StringType, "name":basetypes.StringType]]
+data terrapod_storage_locations.names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_user.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.display_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.email required=true optional=false computed=false sensitive=false type=basetypes.StringType
@@ -562,15 +564,13 @@ resource terrapod_variable.value required=false optional=true computed=false sen
 resource terrapod_variable.value_source required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.version_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.workspace_id required=false optional=true computed=true sensitive=false type=basetypes.StringType
-resource terrapod_variable_set.assignment_rule block type=types.ObjectType["agent_pool_id":basetypes.StringType, "drift_status":basetypes.StringType, "engine_version":basetypes.StringType, "execution_backend":basetypes.StringType, "execution_mode":basetypes.StringType, "has_vcs":basetypes.BoolType, "labels":types.MapType[basetypes.StringType], "locked":basetypes.BoolType, "name_glob":basetypes.StringType, "name_prefix":basetypes.StringType, "owner_email":basetypes.StringType, "terraform_version":basetypes.StringType, "vcs_connection_id":basetypes.StringType]
+resource terrapod_variable_set.assignment_rule block type=types.ObjectType["agent_pool_id":basetypes.StringType, "engine_version":basetypes.StringType, "execution_backend":basetypes.StringType, "execution_mode":basetypes.StringType, "has_vcs":basetypes.BoolType, "labels":types.MapType[basetypes.StringType], "name_glob":basetypes.StringType, "name_prefix":basetypes.StringType, "owner_email":basetypes.StringType, "terraform_version":basetypes.StringType, "vcs_connection_id":basetypes.StringType]
 resource terrapod_variable_set.assignment_rule.agent_pool_id required=false optional=true computed=false sensitive=false type=basetypes.StringType
-resource terrapod_variable_set.assignment_rule.drift_status required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.assignment_rule.engine_version required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.assignment_rule.execution_backend required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.assignment_rule.execution_mode required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.assignment_rule.has_vcs required=false optional=true computed=false sensitive=false type=basetypes.BoolType
 resource terrapod_variable_set.assignment_rule.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
-resource terrapod_variable_set.assignment_rule.locked required=false optional=true computed=false sensitive=false type=basetypes.BoolType
 resource terrapod_variable_set.assignment_rule.name_glob required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.assignment_rule.name_prefix required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.assignment_rule.owner_email required=false optional=true computed=false sensitive=false type=basetypes.StringType

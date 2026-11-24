@@ -200,13 +200,16 @@ var notificationTemplateAttrTypes = map[string]attr.Type{
 	"enabled":          types.BoolType,
 }
 
-// ruleCollectionModel is one `ansible_collections` block.
+// ruleCollectionModel is one `ansible_collection` block. Singular: a repeated
+// block is named for what one of them is, and the plural was the
+// list-attribute spelling this input had before #2681.
 type ruleCollectionModel struct {
 	Name    types.String `tfsdk:"name"`
 	Version types.String `tfsdk:"version"`
 }
 
-// runTaskTemplateModel is one `run_task_templates` block.
+// runTaskTemplateModel is one `run_task_template` block. Singular, for the
+// same reason.
 type runTaskTemplateModel struct {
 	Name             types.String `tfsdk:"name"`
 	URL              types.String `tfsdk:"url"`

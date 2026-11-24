@@ -24,9 +24,12 @@
 //	"provider-template-ids"  -> provider_template_ids   (list(string), optional)
 //	"allowed-agent-pool-ids" -> allowed_agent_pool_ids  (list(string), optional;
 //	    omitted/null -> unrestricted)
-//	"variable-options"       -> variable_options_json   (string, optional; JSON
-//	    array of objects, kept as a JSON string to track the open-ended server
-//	    contract)
+//	"variable-options"       -> variable_option         (repeated BLOCK,
+//	    optional). A typed block since #2681; it was a
+//	    `variable_options_json` string, justified as tracking an open-ended
+//	    server contract, which is the reason the block form withdrew.
+//	    `options_json` within it stays encoded, because the framework refuses
+//	    a dynamic type inside a collection.
 //	"configure-enabled"      -> configure_enabled       (bool, optional+computed)
 //	"ansible-directory"      -> ansible_directory       (string, optional+computed)
 //	"default-playbook"       -> default_playbook        (string, optional+computed)
