@@ -2246,6 +2246,14 @@
     }
   },
   {
+    "name": "terrapod_storage_locations",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_variable_delete",
     "destructive": true,
     "input_schema": {

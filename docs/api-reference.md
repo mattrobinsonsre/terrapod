@@ -7454,6 +7454,45 @@ Statuses worth knowing, because the three say different things:
 Which images this deployment can run a configure operation in (#2154). See
 [Choosing an execution environment](runners.md#choosing-an-execution-environment).
 
+### `GET /api/v1/storage/locations`
+
+Any authenticated user, matching the execution-environment listing above, which
+is the same shape: an operator-configured set a workspace selects from. Anyone
+who may set the attribute needs the valid values, and the name of every location
+already **in use** is readable from the workspaces themselves — so gating this
+would withhold only the names of locations configured and not yet used, while
+costing the picker for every non-admin who may legitimately set it.
+
+```json
+{"data": [
+   {"type": "storage-locations", "id": "archive",
+    "attributes": {"name": "archive", "backend": "s3"}},
+   {"type": "storage-locations", "id": "eu-restricted",
+    "attributes": {"name": "eu-restricted", "backend": "azure"}}
+ ],
+ "meta": {"pagination": {"current-page": 1, "page-size": 2,
+                         "total-count": 2, "total-pages": 1}}}
+```
+
+Three things about the answer, each of which otherwise costs a 422:
+
+| | |
+|---|---|
+| **`default` is absent** | It is the *absence* of a location, not a location, and the write path refuses the literal string — so a client offering a choice supplies its own "use the deployment's store" option mapping to a **null** `storage-location`. Sending `"default"` is refused |
+| **An empty list is ordinary** | It means a single object store, which is the default configuration. Offer no control rather than an empty select; it is not a failure and not a missing feature |
+| **The attribute is create-only** | `storage-location` is set when a workspace is created and a later `PATCH` sending a different value is refused with a 422. A client should offer the choice on a create form and render it read-only on an existing workspace |
+
+Names and backends only. A location's configuration also carries its bucket,
+region, endpoint and a credentials block holding `role_arn` and `external_id`;
+none of it is served here. Nothing a picker does needs it, and those fields sit
+directly beside the credentials in the configuration model — the adjacency that
+makes "while we are here, add the bucket" cheap to write and wrong to ship.
+
+What a location governs is where that workspace's **own** objects live: its
+state, plans, logs, configuration versions and inventory. Registry artifacts,
+caches and backups stay on the default store regardless, being keyed by
+repository or digest rather than by workspace.
+
 ### `GET /api/v1/ansible/execution-environments`
 
 Any authenticated user. The answer is which images this deployment can pull,

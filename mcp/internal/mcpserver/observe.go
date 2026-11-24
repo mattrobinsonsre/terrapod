@@ -658,6 +658,47 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, available, nil
 	})
 
+	// ── terrapod_storage_locations ───────────────────────────────────
+	// The write side accepts `storage_location` on a workspace and the server
+	// validates it against configuration an agent cannot otherwise see, so
+	// without this the only way to find an acceptable value is to attempt a
+	// create and read the 422 -- and because the attribute is create-only, that
+	// attempt costs a workspace rather than a retry.
+	type storageLocationsIn struct{}
+	type storageLocationOut struct {
+		// Name is the value to send as a workspace's `storage_location`.
+		Name string `json:"name"`
+		// Backend is s3, azure or gcs. Never filesystem -- the server refuses
+		// that configuration for a location.
+		Backend string `json:"backend"`
+	}
+	type storageLocationsOut struct {
+		// Count is stated rather than left to be inferred from the array,
+		// because zero is the ORDINARY answer here (a single-store deployment)
+		// and an agent reading an empty array is more likely to treat it as a
+		// failure than as a fact. A wrapper is also required: MCP refuses an
+		// output schema that is not an object, so a bare slice cannot be
+		// returned.
+		Count     int                  `json:"count"`
+		Locations []storageLocationOut `json:"locations"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_storage_locations",
+		Description: "List the named storage locations this deployment has, so a workspace can be pointed at one -- read this BEFORE setting `storage_location`, because the server refuses any name it has not been configured with and the set is deployment configuration you cannot otherwise discover. THREE THINGS THAT WILL OTHERWISE COST YOU A 422. First, `storage_location` IS SET AT CREATE AND CANNOT BE CHANGED afterwards: the workspace update path refuses any value differing from the stored one, so offer the choice when creating a workspace and treat it as read-only on an existing one -- moving a workspace's data between locations is not something this API does. Second, `default` IS NOT A LOCATION and must NEVER be sent: it is the ABSENCE of one, the server refuses the literal string, and it does not appear in this list. To use the deployment's main store, OMIT the attribute or send null. Third, AN EMPTY LIST IS A REAL AND ORDINARY ANSWER -- it means this deployment has a single object store, which is the default configuration, so there is no choice to offer and `storage_location` should simply be left unset. Do not report it as a failure or as a missing feature. Each entry carries only `name` (the value to send) and `backend` (s3, azure or gcs). A location's bucket, region, endpoint and credentials are deployment configuration and are deliberately not exposed here. What a location governs is where that workspace's own objects live -- its state, plans, logs, configuration versions and inventory. Registry artifacts, caches and backups stay on the default store regardless, because they are keyed by repository or digest rather than by workspace and are shared. Read-only; any authenticated user, because anyone who may set the attribute needs the valid values, and the names of locations already in use are readable from the workspaces themselves.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ storageLocationsIn) (*mcp.CallToolResult, *storageLocationsOut, error) {
+		locations, err := c.ListStorageLocations(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		out := &storageLocationsOut{Locations: make([]storageLocationOut, 0, len(locations))}
+		for _, l := range locations {
+			out.Locations = append(out.Locations, storageLocationOut{Name: l.Name, Backend: l.Backend})
+		}
+		out.Count = len(out.Locations)
+		return nil, out, nil
+	})
+
 	// ── terrapod_vault_status ────────────────────────────────────────
 	type vaultStatusIn struct{}
 	mcp.AddTool(s, &mcp.Tool{
