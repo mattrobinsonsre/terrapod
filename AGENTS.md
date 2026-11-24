@@ -1057,10 +1057,13 @@ multi-language implementation ships in the same PR**:
     line or a smuggled-in env var, and it's where chart invariants live.
 - **The chart has three first-class value profiles — keep all three working.**
   `values.yaml` (production defaults), `values-local.yaml` (the Tilt dev loop),
-  and `values-eval.yaml` (the `make eval` kind/k3d quickstart). Any chart value /
-  default / schema change must keep **all three** rendering (`helm lint` +
-  `helm template -f <profile>`) **and** the eval stack booting — the eval-boot CI
-  job (kind + k3d matrix) is what enforces the last part. `values-eval.yaml` must
+  and `values-eval.yaml` (the `make eval` quickstart, which supports kind and
+  k3d). Any chart value / default / schema change must keep **all three**
+  rendering (`helm lint` + `helm template -f <profile>`) **and** the eval stack
+  booting — the eval-boot CI job is what enforces the last part. **It gates on
+  kind alone**: `make eval` still supports k3d, and the Tilt dev loop exercises
+  that cluster type daily, so CI gates the one nothing else covers rather than
+  both. `values-eval.yaml` must
   stay **batteries-included / zero-external-deps** (it deploys in-cluster
   Postgres/Redis via `postgresql.deploy`/`redis.deploy`, filesystem storage, a
   local admin): if a new feature defaults to *requiring* an external dependency,

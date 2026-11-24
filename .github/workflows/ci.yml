@@ -4022,7 +4022,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tool: [kind, k3d]
+        # kind only. The k3d leg was dropped (2026-11-24) because it carried
+        # EVERY failure this job has had while kind has not failed once, and
+        # because the two legs are not equal in what they uniquely cover:
+        # `make dev` runs the local stack on k3d daily, so that cluster type is
+        # exercised constantly, whereas kind is exercised ONLY here. Dropping
+        # kind would have removed the sole coverage of a cluster type; dropping
+        # k3d removes a duplicate with a flake rate.
+        #
+        # `scripts/eval.sh` still supports k3d and the docs still offer it --
+        # this drops a GATE, not support. If it is ever re-added, re-read the
+        # measurement above rather than assuming the flake was transient: a
+        # release-gating job that fails a quarter of the time teaches people to
+        # re-run without reading, which is worse than one fewer leg.
+        tool: [kind]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install ${{ matrix.tool }}
@@ -4250,12 +4263,16 @@ jobs:
           EVAL_NO_PORT_FORWARD: "1"
           # Use the images built + loaded above (NOT :latest).
           TERRAPOD_VERSION: sha-${{ needs.prepare.outputs.sha_short }}-amd64
-          # Pin the tool — the runner ships a pre-installed `kind`, so without
-          # this the k3d matrix job would auto-detect kind and the smoke step's
-          # k3d-pinned context lookup would miss.
+          # Pin the tool explicitly rather than letting eval.sh auto-detect. The
+          # runner ships a pre-installed `kind`, so auto-detection happens to
+          # agree today -- which is exactly why the pin stays: it makes the
+          # choice visible, and it is what keeps re-adding a k3d leg to a
+          # one-line matrix change rather than a hunt.
           TERRAPOD_EVAL_TOOL: ${{ matrix.tool }}
           # k3d pulls every image from the local registry created above (kind
           # loads images straight into the node, so it needs no override). #975.
+          # DORMANT while the matrix is kind-only: this always resolves to ''.
+          # Kept, not stripped, so a k3d leg is one matrix entry away.
           TERRAPOD_EVAL_IMAGE_REGISTRY: ${{ matrix.tool == 'k3d' && 'k3d-eval-registry.localhost:5111' || '' }}
           # Fail fast: a healthy boot is ~50s, so cap the install wait at 5 min so
           # a genuine image/scheduling problem surfaces quickly with pod
