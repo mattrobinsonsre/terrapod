@@ -456,7 +456,7 @@ def render_inventory_yaml(**kwargs: Any) -> str:
 TARGETED = "targeted"
 
 
-async def effective_limit(db, run) -> str:
+def effective_limit(run, ws) -> str:
     """The `--limit` the RUNNER will actually carry for this run.
 
     Mirrors how `engines.terraform` builds the Job's own value --
@@ -474,20 +474,25 @@ async def effective_limit(db, run) -> str:
     -- so for a workspace with `default_limit` set, the run column is empty
     while the runner narrows. Anything reading the column alone concludes the
     run targeted everything.
-    """
-    from terrapod.db.models import Workspace
 
+    **The workspace is PASSED, not fetched.** Both callers already hold the row
+    -- `create_run` takes it as a parameter and `complete_apply` reads it for the
+    narrowing a few lines above -- so fetching here would be a second query for
+    a row the caller has, and a chance to read a DIFFERENT row than the one the
+    caller validated. It is a required argument rather than an optional one
+    because an optional parameter makes the fetch the default, and defaults are
+    what tests take.
+    """
     limit = (getattr(run, "ansible_limit", "") or "").strip()
-    ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         # Fail WIDE: an unreadable workspace row must not make a run look
         # narrower than it was, because a short target set under-reports what is
         # outstanding and a retry would then miss hosts.
         return limit
-    return bounded_limit(ws, limit or (getattr(ws, "default_limit", "") or ""))
+    return bounded_limit(ws, limit or (getattr(ws, "default_limit", "") or "")) or ""
 
 
-async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str) -> list[str] | None:
+async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str, ws) -> list[str] | None:
     """Record what the run's own `--limit` selects, on its artifact (#2690).
 
     **The artifact itself stays WHOLE, deliberately.** `--limit` does not
@@ -511,7 +516,7 @@ async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str) -> l
     the whole artifact, which is precisely the widening this fixes. Refusing is
     the direction that cannot silently reintroduce it.
     """
-    limit = await effective_limit(db, run)
+    limit = effective_limit(run, ws)
     if not limit.strip():
         return None
     if not (document.get("hosts") or {}):

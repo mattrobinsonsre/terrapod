@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services import inventory_resolve as ir
+from tests.post_plan_stubs import stub_run_lifecycle_task_stages
 
 
 def _run(limit: str | None):
@@ -34,28 +35,34 @@ async def _stamp(
     narrowed_hosts=("web1",),
     default_limit: str = "",
     hard_limit: str = "",
+    workspace_missing: bool = False,
 ):
     """Drive the stamp, returning (result, document, storage, resolve).
 
-    The workspace is supplied EXPLICITLY, with both limits defaulting to empty,
+    The workspace is PASSED to the stamp, with both limits defaulting to empty,
     because the stamp reads the run's EFFECTIVE limit -- the run's own, falling
     back to the workspace's `default_limit`, bounded by `hard_limit`, exactly as
-    the engine builds the Job's. A bare `AsyncMock()` db would hand it a mock
-    whose `default_limit` is truthy, so every one of these tests would take the
-    stamping branch for the wrong reason.
+    the engine builds the Job's.
+
+    `ws=None` drives the fail-wide branch. It used to be reachable only by
+    arranging for `db.get` to return None; now it is an argument, which is the
+    point of the workspace being passed rather than fetched -- a caller's mock db
+    returning a truthy `AsyncMock` workspace was how four unrelated tests in
+    `test_configure_ee_image` came to fail on an unrelated change.
     """
     doc = dict(WHOLE if document is None else document)
     storage = MagicMock()
     storage.put = AsyncMock()
     narrowed = {"hosts": {h: {} for h in narrowed_hosts}}
-    ws = MagicMock(default_limit=default_limit, hard_limit=hard_limit)
+    ws = (
+        None if workspace_missing else MagicMock(default_limit=default_limit, hard_limit=hard_limit)
+    )
     db = AsyncMock()
-    db.get = AsyncMock(return_value=ws)
     with (
         patch.object(ir, "resolve_for_run", AsyncMock(return_value=narrowed)) as resolve,
         patch("terrapod.storage.get_storage", return_value=storage),
     ):
-        out = await ir.stamp_targeted_hosts(db, _run(limit), doc, "the/key")
+        out = await ir.stamp_targeted_hosts(db, _run(limit), doc, "the/key", ws)
     return out, doc, storage, resolve
 
 
@@ -187,15 +194,149 @@ class TestTheWorkspaceDefaultNarrowsToo:
         from it would miss hosts -- so the degradation is to the run's own limit
         (here none, so no stamp) rather than to a guess.
         """
-        doc = dict(WHOLE)
-        storage = MagicMock()
-        storage.put = AsyncMock()
-        db = AsyncMock()
-        db.get = AsyncMock(return_value=None)
-        with (
-            patch.object(ir, "resolve_for_run", AsyncMock()) as resolve,
-            patch("terrapod.storage.get_storage", return_value=storage),
-        ):
-            out = await ir.stamp_targeted_hosts(db, _run(None), doc, "the/key")
+        out, doc, storage, resolve = await _stamp(None, workspace_missing=True)
         assert out is None
         resolve.assert_not_awaited()
+        storage.put.assert_not_awaited()
+        assert ir.TARGETED not in doc
+
+        # And the degradation is to the run's OWN limit, not to nothing: a run
+        # that did carry one still records it with no workspace to bound it.
+        out2, doc2, _, _ = await _stamp("web1", workspace_missing=True)
+        assert out2 == ["web1"]
+        assert doc2[ir.TARGETED]["limit"] == "web1"
+
+
+@pytest.mark.asyncio
+class TestTheCallSitesPassTheirOwnWorkspace:
+    """The stamp is handed the workspace; the two callers must hand it the real one.
+
+    Every test above drives `stamp_targeted_hosts` directly, so all of them pass
+    with a caller supplying `None` -- and `None` is the fail-WIDE branch, which
+    restores #2690 exactly: the run's own column alone, so a `default_limit`
+    workspace records no target set and every consumer is handed the whole
+    inventory again. Measured: mutating `create_run`'s argument to `None` left
+    twenty tests green.
+
+    So these drive the CALLERS. A unit test of a function that gained a parameter
+    says nothing about whether the call site passes the right thing.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _stub_post_plan_task_stages(self):
+        """`create_run` reserves a post-plan task stage now that
+        `runs.tfe_post_plan_decisions` defaults on (#2425), and that queries the
+        db. This test drives the lifecycle against a narrow mock and has no
+        opinion about stages -- the shared stub, not a patch of my own, so it
+        cannot drift from what the lifecycle actually calls."""
+        with stub_run_lifecycle_task_stages():
+            yield
+
+    async def test_create_run_passes_the_workspace_it_was_given(self) -> None:
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        from terrapod.services.run_service import create_run
+
+        # Every attribute `create_run` gates a configure on, set explicitly:
+        # left as MagicMock attributes they are TRUTHY, so `locked` alone refuses
+        # the run (#1975) and `ansible_execution_environment` resolves to an
+        # unknown environment. The sibling fixture in `test_configure_ee_image`
+        # records the same list for the same reason.
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.name = "stamp-ws"
+        ws.engine = "terraform"
+        ws.engine_version = "1.11"
+        ws.execution_mode = "agent"
+        ws.auto_apply = False
+        ws.terragrunt_enabled = False
+        ws.resource_cpu = "1"
+        ws.resource_memory = "2Gi"
+        ws.ee_resource_cpu = ""
+        ws.ee_resource_memory = ""
+        ws.parallelism = 10
+        ws.configure_parallelism = None
+        ws.agent_pool_links = []
+        ws.plan_apply_enabled = True
+        ws.configure_enabled = True
+        ws.configure_after_apply = False
+        ws.auto_configure_enabled = False
+        ws.ansible_version = ""
+        ws.ansible_execution_environment = ""
+        ws.locked = False
+        ws.config_directory = "ansible"
+        # The point of the test: a workspace whose narrowing lives HERE and
+        # nowhere on the run.
+        ws.default_limit = "web"
+        ws.hard_limit = ""
+        db = AsyncMock(spec=AsyncSession)
+        stamp = AsyncMock(return_value=None)
+        with (
+            patch("terrapod.services.run_service.Run") as MockRun,
+            patch.object(ir, "write_run_artifact", AsyncMock(return_value=("k", dict(WHOLE)))),
+            patch.object(ir, "stamp_targeted_hosts", stamp),
+            # The derived-configure narrowing that runs just above the stamp. Not
+            # the subject here -- it has its own tests -- and it queries the db,
+            # so leaving it live means scripting a query to assert an argument.
+            patch(
+                "terrapod.services.inventory_narrowing.limit_for",
+                AsyncMock(return_value=""),
+            ),
+        ):
+            inst = MockRun.return_value
+            inst.id = uuid.uuid4()
+            inst.status = "pending"
+            inst.workspace_id = ws.id
+            inst.ansible_limit = ""
+            await create_run(db, ws, message="m", is_configure=True)
+
+        stamp.assert_awaited_once()
+        # The WORKSPACE, by identity -- not None, and not a row re-read from the
+        # db, which could be a different one than the caller validated.
+        assert stamp.await_args[0][4] is ws
+
+
+class TestNoCallSitePassesNoWorkspace:
+    """DERIVED from the source, so a THIRD call site is covered the day it lands.
+
+    The behavioural test above drives `create_run` only. `complete_apply` stamps
+    too, and mutating ITS argument to `None` left twenty-one tests green --
+    driving that function would mean scripting its whole apply path to assert one
+    argument, so the honest tool is the source.
+
+    `None` is the fail-WIDE branch: it means "there is no workspace row to bound
+    this run", which for a caller that HAS one restores #2690 exactly. A caller
+    may only pass a name it resolved.
+    """
+
+    def test_every_stamp_call_passes_a_resolved_workspace(self) -> None:
+        import ast
+        import pathlib
+
+        from terrapod.services import run_service
+
+        source = pathlib.Path(run_service.__file__).read_text()
+        calls = [
+            n
+            for n in ast.walk(ast.parse(source))
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "stamp_targeted_hosts"
+        ]
+        # A floor, so a renamed helper fails here rather than passing on nothing.
+        assert len(calls) >= 2, f"found only {len(calls)} stamp call sites; the matcher has drifted"
+
+        for call in calls:
+            assert len(call.args) == 5, (
+                f"line {call.lineno}: the workspace is positional argument 5; "
+                "a keyword or a short call means this gate cannot read it"
+            )
+            ws_arg = call.args[4]
+            assert not (isinstance(ws_arg, ast.Constant) and ws_arg.value is None), (
+                f"line {call.lineno}: passes None as the workspace. That is the "
+                "fail-wide branch, so a workspace's `default_limit` is never read "
+                "and the run records no target set -- #2690, restored."
+            )
+            assert isinstance(ws_arg, ast.Name), (
+                f"line {call.lineno}: expected a resolved name, got {type(ws_arg).__name__}"
+            )

@@ -1843,7 +1843,7 @@ async def create_run(
         # What that limit actually SELECTS, recorded on the artifact (#2690).
         # After the narrowing above, because that is what may have set the limit
         # in the first place.
-        await inventory_resolve.stamp_targeted_hosts(db, run, document, art_key)
+        await inventory_resolve.stamp_targeted_hosts(db, run, document, art_key, workspace)
 
     # In the Terraform Enterprise vocabulary the run's post-plan task stage
     # exists from the start, as it does there: the CLI reads a run's stages
@@ -2676,15 +2676,16 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
         # Only when the run carries no limit of its own. A composite created
         # with an explicit limit was asked for that limit, and the apply
         # chaining a configure onto it does not make it the platform's choice.
-        if not run.ansible_limit:
-            ws = await db.get(Workspace, run.workspace_id)
-            if ws is not None:
-                run.ansible_limit = await inventory_narrowing.limit_for(
-                    db, run, ws, current=document
-                )
+        #
+        # Read once, ABOVE the branch: the stamp below needs the same row to
+        # resolve the workspace's `default_limit`, and two reads of one row are
+        # two chances to read different rows.
+        ws = await db.get(Workspace, run.workspace_id)
+        if not run.ansible_limit and ws is not None:
+            run.ansible_limit = await inventory_narrowing.limit_for(db, run, ws, current=document)
 
         # As at creation: record what the limit selects, after whatever set it.
-        await inventory_resolve.stamp_targeted_hosts(db, run, document, art_key)
+        await inventory_resolve.stamp_targeted_hosts(db, run, document, art_key, ws)
 
         run.apply_finished_at = now_utc()
         # Exactly what entering `applying` does to the plan's Job state, and
