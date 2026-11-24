@@ -162,6 +162,19 @@ export default function BulkUpdatePage() {
   const [fAgentPoolId, setFAgentPoolId] = useState('')
   const [fVcsConnId, setFVcsConnId] = useState('')
   const [fOwnerEmail, setFOwnerEmail] = useState('')
+  // The eight dimensions the server accepted and this form could not send
+  // (#2696). The exclusion editor has offered all fourteen since #2694, so an
+  // operator could exclude by a dimension they could not select by.
+  const [fWorkspaceIds, setFWorkspaceIds] = useState('')
+  const [fNameGlob, setFNameGlob] = useState('')
+  const [fExecMode, setFExecMode] = useState('')
+  const [fEngineVersion, setFEngineVersion] = useState('')
+  const [fAutodiscoveryRuleId, setFAutodiscoveryRuleId] = useState('')
+  const [fDriftStatus, setFDriftStatus] = useState('')
+  // Tri-state, not boolean: '' is "any", so adding the control must not remove
+  // the ability to NOT filter on the dimension at all.
+  const [fLocked, setFLocked] = useState('')
+  const [fHasVcs, setFHasVcs] = useState('')
   const [fAll, setFAll] = useState(false)
   const [fExclude, setFExclude] = useState<ExcludeEntry[]>([])
 
@@ -372,6 +385,23 @@ export default function BulkUpdatePage() {
     if (fAgentPoolId) f['agent-pool-id'] = fAgentPoolId
     if (fVcsConnId) f['vcs-connection-id'] = fVcsConnId
     if (fOwnerEmail.trim()) f['owner-email'] = fOwnerEmail.trim()
+    // #2696. `workspace-ids` is a LIST, so it is split and trimmed rather than
+    // sent as the raw string; the other seven are scalars.
+    const ids = fWorkspaceIds.split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (ids.length) f['workspace-ids'] = ids
+    if (fNameGlob.trim()) f['name-glob'] = fNameGlob.trim()
+    if (fExecMode) f['execution-mode'] = fExecMode
+    if (fEngineVersion.trim()) f['engine-version'] = fEngineVersion.trim()
+    if (fAutodiscoveryRuleId.trim())
+      f['autodiscovery-rule-id'] = fAutodiscoveryRuleId.trim()
+    if (fDriftStatus) f['drift-status'] = fDriftStatus
+    // Tri-state: '' means "any" and sends nothing, so the dimension is not
+    // filtered on -- distinct from sending `false`, which SELECTS the
+    // workspaces that are not locked.
+    if (fLocked) f.locked = fLocked === 'true'
+    if (fHasVcs) f['has-vcs'] = fHasVcs === 'true'
     return f
   }
 
@@ -1785,6 +1815,108 @@ export default function BulkUpdatePage() {
                   ))}
                 </select>
               </div>
+              {/*
+                The eight dimensions #2696 adds. Labelled from the SHARED
+                dimension vocabulary (`exclude.dim.*`) rather than new
+                `filter.*` keys: the exclusion editor has carried all fourteen
+                in every locale since #2694, they are the same words either
+                way, and one vocabulary is what stops these two surfaces
+                drifting apart again. `tEx` is already bound on this page.
+
+                `autodiscovery_rule_id` is a text input rather than a select
+                because this page does not fetch the rules -- the same shape
+                the exclusion editor uses for it.
+              */}
+              <div>
+                <label className={labelCls}>{tEx('dim.name_glob')}</label>
+                <input
+                  type="text"
+                  value={fNameGlob}
+                  onChange={(e) => setFNameGlob(e.target.value)}
+                  placeholder="*-prod-*" /* i18n-ignore: syntax example */
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{tEx('dim.execution_mode')}</label>
+                <select
+                  value={fExecMode}
+                  onChange={(e) => setFExecMode(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('anyOption')}</option>
+                  <option value="local">local</option>{/* i18n-ignore: literal API value */}
+                  <option value="agent">agent</option>{/* i18n-ignore: literal API value */}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{tEx('dim.engine_version')}</label>
+                <input
+                  type="text"
+                  value={fEngineVersion}
+                  onChange={(e) => setFEngineVersion(e.target.value)}
+                  placeholder="1.12.0" /* i18n-ignore: syntax example */
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  {tEx('dim.autodiscovery_rule_id')}
+                </label>
+                <input
+                  type="text"
+                  value={fAutodiscoveryRuleId}
+                  onChange={(e) => setFAutodiscoveryRuleId(e.target.value)}
+                  placeholder="adr-..." /* i18n-ignore: syntax example */
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{tEx('dim.drift_status')}</label>
+                <select
+                  value={fDriftStatus}
+                  onChange={(e) => setFDriftStatus(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('anyOption')}</option>
+                  <option value="drifted">drifted</option>{/* i18n-ignore: literal API value */}
+                  <option value="no_drift">no_drift</option>{/* i18n-ignore: literal API value */}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{tEx('dim.locked')}</label>
+                <select
+                  value={fLocked}
+                  onChange={(e) => setFLocked(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('anyOption')}</option>
+                  <option value="true">{tEx('yes')}</option>
+                  <option value="false">{tEx('no')}</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{tEx('dim.has_vcs')}</label>
+                <select
+                  value={fHasVcs}
+                  onChange={(e) => setFHasVcs(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">{t('anyOption')}</option>
+                  <option value="true">{tEx('yes')}</option>
+                  <option value="false">{tEx('no')}</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>{tEx('dim.workspace_ids')}</label>
+              <input
+                type="text"
+                value={fWorkspaceIds}
+                onChange={(e) => setFWorkspaceIds(e.target.value)}
+                placeholder="ws-... ws-..." /* i18n-ignore: syntax example */
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>{t('filter.labels')}</label>
