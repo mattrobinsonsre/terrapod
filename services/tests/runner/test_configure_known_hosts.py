@@ -666,3 +666,115 @@ class TestTheMixedInventoryList:
         assert hosts["web1"]["ansible_host"] == "10.0.0.11"
         assert hosts["db1"]["ansible_port"] == 2222
         assert hosts["web2"] == {}
+
+
+class TestThePolicyReachesTheSshArguments:
+    """`materialise` must pass the RUN'S policy to `ssh_args`, not a constant.
+
+    Every link in this chain was tested in isolation and the joining line was
+    tested nowhere: the API stores the policy, `create_run` snapshots it, the
+    engines emit `TP_SSH_HOST_KEY_POLICY`, `RunnerConfig` reads it, and
+    `ssh_args(path, policy=X)` renders X -- each with its own parametrized test.
+    `materialise` passing `cfg.ssh_host_key_policy` to `ssh_args` had none, so
+    hardcoding `policy="strict"` there survived the whole suite.
+
+    That is the shape where a helper is driven by hand with the argument, so
+    deleting it from the caller leaves everything green. The `cfg` fixture in
+    this file sets no `TP_SSH_HOST_KEY_POLICY`, so every other test here runs at
+    `strict` and asserts exactly what a hardcoded `"strict"` would produce.
+
+    Parametrized off the model's own set rather than a literal, so a fourth
+    policy cannot be added without landing here.
+    """
+
+    @staticmethod
+    def _cfg(policy: str):
+        from terrapod.runner.runner_config import RunnerConfig
+
+        return RunnerConfig.from_env(
+            {
+                "TP_RUN_ID": "run-1",
+                "TP_PHASE": "configure",
+                "TP_WORKSPACE_ID": "ws-abc",
+                "TP_API_URL": "http://api",
+                "TP_AUTH_TOKEN": "t",
+                "TP_SSH_HOST_KEY_POLICY": policy,
+            }
+        )
+
+    def test_every_policy_reaches_the_arguments(self, tmp_path):
+        from terrapod.db.models import SSH_HOST_KEY_POLICIES
+
+        assert len(SSH_HOST_KEY_POLICIES) >= 3, "the set shrank -- is this still the subject?"
+        for policy in SSH_HOST_KEY_POLICIES:
+            client = client_for(body=keys_body({"web1": [key()]}))
+            env = materialise(
+                self._cfg(policy), inventory=inventory_at(tmp_path, DOCUMENT), client=client
+            )
+            want = configure_known_hosts.SSH_HOST_KEY_POLICY_TO_OPENSSH[policy]
+            assert f"-o StrictHostKeyChecking={want}" in env["ANSIBLE_SSH_ARGS"], (
+                f"policy {policy!r} did not reach the ssh arguments: "
+                f"{env.get('ANSIBLE_SSH_ARGS')!r}"
+            )
+
+    def test_a_non_strict_policy_is_delivered_with_no_approved_keys(self, tmp_path):
+        """The regression the three-state replacement introduced.
+
+        Until this release a relaxed workspace was relaxed by a producer that did
+        not consult approved keys at all -- it keyed on the boolean alone. That
+        producer is gone, and `materialise` returns `{}` when no keys are
+        declared, which delivers ansible's OWN default: verification ON.
+
+        So `off` on a workspace that has pinned nothing -- the ordinary shape,
+        since pinning is new -- became `StrictHostKeyChecking=ask` and refused
+        every unseen host non-interactively. That is exactly the outcome the
+        migration's `false -> off` conversion exists to prevent, arriving by a
+        different route, and `accept-new` reached it the same way.
+        """
+        for policy, want in (("off", "no"), ("accept-new", "accept-new")):
+            client = client_for(body=keys_body({}))
+            env = materialise(
+                self._cfg(policy), inventory=inventory_at(tmp_path, DOCUMENT), client=client
+            )
+            assert env, f"policy {policy!r} delivered nothing with no approved keys"
+            assert f"-o StrictHostKeyChecking={want}" in env["ANSIBLE_SSH_ARGS"], (
+                f"policy {policy!r} with no keys gave {env['ANSIBLE_SSH_ARGS']!r}"
+            )
+
+    def test_off_survives_an_unreadable_key_route(self, tmp_path):
+        """`off` is answered before the fetch, and that is the point of it.
+
+        A 404 makes `_fetch` return `None`, which the gate treats as "leave
+        host-key checking unchanged" -- correct for `strict`, and for `off` it
+        silently converts "verify nothing" into verification, on a transient
+        failure of a route whose answer `off` does not even depend on. Its anchor
+        is `/dev/null`, so there is nothing the keys could say.
+
+        Mutation this pins: removing the pre-fetch shortcut. The no-keys branch
+        below also delivers `off`, so deleting the shortcut is INVISIBLE on a
+        healthy route -- this is the only case that distinguishes them.
+        """
+        client = client_for(status=404)
+        env = materialise(
+            self._cfg("off"), inventory=inventory_at(tmp_path, DOCUMENT), client=client
+        )
+        assert env, "`off` was dropped because the key route could not be read"
+        assert "-o StrictHostKeyChecking=no" in env["ANSIBLE_SSH_ARGS"]
+        assert "/dev/null" in env["ANSIBLE_SSH_ARGS"]
+
+    def test_strict_with_no_keys_still_leaves_checking_unchanged(self, tmp_path):
+        """The gate's one legitimate case, and the reason it exists.
+
+        `strict` anchors on the approved-keys file, which is an ALLOW-LIST -- so
+        raising it on a workspace that has pinned nothing would refuse that
+        workspace's whole fleet. Returning `{}` leaves the operator's own
+        `ansible.cfg` and inventory deciding, which is the pre-#2592 behaviour
+        and what `TestTheGate` above asserts.
+        """
+        client = client_for(body=keys_body({}))
+        assert (
+            materialise(
+                self._cfg("strict"), inventory=inventory_at(tmp_path, DOCUMENT), client=client
+            )
+            == {}
+        )

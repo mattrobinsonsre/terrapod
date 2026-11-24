@@ -471,6 +471,15 @@ def materialise(
             could not be read back, a key cannot be rendered, or the inventory
             sets a variable that would displace the anchor.
     """
+    # `off` does not depend on the key set at all -- its anchor is `/dev/null`,
+    # so there is nothing the keys could say that changes the arguments. Answered
+    # before the fetch, which also means an unreadable key route cannot quietly
+    # convert "verify nothing" into verification (see the no-keys branch below
+    # for why that direction is the dangerous one).
+    if cfg.ssh_host_key_policy == "off":
+        logger.info("host-key verification off by policy", policy="off")
+        return {"ANSIBLE_SSH_ARGS": ssh_args(known_hosts_dir() / RENDERED_NAME, policy="off")}
+
     own_client = client is None
     if client is None:
         client = httpx.Client(timeout=httpx.Timeout(cfg.upload_timeout_seconds, connect=10.0))
@@ -489,6 +498,31 @@ def materialise(
     # take the anchored branch and refuse its whole fleet.
     keys = {name: rows for name, rows in keys.items() if rows}
     if not keys:
+        # `strict` is the only policy this gate may answer for. It exists so a
+        # workspace that pins nothing is not refused wholesale -- which is true
+        # of `strict` and of nothing else.
+        #
+        # `accept-new` with no pinned keys is a legitimate and useful state:
+        # accept every host on first contact. Returning `{}` for it delivers
+        # ansible's OWN default instead, which is verification ON -- so the
+        # operator's setting would silently do the opposite of what it says.
+        # That is the direction the `false -> off` migration was written to
+        # prevent, and it reached `accept-new` by the same route.
+        #
+        # The anchor is written EMPTY rather than skipped, because `accept-new`
+        # needs a file to accept into; its directory must exist for ssh to
+        # create it.
+        if cfg.ssh_host_key_policy != "strict":
+            target = known_hosts_dir()
+            target.mkdir(parents=True, exist_ok=True)
+            path = target / RENDERED_NAME
+            _write(path, "")
+            logger.info(
+                "no approved host keys declared — policy delivered with an empty anchor",
+                policy=cfg.ssh_host_key_policy,
+                path=str(path),
+            )
+            return {"ANSIBLE_SSH_ARGS": ssh_args(path, policy=cfg.ssh_host_key_policy)}
         logger.info("no approved host keys declared — host-key checking left unchanged")
         return {}
 
