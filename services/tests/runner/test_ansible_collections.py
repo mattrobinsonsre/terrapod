@@ -25,6 +25,7 @@ from unittest.mock import patch
 
 import pytest
 
+from terrapod.http_retry import DEFAULT_RETRIES
 from terrapod.runner.phases import ansible_collections as ac
 
 API = "https://terrapod.test"
@@ -310,11 +311,14 @@ class TestRolesAndCollectionsAreTwoMechanisms:
     def test_a_failing_role_install_names_the_roles(self, tmp_path: Path) -> None:
         f = self._req(tmp_path, "roles:\n  - src: git+ssh://git@host/r.git\n")
         with patch.object(ac.ee_client, "run") as run:
-            run.return_value = SimpleNamespace(rc=3, error="")
+            # `tail` is empty on purpose: an rc with no recognised transient
+            # signature must report at once rather than be retried (#2689).
+            run.return_value = SimpleNamespace(rc=3, error="", tail=b"")
             with pytest.raises(ac.CollectionInstallError) as e:
                 ac.install(_cfg(), tmp_path)
         assert "roles" in str(e.value) and str(f) in str(e.value)
         assert e.value.exit_code == 3
+        assert run.call_count == 1, "an unrecognised failure must not be retried"
 
 
 class TestTheWorkspacesOwnCollections:
@@ -853,3 +857,148 @@ class TestPipPrintsInColour:
         builder plain -- and two sites holding one value is the recorded way
         they come to disagree."""
         assert "FORCE_COLOR" not in ac.pip_env(API)
+
+
+#: Exactly what `ansible-galaxy` printed for each failure mode, measured inside
+#: `terrapod-ee:2.15` against a server under our control (#2689). VERBATIM
+#: rather than paraphrased: the classifier matches on these strings, so a
+#: paraphrase would pin a string this project invented instead of one the tool
+#: emits, and the two could drift without a single test noticing.
+_REFUSED = (
+    b"ERROR! Unknown error when attempting to call Galaxy at "
+    b"'http://127.0.0.1:8098/api/terrapod/v1/package-cache/galaxy/api': "
+    b"<urlopen error [Errno 111] Connection refused>. "
+    b"<urlopen error [Errno 111] Connection refused>\n"
+)
+_HTTP_503 = (
+    b"ERROR! Error when finding available api versions from terrapod "
+    b"(http://127.0.0.1:8099/api/terrapod/v1/package-cache/galaxy/) "
+    b"(HTTP Code: 503, Message: Service Unavailable)\n"
+)
+_HTTP_404 = (
+    b"ERROR! Error when finding available api versions from terrapod "
+    b"(http://127.0.0.1:8099/api/terrapod/v1/package-cache/galaxy/) "
+    b"(HTTP Code: 404, Message: Not Found)\n"
+)
+_UNRESOLVABLE = (
+    b"ERROR! Failed to resolve the requested dependencies map. Could not satisfy "
+    b"the following requirements:\n* community.general:10.1.0 (direct request)\n"
+)
+
+
+class TestClassifyingAGalaxyFailure:
+    """Which `ansible-galaxy` failures are worth retrying (#2689).
+
+    `ansible-galaxy` exits 1 for every case below, so the exit code cannot tell
+    them apart and the classification has to come from its output.
+    """
+
+    @pytest.mark.parametrize(
+        ("name", "tail"), [("connection refused", _REFUSED), ("HTTP 503", _HTTP_503)]
+    )
+    def test_a_transient_failure_is_recognised(self, name: str, tail: bytes) -> None:
+        assert ac._is_transient_galaxy_failure(tail) is True, name
+
+    @pytest.mark.parametrize(
+        ("name", "tail"),
+        [
+            ("HTTP 404 — the path is not served, so asking again asks the same", _HTTP_404),
+            ("the collection or version does not exist", _UNRESOLVABLE),
+            ("no output at all", b""),
+            ("a message this classifier has never seen", b"ERROR! something entirely new\n"),
+        ],
+    )
+    def test_everything_else_is_final(self, name: str, tail: bytes) -> None:
+        """Positive evidence only. An unrecognised failure must NOT be retried:
+        retrying by default turns every certain failure into a slow one, and a
+        deny-list of definitive shapes cannot stay complete against a tool that
+        is free to add messages."""
+        assert ac._is_transient_galaxy_failure(tail) is False, name
+
+
+class TestTheInstallRetriesOnlyWhatIsWorthRetrying:
+    """The retry itself (#2689).
+
+    This was the one runner->API operation with no retry of any kind, so one
+    refused connection destroyed a whole configure — while the policy-bundle
+    fetch one second earlier survived the identical refusal by retrying.
+    """
+
+    @staticmethod
+    def _drive(results: list) -> tuple:
+        """`_run_install` against a scripted sequence of EE verdicts.
+
+        `time.sleep` is patched out: the backoff curve is `http_retry`'s and is
+        tested there, and sleeping for real would add seconds to every case.
+        """
+        seq = iter(results)
+        err = None
+        with (
+            patch.object(ac.ee_client, "run", side_effect=lambda *a, **k: next(seq)) as run,
+            patch.object(ac.time, "sleep") as sleep,
+        ):
+            try:
+                ac._run_install(
+                    ["collection", "install"],
+                    cwd=Path("/tmp"),
+                    env={},
+                    log_file=None,
+                    what="the collections",
+                )
+            except ac.CollectionInstallError as exc:
+                err = exc
+        return run, sleep, err
+
+    def test_a_transient_failure_is_retried_and_can_then_succeed(self) -> None:
+        """The whole point: today's live failure, survived."""
+        run, sleep, err = self._drive(
+            [
+                SimpleNamespace(rc=1, error="", tail=_REFUSED),
+                SimpleNamespace(rc=0, error="", tail=b""),
+            ]
+        )
+        assert err is None
+        assert run.call_count == 2
+        assert sleep.call_count == 1
+
+    def test_a_definitive_failure_reports_at_once(self) -> None:
+        run, sleep, err = self._drive([SimpleNamespace(rc=1, error="", tail=_UNRESOLVABLE)])
+        assert err is not None and err.exit_code == 1
+        assert run.call_count == 1
+        assert sleep.call_count == 0
+        # It did not retry, so it must not claim to have.
+        assert "attempts" not in str(err)
+
+    def test_a_transient_failure_that_never_clears_is_BOUNDED(self) -> None:
+        """Bounded, and the message says it tried — otherwise an operator reads
+        a retried failure as a first one."""
+        run, sleep, err = self._drive(
+            [SimpleNamespace(rc=1, error="", tail=_REFUSED)] * (DEFAULT_RETRIES + 5)
+        )
+        assert err is not None
+        assert run.call_count == DEFAULT_RETRIES + 1
+        assert sleep.call_count == DEFAULT_RETRIES
+        assert f"after {DEFAULT_RETRIES + 1} attempts" in str(err)
+
+    def test_an_agent_error_is_not_retried(self) -> None:
+        """`error` is the execution environment failing to run the binary at
+        all. That is a contract failure of the EE, not a transient network one,
+        and retrying it would hide the image being wrong behind a delay."""
+        run, _sleep, err = self._drive(
+            [SimpleNamespace(rc=1, error="exec: ansible-galaxy: not found", tail=_REFUSED)]
+        )
+        assert err is not None and "not found" in str(err)
+        assert run.call_count == 1
+
+    def test_the_tail_is_requested_at_the_CALL_SITE(self, tmp_path: Path) -> None:
+        """The classifier is only reachable if `run` is asked for a tail, and
+        nothing behavioural would notice if it were not: every result would
+        carry an empty tail, every failure would read as unrecognised, and the
+        retry would be dead code that still passed its own unit tests."""
+        (tmp_path / "requirements.yml").write_text("collections:\n  - name: a.b\n")
+        with patch.object(ac.ee_client, "run") as run:
+            run.return_value = SimpleNamespace(rc=0, error="", tail=b"")
+            ac.install(_cfg(), tmp_path)
+        assert run.call_count >= 1
+        for call in run.call_args_list:
+            assert call.kwargs.get("tail_bytes") == ac._GALAXY_TAIL_BYTES

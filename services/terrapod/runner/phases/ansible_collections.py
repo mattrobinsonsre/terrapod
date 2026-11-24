@@ -83,10 +83,13 @@ must not be reused for the run that follows it.
 from __future__ import annotations
 
 import os
+import re
+import time
 from pathlib import Path
 
 import structlog
 
+from terrapod.http_retry import DEFAULT_RETRIES, retry_delay_seconds
 from terrapod.runner import ee_client
 
 # `structlog` directly rather than `terrapod.logging_config`: the runner image
@@ -401,6 +404,55 @@ def highlight_galaxy_line(line: bytes) -> bytes:
     return line
 
 
+#: How much of `ansible-galaxy`'s output to keep for classifying a failure. Its
+#: diagnostic is the last line or two, so this is generous for the job and
+#: bounded however much a long install printed before it.
+_GALAXY_TAIL_BYTES = 8 * 1024
+
+#: `ansible-galaxy` wraps every TRANSPORT failure in this, whatever the cause.
+#: Matched on the wrapper rather than on errno strings, which would then have to
+#: be kept complete against every way a socket can fail.
+_GALAXY_TRANSPORT_MARKER = b"urlopen error"
+
+#: The status galaxy reports when it DID reach us and got an answer.
+_GALAXY_HTTP_CODE = re.compile(rb"HTTP Code: (\d{3})")
+
+#: Retried: the server is there and is asking us to come back.
+_GALAXY_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+def _is_transient_galaxy_failure(tail: bytes) -> bool:
+    """Whether this `ansible-galaxy` failure is worth retrying (#2689).
+
+    POSITIVE EVIDENCE ONLY, deliberately. An unrecognised failure is FINAL,
+    because the alternative -- retry unless it looks definitive -- makes every
+    certain failure wait out the whole backoff before reporting it, and a
+    deny-list of definitive shapes would have to stay complete against a tool
+    that is free to add messages.
+
+    The four cases were measured inside the execution environment against a
+    server under our control, because `ansible-galaxy` exits 1 for all of them
+    and the exit code cannot tell them apart:
+
+    * connection refused, reset, timed out or unresolvable -> `<urlopen error
+      [Errno 111] Connection refused>` inside galaxy's own "Unknown error when
+      attempting to call Galaxy" wrapper. RETRIED.
+    * `HTTP Code: 503` (and 429/500/502/504) on the api-versions probe.
+      RETRIED -- the proxy answered and the answer was "not now".
+    * `HTTP Code: 404` there. NOT retried: the path is not being served, and
+      another attempt asks the same unserved path again.
+    * `Failed to resolve the requested dependencies map` -> the collection or
+      the pinned version does not exist. NOT retried, and this is the case that
+      makes a bare retry-on-rc wrong: it would turn a certain answer into a
+      slow one.
+    """
+    if _GALAXY_TRANSPORT_MARKER in tail:
+        return True
+    return any(
+        int(m.group(1)) in _GALAXY_RETRYABLE_STATUS for m in _GALAXY_HTTP_CODE.finditer(tail)
+    )
+
+
 def _run_install(
     argv_tail: list[str],
     *,
@@ -429,28 +481,58 @@ def _run_install(
     No `child_grace` any more. The agent owns ansible's descriptors and parents
     the process, so the grace is its own fixed contract (one SIGINT, then SIGKILL
     after 25s) and a value passed from here would describe nothing.
+
+    **Retried on a transient failure, bounded, sharing `http_retry`'s curve**
+    (#2689). This was the one runner->API operation with no retry at all, so a
+    single refused connection destroyed a whole configure -- while the policy
+    bundle fetch one second earlier survived the identical refusal. The retry
+    cannot be an `http_retry` call because the request is made by
+    `ansible-galaxy` inside the EE, not by us, so it wraps the invocation and
+    classifies from the child's own output; see `_is_transient_galaxy_failure`.
+
+    Re-running is safe: an install writes collections into a directory and is
+    idempotent, so a partially-completed attempt is overwritten rather than
+    compounded.
     """
-    result = ee_client.run(
-        "ansible-galaxy",
-        argv_tail,
-        cwd=str(cwd),
-        env=env,
-        log_file=log_file,
-        highlight=highlight_galaxy_line,
-    )
-    if result.error:
-        # The agent could not run the entry point at all, which is a failure of
-        # the execution environment rather than of the requirements.
-        raise CollectionInstallError(
-            f"the execution environment could not run ansible-galaxy to install "
-            f"{what}: {result.error}",
-            exit_code=result.rc,
+    attempts = DEFAULT_RETRIES + 1
+    for attempt in range(attempts):
+        result = ee_client.run(
+            "ansible-galaxy",
+            argv_tail,
+            cwd=str(cwd),
+            env=env,
+            log_file=log_file,
+            highlight=highlight_galaxy_line,
+            tail_bytes=_GALAXY_TAIL_BYTES,
         )
-    if result.rc != 0:
-        raise CollectionInstallError(
-            f"installing {what} failed; the log above is ansible-galaxy's own output",
-            exit_code=result.rc,
+        if result.error:
+            # The agent could not run the entry point at all, which is a failure of
+            # the execution environment rather than of the requirements.
+            raise CollectionInstallError(
+                f"the execution environment could not run ansible-galaxy to install "
+                f"{what}: {result.error}",
+                exit_code=result.rc,
+            )
+        if result.rc == 0:
+            return
+        # The last attempt raises whatever the reason: there is nothing left to
+        # try, so classifying it again would only change the message.
+        if attempt == attempts - 1 or not _is_transient_galaxy_failure(result.tail):
+            tried = f" after {attempt + 1} attempts" if attempt else ""
+            raise CollectionInstallError(
+                f"installing {what} failed{tried}; the log above is ansible-galaxy's own output",
+                exit_code=result.rc,
+            )
+        delay = retry_delay_seconds(attempt)
+        logger.info(
+            "installing the configuration's requirements failed transiently — will retry",
+            what=what,
+            attempt=attempt + 1,
+            attempts=attempts,
+            delay_seconds=delay,
+            rc=result.rc,
         )
+        time.sleep(delay)
 
 
 def _pip_is_available(env: dict[str, str], cwd: Path, log_file: str | None) -> bool:
