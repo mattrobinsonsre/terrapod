@@ -1,6 +1,12 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
+import {
+  BULK_EXCLUDE_DIMENSIONS,
+  ExcludeListEditor,
+  entryIsEmpty,
+  type ExcludeEntry,
+} from '@/components/exclude-list-editor'
 import { tieredHint } from '@/components/hint-with-detail'
 import { engineWord } from '@/lib/phase-vocabulary'
 import {
@@ -46,7 +52,36 @@ interface WorkspaceSummary {
   labels: Record<string, string>
 }
 
-interface SearchResult {
+/**
+ * `excluded` and `exclude_empty` are present on search, dry-run and apply, and
+ * OMITTED entirely when the filter carries no `exclude` (#2548). Optional
+ * rather than defaulted to 0, because "no exclusions" and "exclusions that
+ * removed nothing" are different answers and only one of them is worth saying.
+ */
+/**
+ * The exclusion figure, or nothing at all.
+ *
+ * ABSENT and ZERO are different answers and only one is worth printing: the
+ * server omits `excluded` entirely when the filter carried no `exclude`, so
+ * `undefined` means "there were no exclusions" while `0` means "there were, and
+ * they removed nothing" -- which is itself worth saying, because it is the
+ * shape that is about to block Apply.
+ */
+function ExcludedNote({ n }: { n: number | undefined }) {
+  // Binds its own namespace rather than taking the translator as a prop: a
+  // hand-written function type for it cannot match next-intl's, and the
+  // component is the natural place for the hook anyway.
+  const t = useTranslations('exclude')
+  if (n === undefined) return null
+  return <span className="text-slate-500"> {t('excludedCount', { n })}</span>
+}
+
+interface ExclusionFigures {
+  excluded?: number
+  exclude_empty?: number[]
+}
+
+interface SearchResult extends ExclusionFigures {
   matched: number
   workspaces: WorkspaceSummary[]
 }
@@ -57,14 +92,14 @@ interface DiffEntry {
   diff: Record<string, { from: unknown; to: unknown } | unknown>
 }
 
-interface DryRunResult {
+interface DryRunResult extends ExclusionFigures {
   dry_run: true
   matched: number
   would_change: DiffEntry[]
   unchanged: { id: string; name: string }[]
 }
 
-interface ApplyResult {
+interface ApplyResult extends ExclusionFigures {
   dry_run: false
   matched: number
   applied: number
@@ -109,6 +144,7 @@ export default function BulkUpdatePage() {
   const tScan = useTranslations('workspaceDetail.securityScan')
   const tAi = useTranslations('workspaceDetail.aiSummary')
   const tWs = useTranslations('workspaceDetail')
+  const tEx = useTranslations('exclude')
   // Root-scoped, because a phase word's key is `phases.<engine>.words.<name>`.
   const tPhase = useTranslations()
   const tAd = useTranslations('adminAutodiscovery.form')
@@ -127,6 +163,7 @@ export default function BulkUpdatePage() {
   const [fVcsConnId, setFVcsConnId] = useState('')
   const [fOwnerEmail, setFOwnerEmail] = useState('')
   const [fAll, setFAll] = useState(false)
+  const [fExclude, setFExclude] = useState<ExcludeEntry[]>([])
 
   const [searching, setSearching] = useState(false)
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null)
@@ -275,6 +312,22 @@ export default function BulkUpdatePage() {
   const [dryResult, setDryResult] = useState<DryRunResult | null>(null)
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null)
 
+  // An exclusion that matches nothing protects nothing: the server treats it
+  // as a soft field on search and dry-run and a HARD 422 on apply, so a clean
+  // preview could be followed by a refusal. Gating Apply here makes that 422
+  // unreachable from this page instead of a surprise; the server keeps it for
+  // API callers, who have no preview to read.
+  //
+  // Two sources, because they catch different things: a row with nothing set
+  // is knowable here, while a row that is well-formed and matches no workspace
+  // is only knowable from a search the server has already answered.
+  const excludeBlankRows = fExclude.map((e, i) => (entryIsEmpty(e) ? i : -1)).filter((i) => i >= 0)
+  const excludeServerEmpty = (dryResult ?? searchResult)?.exclude_empty ?? []
+  const excludeEmptyRows = Array.from(new Set([...excludeBlankRows, ...excludeServerEmpty])).sort(
+    (a, b) => a - b,
+  )
+  const excludeBlocksApply = excludeEmptyRows.length > 0
+
   useEffect(() => {
     if (!getAuthState()) {
       router.push('/login')
@@ -307,8 +360,12 @@ export default function BulkUpdatePage() {
   }
 
   function buildFilter(): Record<string, unknown> {
-    if (fAll) return { all: true }
-    const f: Record<string, unknown> = {}
+    // `exclude` rides on BOTH branches. `{all: true, exclude: [...]}` is the
+    // canonical "everything except", so dropping it on the `all` path would
+    // silently widen exactly the selection an operator was narrowing.
+    const exclude = fExclude.length ? { exclude: fExclude } : {}
+    if (fAll) return { all: true, ...exclude }
+    const f: Record<string, unknown> = { ...exclude }
     if (Object.keys(fLabels).length > 0) f.labels = fLabels
     if (fNamePrefix.trim()) f['name-prefix'] = fNamePrefix.trim()
     if (fExecBackend) f['execution-backend'] = fExecBackend
@@ -1728,6 +1785,20 @@ export default function BulkUpdatePage() {
               <LabelsEditor labels={fLabels} onChange={setFLabels} />
             </div>
           </fieldset>
+
+          {/* OUTSIDE the fieldset above, which is `disabled={fAll}`.
+              `{all: true, exclude: [...]}` is the canonical "everything
+              except", so exclusions are at their most useful precisely when
+              "match all" is checked -- disabling them there would remove the
+              only way to express it. */}
+          <ExcludeListEditor
+            value={fExclude}
+            onChange={setFExclude}
+            dimensions={BULK_EXCLUDE_DIMENSIONS}
+            keyStyle="kebab"
+            emptyRows={excludeEmptyRows}
+          />
+
           <button
             type="submit"
             disabled={searching || loading}
@@ -1744,6 +1815,7 @@ export default function BulkUpdatePage() {
                 count: searchResult.matched,
                 strong: (c) => <strong className="text-slate-200">{c}</strong>,
               })}
+              <ExcludedNote n={searchResult.excluded} />
             </p>
             {searchResult.workspaces.length === 0 ? (
               <EmptyState message={t('results.noMatch')} />
@@ -1895,7 +1967,7 @@ export default function BulkUpdatePage() {
                 <span className="text-sm text-amber-300">{t('update.confirmWarning')}</span>
                 <button
                   type="submit"
-                  disabled={submitting || uWouldLeaveNoOperations}
+                  disabled={submitting || uWouldLeaveNoOperations || excludeBlocksApply}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-600/80 disabled:opacity-50 text-white transition-colors"
                 >
                   {submitting ? t('update.applying') : t('update.confirmApply')}
@@ -1911,11 +1983,22 @@ export default function BulkUpdatePage() {
             ) : (
               <button
                 type="submit"
-                disabled={submitting || uWouldLeaveNoOperations}
+                disabled={submitting || uWouldLeaveNoOperations || excludeBlocksApply}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-500/80 disabled:opacity-50 text-black transition-colors"
               >
                 {t('update.applyChanges')}
               </button>
+            )}
+            {/* The reason, beside the disabled control rather than only in the
+                row itself: an operator who has scrolled past the exclusions
+                would otherwise meet a dead button with no explanation. */}
+            {excludeBlocksApply && (
+              <p className="mt-2 text-xs text-amber-400">
+                {tEx('blocksApply', {
+                  rows: excludeEmptyRows.map((i) => i + 1).join(', '),
+                  n: excludeEmptyRows.length,
+                })}
+              </p>
             )}
           </div>
         </form>
@@ -1930,6 +2013,7 @@ export default function BulkUpdatePage() {
                 unchanged: dryResult.unchanged.length,
                 strong: (c) => <strong className="text-slate-200">{c}</strong>,
               })}
+              <ExcludedNote n={dryResult.excluded} />
             </p>
             {renderDiffTable(dryResult.would_change, t('dryResult.wouldChange'))}
             {dryResult.would_change.length === 0 && (
@@ -1950,6 +2034,7 @@ export default function BulkUpdatePage() {
                 strong: (c) => <strong className="text-slate-200">{c}</strong>,
                 appliedstrong: (c) => <strong className="text-green-300">{c}</strong>,
               })}
+              <ExcludedNote n={applyResult.excluded} />
             </p>
             {applyResult.errors.length > 0 && (
               <div className="mb-4 p-3 bg-red-900/30 text-red-300 rounded-lg text-sm border border-red-800/50">

@@ -4379,5 +4379,38 @@
       "verification": "Verification",
       "supplyChain": "Contents"
     }
+  },
+  "exclude": {
+    "title": "Exclusions",
+    "selectorLead": "Remove workspaces from the selection. Each exclusion is itself a selector, and a workspace matching any of them is left out — so this is how you say “everything of this kind, except those”.",
+    "selectorHint": "Exclusions are OR-ed: a workspace matching any one of them is left out, while the dimensions within a single exclusion are AND-ed together. An exclusion cannot itself contain another, and at most {max} are allowed. An exclusion that matches nothing protects nothing, so it is flagged here and refused on apply.",
+    "none": "No exclusions. Every workspace the selector matches will be included.",
+    "count": "{n, plural, one {# exclusion} other {# exclusions}}",
+    "entry": "Exclusion {n}",
+    "add": "Add exclusion",
+    "atCap": "At the limit of {max} exclusions.",
+    "any": "Any",
+    "yes": "Yes",
+    "no": "No",
+    "rowNoSelector": "This exclusion sets nothing, so it protects nothing. Set a dimension or remove it.",
+    "rowMatchesNothing": "This exclusion matches no workspace, so it protects nothing.",
+    "excludedCount": "{n, plural, one {# workspace excluded} other {# workspaces excluded}}.",
+    "blocksApply": "{n, plural, one {Exclusion {rows} matches no workspace, so it protects nothing. Fix or remove it before applying.} other {Exclusions {rows} match no workspace, so they protect nothing. Fix or remove them before applying.}}",
+    "dim": {
+      "labels": "Labels",
+      "workspace_ids": "Workspace IDs",
+      "name_prefix": "Name prefix",
+      "name_glob": "Name pattern",
+      "execution_backend": "Execution backend",
+      "execution_mode": "Execution mode",
+      "engine_version": "Engine version",
+      "agent_pool_id": "Agent pool",
+      "vcs_connection_id": "VCS connection",
+      "autodiscovery_rule_id": "Autodiscovery rule",
+      "owner_email": "Owner email",
+      "drift_status": "Drift status",
+      "locked": "Locked",
+      "has_vcs": "VCS connected"
+    }
   }
 }

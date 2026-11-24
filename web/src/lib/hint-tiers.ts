@@ -53,6 +53,10 @@ export const TITLE_EXPLANATION = 120
  * length and some fields carry more than one.
  */
 export const HINT_LEADS: Record<string, string> = {
+  // exclude (#2548). Shared by bulk update and the assignment-rule editor,
+  // which is exactly the case this registry exists for: one hint, two
+  // surfaces, and it must be two-tier on both.
+  selectorHint: 'selectorLead',
   // workspaceDetail
   'fields.oidcAudiencesHint': 'fields.oidcAudiencesLead',
   'allowForkPrPlans.hint': 'allowForkPrPlans.lead',

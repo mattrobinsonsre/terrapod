@@ -83,7 +83,7 @@ const inputCls =
   "w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 const labelCls = "block text-xs font-medium text-slate-400 mb-1";
 
-function AddButton({
+export function AddButton({
   onClick,
   label,
   disabled = false,
@@ -108,7 +108,7 @@ function AddButton({
 // (AGENTS.md → Responsive: an action is a button, and it needs a tap target).
 // It was the latter, which on a phone was a ~16px-tall run of red text sat
 // beside a full-height input.
-function RemoveButton({ onClick }: { onClick: () => void }) {
+export function RemoveButton({ onClick }: { onClick: () => void }) {
   const t = useTranslations("common");
   return (
     <button

@@ -11,14 +11,25 @@
  * chose. Hence the live match count, which resolves the rule against the real
  * estate through the same selector the server will use.
  *
- * Every dimension the API accepts is present. One left out would be a dimension
- * the form silently drops on save, quietly widening or narrowing a rule the
- * operator set through the API or Terraform.
+ * Every dimension the API accepts is present, `exclude` included (#2548). One
+ * left out would be a dimension the form silently drops on save, quietly
+ * widening or narrowing a rule the operator set through the API or Terraform.
+ *
+ * The exclusion rows offer the rule's dimensions MINUS the five the server
+ * refuses inside an entry -- `drift_status`, `locked` and
+ * `autodiscovery_rule_id` from `RULE_DIMENSIONS_REFUSED`, plus `workspace_ids`
+ * and a reserved label key. Offering one would mean an operator filling a
+ * control whose only possible outcome is a 422 on save.
  */
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { LabelsEditor } from '@/components/labels-editor'
+import {
+  ExcludeListEditor,
+  RULE_EXCLUDE_DIMENSIONS,
+  type ExcludeEntry,
+} from '@/components/exclude-list-editor'
 import { apiFetch } from '@/lib/api'
 
 export type AssignmentRule = Record<string, unknown>
@@ -70,6 +81,7 @@ export function AssignmentRuleEditor({
   disabled?: boolean
 }) {
   const t = useTranslations('adminVariableSets.detail')
+  const tEx = useTranslations('exclude')
   const enabled = rule !== null
 
   // Live blast-radius count, resolved server-side so the preview and the
@@ -84,6 +96,12 @@ export function AssignmentRuleEditor({
     matched: number
     names: string[]
     error: string
+    // Already on the search response (#2548), so making the live count
+    // exclusion-aware costs nothing but reading them. `excluded` is absent
+    // when the rule carries no `exclude` at all, which is why it is optional
+    // rather than 0 -- the same null-vs-zero distinction the varset page makes.
+    excluded?: number
+    excludeEmpty: number[]
   } | null>(null)
 
   const dimensions = Object.keys(rule ?? {}).length
@@ -114,7 +132,7 @@ export function AssignmentRuleEditor({
         })
         if (cancelled) return
         if (!res.ok) {
-          setPreview({ key: ruleKey, matched: 0, names: [], error: 'invalid' })
+          setPreview({ key: ruleKey, matched: 0, names: [], error: 'invalid', excludeEmpty: [] })
           return
         }
         const data = await res.json()
@@ -129,9 +147,12 @@ export function AssignmentRuleEditor({
             )
             .filter(Boolean),
           error: '',
+          excluded: typeof data.excluded === 'number' ? data.excluded : undefined,
+          excludeEmpty: Array.isArray(data.exclude_empty) ? data.exclude_empty : [],
         })
       } catch {
-        if (!cancelled) setPreview({ key: ruleKey, matched: 0, names: [], error: 'invalid' })
+        if (!cancelled)
+          setPreview({ key: ruleKey, matched: 0, names: [], error: 'invalid', excludeEmpty: [] })
       }
     }, 400)
     return () => {
@@ -290,6 +311,14 @@ export function AssignmentRuleEditor({
             />
           </div>
 
+          <ExcludeListEditor
+            value={(rule?.exclude as ExcludeEntry[]) ?? []}
+            onChange={(next) => setField('exclude', next.length ? next : undefined)}
+            dimensions={RULE_EXCLUDE_DIMENSIONS}
+            keyStyle="snake"
+            emptyRows={current?.excludeEmpty ?? []}
+          />
+
           {/* The blast radius, before saving rather than after. */}
           <div className="rounded-lg border border-slate-700/50 bg-slate-900/40 px-3 py-2">
             {dimensions === 0 ? (
@@ -302,6 +331,13 @@ export function AssignmentRuleEditor({
               <>
                 <p className="text-xs text-slate-300">
                   {t('rulePreview', { count: current.matched })}
+                  {/* Absent, not zero, when the rule carries no exclusions. */}
+                  {current.excluded !== undefined && current.excluded > 0 && (
+                    <span className="text-slate-500">
+                      {' '}
+                      {tEx('excludedCount', { n: current.excluded })}
+                    </span>
+                  )}
                 </p>
                 {current.names.length > 0 && (
                   <p className="mt-1 text-xs text-slate-500 break-words">
