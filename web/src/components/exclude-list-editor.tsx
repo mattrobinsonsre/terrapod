@@ -118,7 +118,7 @@ export function ExcludeListEditor({
         detail={t('selectorHint', { max: MAX_EXCLUDE_ENTRIES })}
       />
 
-      {value.length === 0 && <p className="mt-2 text-xs text-slate-600">{t('none')}</p>}
+      {value.length === 0 && <p className="mt-2 text-xs text-slate-500">{t('none')}</p>}
 
       <div className="mt-2 space-y-3">
         {value.map((entry, i) => {
