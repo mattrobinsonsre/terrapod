@@ -32,10 +32,15 @@ def _user():
     )
 
 
-def _run(ws_id):
+def _run(ws_id, *, ansible_limit=""):
     run = MagicMock()
     run.id = uuid.uuid4()
     run.workspace_id = ws_id
+    # Explicit, because a bare MagicMock attribute is TRUTHY: left unset this
+    # run looks limited, and `targeted_hosts` then takes its #2690 fail-safe
+    # branch and answers `set()` -- so every `not-reached` row would vanish and
+    # the union these tests are about would look broken.
+    run.ansible_limit = ansible_limit
     return run
 
 
@@ -69,9 +74,17 @@ async def _get(app, path):
         return await c.get(path, headers={"Authorization": "Bearer t"})
 
 
-def _storage_with(hosts: list[str]):
-    """A storage whose resolved-inventory artifact names these hosts."""
+def _storage_with(hosts: list[str], *, targeted: list[str] | None = None):
+    """A storage whose resolved-inventory artifact names these hosts.
+
+    `targeted` is what the run's own `--limit` selected, recorded at creation
+    (#2690). The artifact's own host set stays WHOLE either way, which is the
+    arrangement under test: the inventory a play is handed must not be narrowed,
+    because `--limit` does not restrict `delegate_to`.
+    """
     document = {"hosts": {h: {} for h in hosts}, "groups": {}, "children": {}}
+    if targeted is not None:
+        document["targeted"] = {"limit": ":".join(targeted), "hosts": sorted(targeted)}
     storage = MagicMock()
     storage.get = AsyncMock(return_value=json.dumps(document).encode())
     return storage
@@ -82,9 +95,9 @@ def _storage_with(hosts: list[str]):
 @patch("terrapod.api.app.init_db")
 @pytest.mark.asyncio
 class TestTheHostResultsRead:
-    async def _drive(self, rows, targeted, *, db=None):
+    async def _drive(self, rows, targeted, *, db=None, limit="", selected=None):
         ws_id = uuid.uuid4()
-        run = _run(ws_id)
+        run = _run(ws_id, ansible_limit=limit)
         db = db or AsyncMock()
         db.get = AsyncMock(return_value=run)
         app = _app(db)
@@ -95,7 +108,10 @@ class TestTheHostResultsRead:
                 "terrapod.services.host_results_service.list_results",
                 AsyncMock(return_value=rows),
             ),
-            patch("terrapod.storage.get_storage", return_value=_storage_with(targeted)),
+            patch(
+                "terrapod.storage.get_storage",
+                return_value=_storage_with(targeted, targeted=selected),
+            ),
         ):
             resp = await _get(app, f"/api/v1/runs/run-{run.id}/host-results")
         return resp
@@ -121,6 +137,37 @@ class TestTheHostResultsRead:
         assert entries["web2"]["reached"] is False
         # null rather than zero: zero is a measurement, this is its absence.
         assert entries["web2"]["ok"] is None
+
+    async def test_a_host_the_LIMIT_EXCLUDED_is_not_reported_at_all(self, *_mocks):
+        """#2690. `not-reached` ASSERTS the run targeted a host and ansible
+        never reported on it -- the `serial:`/`any_errors_fatal:` unknown. An
+        excluded host is not that: it was never in scope, and saying so turns a
+        clean three-host run against a large inventory into a mostly-failed one.
+        """
+        resp = await self._drive(
+            [_result("web1")],
+            ["web1", "web2", "db1", "db2"],
+            limit="web1:web2",
+            selected=["web1", "web2"],
+        )
+        entries = {e["attributes"]["host"]: e["attributes"] for e in resp.json()["data"]}
+        assert set(entries) == {"web1", "web2"}, "db1 and db2 were never targeted"
+        # web2 WAS targeted and did not report, so it is still not-reached.
+        assert entries["web2"]["status"] == "not-reached"
+
+    async def test_the_outstanding_set_a_RETRY_reads_cannot_widen(self, *_mocks):
+        """The consequence with teeth: `meta.outstanding` is what an
+        outstanding-only retry turns into its own `--limit`, so a widened one
+        reaches hosts the operator excluded. Containment, not equality."""
+        resp = await self._drive(
+            [_result("web1")],
+            ["web1", "web2", "db1", "db2"],
+            limit="web1:web2",
+            selected=["web1", "web2"],
+        )
+        outstanding = set(resp.json()["meta"]["outstanding"]["hosts"])
+        assert outstanding <= {"web1", "web2"}, outstanding
+        assert not outstanding & {"db1", "db2"}
 
     async def test_status_comes_off_saw_unreachable_not_the_counters(self, *_mocks):
         resp = await self._drive(

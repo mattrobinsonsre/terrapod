@@ -447,6 +447,69 @@ def render_inventory_yaml(**kwargs: Any) -> str:
     )
 
 
+#: Where the hosts a run's OWN `--limit` selects are recorded, on the run's
+#: resolved-inventory artifact. A top-level key the runner's renderer ignores by
+#: construction -- `configure_inventory.document_to_source` reads `hosts`,
+#: `groups` and `children` and nothing else -- which is what lets this ride the
+#: artifact instead of taking a second storage object AND a second
+#: `RUN_ARTIFACT_KEYS` registration to be reaped by.
+TARGETED = "targeted"
+
+
+async def stamp_targeted_hosts(db, run, document: dict[str, Any], key: str) -> list[str] | None:
+    """Record what the run's own `--limit` selects, on its artifact (#2690).
+
+    **The artifact itself stays WHOLE, deliberately.** `--limit` does not
+    restrict `delegate_to`, so narrowing the inventory a play is handed would
+    break a playbook delegating to a host outside the limit -- which `--limit`
+    permits. Applying the limit is the runner's job; this records what it will
+    select, so the API can answer "which hosts did this run target" without
+    either guessing or re-deriving it on every read.
+
+    Returns None when there is nothing to record, which is the ordinary case: a
+    run with no limit of its own targets the artifact as stored, because
+    `resolve_for_run` bounds EVERY resolution, so even an unlimited write is
+    already narrowed to the workspace's `hard_limit`.
+
+    **Resolved through ansible rather than matched here.** A limit pattern
+    carries globs, group names, `&`, `!` and `~regex`; a second implementation
+    of that would be wrong in ways only a real inventory would reveal.
+
+    It RAISES rather than degrading, following `write_run_artifact` above: a
+    limited configure whose target set we could not record would fall back to
+    the whole artifact, which is precisely the widening this fixes. Refusing is
+    the direction that cannot silently reintroduce it.
+    """
+    if not (getattr(run, "ansible_limit", "") or "").strip():
+        return None
+    if not (document.get("hosts") or {}):
+        # Nothing to narrow. An empty inventory is a legitimate resolution --
+        # `write_run_artifact` stores one rather than skipping, so the phase can
+        # tell "no hosts" from "could not read it" -- and a limit over no hosts
+        # selects no hosts, which is what reading the artifact already answers.
+        return None
+
+    from terrapod.storage import get_storage
+
+    narrowed = await resolve_for_run(db, run, limit=run.ansible_limit)
+    hosts = sorted((narrowed.get("hosts") or {}).keys())
+    document[TARGETED] = {"limit": run.ansible_limit, "hosts": hosts}
+    await get_storage().put(
+        key,
+        json.dumps(document).encode(),
+        content_type="application/json",
+    )
+    logger.info(
+        "run target set recorded",
+        run_id=str(run.id),
+        workspace_id=str(run.workspace_id),
+        limit=run.ansible_limit,
+        targeted=len(hosts),
+        of_inventory=len(document.get("hosts") or {}),
+    )
+    return hosts
+
+
 # ── Refusing a plugin source ─────────────────────────────────────────────────
 
 

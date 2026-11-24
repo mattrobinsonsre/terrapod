@@ -1819,7 +1819,7 @@ async def create_run(
     if is_configure:
         from terrapod.services import inventory_narrowing, inventory_resolve
 
-        _key, document = await inventory_resolve.write_run_artifact(db, run)
+        art_key, document = await inventory_resolve.write_run_artifact(db, run)
 
         # A configure the PLATFORM derived is narrowed to the hosts whose
         # resolved configuration actually moved (#2229). One somebody ASKED for
@@ -1839,6 +1839,11 @@ async def create_run(
             run.ansible_limit = await inventory_narrowing.limit_for(
                 db, run, workspace, current=document
             )
+
+        # What that limit actually SELECTS, recorded on the artifact (#2690).
+        # After the narrowing above, because that is what may have set the limit
+        # in the first place.
+        await inventory_resolve.stamp_targeted_hosts(db, run, document, art_key)
 
     # In the Terraform Enterprise vocabulary the run's post-plan task stage
     # exists from the start, as it does there: the CLI reads a run's stages
@@ -2634,7 +2639,7 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
         from terrapod.services import inventory_narrowing, inventory_resolve
 
         try:
-            _key, document = await inventory_resolve.write_run_artifact(db, run)
+            art_key, document = await inventory_resolve.write_run_artifact(db, run)
         except Exception as exc:  # noqa: BLE001
             # The apply SUCCEEDED and the configure cannot run. Never fall back
             # to the stale artifact: configuring a host set known to be wrong is
@@ -2677,6 +2682,9 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
                 run.ansible_limit = await inventory_narrowing.limit_for(
                     db, run, ws, current=document
                 )
+
+        # As at creation: record what the limit selects, after whatever set it.
+        await inventory_resolve.stamp_targeted_hosts(db, run, document, art_key)
 
         run.apply_finished_at = now_utc()
         # Exactly what entering `applying` does to the plan's Job state, and

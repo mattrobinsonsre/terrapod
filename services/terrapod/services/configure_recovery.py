@@ -127,6 +127,7 @@ async def targeted_hosts(run: Run) -> set[str]:
     which is the safe direction -- see `outstanding_hosts`.
     """
     from terrapod.services.host_results_service import reported_inventory_hosts
+    from terrapod.services.inventory_resolve import TARGETED
     from terrapod.storage import get_storage
     from terrapod.storage.keys import resolved_inventory_key
 
@@ -150,6 +151,33 @@ async def targeted_hosts(run: Run) -> set[str]:
     # every per-host view.
     if document.get("partial"):
         targeted |= await reported_inventory_hosts(run)
+
+    # Narrowed to what the run's OWN `--limit` selects, recorded at creation
+    # (#2690). The artifact is deliberately whole -- `--limit` does not restrict
+    # `delegate_to`, so the inventory a play gets must not be narrowed -- so
+    # without this every consumer of "the hosts this run targeted" was handed
+    # the entire inventory: the log viewer offered a host filter covering hosts
+    # that cannot appear in the log, the per-host view reported every excluded
+    # host as `not-reached` (a status that ASSERTS the run targeted it), and an
+    # outstanding-only retry turned those into its own `--limit` and reached
+    # hosts the operator had excluded.
+    #
+    # INTERSECTED rather than replaced, so this can only ever narrow. For a
+    # partial resolution (#2033) the stamped set comes from the same partial
+    # artifact, so a dynamic workspace WITH a limit still gets a short
+    # denominator -- under-reporting what is outstanding. That is the direction
+    # that cannot send a retry at an excluded host, which is the one to prefer.
+    stamped = document.get(TARGETED)
+    if isinstance(stamped, dict) and isinstance(stamped.get("hosts"), list):
+        targeted &= {h for h in stamped["hosts"] if isinstance(h, str)}
+    elif (getattr(run, "ansible_limit", "") or "").strip():
+        # The run carries a limit and the artifact does not say what it
+        # selected, so this denominator is unknowable. EMPTY rather than whole,
+        # for the same reason every other degradation in this module is empty:
+        # "every host needs configuring" is the one answer that would have a
+        # retry touch the whole estate, and here it would specifically reach the
+        # hosts the operator excluded.
+        return set()
     return targeted
 
 

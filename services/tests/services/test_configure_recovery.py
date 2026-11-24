@@ -8,6 +8,7 @@ appears in no callback event and in no PLAY RECAP, so it is indistinguishable
 from a host that does not exist unless you subtract from the targeted set.
 """
 
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -194,7 +195,11 @@ class TestTheDenominatorFailsSafe:
         whether the reader works or returns `set()` unconditionally."""
         storage = MagicMock()
         storage.get = AsyncMock(return_value=b'{"hosts": {"web1": {}, "web2": {}}}')
-        run = MagicMock(id=uuid.uuid4(), workspace_id=uuid.uuid4())
+        # `ansible_limit` explicitly: a bare MagicMock attribute is TRUTHY, so
+        # leaving it unset makes this run look limited and takes the #2690
+        # fail-safe branch, which answers `set()`. Not noise -- it is what keeps
+        # this test about the artifact reader.
+        run = MagicMock(id=uuid.uuid4(), workspace_id=uuid.uuid4(), ansible_limit="")
         with patch("terrapod.storage.get_storage", return_value=storage):
             assert await cr.targeted_hosts(run) == {"web1", "web2"}
 
@@ -451,3 +456,124 @@ class TestARefusedRetryIsSkippedRatherThanRaised:
             # No exception escapes, and nothing is queued.
             await cr._retry_one(db, run, retries=2)
         queue.assert_not_called()
+
+
+_ABSENT = object()
+
+
+class TestTheRunsOwnLimitNarrowsTheDenominator:
+    """#2690. The artifact is whole; the run's `--limit` is recorded beside it.
+
+    Without the narrowing every consumer of "the hosts this run targeted" was
+    handed the entire inventory: the log viewer offered a host filter covering
+    hosts that cannot appear in the log, the per-host view reported every
+    excluded host as `not-reached` -- a status that ASSERTS the run targeted it
+    -- and an outstanding-only retry turned those into its own `--limit`, so
+    retrying "just the outstanding hosts" of a three-host run reached the hosts
+    the operator had excluded.
+    """
+
+    @staticmethod
+    def _payload(*, targeted=_ABSENT, partial=False, hosts=("web1", "web2", "db1")) -> bytes:
+        doc: dict = {"hosts": {h: {} for h in hosts}}
+        if partial:
+            doc["partial"] = True
+        if targeted is not _ABSENT:
+            doc["targeted"] = targeted
+        return json.dumps(doc).encode()
+
+    @staticmethod
+    async def _targeted(payload: bytes, *, limit=None, reported=()) -> set[str]:
+        storage = MagicMock()
+        storage.get = AsyncMock(return_value=payload)
+        run = MagicMock(id=uuid.uuid4(), workspace_id=uuid.uuid4(), ansible_limit=limit)
+        with (
+            patch("terrapod.storage.get_storage", return_value=storage),
+            patch(
+                "terrapod.services.host_results_service.reported_inventory_hosts",
+                AsyncMock(return_value=set(reported)),
+            ),
+        ):
+            return await cr.targeted_hosts(run)
+
+    @pytest.mark.asyncio
+    async def test_a_recorded_limit_narrows_to_what_it_selected(self) -> None:
+        got = await self._targeted(
+            self._payload(targeted={"limit": "web1", "hosts": ["web1"]}), limit="web1"
+        )
+        assert got == {"web1"}
+
+    @pytest.mark.asyncio
+    async def test_no_limit_means_the_whole_artifact(self) -> None:
+        """Unchanged, and the common case. Such a run targets the artifact as
+        stored, which `resolve_for_run` has already bounded by the workspace's
+        `hard_limit`."""
+        assert await self._targeted(self._payload()) == {"web1", "web2", "db1"}
+
+    @pytest.mark.asyncio
+    async def test_a_limit_that_selected_NOTHING_is_not_the_whole_estate(self) -> None:
+        """An empty selection is a real answer and must not read as "no limit"."""
+        got = await self._targeted(
+            self._payload(targeted={"limit": "ghost", "hosts": []}), limit="ghost"
+        )
+        assert got == set()
+
+    @pytest.mark.asyncio
+    async def test_it_can_only_ever_NARROW(self) -> None:
+        """A record naming a host the artifact does not contain cannot add it.
+        Intersection rather than replacement is what makes that structural."""
+        got = await self._targeted(
+            self._payload(targeted={"limit": "web1:ghost", "hosts": ["web1", "ghost"]}),
+            limit="web1:ghost",
+        )
+        assert got == {"web1"}
+
+    @pytest.mark.asyncio
+    async def test_the_partial_resolution_union_still_happens_AND_is_narrowed(self) -> None:
+        """#2033's union must survive this: a workspace resolving dynamic
+        sources on the runner has a short artifact, and the report is the longer
+        side. So union first, then narrow -- `db2` is reported, not in the
+        artifact, and inside the limit."""
+        got = await self._targeted(
+            self._payload(partial=True, targeted={"limit": "web1:db2", "hosts": ["web1", "db2"]}),
+            limit="web1:db2",
+            reported=("db2",),
+        )
+        assert got == {"web1", "db2"}
+
+    @pytest.mark.parametrize(
+        "bad", [{"limit": "x"}, {"hosts": "web1"}, {"hosts": None}, "web1", 7, None]
+    )
+    @pytest.mark.asyncio
+    async def test_an_unreadable_record_on_a_LIMITED_run_fails_safe_to_empty(self, bad) -> None:
+        """The run carries a limit and the artifact does not say what it
+        selected, so the denominator is unknowable. Empty, for the same reason
+        every other degradation in this module is empty: "every host needs
+        configuring" is the one answer that would have a retry touch the whole
+        estate, and here it would reach precisely the excluded hosts."""
+        assert await self._targeted(self._payload(targeted=bad), limit="web1") == set()
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_record_on_an_UNLIMITED_run_changes_nothing(self) -> None:
+        """The pair to the above: with no limit there is nothing to narrow, so a
+        junk key must not empty a perfectly good denominator."""
+        got = await self._targeted(self._payload(targeted="junk"), limit=None)
+        assert got == {"web1", "web2", "db1"}
+
+    @pytest.mark.asyncio
+    async def test_a_RETRY_can_never_widen_past_the_limit(self) -> None:
+        """The consequence with teeth, asserted as CONTAINMENT rather than
+        equality: whatever the remainder turns out to be, the `--limit` a retry
+        carries must stay inside the one the operator asked for.
+
+        Driven with nothing reported, which is the worst case -- every targeted
+        host is outstanding, so this is the largest remainder possible.
+        """
+        asked_for = {"web1", "web2"}
+        targeted = await self._targeted(
+            self._payload(targeted={"limit": "web1:web2", "hosts": sorted(asked_for)}),
+            limit="web1:web2",
+        )
+        outstanding = cr.outstanding_from(targeted, [])
+        assert set(outstanding) <= asked_for, outstanding
+        assert "db1" not in cr.remainder_limit(outstanding)
