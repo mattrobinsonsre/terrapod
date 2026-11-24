@@ -199,10 +199,20 @@ test.describe('Assignment rule editor (regression for the inert-save bug)', () =
     await page.getByRole('button', { name: 'Edit' }).click()
     await page.getByRole('checkbox', { name: /assignment rule/i }).check()
 
-    // Add the label through the editor's own controls.
-    await page.getByPlaceholder('key').last().fill('e2eeditor')
-    await page.getByPlaceholder('value').last().fill(wsName)
-    await page.getByRole('button', { name: 'Add' }).last().click()
+    // Add the label through the editor's own controls, SCOPED to the rule's
+    // own label editor. These were page-wide `.last()` locators, which held
+    // only while nothing came after this editor in the DOM -- the exclusion
+    // rows (#2548) render the same component, so `.last()` silently started
+    // filling an exclusion's labels instead of the rule's, the rule saved with
+    // no selector at all, and this spec failed on `rule` being null. A
+    // positional locator over a whole page is never the check.
+    //
+    // `name: 'Add'` is a SUBSTRING match too, so it matched "Add exclusion"
+    // as well -- the scope fixes both.
+    const ruleLabels = page.getByTestId('rule-labels')
+    await ruleLabels.getByPlaceholder('key').fill('e2eeditor')
+    await ruleLabels.getByPlaceholder('value').fill(wsName)
+    await ruleLabels.getByRole('button', { name: 'Add' }).click()
 
     await page.getByRole('button', { name: 'Save' }).click()
 

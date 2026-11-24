@@ -188,7 +188,11 @@ export function AssignmentRuleEditor({
         <div className="mt-3 space-y-4">
           <div>
             <label className="text-xs text-slate-500">{t('ruleLabels')}</label>
-            <div className="mt-1">
+            {/* Named, because the exclusion rows below render the SAME
+                component (#2548): a page-wide locator or a `.last()` cannot
+                tell the rule's own labels from an exclusion's, and resolves to
+                whichever is last in the DOM. */}
+            <div className="mt-1" data-testid="rule-labels">
               <LabelsEditor
                 labels={(rule?.labels as Record<string, string>) ?? {}}
                 onChange={(labels) =>
