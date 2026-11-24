@@ -2179,7 +2179,8 @@
       "memory": "Cof",
       "requested": "Gofynnwyd {value}",
       "limit": "Terfyn {value}",
-      "phaseConfigure": "Cyflunio"
+      "phaseConfigure": "Cyflunio",
+      "orchestratorOnly": "Ffigurau cynhwysydd y trefnydd yw''r rhain. Mae''r llyfr chwarae''n rhedeg yn yr amgylchedd gweithredu, ac nid yw Terrapod yn mesur defnydd yr amgylchedd hwnnw eto, felly nid yw hyn yn dweud a yw maint yr amgylchedd gweithredu''n gywir."
     },
     "labelsEditor": {
       "none": "Dim",
@@ -2493,7 +2494,13 @@
       "agentPool": "Pwll asiant",
       "agentPoolCandidates": "{count, plural, one {# pwll ymgeisydd} other {# pyllau ymgeisydd}}",
       "autoApplyHeld": "dal",
-      "playbook": "Llyfr chwarae"
+      "playbook": "Llyfr chwarae",
+      "limit": "Terfyn gwesteiwyr",
+      "limitWholeInventory": "dim terfyn — y rhestr eiddo gyfan",
+      "eeImage": "Amgylchedd gweithredu",
+      "eeResources": "Adnoddau''r amgylchedd gweithredu",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Cyfochredd cyflunio"
     },
     "timeline": {
       "heading": "Llinell Amser",

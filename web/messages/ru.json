@@ -2179,7 +2179,8 @@
       "memory": "Память",
       "requested": "Запрошено {value}",
       "limit": "Лимит {value}",
-      "phaseConfigure": "Настройка"
+      "phaseConfigure": "Настройка",
+      "orchestratorOnly": "Эти показатели относятся к контейнеру оркестратора. Плейбук выполняется в среде выполнения, собственное потребление которой Terrapod пока не измеряет, поэтому они не говорят о том, правильно ли подобран размер среды выполнения."
     },
     "labelsEditor": {
       "none": "Нет",
@@ -2493,7 +2494,13 @@
       "agentPool": "Пул агентов",
       "agentPoolCandidates": "{count, plural, one {# пул-кандидат} few {# пула-кандидата} other {# пулов-кандидатов}}",
       "autoApplyHeld": "отложено",
-      "playbook": "Плейбук"
+      "playbook": "Плейбук",
+      "limit": "Лимит хостов",
+      "limitWholeInventory": "без лимита — весь инвентарь",
+      "eeImage": "Среда выполнения",
+      "eeResources": "Ресурсы среды выполнения",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Параллелизм настройки"
     },
     "timeline": {
       "heading": "Хронология",

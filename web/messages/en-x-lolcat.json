@@ -2179,7 +2179,8 @@
       "memory": "Memry",
       "requested": "Requestd {value}",
       "limit": "Limit {value}",
-      "phaseConfigure": "Konfigur"
+      "phaseConfigure": "Konfigur",
+      "orchestratorOnly": "Deez numberz is teh orkestraytor containr''s. Teh playbuk runz in teh execushun enviroment, an Terrapod duznt measur its own usaij yet, so dey dont tel u if teh execushun enviroment is sized rite."
     },
     "labelsEditor": {
       "none": "Noes",
@@ -2493,7 +2494,13 @@
       "agentPool": "Agent Poolz",
       "agentPoolCandidates": "{count, plural, one {# candidat poolz} other {# candidat poolz}}",
       "autoApplyHeld": "holdin",
-      "playbook": "Playbuk"
+      "playbook": "Playbuk",
+      "limit": "Hostz limit",
+      "limitWholeInventory": "no limit — teh whole inventoree",
+      "eeImage": "Execushun enviroment",
+      "eeResources": "Execushun enviroment resourcez",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Konfigur Parallelizm"
     },
     "timeline": {
       "heading": "Timeline",

@@ -2179,7 +2179,8 @@
       "memory": "Memory",
       "requested": "Requested {value}",
       "limit": "Limit {value}",
-      "phaseConfigure": "Configure"
+      "phaseConfigure": "Configure",
+      "orchestratorOnly": "The orchestrator container''s, these figures are. In the execution environment, the playbook runs, whose own usage Terrapod does not yet measure, so whether the environment of execution is sized correctly, they do not say."
     },
     "labelsEditor": {
       "none": "None",
@@ -2493,7 +2494,13 @@
       "agentPool": "Agent pool",
       "agentPoolCandidates": "{count, plural, one {# candidate pool, there is} other {# candidate pools, there are}}",
       "autoApplyHeld": "held",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Limit, host",
+      "limitWholeInventory": "the whole inventory — no limit",
+      "eeImage": "Environment of execution",
+      "eeResources": "resources, environment of execution",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "parallelism, Configure"
     },
     "timeline": {
       "heading": "Timeline",

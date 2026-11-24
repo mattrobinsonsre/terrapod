@@ -2179,7 +2179,8 @@
       "memory": "Paměť",
       "requested": "Požadováno {value}",
       "limit": "Limit {value}",
-      "phaseConfigure": "Konfigurace"
+      "phaseConfigure": "Konfigurace",
+      "orchestratorOnly": "Tyto údaje patří kontejneru orchestrátoru. Playbook běží v běhovém prostředí, jehož vlastní využití Terrapod zatím neměří, takže z nich nelze poznat, zda je běhové prostředí správně dimenzováno."
     },
     "labelsEditor": {
       "none": "Žádné",
@@ -2493,7 +2494,13 @@
       "agentPool": "Fond agentů",
       "agentPoolCandidates": "{count, plural, one {# kandidátský fond} few {# kandidátské fondy} other {# kandidátských fondů}}",
       "autoApplyHeld": "pozastaveno",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Limit hostitelů",
+      "limitWholeInventory": "bez limitu — celý inventář",
+      "eeImage": "Běhové prostředí",
+      "eeResources": "Prostředky běhového prostředí",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Paralelismus konfigurace"
     },
     "timeline": {
       "heading": "Časová osa",

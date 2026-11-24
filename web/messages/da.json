@@ -2179,7 +2179,8 @@
       "memory": "Hukommelse",
       "requested": "Anmodet {value}",
       "limit": "Grænse {value}",
-      "phaseConfigure": "Konfiguration"
+      "phaseConfigure": "Konfiguration",
+      "orchestratorOnly": "Disse tal er orkestrator-containerens. Playbooken kører i eksekveringsmiljøet, hvis eget forbrug Terrapod endnu ikke måler, så tallene siger ikke noget om, hvorvidt eksekveringsmiljøet er dimensioneret rigtigt."
     },
     "labelsEditor": {
       "none": "Ingen",
@@ -2493,7 +2494,13 @@
       "agentPool": "Agentpulje",
       "agentPoolCandidates": "{count, plural, one {# kandidatpulje} other {# kandidatpuljer}}",
       "autoApplyHeld": "afventer",
-      "playbook": "Playbook"
+      "playbook": "Playbook",
+      "limit": "Værtslimit",
+      "limitWholeInventory": "intet limit — hele inventaret",
+      "eeImage": "Eksekveringsmiljø",
+      "eeResources": "Eksekveringsmiljøets ressourcer",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "Konfigurationsparallelitet"
     },
     "timeline": {
       "heading": "Tidslinje",

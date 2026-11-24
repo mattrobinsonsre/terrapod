@@ -2179,7 +2179,8 @@
       "memory": "M3m0ry",
       "requested": "R3qu3573d {value}",
       "limit": "L1m17 {value}",
-      "phaseConfigure": "C0nf1gur3"
+      "phaseConfigure": "C0nf1gur3",
+      "orchestratorOnly": "7h353 f1gur35 4r3 7h3 0rch357r470r c0n741n3r''5. 7h3 pl4yb00k run5 1n 7h3 3x3cu710n 3nv1r0nm3n7, wh053 0wn u54g3 73rr4p0d d035 n07 y37 m345ur3, 50 7h3y d0 n07 54y wh37h3r 7h3 3x3cu710n 3nv1r0nm3n7 15 51z3d c0rr3c7ly."
     },
     "labelsEditor": {
       "none": "N0n3",
@@ -2493,7 +2494,13 @@
       "agentPool": "4g3n7 p00l",
       "agentPoolCandidates": "{count, plural, one {# candidate pool} other {# candidate pools}}",
       "autoApplyHeld": "h3ld",
-      "playbook": "Pl4yb00k"
+      "playbook": "Pl4yb00k",
+      "limit": "H057 l1m17",
+      "limitWholeInventory": "n0 l1m17 — 7h3 wh0l3 1nv3n70ry",
+      "eeImage": "3x3cu710n 3nv1r0nm3n7",
+      "eeResources": "3x3cu710n 3nv1r0nm3n7 r350urc35",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "C0nf1gur3 p4r4ll3l15m"
     },
     "timeline": {
       "heading": "71m3l1n3",

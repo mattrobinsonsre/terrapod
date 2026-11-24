@@ -2179,7 +2179,8 @@
       "memory": "حافظه",
       "requested": "درخواست‌شده {value}",
       "limit": "محدودیت {value}",
-      "phaseConfigure": "پیکربندی"
+      "phaseConfigure": "پیکربندی",
+      "orchestratorOnly": "این اعداد مربوط به کانتینر هماهنگ‌کننده است. پلی‌بوک درون محیط اجرا اجرا می‌شود و Terrapod هنوز مصرف خودِ آن را اندازه نمی‌گیرد، پس این اعداد نمی‌گویند که آیا اندازهٔ محیط اجرا درست است یا نه."
     },
     "labelsEditor": {
       "none": "هیچ‌کدام",
@@ -2493,7 +2494,13 @@
       "agentPool": "استخر عامل",
       "agentPoolCandidates": "{count, plural, other {# استخر نامزد}}",
       "autoApplyHeld": "نگه‌داشته",
-      "playbook": "پلی‌بوک"
+      "playbook": "پلی‌بوک",
+      "limit": "محدودهٔ میزبان‌ها",
+      "limitWholeInventory": "بدون محدوده — کل موجودی",
+      "eeImage": "محیط اجرا",
+      "eeResources": "منابع محیط اجرا",
+      "eeResourcesValue": "{cpu} CPU · {memory}",
+      "configureParallelism": "موازی‌کاری پیکربندی"
     },
     "timeline": {
       "heading": "خط زمانی",
