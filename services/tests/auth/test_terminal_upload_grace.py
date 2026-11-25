@@ -112,6 +112,29 @@ class TestTheRouteListIsDerivedFromWhatTheRunnerUploads:
         the same defect for an upload that needed one."""
         assert rts.TERMINAL_UPLOAD_GRACE_SECONDS >= 60
 
+    def test_the_window_is_bounded_above_as_well(self):
+        """The floor was the only numeric assertion about this window, and every
+        expiry test here is written RELATIVE to the constant -- so raising it to
+        86400 left the whole suite green while a revoked runner token went on
+        authenticating on the artifact routes for a day (#2715).
+
+        The ceiling is derived rather than picked. `RUNNER_TOKEN_LAUNCH_MARGIN_SECONDS`
+        is the slack this project already chose for the window around a run in
+        which a runner token may legitimately be used, before the job starts. A
+        reprieve AFTER the run is known to be terminal that outlasted the margin
+        granted BEFORE it began would be incoherent: what this widens is "may
+        finish writing its own log", never "may act", and the file's own opening
+        says so. So the post-terminal window must be the smaller of the two.
+        """
+        from terrapod.config import RUNNER_TOKEN_LAUNCH_MARGIN_SECONDS
+
+        assert rts.TERMINAL_UPLOAD_GRACE_SECONDS < RUNNER_TOKEN_LAUNCH_MARGIN_SECONDS, (
+            f"the terminal upload reprieve ({rts.TERMINAL_UPLOAD_GRACE_SECONDS}s) must stay "
+            f"below the pre-launch margin ({RUNNER_TOKEN_LAUNCH_MARGIN_SECONDS}s): a window "
+            "that long stops being 'finish the upload you were already making' and becomes a "
+            "general reprieve wearing a narrow name."
+        )
+
 
 class TestPathEligibility:
     @pytest.mark.parametrize("suffix", sorted(rts.GRACE_PATH_SUFFIXES))

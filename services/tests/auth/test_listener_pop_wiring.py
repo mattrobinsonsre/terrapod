@@ -7,8 +7,8 @@ regress. They just stop proving possession, which is the whole point.
 
 from __future__ import annotations
 
+import ast
 import pathlib
-import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2] / "terrapod"
 
@@ -22,13 +22,40 @@ class TestEveryListenerCallSigns:
         request. Nothing fails; the request succeeds while the API has the
         setting off, and 401s once it is on.
         """
+        # `_auth_headers(self, method="GET", path="")` has TWO defaults, and the
+        # signing branch requires a non-empty `path` -- so an empty path means no
+        # signature at all, not a signature over an empty path. A matcher for the
+        # zero-argument spelling therefore misses `_auth_headers("POST")`, which
+        # takes the method and leaves the path defaulted: one positional
+        # argument, no signature, a replayable bearer-certificate request, and
+        # nothing else fails because the API accepts the certificate form when
+        # PoP is off. So require BOTH arguments at every call site rather than
+        # refusing the bare one (#2715).
         src = (ROOT / "runner/listener.py").read_text()
-        bare = re.findall(r"_auth_headers\(\s*\)", src)
-        assert not bare, (
-            f"{len(bare)} call site(s) use _auth_headers() with no method/path, so they "
-            "send the certificate unsigned. Pass the method and path, or route the call "
-            "through _sign_headers via arequest_with_retry's headers_factory."
+        starved = []
+        for call in ast.walk(ast.parse(src)):
+            if not isinstance(call, ast.Call):
+                continue
+            name = getattr(call.func, "attr", None) or getattr(call.func, "id", None)
+            if name != "_auth_headers":
+                continue
+            if len(call.args) + len(call.keywords) < 2:
+                starved.append(f"line {call.lineno}: {len(call.args) + len(call.keywords)} arg(s)")
+        assert not starved, (
+            f"{len(starved)} _auth_headers() call site(s) do not pass both the method AND "
+            "the path, so the certificate goes unsigned -- the signing branch needs a "
+            f"non-empty path: {starved}. Pass both, or route the call through "
+            "_sign_headers via arequest_with_retry's headers_factory."
         )
+        # The other direction: a matcher that stops finding the call reports
+        # nothing. Asserted as an equality, so a NEW call site is visible too.
+        found = [
+            c
+            for c in ast.walk(ast.parse(src))
+            if isinstance(c, ast.Call)
+            and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) == "_auth_headers"
+        ]
+        assert len(found) == 1, f"expected 1 _auth_headers call site, found {len(found)}"
 
 
 class TestBothServerPathsEnforceIt:
