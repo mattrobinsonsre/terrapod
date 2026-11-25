@@ -43,9 +43,14 @@ logger = structlog.get_logger(__name__)
 GATE_PASSED = "passed"
 GATE_BLOCKED = "blocked"
 
-VALID_ENFORCEMENT = frozenset({"off", "advisory", "enforced"})
-VALID_ENGINE = frozenset({"checkov", "trivy", "both"})
-VALID_SEVERITY = frozenset({"critical", "high", "medium", "low"})
+#: The workspace-setting vocabularies live in `workspace_settings`, which is
+#: the validator that writes those columns and what every router already reads
+#: (#2715). This module carried byte-identical copies of all three; two had no
+#: reader at all and the third had one, so they were three chances to disagree
+#: with the thing that decides what is storable. `VALID_OUTCOME` stays: it is a
+#: scan-RESULT vocabulary rather than a setting, and its three-word overlap with
+#: the enforcement vocabularies elsewhere is two domains sharing words, not one
+#: fact typed twice.
 VALID_OUTCOME = frozenset({"passed", "failed", "errored"})
 
 

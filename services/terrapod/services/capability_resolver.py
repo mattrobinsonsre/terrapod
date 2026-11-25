@@ -30,7 +30,9 @@ from terrapod.services.rbac_service import first_matching_label, merge_labels
 if TYPE_CHECKING:
     from terrapod.api.dependencies import AuthenticatedUser
 
-AXES = ("workspace", "pool", "registry", "catalog")
+#: Derived, not typed: the axes ARE the keys of the capability level tables, so
+#: a fifth axis is resolved here the day it is declared there (#2715).
+AXES = tuple(cap.AXIS_LEVEL_MAPS)
 
 
 def role_effective_capabilities(role: Role) -> frozenset[str]:

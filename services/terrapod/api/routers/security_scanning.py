@@ -35,7 +35,7 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import run_service, security_scan_service
+from terrapod.services import run_service, security_scan_service, workspace_settings
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 router = APIRouter(tags=["security-scanning"])
@@ -212,7 +212,7 @@ async def post_security_scan_results(
     outcome = str(body.get("outcome") or "")
     if outcome not in security_scan_service.VALID_OUTCOME:
         raise HTTPException(status_code=422, detail=f"invalid outcome: {outcome!r}")
-    if engine and engine not in security_scan_service.VALID_ENGINE:
+    if engine and engine not in workspace_settings.SCAN_ENGINES:
         raise HTTPException(status_code=422, detail=f"invalid engine: {engine!r}")
     findings = body.get("findings")
     if not isinstance(findings, list):
