@@ -39,6 +39,9 @@ class TestEveryListenerCallSigns:
             name = getattr(call.func, "attr", None) or getattr(call.func, "id", None)
             if name != "_auth_headers":
                 continue
+            # An argument count on ONE call, not a coverage floor: this asks
+            # whether this call site passes both parameters, and the other
+            # direction -- the call-site SET growing -- is the equality below.
             if len(call.args) + len(call.keywords) < 2:
                 starved.append(f"line {call.lineno}: {len(call.args) + len(call.keywords)} arg(s)")
         assert not starved, (
