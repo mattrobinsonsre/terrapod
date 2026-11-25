@@ -141,13 +141,6 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
    | **Pull requests** | Read & write | Post and update PR comments, read mergeability state |
    | **Issues** | Read & write (only if using apply-then-merge) | Receive and post PR comments — GitHub serves PR comments through the Issues API |
 
-   ![GitHub App Permissions](images/github-app-permissions.png)
-
-   > **One row of the screenshot above is stale.** It still shows **Checks:
-   > Read and write** selected. Do not grant it — the table is the
-   > authoritative list, and a release before this one asked for `Checks`
-   > without ever using it.
-
    **The table is the whole of it, and it is checked.** Terrapod reports back
    with **commit statuses**, never [check
    runs](https://docs.github.com/en/rest/checks/runs): no code path creates
@@ -156,6 +149,14 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
    `scripts/docs-audit/check_vcs_app_permissions.py` holds this table to the
    endpoints the code calls, in both directions, so a permission nobody
    exercises fails the build and so does a call this table does not ask for.
+
+   > There is deliberately no screenshot of this form. The other images in this
+   > guide show you **where to go**; a picture of the permissions form would
+   > show you **which values to pick**, and that is the one thing here that can
+   > go out of date — as it did, sitting with `Checks` selected for a release
+   > after the code had stopped using it. The table above is held against the
+   > code by the gate named in the previous paragraph. A screenshot is not, and
+   > nothing would have told you it had drifted.
 
    These permissions also cover [workspace autodiscovery](autodiscovery.md). No App reinstall is needed if you enable autodiscovery later — `Contents: read` and `Pull requests: read & write` are what the autodiscovery scanner uses.
 
