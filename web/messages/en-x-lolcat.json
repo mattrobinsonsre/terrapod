@@ -1781,7 +1781,6 @@
       "load": "Faild ta load audit log"
     },
     "filters": {
-      "actorEmail": "Actor Email",
       "actorPlaceholder": "user@example.com",
       "resourceType": "Resource Typ",
       "resourceTypePlaceholder": "workspacez",
@@ -1790,7 +1789,12 @@
       "since": "Sins",
       "until": "Til",
       "clear": "Clear",
-      "apply": "Apply Filterz"
+      "apply": "Apply Filterz",
+      "actor": "Actor",
+      "actorKind": "Actor Kynd",
+      "actorKindEmail": "Emayl",
+      "actorKindLogin": "VCS Loggin",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "Timestamp",
@@ -1805,6 +1809,11 @@
       "summary": "Paig {current} ov {total} ({count, plural, one {# entree} other {# entriez}})",
       "previous": "Previus",
       "next": "Nekst"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "Sistem",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {

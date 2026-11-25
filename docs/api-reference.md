@@ -6114,6 +6114,7 @@ GET /api/v1/admin/audit-log
 | Parameter | Type | Description |
 |---|---|---|
 | `filter[actor]` | string | Filter by actor email |
+| `filter[actor-login]` | string | Filter by VCS login. A `vcs_user` entry carries a login and an empty `actor-email`, so `filter[actor]` cannot reach one; the two are ANDed, so send whichever the value belongs to, not both |
 | `filter[resource-type]` | string | Filter by resource type (e.g. `workspaces`, `runs`) |
 | `filter[action]` | string | Filter by action: an HTTP method (GET, POST, PATCH, DELETE) or a system-event verb such as `vault.read` |
 | `filter[since]` | datetime | Only entries after this timestamp (RFC3339) |

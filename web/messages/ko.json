@@ -1781,7 +1781,6 @@
       "load": "감사 로그를 불러오지 못했습니다"
     },
     "filters": {
-      "actorEmail": "행위자 이메일",
       "actorPlaceholder": "user@example.com",
       "resourceType": "리소스 유형",
       "resourceTypePlaceholder": "workspaces",
@@ -1790,7 +1789,12 @@
       "since": "시작",
       "until": "종료",
       "clear": "지우기",
-      "apply": "필터 적용"
+      "apply": "필터 적용",
+      "actor": "행위자",
+      "actorKind": "행위자 유형",
+      "actorKindEmail": "이메일",
+      "actorKindLogin": "VCS 로그인",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "타임스탬프",
@@ -1805,6 +1809,11 @@
       "summary": "{total}페이지 중 {current}페이지 ({count, plural, one {항목 #개} other {항목 #개}})",
       "previous": "이전",
       "next": "다음"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "시스템",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {

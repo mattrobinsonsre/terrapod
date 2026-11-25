@@ -1781,7 +1781,6 @@
       "load": "Échec du chargement du journal d'audit"
     },
     "filters": {
-      "actorEmail": "E-mail de l'acteur",
       "actorPlaceholder": "user@example.com",
       "resourceType": "Type de ressource",
       "resourceTypePlaceholder": "workspaces",
@@ -1790,7 +1789,12 @@
       "since": "Depuis",
       "until": "Jusqu'à",
       "clear": "Effacer",
-      "apply": "Appliquer les filtres"
+      "apply": "Appliquer les filtres",
+      "actor": "Acteur",
+      "actorKind": "Type d'acteur",
+      "actorKindEmail": "E-mail",
+      "actorKindLogin": "Identifiant VCS",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "Horodatage",
@@ -1805,6 +1809,11 @@
       "summary": "Page {current} sur {total} ({count, plural, one {# entrée} other {# entrées}})",
       "previous": "Précédent",
       "next": "Suivant"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "Système",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {

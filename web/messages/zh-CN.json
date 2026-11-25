@@ -1781,7 +1781,6 @@
       "load": "加载审计日志失败"
     },
     "filters": {
-      "actorEmail": "操作者电子邮箱",
       "actorPlaceholder": "user@example.com",
       "resourceType": "资源类型",
       "resourceTypePlaceholder": "workspaces",
@@ -1790,7 +1789,12 @@
       "since": "起始",
       "until": "截止",
       "clear": "清除",
-      "apply": "应用筛选"
+      "apply": "应用筛选",
+      "actor": "操作者",
+      "actorKind": "操作者类型",
+      "actorKindEmail": "电子邮箱",
+      "actorKindLogin": "VCS 登录名",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "时间戳",
@@ -1805,6 +1809,11 @@
       "summary": "第 {current} 页，共 {total} 页（{count, plural, one {# 个条目} other {# 个条目}}）",
       "previous": "上一页",
       "next": "下一页"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "系统",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {
