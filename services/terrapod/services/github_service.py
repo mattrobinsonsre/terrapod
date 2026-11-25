@@ -25,7 +25,6 @@ from terrapod.services.vcs_provider import (
     OpenPullRequests,
     PRComment,
     PRMergeResult,
-    PRReview,
     PullRequest,
     RepositoryListing,
     RepositoryRef,
@@ -1182,34 +1181,6 @@ async def list_pr_comments_typed(
                 author_user_id=str(user.get("id", "")),
                 created_at=c.get("created_at", ""),
                 updated_at=c.get("updated_at", ""),
-            )
-        )
-    return out
-
-
-async def list_pr_reviews(
-    conn: VCSConnection, owner: str, repo: str, pr_number: int
-) -> list[PRReview]:
-    """List reviews submitted on a PR (used for approval-state detection)."""
-    token = await _api_call_token(conn)
-    api_url = _api_url(conn)
-    resp = await _github_request(
-        "GET",
-        f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}/reviews",
-        token,
-        params={"per_page": 100},
-        conn=conn,
-    )
-    resp.raise_for_status()
-    out: list[PRReview] = []
-    for r in resp.json():
-        user = r.get("user") or {}
-        out.append(
-            PRReview(
-                id=str(r["id"]),
-                state=(r.get("state") or "").lower(),
-                author_login=user.get("login", ""),
-                submitted_at=r.get("submitted_at") or "",
             )
         )
     return out
