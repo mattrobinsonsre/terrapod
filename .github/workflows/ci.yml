@@ -638,6 +638,10 @@ jobs:
       # snapshot, so there is no second source of truth to maintain.
       - name: (docs-audit) the docs only read attributes the API serves
         run: python3 scripts/docs-audit/check_doc_api_attributes.py
+      - name: (docs-audit) A cited identifier of ours resolves to something
+        run: python3 scripts/docs-audit/check_cited_symbols.py
+      - name: (docs-audit) No three modules share one identical deciding body
+        run: python3 scripts/docs-audit/check_duplicate_bodies.py
 
       # And that the CLI-surface body catalogues tell the truth (#2389). They
       # say, per attribute, whether Terrapod consumes it -- which is the claim

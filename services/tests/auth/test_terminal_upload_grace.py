@@ -110,6 +110,9 @@ class TestTheRouteListIsDerivedFromWhatTheRunnerUploads:
         """`log_capture` retries on a linear backoff. A window shorter than the
         ladder would let the first attempt through and refuse the retry, which is
         the same defect for an upload that needed one."""
+        # The other direction is `test_the_window_is_bounded_above_as_well`
+        # below, which is an inequality against the pre-launch margin -- so this
+        # lower bound is deliberate and the window cannot grow without limit.
         assert rts.TERMINAL_UPLOAD_GRACE_SECONDS >= 60
 
     def test_the_window_is_bounded_above_as_well(self):
