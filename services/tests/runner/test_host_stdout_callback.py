@@ -1839,7 +1839,8 @@ class TestCheckModeIsVisible:
     #: here: the notice and the result take their label from DIFFERENT builders
     #: (`_tp_task_label` and `_tp_label_of`), so a test that accepts either can
     #: pass with one of the two unmarked -- which is the asymmetry
-    #: `test_handler_marking` exists to stop and this would have reintroduced.
+    #: `test_a_handler_is_marked_as_one` exists to stop and this would have
+    #: reintroduced.
     _RESULTS = ("ok", "changed", "skipped", "FAILED")
 
     def test_a_result_block_carries_the_marker(self, marked):

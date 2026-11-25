@@ -85,11 +85,28 @@ SUFFIXES = {".py", ".go", ".ts", ".mjs", ".tsx"}
 #: the set grows, which is the point.
 _ASSERTION = r"assert(?:\.\w+)?\s|require\.|t\.(?:Fatal|Error)|expect\(|SystemExit|sys\.exit|print\(\s*[\"\']FAIL"
 
+#: What the floor is ON. `len(...)`, `.length` and `count` are coverage floors
+#: over a collection. An UPPER_CASE name is a tuning CONSTANT, and a floor on one
+#: with no ceiling is the same defect in a different shape -- which this matcher
+#: could not see, so `TERMINAL_UPLOAD_GRACE_SECONDS >= 60` was never in the
+#: baseline at all and the credential reprieve had a floor and no upper bound for
+#: as long as it has existed (#2715). That is this gate's own subject having been
+#: narrower than its name, which is the class it exists to catch.
+#:
+#: Measured before widening: `len`/`length`/`count` alone matches 122, adding
+#: UPPER_CASE constants takes it to 215, and widening further to ANY bare
+#: identifier takes it to 216 -- one more. So almost everything a looser matcher
+#: would add is a constant anyway, and the targeted form carries none of the risk
+#: of matching arbitrary numeric comparisons.
+_FLOOR_HEAD = r"\blen\s*\(|\.length\b|\bcount\b|\b[A-Z][A-Z0-9_]{3,}\b"
+
 _FLOOR = re.compile(
     r"""(?:(?P<assertion>"""
     + _ASSERTION
     + r""")[^\n]*?)
-        (?P<head>\blen\s*\(|\.length\b|\bcount\b)
+        (?P<head>"""
+    + _FLOOR_HEAD
+    + r""")
         [^\n]*?(?P<op>>=|>)\s*(?P<n>\d+)""",
     re.VERBOSE | re.IGNORECASE,
 )
