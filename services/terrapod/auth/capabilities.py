@@ -125,6 +125,11 @@ def create_run_capability(*, plan_only: bool, is_destroy: bool, is_configure: bo
     return confirm_capability(is_destroy)
 
 
+def can_override(caps: frozenset[str] | set[str]) -> bool:
+    """Whether `caps` may override a policy, scan or AI-policy gate (not a run-task stage)."""
+    return RUN_OVERRIDE in caps
+
+
 VAR_WRITE = "var:write"  # create / update / delete variables
 INVENTORY_WRITE = "inventory:write"  # declare / change / remove inventory hosts (#1968)
 STATE_WRITE = "state:write"  # create state version, manual upload, rollback
@@ -133,6 +138,7 @@ CONFIG_UPLOAD = "config:upload"  # create a configuration version
 # ── Workspace / runs — admin tier ───────────────────────────────────────────
 WORKSPACE_SETTINGS = "workspace:settings"  # PATCH workspace (settings/VCS/labels/pool)
 WORKSPACE_FORCE_UNLOCK = "workspace:force-unlock"  # unlock a lock held by someone else
+RUN_OVERRIDE = "run:override"  # override a soft-failed policy / scan / AI-policy gate
 WORKSPACE_DELETE = "workspace:delete"  # delete the workspace
 STATE_DELETE = "state:delete"  # delete a non-current state version
 NOTIFICATION_MANAGE = "notification:manage"  # create/update/delete/verify notif configs
@@ -237,6 +243,7 @@ _WORKSPACE_LEVELS["write"] = _WORKSPACE_LEVELS["plan"] | {
 _WORKSPACE_LEVELS["admin"] = _WORKSPACE_LEVELS["write"] | {
     WORKSPACE_SETTINGS,
     WORKSPACE_FORCE_UNLOCK,
+    RUN_OVERRIDE,
     WORKSPACE_DELETE,
     STATE_DELETE,
     NOTIFICATION_MANAGE,

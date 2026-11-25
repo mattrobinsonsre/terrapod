@@ -177,7 +177,7 @@ async def test_override_redrives_planning_run() -> None:
         patch.object(
             router,
             "resolve_workspace_capabilities_for",
-            new=AsyncMock(return_value={cap.WORKSPACE_SETTINGS}),
+            new=AsyncMock(return_value={cap.RUN_OVERRIDE}),
         ),
         patch.object(
             router.security_scan_service, "override_run_scan", new=AsyncMock(return_value=1)

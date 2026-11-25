@@ -59,6 +59,24 @@ and a comment verb is a command surface. Named rather than quietly stretched.
 
 ## Behaviour changes in the next release
 
+### Overriding a gate needs `run:override`, not `workspace:settings`
+
+Releasing a run held by a failed policy set, enforced security scan or AI policy
+gate (`POST /runs/{id}/actions/override-policy`, `override-security-scan`,
+`override-ai-policy`, `POST /policy-checks/{id}/actions/override`, and the
+`permissions.can-override` flag) now needs the new `run:override` capability.
+It is in the `admin` preset, so built-in admin and workspace owners keep it.
+Overriding a failed **run task** stage is unchanged and still needs
+`run-task:manage`.
+
+| if you | then |
+|---|---|
+| use built-in `admin`, or own workspaces | nothing to do |
+| have custom roles holding `workspace:settings`, managed in the UI or API without a stored capability list you maintain | nothing to do: the upgrade migration adds `run:override` to each of them, so what they can do does not change |
+| **manage a role as code with an explicit `capabilities` list** (`terrapod_role` in Terraform/OpenTofu, the Pulumi provider, or the API) that holds `workspace:settings` | **add `run:override` to that list before the first apply after upgrading.** The migration adds it to the stored role, so the next plan shows `run:override` being removed (with Pulumi, after a `pulumi refresh` or `pulumi up --refresh`), and applying that plan strips it and the role loses override. The authored list is the source of truth, so the provider cannot keep a token your configuration does not name. A role authored by level (`workspace_permission = "admin"`) needs nothing |
+| create a custom role after the upgrade | `workspace:settings` alone no longer overrides, which is deliberate. Grant `run:override` where you want it, with or without `workspace:settings` |
+| downgrade | the downgrade removes `run:override` from every role, since the previous release rejects a capability it does not know the next time a role is edited. **On the previous release `workspace:settings` alone overrides again**, so a role you tightened after the upgrade (holding `workspace:settings` but not `run:override`) regains override |
+
 ### Checkov is fetched from Terrapod's releases, not upstream's
 
 **Act before upgrading if you run air-gapped or allowlist egress by host.**

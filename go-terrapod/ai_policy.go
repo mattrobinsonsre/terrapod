@@ -131,7 +131,7 @@ func (c *Client) GetRunAIPolicyStatus(ctx context.Context, runID string) (*AIPol
 }
 
 // OverrideRunAIPolicy releases a run held by the AI policy gate (requires
-// workspace admin). A run still held in planning is re-driven immediately.
+// the `run:override` capability). A run still held in planning is re-driven immediately.
 //
 // A run held with NO verdict recorded is released too, and is the case that
 // most needs it: the summariser never ran, or failed before ruling, so the

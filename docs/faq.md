@@ -164,7 +164,7 @@ dependencies. See [Getting started](getting-started.md).
 
 ## How granular is Terrapod's access control?
 
-Enforcement is per **capability**, and there are **50 capabilities across 14
+Enforcement is per **capability**, and there are **51 capabilities across 14
 resource kinds** — workspaces, runs, state, variables, the module and provider registry,
 agent pools, policy sets, inventory, notifications, run tasks, run triggers,
 drift, the catalog, and platform-level administration. A capability is a
@@ -194,7 +194,7 @@ it directly instead of leaving you to work it out:
   path, **including the ones that bypass roles entirely** — ownership, platform
   admin, the `everyone` floor.
 
-Full catalogue of all 50: [RBAC capabilities](rbac-capabilities.md). The model
+Full catalogue of all 51: [RBAC capabilities](rbac-capabilities.md). The model
 itself: [RBAC](rbac.md).
 
 ## Can I give someone plan access but not apply?

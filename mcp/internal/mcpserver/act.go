@@ -228,7 +228,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_run_security_scan_override ──────────────────────────
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_security_scan_override",
-		Description: "Override a run's blocking IaC security scan so it can proceed despite failed/errored findings. Requires workspace admin. A run held in planning by an enforced scan is re-driven immediately. Use deliberately — this bypasses a security gate; prefer fixing the finding or adding a skip rule.",
+		Description: "Override a run's blocking IaC security scan so it can proceed despite failed/errored findings. Requires the `run:override` capability on the workspace. A run held in planning by an enforced scan is re-driven immediately. Use deliberately — this bypasses a security gate; prefer fixing the finding or adding a skip rule.",
 		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.SecurityScan, error) {
 		if in.RunID == "" {
@@ -245,7 +245,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_ai_policy_override",
 		Description: "Release a run held by the AI policy gate so it can proceed despite a deny or an unreachable verdict. " +
-			"Requires workspace admin. A run still held in planning is re-driven immediately. Use deliberately — this " +
+			"Requires the `run:override` capability on the workspace. A run still held in planning is re-driven immediately. Use deliberately — this " +
 			"bypasses a governance gate; read the verdict's reasons first and prefer fixing what they name. Also releases a " +
 			"run held with NO verdict recorded -- the summariser never ran, or failed before ruling -- which is the case " +
 			"a mandatory gate cannot otherwise escape. That records an explicit no-verdict override rather than a pass.",
@@ -268,7 +268,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_policy_check_override",
 		Description: "Override a soft_failed policy check so the run it holds can proceed: the OPA check overrides every failed " +
-			"policy set on the run, the scan check overrides the security scan. Requires workspace admin. The run is moved on " +
+			"policy set on the run, the scan check overrides the security scan. Requires the `run:override` capability on the workspace. The run is moved on " +
 			"at once; it applies only if it would have without the gate (auto-apply, or a later confirm). Use deliberately — " +
 			"this bypasses a governance gate; read the check's output first and prefer fixing the configuration.",
 		Annotations: destructive,

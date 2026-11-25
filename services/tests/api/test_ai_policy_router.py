@@ -273,7 +273,7 @@ async def test_overriding_releases_a_run_held_with_no_verdict_at_all() -> None:
         patch.object(
             router,
             "resolve_workspace_capabilities_for",
-            new=AsyncMock(return_value={cap.WORKSPACE_SETTINGS}),
+            new=AsyncMock(return_value={cap.RUN_OVERRIDE}),
         ),
         patch.object(
             router.ai_policy_service, "override", new=AsyncMock(return_value=recorded)
@@ -305,7 +305,7 @@ async def test_an_override_re_drives_a_run_still_held_in_planning() -> None:
         patch.object(
             router,
             "resolve_workspace_capabilities_for",
-            new=AsyncMock(return_value={cap.WORKSPACE_SETTINGS}),
+            new=AsyncMock(return_value={cap.RUN_OVERRIDE}),
         ),
         patch.object(
             router.ai_policy_service,
@@ -332,7 +332,7 @@ async def test_an_override_on_a_finished_run_does_not_re_drive_it() -> None:
         patch.object(
             router,
             "resolve_workspace_capabilities_for",
-            new=AsyncMock(return_value={cap.WORKSPACE_SETTINGS}),
+            new=AsyncMock(return_value={cap.RUN_OVERRIDE}),
         ),
         patch.object(
             router.ai_policy_service,
@@ -358,7 +358,7 @@ async def test_the_override_records_who_did_it() -> None:
         patch.object(
             router,
             "resolve_workspace_capabilities_for",
-            new=AsyncMock(return_value={cap.WORKSPACE_SETTINGS}),
+            new=AsyncMock(return_value={cap.RUN_OVERRIDE}),
         ),
         patch.object(
             router.ai_policy_service,

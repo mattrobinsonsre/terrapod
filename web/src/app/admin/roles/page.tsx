@@ -48,12 +48,12 @@ const CAPABILITY_GROUPS: { resource: string; label: string; caps: string[] }[] =
   {
     resource: 'workspace',
     label: 'Workspace',
-    caps: ['workspace:read', 'workspace:lock', 'workspace:settings', 'workspace:force-unlock', 'workspace:delete'],
+    caps: ['workspace:read', 'workspace:lock', 'workspace:settings', 'workspace:force-unlock', 'workspace:delete', 'workspace:onboard'],
   },
   {
     resource: 'run',
     label: 'Run',
-    caps: ['run:read', 'run:plan', 'run:cancel', 'run:apply', 'run:apply-destroy'],
+    caps: ['run:read', 'run:plan', 'run:cancel', 'run:apply', 'run:apply-destroy', 'run:override'],
   },
   {
     resource: 'state',
@@ -66,6 +66,7 @@ const CAPABILITY_GROUPS: { resource: string; label: string; caps: string[] }[] =
   { resource: 'run-task', label: 'Run tasks', caps: ['run-task:read', 'run-task:manage'] },
   { resource: 'notification', label: 'Notifications', caps: ['notification:read', 'notification:manage'] },
   { resource: 'run-trigger', label: 'Run triggers', caps: ['run-trigger:read', 'run-trigger:manage'] },
+  { resource: 'inventory', label: 'Inventory', caps: ['inventory:read', 'inventory:write'] },
   { resource: 'pool', label: 'Agent pools', caps: ['pool:read', 'pool:assign', 'pool:manage'] },
   { resource: 'registry', label: 'Registry', caps: ['registry:read', 'registry:write', 'registry:admin'] },
   { resource: 'catalog', label: 'Service catalog', caps: ['catalog:read', 'catalog:use', 'catalog:admin'] },
@@ -82,11 +83,11 @@ const ALL_CAPABILITIES_SET = new Set(ALL_CAPABILITIES)
 // (cumulative). Selecting the preset dropdowns pre-checks exactly these boxes;
 // this is the same expansion the server applies when a role is level-authored.
 const WORKSPACE_LEVELS: Record<string, string[]> = {
-  read: ['workspace:read', 'run:read', 'state:read-metadata', 'var:read', 'config:read', 'run-task:read', 'notification:read', 'run-trigger:read'],
+  read: ['workspace:read', 'run:read', 'state:read-metadata', 'var:read', 'config:read', 'run-task:read', 'notification:read', 'run-trigger:read', 'inventory:read'],
 }
-WORKSPACE_LEVELS.plan = [...WORKSPACE_LEVELS.read, 'run:plan', 'run:cancel', 'workspace:lock', 'state:read', 'drift:dismiss']
-WORKSPACE_LEVELS.write = [...WORKSPACE_LEVELS.plan, 'run:apply', 'run:apply-destroy', 'var:write', 'state:write', 'config:upload']
-WORKSPACE_LEVELS.admin = [...WORKSPACE_LEVELS.write, 'workspace:settings', 'workspace:force-unlock', 'workspace:delete', 'state:delete', 'notification:manage', 'run-task:manage', 'run-trigger:manage']
+WORKSPACE_LEVELS.plan = [...WORKSPACE_LEVELS.read, 'run:plan', 'run:cancel', 'workspace:lock', 'state:read', 'drift:dismiss', 'workspace:onboard']
+WORKSPACE_LEVELS.write = [...WORKSPACE_LEVELS.plan, 'run:apply', 'run:apply-destroy', 'var:write', 'state:write', 'config:upload', 'inventory:write']
+WORKSPACE_LEVELS.admin = [...WORKSPACE_LEVELS.write, 'workspace:settings', 'workspace:force-unlock', 'run:override', 'workspace:delete', 'state:delete', 'notification:manage', 'run-task:manage', 'run-trigger:manage']
 
 const POOL_LEVELS: Record<string, string[]> = {
   read: ['pool:read'],

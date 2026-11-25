@@ -14,6 +14,8 @@ resource "terrapod_role" "dev_writer" {
 # fields are then server-derived as a summary (a preset name, or the literal
 # "custom" when the capabilities match no preset) and must not be set here —
 # they are computed. Omit `capabilities` to author by level instead.
+# A list holding "workspace:settings" that should keep overriding failed
+# policy, scan and AI-policy gates must also list "run:override".
 resource "terrapod_role" "custom_scoped" {
   name        = "custom-scoped"
   description = "Fine-grained grant authored via capabilities"

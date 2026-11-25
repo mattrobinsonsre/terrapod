@@ -406,8 +406,11 @@ skipping the gate.
 
 ## Overriding a blocked run
 
-A workspace **admin** can override a run blocked by a mandatory policy
-failure from the run's Policy Checks panel ("Override & Continue"). The
+A holder of the `run:override` capability (every workspace admin has it) can override a run blocked by a mandatory policy
+failure through the API (`POST /api/v1/runs/{run_id}/actions/override-policy`), the
+`terrapod_policy_check_override` MCP tool, or the `tofu`/`terraform` CLI below. The run page's
+Policy Checks panel ("Override & Continue") is shown to platform admins only
+today, whatever a custom role grants. The
 override is recorded against each failed evaluation (`overridden_by`),
 and the run is released to continue immediately. Alternatively, discard
 the run, or queue a newer one, which supersedes it.

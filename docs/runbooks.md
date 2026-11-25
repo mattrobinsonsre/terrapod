@@ -1304,7 +1304,7 @@ GROUP BY e.outcome;   -- a NULL outcome is "held with no verdict"
 ### Resolution
 
 - **Per run**: `POST /api/terrapod/v1/runs/{id}/actions/override-ai-policy`
-  (workspace admin). This works even with **no verdict recorded**, and writes
+  (the `run:override` capability). This works even with **no verdict recorded**, and writes
   an explicit no-verdict override rather than forging a pass.
 - **Fleet-wide, immediately**: set `api.config.ai_summary.policy.enforcement_level: advisory`
   and roll the API. Verdicts are still recorded; nothing is held.
@@ -1335,7 +1335,7 @@ Pick the least-disruptive option that fits:
 - **Policy is wrong** — fix the Rego (`PATCH /api/v1/policies/{id}`) or delete the offending policy. The next reconciler tick re-evaluates held runs automatically.
 - **Set is too broadly scoped** — narrow its allow-labels, or set `enabled: false` on the set (`PATCH /api/v1/policy-sets/{id}`) to stop it being evaluated. Disabling does not delete it.
 - **Demote to advisory** — `PATCH` the set's `enforcement-level` to `advisory`; runs then proceed with a warning instead of a block. Note the enforcement level is *snapshotted per evaluation*, so already-recorded blocks are cleared by re-evaluation, not by the edit alone — held runs re-evaluate on the next tick.
-- **Single urgent run** — a workspace admin can override one run from its Policy Checks panel ("Override & Continue").
+- **Single urgent run** — a holder of `run:override` (every workspace admin) can override one run with `POST /api/v1/runs/{id}/actions/override-policy` or the `terrapod_policy_check_override` MCP tool. The run page's Policy Checks panel ("Override & Continue") is shown to platform admins only today.
 - **Abandon a held run** — discard it (`POST /api/v2/runs/{id}/actions/discard`), or queue a newer run, which supersedes it. Since v1.7.2 a held run stays held until one of these happens; before that it errored with `Job deleted` about ten minutes after its plan finished. Its `blocked-by` attribute says which gate holds it.
 
 ### Verification
@@ -1361,7 +1361,7 @@ This usually means **the runner image is from before policy-as-code support / do
 ### Resolution
 
 - **Roll the runner image forward.** Re-deploy with the matching Terrapod version (or restart the affected node so K8s pulls fresh). Future runs on this workspace will then evaluate cleanly.
-- **Release this specific run** — a workspace admin can override the synthetic errored evaluation from the Policy Checks panel; the run resumes immediately.
+- **Release this specific run** — a holder of `run:override` can override the synthetic errored evaluation with `POST /api/v1/runs/{id}/actions/override-policy` or the `terrapod_policy_check_override` MCP tool (platform admins also have "Override & Continue" in the Policy Checks panel); the run resumes immediately.
 
 ### Verification
 

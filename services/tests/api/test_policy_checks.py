@@ -37,7 +37,7 @@ def _tfe_request(path: str = "/api/tfe/v2/runs/run-x/policy-checks"):
 
 STAMP = datetime(2026, 9, 17, 12, 30, tzinfo=UTC)
 READ = {cap.RUN_READ}
-ADMIN = {cap.RUN_READ, cap.WORKSPACE_SETTINGS}
+ADMIN = {cap.RUN_READ, cap.RUN_OVERRIDE}
 
 
 def _user() -> AuthenticatedUser:

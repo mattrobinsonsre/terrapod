@@ -96,6 +96,12 @@ def main() -> int:
         # loose-pattern failure this file's own comment warns about, found by
         # the gate immediately disagreeing with unrelated prose.
         ("RBAC capabilities", caps, re.compile(r"(\d+)\s+capabilities\b")),
+        # The one "N of them" shape that is safe to match: it names the kinds right after.
+        (
+            "RBAC capabilities",
+            caps,
+            re.compile(r"(\d+)\s+of them across\s+\d+\s+resource kinds\b"),
+        ),
         ("RBAC resource kinds", kinds, re.compile(r"(\d+)\s+resource kinds\b")),
     ]
 
@@ -108,11 +114,13 @@ def main() -> int:
     ).stdout.split()
 
     problems, seen = [], 0
+    hits = [0] * len(checks)
     for f in files:
         for i, line in enumerate((ROOT / f).read_text(errors="replace").splitlines(), 1):
-            for name, expected, pat in checks:
+            for n, (name, expected, pat) in enumerate(checks):
                 for m in pat.finditer(line):
                     seen += 1
+                    hits[n] += 1
                     if int(m.group(1)) != expected:
                         problems.append(f"{f}:{i}: says {m.group(1)} {name}, code has {expected}")
 
@@ -122,6 +130,12 @@ def main() -> int:
         f"{real_locales} languages, {tools} MCP tools"
     )
     print(f"  {seen} countable claim(s) checked across {len(files)} docs")
+    # A pattern that matches nothing cannot fail, whatever the code says.
+    for n, (name, _, pat) in enumerate(checks):
+        if hits[n] == 0:
+            problems.append(
+                f"no claim matches {pat.pattern!r} ({name}): the pattern checks nothing"
+            )
     if problems:
         print(f"\nFAIL — {len(problems)} count(s) disagree with the code:\n")
         for p in problems:

@@ -394,10 +394,11 @@ there would be no criteria and no threshold to rule against.
 
 ### Releasing a held run
 
-`POST /api/terrapod/v1/runs/{run_id}/actions/override-ai-policy` — workspace
-admin, and the run is re-driven immediately. The run page offers it on the
-blocked banner in the **AI** tab; an agent can do it through the
-`terrapod_run_ai_policy_override` MCP tool.
+`POST /api/terrapod/v1/runs/{run_id}/actions/override-ai-policy` — needs the
+`run:override` capability on the workspace, and the run is re-driven
+immediately. An agent can do it through the `terrapod_run_ai_policy_override`
+MCP tool. The run page offers it on the blocked banner in the **AI** tab to
+platform admins only today, whatever a custom role grants.
 
 It also releases a run held with **no verdict at all** -- the summariser never
 ran, or failed before ruling -- which is the one state a mandatory gate cannot

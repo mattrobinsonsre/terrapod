@@ -39,7 +39,7 @@ Each workspace picks one enforcement level (default **advisory**):
 |---|---|
 | `off` | The scan stage is skipped entirely. |
 | `advisory` (default) | The scan runs and its findings are recorded and shown, but it **never blocks** — apply proceeds as soon as the run's other work is done (the scan runs as no-wait add-on work). |
-| `enforced` | A **failed** (a finding at/above the threshold) or **errored** (the scanner crashed, or an enforced run recorded no result) scan **holds the run in `planning`** until the finding is fixed or a workspace admin overrides it. The run is *not* errored — it waits at the gate, so fixing the config and re-planning, or overriding, resolves it cleanly. |
+| `enforced` | A **failed** (a finding at/above the threshold) or **errored** (the scanner crashed, or an enforced run recorded no result) scan **holds the run in `planning`** until the finding is fixed or a holder of `run:override` overrides it. The run is *not* errored — it waits at the gate, so fixing the config and re-planning, or overriding, resolves it cleanly. |
 
 There is **no platform-wide off switch** — scanning is a per-workspace choice.
 Speculative (plan-only) runs are always recorded but never gated.
@@ -93,7 +93,7 @@ resource "terrapod_workspace" "prod" {
 
 ## Overriding a blocking scan
 
-When an `enforced` scan holds a run, a **workspace admin** can override it:
+When an `enforced` scan holds a run, a holder of the **`run:override`** capability (every workspace admin has it) can override it:
 
 ```
 POST /api/v1/runs/{run_id}/actions/override-security-scan

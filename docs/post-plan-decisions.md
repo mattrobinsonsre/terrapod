@@ -97,7 +97,7 @@ handles a held run the way it would on Terraform Enterprise:
    the usual apply confirmation. Any other answer leaves the run held, to be
    overridden or discarded later.
 3. With `-auto-approve` it overrides a failed policy check itself, **if** the
-   caller is allowed to (admin on the workspace), and then applies. A caller
+   caller is allowed to (it holds `run:override` on the workspace), and then applies. A caller
    who is not allowed to override gets an error naming the run instead.
 
 A failed run task is offered for override the same way (`Do you want to
@@ -110,7 +110,7 @@ the failed check.
 Terrapod has two policy checks per run, each present only when its gate ran:
 one for its OPA policy sets (shown as *Organization Policy Check*) and one for
 its security scan (*Workspace Policy Check*). Overriding the OPA check
-overrides every failed policy set on the run, as the Policy Checks panel does.
+overrides every failed policy set on the run, as `POST /runs/{id}/actions/override-policy` does.
 
 ## API
 

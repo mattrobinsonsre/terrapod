@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.ids import strip_id_prefix
 from terrapod.api.metrics import AUTH_FAILURES
 from terrapod.auth.api_tokens import validate_api_token
+from terrapod.auth.capabilities import RUN_OVERRIDE, can_override
 from terrapod.auth.sessions import (
     Session,
     _should_refresh_session,
@@ -847,6 +848,15 @@ async def require_admin_or_audit(
             detail="Admin or audit access required",
         )
     return user
+
+
+def require_override(caps: frozenset[str] | set[str]) -> None:
+    """Refuse a gate override unless `caps` holds `run:override`."""
+    if not can_override(caps):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires '{RUN_OVERRIDE}' capability on workspace",
+        )
 
 
 def require_runner_for_run(
