@@ -194,16 +194,6 @@ class PRComment:
 
 
 @dataclass(frozen=True)
-class PRReview:
-    """A PR/MR review. Used to detect approvals for apply gating."""
-
-    id: str
-    state: str  # "approved" / "changes_requested" / "commented" / etc.
-    author_login: str
-    submitted_at: str
-
-
-@dataclass(frozen=True)
 class PRMergeResult:
     """Outcome of a merge attempt. `merged=True` means the API confirmed merge.
 
@@ -357,20 +347,6 @@ class VCSProvider(Protocol):
         Used by the status-comment surface so the same comment is
         re-rendered on every state transition rather than appending a
         new comment per update.
-        """
-        ...
-
-    async def list_pr_reviews(
-        self,
-        conn: VCSConnection,
-        owner: str,
-        repo: str,
-        pr_number: int,
-    ) -> list[PRReview]:
-        """List reviews on a PR (GitHub) or approvals on an MR (GitLab).
-
-        Used to detect approval-state transitions for the mergeability
-        gate, alongside the provider's `is_mergeable` summary.
         """
         ...
 

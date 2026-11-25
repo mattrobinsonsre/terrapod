@@ -2801,11 +2801,29 @@ class PRSession(Base):
     # GitHub uses int64s but GitLab and other providers may differ).
     status_comment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    # Poll cursors — last item we've processed via webhook or poll, so the
-    # poll fallback doesn't re-dispatch already-handled events. Strings to
-    # accommodate provider-specific id shapes.
+    # Poll cursor — the last comment we've processed via webhook or poll, so
+    # the poll fallback doesn't re-dispatch an already-handled command. A
+    # string to accommodate provider-specific id shapes.
+    #
+    # A comment needs this because it IS an event: it can carry `terrapod
+    # apply`, and dispatching one twice queues two applies. The poller filters
+    # on the cursor, dispatches per comment under a comment-scoped dedup key,
+    # and advances it (`vcs_poller._poll_pr_comments`).
+    #
+    # There is deliberately NO review cursor beside it, and the absence is the
+    # answer rather than a gap (#2704). A review is never processed as an
+    # individual item: nothing enumerates reviews at all, the only reaction to
+    # one is a repo-scoped `vcs_immediate_poll` that any number of reviews
+    # collapse into (`api/routers/vcs_events.py`), and approval reaches the
+    # apply gate as a SNAPSHOT pulled at confirm time
+    # (`run_service._check_mergeability_or_block`) rather than as an event
+    # acted upon. Re-asking the provider yields the same answer, so the
+    # property a cursor would protect is already structural.
+    #
+    # It could not be expressed on GitLab even if something wanted it: there
+    # are no review ids there, only a snapshot of current approvers keyed by
+    # user id, so a "last processed review id" has nothing to order.
     last_processed_comment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    last_processed_review_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # PR lifecycle state. Mirrors the VCS provider's notion: open, closed
     # (without merge), or merged. Closed/merged sessions are kept for
