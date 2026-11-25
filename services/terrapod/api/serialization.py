@@ -75,3 +75,19 @@ def rfc3339(dt: datetime | None) -> str | None:
     if dt is None:
         return None
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def rfc3339_or_empty(dt: datetime | None) -> str:
+    """`rfc3339`, with the empty string for an absent value.
+
+    Two absent-value conventions are in use on the wire and both are real: most
+    routers emit `""` for a null timestamp and a few emit `null`. They are not
+    interchangeable -- a consumer reads one or the other -- so this is a sibling
+    rather than a flag on `rfc3339`, and a caller keeps whichever it already
+    served. The FORMAT is what was drifting (#2715): twenty per-module copies of
+    this existed in seven different shapes, three of which emitted microseconds
+    and three of which skipped `astimezone`, so a non-UTC or naive value came
+    out as `+05:30` with no `Z` at all -- which rule 10 exists to prevent and
+    `go-tfe` rejects.
+    """
+    return rfc3339(dt) or ""

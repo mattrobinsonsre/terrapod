@@ -29,7 +29,6 @@ import json
 import re
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import UTC
 from typing import Literal
 
 import httpx
@@ -40,6 +39,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
+from terrapod.api import serialization
 from terrapod.api.capability_access import resolve_capability_or_authenticate
 from terrapod.api.dependencies import (
     AuthenticatedUser,
@@ -179,9 +179,10 @@ _LISTENER_REPORTABLE: frozenset[tuple[str, str]] = frozenset(
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _plan_summary_attr(run: Run) -> dict[str, int] | None:

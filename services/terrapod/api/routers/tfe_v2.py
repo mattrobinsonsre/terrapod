@@ -50,7 +50,6 @@ import os
 import re
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
@@ -59,6 +58,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.capability_access import resolve_capability_or_authenticate
 from terrapod.api.dependencies import (
     DEFAULT_ORG,
@@ -194,11 +194,11 @@ def _primary_run_filter():
     )
 
 
-def _rfc3339(dt: datetime | None) -> str:
-    """Format a datetime as RFC3339 with trailing Z (what go-tfe expects)."""
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _tfe_headers() -> dict[str, str]:

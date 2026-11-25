@@ -21,14 +21,13 @@ Endpoints:
     DELETE /authentication-tokens/:id                             — revoke token
 """
 
-from datetime import UTC
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, get_current_user
 from terrapod.api.pagination import paginate
 from terrapod.auth.api_tokens import (
@@ -59,11 +58,11 @@ _ALL_KINDS = {"interactive", "service_bound", "service_detached"}
 _TOKEN_ROLES_PREFIX = "tp:token_roles:"
 
 
-def _rfc3339(dt) -> str | None:  # type: ignore[no-untyped-def]
-    """RFC3339 with a trailing Z (not +00:00) — go-tfe/contract compatible."""
-    if dt is None:
-        return None
-    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 class CreateTokenRequest(BaseModel):

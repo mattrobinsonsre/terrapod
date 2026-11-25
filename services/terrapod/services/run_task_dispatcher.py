@@ -9,8 +9,8 @@ import hashlib
 import hmac
 import json
 import uuid
-from datetime import UTC
 
+from terrapod.api import serialization
 from terrapod.api.prefixes import TFE_PREFIX
 from terrapod.db.models import (
     ConfigurationVersion,
@@ -33,10 +33,11 @@ logger = get_logger(__name__)
 SPEC_SIGNATURE_HEADER = "X-TFC-Task-Signature"
 
 
-def _rfc3339(dt) -> str:  # type: ignore[no-untyped-def]
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def build_task_callback_payload(

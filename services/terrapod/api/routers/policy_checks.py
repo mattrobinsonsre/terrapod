@@ -18,12 +18,11 @@ because that is what makes the CLI act on them. These endpoints are served
 either way.
 """
 
-from datetime import UTC
-
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
@@ -43,9 +42,10 @@ logger = get_logger(__name__)
 
 
 def _rfc3339(dt) -> str | None:
-    if dt is None:
-        return None
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339(dt)
 
 
 def _check_json(check: PolicyCheck, *, can_override: bool) -> dict:

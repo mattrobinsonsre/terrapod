@@ -38,6 +38,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
@@ -84,10 +85,11 @@ async def require_catalog_enabled() -> None:
         raise HTTPException(status_code=404, detail="Service catalog is not enabled")
 
 
-def _rfc3339(dt) -> str:  # noqa: ANN001
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _now() -> datetime:

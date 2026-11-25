@@ -18,7 +18,7 @@ Endpoints:
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
@@ -28,6 +28,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
@@ -107,9 +108,10 @@ logger = get_logger(__name__)
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _visible_value(var) -> str | None:

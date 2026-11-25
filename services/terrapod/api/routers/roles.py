@@ -15,13 +15,12 @@ Endpoints:
     GET    /api/terrapod/v1/roles/{name}/preview — reach of a saved role
 """
 
-from datetime import UTC
-
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
@@ -61,9 +60,10 @@ logger = get_logger(__name__)
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 # axis JSON:API key → (short axis name, valid level values), derived from the
