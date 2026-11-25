@@ -1781,7 +1781,6 @@
       "load": "Не удалось загрузить журнал аудита"
     },
     "filters": {
-      "actorEmail": "Эл. почта субъекта",
       "actorPlaceholder": "user@example.com",
       "resourceType": "Тип ресурса",
       "resourceTypePlaceholder": "workspaces",
@@ -1790,7 +1789,12 @@
       "since": "С",
       "until": "По",
       "clear": "Очистить",
-      "apply": "Применить фильтры"
+      "apply": "Применить фильтры",
+      "actor": "Субъект",
+      "actorKind": "Тип субъекта",
+      "actorKindEmail": "Эл. почта",
+      "actorKindLogin": "Логин VCS",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "Время",
@@ -1805,6 +1809,11 @@
       "summary": "Страница {current} из {total} ({count, plural, one {# запись} few {# записи} many {# записей} other {# записей}})",
       "previous": "Назад",
       "next": "Вперёд"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "Система",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {

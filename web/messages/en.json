@@ -1781,8 +1781,12 @@
       "load": "Failed to load audit log"
     },
     "filters": {
-      "actorEmail": "Actor Email",
+      "actor": "Actor",
       "actorPlaceholder": "user@example.com",
+      "actorKind": "Actor Kind",
+      "actorKindEmail": "Email",
+      "actorKindLogin": "VCS Login",
+      "actorLoginPlaceholder": "octocat",
       "resourceType": "Resource Type",
       "resourceTypePlaceholder": "workspaces",
       "method": "Method",
@@ -1800,6 +1804,11 @@
       "resourceId": "Resource ID",
       "status": "Status",
       "duration": "Duration"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "System",
+      "slackUser": "Slack"
     },
     "pagination": {
       "summary": "Page {current} of {total} ({count, plural, one {# entry} other {# entries}})",

@@ -1781,7 +1781,6 @@
       "load": "Diarium recognitionis onerari non potuit"
     },
     "filters": {
-      "actorEmail": "Inscriptio Actoris",
       "actorPlaceholder": "usor@exemplum.com",
       "resourceType": "Genus Facultatis",
       "resourceTypePlaceholder": "loca operis",
@@ -1790,7 +1789,12 @@
       "since": "Ex",
       "until": "Usque ad",
       "clear": "Vacuare",
-      "apply": "Cribra Applicare"
+      "apply": "Cribra Applicare",
+      "actor": "Actor",
+      "actorKind": "Genus Actoris",
+      "actorKindEmail": "Inscriptio Electronica",
+      "actorKindLogin": "Nomen VCS",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "Momentum Temporis",
@@ -1805,6 +1809,11 @@
       "summary": "Pagina {current} ex {total} ({count, plural, one {# inscriptio} other {# inscriptiones}})",
       "previous": "Prior",
       "next": "Sequens"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "Systema",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {

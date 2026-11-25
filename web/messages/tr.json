@@ -1781,7 +1781,6 @@
       "load": "Denetim günlüğü yüklenemedi"
     },
     "filters": {
-      "actorEmail": "Aktör E-postası",
       "actorPlaceholder": "user@example.com",
       "resourceType": "Kaynak Türü",
       "resourceTypePlaceholder": "workspaces",
@@ -1790,7 +1789,12 @@
       "since": "Başlangıç",
       "until": "Bitiş",
       "clear": "Temizle",
-      "apply": "Filtreleri Uygula"
+      "apply": "Filtreleri Uygula",
+      "actor": "Aktör",
+      "actorKind": "Aktör Türü",
+      "actorKindEmail": "E-posta",
+      "actorKindLogin": "VCS Kullanıcı Adı",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "Zaman Damgası",
@@ -1805,6 +1809,11 @@
       "summary": "Sayfa {current} / {total} ({count, plural, one {# girdi} other {# girdi}})",
       "previous": "Önceki",
       "next": "Sonraki"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "Sistem",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {
