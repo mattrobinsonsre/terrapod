@@ -22,6 +22,17 @@ _PLANNED_STATUSES = frozenset({"planned", "confirmed", "applying", "applied"})
 _STOPPED_STATUSES = frozenset({"errored", "discarded", "canceled", "canceling"})
 _NO_AFFECTED = "No Terrapod workspaces affected"
 _EVALUATING = "Evaluating affected workspaces"
+#: Rows exist and none of them blocks, yet the poll pass has recorded no
+#: evaluation for this head -- so there is nothing to prove the set complete and
+#: the verdict cannot go green. Worded separately from `_EVALUATING` because the
+#: two are reached from opposite situations and only one of them is progress:
+#: with no rows at all, "evaluating" is true and transient; with every run
+#: finished, it reads as progress while being capable of lasting for ever. It
+#: states the fact rather than diagnosing it, because the same branch covers the
+#: ordinary window between a run appearing and the next poll pass storing its
+#: decisions. Distinguishing them is what would have shown #2708 on the pull
+#: request instead of only in the logs.
+_NO_EVALUATION = "no affected-workspace evaluation recorded for this head"
 # Worst first: the order a verdict's state and its blocker list are ranked in.
 _SEVERITY: dict[str, int] = {"failure": 0, "pending": 1, "running": 2}
 
@@ -241,7 +252,7 @@ def _verdict(
     if not total:
         head = empty if state == "success" else _EVALUATING
     elif not blockers and not proven:
-        head = _EVALUATING
+        head = f"{noun} {total} of {total} workspaces; {_NO_EVALUATION}"
     else:
         head = f"{noun} {total - len(blockers)} of {total} workspaces"
     return Verdict(state, _describe(head, blockers), _url(blockers, rows))
