@@ -577,28 +577,155 @@ async def test_state_async_helpers_passthrough_when_disabled(monkeypatch):
     assert await state_mod.decrypt_state_bytes(b"plain") == b"plain"
 
 
-def test_every_state_io_router_routes_through_crypto_helpers():
-    """Death-by-encryption tripwire: every router that reads or writes state
-    objects MUST go through the state-crypto helpers, or a state file could be
-    written encrypted and never decrypted on read (or vice-versa). If a future
-    change adds a raw state put/get that bypasses the helpers, this fails loudly.
+def test_every_state_io_call_site_routes_through_crypto_helpers():
+    """Death-by-encryption tripwire: every call that reads or writes the CONTENT
+    of a state object must apply the state-crypto helper TO THAT CALL'S OWN
+    BYTES, or state is stored in plaintext or handed to the parser as ciphertext.
 
-    We assert each state-I/O router references the encrypt+decrypt helpers; the
-    behavioural round-trip is proven by the service/helper tests above.
+    Three things here are deliberate, because the first version had none of them
+    and was blind in every one of these directions (#2715).
+
+    The SUBJECT IS DERIVED. The first version listed three router filenames;
+    twelve modules reference a state key, and `api/routers/pulumi_service.py` --
+    which reads state content -- was not among the three, so deleting its
+    `decrypt_state_bytes` kept the gate green. A new module is in scope the day
+    it lands.
+
+    It is PER CALL SITE AND STRUCTURAL, not a mention. Asking whether the
+    helper's name appears in the module passes when one of four encrypt sites
+    loses it; asking whether it appears in the FUNCTION passes when one of two
+    does, which is the same defect one scope down and is what the second attempt
+    at this gate did. So for a put, the value argument must BE the helper's
+    result; for a get, the result must reach the helper.
+
+    A STREAMED PUT UNDER `state_encryption_active() == False` is plaintext on
+    purpose -- a stream cannot be wrapped in a bytes helper, and when encryption
+    is off there is nothing to apply. That arm is recognised by its position in
+    the `if` rather than by the file's name, so the two legitimate sites need no
+    exemption entry and a third would be covered automatically.
     """
+    import ast
     import pathlib
 
     import terrapod
 
-    root = pathlib.Path(terrapod.__path__[0]) / "api" / "routers"
-    # (file, must encrypt on write, must decrypt on read)
-    expectations = {
-        "tfe_v2.py": ("encrypt_state_bytes", "decrypt_state_bytes"),
-        "run_artifacts.py": ("encrypt_state_bytes", "decrypt_state_bytes"),
-        "state_management.py": ("encrypt_state_bytes", "decrypt_state_bytes"),
-    }
-    for fname, needles in expectations.items():
-        src = (root / fname).read_text()
-        assert "state_key(" in src, f"{fname} no longer does state I/O — update this test"
-        for needle in needles:
-            assert needle in src, f"{fname} state I/O must route through {needle} (#635)"
+    root = pathlib.Path(terrapod.__path__[0])
+    builders = {"state_key", "pulumi_checkpoint_key"}
+    ENC, DEC = "encrypt_state_bytes", "decrypt_state_bytes"
+    WRITES, READS = ("put", "put_stream"), ("get", "get_stream")
+
+    def bare(node):
+        """The expression under an `await`, if there is one."""
+        return node.value if isinstance(node, ast.Await) else node
+
+    def is_key(node):
+        node = bare(node)
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, (ast.Name, ast.Attribute))
+            and (getattr(node.func, "id", None) or getattr(node.func, "attr", None)) in builders
+        )
+
+    def is_helper(node, helper):
+        node = bare(node)
+        return isinstance(node, ast.Call) and getattr(node.func, "id", None) == helper
+
+    problems, sites, modules, plaintext_arms = [], 0, set(), 0
+    for path in sorted(root.rglob("*.py")):
+        src = path.read_text()
+        if path.name == "keys.py" or not any(f"{b}(" in src for b in builders):
+            continue
+        modules.add(str(path.relative_to(root)))
+        tree = ast.parse(src)
+
+        # Calls sitting in the `else` of an `if state_encryption_active()`, i.e.
+        # the arm that runs only when there is nothing to encrypt.
+        unencrypted_ok = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.If):
+                continue
+            test = ast.dump(node.test)
+            if "state_encryption_active" not in test:
+                continue
+            arm = node.orelse if "UnaryOp" not in test else node.body
+            for stmt in arm:
+                for c in ast.walk(stmt):
+                    if isinstance(c, ast.Call):
+                        unencrypted_ok.add(id(c))
+
+        for fn in ast.walk(tree):
+            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            key_names = {
+                t.id
+                for n in ast.walk(fn)
+                if isinstance(n, ast.Assign)
+                for t in n.targets
+                if isinstance(t, ast.Name) and is_key(n.value)
+            }
+            enc_names = {
+                t.id
+                for n in ast.walk(fn)
+                if isinstance(n, ast.Assign)
+                for t in n.targets
+                if isinstance(t, ast.Name) and is_helper(n.value, ENC)
+            }
+            decrypted = {
+                a.id
+                for c in ast.walk(fn)
+                if is_helper(c, DEC)
+                for a in bare(c).args
+                if isinstance(a, ast.Name)
+            }
+            assigned_to = {
+                id(bare(n.value)): n.targets[0].id
+                for n in ast.walk(fn)
+                if isinstance(n, ast.Assign)
+                and len(n.targets) == 1
+                and isinstance(n.targets[0], ast.Name)
+            }
+            wrapped_by_dec = {
+                id(bare(a)) for c in ast.walk(fn) if is_helper(c, DEC) for a in bare(c).args
+            }
+
+            for call in ast.walk(fn):
+                if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)):
+                    continue
+                verb = call.func.attr
+                if verb not in WRITES + READS or not call.args:
+                    continue
+                first = call.args[0]
+                if not (is_key(first) or (isinstance(first, ast.Name) and first.id in key_names)):
+                    continue
+                sites += 1
+                where = f"{path.relative_to(root)}:{call.lineno} {fn.name}().{verb}"
+
+                if verb in WRITES:
+                    if id(call) in unencrypted_ok:
+                        plaintext_arms += 1
+                        continue
+                    value = call.args[1] if len(call.args) > 1 else None
+                    ok = value is not None and (
+                        is_helper(value, ENC)
+                        or (isinstance(value, ast.Name) and value.id in enc_names)
+                    )
+                    if not ok:
+                        problems.append(f"{where} — value is not {ENC}(...)")
+                else:
+                    target = assigned_to.get(id(call))
+                    ok = (target in decrypted) or (id(call) in wrapped_by_dec)
+                    if not ok:
+                        problems.append(f"{where} — result never reaches {DEC}(...)")
+
+    assert not problems, (
+        "state content reaching storage without its crypto helper (#635, #2715):\n  "
+        + "\n  ".join(problems)
+    )
+    # The other direction. These are equalities against what the tree holds, not
+    # floors, so the set GROWING is visible too -- which is the half a `>=`
+    # cannot see and the reason this gate was rewritten at all.
+    assert sites == 22, f"expected 22 state content I/O sites, found {sites}"
+    assert len(modules) == 12, f"expected 12 modules touching a state key, found {len(modules)}"
+    assert plaintext_arms == 2, (
+        f"expected 2 streamed puts on the encryption-off arm, found {plaintext_arms}"
+    )

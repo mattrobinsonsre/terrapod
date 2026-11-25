@@ -167,47 +167,6 @@ _STUCK_POD_REASONS = {
 }
 
 
-async def watch_job(
-    job_name: str,
-    namespace: str = "",
-    timeout_seconds: int = 3600,
-    poll_interval: int = 5,
-) -> str:
-    """Poll a Job until completion, failure, deletion, or stuck pod.
-
-    Returns: "succeeded", "failed", "deleted", "timeout", or "pod_error:{reason}".
-    """
-    if not namespace:
-        namespace = _default_namespace()
-
-    deadline = asyncio.get_event_loop().time() + timeout_seconds
-
-    prev_status = None
-    while asyncio.get_event_loop().time() < deadline:
-        status = await get_job_status(job_name, namespace)
-
-        if status != prev_status:
-            logger.info("Job status", job=job_name, status=status)
-            prev_status = status
-
-        if status is None:
-            logger.info("Job deleted externally", job=job_name)
-            return "deleted"
-        if status == "succeeded":
-            return "succeeded"
-        if status == "failed":
-            return "failed"
-
-        stuck_reason = await _check_pod_stuck(job_name, namespace)
-        if stuck_reason:
-            logger.warning("Pod stuck", job=job_name, reason=stuck_reason)
-            return f"pod_error:{stuck_reason}"
-
-        await asyncio.sleep(poll_interval)
-
-    return "timeout"
-
-
 async def _check_pod_stuck(job_name: str, namespace: str) -> str | None:
     """Check if a Job's pod is stuck in an unrecoverable waiting state."""
     core_api = _get_core_api()

@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.capability_access import resolve_capability_or_authenticate
 from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, get_current_user
 from terrapod.api.engine_scope import load_workspace_scoped
@@ -68,9 +69,10 @@ _MAX_PAGE_SIZE = 100
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _cv_json(

@@ -41,13 +41,17 @@ def is_encrypted(value: str) -> bool:
     return value.startswith(MARKER + ":")
 
 
-def encrypt(plaintext: str, dek: bytes, dek_version: int, *, nonce: bytes | None = None) -> str:
+def encrypt(plaintext: str, dek: bytes, dek_version: int) -> str:
     """Encrypt ``plaintext`` with ``dek`` (AES-256-GCM) into an envelope string."""
     if len(dek) != DEK_LEN:
         raise ValueError(f"DEK must be {DEK_LEN} bytes, got {len(dek)}")
     import os
 
-    n = nonce if nonce is not None else os.urandom(_NONCE_LEN)
+    # Always fresh. Both primitives used to take an injectable `nonce`;
+    # nothing in the tree or the tests ever passed one, and a caller-supplied
+    # nonce reused under a single DEK is AES-GCM's catastrophic failure mode.
+    # So the seam carried that risk and bought nothing (#2715).
+    n = os.urandom(_NONCE_LEN)
     ct = AESGCM(dek).encrypt(n, plaintext.encode("utf-8"), None)
     return f"{MARKER}:{FORMAT_VERSION}:{dek_version}:{_b64e(n)}:{_b64e(ct)}"
 
@@ -103,15 +107,17 @@ def is_encrypted_blob(blob: bytes) -> bool:
     return blob[: len(_BLOB_MAGIC)] == _BLOB_MAGIC
 
 
-def encrypt_blob(
-    plaintext: bytes, dek: bytes, dek_version: int, *, nonce: bytes | None = None
-) -> bytes:
+def encrypt_blob(plaintext: bytes, dek: bytes, dek_version: int) -> bytes:
     """Encrypt ``plaintext`` bytes with ``dek`` (AES-256-GCM) into a binary envelope."""
     if len(dek) != DEK_LEN:
         raise ValueError(f"DEK must be {DEK_LEN} bytes, got {len(dek)}")
     import os
 
-    n = nonce if nonce is not None else os.urandom(_NONCE_LEN)
+    # Always fresh. Both primitives used to take an injectable `nonce`;
+    # nothing in the tree or the tests ever passed one, and a caller-supplied
+    # nonce reused under a single DEK is AES-GCM's catastrophic failure mode.
+    # So the seam carried that risk and bought nothing (#2715).
+    n = os.urandom(_NONCE_LEN)
     ct = AESGCM(dek).encrypt(n, plaintext, None)
     return _BLOB_MAGIC + dek_version.to_bytes(_BLOB_VER_LEN, "big") + n + ct
 

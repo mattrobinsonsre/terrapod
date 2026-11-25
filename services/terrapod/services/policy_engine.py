@@ -32,6 +32,7 @@ The package-name and deny-rule requirements are enforced separately in
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 import tempfile
 
@@ -56,6 +57,37 @@ CHECK_TIMEOUT_SECONDS = 15.0
 #: policy, while the thing that was skipped — a syntax check — still happens at
 #: evaluation time on the runner, which fails closed.
 VALIDATION_UNAVAILABLE = "OPA binary not available on the API server"
+
+
+#: What makes a `.rego` file a Terrapod policy. ONE producer, because this was
+#: written twice -- in `api/routers/policy_sets.py` and in `policy_vcs_poller`
+#: -- and the two had already diverged (#2715): the poller counted a `warn`
+#: rule and the API did not, so a warn-only advisory policy synced cleanly from
+#: VCS and was a 422 through the API or the UI. The poller's reading is the
+#: correct one and its comment says why: a set may be advisory-only, and a file
+#: that produces warnings is a policy by any reading.
+#:
+#: `\b` alone would match at the `.` in `terrapod.foo`, so the package anchor
+#: ends with `\s*$` or a comment instead. v1 syntax allows
+#: `deny contains msg if { ... }`, `deny := [...]` and `deny = ...`, so the
+#: rule-head patterns match at the start of a line.
+POLICY_PACKAGE_RE = re.compile(r"(?m)^\s*package\s+terrapod\s*(#.*)?$")
+DENY_RULE_RE = re.compile(r"(?m)^\s*deny\s+(contains|:=|=)")
+WARN_RULE_RE = re.compile(r"(?m)^\s*warn\s+(contains|:=|=)")
+
+
+def declares_a_verdict(rego: str) -> bool:
+    """Does this Rego produce a verdict -- a `deny` OR a `warn` rule?
+
+    A policy in `package terrapod` that declares neither would silently always
+    pass, which is what both callers are screening for.
+    """
+    return bool(DENY_RULE_RE.search(rego) or WARN_RULE_RE.search(rego))
+
+
+def is_terrapod_policy(rego: str) -> bool:
+    """The whole rule: the right package AND a verdict rule."""
+    return bool(POLICY_PACKAGE_RE.search(rego)) and declares_a_verdict(rego)
 
 
 def _write_rego_to_tempdir(rego: str) -> str:

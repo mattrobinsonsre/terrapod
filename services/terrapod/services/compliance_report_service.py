@@ -7,21 +7,21 @@ post-plan decision verdicts, and cost estimation into audit-ready compliance rep
 import csv
 import io
 import uuid
-from datetime import UTC
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.db.models import PolicyEvaluation, Run, SecurityScanResult
 from terrapod.services import policy_check_service
 
 
-def _rfc3339(dt: Any) -> str:
-    """Format datetime as RFC3339 UTC string with trailing Z."""
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _build_run_compliance_report_from_data(

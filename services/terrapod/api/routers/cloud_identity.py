@@ -31,6 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     get_current_user,
@@ -140,9 +141,10 @@ def _subject(ws: Workspace, phase: str | None) -> str:
 
 
 def _rfc3339(dt) -> str | None:
-    if dt is None:
-        return None
-    return dt.isoformat().replace("+00:00", "Z")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339(dt)
 
 
 class CloudIdentityMintRequest(BaseModel):

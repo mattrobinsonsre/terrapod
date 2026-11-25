@@ -12,13 +12,12 @@ Endpoints:
     DELETE /api/terrapod/v1/role-assignments/{provider}/{email}/{role} — remove single assignment
 """
 
-from datetime import UTC
-
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
 from terrapod.api.pagination import paginate
 from terrapod.auth.builtin_roles import is_builtin_role, is_platform_role
@@ -33,9 +32,10 @@ logger = get_logger(__name__)
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _assignment_json(

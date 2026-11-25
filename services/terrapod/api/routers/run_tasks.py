@@ -17,14 +17,13 @@ Endpoints:
     PATCH  /api/terrapod/v1/task-stage-results/{id}/callback      (external callback)
 """
 
-from datetime import UTC
-
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.ids import parse_id
@@ -58,10 +57,11 @@ extensions_router = APIRouter(tags=["run-tasks-management"])
 logger = get_logger(__name__)
 
 
-def _rfc3339(dt) -> str:  # type: ignore[no-untyped-def]
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _run_task_json(rt: RunTask) -> dict:

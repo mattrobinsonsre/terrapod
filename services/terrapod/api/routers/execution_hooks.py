@@ -10,7 +10,6 @@ Consumed by ``web/src/app/admin/execution-hooks/*`` and go-terrapod (PR2).
 """
 
 import uuid
-from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
@@ -20,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.api.pagination import paginate
 from terrapod.db.models import ExecutionHook, ExecutionHookWorkspace, Workspace
@@ -54,9 +54,10 @@ def _coerce_priority(raw) -> int:
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _hook_json(h: ExecutionHook) -> dict:

@@ -53,7 +53,6 @@ caller's duplicate (409, which is what makes a Terraform import the next step),
 from __future__ import annotations
 
 import uuid
-from datetime import UTC
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
@@ -62,6 +61,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.ids import parse_id_for, strip_id_prefix
 from terrapod.api.pagination import paginate
@@ -119,9 +119,10 @@ _MASKED = "***"
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 # ── Serializers ──────────────────────────────────────────────────────────────

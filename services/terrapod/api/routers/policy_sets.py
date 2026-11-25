@@ -30,9 +30,7 @@ Endpoints (all under /api/terrapod/v1):
         POST   /runs/{run_id}/policy-results        record evaluation outcomes
 """
 
-import re
 import uuid
-from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
@@ -41,6 +39,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     get_current_user,
@@ -75,22 +74,17 @@ VALID_ENFORCEMENT = {"advisory", "mandatory"}
 # `data.terrapod.deny`. A policy in another package, including a sub-
 # package like `terrapod.aws.s3`, would silently always pass, so we
 # require the package to be *exactly* `terrapod` (trailing whitespace
-# or a comment is fine). `\b` alone matches at the `.` in `terrapod.foo`
-# so we anchor with `\s*$` / a `#` instead.
-_PACKAGE_RE = re.compile(r"(?m)^\s*package\s+terrapod\s*(#.*)?$")
-
-# A Terrapod policy must also actually define a `deny` rule — a policy
-# in `package terrapod` that doesn't define `deny` would silently
-# always pass. v1 syntax allows `deny contains msg if { ... }`,
-# `deny := [...]`, or `deny = ...`. The regex matches the rule head at
-# the start of a line.
-_DENY_RULE_RE = re.compile(r"(?m)^\s*deny\s+(contains|:=|=)")
+# or a comment is fine). The patterns and the verdict rule live in
+# `policy_engine`, which is the one producer -- this file used to carry its own
+# copies and they had diverged from the poller's, refusing a warn-only advisory
+# policy the poller accepts (#2715).
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _policy_json(p: Policy) -> dict:
@@ -475,7 +469,7 @@ async def _validate_rego(rego: str) -> None:
     """
     if not rego or not rego.strip():
         raise HTTPException(status_code=422, detail="rego source is required")
-    if not _PACKAGE_RE.search(rego):
+    if not policy_engine.POLICY_PACKAGE_RE.search(rego):
         raise HTTPException(
             status_code=422,
             detail=(
@@ -483,13 +477,14 @@ async def _validate_rego(rego: str) -> None:
                 "(sub-packages like 'package terrapod.foo' are not evaluated by Terrapod)"
             ),
         )
-    if not _DENY_RULE_RE.search(rego):
+    if not policy_engine.declares_a_verdict(rego):
         raise HTTPException(
             status_code=422,
             detail=(
-                "policy Rego must define a 'deny' rule "
-                "(e.g. `deny contains msg if { ... }`); "
-                "a policy with no deny rule would silently always pass"
+                "policy Rego must define a 'deny' or 'warn' rule "
+                "(e.g. `deny contains msg if { ... }`, or `warn` for an "
+                "advisory-only set); a policy with neither would silently "
+                "always pass"
             ),
         )
     err = await policy_engine.check_rego(rego)

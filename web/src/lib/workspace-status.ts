@@ -177,3 +177,50 @@ export function resolveStatus(ws: ResolveInput): ResolvedStatus {
     phaseStarts: run['phase-started-at'] ?? null,
   }
 }
+
+/** The Tailwind classes for a RUN status chip.
+ *
+ *  One producer. This switch existed twice -- on the run-detail page and on the
+ *  workspace page's runs list -- and the copies had already diverged (#2715):
+ *  `confirmed` and `queued` were handled on the run-detail page and absent from
+ *  the workspace page, where they fell through to the same grey as `canceled`
+ *  and `discarded`. So a run awaiting apply, or sitting in the queue, read as
+ *  FINISHED on the workspace's list and as in-flight one click later on its own
+ *  page. The run-detail copy already carried that lesson in a comment, about
+ *  `configuring`, from the previous time this drifted.
+ *
+ *  Deliberately NOT derived from `WorkspaceStatusDef.color`: that is the
+ *  workspace-LIST pill palette, which answers "what is this workspace doing"
+ *  and maps `planned` to green and `applying` to blue, where the chip maps them
+ *  to indigo and yellow. The two are different questions with different
+ *  palettes, so folding them would be a silent visual change rather than a
+ *  consolidation.
+ */
+export function runStatusChipClass(status: string): string {
+  switch (status) {
+    case 'applied':
+      return 'bg-green-900/50 text-green-300'
+    case 'planned':
+    case 'confirmed':
+      return 'bg-indigo-900/50 text-indigo-300'
+    // An ACTIVE phase is yellow. `configuring` was missed when the
+    // live-configure work landed and `queued`/`confirmed` were missed on the
+    // workspace page; in both cases the chip read as finished while the run was
+    // not. That is the whole reason this lives in one place now.
+    case 'planning':
+    case 'applying':
+    case 'configuring':
+    case 'canceling':
+    case 'queued':
+      return 'bg-yellow-900/50 text-yellow-300'
+    case 'errored':
+      return 'bg-red-900/50 text-red-300'
+    case 'canceled':
+    case 'discarded':
+      return 'bg-slate-700 text-slate-400'
+    case 'pending':
+      return 'bg-slate-700 text-slate-300'
+    default:
+      return 'bg-slate-700 text-slate-400'
+  }
+}

@@ -15,13 +15,12 @@ Endpoints:
     GET    /api/terrapod/v1/roles/{name}/preview — reach of a saved role
 """
 
-from datetime import UTC
-
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
@@ -52,27 +51,31 @@ from terrapod.services.role_change_propagation import (
 router = APIRouter(tags=["roles"])
 logger = get_logger(__name__)
 
-VALID_PERMISSIONS = {"read", "plan", "write", "admin"}
-VALID_POOL_PERMISSIONS = {"read", "write", "admin"}
-VALID_REGISTRY_PERMISSIONS = {"read", "write", "admin"}
-# Catalog access is an opt-in extension: "none" (default) grants nothing, so it
-# is a valid value here (unlike the other axes, which floor at "read").
-VALID_CATALOG_PERMISSIONS = {"none", "read", "use", "admin"}
+# The level vocabulary per axis is `capabilities.AXIS_LEVEL_MAPS` and nothing
+# else: these were four hand-kept sets that each restated one axis's own keys,
+# so a new tier added there was refused by this router with a 422 until someone
+# remembered to add it here too (#2715). Catalog carrying "none" -- an opt-in
+# axis where the default grants nothing, unlike the others, which floor at
+# "read" -- falls out of its own map rather than needing to be said twice.
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
-# axis JSON:API key → (short axis name, valid level values)
+# axis JSON:API key → (short axis name, valid level values), derived from the
+# capability tables so a new axis or a new tier arrives here for free.
 _LEVEL_INPUT: dict[str, tuple[str, set[str]]] = {
-    "workspace-permission": ("workspace", VALID_PERMISSIONS),
-    "pool-permission": ("pool", VALID_POOL_PERMISSIONS),
-    "registry-permission": ("registry", VALID_REGISTRY_PERMISSIONS),
-    "catalog-permission": ("catalog", VALID_CATALOG_PERMISSIONS),
+    f"{axis}-permission": (axis, set(levels)) for axis, levels in AXIS_LEVEL_MAPS.items()
 }
+
+
+def _levels(axis: str) -> set[str]:
+    """The level vocabulary for one axis, from the capability tables."""
+    return set(AXIS_LEVEL_MAPS[axis])
 
 
 def _validate_capabilities(caps_in) -> list[str]:
@@ -165,12 +168,10 @@ def _caps_from_level_input(attrs: dict) -> list[str]:
     """Expand a create request's level shorthand into a capability set. Absent
     axes use their default (read/read/read/none)."""
     return expand_preset(
-        workspace_permission=_level(attrs, "workspace-permission", "read", VALID_PERMISSIONS),
-        pool_permission=_level(attrs, "pool-permission", "read", VALID_POOL_PERMISSIONS),
-        registry_permission=_level(
-            attrs, "registry-permission", "read", VALID_REGISTRY_PERMISSIONS
-        ),
-        catalog_permission=_level(attrs, "catalog-permission", "none", VALID_CATALOG_PERMISSIONS),
+        workspace_permission=_level(attrs, "workspace-permission", "read", _levels("workspace")),
+        pool_permission=_level(attrs, "pool-permission", "read", _levels("pool")),
+        registry_permission=_level(attrs, "registry-permission", "read", _levels("registry")),
+        catalog_permission=_level(attrs, "catalog-permission", "none", _levels("catalog")),
     )
 
 

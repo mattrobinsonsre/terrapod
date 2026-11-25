@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import asdict
-from datetime import UTC
 from typing import Any
 
 import structlog
@@ -34,6 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import paginate
@@ -76,10 +76,11 @@ _VALID_BACKENDS = frozenset({"tofu", "terraform"})
 _NAME_CONFLICT = "An autodiscovery rule with that name already exists for this connection"
 
 
-def _rfc3339(dt) -> str:  # noqa: ANN001
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _rule_json(rule: AutodiscoveryRule) -> dict:

@@ -1,10 +1,19 @@
 """The rendered ConfigMap and the `Settings` model must agree.
 
-Three gates already exist and none of them covers this. `test_values_contract`
-snapshots the keys in **values.yaml**; `test_config_contract` snapshots the keys
-`Settings` accepts; `helm-smoke` greps the rendered output for a handful of
-specific strings. So the chart can stop rendering a key, or render one the API has
-never heard of, and every gate stays green.
+`scripts/check_helm_config_contract.py` is the gate for this, and it has been
+since #617: it renders every values profile and walks the result against the REAL
+`Settings` / `RunnerConfig` models with full pydantic validation, driven by
+`scripts/helm-config-contract.sh` in the `host-checks` job.
+
+This docstring used to open "Three gates already exist and none of them covers
+this", listing `test_values_contract` (which snapshots the keys in
+**values.yaml**), `test_config_contract` (which snapshots the keys `Settings`
+accepts) and `helm-smoke`'s greps. That enumeration omitted the gate that did
+cover it, and the cost was not cosmetic: a second CI checker was written against
+this framing, verbatim, and ran alongside the real one for weeks -- reading a
+committed snapshot of the model rather than the model, so the two could disagree
+whenever the snapshot was not regenerated (#2715). An enumeration of "what
+already exists" is a claim like any other.
 
 Both halves have now happened, in the same release:
 
@@ -63,10 +72,12 @@ def _require_helm() -> str:
     which is exactly how a gate becomes decorative, and the regression this file was
     written for would have sailed through.
 
-    The real gate is therefore the `helm-smoke` job, which has a helm binary and
-    runs both directions of this check (`scripts/ci/check_rendered_config_keys.py`
-    plus an explicit-`false` loop). This file is the local-dev convenience: a
-    developer who has helm gets the same check for free before pushing.
+    The real gate is therefore `scripts/check_helm_config_contract.py`, run by
+    `scripts/helm-config-contract.sh` in `host-checks` -- it renders in Docker, so
+    it has helm, and it checks against the real models rather than a snapshot. The
+    `helm-smoke` job additionally runs the explicit-`false` loop. This file is the
+    local-dev convenience: a developer who has helm gets the same check for free
+    before pushing.
 
     `TERRAPOD_REQUIRE_HELM=1` turns the skip into a failure, so an image that later
     gains helm starts enforcing instead of quietly continuing to skip.
@@ -79,8 +90,9 @@ def _require_helm() -> str:
                 "for this is the `helm-smoke` job; see this function's docstring."
             )
         pytest.skip(
-            "helm is not on PATH — the CI gate for this is the `helm-smoke` job, "
-            "which runs scripts/ci/check_rendered_config_keys.py"
+            "helm is not on PATH — the CI gate for this is "
+            "scripts/check_helm_config_contract.py, run by "
+            "scripts/helm-config-contract.sh in the host-checks job"
         )
     return helm
 

@@ -14,6 +14,7 @@ from email.message import EmailMessage
 
 import httpx
 
+from terrapod.api import serialization
 from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
@@ -52,10 +53,11 @@ STATUS_TO_TRIGGER: dict[str, str] = {
 }
 
 
-def _rfc3339(dt) -> str:  # type: ignore[no-untyped-def]
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _rfc3339(dt) -> str:
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def build_run_payload(

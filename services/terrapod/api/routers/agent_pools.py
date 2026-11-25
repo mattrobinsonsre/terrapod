@@ -30,6 +30,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     DEFAULT_ORG,
     AuthenticatedUser,
@@ -62,9 +63,10 @@ logger = get_logger(__name__)
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 # Sanity-check email shape. Each domain segment is bounded by literal dots

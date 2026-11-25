@@ -236,7 +236,17 @@ def test_builtin_capability_sets():
     assert cap.PLATFORM_HOOK_ADMIN in admin
     # audit = read-only everywhere + the (read-only) audit-log power; no
     # write/manage caps and no platform capability other than audit-admin.
-    assert {cap.WORKSPACE_READ, cap.POOL_READ, cap.REGISTRY_READ, cap.CATALOG_READ} <= audit
+    # Derived, not enumerated. This named four capabilities by hand, so a
+    # fifth read capability was invisible to it -- which is exactly how
+    # `inventory:read` came to be missing from `audit` for as long as it has
+    # existed (#2715). The subject is now every axis's own read floor, so a new
+    # read capability is in scope the day it lands.
+    for axis in cap.AXIS_LEVEL_MAPS:
+        missing = sorted(c for c in cap.axis_read_caps(axis) if c not in audit)
+        assert not missing, (
+            f"the built-in `audit` role is read-only everywhere, so it must carry the "
+            f"whole {axis} read floor; it is missing {missing}"
+        )
     assert cap.PLATFORM_AUDIT_ADMIN in audit
     assert not (audit & {cap.STATE_WRITE, cap.VAR_WRITE, cap.RUN_APPLY, cap.WORKSPACE_DELETE})
     assert not (audit & (cap.PLATFORM_CAPABILITIES - {cap.PLATFORM_AUDIT_ADMIN}))

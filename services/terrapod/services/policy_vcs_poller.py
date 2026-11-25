@@ -12,7 +12,6 @@ import asyncio
 import io
 import os
 import posixpath
-import re
 import tarfile
 import tempfile
 import uuid
@@ -24,7 +23,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from terrapod.db.models import Policy, PolicySet, VCSConnection, now_utc
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, vcs_rate_limit
+from terrapod.services import github_service, gitlab_service, policy_engine, vcs_rate_limit
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_provider import (
     get_branch_sha as _provider_get_branch_sha,
@@ -41,11 +40,10 @@ logger = get_logger(__name__)
 # Max archive size (256 MB) — defence against pathological repos OOMing the worker.
 _MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 
-_PACKAGE_RE = re.compile(r"(?m)^\s*package\s+terrapod\s*(#.*)?$")
-_DENY_RULE_RE = re.compile(r"(?m)^\s*deny\s+(contains|:=|=)")
-# `warn` counts as well: a set may be advisory-only, and a file that produces
-# warnings is a policy by any reading — the old filter dropped it silently.
-_WARN_RULE_RE = re.compile(r"(?m)^\s*warn\s+(contains|:=|=)")
+# What makes a `.rego` file a Terrapod policy lives in `policy_engine`, which is
+# the one producer. These patterns were here AND in the API router, and the two
+# had diverged: `warn` counted here and not there, so a warn-only advisory set
+# synced from VCS and was refused through the API (#2715).
 
 _POLICY_FILE_SUFFIXES = (".rego", ".yaml", ".yml", ".json")
 # Per file. Data files are small by nature; the cap is here so one pathological
@@ -168,8 +166,7 @@ def _classify(files: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
     support: dict[str, str] = {}
     for name, content in files.items():
         if name.endswith(".rego"):
-            verdict = _DENY_RULE_RE.search(content) or _WARN_RULE_RE.search(content)
-            if _PACKAGE_RE.search(content) and verdict:
+            if policy_engine.is_terrapod_policy(content):
                 policies[os.path.splitext(name)[0]] = content
             else:
                 support[name] = content

@@ -29,6 +29,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
@@ -46,7 +47,10 @@ class PricesheetUnavailable(Exception):
 
 
 def _rfc3339(dt) -> str:
-    return dt.isoformat().replace("+00:00", "Z")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _empty_attrs(state_version: dict | None = None) -> dict[str, Any]:

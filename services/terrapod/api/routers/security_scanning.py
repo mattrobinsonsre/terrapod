@@ -19,12 +19,12 @@ Endpoints (all under /api/terrapod/v1):
 """
 
 import uuid
-from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api import serialization
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     get_current_user,
@@ -35,7 +35,7 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import run_service, security_scan_service
+from terrapod.services import run_service, security_scan_service, workspace_settings
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 router = APIRouter(tags=["security-scanning"])
@@ -43,9 +43,10 @@ logger = get_logger(__name__)
 
 
 def _rfc3339(dt) -> str:
-    if dt is None:
-        return ""
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # One producer for the FORMAT (#2715): `serialization.rfc3339_or_empty` is the
+    # canonical RFC3339-with-Z serializer. This module keeps its own
+    # absent-value convention, because that is its wire contract.
+    return serialization.rfc3339_or_empty(dt)
 
 
 def _scan_json(scan) -> dict:
@@ -212,7 +213,7 @@ async def post_security_scan_results(
     outcome = str(body.get("outcome") or "")
     if outcome not in security_scan_service.VALID_OUTCOME:
         raise HTTPException(status_code=422, detail=f"invalid outcome: {outcome!r}")
-    if engine and engine not in security_scan_service.VALID_ENGINE:
+    if engine and engine not in workspace_settings.SCAN_ENGINES:
         raise HTTPException(status_code=422, detail=f"invalid engine: {engine!r}")
     findings = body.get("findings")
     if not isinstance(findings, list):
