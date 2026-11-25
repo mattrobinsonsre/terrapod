@@ -373,7 +373,7 @@ require them whatever workspaces the change touches:
 |---|---|
 | `terrapod/plan` | **Yes** |
 | `terrapod/policy` | **Yes** |
-| `terrapod/apply` | **No, never** |
+| `terrapod/apply` | **Only with [`apply_is_required_check`](#requiring-terrapodapply)**, and GitHub only |
 
 The names, the state mapping per provider and the configuration keys are in
 [Aggregate statuses](vcs-integration.md#aggregate-statuses). Branch protection
@@ -381,17 +381,74 @@ needs no new permission: the statuses use the commit-status permission the
 integration already has, and Terrapod does not read the repository's
 protection rules. Everything described here is scoped to the repository.
 
-### Why not `apply`
+### Requiring `terrapod/apply`
 
-Requiring `terrapod/apply` deadlocks an `apply_then_merge` workspace. Before the
-apply, `terrapod/apply` is `pending`. As far as we know, GitHub reports the pull
-request's `mergeable_state` as `blocked` while a required status is pending, and
-Terrapod refuses `terrapod apply` while the mergeability check reports `blocked`
-(`dirty`, `blocked` and `behind` all refuse: `github_service.py`'s
-`_GITHUB_BLOCKING_STATES`, read by `run_service._check_mergeability_or_block`).
-So the apply is refused until the status is green, and the status cannot turn
-green until the apply has run. Nothing clears it. Require `plan` and `policy`
-instead: both can go green **before** the apply.
+Requiring it is **opt-in**, needs one setting, and is GitHub-only. Without that
+setting it deadlocks an `apply_then_merge` workspace, which is why it was
+"never" before Terrapod had the switch.
+
+**The deadlock.** Before the apply, `terrapod/apply` is `pending`, and GitHub
+documents a required check as one that ["must have a `successful`, `skipped`, or
+`neutral` status before collaborators can make
+changes"](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
+As far as we know that surfaces as the pull request's `mergeable_state` being
+`blocked`, and Terrapod refuses `terrapod apply` while the
+mergeability check reports `blocked` (`dirty`, `blocked` and `behind` all
+refuse: `github_service.py`'s `_GITHUB_BLOCKING_STATES`, read by
+`run_service._check_mergeability_or_block`). So the apply is refused until the
+status is green, and the status cannot turn green until the apply has run.
+Nothing clears it.
+
+**The switch.** Set
+`api.config.vcs.commit_statuses.apply_is_required_check: true` and the gate
+stops refusing on `blocked` alone:
+
+```yaml
+api:
+  config:
+    vcs:
+      commit_statuses:
+        apply_is_required_check: true
+```
+
+It is a **statement about your branch protection**, not a feature flag.
+Terrapod cannot read a branch's required checks — the endpoint that lists them
+needs a repository-administration permission the App does not have, and which
+every existing installation would have to re-approve — so you are telling it the
+one thing only you know. Set it when `terrapod/apply` really is required, and
+leave it alone otherwise: it is scoped to the deployment, so it applies to every
+`apply_then_merge` workspace at once.
+
+**What it does and does not relax.** Only GitHub's `blocked` is disregarded,
+and only because a pending required status of ours is enough to produce it on
+its own. Everything else refuses exactly as before — `dirty` (merge conflicts),
+`behind` (out of date), a draft pull request, a closed one, and the transient
+state GitHub returns while it is still computing mergeability. The disregard is
+logged, naming the state and the status.
+
+**Why that is sound rather than a hole.** The confirm-time check was never the
+enforcement. The enforcement is GitHub's own merge call, which Terrapod makes
+*after* the apply and which applies branch protection in full; the gate is an
+advance warning that saves applying when the merge will obviously fail. So the
+cost of setting this wrongly is bounded and already a handled outcome: if
+something else really was blocking — a missing review, a code-owner approval,
+another required check — Terrapod applies, GitHub refuses the merge, and the
+pull request is left open with the change applied. That can already happen
+whenever somebody pushes between the gate and the merge.
+
+**It is ignored while the aggregates are off.** With
+`commit_statuses.enabled: false` nothing posts `terrapod/apply`, so there is no
+status of ours for protection to wait on and no block of ours to disregard.
+Turning the aggregates off cannot leave a relaxed apply gate behind.
+
+**GitLab does nothing with it.** See [the GitLab
+paragraphs](#configuring-the-required-checks) below: there is no per-name
+required check to set, and GitLab's merge states already tolerate a pipeline
+that has not finished, so the gate does not refuse by this route there anyway.
+
+If you would rather not think about any of this, require `plan` and `policy`
+and leave `apply` out: both go green **before** the apply, and the switch stays
+`false`.
 
 ### What each status means
 
@@ -469,17 +526,51 @@ name exactly.
 
 **GitLab:** Terrapod posts the aggregates as commit statuses to the `/statuses`
 API (`name=terrapod/plan`, states `pending`, `running`, `success`, `failed`).
-GitLab's documentation describes its *external status checks* as a different
-mechanism, which this change does not use, and says a failing external status
-check does not by itself prevent merging. **Not tested by us:** how *Pipelines
-must succeed* treats a commit status posted this way, and whether any GitLab
-setting can require these particular names; we can describe none. Try it on a
-test project before relying on it.
-Terrapod's own apply gate accepts GitLab's `ci_must_pass` and
+
+> **Everything in this GitLab subsection is documentation-derived.** We have no
+> GitLab instance to test against, so it is read off GitLab's published
+> documentation rather than measured, and it is labelled that way deliberately:
+> a doc-derived claim written as a measured one reads as settled and stops the
+> next person checking. Try it on a test project before relying on it.
+
+**There is no per-name required check on GitLab, and that is the thing to plan
+around.** GitLab offers no equivalent of GitHub's "require these contexts": the
+merge check is [*Pipelines must
+succeed*](https://docs.gitlab.com/user/project/merge_requests/auto_merge/), and
+it is all-or-nothing on the merge request's pipeline. So neither the per-context
+advice in the table at the top of this section nor the
+[`apply_is_required_check`](#requiring-terrapodapply) switch **can be expressed
+on GitLab at all**: that table is a GitHub table.
+
+**A Terrapod commit status is expected to count towards that check**, which
+inverts an earlier reading of ours that it would not. GitLab's [commit status
+API](https://docs.gitlab.com/api/commits/) documents the posted status as
+becoming a pipeline job: *"Existing pipelines are searched first to append the
+job to"*, and *"If no suitable pipeline exists, a new pipeline is created with
+`CI_PIPELINE_SOURCE: external`"*. A status is therefore not outside the pipeline
+model, and a pending or failed Terrapod status should leave the pipeline
+unsuccessful and the merge request unmergeable while *Pipelines must succeed* is
+on. The same page flags its own edge: *"When duplicate pipelines exist for the
+same commit, it can be ambiguous which pipeline receives the external status."*
+
+**For `apply_then_merge` the consequence is the mirror of GitHub's.** All three
+aggregates land in one pipeline, so the pipeline cannot be successful until
+`terrapod/apply` is — there is no way to exempt it. That does not deadlock,
+because Terrapod's own apply gate accepts GitLab's `ci_must_pass` and
 `ci_still_running` merge states as mergeable (`gitlab_service.py`'s
-`_GITLAB_MERGEABLE_DETAILED`), so a pending status does not by that route refuse
-`terrapod apply`; whether GitLab reports those states for external statuses is
-also unverified.
+`_GITLAB_MERGEABLE_DETAILED`), so it applies, `apply` goes green, and the
+pipeline is green by the time Terrapod merges. The GitHub-side
+[`apply_is_required_check`](#requiring-terrapodapply) switch is therefore not
+needed on GitLab and does nothing there. Whether GitLab reports those merge
+states for an externally-posted status is itself unverified.
+
+**GitLab's *external status checks* are a different mechanism and Terrapod does
+not use them.** They are configured per project rather than by the integration,
+GitLab badges [that
+page](https://docs.gitlab.com/user/project/merge_requests/status_checks/) **Tier:
+Ultimate**, and by default *"merge requests in projects can be merged even if
+external status checks fail"* unless *Status checks must succeed* is selected.
+Nothing here posts one.
 
 #### Renaming a status
 
@@ -585,7 +676,7 @@ Project / Group access tokens need `api` scope (the existing requirement covers 
 
 **`terrapod/plan` stays `pending` with a workspace named in brackets** — read the bracket against [When a status is not green](#when-a-status-is-not-green): `(run not created)`, `(not evaluated)`, `(connection disabled)` and `(queued)` each have a different remedy.
 
-**`terrapod apply` is refused as blocked and `terrapod/apply` is pending** — `terrapod/apply` is required in branch protection. Remove it from the required checks: see [Why not `apply`](#why-not-apply).
+**`terrapod apply` is refused as blocked and `terrapod/apply` is pending** — `terrapod/apply` is required in branch protection and Terrapod has not been told so, so the gate is refusing the apply that would clear it. Set `api.config.vcs.commit_statuses.apply_is_required_check: true`, or remove it from the required checks: see [Requiring `terrapod/apply`](#requiring-terrapodapply).
 
 **Workflow flip rejected** — you can't change `vcs_workflow` while PR runs are in flight on the workspace. Cancel or merge those PR runs first.
 

@@ -16,7 +16,14 @@ _HELM_ROOT = Path("/app/helm/terrapod")
 if not _HELM_ROOT.exists():  # local checkout fallback (running outside the image)
     _HELM_ROOT = Path(__file__).resolve().parents[3] / "helm" / "terrapod"
 
-_KEYS = ("enabled", "plan_name", "policy_name", "apply_name", "per_workspace")
+_KEYS = (
+    "enabled",
+    "plan_name",
+    "policy_name",
+    "apply_name",
+    "apply_is_required_check",
+    "per_workspace",
+)
 
 
 def _code() -> dict:

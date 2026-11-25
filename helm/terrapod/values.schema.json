@@ -2699,6 +2699,9 @@
                   "maxLength": 255,
                   "pattern": "^\\S(.*\\S)?$"
                 },
+                "apply_is_required_check": {
+                  "type": "boolean"
+                },
                 "per_workspace": {
                   "type": "boolean"
                 }

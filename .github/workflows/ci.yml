@@ -318,6 +318,15 @@ jobs:
 
       - name: (docs-audit) Named targets, values and paths exist
         run: python3 scripts/docs-audit/check_references.py
+      # The permission list in docs/vcs-integration.md is the GitHub App's blast
+      # radius, and it was prose. It asked for `Checks: Read & write` from the day
+      # it was written until #2707, over an API no code path has ever called --
+      # with a stated purpose, which is what stopped anyone re-checking it. The
+      # mirror defect has no symptom here at all, only a 403 in an operator's
+      # installation, so this asks both questions of one ledger.
+
+      - name: (docs-audit) Documented App permissions match the endpoints we call
+        run: python3 scripts/docs-audit/check_vcs_app_permissions.py
       # The provider hard-codes copies of server defaults, and schema.golden
       # records types rather than defaults -- so a drift is invisible to every
       # other gate. It happened: the provider sat a minor behind for a release.
@@ -2039,18 +2048,27 @@ jobs:
 
       - name: (helm-smoke) The aggregate status names render, honour overrides, and the schema rejects bad ones
         run: |
-          # All five vcs.commit_statuses keys render, an override (false included)
+          # All six vcs.commit_statuses keys render, an override (false included)
           # reaches the ConfigMap, and the schema refuses bad names and unknown keys.
           for f in values.yaml values-local.yaml values-eval.yaml; do
             out=$(helm template ./helm/terrapod -f "helm/terrapod/$f")
             for want in 'plan_name: "terrapod/plan"' 'policy_name: "terrapod/policy"' \
-                        'apply_name: "terrapod/apply"' 'per_workspace: true'; do
+                        'apply_name: "terrapod/apply"' 'per_workspace: true' \
+                        'apply_is_required_check: false'; do
               echo "$out" | grep -q "$want" \
                 || { echo "$f: commit_statuses is missing '$want'"; exit 1; }
             done
             echo "$out" | grep -A1 'commit_statuses:' | grep -q 'enabled: true' \
               || { echo "$f: commit_statuses.enabled is not true by default"; exit 1; }
           done
+          # apply_is_required_check relaxes the apply-then-merge mergeability gate,
+          # so the direction that matters is the one a missing render line breaks:
+          # an operator turns it ON, the chart falls back to the code default, and
+          # their required `terrapod/apply` deadlocks every apply with nothing to
+          # say why. Default-off is asserted above on all three profiles.
+          on=$(helm template ./helm/terrapod --set api.config.vcs.commit_statuses.apply_is_required_check=true)
+          echo "$on" | grep -q 'apply_is_required_check: true' \
+            || { echo "apply_is_required_check=true does not reach the ConfigMap"; exit 1; }
           off=$(helm template ./helm/terrapod --set api.config.vcs.commit_statuses.per_workspace=false)
           echo "$off" | grep -q 'per_workspace: false' \
             || { echo "per_workspace=false does not reach the ConfigMap"; exit 1; }

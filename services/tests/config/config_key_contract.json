@@ -420,6 +420,7 @@
   "vault.instances[].tls_skip_verify",
   "vault.timeout_seconds",
   "vcs.archive_cache_retention_days",
+  "vcs.commit_statuses.apply_is_required_check",
   "vcs.commit_statuses.apply_name",
   "vcs.commit_statuses.enabled",
   "vcs.commit_statuses.per_workspace",
