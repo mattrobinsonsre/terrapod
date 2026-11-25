@@ -517,7 +517,7 @@ def is_standalone_configure_sql(model) -> object:
 #:
 #: Kept beside the transition table for the same reason
 #: `LIVE_STATES_FOR_PHASE` is, and pinned against the claim loop by
-#: `test_queue_states_match_the_dispatcher`: a new waiting state added to the
+#: `test_the_states_match_the_dispatcher`: a new waiting state added to the
 #: dispatcher and not here would leave the queue silently short of the runs it
 #: exists to report.
 WAITING_STATES: frozenset[str] = frozenset({"pending", "queued", "confirmed"})

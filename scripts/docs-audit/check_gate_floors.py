@@ -104,12 +104,28 @@ _FLOOR_REFUSAL = re.compile(
 #: A named floor constant. `MIN_PINS = 10`, `_MIN_COLUMNS = 800`.
 _MIN_CONST = re.compile(r"^\s*(?P<name>_?MIN_[A-Z0-9_]+)\s*(?::[^=]+)?=\s*(?P<n>\d+)\s*$", re.M)
 
+#: A comment saying this `>=` is not a coverage floor at all -- a key length, a
+#: bounds check, a nil guard. Out of the gate's scope entirely, which is a
+#: DIFFERENT claim from a floor whose other direction is protected, below.
+_NOT_A_FLOOR = re.compile(
+    r"not a (coverage )?floor|key length|bounds check|nil guard|length check",
+    re.I,
+)
+
 #: What counts as a written justification on the line(s) above a floor. The
 #: point is not the exact wording -- it is that somebody said what the other
 #: direction is protected by, because that is the question a floor cannot answer.
+#:
+#: These two patterns used to be one, and merging them was an escape hatch: the
+#: single pattern also accepted `floor`, `lower bound`, `at least` and `sanity`,
+#: so `assert len(x) >= 7  # sanity floor` was treated as justified AND dropped
+#: from the inventory, which means the ratchet never saw it. Those four words are
+#: self-referential -- they are what any comment ABOUT a floor says, and none of
+#: them names the other direction. The legitimate case they were there to rescue
+#: is the one `_NOT_A_FLOOR` now owns: `# a key length, not a coverage floor` is
+#: out of scope, rather than an unprotected floor that someone excused.
 _JUSTIFIED = re.compile(
-    r"other direction|grows?\b|equality|exact count|derived|cannot shrink"
-    r"|floor|lower bound|at least|sanity",
+    r"other direction|grows?\b|equality|exact count|derived|cannot shrink",
     re.I,
 )
 
@@ -131,7 +147,17 @@ _MUST_NOT_MATCH = (
     "if len(l) > 0 && err == nil {",  # ditto
     "assert len(found) == 3",  # equality is what we WANT
     'if len(id) > 4 && id[:4] == "run-" {',  # a bounds check
-    "assert len(raw) >= 32  # a key length, not a coverage floor",  # justified
+    "assert len(raw) >= 32  # a key length, not a coverage floor",  # out of scope
+)
+
+#: Comments that must NOT count as a justification. Each is a real phrasing that
+#: reads as considered and says nothing about what stops the set growing, so a
+#: floor carrying one is exactly what this gate exists to surface.
+_UNJUSTIFIED_COMMENTS = (
+    "# sanity floor",
+    "# a lower bound",
+    "# at least this many",
+    "# sanity check",
 )
 
 
@@ -159,6 +185,13 @@ def _self_test() -> list[str]:
     for s in _MUST_NOT_MATCH:
         if _matches(s):
             bad.append(f"matcher now flags a non-floor: {s.splitlines()[0][:70]}")
+    for c in _UNJUSTIFIED_COMMENTS:
+        if _justified([c, "assert len(mods) >= 7"], 1):
+            bad.append(f"self-referential comment now counts as justified: {c}")
+    if not _justified(["# the other direction is an equality below", "assert len(x) >= 3"], 1):
+        bad.append("an honest justification is no longer accepted")
+    if not _justified(["# a key length, not a coverage floor", "assert len(raw) >= 32"], 1):
+        bad.append("an out-of-scope length check is no longer excluded")
     return bad
 
 
@@ -191,7 +224,7 @@ def _justified(lines: list[str], idx: int) -> bool:
         if j < 0 or j >= len(lines):
             continue
         c = _COMMENT.search(lines[j])
-        if c and _JUSTIFIED.search(c.group("text")):
+        if c and (_JUSTIFIED.search(c.group("text")) or _NOT_A_FLOOR.search(c.group("text"))):
             return True
     return False
 

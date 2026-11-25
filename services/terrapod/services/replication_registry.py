@@ -668,6 +668,6 @@ ARTIFACT_LEDGER = register(
 # that the key never has to travel.
 #
 # There is nothing to write here; the point is that nothing is written here.
-# `TestTheKeysThemselvesNeverTravel` in tests/services/test_replication_variables.py
+# `TestTheEncryptionKeysNeverTravel`, in tests/services/test_replication_node_local.py,
 # fails if that class is ever registered.
 # ---------------------------------------------------------------------------

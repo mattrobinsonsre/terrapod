@@ -174,7 +174,7 @@ async def get_or_fetch_platforms(
     #       case it; the registry-table lookup would always miss.
     #   (b) Operator-published providers — live in the registry tables
     #       (registry_providers / _versions / _platforms) and are stored
-    #       at `registry/providers/...` storage keys via `upload_provider_binary`.
+    #       at `registry/providers/...` storage keys via `record_provider_binary`.
     #
     # In both cases the operator is authoritative — never fall through
     # to upstream tiers for our own hostname.

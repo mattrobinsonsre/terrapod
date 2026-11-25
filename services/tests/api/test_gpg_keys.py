@@ -270,7 +270,7 @@ class TestDelete:
 
 class TestTrustAnchorAuthorization:
     """The GPG key store is the trust anchor for provider signature
-    verification: `_verify_and_store_shasums_signature` reads the issuer key id
+    verification: `store_and_verify_provider_sig` reads the issuer key id
     out of a publisher's detached SHA256SUMS.sig and verifies it against
     whichever registered key matches. Every route here was previously gated on
     `get_current_user` alone, so any authenticated principal could register a

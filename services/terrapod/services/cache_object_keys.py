@@ -14,9 +14,9 @@ always recorded one; `cached_binaries` and `cached_provider_packages` gained the
 column in #2599, so a row written before that has NULL and its object sits at
 the derived key.
 
-ONE place for that fallback, deliberately. It is needed at nine read sites
-across five modules, and nine copies of `row.storage_key or derive(...)` is nine
-chances to write `derive(...)` alone -- which serves, checks or reaps the wrong
+ONE place for that fallback, deliberately. It is needed at every read site
+across several modules, and a copy of `row.storage_key or derive(...)` at each
+is a chance to write `derive(...)` alone -- which serves, checks or reaps the wrong
 object for every uploaded artifact, silently, because the derived key is a
 perfectly valid key that simply holds nothing.
 """

@@ -1991,8 +1991,8 @@ def _apply_status(run: Run) -> str:
         #
         # It is NOT the same question as "did the engine run", and there is one
         # reachable case where the two diverge. `apply_started_at` is stamped
-        # when the apply is DISPATCHED (`run_service.queue_apply`, before the
-        # transition), not when the engine starts, so a run whose Job never
+        # when the apply is DISPATCHED (`transition_run`, on the hop into
+        # `applying`), not when the engine starts, so a run whose Job never
         # produced a running pod has it set: `_check_unschedulable` and
         # `_check_stale` in the reconciler both read it as `phase_start` and
         # then `_handle_failed`, which errors the run. An `ImagePullBackOff`, a
@@ -4900,7 +4900,7 @@ _ANSI_RE = re.compile(rb"\x1b\[[0-9;]*[a-zA-Z]")
 #: #2144's framing, RESTATED rather than imported: the plugin that writes it
 #: imports `ansible`, which this process does not have, so it cannot be a shared
 #: constant. Restating a contract is how two sides drift, which is why
-#: `test_host_log_format_agrees_with_the_plugin` reads the plugin's own source
+#: `test_the_api_literals_match_the_plugins` reads the plugin's own source
 #: and fails if either literal moves.
 _HOST_LOG_HEADER = b"#terrapod-host-log v2"
 
