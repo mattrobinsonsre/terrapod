@@ -740,11 +740,8 @@ def build_job_spec(
             Pulumi). The name keeps its Terraform spelling because a runner up
             to N-2 minors behind reads this exact key.
         resource_cpu: CPU request (e.g. "1", "500m").
-        parallelism: How many operations the engine runs at once (#1431).
         resource_memory: Memory request (e.g. "2Gi", "256Mi").
         timeout_minutes: Job timeout in minutes.
-        engine_version: Engine version to use (terraform/tofu, or pulumi).
-        execution_backend: Execution backend (terraform or tofu).
         namespace: Target namespace for the Job.
     """
     if not namespace:

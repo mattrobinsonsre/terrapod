@@ -76,9 +76,12 @@ MAX_ITEMS = 500
 
 #: Package ecosystems a warm can name, which is every one the cache holds.
 #: Derived from nothing on purpose — `CachedPackageFile.ecosystem` documents the
-#: same six and `capabilities.CAPABILITIES` carries them plus `oci`, but each of
-#: those answers a different question, and a warm adapter existing is this
-#: module's own fact. `test_warm_ahead.py` asserts the three agree.
+#: same six, but it answers a different question, and a warm adapter existing is
+#: this module's own fact. `test_warm_ahead.py` asserts the two agree.
+#:
+#: There were three until the cache-disable flags went: a gated capability was
+#: the third, and `services/capabilities.py` carried its own six-entry table.
+#: Both are gone, so there is no third enumeration left to drift.
 PACKAGE_ECOSYSTEMS: tuple[str, ...] = ("galaxy", "pypi", "npm", "go", "nuget", "pulumi")
 
 #: Plus the container registry, which is warmable and is not a package cache.

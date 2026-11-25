@@ -118,7 +118,7 @@ def _gpg_key_to_jsonapi(key) -> dict:  # type: ignore[no-untyped-def]
 
 
 # The GPG key store is the trust anchor for provider signature verification:
-# `registry_provider_service._verify_and_store_shasums_signature` reads the
+# `registry_provider_service.store_and_verify_provider_sig` reads the
 # issuer key id out of a publisher's detached SHA256SUMS.sig and verifies the
 # signature against whichever registered GPGKey matches. Being able to add a
 # key therefore means being able to have Terrapod accept a signature you made;

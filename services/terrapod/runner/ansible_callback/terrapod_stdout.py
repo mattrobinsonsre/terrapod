@@ -364,7 +364,7 @@ INDENT = "                       "
 #: a 1000-hour run is `999h59m` at 7.
 _TIME_W = 21
 
-#: The host column's FLOOR, not its width: `_tp_host_width` raises it per play
+#: The host column's FLOOR, not its width: `_tp_widen_host_column` raises it per play
 #: to the longest name the play can reach, so an FQDN fleet lines up without a
 #: short-name run paying for the space. See that method for why it is measured
 #: there rather than fixed here.
@@ -493,7 +493,7 @@ class CallbackModule(DefaultCallback):
         self._tp_inner_display = None
         self._tp_inner_banner = None
         #: The host column's current width. Raised per play by
-        #: `_tp_host_width` and NEVER lowered, so a column cannot move left
+        #: `_tp_widen_host_column` and NEVER lowered, so a column cannot move left
         #: part way down a log.
         self._tp_host_w = _HOST_W
 

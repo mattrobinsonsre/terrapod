@@ -702,7 +702,7 @@ async def update_module_endpoint(
             # otherwise publish a module pointing a narrowed connection at anything
             # its credential reaches, and ingestion clones it.
             #
-            # `_repo_for_allowlist` falls back to the module's STORED url, because a
+            # `_repo_url_for_allowlist` falls back to the module's STORED url, because a
             # partial update may attach a connection without restating the url. The
             # old code subscripted `attrs["vcs-repo-url"]` unguarded and raised
             # KeyError -> 500 on exactly that call.

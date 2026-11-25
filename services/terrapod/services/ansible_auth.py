@@ -89,9 +89,11 @@ from typing import Any
 #: cannot run as 1000 is refused at the startup probe rather than meeting this
 #: as an unreadable file mid-playbook.
 #:
-#: **One producer, because there are two kinds of file that need it** and they
-#: are written by different modules. The credential phase writes the key
-#: material; the inventory renderer writes a document that carries
+#: **One producer, because several kinds of file need it** and they are written
+#: by different modules. The credential phase writes the key
+#: material; the known-hosts phase writes a host-key anchor (public, so neither
+#: encrypted at rest nor redacted -- it takes this mode for the directory's
+#: sake, not its own); the inventory renderer writes a document that carries
 #: `ansible_password` and `ansible_become_password` as VARIABLES, because
 #: ansible has no `ansible_password_file` and a connection password can only be
 #: a variable. Two copies of this number is how one of them ends up `0644`.
