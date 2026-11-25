@@ -78,8 +78,16 @@ test.describe('Audit Log', () => {
       page.waitForResponse((r) => r.url().includes('/admin/audit-log') && r.ok()),
       page.click('button:has-text("Apply Filters")'),
     ]);
-    expect(decodeURIComponent(emailReq.url())).toContain('filter[actor]=admin%40example.com');
-    expect(decodeURIComponent(emailReq.url())).not.toContain('filter[actor-login]');
+    // Decoded, so the expectation is the decoded form: `decodeURIComponent` has
+    // already turned `%40` back into `@`. Decoding at all is what makes the
+    // bracket keys readable, and asserting the encoded value against a decoded
+    // string is a test that can only ever fail.
+    const emailUrl = decodeURIComponent(emailReq.url());
+    expect(emailUrl).toContain('filter[actor]=admin@example.com');
+    // Not both: the two are ANDed, and no row carries the same value as email
+    // AND login. `filter[actor]=` is not a substring of `filter[actor-login]=`,
+    // so this says what it looks like it says.
+    expect(emailUrl).not.toContain('filter[actor-login]');
 
     // The VCS login filter, which nothing in the UI could reach before.
     await page.selectOption('#f-actor-kind', 'login');
