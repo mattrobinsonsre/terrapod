@@ -564,18 +564,39 @@ A gate nobody has seen fail is a gate nobody knows binds. So when you add or
 widen one, break the thing it guards, watch it fail **by the name of the test
 that catches it**, and restore — then say in the PR which mutation you ran.
 
-Two directions, because each catches what the other cannot:
+Three directions, because each catches what the others cannot:
 
 - **remove the behaviour** — the gate must fail. If it does not, the gate is
   asserting something weaker than its name claims.
 - **narrow the gate's own subject** — drop a surface from its list, lower its
   floor, restrict its glob. The gate must *also* fail, or it cannot defend
   against the very drift this section is about.
+- **feed the gate's own exemption what it should refuse** — write the value a
+  too-permissive predicate would wave through. The gate must fail. This is the
+  direction nobody runs, and it is the one that catches a gate which is correct
+  about everything it looks at and wrong about what it lets past.
+
+That third direction was added after two gates shipped with holes **having been
+mutation-proven in the first two** — correctly, both times. `check_gate_floors`
+accepted any floor whose comment contained the word "floor", so
+`assert len(x) >= 7  # sanity floor` was treated as justified *and* dropped from
+the inventory, exempting 32 floors including ones inside sibling gates. And
+`check_token_mints` tested `if "identity_provider" in call`, a substring, against
+a parameter declared `str | None = None` — so `identity_provider=None` satisfied
+the gate while being the exact failure it existed to catch. Removing the
+behaviour fires in both cases. Narrowing the subject fires in both cases. Only
+feeding the exemption its own forbidden value finds either.
+
+So for any gate with a ledger, an allowlist, a `continue`, a justification
+pattern or an `in` test, the question is not only "does it see everything" but
+"what does it accept, and is that what it meant to accept".
 
 A mutation that does not fire is not automatically a weak gate: the property may
 have two defenders, or the mutation may not have applied. Isolate before
 concluding, and check the mutation actually landed before reading anything into
-the result.
+the result. And restore from a copy you made yourself — never from git, because a
+new gate file is untracked and `git checkout` on it fails silently or not at all,
+leaving the mutation live.
 
 ## Responsive / mobile-first UI (hard requirement)
 
