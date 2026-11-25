@@ -2018,14 +2018,15 @@ jobs:
           done
           echo "an explicit false reaches the pod for all six keys"
 
-          # Direction 2: every key rendered into config.yaml is one Settings accepts,
-          # on all three profiles -- the eval profile included, because a key behind
-          # a `with` block only appears when a profile sets it.
-          for f in values.yaml values-local.yaml values-eval.yaml; do
-            helm template ./helm/terrapod -f "helm/terrapod/$f" \
-              | python3 scripts/ci/check_rendered_config_keys.py \
-              || { echo "rendered config disagrees with Settings on $f"; exit 1; }
-          done
+          # Direction 2 used to live here, re-checking that every rendered key is
+          # one `Settings` accepts. `scripts/check_helm_config_contract.py`
+          # already does that against the REAL model -- it walks the rendered
+          # config.yaml against `Settings.model_fields` AND runners.yaml against
+          # `RunnerConfig`, on these same three profiles, with full pydantic
+          # validation, and it has run unconditionally in `host-checks` since
+          # #617. The copy here read a committed snapshot of the model instead,
+          # so the two could disagree whenever the snapshot was not regenerated,
+          # and it covered config.yaml only (#2715).
 
 
       - name: (helm-smoke) The comment-command push gate reaches the pod and stays on by default
