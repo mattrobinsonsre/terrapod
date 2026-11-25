@@ -81,6 +81,7 @@ import {
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
 import { useRunEvents } from '@/lib/use-run-events'
+import { runStatusChipClass } from '@/lib/workspace-status'
 
 interface WorkspacePermissions {
   'can-update': boolean
@@ -2591,16 +2592,6 @@ function WorkspaceDetailContent() {
     return sub !== only ? sub : g.label
   }
 
-  function statusColor(status: string): string {
-    switch (status) {
-      case 'applied': return 'bg-green-900/50 text-green-300'
-      case 'planned': return 'bg-indigo-900/50 text-indigo-300'
-      case 'planning': case 'applying': case 'configuring': case 'canceling': return 'bg-yellow-900/50 text-yellow-300'
-      case 'errored': return 'bg-red-900/50 text-red-300'
-      case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
-      default: return 'bg-slate-700 text-slate-400'
-    }
-  }
 
   function driftStatusBadge(s: string): { cls: string; label: string } {
     switch (s) {
@@ -5945,7 +5936,7 @@ function WorkspaceDetailContent() {
                                  stays a plain span. */
                               (() => {
                                 const phase = explainingPhase(run.attributes['status-timestamps'])
-                                const cls = `inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`
+                                const cls = `inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${runStatusChipClass(run.attributes.status)}`
                                 return phase ? (
                                   <button
                                     type="button"
@@ -6114,7 +6105,7 @@ function WorkspaceDetailContent() {
                               {t('runs.awaitingDecision')}
                             </span>
                           ) : (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${runStatusChipClass(run.attributes.status)}`}>
                               {runStatusLabel(run.attributes.status)}
                             </span>
                           )

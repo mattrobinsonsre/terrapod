@@ -40,6 +40,7 @@ import { gateOf, holdActivityKey, phaseOf, type Gate } from '@/lib/run-hold'
 import { RUN_TIMELINE_KEYS } from '@/lib/run-timeline'
 import { initialRunView } from '@/lib/run-initial-view'
 import { CopyButton } from '@/components/copy-button'
+import { runStatusChipClass } from '@/lib/workspace-status'
 
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
 const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) => m.ImpactGraph), {
@@ -1808,22 +1809,6 @@ function RunDetailPageInner() {
     handleAction(action)
   }
 
-  function statusColor(status: string): string {
-    switch (status) {
-      case 'applied': return 'bg-green-900/50 text-green-300'
-      case 'planned': case 'confirmed': return 'bg-indigo-900/50 text-indigo-300'
-      // `configuring` belongs here and was missed when the live-configure work
-      // landed: without it a RUNNING configure falls to `default`, which is the
-      // same grey as `canceled` and `discarded`, so the chip reads as finished
-      // while the activity card above it correctly pulses. Two views of one run
-      // disagreeing, on the page that shows both.
-      case 'planning': case 'applying': case 'configuring': case 'canceling': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
-      case 'errored': return 'bg-red-900/50 text-red-300'
-      case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
-      case 'pending': return 'bg-slate-700 text-slate-300'
-      default: return 'bg-slate-700 text-slate-400'
-    }
-  }
 
   function formatTimestamp(iso: string | undefined): string {
     if (!iso) return '-'
@@ -2076,7 +2061,7 @@ function RunDetailPageInner() {
           {t('status.awaitingDecision')}
         </span>
       ) : (
-        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(attrs.status)}`}>
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${runStatusChipClass(attrs.status)}`}>
           {statusLabel(attrs.status)}
         </span>
       )}
