@@ -473,22 +473,20 @@ def summarize_capabilities(caps: list[str] | set[str] | frozenset[str]) -> dict[
 # every grantable capability PLUS every platform:* power (admin bypasses RBAC
 # entirely, so this set is the honest description of what it can do).
 
-_AUDIT_CAPS = frozenset(
-    {
-        WORKSPACE_READ,
-        RUN_READ,
-        STATE_READ_METADATA,
-        VAR_READ,
-        CONFIG_READ,
-        RUN_TASK_READ,
-        NOTIFICATION_READ,
-        RUN_TRIGGER_READ,
-        POOL_READ,
-        REGISTRY_READ,
-        CATALOG_READ,
-        PLATFORM_AUDIT_ADMIN,
-    }
-)
+#: `audit` is read-only everywhere plus the (read-only) audit-log power, so it
+#: is DERIVED from each axis's own read floor rather than typed out. It used to
+#: be a hand-kept list of twelve, and it had drifted: `INVENTORY_READ` joined
+#: the workspace read floor with the inventory work and never reached the copy,
+#: so the built-in `audit` role could not read any inventory while every
+#: workspace `read` grant could -- across the ~19 endpoints that capability
+#: gates. The sibling below has always been derived; this one now matches it.
+#:
+#: Note what this does NOT pick up, because the read floors are the right
+#: subject: `STATE_READ` is plan-tier, not read-tier, so audit still never
+#: downloads raw state. `test_capabilities.py` asserts that in both directions.
+_AUDIT_CAPS = frozenset().union(*(axis_read_caps(axis) for axis in AXIS_LEVEL_MAPS)) | {
+    PLATFORM_AUDIT_ADMIN
+}
 
 _BUILTIN_CAPS: dict[str, list[str]] = {
     "admin": sorted(GRANTABLE_CAPABILITIES | PLATFORM_CAPABILITIES),
