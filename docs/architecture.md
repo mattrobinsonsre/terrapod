@@ -706,7 +706,7 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | `CachedBinary` | Pull-through CLI binary cache entries |
 | `RunTrigger` | Cross-workspace dependency chains |
 | `AuditLog` | Immutable API request log entries. Includes dual-actor fields (`actor_type`, `actor_login`, `actor_id`, `origin`) so PR-comment-driven actions in apply-then-merge mode record the VCS user rather than a Terrapod identity |
-| `PRSession` | Per-PR conversation state for apply-then-merge: status-comment id, last processed comment/review cursors, current PR state |
+| `PRSession` | Per-PR conversation state for apply-then-merge: status-comment id, the last processed comment cursor, current PR state, and the commit the PR merged as. There is no review cursor: approval is read as a snapshot at confirm time rather than processed as an event, so there is nothing to advance past |
 | `NotificationConfiguration` | Workspace notification configs (webhook/Slack/email) |
 | `RunTask` / `TaskStage` / `TaskStageResult` | Run task webhooks and callback tracking |
 | `ModuleWorkspaceLink` | Module-to-workspace links for impact analysis |
