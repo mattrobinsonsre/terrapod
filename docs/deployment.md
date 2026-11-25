@@ -324,7 +324,8 @@ language-package proxies have their own settings, in
 | `api.config.vcs.commit_statuses.enabled` | `true` | Post the aggregate statuses at all. `false` turns off everything that serves them ([details](vcs-integration.md#turning-the-aggregates-off)) |
 | `api.config.vcs.commit_statuses.plan_name` | `terrapod/plan` | Context of the aggregate plan status posted on every open PR ([Aggregate statuses](vcs-integration.md#aggregate-statuses)) |
 | `api.config.vcs.commit_statuses.policy_name` | `terrapod/policy` | Context of the aggregate policy status |
-| `api.config.vcs.commit_statuses.apply_name` | `terrapod/apply` | Context of the aggregate apply status. Never require it in branch protection ([why](vcs-workflows.md#why-not-apply)) |
+| `api.config.vcs.commit_statuses.apply_name` | `terrapod/apply` | Context of the aggregate apply status. Requiring it in branch protection needs the next row ([why](vcs-workflows.md#requiring-terrapodapply)) |
+| `api.config.vcs.commit_statuses.apply_is_required_check` | `false` | Declares that `apply_name` is a required check on GitHub, so the apply-then-merge gate stops refusing on a block its own pending status caused ([Requiring `terrapod/apply`](vcs-workflows.md#requiring-terrapodapply)) |
 | `api.config.vcs.commit_statuses.per_workspace` | `true` | Also post `terrapod/<workspace>` for pull-request runs. Branch runs and module-impact statuses are unaffected |
 | `api.config.vcs.github.existingSecret` | `""` | K8s Secret containing the GitHub webhook HMAC secret |
 | `api.config.vcs.github.existingSecretKey` | `"webhook_secret"` | Key within the Secret |

@@ -34,6 +34,7 @@ from terrapod.services import (
     gitlab_service,
     ha_role,
     pool_set,
+    vcs_mergeability,
     workspace_settings,
 )
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
@@ -3068,6 +3069,25 @@ async def _check_mergeability_or_block(db: AsyncSession, run: Run) -> None:
         run.vcs_apply_blocked_reason = reason
         raise ApplyBlocked(reason)
     if not status.mergeable:
+        # The self-reference (#2707): with `terrapod/apply` a required check it
+        # is `pending` until this very apply lands, which is enough on its own
+        # to make GitHub report the pull request as blocked. Refusing here would
+        # mean the apply waits on a status only the apply can clear. The module
+        # carries why this is sound rather than a loosened gate; the short of it
+        # is that the merge call after the apply is the real enforcement, and
+        # every other refusing state still refuses.
+        if vcs_mergeability.block_is_self_inflicted(conn.provider, status.state):
+            from terrapod.config import settings
+
+            logger.info(
+                "confirm_run: disregarding a merge block attributable to our own required status",
+                run_id=str(run.id),
+                provider=conn.provider,
+                state=status.state,
+                apply_status=settings.vcs.commit_statuses.apply_name,
+            )
+            run.vcs_apply_blocked_reason = None
+            return
         run.vcs_apply_blocked_reason = status.reason or f"PR is not mergeable ({status.state})."
         raise ApplyBlocked(run.vcs_apply_blocked_reason)
     # Mergeable now — clear any stale block reason from a previous attempt.

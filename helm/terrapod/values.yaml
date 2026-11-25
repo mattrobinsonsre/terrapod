@@ -1254,7 +1254,8 @@ api:
       # established is refused, with a reply on the PR saying so.
       require_push_permission_for_commands: true
       # Aggregate statuses on every open PR, so branch protection can require a stable
-      # name. Require `plan` and `policy`, never `apply`: it would block its own apply.
+      # name. Require `plan` and `policy` freely; requiring `apply` needs
+      # apply_is_required_check below, or it blocks its own apply.
       commit_statuses:
         # false posts no aggregate status and runs nothing that serves them: with
         # per_workspace left true that is the behaviour before the aggregates existed.
@@ -1262,6 +1263,15 @@ api:
         plan_name: "terrapod/plan"
         policy_name: "terrapod/policy"
         apply_name: "terrapod/apply"
+        # Set this ONLY if you have made apply_name a required check on GitHub. It
+        # is a statement about your branch protection, which Terrapod cannot read:
+        # before the apply that status is pending, which is enough for GitHub to
+        # report the PR blocked, so the apply-then-merge gate would refuse the very
+        # apply that clears it. With this on the gate stops refusing on `blocked`
+        # alone; merge conflicts and an out-of-date branch still refuse, and the
+        # merge is still the provider's to allow. No effect on GitLab, which has no
+        # per-name required check, nor while enabled is false.
+        apply_is_required_check: false
         # Also post a `terrapod/<workspace>` status per pull-request run. Branch
         # runs and module pull requests keep theirs either way.
         per_workspace: true

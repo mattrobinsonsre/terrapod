@@ -349,7 +349,7 @@ async def _api_call_token(conn: VCSConnection) -> str:
     writes — PR comments, comment reactions, commit statuses, a squash merge —
     so narrowing it to a fixed set would mean naming each permission, and
     GitHub refuses the whole mint with a 422 when a requested permission is one
-    the installation does not grant. An operator whose App grants `checks:
+    the installation does not grant. An operator whose App grants `issues:
     write` but not `statuses: write` would lose every VCS operation rather than
     one. So it asks for what the App holds, exactly as before this split.
     """
@@ -1414,6 +1414,20 @@ async def actor_has_push_access(
     who is not a collaborator and for a repository the installation cannot
     see; neither is a person who may push to a repository Terrapod runs
     applies against.
+
+    **An approver list naming TEAMS cannot be built on this, and the reason is
+    the permission rather than the endpoint (#2707).** Resolving team
+    membership needs the organization `members` permission, which the App does
+    not request. That is not a question of whether a granted permission
+    suffices: it is a new permission, and GitHub's own documentation on
+    approving updated permissions says each installation must approve one
+    before the App may use it -- until then *"the GitHub App will still retain
+    its current permissions"*. Documentation-derived; nobody has run it against
+    a real installation. So such a feature would not reach an existing
+    installation on upgrade and would have to keep working, visibly degraded,
+    until somebody with admin on that account acted. Explicit logins need none
+    of this, which is why they are the part that works on any permission set
+    and on GitLab.
     """
     if not login:
         return False
