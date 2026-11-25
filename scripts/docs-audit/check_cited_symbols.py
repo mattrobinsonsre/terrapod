@@ -121,9 +121,9 @@ def _self_test() -> list[str]:
         ("test_a_thing", True),
         ("TestAThing", True),
         ("_private_helper", True),
-        ("_refresh_lock", False),      # a measured foreign private
-        ("__dunder__", False),         # a language protocol, never ours
-        ("SomeExternalType", False),   # an external name without an underscore
+        ("_refresh_lock", False),  # a measured foreign private
+        ("__dunder__", False),  # a language protocol, never ours
+        ("SomeExternalType", False),  # an external name without an underscore
     ):
         if _ours(token) is not want:
             bad.append(f"_ours({token!r}) should be {want}")
