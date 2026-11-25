@@ -23,6 +23,7 @@ so the files holding them are not parseable Python at all -- and those are the
 ones that broke.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -37,6 +38,10 @@ SEARCH = ("services/terrapod", "scripts")
 #: A mint this many sites below is a sign the matcher has stopped matching --
 #: the router, both OAuth grants and the two smokes are the floor.
 MIN_SITES = 5
+
+#: An `identity_provider` that is present and empty. Whitespace is stripped
+#: from the call text before matching, so this catches the spaced form too.
+_UNSET_PROVIDER = re.compile(r"""identity_provider=(None|''|""|0)(,|\))""")
 
 
 def _call_text(text: str, ix: int) -> str:
@@ -96,6 +101,17 @@ def main() -> int:
 
     problems = []
     for loc, call in sites:
+        # The keyword being PRESENT is not the keyword carrying a value. The
+        # parameter is `identity_provider: str | None = None`, so the falsy
+        # value is in band: `identity_provider=None` is the exact failure this
+        # gate exists to catch -- an unattributed mint resolves to `everyone`
+        # and nothing else -- while satisfying a substring test. A non-literal
+        # RHS like `getattr(user, "provider_name", None)` is accepted, because
+        # what it evaluates to is not decidable from here; what is refused is a
+        # mint that names the keyword and hardcodes nothing behind it.
+        if _UNSET_PROVIDER.search(call.replace(" ", "")):
+            problems.append(f"{loc} (identity_provider is explicitly empty)")
+            continue
         if "identity_provider" in call:
             continue
         # A detached token (the HA peer client_credentials grant) owns no
