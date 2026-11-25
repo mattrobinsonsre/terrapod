@@ -76,6 +76,28 @@ class TestEmptyPullRequest:
         assert agg.policy.state == "pending"
         assert agg.apply is None
 
+    def test_finished_runs_with_no_recorded_evaluation_do_not_read_as_progress(self):
+        """The branch that #2708 sat in for ever, worded to say so.
+
+        Every run is finished and nothing blocks, but no evaluation was recorded,
+        so the set cannot be proven complete and the verdict stays pending. It
+        used to share `Evaluating affected workspaces` with the no-rows case,
+        which reads as progress -- and on a Redis Cluster that wording was
+        permanent, so the pull request gave no hint while the logs were explicit.
+
+        The description must state that the evaluation is missing rather than
+        that evaluation is under way, and must not blame the runs: they are fine.
+        """
+        rows = [_run(name="a"), _run(name="b")]
+        agg = aggregate(rows, None)
+
+        assert agg.plan.state == "pending"
+        assert agg.plan.description != "Evaluating affected workspaces"
+        assert "no affected-workspace evaluation recorded" in agg.plan.description
+        assert "2 of 2" in agg.plan.description
+        # The no-rows case is genuinely transient and keeps the old wording.
+        assert aggregate([], None).plan.description == "Evaluating affected workspaces"
+
     def test_incomplete_evaluation_is_pending(self):
         agg = aggregate([], _eval(complete=False, not_evaluated=("a",)))
         assert agg.plan.state == "pending"

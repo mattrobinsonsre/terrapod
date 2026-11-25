@@ -1781,7 +1781,6 @@
       "load": "F41l3d 70 l04d 4ud17 l0g"
     },
     "filters": {
-      "actorEmail": "4c70r 3m41l",
       "actorPlaceholder": "u53r@3x4mpl3.c0m",
       "resourceType": "R350urc3 7yp3",
       "resourceTypePlaceholder": "w0rk5p4c35",
@@ -1790,7 +1789,12 @@
       "since": "51nc3",
       "until": "Un71l",
       "clear": "Cl34r",
-      "apply": "4pply F1l73r5"
+      "apply": "4pply F1l73r5",
+      "actor": "4c70r",
+      "actorKind": "4c70r K1nd",
+      "actorKindEmail": "3m41l",
+      "actorKindLogin": "VC5 L0g1n",
+      "actorLoginPlaceholder": "0c70c47"
     },
     "columns": {
       "timestamp": "71m3574mp",
@@ -1805,6 +1809,11 @@
       "summary": "P4g3 {current} 0f {total} ({count, plural, one {# entry} other {# entries}})",
       "previous": "Pr3v10u5",
       "next": "N3x7"
+    },
+    "actorType": {
+      "vcsUser": "VC5",
+      "system": "5y573m",
+      "slackUser": "5l4ck"
     }
   },
   "adminBinaryCache": {

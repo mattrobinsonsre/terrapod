@@ -707,6 +707,7 @@ data:
         plan_name: {{ dig "commit_statuses" "plan_name" "terrapod/plan" .Values.api.config.vcs | quote }}
         policy_name: {{ dig "commit_statuses" "policy_name" "terrapod/policy" .Values.api.config.vcs | quote }}
         apply_name: {{ dig "commit_statuses" "apply_name" "terrapod/apply" .Values.api.config.vcs | quote }}
+        apply_is_required_check: {{ dig "commit_statuses" "apply_is_required_check" false .Values.api.config.vcs }}
         per_workspace: {{ dig "commit_statuses" "per_workspace" true .Values.api.config.vcs }}
       # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
       # streamed tarballs onto the PVC, not pod memory. Override

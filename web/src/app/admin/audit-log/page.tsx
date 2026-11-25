@@ -13,6 +13,7 @@ import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 import { getAuthState, isAdminOrAudit } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { actorFilterParam, actorTypeBadge, type ActorFilterKind } from '@/lib/audit-actor'
 
 interface AuditEntry {
   id: string
@@ -62,6 +63,12 @@ export default function AuditLogPage() {
 
   // Filters
   const [filterActor, setFilterActor] = useState('')
+  // Which of the two served actor filters the box above drives. The server
+  // matches `filter[actor]` on the email and `filter[actor-login]` on the VCS
+  // login, and ANDs them, so one value can only ever be sent as one of the two
+  // (see `actorFilterParam`). Defaults to the email, which is what the box did
+  // when it was labelled "Actor Email".
+  const [filterActorKind, setFilterActorKind] = useState<ActorFilterKind>('email')
   const [filterResourceType, setFilterResourceType] = useState('')
   const [filterAction, setFilterAction] = useState('')
   const [filterSince, setFilterSince] = useState('')
@@ -98,6 +105,7 @@ export default function AuditLogPage() {
 
   async function loadEntries(overrides?: {
     actor?: string
+    actorKind?: ActorFilterKind
     resourceType?: string
     action?: string
     since?: string
@@ -109,6 +117,7 @@ export default function AuditLogPage() {
       // Allow callers (e.g. Clear) to pass freshly-computed filter values so
       // the fetch doesn't race the async state setters.
       const actor = overrides?.actor ?? filterActor
+      const actorKind = overrides?.actorKind ?? filterActorKind
       const resourceType = overrides?.resourceType ?? filterResourceType
       const action = overrides?.action ?? filterAction
       const since = overrides?.since ?? filterSince
@@ -117,7 +126,7 @@ export default function AuditLogPage() {
       const params = new URLSearchParams()
       params.set('page[number]', String(pageNum))
       params.set('page[size]', '20')
-      if (actor) params.set('filter[actor]', actor)
+      if (actor) params.set(actorFilterParam(actorKind), actor)
       if (resourceType) params.set('filter[resource-type]', resourceType)
       if (action) params.set('filter[action]', action)
       if (since) params.set('filter[since]', new Date(since).toISOString())
@@ -143,6 +152,7 @@ export default function AuditLogPage() {
 
   function handleClearFilters() {
     setFilterActor('')
+    setFilterActorKind('email')
     setFilterResourceType('')
     setFilterAction('')
     setFilterSince('')
@@ -152,7 +162,9 @@ export default function AuditLogPage() {
     // async, so a deferred loadEntries() would close over the pre-clear filter
     // values and reload the still-filtered (often empty) list — the clear
     // would appear to do nothing when the prior filter had no matches.
-    loadEntries({ actor: '', resourceType: '', action: '', since: '', until: '', page: 1 })
+    loadEntries({
+      actor: '', actorKind: 'email', resourceType: '', action: '', since: '', until: '', page: 1,
+    })
   }
 
   return (
@@ -168,17 +180,38 @@ export default function AuditLogPage() {
 
         {/* Filters */}
         <form onSubmit={handleApplyFilters} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* Six fields over two rows of three at desktop rather than one row of
+              five: the actor box gained a companion select, and five narrow
+              columns already truncated the two datetime inputs. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
-              <label htmlFor="f-actor" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.actorEmail')}</label>
+              <label htmlFor="f-actor" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.actor')}</label>
               <input
                 id="f-actor"
                 type="text"
                 value={filterActor}
                 onChange={(e) => setFilterActor(e.target.value)}
-                placeholder={t('filters.actorPlaceholder')}
+                placeholder={filterActorKind === 'login'
+                  ? t('filters.actorLoginPlaceholder')
+                  : t('filters.actorPlaceholder')}
                 className="w-full px-3 py-1.5 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
+            </div>
+            <div>
+              {/* Which field the box above is matched against. A select rather
+                  than a guess from the value's shape: the guess would be right
+                  (an email has an `@`) and it would leave filtering by a VCS
+                  login undiscoverable, which was the gap. */}
+              <label htmlFor="f-actor-kind" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.actorKind')}</label>
+              <select
+                id="f-actor-kind"
+                value={filterActorKind}
+                onChange={(e) => setFilterActorKind(e.target.value as ActorFilterKind)}
+                className="w-full px-3 py-1.5 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              >
+                <option value="email">{t('filters.actorKindEmail')}</option>
+                <option value="login">{t('filters.actorKindLogin')}</option>
+              </select>
             </div>
             <div>
               <label htmlFor="f-resource" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.resourceType')}</label>
@@ -268,15 +301,30 @@ export default function AuditLogPage() {
                   <tbody className="divide-y divide-slate-700/30">
                     {sortedItems.map((entry) => {
                       const a = entry.attributes
+                      // A badge for every actor type EXCEPT the ordinary
+                      // `terrapod_user`: that one is almost every row, so
+                      // badging it would bury the one the log could not
+                      // distinguish before (#2701).
+                      const badge = actorTypeBadge(a['actor-type'])
                       return (
                         <tr key={entry.id} className="hover:bg-slate-700/20 transition-colors">
                           <td className="px-4 py-2.5 text-xs text-slate-300 whitespace-nowrap">
                             {new Date(a.timestamp).toLocaleString()}
                           </td>
                           <td className="px-4 py-2.5 text-sm text-slate-300">
-                            {a['actor-email'] || a['actor-login'] || (
-                              <span className="text-slate-500">-</span>
-                            )}
+                            <span className="flex items-center gap-1.5 flex-wrap">
+                              {a['actor-email'] || a['actor-login'] || (
+                                <span className="text-slate-500">-</span>
+                              )}
+                              {badge && (
+                                <span
+                                  data-testid="actor-type-badge"
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
+                                >
+                                  {badge.messageKey ? t(`actorType.${badge.messageKey}`) : badge.raw}
+                                </span>
+                              )}
+                            </span>
                           </td>
                           <td className="px-4 py-2.5">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-slate-700/50 text-slate-300">

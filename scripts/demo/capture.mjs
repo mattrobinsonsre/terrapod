@@ -103,8 +103,16 @@ const shots = []
 // answer different questions: the desktop set shows what the product does, this
 // one shows that it does it on a phone.
 const phoneShots = []
-const phoneShot = (name, fn) => phoneShots.push({ name, fn })
-const shot = (name, fn) => shots.push({ name, fn })
+//: `needsHero` is false for a shot whose URL is a literal path. It decides
+//: whether `findHeroRun` has to run at all, and the only reason it exists is
+//: that `--only` could not previously be used for ANY page without the whole
+//: demo estate: the hero was resolved unconditionally, before the loop that
+//: honours `--only`, so re-shooting one admin page on an ordinary dev stack
+//: failed on a precondition that shot does not have. Defaulting to true keeps
+//: a new shot safe -- a shot that interpolates `ws` or `run` and forgets to say
+//: so would otherwise build a URL containing `undefined`.
+const phoneShot = (name, fn, needsHero = true) => phoneShots.push({ name, fn, needsHero })
+const shot = (name, fn, needsHero = true) => shots.push({ name, fn, needsHero })
 
 //: A page whose whole content is "nothing here yet" teaches a reader nothing,
 //: so it is refused -- except where the empty view IS the subject. One shot
@@ -460,10 +468,14 @@ const anonShot = (name, url, marker = 'main') =>
   })
 
 const page_ = (name, url, marker = 'main') =>
-  shot(name, async (page) => {
-    await page.goto(`${BASE}${url}`)
-    await settle(page, marker)
-  })
+  shot(
+    name,
+    async (page) => {
+      await page.goto(`${BASE}${url}`)
+      await settle(page, marker)
+    },
+    false, // a literal path: nothing to resolve
+  )
 
 // Signed OUT, and taken FIRST. The signed-in context redirects away from
 // /login so the form never appears there; and signing in for everything else
@@ -705,11 +717,21 @@ const main = async () => {
   }
 
   await login(page)
-  const { ws, run, complete } = await findHeroRun(page)
-  console.log(
-    `  hero: workspace ${ws} run ${run}` +
-      (complete ? '' : '  (WARNING: this run has no cost estimate — re-run seed.py)')
-  )
+
+  // Resolve the hero only if something SELECTED needs it. `--only admin-audit-log`
+  // on a dev stack with no demo estate is a legitimate run, and it used to die
+  // here on a precondition that shot does not have.
+  const heroWanted = [...shots, ...phoneShots].some((s) => wanted(s.name) && s.needsHero)
+  let ws, run, complete
+  if (heroWanted) {
+    ;({ ws, run, complete } = await findHeroRun(page))
+    console.log(
+      `  hero: workspace ${ws} run ${run}` +
+        (complete ? '' : '  (WARNING: this run has no cost estimate — re-run seed.py)')
+    )
+  } else {
+    console.log('  hero: not needed by the selected shot(s)')
+  }
 
   // The Next.js dev-mode badge is not part of the product and reads as
   // "captured from a hot-reload dev server". Hidden rather than depended on,

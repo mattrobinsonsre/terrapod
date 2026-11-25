@@ -19,7 +19,6 @@ from terrapod.services.vcs_provider import (
     OpenPullRequests,
     PRComment,
     PRMergeResult,
-    PRReview,
     PullRequest,
     RepositoryListing,
     RepositoryRef,
@@ -948,39 +947,6 @@ async def list_pr_comments_typed(
                 author_user_id=str(author.get("id", "")),
                 created_at=n.get("created_at", ""),
                 updated_at=n.get("updated_at", ""),
-            )
-        )
-    return out
-
-
-async def list_pr_reviews(
-    conn: VCSConnection, owner: str, repo: str, mr_number: int
-) -> list[PRReview]:
-    """Approvals on a GitLab MR, expressed as PRReview entries.
-
-    GitLab approvals aren't event-like (no list of individual review
-    submissions) — they're a snapshot. We synthesise one PRReview per
-    current approver so the consumer can count them; `submitted_at` is
-    left blank because the snapshot doesn't tell us when each approval
-    landed.
-    """
-    api = _api_url(conn)
-    project = _project_path(owner, repo)
-    resp = await _gitlab_request(
-        "GET",
-        f"{api}/projects/{project}/merge_requests/{mr_number}/approvals",
-        conn,
-    )
-    resp.raise_for_status()
-    out: list[PRReview] = []
-    for a in resp.json().get("approved_by", []):
-        u = a.get("user") or {}
-        out.append(
-            PRReview(
-                id=str(u.get("id", "")),
-                state="approved",
-                author_login=u.get("username", ""),
-                submitted_at="",
             )
         )
     return out

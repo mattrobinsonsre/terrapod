@@ -56,6 +56,7 @@ All filters are optional and use JSON:API query parameter syntax:
 | Parameter | Description |
 |---|---|
 | `filter[actor]` | Filter by actor email (exact match) |
+| `filter[actor-login]` | Filter by VCS login (exact match). A `vcs_user` entry carries a login and an **empty** `actor-email` by design, so `filter[actor]` can never reach one |
 | `filter[resource-type]` | Filter by resource type (exact match) |
 | `filter[action]` | Filter by HTTP method (exact match) |
 | `filter[since]` | Entries after this timestamp (ISO 8601) |
@@ -78,6 +79,19 @@ filter[action]=POST&\
 page[size]=50" \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+```bash
+# Everything a VCS identity did, by its provider login
+curl "https://terrapod.local/api/v1/admin/audit-log?\
+filter[actor-login]=octocat&\
+page[size]=50" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+The two actor filters are **ANDed**, like every other pair here, so sending both
+with the same value matches nothing: no entry carries both an `actor-email` and
+an `actor-login`. Pick the one the value belongs to — which is what the audit
+log's own **Actor Kind** selector does.
 
 ### Response
 

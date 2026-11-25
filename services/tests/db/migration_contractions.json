@@ -50,6 +50,9 @@
     "drop_column(inventory_ignore_paths)",
     "drop_column(inventory_include_platform)"
   ],
+  "a0735f81e9d2_drop_pr_session_review_cursor": [
+    "drop_column(pr_sessions, last_processed_review_id)"
+  ],
   "a0b6c95a281d_audit_dual_actor": [
     "alter_column(audit_logs, action)"
   ],

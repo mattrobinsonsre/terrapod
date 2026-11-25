@@ -71,12 +71,28 @@ def repo_scope(conn: Any, repo: str) -> str:
     return f"{conn.provider}:{_server(conn)}:{normalise_repo(repo)}"
 
 
+#: `{...}` is a Redis hash tag: in cluster mode only the tagged part decides the
+#: slot, so tagging the shared `scope:pr_number` puts the evaluation hash and the
+#: head hash in the SAME slot. `store_all` writes both in one MULTI/EXEC, and
+#: without this they hash to different slots and every write is refused with
+#: `ClusterCrossSlotError` -- which is not a degraded mode but a total one, because
+#: the handler deletes the half-written key by design, leaving an empty evaluation
+#: that `evaluation_from_fields` reports as `complete=False` for ever. The
+#: aggregate statuses then sit at "Evaluating affected workspaces" permanently on
+#: every pull request. Single-node Redis is unaffected, which is why dev, CI, Tilt
+#: and the eval stack all show the feature working (#2708).
+#:
+#: The alternative was `transaction=False`, and it is worse: `store_all` relies on
+#: atomicity to keep no half record, and says so at its own rollback.
+#:
+#: Neither provider permits a brace in an owner, repository or server name, so the
+#: tag cannot be truncated by a `}` arriving from the scope.
 def evaluation_key(scope: str, pr_number: int, head_sha: str) -> str:
-    return f"tp:vcs_pr_eval:{scope}:{pr_number}:{head_sha}"
+    return f"tp:vcs_pr_eval:{{{scope}:{pr_number}}}:{head_sha}"
 
 
 def head_key(scope: str, pr_number: int) -> str:
-    return f"tp:vcs_pr_head:{scope}:{pr_number}"
+    return f"tp:vcs_pr_head:{{{scope}:{pr_number}}}"
 
 
 class Stored(NamedTuple):

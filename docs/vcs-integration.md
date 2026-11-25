@@ -136,13 +136,26 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
    | Permission | Access | Purpose |
    |---|---|---|
    | **Contents** | Read-only (read & write if using apply-then-merge auto-merge — see [VCS Workflows](vcs-workflows.md)) | Download repository archives; auto-merging a PR creates a commit on the target branch |
-   | **Metadata** | Read-only (auto-selected) | Repository metadata |
-   | **Checks** | Read & write | Post check runs on commits |
+   | **Metadata** | Read-only (auto-selected) | Repository metadata; also what the comment commands' push-access check reads |
    | **Commit statuses** | Read & write | Post plan/apply status to commits |
    | **Pull requests** | Read & write | Post and update PR comments, read mergeability state |
    | **Issues** | Read & write (only if using apply-then-merge) | Receive and post PR comments — GitHub serves PR comments through the Issues API |
 
    ![GitHub App Permissions](images/github-app-permissions.png)
+
+   > **One row of the screenshot above is stale.** It still shows **Checks:
+   > Read and write** selected. Do not grant it — the table is the
+   > authoritative list, and a release before this one asked for `Checks`
+   > without ever using it.
+
+   **The table is the whole of it, and it is checked.** Terrapod reports back
+   with **commit statuses**, never [check
+   runs](https://docs.github.com/en/rest/checks/runs): no code path creates
+   one, so `Checks` bought nothing and we stopped asking for it. If you granted
+   it for an earlier release, set it back to **No access** — nothing changes.
+   `scripts/docs-audit/check_vcs_app_permissions.py` holds this table to the
+   endpoints the code calls, in both directions, so a permission nobody
+   exercises fails the build and so does a call this table does not ask for.
 
    These permissions also cover [workspace autodiscovery](autodiscovery.md). No App reinstall is needed if you enable autodiscovery later — `Contents: read` and `Pull requests: read & write` are what the autodiscovery scanner uses.
 
@@ -640,6 +653,35 @@ Without `external_url`, commit statuses are still posted but without clickable l
 
 The [aggregate statuses](#aggregate-statuses) use the same commit-status call, so they need no additional GitHub App permission or token scope, and nothing is read from the repository's branch-protection settings.
 
+Terrapod posts **commit statuses** on both providers and nothing else. It does
+not create GitHub [check runs](https://docs.github.com/en/rest/checks/runs), and
+it does not use GitLab [external status
+checks](https://docs.gitlab.com/user/project/merge_requests/status_checks/) --
+those are a different mechanism, configured per project in GitLab rather than by
+the integration, and GitLab badges that page **Tier: Ultimate**. Neither is
+implemented, so neither needs a permission or a scope.
+
+#### Adding a permission later is not free
+
+This matters before any feature is designed around a permission that is not in
+the table above, so it is recorded here rather than discovered during one.
+**Documentation-derived, from GitHub's own page on [approving updated
+permissions](https://docs.github.com/en/apps/using-github-apps/approving-updated-permissions-for-a-github-app);
+we have not run the experiment against a real installation.** GitHub states that
+new permissions need per-installation approval, and that until somebody with
+admin on that account grants it, *"the GitHub App will still retain its current
+permissions"* and *"may not function as expected"*.
+
+So a permission added to the App does not reach an existing installation on
+upgrade. A feature built on one has to keep working — degraded, and saying so —
+on every installation that has not re-approved. Two pieces of work would need a
+new permission and neither is built:
+
+| Work | Permission | Why it is not in the table |
+|---|---|---|
+| Read a branch's **required status checks**, so the apply gate could tell a self-inflicted block from a real one | Repository **administration** | Not needed: the apply gate is made self-reference-safe by [`apply_is_required_check`](vcs-workflows.md#requiring-terrapodapply) instead, which costs no permission |
+| Resolve **team membership**, for an approver list that names teams rather than logins | Organization **members** | Nothing reads team membership today. `actor_has_push_access` deliberately answers from the collaborator-permission endpoint, which needs only `Metadata: read` |
+
 ### Status Mapping
 
 This is the mapping for the per-workspace `terrapod/<workspace>` status of one run. The aggregate statuses are mapped separately, [below](#aggregate-statuses).
@@ -694,7 +736,8 @@ api:
 | `api.config.vcs.commit_statuses.enabled` | `true` | Post the aggregate statuses at all. `false` turns off everything that serves them, see [Turning the aggregates off](#turning-the-aggregates-off) |
 | `api.config.vcs.commit_statuses.plan_name` | `terrapod/plan` | Context of the aggregate plan status |
 | `api.config.vcs.commit_statuses.policy_name` | `terrapod/policy` | Context of the aggregate policy status |
-| `api.config.vcs.commit_statuses.apply_name` | `terrapod/apply` | Context of the aggregate apply status. Do not require it in branch protection |
+| `api.config.vcs.commit_statuses.apply_name` | `terrapod/apply` | Context of the aggregate apply status. Requiring it in branch protection needs the next row set as well |
+| `api.config.vcs.commit_statuses.apply_is_required_check` | `false` | Set it when `apply_name` really is a required check on GitHub, so the apply-then-merge gate stops refusing on a block its own pending status caused. GitHub only, and ignored while `enabled` is `false`. See [Requiring `terrapod/apply`](vcs-workflows.md#requiring-terrapodapply) |
 | `api.config.vcs.commit_statuses.per_workspace` | `true` | Also post the per-workspace `terrapod/<workspace>` status for pull-request runs. See [the per-workspace switch](#the-per-workspace-switch) |
 
 A name must be 1 to 255 characters with no leading or trailing whitespace and no control characters, and the three names must differ. The chart's values schema rejects a bad name when you run `helm lint` or `helm template`, and the API refuses to start with one. **Renaming a status leaves the old context on commits that already have it**; see [Branch protection](vcs-workflows.md#renaming-a-status).

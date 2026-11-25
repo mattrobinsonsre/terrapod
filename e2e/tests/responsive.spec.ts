@@ -1347,6 +1347,68 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('the audit log fits a phone, and the VCS badge survives the reflow (#2701)', async ({
+    page,
+  }) => {
+    // The actor-type badge and the actor-kind select are the two things #2701
+    // added. Both have to hold up here: the badge is useless if it is in a
+    // column a phone hides, and the filter grid grew from five fields to six.
+    //
+    // There is no API to write an audit entry, so the actor types are stubbed.
+    // The filter form below is the real page driving the real route.
+    await page.route('**/api/terrapod/v1/admin/audit-log**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: [
+            {
+              id: '44444444-4444-4444-4444-444444444444',
+              type: 'audit-log-entries',
+              attributes: {
+                timestamp: '2026-01-01T00:00:00Z',
+                'actor-email': '', 'actor-type': 'vcs_user',
+                'actor-login': 'resp-vcs-login', 'actor-id': '77',
+                origin: 'pr_comment', 'actor-ip': '10.0.0.1',
+                action: 'apply', 'resource-type': 'workspaces',
+                'resource-id': 'ws-resp', 'status-code': 200,
+                'request-id': 'r1', 'duration-ms': 12, detail: '',
+              },
+            },
+          ],
+          meta: { pagination: { 'current-page': 1, 'page-size': 20, 'total-count': 1, 'total-pages': 1 } },
+        }),
+      })
+    );
+
+    await page.goto('/admin/audit-log');
+    await expect(page.locator('h1:has-text("Audit Log")')).toBeVisible({ timeout: 15_000 });
+
+    // The actor column is never hidden behind a breakpoint, so the badge is
+    // legible on a phone. `visible: true` because the table hides its Resource
+    // ID and Duration columns at this width -- a bare locator can match one of
+    // those cells and then assert a hidden element is visible.
+    const badge = page.getByTestId('actor-type-badge').filter({ visible: true }).first();
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText('VCS');
+    await expectNoHorizontalPageScroll(page);
+
+    // Both actor controls are reachable with a thumb: the grid collapses to one
+    // column, so the select is a full-width control rather than a sliver.
+    const kind = page.locator('#f-actor-kind');
+    await expect(kind).toBeVisible();
+    const box = await kind.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(32);
+    const vw = page.viewportSize()!.width;
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(vw);
+
+    await kind.selectOption('login');
+    await page.fill('#f-actor', 'resp-vcs-login');
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('touch: both a reversible toggle and an irreversible delete prompt confirm()', async ({ page }) => {
     // #719 two-tier confirm policy, coarse-pointer half. On touch EVERY mutation
     // prompts: tier-2 (toggle) — which on a precise pointer would NOT — and

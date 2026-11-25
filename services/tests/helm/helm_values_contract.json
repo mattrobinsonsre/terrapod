@@ -301,6 +301,7 @@
   "api.config.vault.enabled",
   "api.config.vault.instances",
   "api.config.vault.timeout_seconds",
+  "api.config.vcs.commit_statuses.apply_is_required_check",
   "api.config.vcs.commit_statuses.apply_name",
   "api.config.vcs.commit_statuses.enabled",
   "api.config.vcs.commit_statuses.per_workspace",

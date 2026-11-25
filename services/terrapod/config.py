@@ -2289,7 +2289,22 @@ class CommitStatusConfig(BaseModel):
         default="terrapod/apply",
         description=(
             "Context of the aggregate apply status, posted only when a workspace "
-            "applies before merge. Do not require it in branch protection."
+            "applies before merge. Requiring it in branch protection needs "
+            "apply_is_required_check set too, or the apply deadlocks on itself."
+        ),
+    )
+    apply_is_required_check: bool = Field(
+        default=False,
+        description=(
+            "Set this when you have made the aggregate apply status a required "
+            "check on GitHub. It is a statement about your branch protection, "
+            "which Terrapod cannot read: with it on, the apply-then-merge gate "
+            "stops refusing on GitHub's `blocked` merge state, because before the "
+            "apply the required status is pending and the block is Terrapod's own. "
+            "Merge conflicts and an out-of-date branch still refuse, and the merge "
+            "itself is still the provider's to allow. GitLab has no per-name "
+            "required check, so this does nothing there. Ignored while `enabled` "
+            "is false: nothing is posted to be required."
         ),
     )
     enabled: bool = Field(

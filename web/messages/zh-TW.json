@@ -1781,7 +1781,6 @@
       "load": "載入審計日誌失敗"
     },
     "filters": {
-      "actorEmail": "操作者電子郵箱",
       "actorPlaceholder": "user@example.com",
       "resourceType": "資源型別",
       "resourceTypePlaceholder": "workspaces",
@@ -1790,7 +1789,12 @@
       "since": "起始",
       "until": "截止",
       "clear": "清除",
-      "apply": "應用篩選"
+      "apply": "應用篩選",
+      "actor": "操作者",
+      "actorKind": "操作者類型",
+      "actorKindEmail": "電子郵箱",
+      "actorKindLogin": "VCS 登入名稱",
+      "actorLoginPlaceholder": "octocat"
     },
     "columns": {
       "timestamp": "時間戳",
@@ -1805,6 +1809,11 @@
       "summary": "第 {current} 頁，共 {total} 頁（{count, plural, one {# 個條目} other {# 個條目}}）",
       "previous": "上一頁",
       "next": "下一頁"
+    },
+    "actorType": {
+      "vcsUser": "VCS",
+      "system": "系統",
+      "slackUser": "Slack"
     }
   },
   "adminBinaryCache": {
