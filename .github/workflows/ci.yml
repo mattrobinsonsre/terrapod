@@ -487,6 +487,14 @@ jobs:
       - name: (docs-audit) Outbound calls are retried, or say why not
         run: python3 scripts/docs-audit/check_outbound_retry.py
 
+      # A MULTI/EXEC pipeline spanning two key prefixes is legal on a single-node
+      # Redis and refused on a cluster, so no test this project can run will ever
+      # catch it: CI, Tilt and the eval stack are all single-node, while
+      # ElastiCache Serverless is cluster-mode with no single-node option. Static
+      # is the only place this check can live. Stdlib only. #2708.
+      - name: (docs-audit) No transactional Redis pipeline is cross-slot
+        run: python3 scripts/docs-audit/check_redis_cross_slot.py
+
       # Needs only PyYAML, installed above: the parser's regex is extracted from
       # `pulumi_plugins.py` by `ast` rather than imported, because importing it
       # drags in `settings` and so SQLAlchemy and the rest of the API closure --

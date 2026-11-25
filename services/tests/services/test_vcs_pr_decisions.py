@@ -200,10 +200,37 @@ class TestMerge:
         a = _ws("a")
         await _merge(_pass((a, _pr(), "affected"), completed=[a]))
         key = d.evaluation_key(SCOPE, 7, SHA)
-        assert key == f"tp:vcs_pr_eval:github::org/repo:7:{SHA}"
+        assert key == f"tp:vcs_pr_eval:{{github::org/repo:7}}:{SHA}"
         assert redis.ttls[key] == 7 * 24 * 3600
         assert redis.ttls[d.head_key(SCOPE, 7)] == 7 * 24 * 3600
         assert await d.latest_head(SCOPE, 7) == SHA
+
+    def test_the_two_keys_the_transaction_writes_hash_to_one_slot(self):
+        """`store_all` writes the evaluation hash and the head hash in a single
+        MULTI/EXEC, so on a Redis Cluster they must occupy the SAME slot or every
+        write is refused with `ClusterCrossSlotError`.
+
+        This is asserted against redis-py's own slot function rather than by
+        eyeballing the shared `{...}`, because the hash tag is only the mechanism
+        -- co-location is the property, and a tag that accidentally spanned
+        different content would still look right in the source.
+
+        It cannot be caught by any test that talks to a real Redis here: CI, Tilt
+        and the eval stack are single-node, where a cross-slot MULTI/EXEC is
+        perfectly legal. #2708.
+        """
+        from redis.crc import key_slot
+
+        for scope, pr in (
+            ("github::org/repo", 7),
+            ("github::o/r", 999999),
+            ("gitlab:gl.example:grp/sub/proj", 1),
+        ):
+            ek = d.evaluation_key(scope, pr, SHA)
+            hk = d.head_key(scope, pr)
+            assert key_slot(ek.encode()) == key_slot(hk.encode()), (
+                f"{ek} and {hk} are in different slots, so the transaction cannot execute"
+            )
 
     async def test_the_write_is_one_transaction(self, redis):
         a = _ws("a")
