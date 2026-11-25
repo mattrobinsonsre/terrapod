@@ -441,6 +441,16 @@ jobs:
       - name: (docs-audit) The release trigger admits a pre-release, and lets it hold the badge
         run: python3 scripts/docs-audit/check_release_tag_triggers.py
 
+      # The generated notes' compare base used to be `git describe --tags`, which
+      # answers "the nearest tag of ANY kind" -- and this repository also
+      # publishes Checkov builds, so the notes for `v2.0.0-beta.6` linked
+      # `compare/3.4.4...v2.0.0-beta.6` (#2702). Intermittent, and invisible
+      # because the notes are hand-replaced on every release -- which left a
+      # PRACTICE as the only thing between it and a published wrong link. So the
+      # selection has one producer and this drives it over fixtures.
+      - name: (docs-audit) The notes' compare base is the previous Terrapod release
+        run: python3 scripts/docs-audit/check_release_notes_base.py
+
       # The support window in SECURITY.md is version-relative, so at a MAJOR
       # boundary a line can leave support on a date nobody chose. A line held
       # beyond it is a line plus a SUNSET DATE in `extended-support.json`, and a
@@ -6521,7 +6531,35 @@ jobs:
         run: |
           version="${{ needs.prepare.outputs.version }}"
 
-          prev_tag=$(git describe --tags --abbrev=0 "${version}^" 2>/dev/null || echo "")
+          # NOT `git describe --tags`, which answers "the nearest tag of ANY
+          # kind" -- and this repository also publishes Checkov builds, tagged
+          # `3.4.4` and the like. That command for `v2.0.0-beta.6` returned
+          # `3.4.4`, so the generated notes linked
+          # `compare/3.4.4...v2.0.0-beta.6` and drew their commit list from the
+          # same wrong range (#2702). It is intermittent -- `v2.0.0-beta.7`
+          # answered correctly, because no Checkov tag sat in between -- and the
+          # notes are hand-replaced on every release, so a PRACTICE was the only
+          # thing between that and a published link spanning the wrong range.
+          #
+          # Selected on the Terrapod release pattern instead, by the same
+          # producer the "Latest" badge election below uses: one place that
+          # knows which published versions are ours and which of two is newer.
+          #
+          # `--merged` keeps the ONE good property `git describe` had. It limits
+          # the candidates to tags already in this release's history, so a
+          # release cut from an older line, or an old tag whose pipeline is
+          # re-run long afterwards, cannot take a NEWER release as its base:
+          # v1.10.11 shipped a month after v1.11.0, and over every tag in the
+          # repository it would be the newest thing below v1.11.0. Measured with
+          # it: v1.11.0 -> v1.10.5, which is what `git describe` answered and is
+          # right. Reachability belongs here, in the enumeration, rather than in
+          # the producer -- which stays strings-in, strings-out and so stays
+          # testable against fixtures.
+          #
+          # No `|| echo ""`: this step runs under the default `bash -e` with NO
+          # pipefail, so a failing `git tag` yields empty output rather than
+          # failing the step, and the emptiness branch below is what handles it.
+          prev_tag=$(git tag --list --merged "$version" | scripts/release-versions.sh --before "$version" | tail -1)
 
           if [[ -n "$prev_tag" ]]; then
             range="${prev_tag}..${version}"
@@ -6589,24 +6627,13 @@ jobs:
             {
               gh api "/repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[].tag_name'
               echo "$version"
-            # The optional group admits a pre-release (`v2.0.0-alpha.1`), which
-            # is what lets one hold the badge while it is the newest thing
-            # published. Both ends stay anchored: that is what keeps the Checkov
-            # builder's non-`v` releases out of the comparison, which is the job
-            # the anchors were doing all along.
-            #
-            # `sed 's/-/~/'` on the FIRST dash is what makes `sort -V` agree with
-            # semver, and it is not cosmetic. `sort -V` is Debian version
-            # ordering, where a pre-release suffix sorts AFTER the release it
-            # precedes -- measured identically under GNU coreutils 9.12 and BSD
-            # sort, so it is not a platform quirk. Without the transform
-            # `v2.0.0-alpha.1` beats `v2.0.0`, and the alpha would keep the badge
-            # for ever once 2.0.0 shipped. `~` is the one character that sorts
-            # before nothing, so the substitution restores exactly semver's rule;
-            # it exists only inside this pipeline and never reaches a tag, which
-            # matters because `~` is neither valid semver nor a valid Docker tag.
-            } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$|^v[0-9]+\.0\.0-[0-9A-Za-z.-]+$' \
-              | sed 's/-/~/' | sort -V | tail -1 | sed 's/~/-/'
+            # Filtered and ordered by `scripts/release-versions.sh`, which the
+            # notes' compare base above also uses. The anchored pattern that
+            # keeps the Checkov builder's non-`v` releases out of the
+            # comparison, and the transform that makes `sort -V` put a
+            # pre-release BEFORE the release it precedes, both live there -- in
+            # one place, with the reasoning, so the two selections cannot drift.
+            } | scripts/release-versions.sh | tail -1
           )
           echo "::notice::newest released version is $highest (compared against every release, not a window)"
           if [ "$highest" = "$version" ]; then
