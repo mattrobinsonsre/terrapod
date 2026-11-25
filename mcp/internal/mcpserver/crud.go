@@ -682,7 +682,15 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		}
 		var matches []terrapod.Variable
 		for _, v := range all {
-			if v.Key == in.Key && (in.Category == "" || v.Category == in.Category) {
+			// SameCategory, not ==: the SDK folds `terraform`, `native` and the
+			// retired `pulumi_config` onto one category, and ListVariables reads
+			// the native surface, so `v.Category` is `native`. An agent passing
+			// the primary documented spelling `terraform` -- which this tool's
+			// own field description tells it to -- matched nothing under `==`,
+			// and the tool answered "not found" for a variable that is plainly
+			// there (#2715). The provider has always used the helper; this was
+			// the one consumer comparing by hand.
+			if v.Key == in.Key && (in.Category == "" || terrapod.SameCategory(v.Category, in.Category)) {
 				matches = append(matches, v)
 			}
 		}
