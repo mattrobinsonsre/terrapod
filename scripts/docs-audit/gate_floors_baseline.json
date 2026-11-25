@@ -2,6 +2,9 @@
   "go-terrapod/wire_completeness_test.go": [
     "if len(want) < 4 {"
   ],
+  "mcp/internal/mcpserver/catalog_tools_test.go": [
+    "if len(tools) < 19 {"
+  ],
   "mcp/internal/mcpserver/inventory_tools_test.go": [
     "if len(declared) < 7 {"
   ],
@@ -10,6 +13,9 @@
   ],
   "provider/internal/planmods/sensitive_test.go": [
     "if len(credentialCategories) < 4 {"
+  ],
+  "provider/internal/provider/auto_apply_one_setting_test.go": [
+    "if len(resources) < 20 || len(dataSources) < 5 {"
   ],
   "provider/internal/resources/role/capabilities_plan_test.go": [
     "if len(levels) < 4 {"
@@ -22,12 +28,25 @@
     "if len(tf) < 20 {"
   ],
   "pulumi-provider/schema_test.go": [
+    "if len(res) < 20 || len(ds) < 5 {",
     "if len(reserved) < 10 {"
   ],
+  "scripts/docs-audit/check_action_pins.py": [
+    "MIN_PINS = 10"
+  ],
+  "scripts/docs-audit/check_artifact_deps.py": [
+    "MIN_DOWNLOAD_STEPS = 5"
+  ],
   "scripts/docs-audit/check_backup_prefix_prose.py": [
-    "MIN_SWEPT = 1"
+    "MIN_SWEPT = 1",
+    "MIN_WORKSPACE = 6"
+  ],
+  "scripts/docs-audit/check_ci_pass_wiring.py": [
+    "MIN_NEEDS = 20"
   ],
   "scripts/docs-audit/check_cli_body_claims.py": [
+    "MIN_CATALOGUES = 5",
+    "MIN_CONSUMED = 20",
     "MIN_NOT_CONSUMED = 8"
   ],
   "scripts/docs-audit/check_cli_surface_covered.py": [
@@ -49,25 +68,44 @@
     "MIN_BLOCKS = 5"
   ],
   "scripts/docs-audit/check_docs_audit_wiring.py": [
+    "MIN_GATES = 8",
     "MIN_SHELL_GATES = 3"
+  ],
+  "scripts/docs-audit/check_download_retries.py": [
+    "MIN_DOWNLOADS = 5"
   ],
   "scripts/docs-audit/check_ee_contract.py": [
     "MIN_AGENT_BINARIES = 4",
     "MIN_READERS = 2"
   ],
+  "scripts/docs-audit/check_eval_image_delivery.py": [
+    "MIN_JOBS = 2"
+  ],
+  "scripts/docs-audit/check_extended_support.py": [
+    "MIN_SCENARIOS = 8"
+  ],
   "scripts/docs-audit/check_forced_env.py": [
+    "MIN_FORCED = 4",
     "MIN_SITES = 2"
   ],
   "scripts/docs-audit/check_gate_floors.py": [
     "\"assert len(_STORAGE_LOCATION_CONSUMERS) >= 6\",",
     "\"assert len(pinned) >= 10\",",
-    "'assert len(calls) >= 2, f\"found only {len(calls)}\"',"
+    "#: so `assert len(x) >= 7 # sanity floor` was treated as justified AND dropped",
+    "'assert len(calls) >= 2, f\"found only {len(calls)}\"',",
+    "if _justified([c, \"assert len(mods) >= 7\"], 1):"
   ],
   "scripts/docs-audit/check_ghcr_cleanup.py": [
     "MIN_PACKAGES = 12"
   ],
+  "scripts/docs-audit/check_go_directives.py": [
+    "MIN_MODULES = 7"
+  ],
   "scripts/docs-audit/check_health_flag_codes.py": [
     ""
+  ],
+  "scripts/docs-audit/check_local_action_inputs.py": [
+    "MIN_CALLS = 2"
   ],
   "scripts/docs-audit/check_mirror_consumption.py": [
     "MIN_IMAGES = 10",
@@ -90,11 +128,19 @@
     "MIN_KEYS = 10"
   ],
   "scripts/docs-audit/check_run_task_spec_fields.py": [
+    "MIN_EMITTED = 20",
+    "MIN_SPEC_FIELDS = 20",
     "MIN_TABLE_CHARS = 400"
   ],
   "scripts/docs-audit/check_screenshot_dimensions.py": [
     "MIN_DESKTOP = 20",
     "MIN_PHONE = 2"
+  ],
+  "scripts/docs-audit/check_snapshot_registry.py": [
+    "_MIN_COMMAND_GATES = 3"
+  ],
+  "scripts/docs-audit/check_token_mints.py": [
+    "MIN_SITES = 5"
   ],
   "services/tests/ai_eval/test_offline.py": [
     "assert len(cases) >= 25, f\"expected a substantial generated corpus, got {len(cases)}\""
@@ -108,6 +154,7 @@
   ],
   "services/tests/api/test_autodiscovery_rule_parity.py": [
     "assert len(pairs) >= 8, (",
+    "assert len(paths) >= 5, (",
     "assert len(routes) >= 7, (",
     "if len(reason.strip()) < 20"
   ],
@@ -147,6 +194,12 @@
   "services/tests/api/test_package_cache_uploads.py": [
     "assert len(live) >= 6, f\"only {len(live)} upload routes read off the routers\""
   ],
+  "services/tests/api/test_plan_apply_enforcement.py": [
+    "MIN_CALL_SITES = 10"
+  ],
+  "services/tests/api/test_plan_document_truthfulness.py": [
+    "assert len(statuses) >= 10, ("
+  ],
   "services/tests/api/test_route_contract.py": [
     "assert len(snapshot) > 100"
   ],
@@ -158,6 +211,7 @@
     "assert len(derived) >= 12, ("
   ],
   "services/tests/api/test_tfe_link_prefixes.py": [
+    "MIN_ROUTERS = 15",
     "MIN_STRINGS = 500"
   ],
   "services/tests/api/test_unauthenticated_write_sweep.py": [
@@ -215,6 +269,9 @@
     "assert len(_REFUSED_AS_EMPTY) >= 7",
     "assert len(spellings) >= 200"
   ],
+  "services/tests/helm/test_chart_defaults_match_code.py": [
+    "MIN_COMPARABLE = 200"
+  ],
   "services/tests/helm/test_credentials_are_never_literals.py": [
     "assert len(found) > 10, ("
   ],
@@ -256,6 +313,9 @@
     "assert len(blocks) > 5, f\"too few blocks:\\n{out}\"",
     "assert len(found) >= 10, f\"the matcher stopped matching: {sorted(found)}\"",
     "assert len(theirs) >= 20, f\"only found {len(theirs)} overridden hooks -- wrong class?\""
+  ],
+  "services/tests/runner/test_identity.py": [
+    "assert len(values) >= 15 # at least half the bucket space"
   ],
   "services/tests/runner/test_job_manager_api_refusal.py": [
     "assert len(golden) >= 10, f\"only {len(golden)} scenarios read; the golden moved\""
@@ -303,10 +363,17 @@
     "assert len(claims) >= 5 # Both paths contributed"
   ],
   "services/tests/services/test_orphan_sweep_key_holders.py": [
+    "assert len(found) >= 6, (",
     "assert len(reason.strip()) >= 40, ("
   ],
   "services/tests/services/test_package_cache_pulumi.py": [
     "assert len(seen) > 1, \"a 5xx should have been retried before giving up\""
+  ],
+  "services/tests/services/test_package_cache_upload_coordinates.py": [
+    "assert len(modules) >= 6, f\"only discovered {[m.__name__ for m in modules]}\""
+  ],
+  "services/tests/services/test_package_cache_verification.py": [
+    "assert len(real) >= 6, f\"only discovered {sorted(real)}\""
   ],
   "services/tests/services/test_plan_resource_list.py": [
     "assert len(filler) > 12 * 1024",
@@ -337,6 +404,9 @@
   "services/tests/services/test_summariser_fit.py": [
     "assert len(data) > 200_000 # genuinely over budget",
     "assert skeletons and len(skeletons) < 40 # genuinely a mixture"
+  ],
+  "services/tests/services/test_targeted_hosts_stamp.py": [
+    "assert len(calls) >= 2, f\"found only {len(calls)} stamp call sites; the matcher has drifted\""
   ],
   "services/tests/services/test_vcs_aggregate_post.py": [
     "assert marker.green and marker.count >= 3"
