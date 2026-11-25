@@ -22,6 +22,26 @@ ROOT = pathlib.Path(__file__).resolve().parents[2] / "terrapod"
 #: (module, function) pairs that resolve roles from the assignment tables.
 #: Add to this when a third resolver appears -- and if you are adding a third,
 #: consider whether it should exist at all.
+#:
+#: This list is NOT the gate's whole subject, because it used to be and that was
+#: the hole (#2715): naming the functions we check means a third resolver is
+#: checked by nothing. Sixteen queries over these two tables exist across seven
+#: modules, and this list reached four of them.
+#:
+#: What cannot be derived is which queries resolve a LOGGED-IN identity's
+#: effective roles. The other twelve are admin management and reach queries:
+#: `list_role_assignments`, `list_identities` and `_role_holders` list every
+#: assignment for an operator view and are not identity-scoped at all, while
+#: `set_role_assignments`, `delete_role_assignment` and `bootstrap` address one
+#: specific row by its email AND provider. None of them decides what a session
+#: may do, so `subject_matches` -- which asks "is this assignment unpinned, or
+#: pinned to exactly this `sub`" -- has nothing to say about them.
+#:
+#: So the list stays, and `test_the_resolver_set_is_closed` below holds it to
+#: the tree from the other side: the functions that CALL `subject_matches` must
+#: be exactly these. A third resolver that forgets the predicate is invisible to
+#: any list, but one that uses it and is not listed here now fails, and so does
+#: a listed one that stops using it.
 RESOLVERS = [
     ("api/dependencies.py", "_resolve_user_roles"),
     ("services/sso_service.py", "_load_internal_assignments"),
@@ -99,4 +119,66 @@ def test_both_resolvers_filter_on_the_provider():
     assert not missing, (
         f"These do not filter on provider_name: {missing}. Role assignments are keyed "
         "(provider, email); matching on email alone is GHSA-3m8x-ff8g-7x8c."
+    )
+
+
+def test_the_resolver_set_is_closed():
+    """The functions calling `subject_matches` are exactly `RESOLVERS`.
+
+    `RESOLVERS` is a hand-kept list, so on its own it can only check what it
+    already knows about -- and the defect it exists to prevent (GHSA-3m8x) is a
+    SECOND path becoming the way around a rule applied on the first. This holds
+    the list to the tree from the other side, which is the half a ledger cannot
+    do for itself.
+
+    It catches two things a list cannot. A function that starts using the
+    predicate without being listed here means a third role-resolution path
+    exists and the per-query checks above never looked at it. A listed function
+    that stops using it means a resolver has been gutted while its entry still
+    reads as covered.
+
+    It deliberately does NOT claim to catch a third resolver that never calls
+    the predicate at all -- nothing mechanical can, because "resolves a
+    logged-in identity's roles" is a semantic property. That residue is why the
+    docstring above asks whether a third resolver should exist.
+    """
+    import ast
+
+    found = set()
+    for path in sorted(ROOT.rglob("*.py")):
+        src = path.read_text()
+        if "subject_matches" not in src:
+            continue
+        tree = ast.parse(src)
+        # Both resolvers import it ALIASED -- `subject_matches as
+        # _subject_matches` -- so matching the call by its original name finds
+        # neither of them. Resolve the local name from the import first.
+        local_names = {"subject_matches"}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    if alias.name == "subject_matches":
+                        local_names.add(alias.asname or alias.name)
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.AsyncFunctionDef | ast.FunctionDef):
+                continue
+            for call in ast.walk(fn):
+                if not isinstance(call, ast.Call):
+                    continue
+                name = getattr(call.func, "id", None) or getattr(call.func, "attr", None)
+                if name in local_names:
+                    found.add((str(path.relative_to(ROOT)), fn.name))
+                    break
+
+    expected = {(rel, name) for rel, name in RESOLVERS}
+    extra = sorted(found - expected)
+    missing = sorted(expected - found)
+    assert not extra, (
+        "a function outside RESOLVERS applies the shared subject predicate, so a "
+        "role-resolution path exists that the per-query checks above never read: "
+        f"{extra}. Add it to RESOLVERS (and ask whether it should exist)."
+    )
+    assert not missing, (
+        "a listed resolver no longer applies the shared subject predicate, so its "
+        f"entry reads as covered while the rule is gone: {missing}"
     )
