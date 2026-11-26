@@ -1854,9 +1854,12 @@ JWT shape: the runner knows the literal strings because it wrote them, so this
 cannot mangle a plan that legitimately contains a JWT and cannot miss the token it
 delivered. A redacted occurrence reads `[redacted]`.
 
-That covers the tokens Terrapod minted for the run. It does **not** cover a
-credential of your own that a provider prints, so `TF_LOG` remains what HCP
-Terraform and Terraform Enterprise document it as: a debugging tool that can put
+That covers the tokens Terrapod minted for the run **and every workspace variable
+you marked `sensitive`** — the same mechanism, by the same exact-value matching
+(#2722). It does **not** cover a credential Terrapod never held: one a data source
+reads from a secrets manager, or one generated during the run. So `TF_LOG` remains
+what HCP Terraform and Terraform Enterprise document it as: a debugging tool that
+can put
 sensitive values in logs. Note also that `google`'s `identity_token` and `vault`'s
 `auth_login_jwt.jwt` are not marked sensitive in their schemas, so nothing
 redacts them wherever Terraform surfaces provider configuration — and

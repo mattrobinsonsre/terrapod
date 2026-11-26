@@ -224,7 +224,9 @@ class TestDelivery:
 
     async def test_an_ordinary_vault_variable_is_unchanged(self):
         c = await _claim([_rv("TOKEN", _ref(field="token"))])
-        assert c.attrs["env-vars"] == [{"key": "TOKEN", "value": "TOKEN-V"}]
+        # `sensitive` is True because a vault-sourced value always is -- and it is
+        # what tells the runner to register this value with the log redactor (#2722).
+        assert c.attrs["env-vars"] == [{"key": "TOKEN", "value": "TOKEN-V", "sensitive": True}]
         assert c.attrs["vault-files"] == []
 
     async def test_a_templated_file_and_two_variables_on_one_secret_are_one_read(self):

@@ -39,6 +39,24 @@ from __future__ import annotations
 #: API address, its token, its run id, its phase — is namespaced under it.
 RESERVED_ENV_PREFIX = "TP_"
 
+#: Carries the env-category variable NAMES the API flagged sensitive, from the
+#: listener to the runner, so the runner can register their values with the log
+#: redactor (#2722).
+#:
+#: NAMES, never values. The values reach the container through `secretKeyRef`
+#: precisely so they are absent from the Job spec, and the runner reads each
+#: from its own environment -- so this carries nothing that `kubectl describe`
+#: could not already see.
+#:
+#: A JSON array rather than a delimited list because nothing constrains an env
+#: variable name to exclude a delimiter: `_validated_env_key` refuses the
+#: reserved prefix and says nothing about the rest of the name.
+#:
+#: It lives here, with the prefix, so both ends import one name -- and so it is
+#: reserved by construction: a workspace variable cannot shadow it, and
+#: `exec_subprocess` scrubs the prefix, so it never reaches the engine.
+SENSITIVE_ENV_KEYS_VAR = f"{RESERVED_ENV_PREFIX}SENSITIVE_ENV_KEYS"
+
 
 def is_reserved_env_key(key: str) -> bool:
     """Whether `key` collides with platform plumbing.

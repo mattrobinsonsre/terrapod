@@ -418,6 +418,9 @@
   "services/tests/runner/test_vault_files_introspection.py": [
     "assert len(calls) > 20, \"bite-check: the extractor must see the listener's log calls\""
   ],
+  "services/tests/runner/test_workspace_secret_redaction.py": [
+    "assert len(_REGISTRARS) >= 3"
+  ],
   "services/tests/services/test_agent_pool_service.py": [
     "assert _fingerprint_ttl(cert) >= 60",
     "assert args[1] > 3000"

@@ -3872,7 +3872,15 @@ async def next_run(
             if v.key in vault.values:
                 v.value = vault.values[v.key]
 
-    env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
+    # `sensitive` rides along so the listener can tell the runner WHICH of these
+    # to register with the log redactor (#2722). The runner is sent the names and
+    # reads the values from its own environment, so nothing here puts a value
+    # anywhere it was not already.
+    env_vars = [
+        {"key": v.key, "value": v.value, "sensitive": bool(v.sensitive)}
+        for v in resolved
+        if v.category == "env"
+    ]
     # `hcl` is forwarded so the runner renders the value correctly into the
     # generated terrapod.auto.tfvars (raw HCL expression vs quoted string). All
     # terraform vars — sensitive and not — are delivered uniformly via the
