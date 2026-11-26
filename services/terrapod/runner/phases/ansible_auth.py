@@ -114,7 +114,7 @@ _DEFAULT_CREDENTIALS_DIR = "/tp/credentials"
 #:
 #: `private_key` keeps the default floor on purpose: it arrives as a 0600 file,
 #: which is the control, and it cannot be short.
-_VALUE_SECRET_MIN_LENGTH = 8
+_VALUE_SECRET_MIN_LENGTH = exec_subprocess.SUBSTITUTED_VALUE_MIN_LEN
 
 #: The env var carrying every labelled vault password at once. One variable for
 #: any number of vault IDs: measured against ansible-core 2.18.3, a labelled

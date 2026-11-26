@@ -239,7 +239,7 @@ class TestRecordingCannotHurtTheClaim:
                 )
         assert resp.status_code == 200
         assert json.loads(resp.body)["data"]["attributes"]["env-vars"] == [
-            {"key": "DB_PASSWORD", "value": "p"}
+            {"key": "DB_PASSWORD", "value": "p", "sensitive": True}
         ]
         transition.assert_not_awaited()
         lease_log.warning.assert_called_once()

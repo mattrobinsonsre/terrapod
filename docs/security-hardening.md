@@ -986,6 +986,56 @@ runners:
 
 This schedules runner Jobs on dedicated nodes, isolating them from the control plane.
 
+### Debug logging, and what the redactor can and cannot cover
+
+`TF_LOG` is **not** a reserved variable name, deliberately: HCP Terraform and
+Terraform Enterprise document setting `TF_LOG=TRACE` as a workspace variable as the
+supported way to debug a run, and refusing it would break a migrating user
+following HashiCorp's own runbook to enforce a policy the incumbent does not have.
+
+**The engine is not what leaks.** Measured against OpenTofu, a variable marked
+`sensitive` appears nowhere in its output at `DEBUG` or at `TRACE`, and neither does
+an environment variable's value or even its name. What exposes a secret is a
+**provider** logging its own traffic: `terraform-provider-aws` logs request bodies
+with only narrow redaction, so a secret passed into an AWS API call lands in the
+log. `azurerm`, `google` and `vault` do not (vault will with
+`TERRAFORM_VAULT_LOG_BODY`).
+
+That matters because the run log is readable with **`run:read`**, while **`var:read`**
+masks a sensitive value — so an unredacted leak would be visible one capability
+further out than the value itself.
+
+**What Terrapod redacts from a run log.** Exact values, never a shape, so a plan
+that legitimately contains a JWT or a key-shaped string is never mangled:
+
+| | covered |
+|---|---|
+| a cloud identity token Terrapod minted | yes |
+| a workspace variable marked `sensitive` (`terraform`/`native` or `env`) | yes |
+| a leaf of a sensitive **structured** variable, 8 characters or longer | yes |
+| an Ansible vault password, SSH key material, machine credential | yes |
+| a value a data source reads from a secrets manager | **no** |
+| a value generated during the run | **no** |
+| a secret shorter than 4 characters | **no** |
+
+The last three are not oversights — they are the boundary of the mechanism. Only a
+literal Terrapod delivered can be matched, because matching anything else means
+guessing at shapes, which blanks out legitimate output. A short leaf of a structured
+variable is skipped for the same reason: the operator marked the *object* sensitive,
+not every string in it, so registering a 5-character leaf would strip a word like a
+username from every line of the log.
+
+**So debug logging is still a deliberate choice, not a safe default.** Redaction
+narrows the exposure to secrets Terrapod never saw; it does not remove it. Two
+further switches sit outside it entirely: `TF_LOG_SDK_PROTO_DATA_DIR` writes whole
+RPC payloads to disk rather than to the log stream the redactor filters, and a
+provider's own schema decides whether Terraform treats a field as sensitive at all
+(`google`'s `identity_token` and `vault`'s `auth_login_jwt.jwt` are not marked).
+
+If a workspace needs debug output routinely, treat its run logs as credential
+material: restrict `run:read` on it, and prefer a cloud identity (which Terrapod
+mints per run and can therefore always redact) over a static key in a variable.
+
 ## Object Storage
 
 - **Encryption at rest**: Enable SSE-S3/SSE-KMS (AWS), Azure Storage encryption, or GCS default encryption

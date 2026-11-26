@@ -39,6 +39,7 @@ import os
 import signal
 import stat
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 import structlog
@@ -82,6 +83,7 @@ from terrapod.runner.phases.state import (
     download_state,
     reuse_plan_lock_file,
 )
+from terrapod.runner.reserved_env import SENSITIVE_ENV_KEYS_VAR
 from terrapod.runner.runner_config import RunnerConfig
 
 #: Where the configuration is checked out.
@@ -139,6 +141,164 @@ _OPA_WORK = Path("/tmp/opa")
 
 _UPLOAD_BUDGET_SECONDS = 25  # reserved for artifact uploads at end of grace
 _MIN_CHILD_GRACE_SECONDS = 30
+
+
+def _json_string_leaves(node: object) -> list[str]:
+    """Every string VALUE inside a decoded JSON document. Keys excluded.
+
+    A key is a field name rather than a secret, and registering one would blank
+    the word out of every line that mentions it -- `password` is the obvious
+    example. So only values recurse.
+    """
+    if isinstance(node, str):
+        return [node]
+    if isinstance(node, dict):
+        return [leaf for value in node.values() for leaf in _json_string_leaves(value)]
+    if isinstance(node, list):
+        return [leaf for item in node for leaf in _json_string_leaves(item)]
+    return []
+
+
+def _secret_forms(value: object, *, leaf_floor: int) -> list[str]:
+    """What one sensitive variable could contribute to a provider's own output.
+
+    `leaf_floor` is the length a leaf of a structured value must reach on its own.
+    """
+    if not isinstance(value, str) or not value:
+        return []
+    forms = [value]
+    # A `structured` variable arrives as an HCL expression, and registering the
+    # whole expression cannot match the leaf a provider logs: a value of
+    # `{"user":"u","password":"p"}` reaches a request body as `password=p`, which
+    # the expression as a whole does not appear in. Where the expression is also
+    # valid JSON -- which the common complex-type case is -- its string leaves are
+    # registered too. A non-JSON expression (`[for x in ...]`) keeps the
+    # whole-value form alone, which is the honest best available for it.
+    import json
+
+    try:
+        decoded = json.loads(value)
+    except ValueError:
+        return forms
+    # A bare JSON string decodes to the value again, so it adds nothing.
+    if isinstance(decoded, str):
+        return forms
+    # A leaf is INFERRED where the whole value was DECLARED: the operator marked
+    # the object sensitive, not each string inside it. So a short leaf is far more
+    # likely to be a field value than a credential -- `admin`, a region, a port --
+    # and registering one would blank that word out of every line of the log,
+    # including lines with nothing to do with this variable. A leaf therefore has
+    # to clear the substring floor on its own merits, and the short-credential
+    # tier is deliberately NOT extended to it. The declared value above is
+    # registered either way, so nothing the operator actually marked is lost.
+    forms.extend(leaf for leaf in _json_string_leaves(decoded) if len(leaf) >= leaf_floor)
+    return forms
+
+
+def _sensitive_env_keys(env: Mapping[str, str]) -> list[str]:
+    """The env-category variable names the API flagged sensitive."""
+    log = structlog.get_logger("runner.job_entrypoint")
+    raw = env.get(SENSITIVE_ENV_KEYS_VAR, "")
+    if not raw:
+        return []
+    import json
+
+    try:
+        decoded = json.loads(raw)
+    except ValueError:
+        # Not fatal. A run whose redaction list is unreadable should still run;
+        # what it must not do is run as though the list were empty in silence.
+        log.warning("could not parse the sensitive env key list", var=SENSITIVE_ENV_KEYS_VAR)
+        return []
+    if not isinstance(decoded, list):
+        log.warning("sensitive env key list is not an array", var=SENSITIVE_ENV_KEYS_VAR)
+        return []
+    return [key for key in decoded if isinstance(key, str) and key]
+
+
+def _register_workspace_secrets(env: Mapping[str, str]) -> int:
+    """Register this workspace's own sensitive values with the log redactor.
+
+    Returns how many were registered, for the log line.
+
+    **Why this exists.** The runner's own credentials are protected by
+    MECHANISM -- 0600 files read out-of-band, never an argv or a stdout -- and
+    `exec_subprocess` says in as many words that this is a better guarantee than
+    scrubbing. A workspace variable marked sensitive is the other case, the one
+    the cloud identity token already documents: we hand it to third-party code ON
+    PURPOSE, and a provider prints what it likes. terraform-provider-aws logs
+    request bodies with only narrow redaction (measured, #2047), so a secret
+    passed into an AWS API call is in the log at `TF_LOG=DEBUG` -- which an
+    operator is documented to be able to turn on, and which `reserved_env`
+    deliberately does not refuse.
+
+    The engine itself is NOT the leak, and the distinction decides what this can
+    promise: measured against OpenTofu, a sensitive variable appears nowhere in
+    its output at DEBUG or at TRACE, and neither does an env variable's value or
+    name. Only a provider's own logging exposes one, so this is about what we
+    hand over rather than about verbosity.
+
+    #1934 made redaction the platform's job for Ansible. This is the same
+    principle for every other engine, and it is the whole of what was missing:
+    `exec_subprocess.run` already wraps plan and apply output in a
+    `StreamRedactor`, against a secret set that did not contain these values.
+
+    **Engine- and phase-neutral on purpose.** `register_secret` writes to the
+    module registry every `StreamRedactor` reads, so one call arms a plan, an
+    apply, a Pulumi update and a configure alike. That is why it sits above the
+    per-engine delivery rather than inside it -- the delivery is gated on the
+    engine and this must not be.
+
+    **What it does not promise, and the docs must not either.** Only literals
+    Terrapod delivers can be registered. A value a data source reads from a
+    secrets manager, or one generated during the run, is never ours to know, so
+    this does not make debug logging safe -- it closes the gap where we held the
+    secret all along and scrubbed everything except it.
+    """
+    log = structlog.get_logger("runner.job_entrypoint")
+
+    from terrapod.runner import exec_subprocess
+
+    # Bound once: the same floor decides which leaves are worth registering and
+    # how each form is matched.
+    floor = exec_subprocess.SUBSTITUTED_VALUE_MIN_LEN
+    forms: list[str] = []
+
+    # The vars blob is read here as well as at the delivery below, deliberately
+    # rather than sharing one parse: the delivery is engine-gated and this is
+    # not, so one parse serving both would either arm nothing on a Pulumi run or
+    # write a tfvars file on one.
+    if _VARS_FILE.exists():
+        import json
+
+        try:
+            parsed = json.loads(_VARS_FILE.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as exc:
+            # Not fatal here. The delivery below reads the same file and fails the
+            # run naming it, so failing here as well would report a redaction
+            # problem for what is a delivery problem.
+            log.warning("could not read variables for redaction", error=str(exc))
+            parsed = []
+        if isinstance(parsed, list):
+            for var in parsed:
+                if isinstance(var, dict) and var.get("sensitive"):
+                    forms.extend(_secret_forms(var.get("value"), leaf_floor=floor))
+
+    # Env-category variables. Their values are not on the wire -- they arrive
+    # through `secretKeyRef` -- so the listener sends the NAMES and each value is
+    # read from this process's own environment.
+    for key in _sensitive_env_keys(env):
+        forms.extend(_secret_forms(env.get(key), leaf_floor=floor))
+
+    registered = 0
+    for form in forms:
+        # The substituted-value floor rather than the default: a variable is
+        # interpolated into a provider's request body, so it appears with text
+        # hard against it either side and needs substring matching. The default
+        # floor is chosen for a JWT, which appears as its own token.
+        if exec_subprocess.register_secret(form, min_length=floor):
+            registered += 1
+    return registered
 
 
 def _configure_stdio() -> None:
@@ -834,6 +994,14 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # here, rather than at each.
     engine = os.environ.get("TP_ENGINE", "")
     is_pulumi = engine == "pulumi"
+
+    # Arm the log redactor with this workspace's own sensitive values (#2722),
+    # before anything can exec. Engine-neutral by position: see
+    # `_register_workspace_secrets` for why it is above the delivery below and
+    # not inside it.
+    armed = _register_workspace_secrets(os.environ)
+    if armed:
+        log.info("armed log redaction for workspace secrets", count=armed)
 
     # 4a. Let the Terrapod provider authenticate from inside the run, so a
     # workspace can declare its inventory with the `terrapod_inventory_*`

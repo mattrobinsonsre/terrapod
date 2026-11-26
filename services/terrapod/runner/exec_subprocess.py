@@ -256,6 +256,21 @@ def _split_tail(buf: bytes, *, secrets: tuple[bytes, ...], ceiling: int) -> tupl
 #: a log-hygiene mechanism, and a caller hands over whatever the API returned.
 _MIN_SECRET_LEN = 24
 
+#: The floor a caller passes when its secret is SUBSTITUTED INTO something
+#: longer rather than appearing as its own token -- a password rendered into an
+#: inventory file, a workspace variable interpolated into a provider's request
+#: body. Those need substring matching, which the default floor reserves for 24
+#: characters and up, because a boundary match cannot see a value with text
+#: hard against it either side.
+#:
+#: `services.summary_redaction.MIN_LITERAL_LENGTH` is the same number for the
+#: same reason, and `test_redaction_floors_agree` pins the two together. It is
+#: not imported from there because `docker/Dockerfile.runner` ships three
+#: `services/` modules and that is not one of them -- so one producer per image,
+#: with a gate across the boundary, is the closest thing to one producer that
+#: the minimal image allows.
+SUBSTITUTED_VALUE_MIN_LEN = 8
+
 #: Below THIS, nothing can be done: a one-to-three character token occurs in
 #: ordinary output on its own (`ok`, `id`, `yes`, a single digit), so even a
 #: boundary match would blank out enough of the log to hide the lines an operator

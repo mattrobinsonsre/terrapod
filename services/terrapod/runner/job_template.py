@@ -1,12 +1,13 @@
 """Build K8s Job specs for terraform/tofu plan and apply phases."""
 
 import hashlib
+import json
 import re
 
 from terrapod.config import RunnerConfig
 from terrapod.logging_config import get_logger
 from terrapod.runner.phases.cloud_identity import TOKEN_DIR as OIDC_TOKEN_DIR
-from terrapod.runner.reserved_env import is_reserved_env_key
+from terrapod.runner.reserved_env import SENSITIVE_ENV_KEYS_VAR, is_reserved_env_key
 
 logger = get_logger(__name__)
 
@@ -680,7 +681,7 @@ def build_job_spec(
     phase: str,  # "plan", "apply" or "configure"
     runner_config: RunnerConfig,
     auth_secret_name: str,
-    env_vars: list[dict[str, str]],
+    env_vars: list[dict],
     terraform_vars: list[dict[str, str]],
     execution_hooks: list[dict] | None = None,
     git_auth: list[dict] | None = None,
@@ -852,6 +853,28 @@ def build_job_spec(
             )
         else:
             container_env.append({"name": var["key"], "value": var["value"]})
+
+    # Tell the runner which of those to register with the log redactor (#2722).
+    # NAMES, never values: the values are in the per-run Secret precisely so the
+    # Job spec does not carry them, and the runner reads each from its own
+    # environment -- so this adds nothing `kubectl describe` could not see.
+    #
+    # Reserved keys cannot appear here: the loop above `continue`s on them, so a
+    # variable the platform dropped is never registered for a value the run will
+    # not hold. Emitted only when there is something to say, so an ordinary
+    # workspace spec is byte-identical to before.
+    sensitive_env_keys = [
+        var["key"]
+        for var in env_vars
+        if var.get("sensitive") and not is_reserved_env_key(var["key"])
+    ]
+    if sensitive_env_keys:
+        container_env.append(
+            {
+                "name": SENSITIVE_ENV_KEYS_VAR,
+                "value": json.dumps(sensitive_env_keys, separators=(",", ":")),
+            }
+        )
 
     # Terraform vars (category=terraform) are NOT injected as env vars. They are
     # delivered as a read-only mounted file from the same per-run Secret (volume
