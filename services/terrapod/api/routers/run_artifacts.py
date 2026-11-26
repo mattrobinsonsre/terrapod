@@ -46,7 +46,7 @@ from terrapod.config import settings
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import host_results_service
+from terrapod.services import host_results_service, run_events
 from terrapod.services.plan_resource_list import build_resource_list, strict_sensitive_literals
 from terrapod.services.plan_summary import summarize_plan_json
 from terrapod.storage import get_storage
@@ -197,13 +197,11 @@ async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> No
     try:
         from terrapod.redis.client import RUN_EVENTS_PREFIX, publish_event
 
-        payload = json.dumps(
-            {
-                "event": "log_updated",
-                "run_id": run_id,
-                "workspace_id": workspace_id,
-                "phase": phase,
-            }
+        # The shape comes from `services/run_events.py`, which the service layer
+        # also publishes from -- deferred, because its callers commit much later.
+        # Shared so the two cannot drift (#2720).
+        payload = run_events.log_updated_payload(
+            workspace_id=workspace_id, run_id=run_id, phase=phase
         )
         await asyncio.wait_for(
             publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload),
@@ -254,13 +252,8 @@ async def _publish_run_updated(workspace_id: str, run_id: str, changed: str) -> 
     try:
         from terrapod.redis.client import RUN_EVENTS_PREFIX, publish_event
 
-        payload = json.dumps(
-            {
-                "event": "run_updated",
-                "run_id": run_id,
-                "workspace_id": workspace_id,
-                "changed": changed,
-            }
+        payload = run_events.run_updated_payload(
+            workspace_id=workspace_id, run_id=run_id, changed=changed
         )
         await asyncio.wait_for(
             publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload),

@@ -287,15 +287,46 @@ async def _retire_runs_on_role_change(*, previous: str, role: str) -> None:
     would refuse on demotion), and routing hundreds of rows through it would
     fire a notification and a commit status for each. This is bookkeeping, not
     a lifecycle event.
+
+    **It still has to tell the browser, though** (#2720). That reasoning is about
+    notifications and commit statuses, which are outbound messages to people and
+    to a VCS; an SSE event is neither -- it is the signal that makes an open page
+    re-read a row that just changed. Without it every workspace page and run page
+    showing one of these runs sat on `applying` indefinitely, which is the same
+    symptom as the bug that prompted this, with a rarer cause.
+
+    So the rows are read BEFORE the update, to publish an honest `old_status`: a
+    bulk UPDATE cannot report what it overwrote. One extra SELECT on an operation
+    that happens at a role change is a fair price for an event the UI can act on.
     """
-    from sqlalchemy import update
+    from sqlalchemy import select, update
 
     from terrapod.db.models import Run
     from terrapod.db.session import get_db_session
+    from terrapod.services import run_events
 
-    non_terminal = ("pending", "queued", "planning", "planned", "confirmed", "applying")
+    #: Every state a run can be in that this node would otherwise go on driving.
+    #: `configuring` and `canceling` were missing, so a configure in flight across
+    #: a role change was neither retired nor announced -- it simply stopped being
+    #: reconciled and sat there (#2720). They are exactly `EXECUTING_STATES`'s two
+    #: members that were not already here.
+    non_terminal = (
+        "pending",
+        "queued",
+        "planning",
+        "planned",
+        "confirmed",
+        "applying",
+        "configuring",
+        "canceling",
+    )
     try:
         async with get_db_session() as db:
+            doomed = (
+                await db.execute(
+                    select(Run.id, Run.workspace_id, Run.status).where(Run.status.in_(non_terminal))
+                )
+            ).all()
             result = await db.execute(
                 update(Run)
                 .where(Run.status.in_(non_terminal))
@@ -307,6 +338,14 @@ async def _retire_runs_on_role_change(*, previous: str, role: str) -> None:
                     ),
                 )
             )
+            for run_id, workspace_id, was in doomed:
+                run_events.defer_status_change(
+                    db,
+                    run_id=str(run_id),
+                    workspace_id=str(workspace_id),
+                    old_status=was,
+                    new_status="errored",
+                )
             await db.commit()
             if result.rowcount:
                 logger.warning(

@@ -24,6 +24,7 @@ from terrapod.db.session import get_db_session
 from terrapod.engines import strategy_for
 from terrapod.engines.terraform import TerminalOutcome
 from terrapod.logging_config import get_logger
+from terrapod.services import run_events
 
 logger = get_logger(__name__)
 
@@ -224,7 +225,7 @@ LOG_TAIL_NOTICE = (
 )
 
 
-async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
+async def _persist_live_log_if_missing(db: AsyncSession, run: Run, phase: str) -> None:
     """Promote live-streamed log from Redis to object storage if the runner
     didn't upload its own final log.  This prevents log loss when a Job fails
     before the entrypoint's log upload step (or when the upload itself fails).
@@ -267,6 +268,20 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
             if isinstance(live_data, str):
                 live_data = live_data.encode()
             await storage.put(log_key, LOG_TAIL_NOTICE + live_data)
+            # The upload ROUTE publishes `log_updated` for exactly this reason --
+            # the UI re-fetches a log only when one arrives -- and this
+            # reconciler-side promotion published nothing. It runs for every
+            # terminal outcome including a configure's, so a run whose runner
+            # died before uploading had its tail promoted into storage and left
+            # invisible until a reload (#2720). Deferred, not inline: the
+            # reconciler commits once outside its per-run loop, so an inline
+            # publish here would be the same defect this closed.
+            run_events.defer_log_updated(
+                db,
+                workspace_id=str(run.workspace_id),
+                run_id=run_id,
+                phase=phase,
+            )
             logger.info(
                 "Persisted live log from Redis to storage",
                 run_id=run_id,
@@ -583,7 +598,7 @@ async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
     if run.status == "canceling":
         from terrapod.services import run_service
 
-        await _persist_live_log_if_missing(run, phase)
+        await _persist_live_log_if_missing(db, run, phase)
         await run_service.resolve_canceling_run(db, run, job_status=status)
         return
 
@@ -746,7 +761,7 @@ async def _handle_succeeded(db: AsyncSession, run: Run, outcome: TerminalOutcome
     # So for every Pulumi run this read a Redis key that is never written, found
     # nothing, and silently did nothing: the promote-if-the-runner-did-not-upload
     # safety net has never worked for Pulumi.
-    await _persist_live_log_if_missing(run, _phase_of(run.status))
+    await _persist_live_log_if_missing(db, run, _phase_of(run.status))
 
     # Onboarding discovery (#824 P2): the discovery Job uploaded its artifacts
     # directly to the session; there is no plan to complete. Settle the run
@@ -774,7 +789,7 @@ async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None
     from terrapod.services import run_service
 
     phase = _phase_of(run.status)
-    await _persist_live_log_if_missing(run, phase)
+    await _persist_live_log_if_missing(db, run, phase)
 
     run = await run_service.transition_run(db, run, "errored", error_message=error_message)
 

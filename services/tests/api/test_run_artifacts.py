@@ -1,6 +1,8 @@
 """Tests for runner artifact upload/download endpoints."""
 
+import ast
 import json
+import pathlib
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,6 +11,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.routers import run_artifacts
 from terrapod.db.models import StateVersion
 from terrapod.db.session import get_db
 
@@ -2097,3 +2100,118 @@ class TestTheResolvedInventoryDownload:
 
         assert resp.status_code == 403
         assert "configure" in resp.json()["detail"]
+
+
+class TestTheConfigurePublishesWereUntested:
+    """The two configure-only publishes had no assertion at all (#2720).
+
+    `log_updated` was covered for plan-log and apply-log and not for
+    configure-log; the host-events `run_updated` was covered nowhere. Both routes
+    appeared in the suite only through the token-phase-binding gate, which asserts
+    who may call them rather than what they announce.
+
+    That matters more for a configure than for a plan, because a configure has no
+    `/configure-result` POST: these two events and the terminal transition are the
+    whole of what the browser hears from one.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_configure_log_upload_publishes_log_updated(
+        self, mock_get_storage, mock_publish, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        user = _runner_user(run_id)
+        user.run_phase = "configure"
+        app = _make_app(user, mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/configure-log",
+                content=b"PLAY RECAP *****",
+                headers={**_AUTH, "Content-Type": "text/plain"},
+            )
+
+        assert resp.status_code == 204
+        mock_publish.assert_awaited_once()
+        channel, payload = mock_publish.await_args.args
+        assert channel == f"tp:run_events:{ws_id}"
+        assert json.loads(payload) == {
+            "event": "log_updated",
+            "run_id": str(run_id),
+            "workspace_id": str(ws_id),
+            "phase": "configure",
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.host_results_service")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_host_events_upload_publishes_run_updated(
+        self, mock_get_storage, mock_host_results, mock_publish, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+        # The handler swallows an ingest failure and returns 204 WITHOUT
+        # publishing, so an unmocked ingest would make this pass vacuously.
+        mock_host_results.ingest = AsyncMock(return_value=(3, 11))
+
+        user = _runner_user(run_id)
+        user.run_phase = "configure"
+        app = _make_app(user, mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/host-events",
+                content=b'{"kind":"ok","host":"web1"}\n',
+                headers={**_AUTH, "Content-Type": "application/x-ndjson"},
+            )
+
+        assert resp.status_code == 204
+        mock_publish.assert_awaited_once()
+        channel, payload = mock_publish.await_args.args
+        assert channel == f"tp:run_events:{ws_id}"
+        assert json.loads(payload) == {
+            "event": "run_updated",
+            "run_id": str(run_id),
+            "workspace_id": str(ws_id),
+            "changed": "host-results",
+        }
+
+    def test_this_route_already_commits_before_it_publishes(self) -> None:
+        """Unlike `transition_run` was, `upload_host_events` had the order right.
+
+        Pinned because it is easy to "tidy" the publish above the commit while
+        reading the handler, which would reintroduce #2720 on this route — the
+        browser would refetch and find no host rows.
+        """
+        src = pathlib.Path(run_artifacts.__file__).read_text()
+        fn = next(
+            f
+            for f in ast.walk(ast.parse(src))
+            if isinstance(f, ast.AsyncFunctionDef) and f.name == "upload_host_events"
+        )
+        order = []
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Attribute) and node.func.attr == "commit":
+                    order.append(("commit", node.lineno))
+                elif isinstance(node.func, ast.Name) and node.func.id == "_publish_run_updated":
+                    order.append(("publish", node.lineno))
+        kinds = [k for k, _ in sorted(order, key=lambda t: t[1])]
+        assert kinds == ["commit", "publish"], (
+            f"expected the commit to precede the publish, got {kinds}"
+        )

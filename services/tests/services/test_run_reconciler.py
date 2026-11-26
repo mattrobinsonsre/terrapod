@@ -201,7 +201,7 @@ class TestHandleSucceeded:
         await _handle_succeeded(db, run, _outcome_for(run))
 
         mock_transition.assert_called_once_with(db, run, "planned")
-        mock_persist.assert_called_once_with(run, "plan")
+        mock_persist.assert_called_once_with(db, run, "plan")
 
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
@@ -359,7 +359,7 @@ class TestHandleSucceeded:
 
         mock_transition.assert_called_once_with(db, run, "applied")
         assert ws.locked is True  # not the run's lock to release (#1705)
-        mock_persist.assert_called_once_with(run, "apply")
+        mock_persist.assert_called_once_with(db, run, "apply")
 
     async def _drive_a_failed_post_plan_stage(self, *, tfe: bool):
         """Drive the reconciler's success path into a failed post-plan stage.
@@ -429,7 +429,7 @@ class TestHandleFailed:
 
         mock_transition.assert_called_once_with(db, run, "errored", error_message="Job failed")
         assert ws.locked is True  # not the run's lock to release (#1705)
-        mock_persist.assert_called_once_with(run, "plan")
+        mock_persist.assert_called_once_with(db, run, "plan")
 
 
 # ── _build_failure_message (#430) ─────────────────────────────────────
