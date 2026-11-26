@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.services import run_events
 from terrapod.services.run_service import (
     TERMINAL_STATES,
     VALID_TRANSITIONS,
     _enqueue_ai_plan_summary,
     _publish_run_available,
-    _publish_run_event,
     can_transition,
     cancel_run,
     claim_next_run,
@@ -1056,23 +1056,30 @@ class TestClaimNextRun:
         assert claimed_run.pool_extra_ids == []
 
 
-# ── _publish_run_event ────────────────────────────────────────────────
+# ── run_events.status_change_channels ─────────────────────────────────
 
 
-class TestPublishRunEvent:
-    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
-    async def test_publishes_to_all_three_channels(self, mock_publish):
-        """Run events publish to per-workspace, admin, and workspace list channels."""
-        run = _mock_run(status="planning")
-        workspace_id = run.workspace_id
+class TestStatusChangeChannels:
+    """A status change fans to per-workspace, admin and workspace-list.
 
-        await _publish_run_event(run, "queued", "planning")
+    Asserted on the list itself rather than by patching Redis and counting
+    awaits: the publish moved behind `post_commit` (#2720), so counting awaits
+    inside the transition now measures nothing, and the list is the claim anyway.
+    """
 
-        assert mock_publish.call_count == 3
-        channels = [call.args[0] for call in mock_publish.call_args_list]
-        assert f"tp:run_events:{workspace_id}" in channels
-        assert "tp:admin_events" in channels
-        assert "tp:workspace_list_events" in channels
+    def test_it_is_the_three_channels_in_order(self):
+        channels = run_events.status_change_channels("ws-abc")
+        assert channels == [
+            "tp:run_events:ws-abc",
+            "tp:admin_events",
+            "tp:workspace_list_events",
+        ]
+
+    def test_the_per_workspace_channel_is_scoped_to_the_workspace(self):
+        """The one channel the run detail page reads must carry the id."""
+        a = run_events.status_change_channels("ws-a")[0]
+        b = run_events.status_change_channels("ws-b")[0]
+        assert a != b and a.endswith("ws-a") and b.endswith("ws-b")
 
 
 # ── _publish_run_available ────────────────────────────────────────────
@@ -1161,7 +1168,7 @@ class TestCompletePlan:
         ):
             yield
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_task_service.create_task_stage",
@@ -1177,7 +1184,7 @@ class TestCompletePlan:
         # transition_run was never called → no flush
         _mock_db.flush.assert_not_called()
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_task_service.create_task_stage",
@@ -1192,7 +1199,7 @@ class TestCompletePlan:
         assert result.has_changes is True
 
     @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_task_service.create_task_stage",
@@ -1211,7 +1218,7 @@ class TestCompletePlan:
         result = await complete_plan(_mock_db, run, has_changes=False)
         assert result.status == "applied"
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_task_service.create_task_stage",
@@ -1225,7 +1232,7 @@ class TestCompletePlan:
         result = await complete_plan(_mock_db, run, has_changes=True)
         assert result.status == "confirmed"
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.resolve_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
@@ -1243,7 +1250,7 @@ class TestCompletePlan:
         result = await complete_plan(_mock_db, run, has_changes=True)
         assert result.status == "errored"
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.resolve_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
@@ -1264,7 +1271,7 @@ class TestCompletePlan:
 
 @pytest.mark.usefixtures("_stub_post_plan_stages")
 class TestCompleteApply:
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_service.fire_run_triggers",
@@ -1276,7 +1283,7 @@ class TestCompleteApply:
         assert result.status == "applied"
         _mock_db.flush.assert_not_called()
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_service.fire_run_triggers",
@@ -1555,7 +1562,7 @@ class TestCompletePlanSurvivesADuplicatePost:
         ):
             yield
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     async def test_a_gated_run_still_completes_after_a_duplicate(
         self, _avail, _evt, _mock_db, _stage_none
@@ -1581,7 +1588,7 @@ class TestCompletePlanSurvivesADuplicatePost:
             result = await complete_plan(_mock_db, run, has_changes=True)
         assert result.status == "planned"
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     async def test_the_plan_finished_timestamp_is_not_moved_by_a_retry(
         self, _avail, _evt, _mock_db, _stage_none
@@ -1622,7 +1629,7 @@ class TestCompletePlanRefreshesThePRComment:
         ):
             yield
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_task_service.create_task_stage",
@@ -1638,7 +1645,7 @@ class TestCompletePlanRefreshesThePRComment:
         await complete_plan(_mock_db, run, has_changes=True)
         refresh.assert_awaited_once()
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_task_service.create_task_stage",
@@ -1659,7 +1666,7 @@ class TestCompletePlanRefreshesThePRComment:
             await complete_plan(_mock_db, run, has_changes=True)
         refresh.assert_awaited_once()
 
-    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_events.defer_status_change")
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(
         "terrapod.services.run_task_service.create_task_stage",

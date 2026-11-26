@@ -1980,6 +1980,8 @@ Server-Sent Events stream for real-time workspace updates. The stream emits even
 
 The stream sends `: keepalive` comments every ~1 second. Events are JSON-encoded in `data:` fields. The web UI workspace detail page re-fetches the active tab on receipt of its corresponding event.
 
+**A run event is published only once its transaction has committed**, so a consumer that re-reads the run on receipt is guaranteed to see the change the event describes. Before 2.0 a status event was published from inside the transaction, so a consumer could refetch and read the status the run had just left — permanently, for a configure, because nothing published afterwards to correct it. Note that a transaction's events are all delivered at its commit, so an *intermediate* event may name a status the run has already moved past; re-reading is therefore always at least as current as the event, never behind it.
+
 **Required permission:** `read` on the workspace.
 
 ### Workspace List Events (SSE) (Terrapod Extension)

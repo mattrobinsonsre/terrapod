@@ -111,6 +111,19 @@ async def get_redis_health() -> bool:
 # ── Pub/Sub Helpers ───────────────────────────────────────────────────────
 
 RUN_EVENTS_PREFIX = "tp:run_events:"
+#: Published to by three callers and subscribed to by NOBODY (#2720).
+#:
+#: `run_status_change`, `drift_status_change` and `listener_heartbeat` are fanned
+#: here, the publish sites describing it as the "admin health dashboard" -- a page
+#: that does not exist. `web/src/app/admin/` holds only feature pages, and nothing
+#: in this package calls `subscribe_channel` on it; since every SSE endpoint here
+#: is Python, that makes the channel write-only end to end.
+#:
+#: Kept rather than removed, deliberately and as an open question rather than a
+#: decision: it is Redis pub/sub, so an operator's own tooling may be subscribed,
+#: and whether the dashboard returns is a product call. The cost is one extra
+#: publish per run transition. Recorded here because the real defect was that
+#: nobody could see the situation without deriving it.
 ADMIN_EVENTS_CHANNEL = "tp:admin_events"
 WORKSPACE_LIST_EVENTS_CHANNEL = "tp:workspace_list_events"
 LISTENER_EVENTS_PREFIX = "tp:listener_events:"  # per-pool channel

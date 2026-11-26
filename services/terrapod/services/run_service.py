@@ -34,6 +34,7 @@ from terrapod.services import (
     gitlab_service,
     ha_role,
     pool_set,
+    run_events,
     vcs_mergeability,
     workspace_settings,
 )
@@ -634,7 +635,13 @@ async def start_external_apply(db: AsyncSession, run: Run) -> Run:
     run.apply_started_at = now_utc()
     await db.flush()
     RUNS_TRANSITIONED.labels(from_status="pending", to_status="applying").inc()
-    await _publish_run_event(run, "pending", "applying")
+    run_events.defer_status_change(
+        db,
+        run_id=str(run.id),
+        workspace_id=str(run.workspace_id),
+        old_status="pending",
+        new_status="applying",
+    )
     await _enqueue_notification(run, "applying")
     return run
 
@@ -904,36 +911,6 @@ async def _publish_run_available(run: Run) -> None:
     except Exception as e:
         # Never let SSE publishing break the state machine
         logger.debug("Failed to publish run_available", error=str(e))
-
-
-async def _publish_run_event(run: Run, old_status: str, new_status: str) -> None:
-    """Publish a run status change event via Redis pub/sub for SSE streaming."""
-    try:
-        from terrapod.redis.client import (
-            ADMIN_EVENTS_CHANNEL,
-            RUN_EVENTS_PREFIX,
-            WORKSPACE_LIST_EVENTS_CHANNEL,
-            publish_event,
-        )
-
-        payload = json.dumps(
-            {
-                "event": "run_status_change",
-                "run_id": str(run.id),
-                "workspace_id": str(run.workspace_id),
-                "old_status": old_status,
-                "new_status": new_status,
-            }
-        )
-        # Per-workspace channel (run detail / workspace detail pages)
-        await publish_event(f"{RUN_EVENTS_PREFIX}{run.workspace_id}", payload)
-        # Admin health dashboard
-        await publish_event(ADMIN_EVENTS_CHANNEL, payload)
-        # Workspace list page
-        await publish_event(WORKSPACE_LIST_EVENTS_CHANNEL, payload)
-    except Exception as e:
-        # Never let SSE publishing break the state machine
-        logger.debug("Failed to publish run event", error=str(e))
 
 
 def can_transition(current: str, target: str) -> bool:
@@ -1880,8 +1857,14 @@ async def create_run(
     # Enqueue run:created notification
     await _enqueue_notification(run, "pending")
 
-    # Publish SSE event
-    await _publish_run_event(run, "", "pending")
+    # Published after the commit, not here -- see `services/run_events.py`.
+    run_events.defer_status_change(
+        db,
+        run_id=str(run.id),
+        workspace_id=str(run.workspace_id),
+        old_status="",
+        new_status="pending",
+    )
 
     return run
 
@@ -2016,8 +1999,15 @@ async def transition_run(
         to_status=target_status,
     )
 
-    # Publish SSE event
-    await _publish_run_event(run, old_status, target_status)
+    # Published after the commit, not here. A subscriber that refetches on
+    # receipt must not be able to read the pre-transition row (#2720).
+    run_events.defer_status_change(
+        db,
+        run_id=str(run.id),
+        workspace_id=str(run.workspace_id),
+        old_status=old_status,
+        new_status=target_status,
+    )
 
     # Notify listeners when a run becomes claimable
     if target_status in ("queued", "confirmed") and run.pool_id:
@@ -2702,6 +2692,19 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
         except Exception:
             pass  # Best-effort cleanup
         await db.flush()
+        # The status deliberately stays `applying` here, so the badge is not
+        # wrong -- but the apply phase has ENDED and four columns moved
+        # (`apply_finished_at`, the Job name and namespace, the narrowed limit),
+        # and nothing told the browser. A composite was rescued only by the
+        # configure's own log events arriving about ten seconds later; a composite
+        # whose configure is slow to start showed a finished apply as still
+        # running (#2720).
+        run_events.defer_run_updated(
+            db,
+            workspace_id=str(run.workspace_id),
+            run_id=str(run.id),
+            changed="apply-finished",
+        )
         logger.info(
             "Apply succeeded; awaiting configure claim",
             run_id=str(run.id),

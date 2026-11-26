@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import json
 import pathlib
 
 import pytest
@@ -152,19 +153,33 @@ class TestThePayloadIsUsableByTheClient:
     """`changed` is what lets the page refetch one panel rather than guess."""
 
     @pytest.mark.parametrize(
-        ("helper", "expected"),
-        [("_publish_run_updated", {"event", "run_id", "workspace_id", "changed"})],
+        ("builder", "kwargs", "expected"),
+        [
+            (
+                "run_updated_payload",
+                {"workspace_id": "ws-1", "run_id": "run-1", "changed": "plan-json"},
+                {"event", "run_id", "workspace_id", "changed"},
+            ),
+            (
+                "log_updated_payload",
+                {"workspace_id": "ws-1", "run_id": "run-1", "phase": "configure"},
+                {"event", "run_id", "workspace_id", "phase"},
+            ),
+        ],
     )
-    def test_the_event_carries_what_the_page_keys_on(self, helper, expected):
-        fn = _functions(_module())[helper]
-        keys = {
-            k.value
-            for n in ast.walk(fn)
-            if isinstance(n, ast.Dict)
-            for k in n.keys
-            if isinstance(k, ast.Constant)
-        }
-        assert keys == expected, f"{helper} publishes {sorted(keys)}, expected {sorted(expected)}"
+    def test_the_event_carries_what_the_page_keys_on(self, builder, kwargs, expected):
+        """Asserted by CALLING the producer, not by reading a publisher's source.
+
+        It used to walk `_publish_run_updated`'s own dict literal. That broke the
+        moment the shape moved into one producer shared by the inline and deferred
+        paths (#2720) — and the source walk would have reported "publishes
+        nothing" for a publisher that works perfectly, which is the weaker check
+        anyway: this one would catch a key renamed in the builder too.
+        """
+        from terrapod.services import run_events
+
+        keys = set(json.loads(getattr(run_events, builder)(**kwargs)))
+        assert keys == expected, f"{builder} produces {sorted(keys)}, expected {sorted(expected)}"
 
     def test_every_call_site_names_what_changed_with_a_literal(self):
         """A computed `changed` cannot be matched by the page, which compares it
@@ -325,4 +340,112 @@ class TestAHangingRedisCannotStallAnArtifactUpload:
             "publish(es) with no timeout -- `publish_event` and "
             "`publish_workspace_event` swallow a failure but cannot swallow a hang, "
             "so these stall the request they ride on:\n  " + "\n  ".join(unbounded)
+        )
+
+
+# ---------------------------------------------------------------------------
+# One producer per run event, and none of them inline (#2720)
+# ---------------------------------------------------------------------------
+#
+# Everything above derives its subject from `run_artifacts.py` and so had no view
+# of `run_service.transition_run`, which is where the run STATUS event is
+# published. That is how #2720 shipped: a gate whose name describes the class,
+# whose subject was one module, and whose defect was in the other one.
+#
+# These derive across the whole package instead. Two properties:
+#
+#   1. each wire shape has ONE producer -- `services/run_events.py`. Two modules
+#      building the same payload is how they come to disagree, and the status one
+#      and the artifact ones were built in different modules before this.
+#   2. the SERVICE layer never publishes inline. An event on the wire before its
+#      transaction commits is one a subscriber can read ahead of, and the service
+#      layer's callers commit late: the reconciler commits once outside its
+#      per-run loop. The router's publishes stay inline on purpose -- an API
+#      handler commits as soon as it returns -- which is why this asserts the
+#      shape is shared rather than that every publish is deferred.
+
+#: The module allowed to build a run event's payload.
+PRODUCER = "terrapod/services/run_events.py"
+
+#: Every wire `event` name that reaches the run detail or workspace page.
+RUN_EVENT_NAMES = ("run_status_change", "run_updated", "log_updated")
+
+#: Service-layer modules that emit run events, and must do so deferred.
+DEFERRING_MODULES = (
+    "terrapod/services/run_service.py",
+    "terrapod/services/run_reconciler.py",
+    "terrapod/services/ha_role.py",
+)
+
+#: Below this the walk has stopped finding emitters and proves nothing.
+#:
+#: A lower bound is deliberately what is meant here, and the other direction is
+#: protected elsewhere: this count GROWING means more events are deferred, which
+#: is the desired direction, while a NEW inline producer -- the thing a floor
+#: could not see -- is caught by `test_no_second_module_builds_a_run_event_payload`
+#: above, which derives its subject from every file in the package. So the only
+#: failure this guards is the AST walk matching nothing after a rename.
+MIN_DEFERRED_CALLS = 5
+
+
+def _package_root() -> pathlib.Path:
+    return pathlib.Path(run_artifacts.__file__).parents[3]
+
+
+def _py_files() -> list[pathlib.Path]:
+    root = _package_root() / "terrapod"
+    return sorted(f for f in root.rglob("*.py") if "__pycache__" not in str(f))
+
+
+class TestOneProducerPerRunEvent:
+    def test_no_second_module_builds_a_run_event_payload(self) -> None:
+        root = _package_root()
+        offenders: dict[str, list[str]] = {}
+        for f in _py_files():
+            rel = str(f.relative_to(root))
+            if rel == PRODUCER:
+                continue
+            text = f.read_text()
+            hits = [n for n in RUN_EVENT_NAMES if f'"event": "{n}"' in text]
+            if hits:
+                offenders[rel] = hits
+        assert offenders == {}, (
+            f"a run event payload is built outside {PRODUCER}: {offenders}. "
+            "Two producers of one wire shape is how they come to disagree — use "
+            "`run_events.<name>_payload(...)` or `run_events.defer_<name>(...)`."
+        )
+
+    def test_the_producer_really_builds_them_all(self) -> None:
+        """A floor: a rename must not make the test above pass on nothing."""
+        text = (_package_root() / PRODUCER).read_text()
+        missing = [n for n in RUN_EVENT_NAMES if f'"event": "{n}"' not in text]
+        assert missing == [], f"{PRODUCER} no longer builds: {missing}"
+
+
+class TestTheServiceLayerNeverPublishesInline:
+    def test_every_service_emitter_defers(self) -> None:
+        root = _package_root()
+        bad: dict[str, int] = {}
+        total = 0
+        for rel in DEFERRING_MODULES:
+            tree = ast.parse((root / rel).read_text())
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                if isinstance(fn, ast.Attribute) and fn.attr in (
+                    "publish_event",
+                    "publish_workspace_event",
+                ):
+                    bad[rel] = bad.get(rel, 0) + 1
+                if isinstance(fn, ast.Attribute) and fn.attr.startswith("defer_"):
+                    total += 1
+        assert bad == {}, (
+            f"the service layer publishes a run event inline: {bad}. These modules' "
+            "callers commit late — the reconciler commits once outside its per-run "
+            "loop — so an inline publish is readable ahead of its own row (#2720)."
+        )
+        assert total >= MIN_DEFERRED_CALLS, (
+            f"only {total} deferred publish call(s) across {len(DEFERRING_MODULES)} "
+            f"modules; expected at least {MIN_DEFERRED_CALLS}"
         )

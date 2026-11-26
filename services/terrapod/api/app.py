@@ -59,6 +59,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await init_redis()
     logger.info("Redis initialized")
 
+    # Deferred side effects (#2720). Attached AFTER Redis, because everything it
+    # defers publishes to it, and BEFORE anything can transition a run -- the
+    # listeners are what turn a publish from "inside the transaction, which a
+    # subscriber can read ahead of" into "after the commit it describes".
+    # Unconditional, unlike replication's outbox hooks: run events are not an HA
+    # feature.
+    from terrapod.db import post_commit
+
+    post_commit.install_hooks()
+    logger.info("Post-commit hooks installed")
+
     init_connectors()
     logger.info("Auth connectors initialized")
 

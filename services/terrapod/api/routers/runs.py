@@ -83,6 +83,7 @@ from terrapod.services import (
     inventory_resolve,
     plan_graph_service,
     pool_set,
+    run_events,
     run_service,
     variable_service,
     workspace_settings,
@@ -4670,13 +4671,12 @@ async def upload_log_stream(
 
     # Notify frontend that fresh log data is available
     try:
-        payload = json.dumps(
-            {
-                "event": "log_updated",
-                "run_id": str(run.id),
-                "workspace_id": str(run.workspace_id),
-                "phase": phase,
-            }
+        # The shape comes from `services/run_events.py`, the one producer. This
+        # one stays INLINE: it is the listener's mid-flight chunk upload, whose
+        # whole value is immediacy, and it describes a Redis write that has
+        # already happened rather than a row in this transaction (#2720).
+        payload = run_events.log_updated_payload(
+            workspace_id=str(run.workspace_id), run_id=str(run.id), phase=phase
         )
         await publish_event(f"{RUN_EVENTS_PREFIX}{run.workspace_id}", payload)
     except Exception:

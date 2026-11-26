@@ -57,7 +57,7 @@ class TestThePromotedCopyAnnouncesItself:
         storage = _Storage(already_stored=False)
         a, b = _patches(storage, b"TASK [one]\nPLAY RECAP\n")
         with a, b:
-            await _persist_live_log_if_missing(_run(), "configure")
+            await _persist_live_log_if_missing(MagicMock(), _run(), "configure")
         assert len(storage.put_calls) == 1
         _key, body = storage.put_calls[0]
         assert body.startswith(LOG_TAIL_NOTICE)
@@ -76,7 +76,7 @@ class TestThePromotedCopyAnnouncesItself:
         storage = _Storage(already_stored=False)
         a, b = _patches(storage, "TASK [one]\n")
         with a, b:
-            await _persist_live_log_if_missing(_run(), "configure")
+            await _persist_live_log_if_missing(MagicMock(), _run(), "configure")
         assert storage.put_calls[0][1] == LOG_TAIL_NOTICE + b"TASK [one]\n"
 
 
@@ -87,7 +87,7 @@ class TestItDoesNotTouchACompleteLog:
         storage = _Storage(already_stored=True)
         a, b = _patches(storage, b"TASK [one]\n")
         with a, b:
-            await _persist_live_log_if_missing(_run(), "configure")
+            await _persist_live_log_if_missing(MagicMock(), _run(), "configure")
         assert storage.put_calls == []
 
     async def test_an_empty_snapshot_stores_nothing(self):
@@ -96,7 +96,7 @@ class TestItDoesNotTouchACompleteLog:
         storage = _Storage(already_stored=False)
         a, b = _patches(storage, None)
         with a, b:
-            await _persist_live_log_if_missing(_run(), "configure")
+            await _persist_live_log_if_missing(MagicMock(), _run(), "configure")
         assert storage.put_calls == []
 
 
@@ -111,7 +111,7 @@ class TestItIsStillBestEffort:
 
         a, b = _patches(_Broken(already_stored=False), b"x")
         with a, b:
-            await _persist_live_log_if_missing(_run(), "configure")  # must not raise
+            await _persist_live_log_if_missing(MagicMock(), _run(), "configure")  # must not raise
 
 
 class TestTheCallSitesStillPromote:
@@ -139,5 +139,5 @@ class TestTheCallSitesStillPromote:
         storage = _Storage(already_stored=False)
         a, b = _patches(storage, b"x")
         with a, b:
-            await _persist_live_log_if_missing(run, "configure")
+            await _persist_live_log_if_missing(MagicMock(), run, "configure")
         assert storage.put_calls[0][0] == configure_log_key(str(run.workspace_id), str(run.id))
